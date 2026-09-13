@@ -301,11 +301,31 @@ document.getElementById('log-close-button').addEventListener('click', (e) => {
 
 logToggleButton.addEventListener('click', (e) => {
     e.stopPropagation();
-    setLogOpen(!isLogOpen());
+    const open = !isLogOpen();
+    setLogOpen(open);
+
+    //? The stopPropagation above also hides this click from the downloads panel's
+    //? outside-click listener, so it has to be told - otherwise opening the log left both
+    //? dropdowns open. The reverse direction is closeOtherDropdowns, further up.
+    if (open) window.jimbrainz?.closeDownloads?.();
 });
 
+/*
+ * Judged by where the press BEGAN as well as where it ended. A press inside the log released
+ * outside it - a drag on its title bar, a selection run off the edge - fires its click outside,
+ * and used to close the log. It never came up while the log could be dragged, because the panel
+ * travelled with the pointer; anchored, the pointer leaves it. Reset on every click so a
+ * keyboard click, which has no press, is judged by its target alone. DownloadsPanel does the same.
+ */
+let logPressedInside = false;
+
+document.addEventListener('pointerdown', (e) => {
+    logPressedInside = logControl.contains(e.target);
+}, true);
+
 document.addEventListener('click', (e) => {
-    if (isLogOpen() && !logControl.contains(e.target)) setLogOpen(false);
+    if (isLogOpen() && !logPressedInside && !logControl.contains(e.target)) setLogOpen(false);
+    logPressedInside = false;
 });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && isLogOpen()) setLogOpen(false);

@@ -36,15 +36,25 @@ const PANELS = ['log-window', 'downloads-window', 'candidates-window', 'metadata
   scroll, text you select and buttons you press, and a panel that moves when you try to do any
   of those is worse than one that does not move at all.
 
-  The log had no header until this went in - it was the only panel that did not say what it
-  was, so it gained one rather than being made an exception.
+  Only the two dialogs. The log and downloads panels used to be here too, and it was wrong for
+  them: they are dropdowns, hanging off the button that opened them and sharing its border, and
+  one you could drag across the screen like a tab stopped being attached to anything. They stay
+  anchored now - see ANCHORED.
 */
 const DRAG_HANDLES = {
-    'log-window': '#log-titlebar',
-    'downloads-window': '#downloads-toolbar',
     'candidates-window': '#candidates-header',
     'metadata-window': '#metadata-header',
 };
+
+/*
+  Dropdowns, which resize but never move.
+
+  A dropdown's top edge is glued to its button and, with `right: 0`, so is its right edge.
+  Pulling either would tear it off the button, so only the two free edges resize it - the left
+  and the bottom, and the corner between them. It grows away from its button, never off it, and
+  its CSS anchoring is never replaced with the explicit left/top that freeze() writes.
+*/
+const ANCHORED = new Set(['log-window', 'downloads-window']);
 
 /*
   What inside a title bar is NOT a handle.
@@ -103,7 +113,10 @@ function edgeAt(panel, clientX, clientY) {
     const nearN = clientY - box.top <= EDGE;
     const nearS = box.bottom - clientY <= EDGE + scrollbarY && box.bottom - clientY >= scrollbarY;
 
-    return `${nearN ? 'n' : nearS ? 's' : ''}${nearW ? 'w' : nearE ? 'e' : ''}`;
+    const edge = `${nearN ? 'n' : nearS ? 's' : ''}${nearW ? 'w' : nearE ? 'e' : ''}`;
+
+    //? a dropdown's top and right edges are its anchor, so they are not edges at all here
+    return ANCHORED.has(panel.id) ? edge.replace(/[ne]/g, '') : edge;
 }
 
 /**
@@ -254,14 +267,27 @@ function applySavedSize(panel) {
     const saved = readSizes()[panel.id];
     if (!saved) return;
 
+    const anchored = ANCHORED.has(panel.id);
+
     if (typeof saved.width === 'number' && typeof saved.height === 'number') {
-        panel.style.width = `${Math.min(saved.width, window.innerWidth - 16)}px`;
-        panel.style.height = `${Math.min(saved.height, window.innerHeight - 16)}px`;
+        /*
+          A dropdown grows left and down from its button, so the room it has is from its
+          anchored right edge to the left of the window, and from its top to the bottom - not
+          the window's whole width and height.
+        */
+        const box = panel.getBoundingClientRect();
+        const roomX = anchored ? box.right - 8 : window.innerWidth - 16;
+        const roomY = anchored ? window.innerHeight - box.top - 8 : window.innerHeight - 16;
+
+        panel.style.width = `${Math.min(saved.width, roomX)}px`;
+        panel.style.height = `${Math.min(saved.height, roomY)}px`;
         panel.style.maxWidth = 'none';
         panel.style.maxHeight = 'none';
     }
 
-    if (typeof saved.left === 'number' && typeof saved.top === 'number') {
+    //? A dropdown's position is its button's. One remembered from when they could be dragged
+    //? is ignored rather than restored, so nobody has to clear storage to get it back.
+    if (!anchored && typeof saved.left === 'number' && typeof saved.top === 'number') {
         /*
           Restoring a position means taking the panel out of its CSS anchoring, exactly as a
           drag does - so it goes through freeze() rather than setting left/top on top of a
@@ -327,7 +353,21 @@ function onPointerDown(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    freeze(panel);
+    const anchored = ANCHORED.has(panel.id);
+
+    /*
+      A dropdown keeps its CSS anchoring and only has its size pinned. The size has to be
+      written before max-height goes: the downloads panel is sized by its content up to that
+      cap, and lifting the cap first would snap it to its full content height mid-grab.
+    */
+    if (anchored) {
+        panel.style.width = `${panel.offsetWidth}px`;
+        panel.style.height = `${panel.offsetHeight}px`;
+        panel.style.maxWidth = 'none';
+        panel.style.maxHeight = 'none';
+    }
+
+    else freeze(panel);
 
     const box = panel.getBoundingClientRect();
     const style = getComputedStyle(panel);
@@ -336,6 +376,7 @@ function onPointerDown(event) {
     drag = {
         panel,
         edge,
+        anchored,
         origin,
         startX: event.clientX,
         startY: event.clientY,
@@ -358,9 +399,9 @@ function onPointerMove(event) {
         const { panel, origin, grabX, grabY } = move;
         const wanted = clampToViewport(panel, event.clientX - grabX, event.clientY - grabY);
 
-        //? style.left is offsetParent-relative; the clamp works in viewport coordinates. The
-        //? log and downloads panels are absolute inside their dropdown wrapper, so the two
-        //? are not the same number - see originOf().
+        //? style.left is offsetParent-relative; the clamp works in viewport coordinates, and
+        //? for a panel positioned inside a wrapper the two are not the same number - see
+        //? originOf().
         panel.style.left = `${wanted.left - origin.left}px`;
         panel.style.top = `${wanted.top - origin.top}px`;
         return;
@@ -377,8 +418,8 @@ function onPointerMove(event) {
         return;
     }
 
-    const { panel, edge, origin, startX, startY, startWidth, startHeight, startLeft, startTop,
-            minWidth, minHeight } = drag;
+    const { panel, edge, anchored, origin, startX, startY, startWidth, startHeight, startLeft,
+            startTop, minWidth, minHeight } = drag;
 
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
@@ -403,6 +444,18 @@ function onPointerMove(event) {
     if (edge.includes('n')) {
         height = Math.max(minHeight, startHeight - dy);
         top = startTop + (startHeight - height);
+    }
+
+    /*
+      A dropdown takes the size and nothing else. `right: 0` and its top under the button stay
+      as the CSS set them, so a wider box moves its left edge and a taller one its bottom -
+      which is exactly the edge being dragged. Kept 8px inside the window, because an edge
+      pushed off screen is an edge you can no longer grab to bring back.
+    */
+    if (anchored) {
+        panel.style.width = `${Math.min(width, startLeft + startWidth - 8)}px`;
+        panel.style.height = `${Math.min(height, window.innerHeight - startTop - 8)}px`;
+        return;
     }
 
     panel.style.width = `${width}px`;

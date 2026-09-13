@@ -11,10 +11,18 @@
  */
 export interface JimbrainzBridge {
   /**
-   * Closes the profile and log dropdowns. Set by main.js, called here when the downloads
-   * panel opens - only one of the three should ever be open at a time.
+   * Closes the log dropdown. Set by main.js, called here when the downloads panel opens -
+   * only one of the two should ever be open at a time. (The profile dropdown it also closed
+   * went in v0.5.)
    */
   closeOtherDropdowns?: () => void
+
+  /**
+   * Closes the downloads panel. Set here, called by main.js when the log opens - the other
+   * half of the rule above. The log's toggle stops its click propagating, so the panel's own
+   * outside-click listener never hears it; without this, opening the log left both open.
+   */
+  closeDownloads?: () => void
 
   /**
    * Forces an immediate downloads poll. Set here, called by main.js after enqueueing a

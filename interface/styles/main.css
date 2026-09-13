@@ -2248,10 +2248,12 @@ h3.glow.green{
  * `grab` is the whole affordance - there is no other clue that a panel can be moved, so the
  * cursor has to be the one that says so. The controls inside a title bar keep their pointer
  * cursor, because resize.js refuses to start a drag on them.
+ *
+ * Only the two dialogs move. The log and downloads panels are dropdowns anchored to their
+ * buttons - they resize from their free edges but never move - so their bars get no `grab`
+ * cursor to promise otherwise. See ANCHORED in resize.js.
  * ==========================================================================*/
 
-#log-titlebar,
-#downloads-toolbar,
 #candidates-header,
 #metadata-header {
     cursor: grab;
@@ -2259,8 +2261,6 @@ h3.glow.green{
     user-select: none;
 }
 
-#log-titlebar button,
-#downloads-toolbar button,
 #candidates-header button,
 #metadata-header button {
     cursor: pointer;

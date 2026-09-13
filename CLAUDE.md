@@ -270,6 +270,34 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
 
 ### Panels move as well as resize
 
+- **Only the two DIALOGS move — the Downloads and Log dropdowns are anchored (v0.6.8, asked
+  for).** They were in `DRAG_HANDLES` too, and James could drag them around "like a tab" when
+  they should hang off their button. They are in `ANCHORED` in `resize.js` now: no drag
+  handle, no `grab` cursor, and resizing only from the free edges — `edgeAt()` strips `n` and
+  `e`, because the top is glued to the button and `right: 0` glues the right edge. A resize
+  writes width/height only and never calls `freeze()`, so the CSS anchoring is never replaced
+  by explicit left/top. A position saved from when they could be dragged is IGNORED by
+  `applySavedSize()` rather than restored, so nobody's dropdown is stuck mid-screen from
+  storage. Don't put them back in `DRAG_HANDLES`.
+  - **Anchoring exposed an outside-click bug, fixed alongside.** A press inside a dropdown
+    released outside it fires its click on the common ancestor — outside — so a habitual
+    title-bar drag, or a text selection run off the edge, closed the panel. It never showed
+    while the panels moved, because the pointer stayed on them. Both close handlers
+    (`DownloadsPanel.tsx` and the log's in `main.js`) now also track where the press BEGAN,
+    and reset on every click so a keyboard click is judged by its target alone.
+  - **Verified** in the browser with real pointer drags, transitions disabled (the preview pane
+    paints no frames while hidden, so the open animation sits at `scale(0.98)` and edges measure
+    wrong): toolbar and title-bar drags leave both panels where they were and open; the left
+    edge widened Downloads 520→620 with its right edge fixed at the button; the bottom edge
+    grew both; the top-right corner does nothing; a stale saved `left`/`top` is ignored; a plain
+    click outside still closes.
+  - **Downloads and Log close each other, in BOTH directions.** Opening Downloads always closed
+    the log (`closeOtherDropdowns`), but opening the log left Downloads open: the log's toggle
+    calls `stopPropagation()`, which hides the click from the panel's outside-click listener.
+    The panel now puts `closeDownloads` on the bridge and the log's toggle calls it when it
+    opens. **Verified** with real clicks both ways. The page-level dropdowns (type filter,
+    sort, columns, candidate signals) stop propagation the same way and so still leave
+    Downloads open beside them — not asked for, left alone.
 - **Moving is by a TITLE BAR, never by the whole panel.** These panels are full of lists you
   scroll, text you select and buttons you press; one that slides away when you try any of
   those is worse than one that never moved. `DRAG_HANDLES` names the bar per panel and
