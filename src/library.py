@@ -833,6 +833,17 @@ def _all_values(audio, key: str) -> str:
     return "; ".join(str(v).strip() for v in values if str(v).strip())
 
 
+def named_tags(audio) -> dict[str, str]:
+    """
+    Every DETAIL_TAGS value an opened file carries, the way the track viewer shows them.
+
+    One reading, shared by the viewer and the tag editor's planner, so the genre the viewer
+    shows is exactly the genre an edit is compared against. A preview measured against a
+    different reading of the file than the one on screen would report changes nobody made.
+    """
+    return {key: value for key in DETAIL_TAGS if (value := _all_values(audio, key))}
+
+
 def _plain(value) -> str:
     """
     One raw tag value as text, whatever container it came out of.
@@ -934,7 +945,7 @@ def read_track_details(path: Path) -> dict | None:
     if not bitrate and length and size:
         bitrate = int(size * 8 / length)
 
-    tags = {key: value for key in DETAIL_TAGS if (value := _all_values(audio, key))}
+    tags = named_tags(audio)
 
     return {
         "filename": path.name,

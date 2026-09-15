@@ -29,6 +29,10 @@ async def lifespan(app: FastAPI):
     #? first request in gets the environment's value and the one after it gets the override.
     Config.apply_overrides(app.state.store.stored_settings())
 
+    #? Here rather than in Config.check(), which runs before the overrides exist - an email set
+    #? in the settings tab would otherwise be reported missing on every single restart.
+    Config.report_musicbrainz()
+
     poller_task = asyncio.create_task(
         run_download_poller(app.state.slskd_client, app.state.store)
     )

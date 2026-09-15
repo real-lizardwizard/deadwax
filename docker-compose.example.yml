@@ -56,8 +56,14 @@ services:
       #- SLSKD_URL=http://slskd:5030
       #- SLSKD_APIKEY=your-slskd-api-key
       #
-      # AppName/1.1.1 (github.com/YourUsername)
-      #- MUSICBRAINZ_USERAGENT=
+      # Your email address. MusicBrainz asks every app for a contact, and jimbrainz writes the
+      # rest of its user agent itself, version included: jimbrainz/<version> ( you@example.com ).
+      # An older MUSICBRAINZ_USERAGENT still works - its contact is used - but this replaces it.
+      #- MUSICBRAINZ_EMAIL=you@example.com
+      #
+      # 250 | 500 | 1200 | full - how big a cover jimbrainz saves from the Cover Art Archive.
+      # full is the original upload, often several MB. Also changeable in the settings tab.
+      #- COVER_ART_SIZE=500
       #
       # off | dry_run | copy | move. Starts at dry_run on purpose - organizing is the only
       # thing here that writes to your filesystem, so check the event log looks right before

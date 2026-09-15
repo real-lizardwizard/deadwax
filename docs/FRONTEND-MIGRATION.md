@@ -13,7 +13,8 @@ the how.
 | Downloads panel | **ported**, verified against a running backend with seeded jobs. |
 | Tab shell | **done** — `Tabs.tsx`. Search/Library, built to take Settings as a third. |
 | Metadata editor | **done** — `MetadataEditor.tsx`, an overlay from the library reusing the candidates-window shape. Pick a release *or* type the fields directly; the release the album is already tagged with sorts first and is badged `current`. |
-| Library window | **done** — `LibraryView.tsx` + `src/library.py`. An Explorer-style tree (`LibraryTree.tsx`, `lib/libraryTree.ts`: artist → album → edition → track) beside a details pane (`LibraryDetails.tsx`) with a user-chosen set of track fields. Replaced the one-row-per-album list in v0.6.5. |
+| Library window | **done** — `LibraryView.tsx` + `src/library.py`. An Explorer-style tree (`LibraryTree.tsx`, `lib/libraryTree.ts`: artist → album → edition → track) beside a details pane (`LibraryDetails.tsx`) with a user-chosen set of track fields - reorderable and resizable by their headers since v0.6.9 (`lib/trackFields.ts`). Replaced the one-row-per-album list in v0.6.5. |
+| Tag editor | **done** — `TrackTagEditor.tsx` (v0.6.9), born in Preact rather than ported. Edits tags by hand on one track or every ticked one; only the fields you change are sent (`lib/tagEdit.ts`), and the preview comes from the same planner the write recomputes (`src/track_tags.py`). |
 | Multi-stage Dockerfile | **done** — `ui` stage builds into `interface/dist`. |
 | Cache-header fix | **done** — hashed chunks immutable, entry bundle revalidates. |
 | Everything else | untouched. Vanilla still owns it. |

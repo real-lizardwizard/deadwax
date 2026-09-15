@@ -42,6 +42,8 @@ Python 3.12+ / FastAPI backend, static frontend, SQLite for job state.
 ```
 src/
   config.py        env + validation. describe_slskd_url() explains WHY a URL is unusable.
+                   Also BUILDS the MusicBrainz user agent from MUSICBRAINZ_EMAIL and
+                   __version__ - see "The MusicBrainz user agent" below.
   matching.py      PURE candidate scoring. No I/O. The heart of the project.
   editions.py      PURE. Which edition a release is, in words. See below — it's why the
                    library can hold the deluxe and the standard press at the same time.
@@ -56,9 +58,11 @@ src/
   organizer.py     writes downloads into the library. Plan/execute split, dry_run default.
   retag.py         the metadata manager's write half - applies a chosen release to an album
                    already on disk. Same plan/execute split, for the same reasons.
+  track_tags.py    tags edited BY HAND, on one track or a selection at once. The fourth
+                   writer, and the same plan/execute split again - see "Editing tags by hand".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py, app.py
   routes/          search_musicbrainz, download, monitor_slskd, interface_logs, library,
-                   settings (READ-ONLY by nature - see the decision below)
+                   settings (editable since v0.5.1 - see "The settings tab")
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
                    are ported. main.css styles BOTH halves - see below.
   styles/theme.css THE TOKEN LAYER. Every colour, size, space, radius, shadow, duration and
@@ -68,7 +72,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             403 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             500 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
@@ -159,16 +163,17 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   scoped to what is on screen, so the facets compose with it, and it reports "no cover on the
   Archive" separately from "the request failed" — the first is a fact about the release and
   nothing can be done, the second is worth trying again.
-- **There are now THREE writers to the user's filesystem**, and both use the same plan/execute
-  split: `organizer.py` files downloads in, `retag.py` corrects albums already there, and
-  `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but
-  it re-checks containment at the write rather than trusting the plan, for the same reason the
-  retag endpoint recomputes its own). A
-  preview that disagrees with the write it previews is worse than no preview, so both derive
-  the tags from one shared `organizer.tag_values()` rather than computing them twice. The
-  apply endpoint **recomputes the plan** rather than accepting the previewed one back — a
-  plan is a list of file operations, and taking one over the wire would let a caller name
-  arbitrary paths to write to.
+- **There are now FOUR writers to the user's filesystem**, and all but the smallest use the same
+  plan/execute split: `organizer.py` files downloads in, `retag.py` corrects albums already
+  there, `track_tags.py` writes tags edited by hand (v0.6.9), and `save_cover_art()` writes a
+  single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
+  the write rather than trusting the plan, for the same reason the retag endpoint recomputes its
+  own). A preview that disagrees with the write it previews is worse than no preview, so the
+  first two derive the tags from one shared `organizer.tag_values()` rather than computing them
+  twice, and the hand editor compares against `library.named_tags()` - the same reading of the
+  file the track viewer shows. Every apply endpoint **recomputes the plan** rather than
+  accepting the previewed one back — a plan is a list of file operations, and taking one over
+  the wire would let a caller name arbitrary paths to write to.
 - **MusicBrainz responses are cached in memory, successes only.** One bounded TTL cache for the
   process (`ResponseCache`), shared like the rate limiter and for the same reason: both are
   about what this application asks of MusicBrainz as a whole. It is what makes the review queue
@@ -378,11 +383,14 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   UNTAGGED, which is the common case for any library that predates jimbrainz. The fix has to
   be that the two never resolve to the same name in the first place.
 - **`instrumental`, `acoustic` and `a cappella` are therefore in the edition vocabulary**, and
-  that vocabulary exists in TWO places which must stay in step: `EDITION_PATTERNS` in
-  `matching.py` tags the Soulseek FOLDER being offered, and `EDITION_KEYWORDS` in `main.js`
-  tags the RELEASE you picked. They are scored against each other, so **a marker in only one
-  of them is worse than one in neither** — the release would carry a tag no folder could
-  match.
+  that vocabulary exists in THREE places which must stay in step: `EDITION_PATTERNS` in
+  `matching.py` tags the Soulseek FOLDER being offered, `EDITION_KEYWORDS` in `main.js` tags
+  the RELEASE you picked for a download, and `EDITION_KEYWORDS` in `ui/src/lib/release.ts` tags
+  the release you pick in the metadata editor. The first two are scored against each other, so
+  **a marker in only one of them is worse than one in neither** — the release would carry a tag
+  no folder could match. **The third copy had none of the three markers until v0.6.9**, so
+  applying "Jackpot Juicer (instrumental)" in the editor aimed it at the ordinary album's
+  folder, where it could only be refused as "already exists". `ui/test/tags.sim.cjs` pins it.
 
 ### The mobile layout
 
@@ -571,7 +579,9 @@ full-width album cards (`LibraryAlbumRow`, deleted), whose middle was mostly emp
 - **Field choices have their own storage key** (`jimbrainz-library-fields`) and one writer - the
   details pane's single `useTrackFields` instance, which the menu and the table both read.
   It stores `seen` beside `visible`, so a field added in a later version takes its own default
-  instead of staying hidden for everyone who ever touched the menu. Pinned in the sim.
+  instead of staying hidden for everyone who ever touched the menu. Pinned in the sim. Since
+  v0.6.9 the same key and writer also hold the columns' `order` and `widths` - see "Arranging
+  the track viewer's columns".
 - **The splitter's width is persisted (`jimbrainz-library-pane-width`) and capped in CSS** at
   `100% - 340px`, so a width saved in a big window can't swallow the details in a small one.
 - **What fits on a tree row depends on the TREE's width, not the window's.** `#library-nav` is
@@ -614,16 +624,142 @@ full-width album cards (`LibraryAlbumRow`, deleted), whose middle was mostly emp
   matcher keys on it and files are named after it, which keeps a two-disc set in order inside
   one folder - and `disc`/`disc_position` are MusicBrainz's own. `flattenTracks()` in release.ts
   and `buildExpectedFromRelease()` in main.js both produce them; keep the two in step.
-- **A multi-disc release is tagged per disc; a single-disc release writes no disc tag at all.**
-  Writing "1" everywhere would give every album in the library a discnumber diff, so an album
-  that is already right could never again say "nothing to change". Decided once, in
-  `organizer.tag_values`, which the retag preview shares as always.
+- **A multi-disc release is tagged per disc; a single-disc release writes no disc tag at all -
+  unless the file claims some OTHER disc (v0.6.9).** Writing "1" everywhere would give every
+  album in the library a discnumber diff, so an album that is already right could never again
+  say "nothing to change". But the unconditional rule had a hole James found on Jackpot
+  Juicer: its opening track, "Untitled 2", sat alone on "disc 2" of a one-disc album, and since
+  a single-disc release writes no disc tag, re-applying the right release could never move it
+  back. `tag_values` now takes the file's `current` tags and writes `discnumber=1` only when
+  the file carries a disc number other than 1 ("1/1" and "01" count as 1). Both callers pass
+  the same reading of the same file - `plan_retag` from `read_current_tags`, `write_tags` from
+  the audio it already has open - so the preview still cannot disagree with the write.
+  **How "Untitled 2" got there is not known.** MusicBrainz's group holds a Target-exclusive 2×CD
+  whose disc 2 is the whole album again with "(instrumental)" titles, but the matcher walks the
+  tracklist in order, so disc 1's exact "Untitled 2" claims the file first - pinned in
+  `test_the_instrumental_disc_does_not_claim_the_opening_track`. The files may simply have
+  arrived that way. The fix doesn't depend on knowing.
+- **A missing disc number DISPLAYS as a dimmed 1 (v0.6.9, asked for: "defaults the disc number
+  to 1 if there isn't another value").** It shows "1" in the tertiary grey with a tooltip
+  saying the file carries no disc tag - `TrackField.inferred` is the hook, because a default
+  that looks exactly like a tag is a small lie about what is on disk. Once a track's own
+  details have been read they win outright, even when they say "none": a stale scan must not
+  keep showing a disc number the file no longer has. `disc_count` is unchanged - it counts only
+  TAGGED discs, 0 when none - so the "Disc N" headings are still driven by real tags. The tag
+  editor's disc field shows the same default as its placeholder.
 - **The download request's `Track` model declares `disc` and `disc_position`.** pydantic drops
   undeclared fields without a word, and downloads would have been tagged 1..20 with no discs -
   quietly unlike the same album corrected in the editor. Tested.
 - **The scan reads `discnumber` and orders disc-first**, so a two-disc set stops interleaving
   (1, 1, 2, 2...). `disc_count` counts distinct TAGGED discs - 0 when untagged, never a guessed
   1 - and only `disc_count > 1` is split under "Disc N" headings.
+
+### Editing tags by hand (v0.6.9)
+
+Asked for: "a way to manually edit metadata per-song with a selection option so I can also
+mass-edit". It used to be on the "Deliberately not built" list, as "the metadata editor takes a
+release's tracklist wholesale" - which stays true of the metadata editor. This is a separate
+tool beside it.
+
+- **`src/track_tags.py` is the fourth writer, with the same plan/execute split.**
+  `plan_tag_edits()` reads each named file and reports only what would change;
+  `execute_tag_edits()` writes that and nothing else. `/library/tags/preview` and `/apply` are
+  separate endpoints, and apply RECOMPUTES the plan from the edits, never accepting one back.
+- **A file is named by its bare filename, and must appear in a LISTING of the album's folder.**
+  That is the whole containment story for files: nothing a caller sends is joined onto a path
+  until it has matched an entry that was already there, so `../../etc/passwd` and
+  `Disc 2/01.flac` are refused without ever being resolved. The album path gets the usual
+  `is_within` guard. Tested with the retag's traversal cases plus a symlink.
+- **Only `EDITABLE_TAGS` can be touched**: title, artist, album, album artist, track, disc,
+  date, original date, genre, composer. The MusicBrainz ids are an album's identity and change
+  by applying a release, where the preview can say what that means. The list exists twice -
+  `EDITABLE_TAGS` in Python, `EDIT_FIELDS` in `ui/src/lib/tagEdit.ts` - and
+  `test_the_editable_tags_are_exactly_the_ones_the_dialog_offers` reads the TypeScript to keep
+  them in step.
+- **Only EDITED fields are sent.** A field whose values differ across the selection starts empty
+  and says "several values"; left alone it is in no edit, so each track keeps its own. Sending
+  the form's value for every field would write the shared value - or a blank - over every
+  track. `buildEdits` holds that rule and `tags.sim.cjs` pins it. An edited field left EMPTY
+  removes the tag, and the preview says "removed".
+- **The whole batch is refused if any of it is invalid** - a track number that isn't a number, a
+  date that isn't a date, a file that isn't there - for the settings route's reason: half an
+  edit, with no way to tell which tracks changed, is the worst outcome available. The same bad
+  value sent to eighteen tracks is reported once.
+- **A tag a format can't hold is NAMED, not swallowed.** Easy MP4 has no `originaldate`. The
+  organizer's `write_tags` skips such keys silently, which is right for a bulk tag and wrong for
+  a field somebody typed into. The rest of that file's edit still lands.
+- **Tags only.** No file is renamed and no folder moves - re-filing is the metadata editor's
+  job, and it previews it. Applying marks the album reviewed, as a retag does.
+- **The selection lives in the details pane, per album.** A tick box on every row and a
+  tri-state one in the header; Ctrl/Cmd-click and Shift-click tick (Shift runs a range to the
+  clicked box's NEW state, as a mail client does); Space ticks the focused row; a plain click
+  still opens the track, as it always has. Going to another album clears the ticks and closes
+  the editor, whose files it could no longer see. The editor's file list is FIXED when it
+  opens, so its preview is never recomputed against a selection changing underneath it - and
+  so its effect's dependencies stay stable: a fresh array every render would re-preview forever.
+
+### The MusicBrainz user agent (v0.6.9)
+
+Asked for: "use the current version automatically ... and have the user only set the email".
+
+- **`MUSICBRAINZ_EMAIL` is the setting; the user agent is BUILT, on every call**, as
+  `jimbrainz/<__version__> ( email )` - MusicBrainz's documented shape. Nothing stores the
+  finished string, so the version can't go stale and a contact changed in the settings tab
+  applies at once. `Config.musicbrainz_user_agent()` is the only place it is made.
+- **An old `MUSICBRAINZ_USERAGENT` keeps working.** `contact_from_useragent()` lifts the contact
+  out (the last bracketed part, else a token with `@` or `://`) and the name and version are
+  rebuilt around it, so an install nobody touched starts reporting the version it runs. With no
+  contact to find, it is sent verbatim - it is what the install was already sending, and
+  replacing it with nothing would be worse. The settings tab shows that row only while it is
+  set, or overridden (which has to stay visible to be revertable).
+- **An email that can't go in a header is passed over, not sent.** httpx refuses a non-ASCII
+  header value while building the client, which would fail EVERY MusicBrainz request rather
+  than this one field. `describe_contact()` refuses it on save, along with brackets, spaces,
+  and anything with neither an `@` nor a `.`.
+- **The Cover Art Archive client sets the header PER REQUEST.** It is built once for the
+  process, so a header fixed at construction went on sending the old contact after a settings
+  change - a latent bug with `MUSICBRAINZ_USERAGENT` too.
+- **It is reported from the lifespan, after the overrides are applied** (`report_musicbrainz()`),
+  not from `Config.check()`, which runs before them - an email set in the tab would otherwise
+  be logged as missing on every restart.
+- **Verified against the live API:** the dev `.env`'s hand-written user agent was rebuilt as
+  `jimbrainz/0.6.9 ( dev-test@example.com )`, and MusicBrainz answered 200.
+
+### Cover art size (v0.6.9)
+
+- **`COVER_ART_SIZE`: 250 | 500 | 1200 | full, default 500 - the size it always was.** Asked
+  for as "full-size album art ... maybe make it an option somewhere". A SERVER setting rather
+  than a browser preference, because it decides what is written into the library, which every
+  device should agree on. `full` is the Archive's bare `front`, the original upload and often
+  several MB; when the original isn't an image (the Archive takes PDFs) it falls back to
+  `front-1200`. A 404 is not retried at another size - no cover is a fact about the release.
+- **Settings with a fixed vocabulary carry `choices`** (value -> label), and the tab draws a
+  dropdown for any row that has them. `ORGANIZE_MODE` lost its special case in the component.
+- **The editor says which size it will save**, from `plan.art.size`, which the preview route
+  lays on so that `plan_retag` stays pure. The full-size comparison shows the original whatever
+  the setting, so its save button's tooltip names the size that will actually be saved.
+
+### Arranging the track viewer's columns (v0.6.9)
+
+Asked for: "reorder and resize columns in the library metadata".
+
+- **Drag a header to move its column, drag its right edge to size it**, double-click the edge to
+  give the column its own width back. Reset in the Fields menu restores fields, order and widths.
+- **The order covers EVERY column, hidden ones and the title included**, so a field you hide and
+  show again comes back where you put it. The title moves like any other column but can't hide.
+- **Same key and same single writer as the field choices** (`jimbrainz-library-fields`,
+  `useTrackFields`). `order` is written only once it differs from the default, and `widths` only
+  once there are some, so a later version's defaults still reach anybody who never arranged
+  anything. `reconcileOrder` places a column the saved order has never heard of beside its
+  default neighbour rather than at the end - the order's equivalent of `seen`. Pinned in
+  `tags.sim.cjs`.
+- **A sized column is exactly that many px; the rest keep their `fr` sizes** and share what is
+  left, so widening one narrows its flexible neighbours rather than pushing the table off the
+  side. `min-width` is a `calc()` of the em minimums plus the fixed pixels.
+- **While resizing, the template is written straight onto the table's style** - one write a
+  frame rather than a render of every row - and committed once on release, which renders the
+  same string. Nothing moves until a header drag has travelled 5px, so a click or the start of
+  a right-click never rearranges anything, and only a change of landing spot causes a render.
 
 ### The settings tab
 
@@ -764,11 +900,11 @@ stay; the CRT overlay, the text-glow and the ░▒▓ chrome go.
   `#format-preference-select` rules in main.css are DEAD - that element left with the v0.5
   profile dropdown and exists nowhere in the markup or scripts - so they don't need to stay
   in step with the shared rule; they need deleting when someone next tidies that corner.
-- **Accent is spent, not sprinkled.** Solid purple fills appear on exactly two controls:
-  Search, and the metadata editor's Apply. Apply writes tags to disk and renames a folder
-  with no undo, so it must not look like the Cancel button beside it. Everything purple used
-  to be purple — three accent-coloured boxes sat in the top bar — and when everything is
-  accented the accent marks nothing.
+- **Accent is spent, not sprinkled.** Solid purple fills appear on exactly three controls:
+  Search, the metadata editor's Apply, and the tag editor's Apply (v0.6.9). Both Applies write
+  tags to disk with no undo, so they must not look like the Cancel button beside them.
+  Everything purple used to be purple — three accent-coloured boxes sat in the top bar — and
+  when everything is accented the accent marks nothing.
 
 ## Gotchas discovered the hard way
 
@@ -1137,12 +1273,28 @@ same-origin with the app by design.
   faulthandler dump caught it 25s into importing mutagen. A tool that seems hung here is far
   more often fetching than stuck - check `ps` for CPU before killing it. (The vite hang above was
   NOT this: 0% CPU and parked threads, where a fetch shows I/O.)
-- **The browser preview tool reads `~/Desktop/Code/.claude/launch.json` - the PARENT folder's -
-  not this repo's.** A configuration added to `jimbrainz/.claude/launch.json` is invisible to
-  it. Fixture servers from past sessions (LIBRARY_PATH and DB_PATH pointed at a scratchpad
-  library) live there, and that is the pattern: a throwaway library of real FLACs with real
-  tags, and a throwaway database, so `.devdata` is never touched. The server's port is fixed at
-  8080 in `src/main.py`, so only one runs at a time.
+- **Which `launch.json` the browser preview tool reads depends on the session's working
+  directory.** Sessions started in `~/Desktop/Code` read THAT folder's `.claude/launch.json`;
+  the v0.6.9 session, started in this repo, read `jimbrainz/.claude/launch.json` - and when asked
+  for a name that wasn't in it, it started the plain `jimbrainz` config instead of failing:
+  against the REAL `.devdata` database, with no library. **Check the name `preview_start`
+  reports back before doing anything that writes.** The pattern is otherwise unchanged: a
+  throwaway library of real FLACs with real tags and a throwaway database, both in the
+  scratchpad, so `.devdata` is never touched. The server's port is fixed at 8080 in
+  `src/main.py`, so only one runs at a time.
+- **The `ui/test/*.sim.cjs` scripts fail inside the agent sandbox unless `TMPDIR` points
+  somewhere writable.** They compile TypeScript into `os.tmpdir()`, which the sandbox refuses,
+  and every sim - including ones nothing touched - dies identically, with only Node's version
+  footer on its last line. `TMPDIR=<scratchpad> node ui/test/tags.sim.cjs` and they all pass.
+- **The agent's file tools write a `\u0000`-style escape to disk as the RAW character**, and a
+  NUL in a file's first 8000 bytes makes git store the whole file as binary - GitHub then shows
+  no diff for it at all. `\n` and `\\` survive as typed; only the four-hex-digit `\u` form becomes
+  the character it names. It bit twice in v0.6.9 - the control-character regex in `tagEdit.ts`,
+  then the sim check written to pin that fix - and was caught only because `git diff --stat`
+  said `Bin`. It is probably how `libraryTree.ts` and `tree.sim.cjs` came to be binary already.
+  Nothing else notices, because a raw control character is legal in a JS string or regex and
+  the code runs the same. Write such escapes with a byte-level replace, and look for `Bin` in
+  `git diff --stat` before committing.
 
 ## Known performance problems (profiled, not guessed)
 
@@ -1239,7 +1391,7 @@ the page, and ported panels mount into it via one extra module script.
 
 | ported | still vanilla |
 | --- | --- |
-| Downloads panel, tab shell, library explorer (tree + details pane), metadata editor, metadata queue, delete dialog, cover viewer | search bar, releases grid, filter column, candidates panel, log |
+| Downloads panel, tab shell, library explorer (tree + details pane), metadata editor, metadata queue, delete dialog, cover viewer, tag editor (v0.6.9 - born in Preact) | search bar, releases grid, filter column, candidates panel, log |
 
 **How the two halves coexist:**
 
@@ -1305,7 +1457,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 403 tests
+.venv/bin/python -m pytest tests/ -q  # 500 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1323,6 +1475,7 @@ node ui/test/queue.sim.cjs      # the tab badge and the review queue agreeing on
 node ui/test/downloads.sim.cjs  # the downloads panel's optimistic overlays, incl. the wrong-prediction paths
 node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and relevance-as-no-op
 node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices
+node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -1333,7 +1486,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 403 tests are fixture-driven. **Nothing has ever talked to a real slskd.** The parts most
+All 500 tests are fixture-driven. **Nothing has ever talked to a real slskd.** The parts most
 likely to break on deployment are exactly the parts tests can't reach:
 
 - slskd transfer `state` strings. **This one already came true**: `"Completed, Rejected"` was
@@ -1392,8 +1545,10 @@ A green suite here means the logic is sound, not that it works against real infr
 
 Worth knowing before someone "fixes" one of these:
 
-- **Per-track editing.** The metadata editor takes a release's tracklist wholesale. Files the
-  tracklist doesn't reach keep their own title and number rather than being renumbered.
+- ~~Per-track editing~~ **Built in v0.6.9, because James asked for it** - "a way to manually
+  edit metadata per-song with a selection option so I can also mass-edit". The metadata editor
+  still takes a release's tracklist wholesale, and files it doesn't reach still keep their own
+  title and number; hand edits are a separate tool beside it. See "Editing tags by hand".
 - **Embedding art into the audio.** Only a cover file is written; it's what `find_cover_file()`
   prefers and it's one write instead of one per track.
 - **Undo.** For retag or delete. The preview is the safety net for the first, and the

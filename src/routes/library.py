@@ -13,6 +13,7 @@ from src.metadata_health import ISSUE_TYPES, attach_issues
 from src.organizer import is_within
 from src.api.coverart_endpoint import CoverArtClient
 from src.retag import execute_retag, plan_cover_art, plan_retag, save_cover_art
+from src.track_tags import execute_tag_edits, plan_tag_edits
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
 #? rarely and one at a time, so there is nothing to gain from per-request clients and a
@@ -329,10 +330,15 @@ async def retag_preview(body: RetagRequest):
         raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
 
     try:
-        return await asyncio.to_thread(
+        plan = await asyncio.to_thread(
             plan_retag, body.album_path, body.release.model_dump(),
             Config.LIBRARY_PATH, body.fetch_art,
         )
+
+        #? which size a cover would be fetched at, so the editor can say so. Laid on here rather
+        #? than planned: plan_retag is the pure half, and this is configuration, not a decision.
+        plan["art"]["size"] = Config.COVER_ART_SIZE
+        return plan
 
     except Exception as e:
         logger.error(f"Exception in /retag/preview endpoint: {e}")
@@ -473,6 +479,91 @@ async def fetch_cover_art(request: Request, body: CoverArtRequest):
     except Exception as e:
         logger.error(f"Exception in /art/fetch endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching the cover art: {e}")
+
+
+class TagEdit(BaseModel):
+    #? a bare filename in the album's own folder - anything else is refused, see track_tags
+    filename: str
+    #? a value of null or "" removes that tag; a tag left out is not touched at all
+    tags: dict[str, str | None] = Field(default_factory=dict)
+
+
+class TagEditRequest(BaseModel):
+    #? relative to LIBRARY_PATH, as the scan reports it
+    album_path: str
+    edits: list[TagEdit] = Field(default_factory=list)
+
+
+@router.post("/tags/preview")
+async def tags_preview(body: TagEditRequest):
+    """
+    What editing these tracks' tags by hand would change. Writes nothing.
+
+    Its own endpoint rather than a flag on apply, for the retag preview's reason: it runs while
+    you are still typing, so it must be impossible for it to write anything by accident.
+    """
+    if not Config.LIBRARY_PATH:
+        raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
+
+    try:
+        return await asyncio.to_thread(
+            plan_tag_edits, body.album_path, [edit.model_dump() for edit in body.edits],
+            Config.LIBRARY_PATH,
+        )
+
+    except Exception as e:
+        logger.error(f"Exception in /tags/preview endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Error planning the edit: {e}")
+
+
+@router.post("/tags/apply")
+async def tags_apply(request: Request, body: TagEditRequest):
+    """
+    Write the edited tags, and nothing else: no file is renamed and no folder moves.
+
+    The plan is recomputed here rather than accepted from the client - a plan names files to
+    write, and taking one over the wire would let a caller name any file it liked. The whole
+    batch is refused if any part of it is invalid, since half an edit is worse than none.
+    """
+    if not Config.LIBRARY_PATH:
+        raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
+
+    try:
+        plan = await asyncio.to_thread(
+            plan_tag_edits, body.album_path, [edit.model_dump() for edit in body.edits],
+            Config.LIBRARY_PATH,
+        )
+
+        if plan["source"] is None or plan["problems"]:
+            raise HTTPException(status_code=400, detail="; ".join(plan["problems"]))
+
+        results = await asyncio.to_thread(execute_tag_edits, plan, "apply")
+
+        #? An in-place tag edit doesn't move the folder's mtime, so without this the library
+        #? would go on showing the old values and the edit would look like it had failed - and
+        #? the saved scan would load them straight back in on the next restart.
+        forget_cached_album(plan["source"])
+        await _persist_cache(request)
+
+        #? Editing an album's tracks is looking at it, as applying a release is, so it stops
+        #? being a new import you haven't seen. Its issues stand - see /queue/reviewed.
+        store = _store(request)
+        if store is not None:
+            await store.mark_album_reviewed(body.album_path)
+
+        logger.info(
+            f"edited the tags of {results['written']} file(s) in {body.album_path}",
+            extra={"frontend": True},
+        )
+
+        return {"plan": plan, "results": results}
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Exception in /tags/apply endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Error editing the tags: {e}")
 
 
 class QueueRequest(BaseModel):

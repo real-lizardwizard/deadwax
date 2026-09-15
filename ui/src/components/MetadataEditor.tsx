@@ -837,6 +837,10 @@ export function MetadataEditor(
                 {plan?.art.existing
                   ? 'this album already has a cover; only overwrite it if the new one is better'
                   : 'from the Cover Art Archive, saved into the album folder'}
+                {/* the size is chosen in the settings tab, so say which one this will be */}
+                {plan?.art.size
+                  ? ` — ${plan.art.size === 'full' ? 'at full size' : `at ${plan.art.size} × ${plan.art.size}`}`
+                  : ''}
               </span>
             </label>
 
@@ -989,7 +993,11 @@ export function MetadataEditor(
             onClose={() => setComparingArt(false)}
             action={incomingId ? {
               label: album.art ? 'Replace with this cover' : 'Save this cover',
-              title: 'Write the right-hand cover into the album folder and change nothing else',
+              //? what gets saved is COVER_ART_SIZE, which may not be the full-size image shown here
+              title: 'Write the right-hand cover into the album folder and change nothing else'
+                + (plan?.art.size && plan.art.size !== 'full'
+                  ? ` - saved at ${plan.art.size} × ${plan.art.size}, as the settings tab has it`
+                  : ''),
               busy: savingArt,
               //? only once the right-hand cover has actually loaded - see ArtViewer
               requires: 1,

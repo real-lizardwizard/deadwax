@@ -8,6 +8,14 @@ const EDITION_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
   [/expanded/, 'EXPANDED'],
   [/limited edition/, 'LIMITED'],
   [/special edition/, 'SPECIAL EDITION'],
+  //? Alternate performances - see the long note in src/matching.py. An instrumental has the same
+  //? titles, numbers and count as the album it accompanies, so without a marker it resolves to
+  //? that album's folder. main.js and matching.py carried these; this third copy didn't, so
+  //? applying "Jackpot Juicer (instrumental)" in the editor aimed it at the ordinary album's
+  //? folder, where it could only be refused as "already exists".
+  [/instrumental/, 'INSTRUMENTAL'],
+  [/acoustic/, 'ACOUSTIC'],
+  [/a\s*capp?ella/, 'A CAPPELLA'],
 ]
 
 /**

@@ -50,6 +50,11 @@ export interface ServerSetting {
   overridden: boolean
   /** What reverting would restore. Always null for secrets. */
   env_value: string | null
+  /**
+   * value -> label, for a setting that only takes certain values. Drawn as a dropdown: a text
+   * box would accept anything and then fail on save.
+   */
+  choices?: Record<string, string> | null
 }
 
 export interface SettingGroup {

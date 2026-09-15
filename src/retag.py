@@ -224,8 +224,9 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
     changes = []
     for path in audio_files:
         track = track_by_filename.get(path.name)
-        desired = tag_values(release, track)
+        #? read first: whether a stray disc number needs correcting depends on what is there
         current = read_current_tags(path)
+        desired = tag_values(release, track, current)
 
         differing = {
             key: {"from": current.get(key, ""), "to": value}

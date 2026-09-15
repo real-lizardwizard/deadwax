@@ -829,6 +829,11 @@ export function LibraryView({ active, onNavigate }: Props) {
             /* the server dropped the folder from its scan cache when it wrote the cover, so a
                plain reload picks up the new art_mtime and the URL changes with it */
             onArtFetched={() => void reload(false)}
+            /* the server dropped the album from its scan cache when it wrote the tags, so a plain
+               reload shows them - and it marked the album reviewed, which the badge recounts */
+            onTagsEdited={() => {
+              void reload(false).then(recountBadge)
+            }}
             onSearchArtist={searchArtist}
             onSearchAlbum={searchAlbum}
             onBack={() => setSheetOpen(false)}

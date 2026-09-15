@@ -51,7 +51,7 @@ _Note: if you're an **UnRaid** user like me, ive added a template that can be ma
 
 ### Prerequisites:
 1. a running [slskd](https://slskd.org) instance reachable from this container, with an API key
-2. some public url/email u can put in the MusicBrainz user agent
+2. an email address to give MusicBrainz as a contact (jimbrainz builds the rest of its user agent itself)
 3. docker
 
 ### Environment:
@@ -63,7 +63,7 @@ _Note: if you're an **UnRaid** user like me, ive added a template that can be ma
 
    Mixing them is fine: a setting in ```environment:``` wins over the same one in ```.env```, so you can keep the key in ```.env``` and the rest in compose. jimbrainz logs which source each setting came from when it starts, so you can check it picked up what you expected.
 
-   If you're unsure how to format your MusicBrainz user agent, see [here](https://MusicBrainz.org/doc/MusicBrainz_API/Rate_Limiting).
+   MusicBrainz asks every app to identify itself with a way to contact whoever runs it, and rate limits the ones that don't ([their rules](https://MusicBrainz.org/doc/MusicBrainz_API/Rate_Limiting)). Set `MUSICBRAINZ_EMAIL` to your email address and jimbrainz does the rest: it sends `jimbrainz/<version> ( you@example.com )` with the version it's actually running filled in, so there's nothing to keep up to date when you upgrade. It can be set from the settings tab too. If you wrote a `MUSICBRAINZ_USERAGENT` by hand before this existed, it keeps working — its contact is lifted out and used — and the settings tab says so.
 
 **`SLSKD_URL` has to be reachable from inside this container**, which is not always the address you type into your browser. If slskd is another container on the same docker network, use its service name and internal port — `http://slskd:5030` — rather than your host's IP and published port. It needs the scheme (`http://`) either way; jimbrainz says so specifically if it's missing.
 
@@ -164,9 +164,9 @@ The search box matches song titles as well as artists and albums: type a song an
 <br><br>
 You can arrange it by artist, album, release date or date added, either way round. By artist it's the tree above; the other three list albums directly under headings (a letter, a year, a month), like Windows 7's music library did. "Date added" goes by when jimbrainz first saw an album, or its folder's date if that's earlier, so a library that was there before jimbrainz still sorts sensibly.
 <br><br>
-The track list shows <em>whichever fields you want</em>. A Fields menu (or right-clicking the column headers) switches columns on and off: track and disc number, artist, genre, composer, label, catalogue number, ISRC, bitrate, sample rate, bit depth, channels, the MusicBrainz ids, and more. Pick a single track and those same fields list down the pane, with every other tag the file carries underneath. Track details are read from the files when you look at them, so they show what's on disk now even if something other than jimbrainz changed the tags.
+The track list shows <em>whichever fields you want</em>. A Fields menu (or right-clicking the column headers) switches columns on and off: track and disc number, artist, genre, composer, label, catalogue number, ISRC, bitrate, sample rate, bit depth, channels, the MusicBrainz ids, and more. Drag a column's header sideways to move it, and its right-hand edge to size it, the way Explorer does; double-click that edge to give the column back its own width. The order and the widths are remembered along with which fields you picked, and Reset in the Fields menu puts all three back. Pick a single track and those same fields list down the pane, with every other tag the file carries underneath. Track details are read from the files when you look at them, so they show what's on disk now even if something other than jimbrainz changed the tags.
 <br><br>
-Multi-disc sets run disc by disc under "Disc 1", "Disc 2" headings, rather than dealing the two discs out alternately because both start at track 1.
+Multi-disc sets run disc by disc under "Disc 1", "Disc 2" headings, rather than dealing the two discs out alternately because both start at track 1. A track with no disc number reads as disc 1 — that's where it sorts, and how every player treats it — and the column says so in a dimmer grey, so it can't be mistaken for a disc number the file actually carries.
 <br><br>
 Opening the tab is instant after the first time. The last scan is saved in jimbrainz's database, so the library draws straight away from that, says how old it is, and checks the disk for changes underneath while you browse. That includes after a restart, which used to mean re-reading every tag in the library. Retags and deletes made in jimbrainz update the saved copy as they happen. If you change files with another program, use Rescan.
 <br><br>
@@ -186,7 +186,19 @@ Pick a release and it fills in the fields, or type them yourself — artist, alb
 <br><br>
 Nothing is written until you press apply, and the preview showing what would change is produced by the same code that does the writing — so it can't drift into lying about it. It can also pull the release's cover into the folder, with the incoming art shown next to the one you already have. Click either cover to compare the two <em>at full size</em>, side by side, with their real pixel dimensions and the larger one marked. Two sleeves that look identical as thumbnails usually differ in exactly that, and you can keep the new one from right there.
 <br><br>
-Multi-disc releases are tagged per disc, the way MusicBrainz and every player number them: disc 2 starts at track 1 of disc 2 rather than carrying on from disc 1. Single-disc albums aren't given a disc number at all, so an album that's already right still reads "nothing to change".
+Multi-disc releases are tagged per disc, the way MusicBrainz and every player number them: disc 2 starts at track 1 of disc 2 rather than carrying on from disc 1. Single-disc albums aren't given a disc number at all, so an album that's already right still reads "nothing to change" — but a track claiming to be on some <em>other</em> disc is put back on disc 1, so re-applying the right release fixes a stray disc number instead of leaving it where it was.
+<br><br>
+Covers are saved at 500 × 500 unless you choose otherwise: <strong>Cover art</strong> in the settings tab offers 250, 500, 1200 or <em>full size</em>, which is the original upload — often thousands of pixels and several megabytes. It applies to "Get cover", the bulk fetch and the editor alike, and the editor says which size it will save.
+</details>
+
+### Editing tags by hand
+<details>
+<summary style="font-style:italic">One track, or a whole selection at once</summary>
+For everything a release can't fix — a genre MusicBrainz doesn't carry, a composer credit, the one track that ended up on the wrong disc. Tick tracks in an album's list (Ctrl/Cmd-click and Shift-click tick too, and Space ticks the row you're on), then <strong>Edit N tracks…</strong> in the command bar. With nothing ticked it edits every track in the album, and on a single track's page it edits just that one.
+<br><br>
+It covers title, artist, album, album artist, track and disc number, year, original year, genre and composer. A field where the tracks disagree says so and starts empty, and <em>left alone it keeps each track's own value</em> — only the fields you actually change are written. Empty a field to remove that tag. The preview beside the fields lists every change, file by file, before anything is written, and it comes from the same code that does the writing. If any part of an edit is invalid, the whole thing is refused rather than half-applied.
+<br><br>
+It's tags only: no file is renamed and the folder stays where it is. The metadata editor is still what re-files an album once its tags say it belongs somewhere else.
 </details>
 
 ### Deleting albums
@@ -268,13 +280,7 @@ There is no authentication of any kind. It can delete files and rewrite tags, so
 ### Undo
 <details>
 <summary style="font-style:italic">Nothing here can be taken back</summary>
-Retagging rewrites tags in place and deleting removes files for good. The preview before a retag and the confirmation before a delete are the whole safety net, which is why both try hard to tell you exactly what's about to happen.
-</details>
-
-### Per-track editing
-<details>
-<summary style="font-style:italic">You take a release's tracklist as a whole</summary>
-The metadata editor applies a release, it doesnt let you fix one track's title. Files the tracklist doesnt match keep their own title and number rather than being renumbered — a wrong track number is worse than none.
+Retagging and editing tags rewrite them in place, and deleting removes files for good. The previews before a retag or a tag edit and the confirmation before a delete are the whole safety net, which is why all of them try hard to tell you exactly what's about to happen.
 </details>
 
 ## Installation (UnRaid)
@@ -308,7 +314,7 @@ basically anyone who wants more functionality than whats mentioned above. if you
 ## probable issues
 - **Organizing finds nothing:** almost always `SLSKD_DOWNLOAD_PATH` not pointing at the same files slskd writes. jimbrainz says so explicitly when this happens rather than pretending it worked.
 - **A download says it finished but the album isnt there:** if a folder with that name already existed, every file is skipped rather than overwritten, and the job now says so instead of reporting success. Usually means you already have that edition.
-- **Rate limiting:** if you've improperly formatted your MusicBrainz user agent, youll automatically get rate limited. Info on this is in the MusicBrainz docs. Note that jimbrainz has a built-in rate limiter so if you are getting rate limited more than youd expect its likely because of improper config.
+- **Rate limiting:** MusicBrainz rate limits requests that don't carry a contact, so check `MUSICBRAINZ_EMAIL` is set — the settings tab shows the exact user agent being sent. jimbrainz also has a built-in rate limiter, so if you're getting rate limited more than you'd expect it's likely the contact.
 - **A search returns nothing:** Soulseek search is a substring match over filenames people happened to type. Try the editable query box in the candidates panel — trimming it down often helps more than adding detail.
 - **MusicBrainz is just down sometimes:** it happens a lot. jimbrainz tells you thats what happened rather than showing you an empty result and letting you blame your search terms.
 - **The library tab is empty:** check `LIBRARY_PATH` is set and points at the same music the container can see. It says which of those is wrong.

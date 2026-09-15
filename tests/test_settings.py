@@ -403,3 +403,94 @@ def test_the_api_key_never_reports_an_env_value_even_when_overridden(monkeypatch
     assert row["env_value"] is None
     assert "env-secret" not in str(payload)
     assert "stored-secret" not in str(payload)
+
+
+# ===== the MusicBrainz contact ================================================
+
+import pytest  # noqa: E402
+
+from src.config import COVER_ART_SIZES  # noqa: E402
+from src.routes.settings import COVER_ART_SIZE_CHOICES, COVER_ART_SIZE_NOTES  # noqa: E402
+
+
+def test_the_email_row_shows_exactly_what_will_be_sent(monkeypatch):
+    """
+    The version is filled in for you now, so the row states the finished user agent - the only
+    way to see that it really was.
+    """
+    from src import __version__
+
+    monkeypatch.setattr(Config, "MUSICBRAINZ_EMAIL", "me@example.com")
+    monkeypatch.setattr(Config, "MUSICBRAINZ_USERAGENT", None)
+
+    row = find(call_settings(), "MUSICBRAINZ_EMAIL")
+
+    assert row["status"] == "ok"
+    assert row["editable"] is True
+    assert f"jimbrainz/{__version__} ( me@example.com )" in row["effect"]
+
+
+def test_the_old_user_agent_row_is_gone_once_nothing_sets_it(monkeypatch):
+    """A new install shouldn't be shown a setting it will never need."""
+    monkeypatch.setattr(Config, "MUSICBRAINZ_EMAIL", "me@example.com")
+    monkeypatch.setattr(Config, "MUSICBRAINZ_USERAGENT", None)
+    monkeypatch.setattr(Config, "OVERRIDDEN", set(), raising=False)
+
+    with pytest.raises(AssertionError):
+        find(call_settings(), "MUSICBRAINZ_USERAGENT")
+
+
+def test_an_old_user_agent_says_which_part_of_it_is_still_used(monkeypatch):
+    monkeypatch.setattr(Config, "MUSICBRAINZ_EMAIL", None)
+    monkeypatch.setattr(Config, "MUSICBRAINZ_USERAGENT", "lidbrainz/0.2 ( me@example.com )")
+
+    payload = call_settings()
+    email = find(payload, "MUSICBRAINZ_EMAIL")
+    legacy = find(payload, "MUSICBRAINZ_USERAGENT")
+
+    #? not an error on either row: the contact is being used, and nothing is broken
+    assert email["status"] == "unset"
+    assert "me@example.com" in email["effect"]
+    assert legacy["status"] == "ok"
+    assert "me@example.com" in legacy["effect"]
+
+
+def test_no_contact_anywhere_is_an_error_on_the_email_row(monkeypatch):
+    monkeypatch.setattr(Config, "MUSICBRAINZ_EMAIL", None)
+    monkeypatch.setattr(Config, "MUSICBRAINZ_USERAGENT", None)
+
+    row = find(call_settings(), "MUSICBRAINZ_EMAIL")
+
+    assert row["required"] is True
+    assert row["status"] == "error"
+
+
+def test_an_unusable_email_is_refused_on_save():
+    assert "has spaces" in _validate("MUSICBRAINZ_EMAIL", "me at example dot com")
+    assert _validate("MUSICBRAINZ_EMAIL", "") is not None, "an empty contact gets every request rate limited"
+    assert _validate("MUSICBRAINZ_EMAIL", "me@example.com") is None
+
+
+# ===== cover art size =========================================================
+
+
+def test_the_cover_art_size_is_a_choice_rather_than_a_text_box():
+    row = find(call_settings(), "COVER_ART_SIZE")
+
+    assert row["editable"] is True
+    assert list(row["choices"]) == list(COVER_ART_SIZES)
+
+
+def test_every_size_is_labelled_and_says_what_it_costs():
+    assert set(COVER_ART_SIZE_CHOICES) == set(COVER_ART_SIZE_NOTES) == set(COVER_ART_SIZES)
+
+
+def test_the_cover_art_size_accepts_only_what_the_archive_serves():
+    for size in COVER_ART_SIZES:
+        assert _validate("COVER_ART_SIZE", size) is None
+
+    assert _validate("COVER_ART_SIZE", "4000") is not None
+
+
+def test_organize_mode_is_offered_as_a_choice_too():
+    assert set(find(call_settings(), "ORGANIZE_MODE")["choices"]) == set(ORGANIZE_MODES)

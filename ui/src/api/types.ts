@@ -577,6 +577,11 @@ export interface RetagArtPlan {
   reason: string
   /** The cover file already in the folder, if any. */
   existing: string | null
+  /**
+   * The size a fetch would ask the Archive for: '250' | '500' | '1200' | 'full'. Laid on by the
+   * preview route from COVER_ART_SIZE, so the editor can say which it will be.
+   */
+  size?: string
 }
 
 export interface RetagPlan {
@@ -613,6 +618,53 @@ export interface RetagResults {
 export interface RetagResponse {
   plan: RetagPlan
   results: RetagResults
+}
+
+/* ===== library: editing tags by hand ===== */
+
+/**
+ * One file's edits, for /library/tags/preview and /apply. src/track_tags.py.
+ *
+ * A tag left out is not touched; a value of '' (or null) removes it. `filename` is a bare name
+ * in the album's own folder - the server refuses anything it can't find in a listing of it.
+ */
+export interface TrackTagEdit {
+  filename: string
+  tags: Record<string, string | null>
+}
+
+export interface TagEditFile {
+  filename: string
+  /** Only the tags that would really change. `to` of '' means the tag is removed. */
+  changes: Record<string, { from: string; to: string }>
+}
+
+/** What an edit would do. Written by the same planner the apply recomputes, never sent back. */
+export interface TagEditPlan {
+  album_path: string
+  /** null when the album couldn't be read at all; `problems` says why. */
+  source: string | null
+  files: TagEditFile[]
+  file_count: number
+  changed_file_count: number
+  /** Anything wrong with the request. Non-empty means apply refuses the whole batch. */
+  problems: string[]
+  /** Nothing would change. */
+  empty: boolean
+}
+
+export interface TagEditResults {
+  mode: string
+  dry_run: boolean
+  written: number
+  failed: number
+  /** Includes any tag a file's format couldn't hold - named, rather than dropped in silence. */
+  problems: string[]
+}
+
+export interface TagEditResponse {
+  plan: TagEditPlan
+  results: TagEditResults
 }
 
 /** What deleting an album would remove. Read live, not from the scan. */

@@ -2,7 +2,8 @@ import type { LibraryTrack, TrackDetails } from '../api/types'
 import { formatSize } from './format'
 
 /**
- * The fields the library's track viewer can show, and how to read each one.
+ * The fields the library's track viewer can show, how to read each one, and how the columns are
+ * arranged.
  *
  * One registry for both places a field appears - as a column in an album's track table and as
  * a row in one track's property list - so the menu that toggles them means the same thing in
@@ -44,10 +45,28 @@ export interface TrackField {
    */
   fromScan: boolean
   value: (row: TrackRow) => string
+  /**
+   * When the value shown is a default rather than something the file says, why - the disc of a
+   * file with no disc tag. The cell is dimmed and carries this as its tooltip, because a default
+   * that looks exactly like a tag is a small lie about what is on disk. null when it is real.
+   */
+  inferred?: (row: TrackRow) => string | null
 }
 
 /** A tag from the file's details, or '' until they arrive. */
 const tag = (key: string) => (row: TrackRow) => row.details?.tags[key] ?? ''
+
+/**
+ * A number the track carries, from the file itself once it has been read.
+ *
+ * Once the details are in they win outright, even when they say "none": the scan is cached on
+ * the folder's mtime, which a retag by another program doesn't move, so a scan still holding a
+ * disc number the file no longer carries is simply out of date.
+ */
+function fileNumber(row: TrackRow, key: 'position' | 'disc'): number | null {
+  const n = row.details ? row.details[key] : row.track[key]
+  return n === undefined ? null : n
+}
 
 function trackTime(seconds: number | null | undefined): string {
   if (!seconds) return ''
@@ -67,18 +86,21 @@ export const TRACK_FIELDS: readonly TrackField[] = [
   {
     id: 'number', label: '#', group: 'Tags', width: '2.6em', align: 'right', mono: true,
     initial: true, fromScan: true,
-    value: ({ track, details }) => {
-      const n = details?.position ?? track.position
-      return n === null || n === undefined ? '' : String(n).padStart(2, '0')
+    value: (row) => {
+      const n = fileNumber(row, 'position')
+      return n === null ? '' : String(n).padStart(2, '0')
     },
   },
   {
     id: 'disc', label: 'Disc', group: 'Tags', width: '3.8em', align: 'right', mono: true,
     initial: true, fromScan: true,
-    value: ({ track, details }) => {
-      const n = details?.disc ?? track.disc
-      return n === null || n === undefined ? '' : String(n)
-    },
+    //? A file with no disc tag is on disc 1: it sorts there, every player reads it that way, and
+    //? applying a one-disc release now writes 1 over a stray other number. So the column says 1
+    //? rather than nothing - dimmed, and saying why, since the file itself doesn't.
+    value: (row) => String(fileNumber(row, 'disc') ?? 1),
+    inferred: (row) => (
+      fileNumber(row, 'disc') === null ? 'No disc number on the file - it reads as disc 1' : null
+    ),
   },
   {
     id: 'artist', label: 'Artist', group: 'Tags', width: 'minmax(8em, 0.7fr)', initial: true,
@@ -195,4 +217,143 @@ export function reconcileVisible(saved: { visible: string[]; seen: string[] } | 
   return TRACK_FIELDS
     .filter((field) => (seen.has(field.id) ? visible.has(field.id) : field.initial))
     .map((field) => field.id)
+}
+
+/* ------------------------------------------------------------------ arranging the columns */
+
+/**
+ * The title's id in a column order. Title is always shown, so it never appears in `visible` -
+ * but it moves like any other column, which is why it needs an id at all.
+ */
+export const TITLE_COLUMN = 'title'
+
+/** The title's size until you drag it: at least 10em, and twice anybody else's share of the rest. */
+export const TITLE_WIDTH = 'minmax(10em, 2fr)'
+
+/** The narrowest a dragged column may get, in px - enough for its first letters and the grip. */
+export const MIN_COLUMN_PX = 36
+
+/** The widest, so one wild drag can't send a column off into the next room. */
+export const MAX_COLUMN_PX = 1200
+
+/**
+ * Every column in its default order: the number and the disc before the title, as they read on
+ * a sleeve, then everything else in registry order.
+ */
+export function defaultOrder(): string[] {
+  const lead = ['number', 'disc']
+  return [
+    ...lead,
+    TITLE_COLUMN,
+    ...TRACK_FIELDS.map((field) => field.id).filter((id) => !lead.includes(id)),
+  ]
+}
+
+/**
+ * A saved column order, reconciled against the columns that exist now.
+ *
+ * Unknown ids are dropped. A column the saved order has never heard of goes in beside its
+ * default neighbour - after the nearest column that comes before it by default - rather than on
+ * the end, so a field added by a later version turns up where it belongs instead of trailing
+ * after everything you arranged. The same promise reconcileVisible's `seen` keeps.
+ */
+export function reconcileOrder(saved: readonly string[] | null | undefined): string[] {
+  const defaults = defaultOrder()
+  if (!saved?.length) return defaults
+
+  const known = new Set(defaults)
+  const order = [...new Set(saved.filter((id) => known.has(id)))]
+
+  for (const [index, id] of defaults.entries()) {
+    if (order.includes(id)) continue
+    const neighbour = defaults.slice(0, index).reverse().find((other) => order.includes(other))
+    order.splice(neighbour === undefined ? 0 : order.indexOf(neighbour) + 1, 0, id)
+  }
+
+  return order
+}
+
+/** A dragged width, kept to something a column can sensibly be. */
+export function clampWidth(px: number): number {
+  return Math.round(Math.min(MAX_COLUMN_PX, Math.max(MIN_COLUMN_PX, px)))
+}
+
+/** Saved widths, less any for a column that no longer exists or a size that makes no sense. */
+export function reconcileWidths(
+  saved: Readonly<Record<string, number>> | null | undefined,
+): Record<string, number> {
+  const known = new Set(defaultOrder())
+  const widths: Record<string, number> = {}
+
+  for (const [id, width] of Object.entries(saved ?? {})) {
+    if (known.has(id) && Number.isFinite(width)) widths[id] = clampWidth(width)
+  }
+
+  return widths
+}
+
+/** The columns to draw: the order, narrowed to the visible fields, with the title always in. */
+export function visibleColumns(order: readonly string[], visible: readonly string[]): string[] {
+  const shown = new Set(visible)
+  return order.filter((id) => id === TITLE_COLUMN || shown.has(id))
+}
+
+/**
+ * Move one column to just before another, or to the end when `before` is null.
+ *
+ * Works on the FULL order, hidden columns included, so a column you hide and later show again
+ * comes back where you put it rather than where it started.
+ */
+export function moveColumn(order: readonly string[], id: string, before: string | null): string[] {
+  if (id === before) return [...order]
+
+  const rest = order.filter((other) => other !== id)
+  const at = before === null ? -1 : rest.indexOf(before)
+
+  return at === -1 ? [...rest, id] : [...rest.slice(0, at), id, ...rest.slice(at)]
+}
+
+/** A grid track size's minimum, in em. The registry writes them in em; anything else counts as 6. */
+export function minimumEm(width: string): number {
+  const match = /(\d+(?:\.\d+)?)em/.exec(width)
+  return match ? Number(match[1]) : 6
+}
+
+/**
+ * The grid template for a row of columns, and the least width the table may shrink to.
+ *
+ * A column you have sized is exactly that many pixels. The rest keep their registry sizes -
+ * mostly fractions - and share whatever is left, so widening one column narrows its flexible
+ * neighbours rather than pushing the table off the side. Past everyone's minimum, the table
+ * scrolls sideways in its own box instead of squeezing every column to an ellipsis.
+ *
+ * `leading` is sized tracks drawn before the columns and never moved: the tick boxes.
+ */
+export function columnLayout(
+  columns: readonly string[],
+  widths: Readonly<Record<string, number>>,
+  leading: readonly string[] = [],
+): { template: string; minWidth: string } {
+  const tracks = [...leading]
+  let em = leading.reduce((total, size) => total + minimumEm(size), 0)
+  let px = 0
+
+  for (const id of columns) {
+    const fixed = widths[id]
+    if (fixed) {
+      tracks.push(`${fixed}px`)
+      px += fixed
+      continue
+    }
+
+    const size = id === TITLE_COLUMN ? TITLE_WIDTH : fieldById(id)?.width ?? 'minmax(6em, 1fr)'
+    tracks.push(size)
+    em += minimumEm(size)
+  }
+
+  //? EXACTLY the tracks' own minimums. The table has to be at least that wide, or the header's
+  //? strip would stop short of columns spilling past it - but any wider and the one flexible
+  //? column left swallows the difference. An em of "slack" per column, carried over from the
+  //? old sum, made widening the title by 100px widen the table by 250 and the artist by 60.
+  return { template: tracks.join(' '), minWidth: `calc(${em}em + ${px}px)` }
 }

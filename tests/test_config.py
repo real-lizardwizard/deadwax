@@ -199,3 +199,119 @@ def test_nothing_configured_reports_no_source(tmp_path):
     """None means "nobody supplied this", which is a different message from "it's wrong"."""
     result = run_with_config(tmp_path, "")
     assert result["url_source"] is None
+
+
+# ---------------------------------------------------------------- the MusicBrainz user agent
+#
+# You say who you are; jimbrainz says what it is. The complaint that prompted this was having to
+# write the whole user agent by hand - including a version number nobody remembers to update.
+
+import pytest  # noqa: E402
+
+from src import __version__  # noqa: E402
+from src.config import (Config, build_user_agent, contact_from_useragent,  # noqa: E402
+                        describe_contact)
+
+
+def use(monkeypatch, email=None, useragent=None):
+    monkeypatch.setattr(Config, "MUSICBRAINZ_EMAIL", email)
+    monkeypatch.setattr(Config, "MUSICBRAINZ_USERAGENT", useragent)
+
+
+def test_the_user_agent_is_the_email_plus_the_version_that_is_running(monkeypatch):
+    use(monkeypatch, email="me@example.com")
+
+    assert Config.musicbrainz_user_agent() == f"jimbrainz/{__version__} ( me@example.com )"
+
+
+def test_the_version_comes_from_the_package_rather_than_anyone_typing_it():
+    assert build_user_agent("me@example.com") == f"jimbrainz/{__version__} ( me@example.com )"
+
+
+@pytest.mark.parametrize("written, contact", [
+    #? this repo's own dev .env, in the shape MusicBrainz documents
+    ("jimbrainzDev/1.0 (dev-test@example.com)", "dev-test@example.com"),
+    #? the format the example compose file used to suggest
+    ("AppName/1.1.1 ( github.com/YourUsername )", "github.com/YourUsername"),
+    ("me@example.com", "me@example.com"),
+    ("https://example.com/me", "https://example.com/me"),
+    ("SomeApp/2.0 me@example.com", "me@example.com"),
+])
+def test_an_old_user_agent_gives_up_its_contact(written, contact):
+    assert contact_from_useragent(written) == contact
+
+
+@pytest.mark.parametrize("written", [None, "", "   ", "SomeApp/1.0", "SomeApp/1.0 ( )"])
+def test_an_old_user_agent_with_no_contact_gives_none(written):
+    assert contact_from_useragent(written) is None
+
+
+def test_an_install_configured_the_old_way_keeps_working_and_reports_the_real_version(monkeypatch):
+    """
+    Nobody should have to touch their compose file to upgrade. The contact carries over; the
+    name and version are rebuilt, so a user agent written for 0.2 stops claiming to be 0.2.
+    """
+    use(monkeypatch, useragent="lidbrainz/0.2.1 ( me@example.com )")
+
+    assert Config.musicbrainz_contact() == ("me@example.com", "MUSICBRAINZ_USERAGENT")
+    assert Config.musicbrainz_user_agent() == f"jimbrainz/{__version__} ( me@example.com )"
+
+
+def test_the_email_wins_over_an_old_user_agent(monkeypatch):
+    use(monkeypatch, email="new@example.com", useragent="Old/1.0 ( old@example.com )")
+
+    assert Config.musicbrainz_contact() == ("new@example.com", "MUSICBRAINZ_EMAIL")
+
+
+def test_an_old_user_agent_with_no_contact_is_still_sent_as_written(monkeypatch):
+    """It is what this install has been sending. Replacing it with nothing would be worse."""
+    use(monkeypatch, useragent="SomeApp/1.0")
+
+    assert Config.musicbrainz_user_agent() == "SomeApp/1.0"
+
+
+def test_nothing_configured_is_no_user_agent_at_all(monkeypatch):
+    use(monkeypatch)
+
+    assert Config.musicbrainz_user_agent() is None
+
+
+def test_an_email_that_cannot_go_in_a_header_is_passed_over_rather_than_sent_broken(monkeypatch):
+    """httpx refuses a header it can't encode, which would fail every request - not just this one."""
+    use(monkeypatch, email="mé@exämple.com", useragent="Old/1.0 ( old@example.com )")
+
+    assert Config.musicbrainz_contact() == ("old@example.com", "MUSICBRAINZ_USERAGENT")
+
+
+@pytest.mark.parametrize("value", ["me@example.com", "https://github.com/me", "github.com/me"])
+def test_ordinary_contacts_pass(value):
+    assert describe_contact(value) is None
+
+
+@pytest.mark.parametrize("value, says", [
+    ("", "is not set"),
+    ("me at example dot com", "has spaces"),
+    ("(me@example.com)", "without brackets"),
+    #? somebody pasting their whole old user agent into the new field
+    ("jimbrainz/0.6 (me@example.com)", "without brackets"),
+    ("nobody", "doesn't look like"),
+    ("mé@example.com", "plain ASCII"),
+])
+def test_contacts_that_cannot_work_say_why(value, says):
+    assert says in describe_contact(value)
+
+
+def test_the_musicbrainz_client_is_built_with_it(monkeypatch):
+    import asyncio
+
+    from src.api.musicbrainz_endpoint import MusicBrainzClient
+
+    use(monkeypatch, email="me@example.com")
+    client = MusicBrainzClient()
+
+    async def built_agent():
+        agent = (await client.get_client()).headers["user-agent"]
+        await client.close_client()
+        return agent
+
+    assert asyncio.run(built_agent()) == f"jimbrainz/{__version__} ( me@example.com )"

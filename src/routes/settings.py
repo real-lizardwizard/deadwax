@@ -50,7 +50,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from src import __version__
-from src.config import Config, describe_slskd_url, setting_source, shadowed_by_empty_env
+from src.config import (COVER_ART_SIZES, Config, build_user_agent, describe_contact,
+                        describe_slskd_url, setting_source, shadowed_by_empty_env)
 from src.logger import logger
 
 router = APIRouter()
@@ -63,6 +64,27 @@ ORGANIZE_MODES = {
     "dry_run": "Log what would happen, write nothing",
     "copy": "Copy into the library, leave slskd's copy alone",
     "move": "Move into the library",
+}
+
+#? What COVER_ART_SIZE can be set to, as the dropdown names them. The keys are the Cover Art
+#? Archive's own sizes - see COVER_ART_SIZES in config.py, which a test keeps these in step with.
+COVER_ART_SIZE_CHOICES = {
+    "250": "250 × 250",
+    "500": "500 × 500",
+    "1200": "1200 × 1200",
+    "full": "Full size",
+}
+
+#? What each one costs, for the line under the dropdown.
+COVER_ART_SIZE_NOTES = {
+    "250": "A thumbnail: a few tens of KB, and soft anywhere bigger than the library's list",
+    "500": "The default. Sharp in the library, and small enough not to notice on disk",
+    "1200": "Sharp on any screen, and usually a few hundred KB",
+    "full": (
+        "The original upload, at whatever size it was scanned - usually thousands of pixels "
+        "and several MB, sometimes much more. If the original isn't an image (the Archive "
+        "takes PDFs), the 1200 × 1200 copy is saved instead"
+    ),
 }
 
 
@@ -118,8 +140,14 @@ def _setting(
     secret: bool = False,
     status: str | None = None,
     detail: str | None = None,
+    choices: dict[str, str] | None = None,
 ) -> dict:
-    """One row in the settings tab."""
+    """
+    One row in the settings tab.
+
+    `choices` is value -> label for a setting that only takes certain values, which the tab
+    draws as a dropdown rather than a text box that would accept anything and fail on save.
+    """
     #? The API key is the only secret here and it never leaves the process. The tab shows
     #? whether one arrived and nothing else - enough to diagnose "downloads don't work",
     #? without putting a credential in a screenshot somebody pastes into an issue.
@@ -159,7 +187,89 @@ def _setting(
         "env_value": (
             None if secret else (Config.ENV_VALUES.get(key) if key in Config.OVERRIDDEN else None)
         ),
+        "choices": choices,
     }
+
+
+def _musicbrainz_rows() -> list[dict]:
+    """
+    The contact MusicBrainz asks for - and, while one is still set, the old hand-written user agent.
+
+    The email row says what is actually sent. That is the only way to see that the version
+    really is filled in for you, and it is the first thing somebody debugging a 403 needs.
+    """
+    email = Config.MUSICBRAINZ_EMAIL
+    email_problem = describe_contact(email) if email else None
+    contact, source = Config.musicbrainz_contact()
+    user_agent = Config.musicbrainz_user_agent()
+
+    sent = (
+        f"Sent as: {user_agent}"
+        if contact
+        else f"Once it is set, requests go out as: {build_user_agent('you@example.com')}"
+    )
+
+    rows = [
+        _setting(
+            "MUSICBRAINZ_EMAIL",
+            email,
+            #? not required while an old user agent is supplying the contact - nothing is broken
+            required=source != "MUSICBRAINZ_USERAGENT",
+            effect=(
+                "Your email address. MusicBrainz asks every app for a way to reach whoever is "
+                "making its requests, and rate limits the ones without - jimbrainz writes the "
+                f"rest of the user agent itself, so it always names the version running. {sent}"
+            ),
+            status="error" if email_problem else None,
+            detail=f"MUSICBRAINZ_EMAIL {email_problem}" if email_problem else None,
+        ),
+    ]
+
+    #? Only while it is set - or overridden to empty, which has to stay visible to be revertable.
+    #? Nobody configuring a new install should be shown a setting they no longer need.
+    legacy = Config.MUSICBRAINZ_USERAGENT
+    if legacy or "MUSICBRAINZ_USERAGENT" in Config.OVERRIDDEN:
+        old = "The old way of identifying jimbrainz: a whole user agent, written by hand."
+        status, detail = "ok", None
+
+        if source == "MUSICBRAINZ_EMAIL":
+            effect = f"{old} Ignored now that MUSICBRAINZ_EMAIL is set, so you can remove it."
+        elif source == "MUSICBRAINZ_USERAGENT":
+            effect = (
+                f"{old} Only its contact, {contact}, is still used - jimbrainz fills in its "
+                f"own name and version now. Put that address in MUSICBRAINZ_EMAIL and this "
+                f"one can go."
+            )
+        elif legacy:
+            effect, status = old, "error"
+            detail = (
+                "There's no contact in it that jimbrainz can find, so it is sent exactly as "
+                "written - and MusicBrainz rate limits a user agent without one. Set "
+                "MUSICBRAINZ_EMAIL instead."
+            )
+        else:
+            effect, status = f"{old} Cleared here, overriding the environment.", "unset"
+
+        rows.append(
+            _setting("MUSICBRAINZ_USERAGENT", legacy, effect=effect, status=status, detail=detail)
+        )
+
+    return rows
+
+
+def _cover_art_row() -> dict:
+    """COVER_ART_SIZE, offered as the sizes the Archive actually serves."""
+    size = Config.COVER_ART_SIZE
+    known = size in COVER_ART_SIZES
+
+    return _setting(
+        "COVER_ART_SIZE",
+        size,
+        effect=COVER_ART_SIZE_NOTES.get(size, "unrecognised - covers are fetched at 500 × 500"),
+        status="ok" if known else "error",
+        detail=None if known else f"expected one of {', '.join(COVER_ART_SIZES)}",
+        choices=COVER_ART_SIZE_CHOICES,
+    )
 
 
 @router.get("")
@@ -233,15 +343,7 @@ async def settings():
                         secret=True,
                         effect="Authenticates against slskd; downloads fail without it",
                     ),
-                    _setting(
-                        "MUSICBRAINZ_USERAGENT",
-                        Config.MUSICBRAINZ_USERAGENT,
-                        required=True,
-                        effect=(
-                            "Identifies this app to MusicBrainz. A malformed one gets you "
-                            "rate limited no matter how politely you ask"
-                        ),
-                    ),
+                    *_musicbrainz_rows(),
                 ],
             },
             {
@@ -307,8 +409,19 @@ async def settings():
                             if organize_known
                             else f"expected one of {', '.join(ORGANIZE_MODES)}"
                         ),
+                        choices={mode: mode for mode in ORGANIZE_MODES},
                     ),
                 ],
+            },
+            {
+                "id": "cover-art",
+                "label": "Cover art",
+                "note": (
+                    "What 'Get cover' and the metadata editor save into an album's folder, from "
+                    "the Cover Art Archive. Covers already on disk are kept - replace one from "
+                    "the metadata editor, where you can compare the two first."
+                ),
+                "settings": [_cover_art_row()],
             },
         ],
         "organize_modes": ORGANIZE_MODES,
@@ -353,6 +466,17 @@ def _validate(key: str, value: str) -> str | None:
         problem = describe_slskd_url(value)
         if problem:
             return problem
+
+    #? An empty or malformed contact can never work: MusicBrainz rate limits a user agent it
+    #? can't reach anybody through, and httpx refuses a header it can't encode. Revert is the way
+    #? back to the environment's value - saving a blank would override it with nothing.
+    if key == "MUSICBRAINZ_EMAIL":
+        problem = describe_contact(value)
+        if problem:
+            return problem
+
+    if key == "COVER_ART_SIZE" and value not in COVER_ART_SIZES:
+        return f"expected one of {', '.join(COVER_ART_SIZES)}"
 
     return None
 
@@ -427,7 +551,12 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
 
     if "musicbrainz" in invalidate:
         await request.app.state.musicbrainz_client.close_client()
-        logger.info("musicbrainz client dropped, it will rebuild with the new user agent")
+        #? said out loud, because the point of the email setting is that the rest of the user
+        #? agent is filled in for you - and this is where you get to see that it was
+        logger.info(
+            f"MusicBrainz user agent is now: {Config.musicbrainz_user_agent() or 'not set'}",
+            extra={"frontend": True},
+        )
 
     if "library" in invalidate:
         #? The scan cache keys on folder mtime under the OLD root, so it is meaningless now.

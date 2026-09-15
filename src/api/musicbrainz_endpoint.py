@@ -124,14 +124,21 @@ class MusicBrainzClient:
         logger.info("getting MusicBrainz httpx AsyncClient")
 
         if not self.client or self.client.is_closed:
-            if not Config.MUSICBRAINZ_USERAGENT:
-                logger.error("MUSICBRAINZ_USERAGENT is not configured", extra={"frontend": True, "src":"musicbrainz"})
-                raise ValueError("MUSICBRAINZ_USERAGENT is not configured")
-            logger.info(f" user agent is {Config.MUSICBRAINZ_USERAGENT}")
+            #? built from MUSICBRAINZ_EMAIL and the running version - see config.py. Fixed for
+            #? the life of this client, which the settings route drops when the contact changes.
+            user_agent = Config.musicbrainz_user_agent()
+            if not user_agent:
+                logger.error(
+                    "MUSICBRAINZ_EMAIL is not set - MusicBrainz asks for a contact address with "
+                    "every request. Set it in the settings tab.",
+                    extra={"frontend": True, "src": "musicbrainz"},
+                )
+                raise ValueError("MUSICBRAINZ_EMAIL is not configured")
+            logger.info(f" user agent is {user_agent}")
             self.client = httpx.AsyncClient(
                 base_url="https://musicbrainz.org/ws/2",
                 headers={
-                    "User-Agent": Config.MUSICBRAINZ_USERAGENT,
+                    "User-Agent": user_agent,
                     "Accept": "application/json"
                 },
                 timeout=httpx.Timeout(
@@ -229,7 +236,7 @@ class MusicBrainzClient:
                     continue
 
                 if status == 403: 
-                    logger.error(f"MusicBrainz forbid your request, this is likely because of missing/invalid User-Agent header", extra={"frontend": True, "src":"musicbrainz"})
+                    logger.error(f"MusicBrainz refused the request - usually the user agent. Check MUSICBRAINZ_EMAIL in the settings tab", extra={"frontend": True, "src":"musicbrainz"})
                     logger.error(f"Response text: {exc.response.text}")
                     ping_error_obj["error"] =  "musicbrainz ping failed with 403 forbidden error, connection was made but user agent / ip not accepted"
                     ping_error_obj["status"] =  "failed"
@@ -269,7 +276,7 @@ class MusicBrainzClient:
                 logger.error(f"HTTP {status}: {exc.response.text[:200]}")
             
             except ValueError as exc: 
-                ping_error_obj["error"] =  f"MUSICBRAINZ_USERAGENT is not configured!!"
+                ping_error_obj["error"] =  "MUSICBRAINZ_EMAIL is not set - add your email in the settings tab"
                 ping_error_obj["status"] =  "failed"
                 ping_error_obj["code"] = "VALUE_ERROR"
                 break

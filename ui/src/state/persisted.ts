@@ -166,6 +166,14 @@ export function writeReleaseColumnState(state: ReleaseColumnState): void {
 export interface LibraryFieldState {
   visible: string[]
   seen: string[]
+  /**
+   * Every column in the order you arranged them, the title and hidden fields included, so a
+   * field hidden and shown again comes back where you put it. Absent until you move one, so a
+   * later version's default order still reaches everyone who never did.
+   */
+  order?: string[]
+  /** Columns you have dragged to a width, in px. A column not in here keeps its own size. */
+  widths?: Record<string, number>
 }
 
 export function readLibraryFields(): LibraryFieldState | null {
@@ -173,7 +181,21 @@ export function readLibraryFields(): LibraryFieldState | null {
   if (!saved || !Array.isArray(saved.visible) || !Array.isArray(saved.seen)) return null
 
   const strings = (list: unknown[]) => list.filter((v): v is string => typeof v === 'string')
-  return { visible: strings(saved.visible), seen: strings(saved.seen) }
+
+  //? JSON a user can edit: a width that isn't a positive number is dropped rather than trusted
+  const widths: Record<string, number> = {}
+  if (saved.widths && typeof saved.widths === 'object') {
+    for (const [id, width] of Object.entries(saved.widths as Record<string, unknown>)) {
+      if (typeof width === 'number' && Number.isFinite(width) && width > 0) widths[id] = width
+    }
+  }
+
+  return {
+    visible: strings(saved.visible),
+    seen: strings(saved.seen),
+    order: Array.isArray(saved.order) ? strings(saved.order) : [],
+    widths,
+  }
 }
 
 export function writeLibraryFields(state: LibraryFieldState): void {

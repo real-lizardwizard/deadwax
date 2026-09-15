@@ -116,13 +116,11 @@ function Checkbox({
 
 function SettingRow({
   setting,
-  modes,
   draft,
   onEdit,
   onRevert,
 }: {
   setting: ServerSetting
-  modes: Record<string, string>
   /** The pending edit: a string, `null` for "revert", or undefined when untouched. */
   draft: string | null | undefined
   onEdit: (key: string, value: string) => void
@@ -140,14 +138,17 @@ function SettingRow({
 
   const control = !setting.editable ? (
     <span class="settings-env-locked" title={setting.locked_reason ?? undefined}>Locked</span>
-  ) : setting.key === 'ORGANIZE_MODE' ? (
+  ) : setting.choices ? (
+    //? A setting that only takes certain values is offered only those values, as the server
+    //? lists them - ORGANIZE_MODE and COVER_ART_SIZE. A text box would take anything and then
+    //? refuse it on save.
     <select
       class="settings-env-input"
       value={value}
       onChange={(e) => onEdit(setting.key, (e.currentTarget as HTMLSelectElement).value)}
     >
-      {Object.keys(modes).map((mode) => (
-        <option key={mode} value={mode}>{mode}</option>
+      {Object.entries(setting.choices).map(([choice, label]) => (
+        <option key={choice} value={choice}>{label}</option>
       ))}
     </select>
   ) : (
@@ -590,7 +591,6 @@ export function SettingsView({ active }: { active: boolean }) {
                     <SettingRow
                       key={setting.key}
                       setting={setting}
-                      modes={server.organize_modes}
                       draft={draftEnv[setting.key]}
                       onEdit={editEnv}
                       onRevert={revertEnv}

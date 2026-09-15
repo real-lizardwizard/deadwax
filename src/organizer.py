@@ -345,7 +345,16 @@ def _is_multi_disc(release: dict) -> bool:
     return len({t.get("disc") for t in release.get("tracks") or [] if t.get("disc")}) > 1
 
 
-def tag_values(release: dict, track: dict | None) -> dict:
+def _disc_number(value) -> int | None:
+    """A disc tag as a number - '2', '02' and '2/3' all mean disc 2. None when absent or unreadable."""
+    head = str(value or "").split("/")[0].strip()
+    try:
+        return int(head)
+    except ValueError:
+        return None
+
+
+def tag_values(release: dict, track: dict | None, current: dict | None = None) -> dict:
     """
     The tags a file should carry for this release and track.
 
@@ -353,6 +362,10 @@ def tag_values(release: dict, track: dict | None) -> dict:
     change without duplicating the rules. Two copies of this would drift, and a preview that
     disagrees with the write it is previewing is worse than no preview - the same reason
     dry-run runs the identical plan rather than a parallel one.
+
+    `current` is what the file carries now, as far as the caller has read it. Only one rule
+    depends on it - a stray disc number, below - and both callers pass the same reading of the
+    same file, so the preview and the write still cannot disagree.
     """
     values = {
         "album": release.get("album"),
@@ -388,11 +401,23 @@ def tag_values(release: dict, track: dict | None) -> dict:
         #? A single-disc release writes no disc tag at all. Writing "1" everywhere would give
         #? every album in the library a discnumber change, so re-opening the editor on an album
         #? that is already right could never again say "nothing to change".
-        if _is_multi_disc(release) and track.get("disc") and track.get("disc_position"):
+        multi_disc = _is_multi_disc(release)
+
+        if multi_disc and track.get("disc") and track.get("disc_position"):
             values["tracknumber"] = str(track["disc_position"])
             values["discnumber"] = str(track["disc"])
         elif track.get("position"):
             values["tracknumber"] = str(track["position"])
+
+        #? A single-disc release IS disc 1, and usually nothing needs writing to say so: a file
+        #? with no disc tag already reads as disc 1 everywhere, and writing "1" into every album
+        #? would give each of them a diff forever (above). But a file that claims to be on some
+        #? OTHER disc is wrong, and applying the release is exactly the moment to put it right -
+        #? without this, re-applying the correct release could never undo a wrong one. That is
+        #? how Jackpot Juicer's opening track was found: alone on "disc 2" of a one-disc album,
+        #? with nothing re-applying the album could do about it.
+        if not multi_disc and _disc_number((current or {}).get("discnumber")) not in (None, 1):
+            values["discnumber"] = "1"
 
     #? empty values are dropped rather than written as blanks - clearing a tag the user
     #? already has because MusicBrainz didn't supply one would be destructive
@@ -419,7 +444,13 @@ def write_tags(path: Path, release: dict, track: dict | None) -> None:
         logger.warning(f"unsupported audio format for tagging: {path.name}")
         return
 
-    for key, value in tag_values(release, track).items():
+    #? the one thing tag_values needs to know about the file as it stands - see the disc rule
+    try:
+        current_disc = str((audio.get("discnumber") or [""])[0])
+    except Exception:
+        current_disc = ""
+
+    for key, value in tag_values(release, track, {"discnumber": current_disc}).items():
         if not value:
             continue
 

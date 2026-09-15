@@ -310,3 +310,104 @@ def test_art_alone_is_enough_to_make_a_plan_worth_applying(tmp_path):
 
     assert plan_retag(path, RELEASE, str(tmp_path))["empty"] is True
     assert plan_retag(path, RELEASE, str(tmp_path), want_art=True)["empty"] is False
+
+
+# ---------------------------------------------------------------- disc numbers
+
+#? Jackpot Juicer, as MusicBrainz holds it: the ordinary CD, and the Target exclusive whose second
+#? disc is the whole album again as instrumentals - the same titles, with "(instrumental)" on.
+JJ_TITLES = ("Untitled 2", "Cream of the Crop", "Synergy")
+JJ_PATH = "Dance Gavin Dance/Jackpot Juicer (2022)"
+
+JJ_CD = {
+    "artist": "Dance Gavin Dance",
+    "album": "Jackpot Juicer",
+    "year": "2022",
+    "release_mbid": "48da6cb3-3232-4c28-b101-a5616637315a",
+    "tracks": [
+        {"position": n, "title": title, "disc": 1, "disc_position": n}
+        for n, title in enumerate(JJ_TITLES, start=1)
+    ],
+}
+
+JJ_TARGET = {
+    **JJ_CD,
+    "release_mbid": "c4e30f05-dc20-4ee1-bfad-0fe1e5c1e7ae",
+    "disambiguation": "Target exclusive",
+    "tracks": JJ_CD["tracks"] + [
+        {"position": len(JJ_TITLES) + n, "title": f"{title} (instrumental)", "disc": 2, "disc_position": n}
+        for n, title in enumerate(JJ_TITLES, start=1)
+    ],
+}
+
+
+def seed_jackpot(root, discs=None):
+    """The ordinary album on disk. `discs` maps a track number to the disc tag it carries."""
+    directory = root / JJ_PATH
+    for n, title in enumerate(JJ_TITLES, start=1):
+        tags = {"album": "Jackpot Juicer", "albumartist": "Dance Gavin Dance",
+                "artist": "Dance Gavin Dance", "title": title, "tracknumber": str(n),
+                "date": "2022", "musicbrainz_albumid": JJ_CD["release_mbid"]}
+        if (discs or {}).get(n):
+            tags["discnumber"] = discs[n]
+        write_flac(directory / f"{n:02d} - {title}.flac", **tags)
+    return directory
+
+
+def disc_changes(plan):
+    return {f["filename"]: f["changes"].get("discnumber") for f in plan["files"]}
+
+
+def test_a_one_disc_release_puts_a_stray_disc_number_back_to_1(tmp_path):
+    """
+    Jackpot Juicer's opening track was found alone on "disc 2" of a one-disc album. A
+    single-disc release wrote no disc tag at all, so re-applying the right release could never
+    move it back - the album just reported nothing to change.
+    """
+    seed_jackpot(tmp_path, discs={1: "2"})
+
+    plan = plan_retag(JJ_PATH, JJ_CD, str(tmp_path))
+
+    assert disc_changes(plan) == {
+        "01 - Untitled 2.flac": {"from": "2", "to": "1"},
+        "02 - Cream of the Crop.flac": None,
+        "03 - Synergy.flac": None,
+    }
+
+    #? and the write agrees with the preview: afterwards there is nothing left to do
+    execute_retag(plan, JJ_CD, "apply")
+    assert plan_retag(JJ_PATH, JJ_CD, str(tmp_path))["empty"] is True
+
+
+def test_a_one_disc_release_still_gives_an_untagged_album_no_disc_number(tmp_path):
+    """
+    The rule this refines, which still holds: an album with no disc tags is already right, and
+    writing "1" into every one would give the whole library a diff it could never clear.
+    """
+    seed_jackpot(tmp_path)
+
+    plan = plan_retag(JJ_PATH, JJ_CD, str(tmp_path))
+
+    assert set(disc_changes(plan).values()) == {None}
+    assert plan["empty"] is True
+
+
+def test_disc_1_written_any_way_is_already_disc_1(tmp_path):
+    seed_jackpot(tmp_path, discs={1: "1/1", 2: "1", 3: "01"})
+
+    assert plan_retag(JJ_PATH, JJ_CD, str(tmp_path))["empty"] is True
+
+
+def test_the_instrumental_disc_does_not_claim_the_opening_track(tmp_path):
+    """
+    The other way the opening track could have reached disc 2: applying the Target exclusive,
+    whose second disc opens with "Untitled 2 (instrumental)". The matcher walks the tracklist
+    in order, so disc 1's exact title claims the file before the instrumental ever looks at it.
+    """
+    seed_jackpot(tmp_path)
+
+    plan = plan_retag(JJ_PATH, JJ_TARGET, str(tmp_path))
+    first = next(f for f in plan["files"] if f["filename"] == "01 - Untitled 2.flac")
+
+    assert (first["track_disc"], first["track_disc_position"]) == (1, 1)
+    assert first["changes"]["discnumber"]["to"] == "1"

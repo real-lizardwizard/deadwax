@@ -1,7 +1,7 @@
 import { get, post } from './http'
 import type {
   DeleteResult, DeletionSummary, LibraryResponse, NewImportsResponse, RetagPlan, RetagRelease,
-  RetagResponse, TrackDetailsResponse,
+  RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackTagEdit,
 } from './types'
 
 /**
@@ -67,6 +67,28 @@ export function applyRetag(
   })
 }
 
+/* ===== editing tags by hand ===== */
+
+/**
+ * What these hand edits would change, file by file. Writes nothing.
+ *
+ * Its own endpoint rather than a flag on apply, for the retag preview's reason: it runs while
+ * you are still typing, so it must be impossible for it to write anything by accident.
+ */
+export function previewTagEdits(albumPath: string, edits: TrackTagEdit[]): Promise<TagEditPlan> {
+  return post<TagEditPlan>('/library/tags/preview', { album_path: albumPath, edits })
+}
+
+/**
+ * Write them. Tags only — no file is renamed and no folder moves.
+ *
+ * Sends the same edits the preview did; the server recomputes the plan rather than taking one
+ * back, and refuses the whole batch if any of it is invalid.
+ */
+export function applyTagEdits(albumPath: string, edits: TrackTagEdit[]): Promise<TagEditResponse> {
+  return post<TagEditResponse>('/library/tags/apply', { album_path: albumPath, edits })
+}
+
 /* ===== the metadata queue ===== */
 
 /**
@@ -111,7 +133,8 @@ export function markReviewed(albumPath: string): Promise<{ reviewed: boolean }> 
  * The narrow counterpart to `applyRetag`. That one rewrites every file's tags and can rename
  * the folder — a lot to agree to when the only thing missing is the picture. This asks the
  * Cover Art Archive for art belonging to the release the album's own tags already name, so
- * there is nothing to choose and nothing to preview.
+ * there is nothing to choose and nothing to preview. It is saved at COVER_ART_SIZE, which the
+ * settings tab sets.
  *
  * `replace` is off by default: a sleeve you picked yourself is not ours to overwrite because
  * the Archive happens to have one too.

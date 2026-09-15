@@ -1,5 +1,7 @@
 import os
+import re
 from dotenv import dotenv_values, load_dotenv
+from src import __version__
 from src.logger import logger
 
 #? Which names the environment already held before .env was read.
@@ -81,8 +83,94 @@ def describe_slskd_url(url: str | None) -> str | None:
     return None
 
 
+#? The name MusicBrainz and the Cover Art Archive are given, with the version appended from
+#? src/__init__.py rather than typed by anybody. That is the point of building it here: a user
+#? agent written by hand in a compose file goes on claiming whichever version it was written
+#? against long after the image has moved on, and the contact is the only part of it that was
+#? ever the user's to supply.
+APP_NAME = "jimbrainz"
+
+#? What the Cover Art Archive will serve for a release's front cover. The numbers are its fixed
+#? thumbnail sizes; `full` is whatever was originally uploaded, which has no fixed size at all.
+COVER_ART_SIZES = ("250", "500", "1200", "full")
+
+
+def build_user_agent(contact: str) -> str:
+    """`jimbrainz/<version> ( contact )` - MusicBrainz's documented shape, spaces and all."""
+    return f"{APP_NAME}/{__version__} ( {contact} )"
+
+
+def contact_from_useragent(value: str | None) -> str | None:
+    """
+    The contact inside a user agent written by hand, the way MUSICBRAINZ_USERAGENT used to be.
+
+    MusicBrainz documents the form `App/1.0 ( contact )`, and the bracketed contact is the only
+    part of it that was ever the user's own - the name and version describe jimbrainz. So an
+    install configured the old way keeps working after an upgrade: the contact is lifted out,
+    and the rest is rebuilt around it with the version actually running.
+
+    None when there is no contact to find. The caller then sends the old value exactly as it
+    was, since that is what this install has been sending, and guessing at it could only make
+    it worse.
+    """
+    text = (value or "").strip()
+    if not text:
+        return None
+
+    #? the documented place: the last bracketed part
+    bracketed = [part.strip() for part in re.findall(r"\(([^()]*)\)", text)]
+    if bracketed and bracketed[-1]:
+        return bracketed[-1]
+
+    #? no brackets - a bare address or URL, possibly after an `App/1.0` token
+    for token in reversed(text.split()):
+        token = token.strip("<>,;")
+        if "@" in token or "://" in token:
+            return token
+
+    return None
+
+
+def describe_contact(value: str | None) -> str | None:
+    """
+    Why this can't be sent as the MusicBrainz contact, or None if it can.
+
+    Checks what would make it unusable, not whether the address is real: an address that parses
+    is all a user agent needs, and MusicBrainz is the one who would ever write to it. Phrased to
+    follow the setting's name - "MUSICBRAINZ_EMAIL has spaces in it".
+    """
+    text = (value or "").strip()
+
+    if not text:
+        return "is not set"
+
+    if not text.isascii():
+        #? request headers are ASCII, and httpx refuses to build a client with anything else -
+        #? which would surface as every MusicBrainz request failing "unexpectedly"
+        return "has characters a web request header can't carry - use plain ASCII"
+
+    if "(" in text or ")" in text:
+        return "wants just the address, without brackets - jimbrainz writes the rest itself"
+
+    if any(c.isspace() or not c.isprintable() for c in text):
+        return "has spaces in it - it should be one address, like you@example.com"
+
+    if "@" not in text and "." not in text:
+        return "doesn't look like an email address or a web address"
+
+    return None
+
+
 load_dotenv()
 class Config:
+    #? The contact MusicBrainz asks every app for: an email address, or a web address. It is the
+    #? only part of the user agent that is yours - jimbrainz writes its own name and version
+    #? around it, so the version sent is always the one running. See musicbrainz_user_agent().
+    MUSICBRAINZ_EMAIL = _env("MUSICBRAINZ_EMAIL")
+
+    #? The old way: a whole user agent, written by hand. Still read, so an install configured
+    #? before MUSICBRAINZ_EMAIL existed keeps working - its contact is lifted out and used when
+    #? no email is set. Superseded rather than required.
     MUSICBRAINZ_USERAGENT = _env("MUSICBRAINZ_USERAGENT")
 
     #? slskd is the download backend now, not optional anymore
@@ -105,6 +193,12 @@ class Config:
     #? have done rather than acting on a possibly mis-mapped volume.
     ORGANIZE_MODE = _env("ORGANIZE_MODE", "dry_run")
 
+    #? How big a cover to fetch from the Cover Art Archive: 250 | 500 | 1200 | full. 500 is the
+    #? size jimbrainz always fetched, and it stays the default - `full` pulls the original
+    #? upload, which is often several megabytes, so it is something to choose rather than
+    #? something to be given. Read at the point of use, like everything else here.
+    COVER_ART_SIZE = _env("COVER_ART_SIZE", "500")
+
     #? ===== which settings the settings tab may write ==========================
     #?
     #? Editability is a property of the setting, not a policy choice, and the split is real:
@@ -122,11 +216,16 @@ class Config:
     EDITABLE = {
         "SLSKD_URL": "slskd",
         "SLSKD_APIKEY": "slskd",
+        "MUSICBRAINZ_EMAIL": "musicbrainz",
+        #? Still editable, so an override stored under it can be seen and reverted. The tab
+        #? only shows its row while it is set - see the settings route.
         "MUSICBRAINZ_USERAGENT": "musicbrainz",
         "ORGANIZE_MODE": None,
         "SLSKD_DOWNLOAD_PATH": None,
         "SLSKD_INCOMPLETE_PATH": None,
         "LIBRARY_PATH": "library",
+        #? the cover art client reads it per fetch, so there is nothing to rebuild
+        "COVER_ART_SIZE": None,
     }
 
     #? Why each of these cannot be edited here, in words the settings tab renders verbatim.
@@ -188,6 +287,89 @@ class Config:
             )
 
     @classmethod
+    def musicbrainz_contact(cls) -> tuple[str | None, str | None]:
+        """
+        The contact to send, and the setting it came from.
+
+        MUSICBRAINZ_EMAIL wins. Without it, the contact inside an old MUSICBRAINZ_USERAGENT is
+        used, so an install configured before the email setting existed carries on working -
+        and starts reporting the version it is actually running.
+
+        An email that could not be sent at all is passed over rather than sent broken: httpx
+        refuses a header it can't encode, which would take down every MusicBrainz request
+        rather than just this one field. describe_contact() is what says why, in the settings
+        tab and in the log.
+        """
+        email = (cls.MUSICBRAINZ_EMAIL or "").strip()
+        if email and email.isascii() and email.isprintable():
+            return email, "MUSICBRAINZ_EMAIL"
+
+        legacy = contact_from_useragent(cls.MUSICBRAINZ_USERAGENT)
+        if legacy:
+            return legacy, "MUSICBRAINZ_USERAGENT"
+
+        return None, None
+
+    @classmethod
+    def musicbrainz_user_agent(cls) -> str | None:
+        """
+        What MusicBrainz and the Cover Art Archive are told we are, or None if there's no contact.
+
+        Built on every call rather than stored, so it follows a contact changed in the settings
+        tab - and the version, which only changes with the code, cannot go stale.
+        """
+        contact, _ = cls.musicbrainz_contact()
+        if contact:
+            return build_user_agent(contact)
+
+        #? An old hand-written value with no contact in it at all. Sent as it was, because it is
+        #? what this install has been sending - MusicBrainz may well rate limit it, and the
+        #? settings tab says so, but quietly replacing it with nothing would be worse.
+        return (cls.MUSICBRAINZ_USERAGENT or "").strip() or None
+
+    @classmethod
+    def report_musicbrainz(cls) -> None:
+        """
+        Say what MusicBrainz will be told, and whether anything about it needs fixing.
+
+        Called once the settings tab's overrides have been laid over the environment, NOT from
+        check(), which runs before they are: an email set in the tab would otherwise be
+        reported missing on every restart, next to a tab showing it perfectly well set.
+        """
+        email_problem = describe_contact(cls.MUSICBRAINZ_EMAIL) if cls.MUSICBRAINZ_EMAIL else None
+        if email_problem:
+            logger.error(f"MUSICBRAINZ_EMAIL {email_problem}", extra={"frontend": True})
+
+        _, source = cls.musicbrainz_contact()
+        user_agent = cls.musicbrainz_user_agent()
+
+        if source == "MUSICBRAINZ_EMAIL":
+            logger.info(f"MusicBrainz user agent: {user_agent}")
+
+        elif source == "MUSICBRAINZ_USERAGENT":
+            #? not an error - it works - but worth a line, since the fix is a one-line edit
+            logger.info(
+                f"using the contact from MUSICBRAINZ_USERAGENT, sent as {user_agent}. Set "
+                f"MUSICBRAINZ_EMAIL instead and the old user agent can go."
+            )
+
+        elif user_agent:
+            logger.error(
+                "MUSICBRAINZ_USERAGENT has no contact in it that jimbrainz can find, so it is "
+                "sent exactly as written - and MusicBrainz rate limits requests without one. "
+                "Set MUSICBRAINZ_EMAIL to your email address.",
+                extra={"frontend": True},
+            )
+
+        else:
+            logger.error(
+                "MUSICBRAINZ_EMAIL is not set. MusicBrainz asks every app for a contact address "
+                "and rate limits requests without one - set it in the settings tab, or in your "
+                "compose file.",
+                extra={"frontend": True},
+            )
+
+    @classmethod
     def exists(cls, env_var: str):
         value = os.getenv(env_var)
 
@@ -198,15 +380,14 @@ class Config:
 
     @classmethod
     def check(cls):
-        if not cls.MUSICBRAINZ_USERAGENT:
-            logger.error("MUSICBRAINZ_USERAGENT not found in environment", extra={"frontend": True})
-
-        else: logger.info(f"MUSICBRAINZ_USERAGENT found!")
+        #? MusicBrainz is reported separately, by report_musicbrainz(), once the settings tab's
+        #? overrides are in - see its docstring for why it can't happen here.
 
         #? Named before anything else, because an empty environment variable beating a good
         #? .env line is invisible from the value alone - the setting simply reads as unset
         #? while the .env line sits there looking correct.
-        for name in ("SLSKD_URL", "SLSKD_APIKEY", "MUSICBRAINZ_USERAGENT", "ORGANIZE_MODE"):
+        for name in ("SLSKD_URL", "SLSKD_APIKEY", "MUSICBRAINZ_EMAIL", "ORGANIZE_MODE",
+                     "COVER_ART_SIZE"):
             if shadowed_by_empty_env(name):
                 logger.error(
                     f"{name} is set to an EMPTY value in the container environment, which "
@@ -258,6 +439,14 @@ class Config:
                 extra={"frontend": True},
             )
             cls.ORGANIZE_MODE = "dry_run"
+
+        if cls.COVER_ART_SIZE not in COVER_ART_SIZES:
+            logger.error(
+                f"COVER_ART_SIZE is '{cls.COVER_ART_SIZE}', expected one of "
+                f"{', '.join(COVER_ART_SIZES)}. Falling back to 500.",
+                extra={"frontend": True},
+            )
+            cls.COVER_ART_SIZE = "500"
 
         if cls.organizing_enabled():
             logger.info(f"organizing enabled in '{cls.ORGANIZE_MODE}' mode")
