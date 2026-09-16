@@ -1292,10 +1292,12 @@ same-origin with the app by design.
   no diff for it at all. `\n` and `\\` survive as typed; only the four-hex-digit `\u` form becomes
   the character it names. It bit twice in v0.6.9 - the control-character regex in `tagEdit.ts`,
   then the sim check written to pin that fix - and was caught only because `git diff --stat`
-  said `Bin`. It is probably how `libraryTree.ts` and `tree.sim.cjs` came to be binary already.
-  Nothing else notices, because a raw control character is legal in a JS string or regex and
-  the code runs the same. Write such escapes with a byte-level replace, and look for `Bin` in
-  `git diff --stat` before committing.
+  said `Bin`. It is exactly how `libraryTree.ts`, `tree.sim.cjs`,
+  `LibraryTree.tsx` and `groupAlbums.ts` came to be binary - all five separators were respelled
+  as escapes in 0.6.10. Nothing else notices, because a raw control character is legal in a JS
+  string or regex and the code runs the same. Write such escapes with a byte-level replace.
+  `tests/test_source_bytes.py` now fails on any raw control byte in a tracked source file, so
+  catching this no longer depends on noticing `Bin` in `git diff --stat`.
 
 ## Known performance problems (profiled, not guessed)
 
