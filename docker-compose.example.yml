@@ -16,7 +16,7 @@ services:
     #                 have sitting in a file you might paste into a forum post - your slskd
     #                 API key in particular.
     #   environment   the block below. Good for keeping everything about this container in
-    #                 one file, which is what you want on Unraid and similar.
+    #                 one file, which is what you want when Komodo or similar manages the stack.
     #
     # If a setting appears in both, `environment:` wins. That is a deliberate feature and
     # not an accident - but see the warning on the block below before using it.
@@ -90,4 +90,4 @@ services:
     ports:
       - "8080:8080"
     # this exposes the port on your host, to change it modify xxxx:8080, xxxx being
-    # the port you want to expose. This is automatically handled in unraid.
+    # the port you want to expose. A stack manager like Komodo reads it straight out of this file.

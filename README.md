@@ -47,7 +47,7 @@ A caveat worth setting expectations on: this won't magically always find the exa
 
 ## Installation
 
-_Note: if you're an **UnRaid** user like me, ive added a template that can be manually added and used, instructions are [below](#installation-unraid)_
+_Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** managing Docker, so the compose file below is the path that gets used day to day — see [below](#installation-openmediavault--komodo). There's also an Unraid template [further down](#installation-unraid), inherited from the project this forked from._
 
 ### Prerequisites:
 1. a running [slskd](https://slskd.org) instance reachable from this container, with an API key
@@ -58,7 +58,7 @@ _Note: if you're an **UnRaid** user like me, ive added a template that can be ma
 1. either clone the repo: ```git clone https://github.com/real-lizardwizard/jimbrainz.git``` <br> or just grab the ```docker-compose.example.yml``` file
 2. fill in the ```docker-compose.example.yml``` and rename it to just ```docker-compose.yml``` (here you can change the exposed port and docker network)
 3. put your settings in **either** place — whichever you prefer:
-   - the ```environment:``` block of your compose file, which keeps everything about the container in one file. This is usually what you want on Unraid.
+   - the ```environment:``` block of your compose file, which keeps everything about the container in one file. This is usually what you want when something like Komodo, Portainer or Dockge manages your stacks.
    - or ```.env.example```, filled in and renamed to just ```.env```, which keeps your slskd API key out of a file you might paste into a forum post.
 
    Mixing them is fine: a setting in ```environment:``` wins over the same one in ```.env```, so you can keep the key in ```.env``` and the rest in compose. jimbrainz logs which source each setting came from when it starts, so you can check it picked up what you expected.
@@ -283,14 +283,28 @@ There is no authentication of any kind. It can delete files and rewrite tags, so
 Retagging and editing tags rewrite them in place, and deleting removes files for good. The previews before a retag or a tag edit and the confirmation before a delete are the whole safety net, which is why all of them try hard to tell you exactly what's about to happen.
 </details>
 
-## Installation (UnRaid)
-since i made this for myself, and i use UnRaid, ive included an unraid template that'll let you manually add a template to run this container like any of your other UnRaid docker containers!
+## Installation (OpenMediaVault + Komodo)
 
-_Note: given this container was just made for myself, i havent published it to the Community Applications plugin, i might in the future though. Images are built and published to ghcr.io automatically on tagged releases, but this still doesnt adhere to the same quality control as the CA containers, again, i made this for myself so use at your own discretion_
+This is how jimbrainz actually runs: OpenMediaVault for the box, Komodo managing Docker.
+
+Komodo deploys compose stacks, so there's nothing jimbrainz-specific to learn — point a stack at this repo, or paste `docker-compose.example.yml` into one, and put the settings in the stack's environment (or in a `.env` beside it; which wins is described above).
+
+Four things are worth getting right the first time:
+
+1. **`PUID`/`PGID` should match whoever owns the media on your OMV share**, and should be the same pair slskd runs as. If the two disagree, jimbrainz files albums away as a user slskd can't write — or the other way round. OMV's shared folders commonly sit in the `users` group.
+2. **`SLSKD_URL` has to be reachable from inside this container.** If slskd is another stack on the same host, put both on one docker network and use its service name and internal port (`http://slskd:5030`) rather than the host address you type into your browser.
+3. **`SLSKD_DOWNLOAD_PATH` and the `/downloads` mount have to point at the same files slskd writes**, as this container sees them. It's the most likely first-run problem by a mile, and it fails quietly: organizing simply finds nothing.
+4. **Mount your library** where `LIBRARY_PATH` points, or the library tab has nothing to read.
+
+Leave `ORGANIZE_MODE` on `dry_run` until the event log shows it finding your files, then switch it to `copy` or `move`.
+
+## Installation (Unraid)
+
+**Inherited from [LidBrainz](https://github.com/dual-shock/lidbrainz), which this forked from, and untested since.** Its author ran Unraid and wrote this template and these notes; jimbrainz is developed and run against OpenMediaVault, so nobody here has put it in front of an Unraid box in a long while. The variables it sets are kept current with the app — the Unraid mechanics around them are upstream's, and it has never been published to the Community Applications plugin. Images are built and published to ghcr.io automatically on tagged releases either way.
 
 ### how to manually add the template
 1. move/copy `my-jimbrainz.xml` to `/boot/config/plugins/dockerMan/templates-user/`
-2. in the docker tab on unraid, click "add container"
+2. in the docker tab on Unraid, click "add container"
 3. the jimbrainz template should show up in the template dropdown, select it
 
 ### how to set up the container
@@ -300,7 +314,7 @@ _Note: given this container was just made for myself, i havent published it to t
 4. point the `/downloads` mapping at the same folder slskd writes finished downloads to
 5. point the `/music` mapping at your library if you want the library tab to do anything
 
-it should now run just like any other UnRaid docker container, and you can automatically pull eventual updates through the docker tab.
+it should now run just like any other Unraid docker container, and you can automatically pull eventual updates through the docker tab.
 
 ## who is this for?
 

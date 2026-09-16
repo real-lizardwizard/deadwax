@@ -12,6 +12,13 @@ directly.**
 
 Repo: `real-lizardwizard/jimbrainz` · owner is James Barnett (jamesambarnett@gmail.com).
 
+**Where it runs: OpenMediaVault, with Komodo managing Docker.** So compose is the deployment path
+that matters, and anything addressed to "your Unraid box" is wrong. The Unraid template
+(`my-jimbrainz.xml`) and the Unraid half of the README are INHERITED from upstream LidBrainz,
+whose author did run Unraid and wrote those first-person notes; they came through the fork
+untouched and nothing here has tested them since. **Don't read Unraid into the repo because those
+files are in it** - it produced a run of confidently wrong deployment advice before James said so.
+
 ### Branches
 
 | branch | what |
@@ -818,8 +825,8 @@ Asked for: "reorder and resize columns in the library metadata".
   `docker compose up`.
 - **A stored override WINS over the environment, and that is the only honest precedence.**
   The alternative — environment wins — means an edit made in the tab silently reverts on the
-  next restart for anyone configuring through compose, which is most people and all Unraid
-  users. So the override wins, the row says it is overriding, and it offers to revert.
+  next restart for anyone configuring through compose, which is most people and everyone whose
+  stacks are managed for them. So the override wins, the row says it is overriding, and it offers to revert.
 - **Reverting DELETES the row rather than writing the environment's value back.** Copying the
   value back would pin whatever compose said that day, so a later compose change would
   silently stop taking effect. Absence is the only representation of "follow the environment"
