@@ -119,6 +119,12 @@ check('a dragged column is exactly that wide', sized.template, '2.4em 2.6em 300p
 check('...and counts towards the table\'s minimum in px', sized.minWidth.includes('300px'), true);
 check('the minimum is exactly the columns\' own minimums, with no slack for a lone flexible column to swallow',
       fields.columnLayout(['number', 'title'], {}, ['2.4em']).minWidth, 'calc(15em + 0px)');
+check('a column that stretches is flexible - a resize has to pin those to its left',
+      [fields.isFlexible('title'), fields.isFlexible('artist')], [true, true]);
+check('...and one with a size of its own is not, so it never moves under the drag',
+      [fields.isFlexible('number'), fields.isFlexible('length')], [false, false]);
+check('a column nobody has heard of takes the flexible default', fields.isFlexible('nonesuch'), true);
+check('the title\'s track is the one the layout draws it with', fields.columnSize('title'), fields.TITLE_WIDTH);
 check('a width below the minimum is raised to it', fields.clampWidth(4), fields.MIN_COLUMN_PX);
 check('saved widths for columns that are gone are dropped',
       fields.reconcileWidths({ title: 200, gone: 90 }), { title: 200 });

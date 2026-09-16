@@ -23,6 +23,8 @@ export interface TrackFieldsState extends Layout {
   move: (id: string, before: string | null) => void
   /** Size a column in px, or null to give it back its own width. */
   resize: (id: string, width: number | null) => void
+  /** Pin several columns to px at once - a resize freezes the flexible ones to its left. */
+  pin: (widths: Readonly<Record<string, number>>) => void
   /** Everything back to how it started: which fields, their order and their widths. */
   reset: () => void
 }
@@ -88,11 +90,23 @@ export function useTrackFields(): TrackFieldsState {
     return { ...current, widths }
   }), [commit])
 
+  /*
+   * One write, so the pinned neighbours and the dragged column cannot land in separate renders
+   * with a reflow in between - which is the flicker this whole freeze exists to remove.
+   */
+  const pin = useCallback((widths: Readonly<Record<string, number>>) => commit((current) => ({
+    ...current,
+    widths: {
+      ...current.widths,
+      ...Object.fromEntries(Object.entries(widths).map(([id, px]) => [id, clampWidth(px)])),
+    },
+  })), [commit])
+
   const reset = useCallback(() => commit(() => ({
     visible: TRACK_FIELDS.filter((field) => field.initial).map((field) => field.id),
     order: defaultOrder(),
     widths: {},
   })), [commit])
 
-  return { ...layout, toggle, move, resize, reset }
+  return { ...layout, toggle, move, resize, pin, reset }
 }

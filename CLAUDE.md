@@ -739,6 +739,37 @@ Asked for: "use the current version automatically ... and have the user only set
   lays on so that `plan_retag` stays pure. The full-size comparison shows the original whatever
   the setting, so its save button's tooltip names the size that will actually be saved.
 
+### Looking at a cover close up (v0.6.12)
+
+Asked for: the zoom "doesn't follow the cursor at all. and it doesn't move either".
+
+- **The viewer zooms about the cursor and is dragged to move**, instead of toggling between fit
+  and actual size. The toggle was no use for the job the viewer exists for - deciding which of
+  two scans to keep - because actual size put the image in a scroll box centred on its middle, so
+  the corner you wanted to look at was reached by scrollbars if at all.
+- **It is a transform, not a scroll box**: `translate(x, y) scale(z)` on the image, inside a
+  stage that keeps `overflow: hidden`. A scroll position cannot be anchored on a point, and the
+  old note still holds for why the scroll box was awkward - a flex container centring an
+  overflowing child pushes its left and top edges out of reach of the scrollbars entirely.
+- **Zoom holds whatever is under the cursor still.** The translation is measured from the stage's
+  centre, which is where the image is anchored, so `x' = px - (px - x) * z'/z` with `px` the
+  cursor's offset from that centre. **Verified in the browser:** at 3.3x the point under the
+  cursor had drifted 2px (the rounding in the screenshot's coordinate frame), and a click-zoom to
+  2x drifted 0 on both axes, with neither axis clamped.
+- **The image cannot be dragged off its own pane.** Panning is clamped to the overflow, so an
+  edge never comes inside the stage. The corollary is worth knowing before it reads as a bug: at
+  a modest zoom, where the image is barely bigger than the stage, the clamp WINS over the
+  anchoring and it re-centres, because there is nothing to pan into.
+- **A click zooms to `max(2, actual size)`.** 1:1 on its own is not always a visible step: this
+  album's cover is 600px shown at 570, so "actual size" zoomed it by five per cent and read as
+  the click having done nothing. The wheel is for the sizes in between.
+- **The wheel listener is added by hand, non-passive.** Preact's `onWheel` can't be marked
+  `passive: false`, and a passive listener may not `preventDefault`, so the page behind the
+  viewer scrolls instead of the cover zooming.
+- **`offsetWidth` over the rect matters more than usual here**: the image is the transformed
+  element, so its rect is the ZOOMED box, and feeding that into the clamp multiplies the zoom
+  back in on every frame.
+
 ### Arranging the track viewer's columns (v0.6.9)
 
 Asked for: "reorder and resize columns in the library metadata".
@@ -754,8 +785,25 @@ Asked for: "reorder and resize columns in the library metadata".
   default neighbour rather than at the end - the order's equivalent of `seen`. Pinned in
   `tags.sim.cjs`.
 - **A sized column is exactly that many px; the rest keep their `fr` sizes** and share what is
-  left, so widening one narrows its flexible neighbours rather than pushing the table off the
-  side. `min-width` is a `calc()` of the em minimums plus the fixed pixels.
+  left. `min-width` is a `calc()` of the em minimums plus the fixed pixels.
+- **A drag pins the flexible columns to its LEFT, and that is what makes the grip follow the
+  cursor (v0.6.12, asked for).** A flexible column shares the row's spare space wherever in the
+  row it sits, so widening a column took that space out of the title beside it: the column's own
+  left edge travelled as far as its right edge did, its width barely changed, and the whole table
+  reflowed under the cursor - "super janky", and it was. `startResize` now measures the flexible
+  columns before the grip and pins them at the width they are already drawn at, which changes
+  nothing on screen, and commits them with the drag so the release doesn't reflow either.
+  Columns to the RIGHT still absorb, so the table goes on filling the pane; when none are left to
+  absorb it grows past the pane and `.track-table-scroll` scrolls, as Explorer does. **Verified
+  with real pointer drags:** 100px of pointer moved the artist column's right edge exactly 100px
+  with its left edge still and the title unchanged, and 80px on the title did the same.
+- **The grip keeps the offset it was grabbed at.** The grip is 7px wide and is taken hold of
+  somewhere inside that; the edge holds that distance from the pointer for the whole drag, or the
+  first move snaps the column onto the cursor by up to 7px.
+- **Cell text is anchored LEFT, numbers included (v0.6.12, asked for).** Right-aligned numbers
+  slide along as their column is sized, so the column you are dragging looks like it is shuffling
+  its contents about. `TrackField.align` is deleted rather than left as metadata nothing reads -
+  the `.track-cell.is-right` rule stays, because the album summary row still uses it.
 - **While resizing, the template is written straight onto the table's style** - one write a
   frame rather than a render of every row - and committed once on release, which renders the
   same string. Nothing moves until a header drag has travelled 5px, so a click or the start of

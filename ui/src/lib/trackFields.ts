@@ -34,7 +34,6 @@ export interface TrackField {
   group: FieldGroup
   /** A CSS grid track size, for the table column. */
   width: string
-  align?: 'right'
   /** Set in the data face, because it is a number or an id that reads in columns. */
   mono?: boolean
   /** On before anyone has chosen. */
@@ -84,7 +83,7 @@ function channels(n: number | null | undefined): string {
 
 export const TRACK_FIELDS: readonly TrackField[] = [
   {
-    id: 'number', label: '#', group: 'Tags', width: '2.6em', align: 'right', mono: true,
+    id: 'number', label: '#', group: 'Tags', width: '2.6em', mono: true,
     initial: true, fromScan: true,
     value: (row) => {
       const n = fileNumber(row, 'position')
@@ -92,7 +91,7 @@ export const TRACK_FIELDS: readonly TrackField[] = [
     },
   },
   {
-    id: 'disc', label: 'Disc', group: 'Tags', width: '3.8em', align: 'right', mono: true,
+    id: 'disc', label: 'Disc', group: 'Tags', width: '3.8em', mono: true,
     initial: true, fromScan: true,
     //? A file with no disc tag is on disc 1: it sorts there, every player reads it that way, and
     //? applying a one-disc release now writes 1 over a stray other number. So the column says 1
@@ -140,7 +139,7 @@ export const TRACK_FIELDS: readonly TrackField[] = [
   { id: 'isrc', label: 'ISRC', group: 'Tags', width: '9em', mono: true, initial: false, fromScan: false, value: tag('isrc') },
   { id: 'releasecountry', label: 'Country', group: 'Tags', width: '4.5em', initial: false, fromScan: false, value: tag('releasecountry') },
   { id: 'media', label: 'Media', group: 'Tags', width: '6em', initial: false, fromScan: false, value: tag('media') },
-  { id: 'bpm', label: 'BPM', group: 'Tags', width: '3.5em', align: 'right', mono: true, initial: false, fromScan: false, value: tag('bpm') },
+  { id: 'bpm', label: 'BPM', group: 'Tags', width: '3.5em', mono: true, initial: false, fromScan: false, value: tag('bpm') },
   { id: 'language', label: 'Language', group: 'Tags', width: '5em', initial: false, fromScan: false, value: tag('language') },
   { id: 'copyright', label: 'Copyright', group: 'Tags', width: 'minmax(8em, 0.5fr)', initial: false, fromScan: false, value: tag('copyright') },
   { id: 'comment', label: 'Comment', group: 'Tags', width: 'minmax(8em, 0.6fr)', initial: false, fromScan: false, value: tag('comment') },
@@ -148,7 +147,7 @@ export const TRACK_FIELDS: readonly TrackField[] = [
   //? widths are measured against the HEADER label plus its padding, not the values - "Sample
   //? rate" is far wider than "44.1 kHz", and a header cut to "Samp…" names nothing
   {
-    id: 'length', label: 'Length', group: 'Audio', width: '5em', align: 'right', mono: true,
+    id: 'length', label: 'Length', group: 'Audio', width: '5em', mono: true,
     initial: true, fromScan: true,
     value: ({ track, details }) => trackTime(details?.length ?? track.length),
   },
@@ -158,18 +157,18 @@ export const TRACK_FIELDS: readonly TrackField[] = [
   },
   { id: 'codec', label: 'Codec', group: 'Audio', width: '6em', initial: false, fromScan: false, value: ({ details }) => details?.codec ?? '' },
   {
-    id: 'bitrate', label: 'Bitrate', group: 'Audio', width: '6em', align: 'right', mono: true,
+    id: 'bitrate', label: 'Bitrate', group: 'Audio', width: '6em', mono: true,
     initial: true, fromScan: false,
     value: ({ details }) => (details?.bitrate ? `${Math.round(details.bitrate / 1000)} kbps` : ''),
   },
   {
-    id: 'sample_rate', label: 'Sample rate', group: 'Audio', width: '7em', align: 'right',
+    id: 'sample_rate', label: 'Sample rate', group: 'Audio', width: '7em',
     mono: true, initial: true, fromScan: false,
     value: ({ details }) =>
       details?.sample_rate ? `${(details.sample_rate / 1000).toFixed(details.sample_rate % 1000 ? 1 : 0)} kHz` : '',
   },
   {
-    id: 'bits', label: 'Bit depth', group: 'Audio', width: '6em', align: 'right', mono: true,
+    id: 'bits', label: 'Bit depth', group: 'Audio', width: '6em', mono: true,
     initial: true, fromScan: false,
     value: ({ details }) => (details?.bits_per_sample ? `${details.bits_per_sample}-bit` : ''),
   },
@@ -186,7 +185,7 @@ export const TRACK_FIELDS: readonly TrackField[] = [
   { id: 'musicbrainz_artistid', label: 'Artist ID', group: 'MusicBrainz', width: '19em', mono: true, initial: false, fromScan: false, value: tag('musicbrainz_artistid') },
 
   {
-    id: 'size', label: 'Size', group: 'File', width: '5em', align: 'right', mono: true,
+    id: 'size', label: 'Size', group: 'File', width: '5em', mono: true,
     initial: false, fromScan: true, value: ({ track }) => formatSize(track.size),
   },
   {
@@ -329,6 +328,23 @@ export function minimumEm(width: string): number {
  *
  * `leading` is sized tracks drawn before the columns and never moved: the tick boxes.
  */
+/** The grid track a column takes when it has not been dragged to a width of its own. */
+export function columnSize(id: string): string {
+  return id === TITLE_COLUMN ? TITLE_WIDTH : fieldById(id)?.width ?? 'minmax(6em, 1fr)'
+}
+
+/**
+ * Does this column stretch to fill the row?
+ *
+ * A flexible column absorbs whatever the others give up, wherever in the row it sits. That is
+ * what makes a resize drag pin the flexible columns to its LEFT: without it, widening a column
+ * takes the space out of the title beside it, the column's own left edge travels as far as its
+ * right edge does, and the grip sits still while the table reflows under the cursor.
+ */
+export function isFlexible(id: string): boolean {
+  return columnSize(id).includes('fr')
+}
+
 export function columnLayout(
   columns: readonly string[],
   widths: Readonly<Record<string, number>>,
@@ -346,7 +362,7 @@ export function columnLayout(
       continue
     }
 
-    const size = id === TITLE_COLUMN ? TITLE_WIDTH : fieldById(id)?.width ?? 'minmax(6em, 1fr)'
+    const size = columnSize(id)
     tracks.push(size)
     em += minimumEm(size)
   }

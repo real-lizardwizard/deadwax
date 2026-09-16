@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
 import { Loading } from './Loading'
 
@@ -29,6 +29,19 @@ interface Props {
     onClick: () => void
   } | undefined
 }
+
+const MAX_ZOOM = 8
+/** A wheel notch is about 100 units, so one notch is about 16%. */
+const WHEEL_ZOOM = 0.0015
+
+/** How the image sits in its pane: 1 is fitted, and x/y move it from the centre in px. */
+interface View {
+  zoom: number
+  x: number
+  y: number
+}
+
+const FIT: View = { zoom: 1, x: 0, y: 0 }
 
 interface Size {
   width: number
@@ -91,7 +104,7 @@ export function ArtViewer({ images, onClose, action }: Props) {
 
         <div class="art-viewer-footer">
           <span class="text white-tertiary art-viewer-hint">
-            Click an image to see it at actual size.
+            Click to zoom in where you point · scroll to zoom · drag to move.
           </span>
           {action && (
             <button
@@ -120,7 +133,10 @@ function ArtPane(
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<'loading' | 'loaded' | 'failed'>('loading')
   const [size, setSize] = useState<Size | null>(null)
-  const [actual, setActual] = useState(false)
+  const [view, setView] = useState<View>(FIT)
+  const [panning, setPanning] = useState(false)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
 
   const src = image.sources[attempt]
   const failed = state === 'failed' || !src
@@ -130,24 +146,164 @@ function ArtPane(
     if (failed) onSize(null)
   }, [failed])
 
+  /**
+   * Hold the image inside its pane: it can be moved until an edge reaches the middle, no further.
+   *
+   * Letting it go anywhere means a cover dragged off the side leaves an empty pane and no way to
+   * tell where it went.
+   */
+  const clamp = useCallback((next: View): View => {
+    const img = imgRef.current
+    const stage = stageRef.current
+    if (!img || !stage) return next
+
+    //? SIZE from the offset properties. The image is the thing being transformed, so its rect is
+    //? the ZOOMED box and would multiply the zoom back in - see CLAUDE.md on transformed boxes
+    const spareX = Math.max(0, (img.offsetWidth * next.zoom - stage.clientWidth) / 2)
+    const spareY = Math.max(0, (img.offsetHeight * next.zoom - stage.clientHeight) / 2)
+
+    return {
+      zoom: next.zoom,
+      x: Math.min(spareX, Math.max(-spareX, next.x)),
+      y: Math.min(spareY, Math.max(-spareY, next.y)),
+    }
+  }, [])
+
+  /**
+   * Zoom about a point on screen, so whatever is under the cursor stays under the cursor.
+   *
+   * Zooming about the centre instead is what made this useless for the job it exists for: the
+   * corner of a sleeve you want a closer look at walks off the pane as it grows.
+   */
+  const zoomAt = useCallback((clientX: number, clientY: number, factor: number) => {
+    setView((current) => {
+      const stage = stageRef.current
+      if (!stage) return current
+
+      const zoom = Math.min(MAX_ZOOM, Math.max(1, current.zoom * factor))
+      if (zoom === current.zoom) return current
+
+      //? POSITION from the rect - the stage is not transformed, only the image inside it is
+      const rect = stage.getBoundingClientRect()
+      //? the image is centred in the stage, so the centre is what its translation is measured from
+      const px = clientX - (rect.left + rect.width / 2)
+      const py = clientY - (rect.top + rect.height / 2)
+      const scale = zoom / current.zoom
+
+      //? the point under the cursor sits at (px - x) / zoom in the image; hold it still
+      return clamp({ zoom, x: px - (px - current.x) * scale, y: py - (py - current.y) * scale })
+    })
+  }, [clamp])
+
+  //? a listener of our own, because Preact's onWheel cannot be marked non-passive - and a passive
+  //? one may not preventDefault, which would scroll the page behind the viewer instead of zooming
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return undefined
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * WHEEL_ZOOM))
+    }
+
+    stage.addEventListener('wheel', onWheel, { passive: false })
+    return () => stage.removeEventListener('wheel', onWheel)
+  }, [zoomAt])
+
+  //? another image starts again; a window that changed shape under a zoomed one is pulled back in
+  useEffect(() => setView(FIT), [src])
+  useEffect(() => {
+    const onResize = () => setView((current) => clamp(current))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [clamp])
+
+  /**
+   * Drag to move the image; a press that never travels is a click, which zooms.
+   *
+   * One gesture has to decide which it was, so nothing moves until the pointer has gone a few
+   * pixels - the same rule the column headers use. Without it a click with a shaky hand nudges
+   * the image instead of zooming, and neither gesture feels like it was heard.
+   */
+  const startPan = (event: PointerEvent) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+
+    const img = event.currentTarget as HTMLImageElement
+    const startX = event.clientX
+    const startY = event.clientY
+    let lastX = startX
+    let lastY = startY
+    let moved = false
+
+    img.setPointerCapture(event.pointerId)
+
+    const move = (e: PointerEvent) => {
+      if (!moved && Math.abs(e.clientX - startX) < 4 && Math.abs(e.clientY - startY) < 4) return
+      if (!moved) {
+        moved = true
+        setPanning(true)
+      }
+
+      const dx = e.clientX - lastX
+      const dy = e.clientY - lastY
+      lastX = e.clientX
+      lastY = e.clientY
+      setView((current) => clamp({ zoom: current.zoom, x: current.x + dx, y: current.y + dy }))
+    }
+
+    const up = (e: PointerEvent) => {
+      img.removeEventListener('pointermove', move)
+      img.removeEventListener('pointerup', up)
+      img.removeEventListener('pointercancel', up)
+      setPanning(false)
+      if (moved) return
+
+      if (view.zoom > 1) {
+        setView(FIT)
+        return
+      }
+
+      //? 1:1 where that is bigger, but never less than a doubling: this album's cover is 600px
+      //? shown at 570, so "actual size" alone zoomed it by five per cent and read as nothing
+      //? happening at all. A click is a step you can see; the wheel is for the sizes between.
+      const actual = imgRef.current?.offsetWidth
+        ? imgRef.current.naturalWidth / imgRef.current.offsetWidth
+        : 2
+      zoomAt(e.clientX, e.clientY, Math.max(2, actual))
+    }
+
+    img.addEventListener('pointermove', move)
+    img.addEventListener('pointerup', up)
+    img.addEventListener('pointercancel', up)
+  }
+
   return (
     <figure class="art-viewer-pane">
       <figcaption class="art-viewer-caption">
         <span class="art-viewer-label">{image.label}</span>
         {size && <span class="art-viewer-dims">{size.width} × {size.height} px</span>}
+        {view.zoom > 1 && <span class="art-viewer-dims">×{view.zoom.toFixed(1)}</span>}
         {largest && <span class="art-viewer-largest" title="More pixels than the other one">Larger</span>}
       </figcaption>
 
-      <div class={`art-viewer-stage${actual ? ' is-actual' : ''}`}>
+      <div
+        ref={stageRef}
+        class={`art-viewer-stage${view.zoom > 1 ? ' is-zoomed' : ''}${panning ? ' is-panning' : ''}`}
+      >
         {src && !failed && (
           <img
+            ref={imgRef}
             src={src}
             alt={image.label}
-            title={actual ? 'Fit to the window' : 'Show at actual size'}
-            style={state === 'loaded' ? undefined : 'visibility:hidden'}
+            draggable={false}
+            title={view.zoom > 1 ? 'Drag to move · click to fit' : 'Click to zoom in · scroll to zoom'}
+            style={`transform:translate(${view.x}px,${view.y}px) scale(${view.zoom})`
+              + (state === 'loaded' ? '' : ';visibility:hidden')}
+            onPointerDown={(event) => startPan(event as unknown as PointerEvent)}
             onLoad={(event) => {
-              const img = event.currentTarget as HTMLImageElement
-              const measured = { width: img.naturalWidth, height: img.naturalHeight }
+              const el = event.currentTarget as HTMLImageElement
+              const measured = { width: el.naturalWidth, height: el.naturalHeight }
               setSize(measured)
               onSize(measured)
               setState('loaded')
@@ -156,7 +312,6 @@ function ArtPane(
               if (attempt + 1 < image.sources.length) setAttempt((n) => n + 1)
               else setState('failed')
             }}
-            onClick={() => setActual((on) => !on)}
           />
         )}
 

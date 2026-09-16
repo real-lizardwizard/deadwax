@@ -12,8 +12,8 @@ import {
 import { isNewImport, outstandingIssues } from '../lib/metadataQueue'
 import { tickTracks } from '../lib/tagEdit'
 import {
-  clampWidth, columnLayout, fieldById, FIELD_GROUPS, TITLE_COLUMN, TRACK_FIELDS, visibleColumns,
-  type TrackField, type TrackRow,
+  clampWidth, columnLayout, fieldById, FIELD_GROUPS, isFlexible, TITLE_COLUMN, TRACK_FIELDS,
+  visibleColumns, type TrackField, type TrackRow,
 } from '../lib/trackFields'
 import { ArtViewer } from './ArtViewer'
 import { AlbumArt, ArtistIcon, coverSources, GetArtButton } from './LibraryParts'
@@ -642,7 +642,17 @@ function TrackTable(
   }
 
   /**
-   * Drag a header's right edge to size its column.
+   * Drag a header's right edge to size its column, and have that edge stay under the cursor.
+   *
+   * Which means this column's LEFT edge must not move while the drag is in flight. It used to:
+   * every flexible column shares the row's spare space, so widening this one took the space out
+   * of the title to its left, the left edge travelled as far as the right edge did, and the
+   * column stayed about the size it started while the whole table reflowed under the cursor.
+   *
+   * So the flexible columns to the LEFT are pinned to the width they are already drawn at, which
+   * changes nothing on screen, and are committed along with the drag so the release doesn't
+   * reflow either. Columns to the RIGHT still absorb, so the table goes on filling the pane
+   * instead of running off the side of it - and when there are none to absorb, it scrolls.
    *
    * While dragging, the new template goes straight onto the table's style - one write a frame
    * rather than a render of every row - and the width is committed once, on release. Committing
@@ -656,20 +666,39 @@ function TrackTable(
 
     const grip = event.currentTarget as HTMLElement
     const cell = grip.parentElement
+    const head = cell?.parentElement
     const table = tableRef.current
-    if (!cell || !table) return
+    if (!cell || !head || !table) return
 
     grip.setPointerCapture(event.pointerId)
     grip.classList.add('is-active')
 
-    const startX = event.clientX
-    //? SIZE from offsetWidth, not the rect - see CLAUDE.md on transformed boxes
+    //? read the ids off the cells rather than building a selector - see CLAUDE.md on CSS.escape
+    const cells = new Map<string, HTMLElement>()
+    for (const el of head.querySelectorAll<HTMLElement>('[data-column]')) {
+      const key = el.dataset['column']
+      if (key) cells.set(key, el)
+    }
+
+    const pinned: Record<string, number> = {}
+    for (const columnId of columns.slice(0, columns.indexOf(id))) {
+      const el = cells.get(columnId)
+      //? SIZE from offsetWidth, not the rect - see CLAUDE.md on transformed boxes
+      if (el && !layout.widths[columnId] && isFlexible(columnId)) pinned[columnId] = el.offsetWidth
+    }
+
+    const widths = { ...layout.widths, ...pinned }
+    const rect = cell.getBoundingClientRect()
+    //? POSITION from the rect, read once - the pins above are what keep it true all drag
+    const left = rect.left
+    //? where in the grip's 7px it was taken hold of, so the column can't jump on the first move
+    const grab = rect.right - event.clientX
     const startWidth = cell.offsetWidth
     let width = startWidth
 
     function move(e: PointerEvent) {
-      width = clampWidth(startWidth + e.clientX - startX)
-      const next = columnLayout(columns, { ...layout.widths, [id]: width }, [CHECK_COLUMN])
+      width = clampWidth(e.clientX + grab - left)
+      const next = columnLayout(columns, { ...widths, [id]: width }, [CHECK_COLUMN])
       ;(table as HTMLElement).style.setProperty('--track-columns', next.template)
       ;(table as HTMLElement).style.minWidth = next.minWidth
     }
@@ -679,7 +708,7 @@ function TrackTable(
       grip.removeEventListener('pointerup', stop)
       grip.removeEventListener('pointercancel', stop)
       grip.classList.remove('is-active')
-      if (width !== startWidth) layout.resize(id, width)
+      if (width !== startWidth) layout.pin({ ...pinned, [id]: width })
     }
 
     grip.addEventListener('pointermove', move)
@@ -736,7 +765,6 @@ function TrackTable(
                 class={[
                   'track-cell',
                   'track-head-cell',
-                  field?.align === 'right' ? 'is-right' : '',
                   dragging ? 'is-dragging' : '',
                   dropBefore ? 'drop-before' : '',
                   dropAfter ? 'drop-after' : '',
@@ -843,7 +871,6 @@ function Cell({ field, row, pending }: { field: TrackField; row: TrackRow; pendi
       role="gridcell"
       class={[
         'track-cell',
-        field.align === 'right' ? 'is-right' : '',
         field.mono ? 'is-mono' : '',
         inferred ? 'is-inferred' : '',
       ].filter(Boolean).join(' ')}

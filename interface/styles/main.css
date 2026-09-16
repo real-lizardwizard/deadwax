@@ -5508,22 +5508,22 @@ span.red { color: var(--red-text); }
     object-fit: contain;
     box-shadow: var(--shadow-lg);
     cursor: zoom-in;
+    /* the drag moves the image: without this a touch scrolls the pane, and the browser takes
+       the press as the start of dragging the picture somewhere */
+    touch-action: none;
+    -webkit-user-drag: none;
+    user-select: none;
 }
 
 /*
- * Actual size. A block with auto margins rather than the flex centring above, because a flex
- * container centring an overflowing child pushes its left and top edges out of reach of the
- * scrollbars - the image would be scrollable only towards the bottom right.
+ * Zoomed, the image is moved and scaled by a transform rather than scrolled inside the stage.
+ * A scroll box centring an overflowing child pushes its left and top edges out of reach of the
+ * scrollbars - it could only ever be looked at towards the bottom right - and nothing about a
+ * scroll position can be anchored on the cursor, which is the whole point of zooming into the
+ * corner of a sleeve. The stage keeps overflow: hidden and the transform is clipped by it.
  */
-.art-viewer-stage.is-actual { display: block; overflow: auto; }
-
-.art-viewer-stage.is-actual > img {
-    display: block;
-    margin: auto;
-    max-width: none;
-    max-height: none;
-    cursor: zoom-out;
-}
+.art-viewer-stage.is-zoomed > img { cursor: grab; }
+.art-viewer-stage.is-panning > img { cursor: grabbing; }
 
 .art-viewer-status {
     position: absolute;
