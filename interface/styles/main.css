@@ -4223,17 +4223,33 @@ span.red { color: var(--red-text); }
     align-items: center;
 }
 
-/* column headers: a gradient strip with a hairline between each, as in Explorer */
+/*
+ * Column headers: a gradient strip with a hairline between each, as in Explorer.
+ *
+ * The smaller label type is set on the CELLS below, never on this grid container. The column
+ * template is in `em`, and a grid resolves em against ITS OWN font-size - so a header one step
+ * smaller than the rows made every em column about 9% narrower up here than in the body (2.6em
+ * came out 28.6px against 31.2px). The two grids' boundaries then drifted further apart the
+ * further right you looked, and a value sat up to 10px right of the label above it, which reads
+ * as a stray space in front of the text. Both grid containers stay on the table's own size.
+ */
 .track-table-head {
     background: var(--gloss-header);
     border-bottom: 1px solid var(--border-default);
+    /* the rows carry a 1px transparent border for their hover and selection outline, so without
+       the same here every value sits one pixel right of the label above it */
+    border-left: 1px solid transparent;
+    border-right: 1px solid transparent;
     box-shadow: var(--bevel);
     color: var(--white-secondary-text);
-    font-size: var(--text-2xs);
     user-select: none;
 }
 
-.track-table-head > .track-cell { padding: 5px var(--space-2); border-right: 1px solid var(--border-subtle); }
+.track-table-head > .track-cell {
+    padding: 5px var(--space-2);
+    border-right: 1px solid var(--border-subtle);
+    font-size: var(--text-2xs);
+}
 .track-table-head > .track-cell:last-child { border-right: 0; }
 .track-table-head > .track-cell:hover { background: var(--hot-fill); color: var(--white-text); }
 

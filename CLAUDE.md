@@ -1063,6 +1063,24 @@ Each of these cost real time. Don't rediscover them.
   focus stayed on the row you left, and only artist rows (no NUL) worked. The tree now compares
   `dataset.node` directly. The same misreading built a group id by hand with a space, which
   resolved to nothing - **never rebuild a node id by hand; go through `lib/libraryTree.ts`.**
+- **A grid resolves `em` track sizes against ITS OWN font-size, so two grids meant to line up
+  have to share one (v0.6.13).** The track viewer draws its header and every row as separate
+  grids from one `--track-columns` template, and the header was a type step smaller with
+  `--text-2xs` set on the CONTAINER. Every em column then came out about 9% narrower up there -
+  `2.6em` was 28.6px in the header against 31.2px in a row - so the two grids' boundaries drifted
+  further apart the further right you looked, and a value sat up to 10px right of its own label.
+  James reported it as "a weird space before the text in the columns", which is exactly what it
+  looks like. The smaller label type belongs on the header's CELLS; both grid containers stay on
+  the table's own size. A px track is immune, which is why a column already dragged to a width
+  was the one thing that lined up, and why this hid for so long.
+  **It also quietly bent the resize**, which measures HEADER cells to pin the flexible columns to
+  the left of the grip: while the two disagreed, it pinned a body column to a width 9% short of
+  the one it was actually drawn at. Nothing about the drag changed to fix that - the grids
+  agreeing is what fixed it.
+  The rows also carry a 1px transparent border for their hover and selection outline, so the
+  header carries a matching transparent one on each side; without it everything sits one pixel
+  out. **Verified:** both grids resolve identical tracks, and every column's value now starts at
+  exactly the same x as its header label, before and after a resize drag.
 - **Current Chrome ignores every `::-webkit-scrollbar` rule on an element that sets
   `scrollbar-width` or `scrollbar-color`.** `.scrollable` set both, so the Windows 7 scrollbars
   applied in Safari only. The Windows 7 block resets both to `auto` first; if the scrollbars
