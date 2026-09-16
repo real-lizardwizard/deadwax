@@ -1008,7 +1008,8 @@ Each of these cost real time. Don't rediscover them.
   the tree narrows, for exactly that reason. **Anything added to a tree row needs measuring at
   the tree's narrowest width (260px)**, not eyeballing.
 - **An id containing NUL can never be found by `querySelector`.** Album group keys are built
-  with a ` ` separator (the Read tool DISPLAYS it as a space - it isn't one), and
+  with a `\u0000` separator (the source writes that escape, so the file stays plain text; the
+  string itself still holds one real NUL), and
   `CSS.escape()` turns NUL into U+FFFD, as the spec requires. So `[data-node="${CSS.escape(id)}"]`
   silently matched nothing for every album and track: arrow keys moved the selection while
   focus stayed on the row you left, and only artist rows (no NUL) worked. The tree now compares
