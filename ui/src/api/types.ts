@@ -47,6 +47,9 @@ export interface Track {
    */
   disc?: number | null
   disc_position?: number | null
+  /** The track's own credit, where it differs from the release's — a split, a compilation. */
+  artist?: string | null
+  artist_mbids?: string[]
 }
 
 /**
@@ -247,6 +250,11 @@ export interface PingResponse {
  */
 export interface ArtistCredit {
   name?: string
+  /**
+   * What MusicBrainz puts BETWEEN this name and the next — " & ", " feat. ", " / ".
+   * It is part of how the credit reads; see creditName() in lib/release.ts.
+   */
+  joinphrase?: string
   artist?: { id?: string; name?: string }
 }
 
@@ -529,6 +537,8 @@ export interface NewImportsResponse {
  */
 export interface RetagRelease {
   artist: string
+  /** Every artist id in the release's credit, in the order credited. */
+  artist_mbids?: string[]
   album: string
   /** This pressing's year. Written to the `date` tag. */
   year?: string | null
@@ -702,4 +712,111 @@ export interface LogEvent {
   event_type: LogLevel
   event_content: string
   src?: LogSource
+}
+
+
+/* ------------------------------------------------------------------ artists */
+
+/**
+ * An artist has no row of its own in the scan — the library is read album by album — so all of
+ * this is derived: which albums are theirs, the folder those share, and what is already in it.
+ */
+export interface ArtistAlbumRow {
+  key?: string
+  album: string
+  year?: string
+  path: string
+  edition?: string
+  track_count?: number
+  total_size?: number
+  release_mbid?: string | null
+}
+
+export interface ArtistSummary {
+  artist: string
+  /** The folder their albums share, or null when they don't share one. */
+  path: string | null
+  folder_problem: string | null
+  album_count: number
+  track_count: number
+  total_size: number
+  first_year: string
+  last_year: string
+  albums: ArtistAlbumRow[]
+  /** kind -> the filename already on disk, e.g. { thumb: 'artist.jpg' }. */
+  art: Record<string, string>
+}
+
+export interface ArtistMember {
+  name: string
+  mbid?: string | null
+  began?: string | null
+  ended?: string | null
+  current: boolean
+  roles: string[]
+}
+
+export interface ArtistFacts {
+  mbid?: string | null
+  name: string
+  sort_name: string
+  type: string
+  disambiguation: string
+  country: string
+  area: string
+  begin_area: string
+  began: string
+  ended_on: string
+  ended: boolean
+  genres: string[]
+  aliases: string[]
+  links: { label: string; url: string }[]
+  members: ArtistMember[]
+}
+
+export interface ArtistImageCandidate {
+  kind: string
+  url: string
+  /** What to show in the picker — a thumbnail for Commons, the image itself otherwise. */
+  preview: string
+  source: string
+  label: string
+}
+
+export interface ArtistMatch {
+  mbid: string
+  name: string
+  disambiguation: string
+  country: string
+  type: string
+  score?: number
+}
+
+export interface ArtistImagesPlan {
+  artist_path: string
+  source: string
+  files: { kind: string; stem: string; existing: string | null; action: 'write' | 'keep' | 'replace' }[]
+  problems: string[]
+  empty: boolean
+}
+
+export interface ArtistImagesPreview extends ArtistSummary {
+  mbid: string | null
+  /** How we know which artist this is: their tags, a name search, or the caller said so. */
+  mbid_source: 'tags' | 'search' | 'given' | null
+  matches: ArtistMatch[]
+  facts: ArtistFacts | null
+  candidates: ArtistImageCandidate[]
+  best: Record<string, ArtistImageCandidate>
+  kinds: { kind: string; label: string }[]
+  plan: ArtistImagesPlan | null
+  has_key: boolean
+  problems: string[]
+}
+
+export interface ArtistImagesResult {
+  artist: string
+  path: string
+  results: { mode: string; dry_run: boolean; written: string[]; skipped: string[]; problems: string[] }
+  art: Record<string, string>
 }

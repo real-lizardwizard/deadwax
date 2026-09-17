@@ -199,6 +199,12 @@ class Config:
     #? something to be given. Read at the point of use, like everything else here.
     COVER_ART_SIZE = _env("COVER_ART_SIZE", "500")
 
+    #? Optional, and artist banners are off without it. MusicBrainz has no artist images at all
+    #? and Wikimedia Commons has a photograph at best, so TheAudioDB is the only source here
+    #? with banners, logos and backgrounds - keyed by the same MusicBrainz artist id jimbrainz
+    #? already holds. Everything else about an artist page works without it.
+    THEAUDIODB_KEY = _env("THEAUDIODB_KEY")
+
     #? ===== which settings the settings tab may write ==========================
     #?
     #? Editability is a property of the setting, not a policy choice, and the split is real:
@@ -226,6 +232,8 @@ class Config:
         "LIBRARY_PATH": "library",
         #? the cover art client reads it per fetch, so there is nothing to rebuild
         "COVER_ART_SIZE": None,
+        #? read per lookup by the artist image client, so nothing to rebuild here either
+        "THEAUDIODB_KEY": None,
     }
 
     #? Why each of these cannot be edited here, in words the settings tab renders verbatim.

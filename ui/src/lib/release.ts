@@ -1,4 +1,4 @@
-import type { Release, ReleaseGroup, RetagRelease, Track } from '../api/types'
+import type { ArtistCredit, Release, ReleaseGroup, RetagRelease, Track } from '../api/types'
 
 const EDITION_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
   [/super deluxe/, 'SUPER DELUXE'],
@@ -56,6 +56,36 @@ export function detectEditionTags(release: Release): string[] {
  * Must produce the same shape as buildExpectedFromRelease() in interface/scripts/main.js, so an
  * album corrected here carries the same tags as one downloaded fresh.
  */
+/**
+ * An artist credit as MusicBrainz itself renders it.
+ *
+ * The join phrases ARE the punctuation: "A / B" for a split, "A & B" for a collaboration,
+ * "A feat. B" for a guest spot. Joining the names on ", " - which this interface did
+ * everywhere - invents punctuation MusicBrainz did not use and turns a duet into what reads
+ * as two separate acts.
+ *
+ * Mirrors credit_name() in src/artists.py; the two must agree, because one names a folder
+ * and the other writes the tag inside it.
+ */
+export function creditName(credit: ArtistCredit[] | undefined): string {
+  return (credit ?? [])
+    .map((entry) => `${entry.name || entry.artist?.name || ''}${entry.joinphrase ?? ''}`)
+    .join('')
+    .trim()
+}
+
+/** Every artist id in a credit, in the order credited. Mirrors credit_ids() in src/artists.py. */
+export function creditIds(credit: ArtistCredit[] | undefined): string[] {
+  const ids: string[] = []
+
+  for (const entry of credit ?? []) {
+    const id = entry.artist?.id
+    if (id && !ids.includes(id)) ids.push(id)
+  }
+
+  return ids
+}
+
 function flattenTracks(release: Release): Track[] {
   const tracks: Track[] = []
   let position = 0
@@ -69,15 +99,21 @@ function flattenTracks(release: Release): Track[] {
         title?: string
         position?: number
         length?: number | null
-        recording?: { title?: string; length?: number | null }
+        'artist-credit'?: ArtistCredit[]
+        recording?: { title?: string; length?: number | null; 'artist-credit'?: ArtistCredit[] }
       }
       position += 1
+      //? the track's own credit, which is the release's on an ordinary album and somebody
+      //? else's on a compilation or a split. Carried so the file can be tagged with it.
+      const credit = entry['artist-credit'] ?? entry.recording?.['artist-credit']
       tracks.push({
         position,
         title: entry.recording?.title || entry.title || '',
         length_ms: entry.recording?.length ?? entry.length ?? null,
         disc,
         disc_position: entry.position ?? trackIndex + 1,
+        artist: creditName(credit) || null,
+        artist_mbids: creditIds(credit),
       })
     }
   }
@@ -111,6 +147,9 @@ export function buildRetagRelease(
 
   return {
     artist: context.artist,
+    //? the ids behind the credit. The NAME still comes from the context, because that is what
+    //? names the folder and the user picked it - see build_album_dirname.
+    artist_mbids: creditIds(release['artist-credit']),
     album: release.title || context.album,
     year: rawDate ? rawDate.substring(0, 4) : null,
     original_year: context.firstReleaseDate ? context.firstReleaseDate.substring(0, 4) : null,

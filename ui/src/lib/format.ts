@@ -70,3 +70,15 @@ export function albumArtUrl(album: { path: string; art_mtime?: number }): string
   const version = album.art_mtime ?? 0
   return `/jimbrainz/library/art?album=${encodeURIComponent(album.path)}&v=${version}`
 }
+
+
+/**
+ * One of an artist's own images, off disk.
+ *
+ * `version` busts the five-minute cache when a picture has just been replaced — the URL names a
+ * KIND rather than a file, so swapping artist.jpg for a new one leaves the address unchanged.
+ */
+export function artistArtUrl(path: string, kind: string, version?: number | string): string {
+  const bust = version === undefined ? '' : `&v=${encodeURIComponent(String(version))}`
+  return `/jimbrainz/library/artist/art?artist=${encodeURIComponent(path)}&kind=${encodeURIComponent(kind)}${bust}`
+}

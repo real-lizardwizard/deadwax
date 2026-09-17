@@ -129,6 +129,24 @@ check('a width below the minimum is raised to it', fields.clampWidth(4), fields.
 check('saved widths for columns that are gone are dropped',
       fields.reconcileWidths({ title: 200, gone: 90 }), { title: 200 });
 
+console.log('\nartist credits (mirrors credit_name/credit_ids in src/artists.py)');
+const SPLIT = [
+  { name: 'Dance Gavin Dance', joinphrase: ' / ', artist: { id: 'id-dgd' } },
+  { name: 'Tilian', joinphrase: '', artist: { id: 'id-tilian' } },
+];
+const FEAT = [
+  { name: 'Jay-Z', joinphrase: ' feat. ', artist: { id: 'id-jay' } },
+  { name: 'Linkin Park', artist: { id: 'id-lp' } },
+];
+check('a split reads with the join phrase MusicBrainz gave it',
+      release.creditName(SPLIT), 'Dance Gavin Dance / Tilian');
+check('so does a guest spot', release.creditName(FEAT), 'Jay-Z feat. Linkin Park');
+check('one artist is just their name', release.creditName([{ name: 'Portishead' }]), 'Portishead');
+check('nothing credited is nothing, not "N/A"', release.creditName(undefined), '');
+check('every id, in the order credited', release.creditIds(SPLIT), ['id-dgd', 'id-tilian']);
+check('the same artist credited twice is one id',
+      release.creditIds([{ name: 'A', artist: { id: 'x' } }, { name: 'A again', artist: { id: 'x' } }]), ['x']);
+
 console.log('\nan instrumental release is an edition (the third copy of the vocabulary)');
 check('"Jackpot Juicer (instrumental)" is tagged INSTRUMENTAL',
       release.detectEditionTags({ id: 'x', title: 'Jackpot Juicer (instrumental)', disambiguation: '' }),

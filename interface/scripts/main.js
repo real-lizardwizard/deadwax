@@ -916,12 +916,17 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
     (release.media || []).forEach((medium, discIndex) => {
         (medium.tracks || []).forEach((track, trackIndex) => {
             position += 1;
+            // the track's OWN credit - the release's on an ordinary album, somebody else's on
+            // a compilation or a split. Carried so the file gets tagged with who is on it.
+            const credit = track['artist-credit'] || track.recording?.['artist-credit'];
             tracks.push({
                 position,
                 title: track.recording?.title || track.title || '',
                 length_ms: track.recording?.length ?? track.length ?? null,
                 disc: medium.position ?? discIndex + 1,
                 disc_position: track.position ?? trackIndex + 1,
+                artist: credit ? getArtistNames(credit) : null,
+                artist_mbids: getArtistIds(credit),
             });
         });
     });
@@ -933,6 +938,9 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
 
     return {
         artist: releaseGroupContext.artist,
+        // the ids behind the credit. The NAME still comes from the context, because that is
+        // what names the folder and it is what the user picked.
+        artist_mbids: getArtistIds(release['artist-credit']),
         album: release.title || releaseGroupContext.album,
         year: rawDate ? rawDate.substring(0, 4) : releaseGroupContext.year,
         release_mbid: release.id,
@@ -1380,9 +1388,28 @@ function renderCandidates() {
 
 
 
+// The join phrases ARE the punctuation MusicBrainz intends: " / " for a split, " & " for a
+// collaboration, " feat. " for a guest spot. Joining on ", " instead - which this did - invents
+// punctuation and turns a duet into what reads as two separate acts.
+//
+// Third copy of this rule, and they must agree: creditName() in ui/src/lib/release.ts and
+// credit_name() in src/artists.py. One of them names a folder, another writes the tag inside it.
 function getArtistNames(artistCredit) {
     if (!artistCredit || !artistCredit.length) return 'N/A';
-    return artistCredit.map(ac => ac.name || 'N/A').join(', ');
+    return artistCredit
+        .map(ac => `${ac.name || ac.artist?.name || ''}${ac.joinphrase ?? ''}`)
+        .join('')
+        .trim() || 'N/A';
+}
+
+// Every artist id in a credit, in the order credited. Mirrors creditIds()/credit_ids().
+function getArtistIds(artistCredit) {
+    const ids = [];
+    for (const entry of artistCredit || []) {
+        const id = entry.artist?.id;
+        if (id && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
 }
 
 

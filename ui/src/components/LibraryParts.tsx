@@ -3,6 +3,8 @@ import { useEffect, useState } from 'preact/hooks'
 import * as libraryApi from '../api/library'
 import type { LibraryAlbum, MetadataIssueType } from '../api/types'
 import { albumArtUrl } from '../lib/format'
+import type { AlbumGroup } from '../lib/groupAlbums'
+import { groupNodeId } from '../lib/libraryTree'
 import { describeIssues, issueLabel } from '../lib/metadataQueue'
 import { Loading } from './Loading'
 
@@ -159,5 +161,37 @@ export function ArtistIcon() {
       <circle cx="8" cy="5" r="3" fill="currentColor" />
       <path d="M2.5 14.5c0-3.2 2.5-5.3 5.5-5.3s5.5 2.1 5.5 5.3z" fill="currentColor" />
     </svg>
+  )
+}
+
+
+/**
+ * An artist's or a group's albums as covers.
+ *
+ * Shared rather than duplicated: the details pane draws it for an artist node and the artist
+ * page draws the same thing, and two copies would drift the moment one gained a tooltip.
+ */
+export function CoverGrid(
+  { groups, showArtist, onSelect }:
+  { groups: readonly AlbumGroup[]; showArtist: boolean; onSelect: (id: string) => void },
+) {
+  return (
+    <div class="cover-grid">
+      {groups.map((group) => (
+        <button
+          key={group.key}
+          type="button"
+          class="cover-tile"
+          title={`${group.album} — ${group.artist}`}
+          onClick={() => onSelect(groupNodeId(group))}
+        >
+          <AlbumArt album={group.artFrom} size="large" class="cover-tile-art" />
+          <span class="cover-tile-title">{group.album}</span>
+          <span class="cover-tile-sub">
+            {showArtist ? group.artist : group.yearRange || group.year || ' '}
+          </span>
+        </button>
+      ))}
+    </div>
   )
 }

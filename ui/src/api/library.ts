@@ -1,7 +1,8 @@
 import { get, post } from './http'
 import type {
-  DeleteResult, DeletionSummary, LibraryResponse, NewImportsResponse, RetagPlan, RetagRelease,
-  RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackTagEdit,
+  ArtistImagesPreview, ArtistImagesResult, ArtistSummary, DeleteResult, DeletionSummary,
+  LibraryResponse, NewImportsResponse, RetagPlan, RetagRelease, RetagResponse, TagEditPlan,
+  TagEditResponse, TrackDetailsResponse, TrackTagEdit,
 } from './types'
 
 /**
@@ -163,4 +164,49 @@ export function deletionSummary(albumPath: string): Promise<DeletionSummary> {
  */
 export function deleteAlbum(albumPath: string): Promise<DeleteResult> {
   return post<DeleteResult>('/library/delete', { album_path: albumPath })
+}
+
+
+/**
+ * One artist as the library knows them. Touches no network on the server.
+ *
+ * Drawn immediately, the way the library tab draws its snapshot; what needs MusicBrainz and the
+ * image hosts arrives separately, because those can take seconds or be down altogether.
+ */
+export function fetchArtist(name: string): Promise<ArtistSummary> {
+  return get<ArtistSummary>(`/library/artist?name=${encodeURIComponent(name)}`)
+}
+
+/**
+ * Who this artist is in MusicBrainz, every picture the sources have of them, and what writing
+ * those would do. Fetches no image bytes — only the small payloads that say what exists.
+ */
+export function previewArtistImages(
+  artist: string,
+  options: { artistMbid?: string | null; replace?: boolean } = {},
+): Promise<ArtistImagesPreview> {
+  return post<ArtistImagesPreview>('/library/artist/images/preview', {
+    artist,
+    artist_mbid: options.artistMbid ?? null,
+    replace: options.replace ?? false,
+  })
+}
+
+/**
+ * Write the chosen pictures into the artist's folder.
+ *
+ * `choices` is kind -> the URL picked for it, and the server only honours a URL that this
+ * artist's own sources offered — it recomputes the list rather than trusting this one.
+ */
+export function applyArtistImages(
+  artist: string,
+  choices: Record<string, string>,
+  options: { artistMbid?: string | null; replace?: boolean } = {},
+): Promise<ArtistImagesResult> {
+  return post<ArtistImagesResult>('/library/artist/images/apply', {
+    artist,
+    artist_mbid: options.artistMbid ?? null,
+    choices,
+    replace: options.replace ?? false,
+  })
 }

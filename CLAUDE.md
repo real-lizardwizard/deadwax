@@ -67,7 +67,13 @@ src/
                    already on disk. Same plan/execute split, for the same reasons.
   track_tags.py    tags edited BY HAND, on one track or a selection at once. The fourth
                    writer, and the same plan/execute split again - see "Editing tags by hand".
-  api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py, app.py
+  artists.py       PURE. What an artist page shows, and where artist pictures come from -
+                   which is nowhere near as obvious as album covers. Also renders artist
+                   CREDITS, which is why a split album no longer reads as a list.
+  artist_art.py    artist images written into the artist's folder. The FIFTH writer, same
+                   plan/execute split - see "The artist page".
+  api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
+                   artist_images_endpoint.py (Wikidata/Commons + TheAudioDB), app.py
   routes/          search_musicbrainz, download, monitor_slskd, interface_logs, library,
                    settings (editable since v0.5.1 - see "The settings tab")
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
@@ -79,7 +85,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             500 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             553 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
@@ -170,10 +176,10 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   scoped to what is on screen, so the facets compose with it, and it reports "no cover on the
   Archive" separately from "the request failed" — the first is a fact about the release and
   nothing can be done, the second is worth trying again.
-- **There are now FOUR writers to the user's filesystem**, and all but the smallest use the same
+- **There are now FIVE writers to the user's filesystem**, and all but the smallest use the same
   plan/execute split: `organizer.py` files downloads in, `retag.py` corrects albums already
-  there, `track_tags.py` writes tags edited by hand (v0.6.9), and `save_cover_art()` writes a
-  single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
+  there, `track_tags.py` writes tags edited by hand (v0.6.9), `artist_art.py` writes an artist's
+  pictures into their folder (v0.6.15), and `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
   the write rather than trusting the plan, for the same reason the retag endpoint recomputes its
   own). A preview that disagrees with the write it previews is worse than no preview, so the
   first two derive the tags from one shared `organizer.tag_values()` rather than computing them
@@ -816,6 +822,77 @@ Asked for: "reorder and resize columns in the library metadata".
   same string. Nothing moves until a header drag has travelled 5px, so a click or the start of
   a right-click never rearranges anything, and only a change of landing spot causes a render.
 
+### The artist page (v0.6.15)
+
+Asked for: artist metadata "the same way" as albums, and "regular square images, banners, and
+anything else I'd need for an artist page".
+
+- **MusicBrainz hosts NO artist images.** The Cover Art Archive is releases only. What
+  musicbrainz.org itself draws on an artist page is a Wikimedia Commons file reached through
+  that artist's Wikidata link - so "get the image from MusicBrainz" is not a thing that can be
+  done, and anyone who assumes otherwise will look for an endpoint that does not exist.
+- **Three sources, and only the one that needs a key has what a page is made of.** An `image`
+  RELATION (present for some artists, not others - Tame Impala and Portishead have one,
+  Radiohead does not) and Wikidata's P18/P154, both of which resolve through Commons' bare
+  `Special:FilePath`; and TheAudioDB, keyed by the same MusicBrainz artist id, which is the only
+  one carrying banners, logos, backgrounds, wide shots and clear art. `THEAUDIODB_KEY` is
+  therefore optional and everything degrades to "a photograph, where Commons has one".
+  fanart.tv was considered and rejected: it requires a PROJECT key, registered by the developer,
+  which cannot be shipped in a public repo or obtained on the user's behalf.
+- **The square image is written as `artist.*`, and that is the whole point of writing files at
+  all.** Navidrome reads it with no configuration: `ArtistArtPriority` defaults to
+  `"artist.*, album/artist.*, external"`. Writing it as `folder.*` - what Jellyfin and Kodi call
+  an artist thumb - would be invisible to Navidrome AND sits in its COVER ART priority, so in a
+  folder that turned out to hold audio it would be read as that album's cover. The other five
+  (`banner`, `fanart`, `logo`, `landscape`, `clearart`) are what jimbrainz's own page is made of;
+  Navidrome displays none of them, Kodi and Jellyfin read them, nothing else notices.
+- **A folder holding TRACKS is refused.** That folder is an album to the scanner, and dropping
+  `artist.*` into it means something else entirely to every reader of these files.
+- **An artist has no folder in the scan, so it is derived** from where their albums are, and
+  only when they agree. Albums in two places, or one sitting at the top of the library, get a
+  message rather than a guess - a picture written into the wrong folder is not dangerous, just
+  silently useless, which is worse to debug.
+- **Applying only honours a URL the artist's own sources just offered.** The apply route
+  recomputes the candidate list exactly as it recomputes the plan. Without it, `choices` could
+  name any address - inside the network this container sits in - and jimbrainz would fetch it
+  and write the answer into the library under a name other tools read. Pinned by a test.
+- **Which artist this is comes from the TAGS first, and a name search is only believed when it
+  is unambiguous** (one exact name match, MusicBrainz score >= 90). Several bands share a name,
+  and the cost of getting it wrong is another band's photograph in this band's folder, where
+  nothing would ever flag it.
+- **The MusicBrainz half of the page is debounced by 400ms**, like the tag editor's preview.
+  Arrowing down a list of artists must not fire a lookup per row at a rate-limited server, three
+  hosts deep.
+- **Known gap:** on a phone the details pane is a sheet that opens for albums and tracks, and an
+  artist "just opens in place" (v0.6.5's decision). So the artist page is desktop and tablet
+  only. The phone rules for it are written and inert until that decision changes.
+
+### Artist credits, and the ids behind them (v0.6.15)
+
+Asked for as "better handling for multi-artist albums and tracks", and "get artist ID in the
+metadata as well".
+
+- **A credit's JOIN PHRASES are its punctuation.** MusicBrainz says "A / B" for a split, "A & B"
+  for a collaboration, "A feat. B" for a guest spot, and it says so in `joinphrase` between the
+  names. Joining on ", " - which every part of this interface did - invents punctuation nobody
+  chose and flattens a duet into what reads as two separate acts. The rule now lives in THREE
+  places that must agree: `credit_name()` in `src/artists.py`, `creditName()` in
+  `ui/src/lib/release.ts`, and `getArtistNames()` in `main.js`. One names a folder, another
+  writes the tag inside it.
+- **A track keeps its OWN artist.** `tag_values` gave every track the release's artist, so
+  applying a release to a compilation rewrote eighteen artists into one. The track's credit wins
+  where it has one; `albumartist` stays the release's, which is what the two tags are for.
+- **The artist ids are written at last**: `musicbrainz_albumartistid` and `musicbrainz_artistid`.
+  Nothing jimbrainz filed had ever recorded WHO an artist was, only which release - which is why
+  the artist page has to fall back to searching by name at all.
+- **One id is a string, several are a list**, and `read_current_tags` reads back the same shape.
+  Get that wrong and a file disagrees with itself on every preview: a bare string on one side, a
+  one-item list on the other, and an album that can never again say "nothing to change". Pinned
+  by a round-trip test that writes a file and re-previews it.
+- **`Track` in the download request declares `artist` and `artist_mbids`.** Same trap as
+  `disc`/`disc_position` before it: pydantic drops undeclared fields without a word, so a
+  compilation would arrive correct from the browser and be filed under one artist anyway.
+
 ### The settings tab
 
 - **The server half is EDITABLE as of v0.5.1**, via exactly the persistence story the
@@ -853,7 +930,8 @@ Asked for: "reorder and resize columns in the library metadata".
   not inside the container is the most common first-run failure in this project and it is
   completely invisible from the string — which looks correct, because it is correct, just
   not from in here.
-- **The API key never reaches the browser.** The row reports `set` or nothing. This payload
+- **The API key never reaches the browser.** The row reports `set` or nothing. `THEAUDIODB_KEY`
+  (v0.6.15) is declared `secret` for the same reason and is masked the same way. This payload
   renders on a page people screenshot into bug reports. A test asserts the key's value does
   not appear anywhere in the payload.
 - **Only `error` is decorated.** An unset OPTIONAL setting renders plain. When every row
@@ -1533,7 +1611,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 500 tests
+.venv/bin/python -m pytest tests/ -q  # 553 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1562,7 +1640,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 500 tests are fixture-driven. **Nothing has ever talked to a real slskd.** The parts most
+All 553 tests are fixture-driven. **Nothing has ever talked to a real slskd.** The parts most
 likely to break on deployment are exactly the parts tests can't reach:
 
 - slskd transfer `state` strings. **This one already came true**: `"Completed, Rejected"` was

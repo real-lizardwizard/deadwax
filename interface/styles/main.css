@@ -5926,6 +5926,190 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 .tags-spacer { flex: 1; }
 
 
+
+/* ---- the artist page ---------------------------------------------------- */
+
+.artist-hero {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--gloss-header);
+}
+
+/* A background only earns the contrast cost when there IS one: the text sits on top of it, so
+   it is dimmed and the panel's own colour is laid under it rather than replaced by it. */
+.artist-hero.has-background {
+    background-size: cover;
+    background-position: center 35%;
+    box-shadow: inset 0 0 0 999px rgb(0 0 0 / 62%);
+}
+
+.artist-hero-portrait > img {
+    display: block;
+    width: 108px;
+    height: 108px;
+    object-fit: cover;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
+.artist-hero-text { min-width: 0; }
+
+/* A logo is already the artist's name, drawn the way they draw it - so it replaces the heading
+   rather than sitting above a second copy of the same words. */
+.artist-hero-logo {
+    max-width: min(320px, 100%);
+    max-height: 72px;
+    object-fit: contain;
+    object-position: left center;
+}
+
+.artist-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+}
+
+.artist-genre {
+    padding: 1px var(--space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background-color: var(--background-color-input);
+    font-size: var(--text-2xs);
+    color: var(--white-secondary-text);
+}
+
+.artist-hero-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.artist-note { margin: var(--space-2) 0 0; font-size: var(--text-xs); }
+
+.artist-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.artist-column { min-width: 0; }
+.artist-folder { font-family: var(--font-mono); font-size: var(--text-2xs); word-break: break-all; }
+
+.artist-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.artist-links > a { font-size: var(--text-xs); }
+
+.artist-members {
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: var(--space-4);
+    font-size: var(--text-xs);
+}
+
+.artist-members > li { break-inside: avoid; padding: 1px 0; }
+/* past members stay, dimmed: a band's history is part of what an artist page is for */
+.artist-members > li.is-past { color: var(--white-tertiary-text); }
+.artist-member-name { color: var(--white-text); }
+
+/* ---- choosing which picture goes where ---------------------------------- */
+
+#artist-images {
+    position: fixed;
+    inset: 0;
+    z-index: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    background-color: rgb(0 0 0 / 55%);
+}
+
+.artist-images-frame {
+    display: flex;
+    flex-direction: column;
+    width: min(880px, 100%);
+    max-height: 100%;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-overlay);
+    box-shadow: var(--shadow-lg);
+}
+
+.artist-images-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    /* a box cannot be visible on one axis and auto on the other - say so, or it scrolls
+       sideways for nothing. See the note at the top of this file. */
+    overflow-x: hidden;
+    padding: var(--space-3);
+}
+
+.artist-images-row {
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.artist-images-row:last-child { border-bottom: 0; }
+.artist-images-label { margin-bottom: var(--space-2); font-size: var(--text-xs); }
+
+.artist-images-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.artist-images-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--background-color-input);
+    cursor: pointer;
+    font-size: var(--text-2xs);
+}
+
+.artist-images-option > img {
+    /* every kind is a different shape - a square, a banner, a wide shot - so they are bounded
+       rather than cropped, and what you click is what would be written */
+    max-width: 180px;
+    max-height: 76px;
+    object-fit: contain;
+}
+
+.artist-images-option:hover { border-color: var(--hot-border); background: var(--hot-fill); }
+.artist-images-option.is-chosen { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.artist-images-option.is-existing { cursor: default; opacity: 0.75; }
+
+.artist-images-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.artist-images-footer > .win-button:last-of-type { margin-left: 0; }
+.artist-images-footer > .settings-check { margin-right: auto; }
+
 /* ============================================================================
  * ? RESPONSIVE  --  KEEP THIS LAST IN THE FILE
  *
@@ -5947,6 +6131,46 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
  * ==========================================================================*/
 
 @media (max-width: 768px) {
+
+    /* ---- the artist page on a phone ---- */
+
+    /* the hero is three columns of things that each want the width to themselves */
+    .artist-hero {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: var(--space-3);
+        padding: var(--space-3);
+    }
+
+    .artist-hero-portrait > img { width: 72px; height: 72px; }
+    .artist-hero-logo { max-height: 48px; }
+
+    .artist-hero-actions {
+        grid-column: 1 / -1;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .artist-columns { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+    .artist-members { columns: 1; }
+
+    #artist-images { padding: 0; }
+
+    .artist-images-frame {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border: 0;
+        border-radius: 0;
+    }
+
+    /* the same 40px tap target the other dialogs' buttons get */
+    .artist-images-footer > .win-button { min-height: 40px; }
+
+    .artist-images-footer {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
 
     /* ---- the peer row drops the advertised speed once we have a real one ----
      *

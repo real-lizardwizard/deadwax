@@ -7,7 +7,7 @@ import { useTrackFields, type TrackFieldsState } from '../hooks/useTrackFields'
 import { formatAge, formatDuration, formatSize, trackTime } from '../lib/format'
 import type { AlbumGroup } from '../lib/groupAlbums'
 import {
-  editionNodeId, groupAddedAt, groupNodeId, nodeIdForAlbum, trackNodeId, type Selected,
+  editionNodeId, groupAddedAt, nodeIdForAlbum, trackNodeId, type Selected,
 } from '../lib/libraryTree'
 import { isNewImport, outstandingIssues } from '../lib/metadataQueue'
 import { tickTracks } from '../lib/tagEdit'
@@ -16,8 +16,9 @@ import {
   visibleColumns, type TrackField, type TrackRow,
 } from '../lib/trackFields'
 import { ArtViewer } from './ArtViewer'
-import { AlbumArt, ArtistIcon, coverSources, GetArtButton } from './LibraryParts'
+import { AlbumArt, CoverGrid, coverSources, GetArtButton } from './LibraryParts'
 import { Loading } from './Loading'
+import { ArtistDetails } from './ArtistDetails'
 import { TrackTagEditor } from './TrackTagEditor'
 
 export interface LibrarySummary {
@@ -150,19 +151,11 @@ export function LibraryDetails(props: Props) {
         return <Overview summary={summary} groups={groups} onSelect={props.onSelect} />
       case 'artist':
         return (
-          <section class="details-section">
-            <div class="details-header">
-              <div class="details-artist-badge" aria-hidden="true"><ArtistIcon /></div>
-              <div class="details-heading">
-                <h2 class="details-title">{selected.node.artist}</h2>
-                <div class="details-facts text default-muted">
-                  {artistFacts(selected.node.groups)}
-                </div>
-              </div>
-            </div>
-            <h3 class="details-subheading">Albums</h3>
-            <CoverGrid groups={selected.node.groups} showArtist={false} onSelect={props.onSelect} />
-          </section>
+          <ArtistDetails
+            artist={selected.node.artist}
+            groups={selected.node.groups}
+            onSelect={props.onSelect}
+          />
         )
       case 'group':
         return (
@@ -329,18 +322,6 @@ export function LibraryDetails(props: Props) {
   )
 }
 
-function artistFacts(groups: readonly AlbumGroup[]): string {
-  const tracks = groups.reduce((n, g) => n + g.trackCount, 0)
-  const size = groups.reduce((n, g) => n + g.totalSize, 0)
-  const duration = groups.reduce((n, g) => n + g.duration, 0)
-  return [
-    `${groups.length} album${groups.length === 1 ? '' : 's'}`,
-    `${tracks} tracks`,
-    formatDuration(duration),
-    formatSize(size),
-  ].filter(Boolean).join(' · ')
-}
-
 /* ------------------------------------------------------------------ pieces */
 
 /** Label / value pairs, Explorer's details-pane layout. A null value drops the row; '' reads —. */
@@ -358,30 +339,6 @@ function PropertyGrid({ rows }: { rows: [string, ComponentChildren][] }) {
 }
 
 /** A shelf of covers, Explorer's "large icons" view. Each opens its album in the tree. */
-function CoverGrid(
-  { groups, showArtist, onSelect }:
-  { groups: readonly AlbumGroup[]; showArtist: boolean; onSelect: (id: string) => void },
-) {
-  return (
-    <div class="cover-grid">
-      {groups.map((group) => (
-        <button
-          key={group.key}
-          type="button"
-          class="cover-tile"
-          title={`${group.album} — ${group.artist}`}
-          onClick={() => onSelect(groupNodeId(group))}
-        >
-          <AlbumArt album={group.artFrom} size="large" class="cover-tile-art" />
-          <span class="cover-tile-title">{group.album}</span>
-          <span class="cover-tile-sub">
-            {showArtist ? group.artist : group.yearRange || group.year || ' '}
-          </span>
-        </button>
-      ))}
-    </div>
-  )
-}
 
 function IssueList(
   { album, issueTypes }: { album: LibraryAlbum; issueTypes: Record<string, MetadataIssueType> },

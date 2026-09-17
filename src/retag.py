@@ -53,13 +53,16 @@ def read_current_tags(path: Path) -> dict:
     current = {}
     for key in ("album", "albumartist", "artist", "date", "originaldate", "title", "tracknumber",
                 "discnumber", "musicbrainz_albumid", "musicbrainz_releasegroupid",
+                "musicbrainz_albumartistid", "musicbrainz_artistid",
                 "releasecountry", "media", "catalognumber"):
         try:
             values = audio.get(key) or []
         except Exception:
             continue
         if values:
-            current[key] = str(values[0])
+            #? read back the same shape tag_values writes - one value is a string, several are a
+            #? list - or a file carrying two artist ids would differ from itself on every preview
+            current[key] = str(values[0]) if len(values) == 1 else [str(v) for v in values]
 
     return current
 

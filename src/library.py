@@ -27,6 +27,7 @@ import time
 from pathlib import Path
 
 from src.logger import logger
+from src.artists import ARTIST_ART_STEMS
 from src.matching import AUDIO_EXTENSIONS, file_extension
 
 #? The shape of what read_album_dir() returns, as a number. BUMP IT whenever that dict gains,
@@ -195,6 +196,75 @@ def read_embedded_art(path: Path) -> tuple[bytes, str] | None:
             return bytes(cover), mime
     except Exception:
         pass
+
+    return None
+
+
+def find_artist_art(directory: Path) -> dict:
+    """
+    Which artist images are already in this folder, as {kind: filename}.
+
+    Matched on the STEM with any image extension, the way every reader of these files works -
+    Navidrome's ArtistArtPriority is literally `artist.*`. So a folder holding artist.png is
+    already served, and jimbrainz must not offer to "add" a picture that is plainly there.
+    """
+    try:
+        entries = sorted(p for p in directory.iterdir() if p.is_file())
+    except OSError:
+        return {}
+
+    by_stem = {stem: kind for kind, stem in ARTIST_ART_STEMS.items()}
+    found = {}
+
+    for entry in entries:
+        if file_extension(entry.name) not in IMAGE_EXTENSIONS:
+            continue
+        kind = by_stem.get(entry.stem.lower())
+        if kind and kind not in found:
+            found[kind] = entry.name
+
+    return found
+
+
+def load_artist_art(directory: Path, kind: str) -> tuple[bytes, str] | None:
+    """One artist image off disk, for the endpoint that serves them."""
+    name = find_artist_art(directory).get(kind)
+    if not name:
+        return None
+
+    try:
+        mime = MIME_BY_EXTENSION.get(file_extension(name), "image/jpeg")
+        return (directory / name).read_bytes(), mime
+    except OSError:
+        return None
+
+
+def read_artist_mbid(directory: Path) -> str | None:
+    """
+    The artist's MusicBrainz id, from the tags of a track in one of their albums.
+
+    Cheaper and far more exact than searching MusicBrainz by name, which cannot tell three
+    bands called Nirvana apart. Anything jimbrainz filed carries the id; a library that predates
+    it may not, and then there is nothing here to find and the caller falls back to a search.
+    """
+    try:
+        entries = sorted(p for p in directory.iterdir() if p.is_file())
+    except OSError:
+        return None
+
+    for entry in entries:
+        if file_extension(entry.name) not in AUDIO_EXTENSIONS:
+            continue
+        try:
+            audio = mutagen.File(str(entry), easy=True)
+        except Exception:
+            continue
+        if audio is None:
+            continue
+        for key in ("musicbrainz_albumartistid", "musicbrainz_artistid"):
+            value = _first(audio, key)
+            if value:
+                return value.strip()
 
     return None
 

@@ -354,6 +354,25 @@ def _disc_number(value) -> int | None:
         return None
 
 
+def _mbids(value) -> str | list[str] | None:
+    """
+    One id as a string, several as a list.
+
+    Vorbis comments and ID3 both hold several values under one key, and a credit to two artists
+    is exactly that - two values. Keeping a single id a plain string matters for the retag
+    preview, which compares what a file carries against what it would carry: a bare string on
+    one side and a one-item list on the other would report a change nobody made, forever.
+    """
+    if not value:
+        return None
+
+    ids = [str(v) for v in (value if isinstance(value, list) else [value]) if v]
+    if not ids:
+        return None
+
+    return ids[0] if len(ids) == 1 else ids
+
+
 def tag_values(release: dict, track: dict | None, current: dict | None = None) -> dict:
     """
     The tags a file should carry for this release and track.
@@ -370,7 +389,14 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
     values = {
         "album": release.get("album"),
         "albumartist": release.get("artist"),
+        #? overridden below by the TRACK's own credit where it has one - see the note there
         "artist": release.get("artist"),
+        #? Who this is, in MusicBrainz's terms, which is the one part of a credit that survives
+        #? somebody renaming a band. jimbrainz already wrote the release and release-group ids
+        #? and not these, so nothing it filed could say who the artist WAS - which is also why
+        #? the artist page has to fall back to searching by name.
+        "musicbrainz_albumartistid": _mbids(release.get("artist_mbids")),
+        "musicbrainz_artistid": _mbids(release.get("artist_mbids")),
         "date": release.get("year"),
         #? Picard's convention, and the reason the folder can say 1975 while the file still
         #? records that this particular copy is the 2011 press. Not every container accepts
@@ -392,6 +418,15 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
 
     if track:
         values["title"] = track.get("title")
+
+        #? A track credited to somebody else keeps its own artist - a split release, a
+        #? compilation, a guest spot. Until now every track was given the RELEASE's artist,
+        #? so applying a release to a compilation rewrote eighteen different artists into
+        #? one. albumartist stays the release's credit, which is what the two tags are for.
+        if track.get("artist"):
+            values["artist"] = track["artist"]
+        if track.get("artist_mbids"):
+            values["musicbrainz_artistid"] = _mbids(track["artist_mbids"])
 
         #? A multi-disc release is numbered PER DISC, the way MusicBrainz and every player number
         #? it: disc 2 opens with track 1 of disc 2, not track 11 of one running sequence.
@@ -420,8 +455,12 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
             values["discnumber"] = "1"
 
     #? empty values are dropped rather than written as blanks - clearing a tag the user
-    #? already has because MusicBrainz didn't supply one would be destructive
-    return {key: str(value) for key, value in values.items() if value}
+    #? already has because MusicBrainz didn't supply one would be destructive. A list is left
+    #? as a list: several artist ids are several values, not one string with commas in it.
+    return {
+        key: (value if isinstance(value, list) else str(value))
+        for key, value in values.items() if value
+    }
 
 
 def write_tags(path: Path, release: dict, track: dict | None) -> None:
@@ -455,7 +494,7 @@ def write_tags(path: Path, release: dict, track: dict | None) -> None:
             continue
 
         try:
-            audio[key] = str(value)
+            audio[key] = value if isinstance(value, list) else str(value)
         except Exception:
             #? not every container supports every key (easy mp4 is picky); skip rather than abort
             continue

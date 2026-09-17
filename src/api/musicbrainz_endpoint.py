@@ -324,6 +324,35 @@ class MusicBrainzClient:
             f"release/{release_mbid}", {"inc": self.RELEASE_FULL_INC, "fmt": "json"}
         )
 
+    #? What an artist page is made of. `url-rels` is doing double duty: it carries the links
+    #? the page lists AND the only two routes to a picture MusicBrainz knows - an `image`
+    #? relation, and the `wikidata` relation that leads to one. `artist-rels` is the band's
+    #? line-up. Tags and genres are what the artist IS, in other people's words.
+    ARTIST_INC = "url-rels+tags+genres+aliases+artist-rels"
+
+    async def search_artists(self, name: str, limit: int = 5) -> dict:
+        """
+        Artists by name, for when the files don't say which one they are.
+
+        The fallback behind read_artist_mbid: anything jimbrainz filed carries the id in its
+        tags, and a library that predates it does not. A name is a far weaker key - there are
+        several bands called Nirvana - so the caller checks the answer before believing it.
+        """
+        return await self.request_with_retries(
+            "artist/", {"query": f'artist:"{name}"', "fmt": "json", "limit": limit},
+        )
+
+    async def get_artist(self, artist_mbid: str) -> dict:
+        """
+        One artist, with everything an artist page shows.
+
+        Shaped into a page's terms by artists.artist_facts(); this returns MusicBrainz's own
+        payload so the cache stores one thing and the shaping stays pure.
+        """
+        return await self.request_with_retries(
+            f"artist/{artist_mbid}", {"inc": self.ARTIST_INC, "fmt": "json"}
+        )
+
     async def get_releases(self, release_group_id: str, log=True, with_tracks: bool = True) -> dict:
         """
         Every release in a group.

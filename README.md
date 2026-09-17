@@ -177,6 +177,27 @@ Cover art comes from a file beside the tracks, then from art embedded in the aud
 
 </details>
 
+### Artist pages, with pictures
+
+Click an artist in the library and you get a page about them rather than a heading: who they are, where they're from, how long they've been going, what MusicBrainz tags them as, the current line-up with instruments (and how many members came before), their official site and socials named after where they actually go, and their albums oldest first.
+
+Above all that: their own pictures. **MusicBrainz has none** — the Cover Art Archive is for releases, and what musicbrainz.org shows on an artist page is a Wikimedia Commons photo reached through Wikidata. jimbrainz uses that too, and adds <strong>TheAudioDB</strong> if you give it a key in the settings tab, which is the only source with banners, logos, backgrounds, wide shots and clear art.
+
+They're written into the artist's folder, so <em>other things read them too</em>:
+
+| what | file | who reads it |
+| --- | --- | --- |
+| square image | `artist.jpg` | **Navidrome, with no configuration at all** — its `ArtistArtPriority` already looks for `artist.*`. Kodi and Jellyfin too |
+| banner | `banner.jpg` | Kodi, Jellyfin |
+| logo | `logo.png` | Jellyfin; Kodi reads it as clearlogo |
+| background | `fanart.jpg` | Kodi's fanart, and one of Jellyfin's backdrop names — one file serves both |
+| wide image | `landscape.jpg` | Kodi's landscape, Jellyfin's thumb |
+| clear art | `clearart.png` | Kodi |
+
+A picker shows every candidate each source offered — TheAudioDB usually has four backgrounds — so you choose which one belongs at the top of the page rather than taking whatever sorted first. Pictures already in the folder are left alone unless you tick "replace". Nothing is written into a folder that holds tracks: that's an album, and those filenames mean something else there.
+
+Without a key you still get a photo where Commons has one, and the rest of the page is unaffected.
+
 ### Fixing things that landed wrong
 <details>
 <summary style="font-style:italic">Pick the release an album really is, and write it back</summary>
@@ -190,6 +211,8 @@ Multi-disc releases are tagged per disc, the way MusicBrainz and every player nu
 <br><br>
 Covers are saved at 500 × 500 unless you choose otherwise: <strong>Cover art</strong> in the settings tab offers 250, 500, 1200 or <em>full size</em>, which is the original upload — often thousands of pixels and several megabytes. It applies to "Get cover", the bulk fetch and the editor alike, and the editor says which size it will save.
 </details>
+
+Tags now record **who** as well as what: `musicbrainz_albumartistid` and `musicbrainz_artistid` go in alongside the release ids, so a library jimbrainz filed says which artist it means rather than leaving the name to be matched later. A track credited to somebody else — a split, a compilation, a guest spot — keeps its own artist instead of being given the album's, and credits read the way MusicBrainz writes them: "A / B", "A & B", "A feat. B", rather than everything flattened to a comma.
 
 ### Editing tags by hand
 <details>

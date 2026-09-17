@@ -343,6 +343,16 @@ async def settings():
                         secret=True,
                         effect="Authenticates against slskd; downloads fail without it",
                     ),
+                    _setting(
+                        "THEAUDIODB_KEY",
+                        Config.THEAUDIODB_KEY,
+                        secret=True,
+                        effect=(
+                            "Artist banners, logos and backgrounds come from TheAudioDB, which "
+                            "is the only source that has them. Without a key an artist still "
+                            "gets a photo from Wikimedia Commons, where there is one"
+                        ),
+                    ),
                     *_musicbrainz_rows(),
                 ],
             },

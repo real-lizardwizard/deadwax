@@ -24,6 +24,13 @@ class Track(BaseModel):
     #? 1..20 with no disc numbers - quietly unlike the same album corrected in the editor.
     disc: int | None = None
     disc_position: int | None = None
+    #? The track's OWN credit, where it differs from the release's - a split, a compilation, a
+    #? guest spot. Declared for the same reason disc is: pydantic drops what it was not told
+    #? about without a word, so an undeclared artist would arrive from the browser, vanish
+    #? here, and every track of a compilation would be filed under the release's artist with
+    #? nothing anywhere saying why.
+    artist: str | None = None
+    artist_mbids: list[str] = Field(default_factory=list)
 
 
 class FindCandidatesRequest(BaseModel):
@@ -56,6 +63,8 @@ class EnqueueRelease(BaseModel):
     original_year: str | None = None
     release_mbid: str | None = None
     edition_tags: list[str] = Field(default_factory=list)
+    #? who the album is by, in MusicBrainz's terms, so the tags can say so
+    artist_mbids: list[str] = Field(default_factory=list)
     tracks: list[Track] = Field(default_factory=list)
 
     #? Everything below feeds src/editions.py, which works out the folder an edition is filed

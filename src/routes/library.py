@@ -5,8 +5,13 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from src.config import Config
-from src.library import (SCAN_FORMAT, delete_album, drain_cache_changes, forget_cached_album,
-                         load_album_art, read_album_details, scan_library, seed_cache,
+from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
+from src.artists import ARTIST_ART_KINDS, KIND_LABELS, artist_facts, best_per_kind
+from src.api.artist_images_endpoint import ArtistImagesClient
+from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
+from src.library import (SCAN_FORMAT, delete_album, drain_cache_changes, find_artist_art,
+                         forget_cached_album, load_album_art, load_artist_art,
+                         read_album_details, read_artist_mbid, scan_library, seed_cache,
                          snapshot_library, summarize_for_deletion)
 from src.logger import logger
 from src.metadata_health import ISSUE_TYPES, attach_issues
@@ -19,6 +24,10 @@ from src.track_tags import execute_tag_edits, plan_tag_edits
 #? rarely and one at a time, so there is nothing to gain from per-request clients and a
 #? little to lose - each would open a fresh TLS connection to archive.org.
 coverart_client = CoverArtClient()
+
+#? Same reasoning as above, and the same lifespan closes it. Artist images come from two hosts
+#? that know nothing of each other, neither of them MusicBrainz.
+artist_images_client = ArtistImagesClient()
 
 router = APIRouter()
 
@@ -293,6 +302,8 @@ class RetagRelease(BaseModel):
     corrected by hand ends up carrying exactly the tags one downloaded fresh would have.
     """
     artist: str = ""
+    #? every artist id in the release's credit, in the order credited
+    artist_mbids: list[str] = Field(default_factory=list)
     album: str = ""
     year: str | None = None
     #? the album's original release year, which is what the folder is named after
@@ -712,3 +723,308 @@ async def deletion_summary(album: str):
         raise HTTPException(status_code=400, detail="that album is not inside the library")
 
     return await asyncio.to_thread(summarize_for_deletion, directory)
+
+
+# ==================== artists ====================
+#
+# An artist has no row of its own in the scan - the library is read album by album - so
+# everything here is derived: which albums are theirs, which folder those share, and what is
+# already sitting in it. See src/artists.py for where artist images come from, which is nowhere
+# near as obvious as album covers, and src/artist_art.py for the writing.
+
+
+class ArtistImagesRequest(BaseModel):
+    artist: str
+    #? Skips the lookup when the caller already knows it - the page does, having been told by
+    #? the preview, so applying doesn't search MusicBrainz for an artist a second time.
+    artist_mbid: str | None = None
+    #? kind -> the URL chosen for it, which must be one this artist's sources actually offered.
+    choices: dict[str, str] = Field(default_factory=dict)
+    replace: bool = False
+
+
+def _artist_albums(scan: dict, name: str) -> list[dict]:
+    return [album for album in scan.get("albums", []) if album.get("artist") == name]
+
+
+def _artist_summary(name: str, albums: list[dict]) -> dict:
+    folder = artist_folder([album["path"] for album in albums])
+    years = sorted({album["year"] for album in albums if album.get("year")})
+
+    return {
+        "artist": name,
+        "path": folder["path"],
+        "folder_problem": folder["problem"],
+        "album_count": len(albums),
+        "track_count": sum(album.get("track_count") or 0 for album in albums),
+        "total_size": sum(album.get("total_size") or 0 for album in albums),
+        "first_year": years[0] if years else "",
+        "last_year": years[-1] if years else "",
+        "albums": [
+            {
+                "key": album.get("key"),
+                "album": album.get("album"),
+                "year": album.get("year"),
+                "path": album.get("path"),
+                "edition": album.get("edition"),
+                "track_count": album.get("track_count"),
+                "total_size": album.get("total_size"),
+                "release_mbid": album.get("release_mbid"),
+            }
+            for album in sorted(albums, key=lambda a: (a.get("year") or "9999", a.get("album") or ""))
+        ],
+    }
+
+
+async def _resolve_artist_mbid(request: Request, name: str, albums: list[dict], given: str | None):
+    """
+    Which MusicBrainz artist this is, and how sure we are.
+
+    The tags are the exact answer and cost one file read; a name search is a guess and is only
+    believed when it is unambiguous, because the consequence of getting it wrong is another
+    band's photograph written into this band's folder, where nothing would ever flag it.
+    """
+    if given:
+        return given, "given", []
+
+    root = Path(Config.LIBRARY_PATH or "")
+    for album in albums[:3]:
+        mbid = await asyncio.to_thread(read_artist_mbid, root / album["path"])
+        if mbid:
+            return mbid, "tags", []
+
+    try:
+        client = request.app.state.musicbrainz_client
+        found = await client.search_artists(name, limit=5)
+    except (AttributeError, MusicBrainzUnavailable):
+        return None, None, []
+
+    matches = [
+        {
+            "mbid": a.get("id"),
+            "name": a.get("name"),
+            "disambiguation": a.get("disambiguation") or "",
+            "country": a.get("country") or "",
+            "type": a.get("type") or "",
+            "score": a.get("score"),
+        }
+        for a in (found.get("artists") or [])[:5] if a.get("id")
+    ]
+
+    #? Believed only when one artist is both an exact name match and MusicBrainz's own top
+    #? score. Two bands sharing a name is common, and the wrong one writing its picture into
+    #? your folder is silent - so anything less certain goes back to the page as a choice.
+    exact = [m for m in matches if (m["name"] or "").casefold() == name.casefold()]
+    if len(exact) == 1 and (exact[0]["score"] or 0) >= 90:
+        return exact[0]["mbid"], "search", matches
+
+    return None, None, matches
+
+
+@router.get("/artist")
+async def artist(request: Request, name: str):
+    """
+    One artist, as the library knows them. Touches no network.
+
+    Drawn immediately by the artist page, which then asks for the MusicBrainz half separately -
+    the same split as the library tab's snapshot: what is already known appears at once, and
+    what needs a stranger's server to answer arrives when it arrives.
+    """
+    if not name:
+        raise HTTPException(status_code=404, detail="no such artist")
+
+    scan = await _scan_with_queue(request, force=False, snapshot=True)
+    albums = _artist_albums(scan, name)
+
+    if not albums:
+        raise HTTPException(status_code=404, detail="no such artist")
+
+    summary = _artist_summary(name, albums)
+
+    if summary["path"]:
+        directory = Path(Config.LIBRARY_PATH or "") / summary["path"]
+        summary["art"] = await asyncio.to_thread(find_artist_art, directory)
+    else:
+        summary["art"] = {}
+
+    return summary
+
+
+@router.get("/artist/art")
+async def artist_art(artist: str, kind: str = "thumb"):
+    """
+    One artist image off disk.
+
+    `artist` is a path relative to LIBRARY_PATH, and gets the same containment check as
+    /library/art for the same reason - it is user input turned into a filesystem read, and
+    without it `?artist=../../..` reads anything this container can.
+    """
+    root_path = Config.LIBRARY_PATH or ""
+
+    if not root_path or not artist or kind not in ARTIST_ART_KINDS:
+        raise HTTPException(status_code=404, detail="no such image")
+
+    root = Path(root_path)
+    directory = root / artist
+
+    if not is_within(directory, root) or not directory.is_dir():
+        logger.warning(f"refused artist art request outside the library: {artist!r}")
+        raise HTTPException(status_code=404, detail="no such image")
+
+    result = await asyncio.to_thread(load_artist_art, directory, kind)
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="no such image")
+
+    data, mime = result
+    return Response(content=data, media_type=mime, headers={"Cache-Control": "private, max-age=300"})
+
+
+@router.post("/artist/images/preview")
+async def artist_images_preview(request: Request, body: ArtistImagesRequest):
+    """
+    Everything that could be written for this artist, and what writing it would do.
+
+    Fetches no image bytes - only the small JSON payloads that say which pictures exist. That is
+    the same split cover art uses: previewing runs on every click, and downloading a megabyte to
+    describe it would be slow and rude to a stranger's server.
+    """
+    scan = await _scan_with_queue(request, force=False, snapshot=True)
+    albums = _artist_albums(scan, body.artist)
+
+    if not albums:
+        raise HTTPException(status_code=404, detail="no such artist")
+
+    summary = _artist_summary(body.artist, albums)
+
+    #? what is already in the folder, so the picker can say "that one is on disk" rather than
+    #? offering to fetch a picture that is plainly there
+    if summary["path"]:
+        directory = Path(Config.LIBRARY_PATH or "") / summary["path"]
+        summary["art"] = await asyncio.to_thread(find_artist_art, directory)
+    else:
+        summary["art"] = {}
+
+    mbid, source, matches = await _resolve_artist_mbid(request, body.artist, albums, body.artist_mbid)
+
+    facts, candidates, problems = None, [], []
+
+    if summary["folder_problem"]:
+        problems.append(summary["folder_problem"])
+
+    if mbid:
+        try:
+            client = request.app.state.musicbrainz_client
+            found = await client.get_artist(mbid)
+            if "error" in found:
+                problems.append("MusicBrainz could not be reached just now")
+            else:
+                facts = artist_facts(found)
+                candidates = await artist_images_client.candidates(found)
+        except (AttributeError, MusicBrainzUnavailable):
+            problems.append("MusicBrainz could not be reached just now")
+    elif matches:
+        problems.append("more than one artist in MusicBrainz goes by this name")
+    else:
+        problems.append("this artist isn't in MusicBrainz under that name, and the files don't say who they are")
+
+    best = best_per_kind(candidates)
+    plan = (plan_artist_art(summary["path"], list(best), Config.LIBRARY_PATH or "", body.replace)
+            if summary["path"] and best else None)
+
+    if not candidates and mbid and not problems:
+        problems.append("no pictures of this artist in any of the sources"
+                        + ("" if Config.THEAUDIODB_KEY else " - a TheAudioDB key would add banners and logos"))
+
+    return {
+        **summary,
+        "mbid": mbid,
+        "mbid_source": source,
+        "matches": matches,
+        "facts": facts,
+        "candidates": candidates,
+        "best": best,
+        "kinds": [{"kind": k, "label": KIND_LABELS[k]} for k in ARTIST_ART_KINDS],
+        "plan": plan,
+        "has_key": bool(Config.THEAUDIODB_KEY),
+        "problems": problems,
+    }
+
+
+@router.post("/artist/images/apply")
+async def artist_images_apply(request: Request, body: ArtistImagesRequest):
+    """
+    Write the chosen images into the artist's folder.
+
+    The plan is recomputed here rather than accepted from the caller, and so is the candidate
+    LIST: a choice is only honoured when its URL is one this artist's own sources just offered.
+    Without that check the endpoint would fetch any URL it was handed, from inside the network
+    this container sits in, and write the result into the library - which is a far larger hole
+    than the path traversal the art endpoints already guard against.
+    """
+    scan = await _scan_with_queue(request, force=False, snapshot=True)
+    albums = _artist_albums(scan, body.artist)
+
+    if not albums:
+        raise HTTPException(status_code=404, detail="no such artist")
+
+    summary = _artist_summary(body.artist, albums)
+    if not summary["path"]:
+        raise HTTPException(status_code=400, detail=summary["folder_problem"] or "no folder for this artist")
+
+    mbid, _, _ = await _resolve_artist_mbid(request, body.artist, albums, body.artist_mbid)
+    if not mbid:
+        raise HTTPException(status_code=400, detail="which artist this is in MusicBrainz isn't settled")
+
+    try:
+        client = request.app.state.musicbrainz_client
+        found = await client.get_artist(mbid)
+    except (AttributeError, MusicBrainzUnavailable):
+        raise HTTPException(status_code=503, detail="MusicBrainz could not be reached")
+
+    if "error" in found:
+        raise HTTPException(status_code=503, detail="MusicBrainz could not be reached")
+
+    candidates = await artist_images_client.candidates(found)
+    offered = {c["url"] for c in candidates}
+    chosen = body.choices or {kind: c["url"] for kind, c in best_per_kind(candidates).items()}
+
+    wanted, refused = {}, []
+    for kind, url in chosen.items():
+        if kind not in ARTIST_ART_KINDS:
+            refused.append(f"{kind} is not an artist image jimbrainz writes")
+        elif url not in offered:
+            refused.append(f"the {kind} chosen is not one of this artist's own pictures")
+        else:
+            wanted[kind] = url
+
+    #? Said before planning, or a request whose choices were ALL refused comes back as "no
+    #? images asked for" - which is true of the plan and a lie about what happened.
+    if refused and not wanted:
+        raise HTTPException(status_code=400, detail="; ".join(refused))
+
+    plan = plan_artist_art(summary["path"], list(wanted), Config.LIBRARY_PATH or "", body.replace)
+
+    if plan["problems"]:
+        raise HTTPException(status_code=400, detail="; ".join(plan["problems"]))
+
+    images = {}
+    for entry in plan["files"]:
+        if entry["action"] == "keep":
+            continue
+        fetched = await artist_images_client.fetch(wanted[entry["kind"]])
+        if fetched:
+            images[entry["kind"]] = fetched
+        else:
+            refused.append(f"the {entry['kind']} could not be fetched")
+
+    results = execute_artist_art(plan, images, mode="apply")
+    results["problems"] = list(results.get("problems") or []) + refused
+
+    directory = Path(Config.LIBRARY_PATH or "") / summary["path"]
+    return {
+        "artist": body.artist,
+        "path": summary["path"],
+        "results": results,
+        "art": await asyncio.to_thread(find_artist_art, directory),
+    }
