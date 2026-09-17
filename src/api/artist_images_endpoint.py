@@ -11,15 +11,25 @@ different rules, no MusicBrainz rate limit to respect, and redirects that must b
 Commons answers Special:FilePath with a 302 to the file itself.
 """
 
+from urllib.parse import quote
+
 import httpx
 
 from src import __version__
-from src.artists import from_relations, from_theaudiodb, from_wikidata, wikidata_id
+from src.artists import (PREVIEW_WIDTH, SAVE_WIDTH, commons_file_url, commons_title,
+                         from_fanarttv, from_relations, from_theaudiodb, from_wikidata,
+                         safe_thumb_width, wikidata_id)
 from src.config import Config
 from src.logger import logger
 
 WIKIDATA_ENTITY = "https://www.wikidata.org/wiki/Special:EntityData/{}.json"
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 THEAUDIODB_ARTIST = "https://www.theaudiodb.com/api/v1/json/{key}/artist-mb.php?i={mbid}"
+#? webservice.fanart.tv, NOT api.fanart.tv. Their own repo documents the latter, and it is the
+#? website: it sits behind Cloudflare and answers a bot check with 403 and an HTML challenge
+#? page, whatever key you send. The webservice host answers properly - a bad key gets
+#? `401 {"error":"invalid API key"}` - and is what every other client uses.
+FANARTTV_ARTIST = "https://webservice.fanart.tv/v3/music/{mbid}"
 
 #? An artist page asks for a handful of pictures at once, and a Commons original can be a 20 MB
 #? scan. Generous enough for a real background, mean enough that one artist can't fill the disk.
@@ -93,20 +103,45 @@ class ArtistImagesClient:
         artists = (data or {}).get("artists")
         return artists[0] if isinstance(artists, list) and artists else None
 
+    async def fanarttv(self, artist_mbid: str) -> dict | None:
+        """
+        One fanart.tv music response, looked up by MusicBrainz artist id.
+
+        None when no key is configured, which is the ordinary case. fanart.tv issues a PROJECT
+        key per application rather than per person, so it cannot be shipped with jimbrainz and
+        has to be registered by whoever runs it; the personal key beside it is optional and only
+        buys earlier sight of images added in the last week.
+        """
+        key = (Config.FANARTTV_KEY or "").strip()
+        if not key or not artist_mbid:
+            return None
+
+        params = f"?api_key={quote(key)}"
+        personal = (Config.FANARTTV_PERSONAL_KEY or "").strip()
+        if personal:
+            params += f"&client_key={quote(personal)}"
+
+        return await self._json(FANARTTV_ARTIST.format(mbid=artist_mbid) + params, "fanart.tv")
+
     async def candidates(self, artist: dict) -> list[dict]:
         """
         Every picture the three sources offer for this artist, best source first.
 
         `artist` is a MusicBrainz artist as looked up with url-rels. Each source is allowed to
-        fail on its own: a Wikidata outage costs the Commons portrait and leaves TheAudioDB's
+        fail on its own: a Wikidata outage costs the Commons portrait and leaves fanart.tv's
         banner, which is the behaviour an artist page wants.
         """
         relations = artist.get("relations") or []
+        mbid = artist.get("id") or ""
         found = list(from_relations(relations))
 
-        row = await self.theaudiodb(artist.get("id") or "")
+        row = await self.theaudiodb(mbid)
         if row:
             found = list(from_theaudiodb(row)) + found
+
+        art = await self.fanarttv(mbid)
+        if art:
+            found = list(from_fanarttv(art)) + found
 
         entity_id = wikidata_id(relations)
         if entity_id:
@@ -114,7 +149,60 @@ class ArtistImagesClient:
             if entity:
                 found += list(from_wikidata(entity))
 
-        return found
+        return await self._size_commons(found)
+
+    async def commons_width(self, title: str) -> int:
+        """
+        How wide a Commons file actually is, so a thumbnail can be asked for under it.
+
+        One small JSON request per picture, and the reason is in safe_thumb_width: ask for a
+        thumbnail wider than the original and MediaWiki answers with the original, which
+        upload.wikimedia.org refuses to a robot. 0 when it can't be found, which leaves the
+        asked-for width alone.
+        """
+        data = await self._json(
+            f"{COMMONS_API}?action=query&titles=File:{quote(title)}&prop=imageinfo"
+            "&iiprop=size&format=json&formatversion=2",
+            "Commons",
+        )
+
+        for page in ((data or {}).get("query") or {}).get("pages") or []:
+            for info in page.get("imageinfo") or []:
+                if isinstance(info.get("width"), int):
+                    return info["width"]
+
+        return 0
+
+    async def _size_commons(self, candidates: list[dict]) -> list[dict]:
+        """
+        Point every Commons candidate at a thumbnail rather than an original.
+
+        Done once here rather than at the point of writing, so the picker shows the same picture
+        that would be saved - and so a file too small to thumbnail at the wanted size is caught
+        while it can still be reported, instead of failing at the write.
+        """
+        widths: dict[str, int] = {}
+        resolved = []
+
+        for candidate in candidates:
+            title = commons_title(candidate["url"])
+            if not title:
+                resolved.append(candidate)
+                continue
+
+            if title not in widths:
+                widths[title] = await self.commons_width(title)
+
+            original = widths[title]
+            #? an SVG logo is drawn at whatever size is asked for, so it keeps the full width
+            vector = title.lower().endswith(".svg")
+            resolved.append({
+                **candidate,
+                "url": commons_file_url(title, safe_thumb_width(original, SAVE_WIDTH, vector)),
+                "preview": commons_file_url(title, safe_thumb_width(original, PREVIEW_WIDTH, vector)),
+            })
+
+        return resolved
 
     async def fetch(self, url: str) -> tuple[bytes, str] | None:
         """
@@ -131,7 +219,11 @@ class ArtistImagesClient:
             return None
 
         if response.status_code != 200:
-            logger.warning(f"an artist image answered {response.status_code}")
+            #? 403 from upload.wikimedia.org is their robot policy, and it means the URL resolved
+            #? to an ORIGINAL rather than a thumbnail - see safe_thumb_width
+            reason = (" - Wikimedia refuses originals to robots, so this needs a smaller thumbnail"
+                      if response.status_code == 403 else "")
+            logger.warning(f"an artist image answered {response.status_code}{reason}")
             return None
 
         mime = (response.headers.get("content-type") or "").split(";")[0].strip().lower()

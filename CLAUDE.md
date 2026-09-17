@@ -85,7 +85,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             553 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             567 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
@@ -835,10 +835,13 @@ anything else I'd need for an artist page".
   RELATION (present for some artists, not others - Tame Impala and Portishead have one,
   Radiohead does not) and Wikidata's P18/P154, both of which resolve through Commons' bare
   `Special:FilePath`; and TheAudioDB, keyed by the same MusicBrainz artist id, which is the only
-  one carrying banners, logos, backgrounds, wide shots and clear art. `THEAUDIODB_KEY` is
-  therefore optional and everything degrades to "a photograph, where Commons has one".
-  fanart.tv was considered and rejected: it requires a PROJECT key, registered by the developer,
-  which cannot be shipped in a public repo or obtained on the user's behalf.
+  one carrying wide shots and clear art; and **fanart.tv**, added on request, which has thumbs,
+  banners, backgrounds (including 4K) and logos, and is the only source whose pictures were
+  VOTED on by the people using them - so `from_fanarttv()` offers the most-liked of each kind
+  first. Both are optional and everything degrades to "a photograph, where Commons has one".
+  **fanart.tv's key is a PROJECT key, issued per application rather than per person**, so it
+  cannot ship with jimbrainz and has to be registered by whoever runs it; `FANARTTV_PERSONAL_KEY`
+  beside it is optional and only buys sight of images added in the last week.
 - **The square image is written as `artist.*`, and that is the whole point of writing files at
   all.** Navidrome reads it with no configuration: `ArtistArtPriority` defaults to
   `"artist.*, album/artist.*, external"`. Writing it as `folder.*` - what Jellyfin and Kodi call
@@ -863,6 +866,16 @@ anything else I'd need for an artist page".
 - **The MusicBrainz half of the page is debounced by 400ms**, like the tag editor's preview.
   Arrowing down a list of artists must not fire a lookup per row at a rate-limited server, three
   hosts deep.
+- **The picker searches, and any picture can go in any slot (asked for).** Two things
+  a rule cannot settle. WHICH ARTIST, when the files carry no ids and the folder name means
+  something else to MusicBrainz - the automatic match deliberately refuses to choose between the
+  eight acts called Nirvana, and a search box with their disambiguations is the way past that;
+  picking one hands its id to the same preview the tags would have. And WHICH PICTURE goes
+  where: the sources are wildly uneven, so "use another picture" offers everything found for
+  every slot. **Without a TheAudioDB key that is the difference between a usable dialog and a
+  dead one** - the only candidates are Commons photographs, all of them of kind `thumb`, so
+  every other row reads "none found" and the square is the only thing selectable. Which is
+  exactly how it was reported.
 - **Known gap:** on a phone the details pane is a sheet that opens for albums and tracks, and an
   artist "just opens in place" (v0.6.5's decision). So the artist page is desktop and tablet
   only. The phone rules for it are written and inert until that decision changes.
@@ -1391,6 +1404,21 @@ same-origin with the app by design.
   from a single 404. It now says `retry art` and stays clickable. Same shape as the rejected
   download and the empty release list — **when an upstream answer could mean "never" or "not
   right now", leave the user a way to ask again.**
+- **fanart.tv's API is on `webservice.fanart.tv`, not `api.fanart.tv`** - and their own API
+  repository documents the latter. `api.fanart.tv` is the website: it sits behind Cloudflare and
+  answers a bot check with 403 and an HTML challenge page whatever key you send, which reads
+  exactly like a rejected key. The webservice host answers properly, and a bad key there gets
+  `401 {"error":"invalid API key"}` - which is how this was told apart.
+- **Wikimedia serves THUMBNAILS to robots and refuses ORIGINALS**, and the refusal is a 403
+  whose body reads "Please honor our robot policy". So every Commons image here is fetched
+  through `Special:FilePath?width=N`, never bare. The trap underneath that is worse: MediaWiki
+  does not upscale, so asking for a width at or above the file's own resolves to the ORIGINAL
+  and is refused - a 367px-wide photograph served at `width=300` and 403'd at `width=366`. That
+  is why `safe_thumb_width()` asks Commons how wide the file actually is (one small API call per
+  picture) and then stays under it. **Symptom to recognise:** the picker shows the image
+  perfectly and saving it fails, because the preview asked for 600 of a large file and the save
+  asked for the original. An SVG has no such limit - it is rasterised to a PNG at whatever width
+  is asked - so logos are exempt and keep their full size.
 - **MusicBrainz and the Cover Art Archive go unreachable for minutes at a time**, repeatedly,
   from dev machines. A failing search is far more often that than a bug — retry before
   concluding anything; the 503 path is deliberate and says which it is. It also produced a
@@ -1611,7 +1639,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 553 tests
+.venv/bin/python -m pytest tests/ -q  # 567 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1640,7 +1668,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 553 tests are fixture-driven. **Nothing has ever talked to a real slskd.** The parts most
+All 567 tests are fixture-driven. **Nothing has ever talked to a real slskd.** The parts most
 likely to break on deployment are exactly the parts tests can't reach:
 
 - slskd transfer `state` strings. **This one already came true**: `"Completed, Rejected"` was

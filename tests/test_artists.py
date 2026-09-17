@@ -20,7 +20,7 @@ from fastapi import HTTPException
 from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
 from src.artists import (ARTIST_ART_KINDS, ARTIST_ART_STEMS, artist_facts, best_per_kind,
                          commons_file_url, commons_title, from_relations, from_theaudiodb,
-                         from_wikidata, wikidata_id)
+                         from_fanarttv, from_wikidata, safe_thumb_width, wikidata_id)
 from src.config import Config
 from tests.test_retag import write_flac
 
@@ -109,6 +109,80 @@ def test_theaudiodb_is_the_only_source_with_the_shapes_a_page_needs():
     assert "clearart" not in kinds, "an empty field is not a picture"
 
 
+FANARTTV = {
+    "artistthumb": [
+        {"url": "https://f/thumb-unloved.jpg", "likes": "1"},
+        {"url": "https://f/thumb-loved.jpg", "likes": "14"},
+    ],
+    "musicbanner": [{"url": "https://f/banner.jpg", "likes": "3"}],
+    "artistbackground": [{"url": "https://f/bg.jpg", "likes": "9"}],
+    "artist4kbackground": [{"url": "https://f/bg4k.jpg"}],
+    "hdmusiclogo": [{"url": "https://f/hd.png", "likes": "20"}],
+    "musiclogo": [{"url": "https://f/plain.png", "likes": "2"}],
+}
+
+
+def test_fanarttv_offers_every_kind_an_artist_page_is_made_of():
+    kinds = {c["kind"] for c in from_fanarttv(FANARTTV)}
+    assert {"thumb", "banner", "fanart", "logo"} == kinds
+
+
+def test_the_most_liked_comes_first():
+    """fanart.tv's pictures were put there by the people using them, so the votes mean something."""
+    thumbs = [c for c in from_fanarttv(FANARTTV) if c["kind"] == "thumb"]
+    assert thumbs[0]["url"] == "https://f/thumb-loved.jpg"
+
+
+def test_the_hd_logo_is_offered_before_the_plain_one():
+    logos = [c for c in from_fanarttv(FANARTTV) if c["kind"] == "logo"]
+    assert logos[0]["url"] == "https://f/hd.png"
+
+
+def test_a_4k_background_is_another_background_not_another_kind():
+    #? offered alongside the ordinary ones, being several megabytes each
+    backgrounds = [c for c in from_fanarttv(FANARTTV) if c["kind"] == "fanart"]
+    assert {b["url"] for b in backgrounds} == {"https://f/bg.jpg", "https://f/bg4k.jpg"}
+
+
+def test_only_so_many_of_one_kind():
+    many = {"artistbackground": [{"url": f"https://f/{n}.jpg", "likes": str(n)} for n in range(12)]}
+    assert len(from_fanarttv(many)) == 4, "a picker listing twelve backgrounds is one nobody reads"
+
+
+def test_a_fanarttv_payload_that_is_junk_is_survived():
+    assert from_fanarttv(None) == []
+    assert from_fanarttv({}) == []
+    assert from_fanarttv({"artistthumb": "not a list"}) == []
+    assert from_fanarttv({"artistthumb": [{"likes": "5"}]}) == [], "no url is not a picture"
+
+
+def test_likes_that_are_not_numbers_do_not_take_the_page_down():
+    #? fanart.tv reports likes as a string, and has been known to leave it out
+    odd = {"artistthumb": [{"url": "https://f/a.jpg", "likes": "lots"}, {"url": "https://f/b.jpg"}]}
+    assert len(from_fanarttv(odd)) == 2
+
+
+def test_fanarttv_is_asked_for_nothing_without_a_key(monkeypatch):
+    import asyncio
+
+    from src.api.artist_images_endpoint import ArtistImagesClient
+
+    monkeypatch.setattr(Config, "FANARTTV_KEY", None)
+    client = ArtistImagesClient()
+
+    async def must_not_ask(*args, **kwargs):
+        raise AssertionError("asked fanart.tv for something with no key configured")
+
+    monkeypatch.setattr(client, "_json", must_not_ask)
+    assert asyncio.run(client.fanarttv("some-mbid")) is None
+
+
+def test_fanarttv_leads_when_two_sources_offer_the_same_kind():
+    candidates = (from_theaudiodb({"strArtistThumb": "https://a/thumb.jpg"})
+                  + from_fanarttv({"artistthumb": [{"url": "https://f/thumb.jpg", "likes": "4"}]}))
+    assert best_per_kind(candidates)["thumb"]["source"] == "fanarttv"
+
+
 def test_purpose_made_artwork_beats_a_photograph_of_a_stage():
     candidates = (from_wikidata({"claims": {"P18": [{"mainsnak": {"datavalue": {"value": "Live.jpg"}}}]}})
                   + from_theaudiodb({"strArtistThumb": "https://x/thumb.jpg"}))
@@ -120,6 +194,58 @@ def test_the_first_background_wins_over_its_alternates():
         "strArtistFanart": "https://x/one.jpg", "strArtistFanart2": "https://x/two.jpg",
     }))
     assert best["fanart"]["url"] == "https://x/one.jpg"
+
+
+def test_commons_is_asked_for_a_thumbnail_under_the_originals_width():
+    """
+    Wikimedia serves thumbnails to robots and refuses originals - "Please honor our robot
+    policy" - and MediaWiki will not upscale, so asking for more than the file has resolves to
+    the original and is refused. Measured on a 367px file: 300 served, 366 did not.
+    """
+    assert safe_thumb_width(367, 600) == 330
+    assert safe_thumb_width(4000, 1200) == 1200, "a big file is capped by what we want, not by itself"
+
+
+def test_a_vector_is_not_shrunk():
+    #? an SVG is rasterised at whatever width is asked for and comes back a PNG, so a logo
+    #? keeps its size instead of being cut to the nominal one Commons reports
+    assert safe_thumb_width(288, 1200, vector=True) == 1200
+
+
+def test_an_unknown_width_leaves_the_asking_alone():
+    assert safe_thumb_width(0, 600) == 600
+
+
+def test_a_tiny_file_still_gets_a_usable_thumbnail():
+    assert safe_thumb_width(40, 600) == 64
+
+
+def test_commons_candidates_are_rewritten_to_thumbnails(monkeypatch):
+    """End to end over the rule: what the picker shows and what gets written are both thumbs."""
+    import asyncio
+
+    from src.api.artist_images_endpoint import ArtistImagesClient
+
+    client = ArtistImagesClient()
+
+    async def fake_width(title):
+        return 367
+
+    monkeypatch.setattr(client, "commons_width", fake_width)
+
+    candidates = [
+        {"kind": "thumb", "url": "https://commons.wikimedia.org/wiki/Special:FilePath/A.jpg",
+         "preview": "x", "source": "wikidata", "label": "Wikidata image"},
+        {"kind": "banner", "url": "https://r2.theaudiodb.com/banner.jpg",
+         "preview": "https://r2.theaudiodb.com/banner.jpg", "source": "theaudiodb", "label": "Banner"},
+    ]
+
+    resolved = asyncio.run(client._size_commons(candidates))
+
+    assert resolved[0]["url"].endswith("?width=330")
+    assert resolved[0]["preview"].endswith("?width=330")
+    #? and a source that isn't Commons is left exactly as it was
+    assert resolved[1] == candidates[1]
 
 
 # ---------------------------------------------------------------- what a page shows

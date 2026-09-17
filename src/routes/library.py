@@ -733,6 +733,11 @@ async def deletion_summary(album: str):
 # near as obvious as album covers, and src/artist_art.py for the writing.
 
 
+class ArtistSearchRequest(BaseModel):
+    """A name to look up in MusicBrainz, when the one on the folder isn't finding the right act."""
+    query: str
+
+
 class ArtistImagesRequest(BaseModel):
     artist: str
     #? Skips the lookup when the caller already knows it - the page does, having been told by
@@ -933,8 +938,9 @@ async def artist_images_preview(request: Request, body: ArtistImagesRequest):
             if summary["path"] and best else None)
 
     if not candidates and mbid and not problems:
+        missing = not (Config.THEAUDIODB_KEY or Config.FANARTTV_KEY)
         problems.append("no pictures of this artist in any of the sources"
-                        + ("" if Config.THEAUDIODB_KEY else " - a TheAudioDB key would add banners and logos"))
+                        + (" - a fanart.tv or TheAudioDB key would add banners and logos" if missing else ""))
 
     return {
         **summary,
@@ -946,7 +952,13 @@ async def artist_images_preview(request: Request, body: ArtistImagesRequest):
         "best": best,
         "kinds": [{"kind": k, "label": KIND_LABELS[k]} for k in ARTIST_ART_KINDS],
         "plan": plan,
-        "has_key": bool(Config.THEAUDIODB_KEY),
+        #? which artwork sources are configured, so the dialog can say what is missing rather
+        #? than only that something is
+        "sources": {
+            "fanarttv": bool(Config.FANARTTV_KEY),
+            "theaudiodb": bool(Config.THEAUDIODB_KEY),
+        },
+        "has_key": bool(Config.THEAUDIODB_KEY or Config.FANARTTV_KEY),
         "problems": problems,
     }
 
@@ -1027,4 +1039,46 @@ async def artist_images_apply(request: Request, body: ArtistImagesRequest):
         "path": summary["path"],
         "results": results,
         "art": await asyncio.to_thread(find_artist_art, directory),
+    }
+
+
+@router.post("/artist/search")
+async def artist_search(request: Request, body: ArtistSearchRequest):
+    """
+    Artists in MusicBrainz going by this name.
+
+    The way out of two dead ends the automatic match cannot solve on its own: files with no
+    MusicBrainz ids whose folder is named something MusicBrainz doesn't recognise, and the
+    several bands that genuinely share a name - where guessing is refused on purpose, because
+    the consequence is another band's photograph in this band's folder.
+
+    Picking one of these hands its id to the preview, which is the same path the tags take when
+    they do know. Nothing is written by searching.
+    """
+    query = (body.query or "").strip()
+    if not query:
+        return {"query": "", "matches": []}
+
+    try:
+        client = request.app.state.musicbrainz_client
+        found = await client.search_artists(query, limit=8)
+    except (AttributeError, MusicBrainzUnavailable):
+        raise HTTPException(status_code=503, detail="MusicBrainz could not be reached")
+
+    if "error" in found:
+        raise HTTPException(status_code=503, detail="MusicBrainz could not be reached")
+
+    return {
+        "query": query,
+        "matches": [
+            {
+                "mbid": a.get("id"),
+                "name": a.get("name"),
+                "disambiguation": a.get("disambiguation") or "",
+                "country": a.get("country") or "",
+                "type": a.get("type") or "",
+                "score": a.get("score"),
+            }
+            for a in (found.get("artists") or [])[:8] if a.get("id")
+        ],
     }

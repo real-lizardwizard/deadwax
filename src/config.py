@@ -205,6 +205,13 @@ class Config:
     #? already holds. Everything else about an artist page works without it.
     THEAUDIODB_KEY = _env("THEAUDIODB_KEY")
 
+    #? fanart.tv, the other source of artist artwork, and the one whose pictures are voted on by
+    #? the people using them. It needs a PROJECT key, which its developers issue per application
+    #? rather than per person - so it cannot be shipped in a public repo and has to be yours.
+    #? The personal key is optional and only buys earlier sight of newly added images.
+    FANARTTV_KEY = _env("FANARTTV_KEY")
+    FANARTTV_PERSONAL_KEY = _env("FANARTTV_PERSONAL_KEY")
+
     #? ===== which settings the settings tab may write ==========================
     #?
     #? Editability is a property of the setting, not a policy choice, and the split is real:
@@ -234,6 +241,8 @@ class Config:
         "COVER_ART_SIZE": None,
         #? read per lookup by the artist image client, so nothing to rebuild here either
         "THEAUDIODB_KEY": None,
+        "FANARTTV_KEY": None,
+        "FANARTTV_PERSONAL_KEY": None,
     }
 
     #? Why each of these cannot be edited here, in words the settings tab renders verbatim.

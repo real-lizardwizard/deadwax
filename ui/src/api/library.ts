@@ -1,6 +1,7 @@
 import { get, post } from './http'
 import type {
-  ArtistImagesPreview, ArtistImagesResult, ArtistSummary, DeleteResult, DeletionSummary,
+  ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
+  DeletionSummary,
   LibraryResponse, NewImportsResponse, RetagPlan, RetagRelease, RetagResponse, TagEditPlan,
   TagEditResponse, TrackDetailsResponse, TrackTagEdit,
 } from './types'
@@ -209,4 +210,15 @@ export function applyArtistImages(
     choices,
     replace: options.replace ?? false,
   })
+}
+
+
+/**
+ * Artists in MusicBrainz going by this name. Writes nothing.
+ *
+ * The way past the two things the automatic match refuses to guess at: files carrying no
+ * MusicBrainz ids, and the several bands that share a name.
+ */
+export function searchArtists(query: string): Promise<ArtistSearchResult> {
+  return post<ArtistSearchResult>('/library/artist/search', { query })
 }

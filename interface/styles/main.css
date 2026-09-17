@@ -6050,6 +6050,59 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
     box-shadow: var(--shadow-lg);
 }
 
+.artist-images-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.artist-images-search > input { flex: 1; min-width: 0; }
+.artist-images-who { font-size: var(--text-2xs); }
+
+/* the answers to a search, offered as a list rather than a dropdown: the disambiguation is the
+   whole point of it - "Nirvana" is three bands and the country and type are how you tell */
+.artist-images-matches {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: 168px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.artist-images-matches > li > button {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font-size: var(--text-xs);
+}
+
+.artist-images-matches > li > button:hover { background: var(--hot-fill); }
+.artist-images-matches > li > button > .white-tertiary { margin-left: auto; white-space: nowrap; }
+
+/* opens the rest of what was found for this slot. A link rather than a button because it
+   reveals, it doesn't act. */
+.artist-images-more {
+    margin-left: var(--space-2);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: var(--text-2xs);
+    text-decoration: underline;
+}
+
 .artist-images-body {
     flex: 1;
     min-height: 0;

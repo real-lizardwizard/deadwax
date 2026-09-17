@@ -181,7 +181,7 @@ Cover art comes from a file beside the tracks, then from art embedded in the aud
 
 Click an artist in the library and you get a page about them rather than a heading: who they are, where they're from, how long they've been going, what MusicBrainz tags them as, the current line-up with instruments (and how many members came before), their official site and socials named after where they actually go, and their albums oldest first.
 
-Above all that: their own pictures. **MusicBrainz has none** — the Cover Art Archive is for releases, and what musicbrainz.org shows on an artist page is a Wikimedia Commons photo reached through Wikidata. jimbrainz uses that too, and adds <strong>TheAudioDB</strong> if you give it a key in the settings tab, which is the only source with banners, logos, backgrounds, wide shots and clear art.
+Above all that: their own pictures. **MusicBrainz has none** — the Cover Art Archive is for releases, and what musicbrainz.org shows on an artist page is a Wikimedia Commons photo reached through Wikidata. jimbrainz uses that too, and adds <strong>fanart.tv</strong> and <strong>TheAudioDB</strong> if you give either a key in the settings tab — between them they have the banners, logos, backgrounds and wide shots an artist page is actually made of. fanart.tv's artwork is voted on by the people using it, so jimbrainz offers the most-liked of each kind first; its key is issued per application rather than per person, so you register your own at fanart.tv.
 
 They're written into the artist's folder, so <em>other things read them too</em>:
 
@@ -194,7 +194,7 @@ They're written into the artist's folder, so <em>other things read them too</em>
 | wide image | `landscape.jpg` | Kodi's landscape, Jellyfin's thumb |
 | clear art | `clearart.png` | Kodi |
 
-A picker shows every candidate each source offered — TheAudioDB usually has four backgrounds — so you choose which one belongs at the top of the page rather than taking whatever sorted first. Pictures already in the folder are left alone unless you tick "replace". Nothing is written into a folder that holds tracks: that's an album, and those filenames mean something else there.
+A picker shows every candidate each source offered — TheAudioDB usually has four backgrounds — so you choose which one belongs at the top of the page rather than taking whatever sorted first. You can search MusicBrainz from inside it for the right artist, which is how you get past files with no MusicBrainz ids and the several bands that share a name, and any picture it found can be used in any slot — so a single photo can be both the square image and the background. Pictures already in the folder are left alone unless you tick "replace". Nothing is written into a folder that holds tracks: that's an album, and those filenames mean something else there.
 
 Without a key you still get a photo where Commons has one, and the rest of the page is unaffected.
 

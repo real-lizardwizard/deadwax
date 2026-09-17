@@ -65,18 +65,50 @@ KIND_LABELS = {
     "clearart": "Clear art",
 }
 
-#? Which source to believe when two offer the same kind. TheAudioDB's art is made to be artwork
+#? Which source to believe when two offer the same kind. fanart.tv leads because its artwork is
+#? voted on by the people using it, and this asks for the most-liked of each kind; TheAudioDB's art
 #? - cropped square, banner-shaped, transparent where it should be - while a Commons file is a
 #? photograph of a band on a stage, which is the right fallback and the wrong first choice.
 #? Between the two Commons routes, an `image` relation was put on that artist by a MusicBrainz
 #? editor; P18 is Wikidata's idea of the same thing and is occasionally a different person.
-SOURCE_ORDER = ("theaudiodb", "musicbrainz", "wikidata")
+SOURCE_ORDER = ("fanarttv", "theaudiodb", "musicbrainz", "wikidata")
 
 COMMONS_HOSTS = {"commons.wikimedia.org", "commons.m.wikimedia.org"}
 
 #? What Special:FilePath is asked for when an image is going to be looked at rather than
 #? written. Commons originals are frequently 20 MB scans.
 PREVIEW_WIDTH = 600
+
+#? And what to ask for when it is going to be kept. Big enough to sit behind an artist page,
+#? small enough not to pull a gatefold scan.
+SAVE_WIDTH = 1200
+
+#? How far below the original a thumbnail has to be asked for. MediaWiki will not upscale, so a
+#? width at or near the original's resolves to the ORIGINAL - and that is the one thing
+#? upload.wikimedia.org refuses a robot. Measured on a 367px-wide file: 300 serves, 366 does not.
+THUMB_HEADROOM = 0.9
+
+
+def safe_thumb_width(original_width: int, want: int = PREVIEW_WIDTH, vector: bool = False) -> int:
+    """
+    A width Commons will actually answer with a thumbnail.
+
+    Wikimedia serves thumbnails to anything that identifies itself politely, and refuses
+    ORIGINALS with "Please honor our robot policy" - so every Commons image here has to be
+    fetched as a thumbnail. The catch is that MediaWiki does not upscale: ask for 600 of a file
+    that is 367 wide and it hands back the original, which is refused. So the width asked for
+    stays under the original's, with room to spare for its rounding.
+
+    A VECTOR has no such limit - an SVG is rasterised at whatever width is asked for, and comes
+    back as a PNG - so a logo is not shrunk to the nominal size Commons reports for it.
+    """
+    if vector:
+        return want
+
+    if original_width <= 0:
+        return want
+
+    return max(64, min(want, int(original_width * THUMB_HEADROOM)))
 
 
 def commons_file_url(title: str, width: int | None = None) -> str:
@@ -241,6 +273,59 @@ def from_theaudiodb(row: dict | None) -> list[dict]:
         url = (row or {}).get(field)
         if isinstance(url, str) and url.strip():
             found.append(_candidate(kind, url.strip(), "theaudiodb", f"TheAudioDB {label}"))
+
+    return found
+
+
+#? fanart.tv's fields, and what each is to jimbrainz. The HD logo comes before the plain one so
+#? that when both exist the better is offered first; 4K backgrounds are offered alongside the
+#? ordinary ones rather than instead of them, being several megabytes each.
+FANARTTV_FIELDS = (
+    ("artistthumb", "thumb", "Thumb"),
+    ("musicbanner", "banner", "Banner"),
+    ("artistbackground", "fanart", "Background"),
+    ("artist4kbackground", "fanart", "Background 4K"),
+    ("hdmusiclogo", "logo", "HD logo"),
+    ("musiclogo", "logo", "Logo"),
+)
+
+#? How many of any one kind to take. fanart.tv can hold a dozen backgrounds for a popular band,
+#? and a picker listing all of them is a picker nobody reads to the end.
+FANARTTV_PER_KIND = 4
+
+
+def _likes(image: dict) -> int:
+    """fanart.tv reports likes as a string, and sometimes not at all."""
+    try:
+        return int(image.get("likes") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def from_fanarttv(payload: dict | None) -> list[dict]:
+    """
+    Image candidates from one fanart.tv music response.
+
+    Sorted by what people voted for. fanart.tv is the one source here whose pictures were put
+    there BY the people using them in media centres - so "most liked" is a real signal about
+    which background belongs behind an artist, rather than whichever happened to be uploaded
+    first, which is the best any of the others can offer.
+    """
+    found = []
+
+    for field, kind, label in FANARTTV_FIELDS:
+        images = (payload or {}).get(field)
+        if not isinstance(images, list):
+            continue
+
+        for image in sorted(images, key=_likes, reverse=True)[:FANARTTV_PER_KIND]:
+            url = (image or {}).get("url")
+            if isinstance(url, str) and url.strip():
+                likes = _likes(image)
+                found.append(_candidate(
+                    kind, url.strip(), "fanarttv",
+                    f"fanart.tv {label}" + (f" ({likes})" if likes else ""),
+                ))
 
     return found
 

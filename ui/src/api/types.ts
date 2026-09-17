@@ -810,6 +810,8 @@ export interface ArtistImagesPreview extends ArtistSummary {
   best: Record<string, ArtistImageCandidate>
   kinds: { kind: string; label: string }[]
   plan: ArtistImagesPlan | null
+  /** Which artwork sources have a key, so the dialog can name the one that is missing. */
+  sources: { fanarttv: boolean; theaudiodb: boolean }
   has_key: boolean
   problems: string[]
 }
@@ -819,4 +821,9 @@ export interface ArtistImagesResult {
   path: string
   results: { mode: string; dry_run: boolean; written: string[]; skipped: string[]; problems: string[] }
   art: Record<string, string>
+}
+
+export interface ArtistSearchResult {
+  query: string
+  matches: ArtistMatch[]
 }

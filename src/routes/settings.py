@@ -348,9 +348,29 @@ async def settings():
                         Config.THEAUDIODB_KEY,
                         secret=True,
                         effect=(
-                            "Artist banners, logos and backgrounds come from TheAudioDB, which "
-                            "is the only source that has them. Without a key an artist still "
-                            "gets a photo from Wikimedia Commons, where there is one"
+                            "One of the two sources of artist banners, logos and backgrounds. "
+                            "Without either, an artist still gets a photo from Wikimedia "
+                            "Commons where there is one"
+                        ),
+                    ),
+                    _setting(
+                        "FANARTTV_KEY",
+                        Config.FANARTTV_KEY,
+                        secret=True,
+                        effect=(
+                            "The other, and the one whose artwork is voted on by the people "
+                            "using it. fanart.tv issues this key per application, so it has to "
+                            "be registered by you at fanart.tv rather than shipped with jimbrainz"
+                        ),
+                    ),
+                    _setting(
+                        "FANARTTV_PERSONAL_KEY",
+                        Config.FANARTTV_PERSONAL_KEY,
+                        secret=True,
+                        effect=(
+                            "Optional, and only alongside the key above: your own fanart.tv "
+                            "account key, which shows images added in the last week rather than "
+                            "waiting for them"
                         ),
                     ),
                     *_musicbrainz_rows(),

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 
-import { applyArtistImages, fetchArtist, previewArtistImages } from '../api/library'
-import type { ArtistImageCandidate, ArtistImagesPreview, ArtistSummary } from '../api/types'
+import { applyArtistImages, fetchArtist, previewArtistImages, searchArtists } from '../api/library'
+import type {
+  ArtistImageCandidate, ArtistImagesPreview, ArtistMatch, ArtistSummary,
+} from '../api/types'
 import { artistArtUrl, formatSize } from '../lib/format'
 import type { AlbumGroup } from '../lib/groupAlbums'
 import { Loading } from './Loading'
@@ -237,12 +239,15 @@ export function ArtistDetails(
 /**
  * Choosing which picture goes where.
  *
- * Every candidate the sources offered, grouped by what it would be written as. Picking is the
- * point: TheAudioDB often has four backgrounds, and which one belongs at the top of a page is
- * not something a rule can decide.
+ * Two things a rule cannot decide, so both are yours. WHICH ARTIST this is, when the files carry
+ * no MusicBrainz ids and the folder is named something MusicBrainz reads as a different act -
+ * the automatic match refuses to guess between two bands of the same name, and this is the way
+ * past that. And WHICH PICTURE goes in which slot: the sources are uneven, TheAudioDB often has
+ * four backgrounds and Commons one photograph, so any picture found can be used anywhere rather
+ * than being stuck as whatever its source happened to call it.
  */
 function ArtistImagePicker(
-  { artist, preview, version, onClose, onSaved }:
+  { artist, preview: found, version, onClose, onSaved }:
   {
     artist: string
     preview: ArtistImagesPreview
@@ -251,13 +256,17 @@ function ArtistImagePicker(
     onSaved: () => Promise<void>
   },
 ) {
-  const [chosen, setChosen] = useState<Record<string, string>>(
-    () => Object.fromEntries(Object.entries(preview.best).map(([kind, c]) => [kind, c.url])),
-  )
+  //? its own copy, because searching replaces the artist being shown without disturbing the
+  //? page underneath - which is still about the artist whose folder this writes into
+  const [preview, setPreview] = useState(found)
+  const [chosen, setChosen] = useState<Record<string, string>>(() => bestUrls(found))
+  const [query, setQuery] = useState(artist)
+  const [matches, setMatches] = useState<ArtistMatch[]>([])
+  const [searching, setSearching] = useState(false)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [replace, setReplace] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
-  const dialog = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -277,13 +286,40 @@ function ArtistImagePicker(
     return grouped
   }, [preview.candidates])
 
+  const search = async () => {
+    setSearching(true)
+    setSaved(null)
+    try {
+      const result = await searchArtists(query)
+      setMatches(result.matches)
+      if (result.matches.length === 0) setSaved(`Nothing in MusicBrainz goes by "${query}".`)
+    } catch {
+      setSaved('MusicBrainz could not be reached.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const useArtist = async (mbid: string) => {
+    setSearching(true)
+    try {
+      const next = await previewArtistImages(artist, { artistMbid: mbid })
+      setPreview(next)
+      setChosen(bestUrls(next))
+      setMatches([])
+      setExpanded({})
+    } catch {
+      setSaved('That artist could not be loaded.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
   const save = async () => {
     setSaving(true)
     setSaved(null)
     try {
-      const result = await applyArtistImages(artist, chosen, {
-        artistMbid: preview.mbid, replace,
-      })
+      const result = await applyArtistImages(artist, chosen, { artistMbid: preview.mbid, replace })
       const written = result.results.written
       setSaved(written.length
         ? `Saved ${written.join(', ')}.`
@@ -298,37 +334,95 @@ function ArtistImagePicker(
 
   return (
     <div id="artist-images" role="dialog" aria-modal="true" aria-label="Artist images" onClick={onClose}>
-      <div class="artist-images-frame" ref={dialog} onClick={(event) => event.stopPropagation()}>
+      <div class="artist-images-frame" onClick={(event) => event.stopPropagation()}>
         <div class="window-titlebar">
-          <span class="window-title">Artist images · {artist}</span>
+          <span class="window-title">
+            Artist images · {preview.facts?.name || artist}
+          </span>
           <button type="button" class="window-close" title="Close (Esc)" onClick={onClose}>✕</button>
         </div>
+
+        <div class="artist-images-search">
+          <input
+            type="search"
+            value={query}
+            placeholder="Search MusicBrainz for an artist"
+            aria-label="Search MusicBrainz for an artist"
+            onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') void search() }}
+          />
+          <button type="button" class="win-button" disabled={searching || !query.trim()} onClick={() => void search()}>
+            {searching ? <Loading label="Looking" /> : 'Search'}
+          </button>
+          {preview.mbid && (
+            <span class="text default-muted artist-images-who">
+              showing {preview.facts?.name || artist}
+              {preview.facts?.disambiguation ? ` (${preview.facts.disambiguation})` : ''}
+            </span>
+          )}
+        </div>
+
+        {matches.length > 0 && (
+          <ul class="artist-images-matches">
+            {matches.map((match) => (
+              <li key={match.mbid}>
+                <button type="button" onClick={() => void useArtist(match.mbid)}>
+                  <strong>{match.name}</strong>
+                  {match.disambiguation && <span class="text default-muted"> {match.disambiguation}</span>}
+                  <span class="text white-tertiary">
+                    {[match.type, match.country].filter(Boolean).join(' · ')}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div class="artist-images-body">
           {!preview.has_key && (
             <p class="text white-tertiary artist-note">
-              Banners, logos and backgrounds come from TheAudioDB. Without a key in the settings
-              tab there is only whatever Wikimedia Commons has, which is usually one photograph.
+              Banners, logos and backgrounds come from fanart.tv and TheAudioDB, and both need a
+              key in the settings tab. Without either there is only what Wikimedia Commons has,
+              which is usually a single photograph — though you can put that in any slot below.
+            </p>
+          )}
+
+          {preview.has_key && !preview.sources?.fanarttv && (
+            <p class="text white-tertiary artist-note">
+              fanart.tv isn't set up. Its artwork is voted on by the people using it, so it is
+              usually the better of the two — a key of your own goes in the settings tab.
             </p>
           )}
 
           {preview.kinds.map(({ kind, label }) => {
             const options = byKind[kind] ?? []
+            //? every other picture found, so one source's "thumb" can be this slot's background
+            const others = preview.candidates.filter((candidate) => candidate.kind !== kind)
             const existing = preview.art?.[kind]
+            const showOthers = expanded[kind]
 
             return (
               <div key={kind} class="artist-images-row">
                 <div class="artist-images-label">
                   <strong>{label}</strong>
                   <span class="text default-muted">
-                    {existing ? ` ${existing} on disk` : options.length ? '' : ' none found'}
+                    {existing ? ` ${existing} on disk` : options.length ? '' : ' none found for this'}
                   </span>
+                  {others.length > 0 && (
+                    <button
+                      type="button"
+                      class="artist-images-more"
+                      onClick={() => setExpanded((c) => ({ ...c, [kind]: !c[kind] }))}
+                    >
+                      {showOthers ? 'fewer' : `use another picture (${others.length})`}
+                    </button>
+                  )}
                 </div>
 
                 <div class="artist-images-options">
-                  {options.map((candidate) => (
+                  {[...options, ...(showOthers ? others : [])].map((candidate) => (
                     <button
-                      key={candidate.url}
+                      key={`${kind}:${candidate.url}`}
                       type="button"
                       class={`artist-images-option${chosen[kind] === candidate.url ? ' is-chosen' : ''}`}
                       title={`${candidate.label} — ${candidate.source}`}
@@ -343,7 +437,8 @@ function ArtistImagePicker(
                       <span class="text default-muted">{candidate.source}</span>
                     </button>
                   ))}
-                  {options.length === 0 && existing && (
+
+                  {options.length === 0 && !showOthers && existing && (
                     <img
                       class="artist-images-option is-existing"
                       src={artistArtUrl(preview.path ?? '', kind, version)}
@@ -372,7 +467,7 @@ function ArtistImagePicker(
             type="button"
             class="win-button is-default"
             disabled={saving || Object.keys(chosen).length === 0}
-            onClick={save}
+            onClick={() => void save()}
           >
             {saving ? <Loading label="Saving" /> : 'Save'}
           </button>
@@ -381,6 +476,11 @@ function ArtistImagePicker(
       </div>
     </div>
   )
+}
+
+/** What "everything, best source first" would write — the picker's starting point. */
+function bestUrls(preview: ArtistImagesPreview): Record<string, string> {
+  return Object.fromEntries(Object.entries(preview.best).map(([kind, c]) => [kind, c.url]))
 }
 
 /** The one line under the name: what they are, where from, and how long they have been at it. */
