@@ -3,7 +3,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from src.api.slskd_endpoint import build_search_query
+from src.api.slskd_endpoint import SlskdSearchRefused, build_search_query
 from src.config import Config
 from src.logger import logger
 from src.matching import rank_candidates
@@ -143,6 +143,13 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
 
     except HTTPException:
         raise
+
+    except SlskdSearchRefused as e:
+        #? slskd would not start the search, and has already said why in the log. 502 rather
+        #? than 500: nothing here is broken, the service we depend on declined - and the detail
+        #? is a sentence about slskd, so it renders on its own without a prefix explaining that
+        #? something went wrong searching slskd.
+        raise HTTPException(status_code=502, detail=str(e))
 
     except Exception as e:
         logger.error(f"Exception in /find_candidates endpoint: {e}")

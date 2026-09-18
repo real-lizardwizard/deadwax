@@ -51,6 +51,179 @@ def build_search_query(artist: str, album: str) -> str:
     return " ".join(combined.split())
 
 
+class SlskdSearchRefused(Exception):
+    """
+    A search slskd would not start, carrying the reason it gave rather than its status code.
+
+    Raised instead of letting requests' HTTPError through, because that one renders as its
+    status line and nothing else - see slskd_said() below for why that matters here.
+    """
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
+#? What slskd answers a refused search with, and what each status actually MEANS - which in the
+#? case that brought this about is nothing like what its name says.
+#?
+#? 409 Conflict reads as "that already exists". What slskd means by it is that its connection to
+#? the Soulseek server is down: SearchesController.Post maps InvalidOperationException to
+#? Conflict, and the only thing that throws one on this path is Soulseek.NET's own precondition -
+#? "The server connection must be connected and logged in to perform a search". slskd's web API
+#? answers perfectly while logged out, so a refused search can be the FIRST sign anything is
+#? wrong. Traced through slskd's SearchesController.Post, SearchService.StartAsync and
+#? SoulseekClient.SearchAsync rather than guessed at.
+#?
+#? 429 is slskd's own one-at-a-time limiter - a static SemaphoreSlim(1, 1) taken with Wait(0) -
+#? so two overlapping searches get it: two browser tabs, or a retry on top of one still running.
+SEARCH_REFUSALS = {
+    400: "slskd rejected the search itself",
+    401: "slskd refused the API key",
+    403: "this slskd is running as a relay agent, and those cannot start searches",
+    409: "slskd is not connected to the Soulseek network, so it cannot search",
+    429: "slskd is already running a search, and it only runs one at a time",
+}
+
+
+def slskd_said(exc: HTTPError) -> str:
+    """
+    The explanation slskd put in the response body, or '' when there wasn't a usable one.
+
+    This exists because requests renders an HTTPError as its status line alone - "409 Client
+    Error: Conflict for url: ..." - and drops the body on the floor. slskd puts the whole reason
+    in that body, so not reading it is what turns a sentence into a number.
+    """
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
+
+    #? slskd declares [Produces("application/json")] and returns bare strings, so the usual body
+    #? is a JSON string. A ProblemDetails object and plain text both turn up too.
+    try:
+        body = response.json()
+    except Exception:
+        body = getattr(response, "text", "") or ""
+
+    if isinstance(body, dict):
+        body = next(
+            (body[key] for key in ("detail", "title", "message", "error")
+             if isinstance(body.get(key), str) and body[key].strip()),
+            "",
+        )
+
+    text = " ".join(str(body or "").split())
+
+    #? An HTML page is somebody else's - a proxy, or a login portal in front of slskd - and a
+    #? screenful of markup in the log helps nobody. Our own headline is better than that.
+    if text.startswith("<") or len(text) > 300:
+        return ""
+
+    return text
+
+
+def describe_search_refusal(status: int | None, said: str = "", connection: str = "") -> str:
+    """
+    One sentence saying why a search didn't run.
+
+    `connection` is what slskd says about its Soulseek connection right now, where that was
+    worth asking for; it wins outright, being both more specific and more current than a status
+    code. Otherwise the status is explained and slskd's own words follow ours rather than
+    replacing them - the body is specific and occasionally cryptic, and the status is the part
+    that can be explained once and for all.
+
+    Every branch names slskd as its subject, because this one string is shown in two places: on
+    its own in the event log, and after "search failed: " in the candidates panel. A sentence
+    that opened with "could not search" would read as a stutter in the second.
+    """
+    if connection:
+        return connection
+
+    headline = SEARCH_REFUSALS.get(status or 0)
+
+    if headline is None:
+        headline = (
+            f"slskd refused the search (HTTP {status})" if status else "slskd refused the search"
+        )
+
+    return f"{headline} - slskd said: {said}" if said else headline
+
+
+def _waiting_on(state: dict | None, transitioning: bool = False) -> str:
+    """
+    The reason slskd itself gives for being disconnected, where its state carries one.
+
+    Both fields are newer than some slskd versions, so both are optional - and the VPN one is
+    the entire answer when slskd runs inside a VPN container, which is a common way to run it
+    and the way this one is deployed.
+
+    "Trying to reconnect" is dropped while slskd is already reported as connecting, where it
+    only says the same thing twice.
+    """
+    watchdog = state.get("connectionWatchdog") if isinstance(state, dict) else None
+    watchdog = watchdog if isinstance(watchdog, dict) else {}
+
+    if watchdog.get("isAwaitingVpn"):
+        return ", and it is waiting for its VPN"
+
+    if watchdog.get("isAttemptingConnection") and not transitioning:
+        return ", and it is trying to reconnect"
+
+    return ""
+
+
+def describe_server_state(state: dict | None) -> dict:
+    """
+    What slskd's own state says about its connection to Soulseek, as {ok, code, detail}.
+
+    `ok` is True when a search could actually run, which is the half of "is slskd working" that
+    pinging its API cannot see. slskd answers its own API perfectly while logged out of
+    Soulseek, so a connection pill built on the ping alone reads "ok" right up until the first
+    search fails - and then blames the search.
+
+    An slskd too old to report `server` is treated as connected. Absence of the field is not
+    evidence of a disconnection, and a red pill on a working install is the worse mistake of the
+    two - the same call as _attach_measured_speeds failing silently.
+    """
+    #? slskd answering with something other than an object is not a disconnection either - it
+    #? is a proxy or an error page, which the ping's own HTTP handling is the place to notice
+    server = state.get("server") if isinstance(state, dict) else None
+    if not isinstance(server, dict) or not server:
+        return {"ok": True, "code": "connected", "detail": ""}
+
+    #? The flags are booleans wherever they exist; `state` is a string like "Connected, LoggedIn"
+    #? or "Disconnected" and is only ever quoted back, never parsed - it is a .NET flags enum and
+    #? reading it ourselves would be one more thing to keep in step with slskd.
+    reported = " ".join(str(server.get("state") or "").split()) or "an unknown state"
+
+    if server.get("isConnected") and server.get("isLoggedIn"):
+        return {"ok": True, "code": "connected",
+                "detail": f"slskd is logged in to Soulseek ({reported})"}
+
+    transitioning = bool(
+        server.get("isTransitioning") or server.get("isConnecting") or server.get("isLoggingIn")
+    )
+
+    #? the fact and the advice are kept apart so the state slskd reported sits beside the fact
+    #? rather than after a clause about what to go and change
+    if transitioning:
+        code, note, advice = "CONNECTING", "slskd is still connecting to Soulseek", ""
+
+    elif server.get("isConnected"):
+        code = "NOT_LOGGED_IN"
+        note = "slskd has reached the Soulseek server but is not logged in"
+        advice = " - check the username and password in its own configuration"
+
+    else:
+        code, note, advice = "NOT_CONNECTED", "slskd is not connected to the Soulseek server", ""
+
+    return {
+        "ok": False,
+        "code": code,
+        "detail": f"{note} ({reported}){_waiting_on(state, transitioning)}{advice}",
+    }
+
+
 class SlskdClient:
     def __init__(self):
         self.client: slskd_api.SlskdClient | None = None
@@ -92,6 +265,32 @@ class SlskdClient:
         self.client = None
 
 
+    async def _explain_refusal(self, exc: HTTPError) -> str:
+        """
+        Turn a refused search into a sentence, asking slskd how it is doing where that helps.
+
+        The extra request runs on the failure path only, and only for the one status a
+        connection explains. It is the difference between "not connected" and "not connected,
+        and it is waiting for its VPN" - which is the whole answer when slskd runs inside a VPN
+        container, and is not something the refusal itself can say.
+        """
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        connection = ""
+
+        if status == 409 and self.client is not None:
+            try:
+                described = describe_server_state(
+                    await asyncio.to_thread(self.client.application.state)
+                )
+                connection = "" if described["ok"] else described["detail"]
+
+            except Exception as e:
+                #? the diagnosis is a bonus - never let it replace the error it explains
+                logger.debug(f"couldnt read slskd's connection state to explain a refusal: {e}")
+
+        return describe_search_refusal(status, slskd_said(exc), connection)
+
+
     async def search(
         self,
         query: str,
@@ -109,11 +308,22 @@ class SlskdClient:
         logger.info(f"searching slskd for: {query}", extra={"frontend": True, "src": "slskd"})
         client = await self.get_client()
 
-        state = await asyncio.to_thread(
-            client.searches.search_text,
-            searchText=query,
-            searchTimeout=search_timeout_ms,
-        )
+        try:
+            state = await asyncio.to_thread(
+                client.searches.search_text,
+                searchText=query,
+                searchTimeout=search_timeout_ms,
+            )
+
+        except HTTPError as exc:
+            #? slskd refused to START the search, which is a different thing from a search that
+            #? found nothing, and it always says why. See _explain_refusal.
+            reason = await self._explain_refusal(exc)
+            logger.error(reason, extra={"frontend": True, "src": "slskd"})
+            raise SlskdSearchRefused(
+                reason, getattr(getattr(exc, "response", None), "status_code", None)
+            ) from exc
+
         search_id = state.get("id")
 
         if not search_id:
@@ -237,14 +447,27 @@ class SlskdClient:
         try:
             client = await self.get_client()
             state = await asyncio.to_thread(client.application.state)
-            if state:
-                logger.info("slskd functionality enabled, auth correct, and connection successful")
-                logger.info(f"Connection successful", extra={"frontend": True, "src":"slskd"})
-                return {"status": "ok"}
-            else:
+
+            if not state:
                 logger.error("slskd ping didnt return a state")
                 return {"status": "failed", "error": "slskd ping didnt return a state", "code": "NO_STATE"}
-            
+
+            #? slskd's API answering says the container is up and the key is right. It says
+            #? NOTHING about the connection to Soulseek, which is the one a search needs - so a
+            #? pill that stopped here read "ok" right up until the first search failed with a
+            #? 409, and then the search took the blame for it. Report what slskd reports.
+            connection = describe_server_state(state)
+
+            if not connection["ok"]:
+                #? connecting is a state it passes THROUGH; the others are states it sits in
+                report = logger.warning if connection["code"] == "CONNECTING" else logger.error
+                report(connection["detail"], extra={"frontend": True, "src": "slskd"})
+                return {"status": "failed", "error": connection["detail"], "code": connection["code"]}
+
+            logger.info("slskd functionality enabled, auth correct, and connection successful")
+            logger.info(f"Connection successful", extra={"frontend": True, "src":"slskd"})
+            return {"status": "ok"}
+
 
         except HTTPError as exc:
             status = exc.response.status_code

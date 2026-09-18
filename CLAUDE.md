@@ -85,7 +85,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             567 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             589 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
@@ -1186,6 +1186,44 @@ Each of these cost real time. Don't rediscover them.
 
 ### Backend and data
 
+- **slskd answers a search with `409 Conflict` when it is not logged in to SOULSEEK**, which is
+  nothing like what the status name suggests, and it was the first thing real infrastructure
+  broke. `SearchesController.Post` maps `InvalidOperationException` to `Conflict`, and the only
+  thing throwing one on that path is Soulseek.NET's own precondition - "The server connection
+  must be connected and logged in to perform a search". Traced through slskd's and
+  Soulseek.NET's source rather than guessed at, because the guess anyone would make from the
+  word "Conflict" is a duplicate search id, and it is not that.
+  **The reason was in the response BODY the whole time.** `requests` renders an `HTTPError` as
+  its status line alone, so `409 Client Error: Conflict for url: ...` is what reached the user
+  while slskd was spelling it out one layer down. `slskd_said()` reads that body - a bare JSON
+  string (slskd declares `[Produces("application/json")]` and returns plain strings), a
+  ProblemDetails object, or text - and `describe_search_refusal()` explains the status around
+  it. **Any other slskd call that shows an error to the user should read the body the same way.**
+  429 is the other status worth knowing: slskd runs ONE search at a time, behind a static
+  `SemaphoreSlim(1, 1)` taken with `Wait(0)`, so two tabs or a retry on top of a slow search get
+  "Only one concurrent operation is permitted".
+- **Pinging slskd's API says nothing about its connection to Soulseek, and the pill claimed
+  otherwise.** `application.state()` answers 200 whenever the container is up and the key is
+  right; slskd sits there logged out and serves it perfectly. So the connection pill read
+  `connected` right up until the first search failed - and then the *search* took the blame for
+  something that was already wrong before it ran, which is the exact failure those pills exist
+  to prevent. Same shape as the `peer avg` relabel: a status that visibly doesn't match reality
+  teaches you to distrust the ones that do. `ping()` now reads `server.isConnected` and
+  `server.isLoggedIn` out of that same payload and reports `NOT_CONNECTED`, `NOT_LOGGED_IN` or
+  `CONNECTING`.
+  **An slskd too old to report `server` at all is treated as connected** - absence of the field
+  is not evidence of a disconnection, and a red pill on a working install is the worse of the
+  two mistakes. `connectionWatchdog.isAwaitingVpn` is named when set, because slskd here runs
+  inside a VPN container and "it is waiting for its VPN" is the entire answer; it is newer than
+  some slskd versions, so it is read defensively and omitted when absent.
+  The state string (`"Connected, LoggedIn"`, `"Disconnected"`) is a .NET flags enum and is only
+  ever QUOTED BACK, never parsed - the booleans beside it are the contract.
+- **A 409 costs one extra request, on the failure path only.** `_explain_refusal()` asks slskd
+  how its connection is doing, because "not connected, and it is waiting for its VPN" is an
+  answer and "not connected" is a shrug. If that request fails too it is dropped silently and
+  slskd's original words are used - a diagnosis must never replace the error it explains.
+  The sentence it builds is shown in TWO places, on its own in the event log and after
+  "search failed: " in the candidates panel, so every branch of it names slskd as its subject.
 - **slskd's `averageSpeed` is cumulative** (total bytes ÷ total elapsed), so it only ever
   creeps upward and never shows the current rate. Real speed is derived from `bytesTransferred`
   deltas between polls. Don't "simplify" back to `averageSpeed`.
@@ -1639,7 +1677,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 567 tests
+.venv/bin/python -m pytest tests/ -q  # 589 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1668,13 +1706,20 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 567 tests are fixture-driven. **Nothing has ever talked to a real slskd.** The parts most
-likely to break on deployment are exactly the parts tests can't reach:
+All 589 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+slskd** - the application now has, once, and the first search it tried was refused. The parts
+most likely to break on deployment are exactly the parts tests can't reach:
 
 - slskd transfer `state` strings. **This one already came true**: `"Completed, Rejected"` was
   not in the recognised set, so a refused download sat at `queued` indefinitely — see the
   gotcha above. `TRANSFER_FAILURE_REASONS` in `store.py` now holds every terminal substate, and
   is the first place to look if a job never leaves `queued` or `downloading`.
+- Whether slskd is in a state where it can search at all. **This one came true too**, on the
+  first live run: the search failed with a 409, which slskd uses to mean its Soulseek connection
+  is down. No fixture could have produced it, because nothing here had ever seen slskd REFUSE a
+  search - only answer one. `SEARCH_REFUSALS` in `slskd_endpoint.py` now names every status it
+  refuses with, and `tests/test_slskd_errors.py` rehearses each against slskd's own documented
+  payloads.
 - slskd's on-disk download layout — `find_local_file()` searches by basename rather than
   reconstructing paths, precisely because the layout isn't guaranteed.
 - Whether `SLSKD_DOWNLOAD_PATH` actually resolves to the same files slskd writes. This is the
@@ -1684,10 +1729,11 @@ A green suite here means the logic is sound, not that it works against real infr
 
 ## Next up
 
-1. **Run it against real infrastructure.** Everything below the interface is fixture-tested
-   and has never met a live slskd. Watch specifically: the derived download speed (byte
-   deltas, not `job.speed`), queue position, cancel, and whether `SLSKD_DOWNLOAD_PATH`
-   resolves to the same files slskd writes.
+1. **Run it against real infrastructure. STARTED in v0.6.17, and it broke immediately** - the
+   first live search came back `409 Conflict`, which is slskd's way of saying its own Soulseek
+   connection is down (see the gotcha above). Everything past that is still unexercised, so
+   watch specifically: the derived download speed (byte deltas, not `job.speed`), queue
+   position, cancel, and whether `SLSKD_DOWNLOAD_PATH` resolves to the same files slskd writes.
 2. **Merge to `main`.** It still holds v0.2.1, so the repo's default branch shows the old
    Lidarr README to anyone who visits, while `:latest` has been the slskd line since v0.3.0.
 3. Continue the port in the order in [docs/FRONTEND-MIGRATION.md](docs/FRONTEND-MIGRATION.md):
