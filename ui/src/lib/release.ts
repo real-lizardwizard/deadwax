@@ -74,6 +74,41 @@ export function creditName(credit: ArtistCredit[] | undefined): string {
     .trim()
 }
 
+/**
+ * The same credit in each artist's CURRENT name - who a release is by, as opposed to what it
+ * was credited to. This is what an album is filed under.
+ *
+ * MusicBrainz keeps both in every credit: `name` is what the sleeve said, `artist.name` is what
+ * the artist is called now. Ye's records say "Kanye West" up to 2024 and "Ye" after, so filing
+ * by the credit gave one artist two folders. The join phrases are kept, so a split stays a
+ * split and a feature stays a feature - only the names are brought up to date.
+ *
+ * Mirrors getCurrentArtistNames() in interface/scripts/credits.mjs, which names a download's
+ * folder while this seeds the editor's; ui/test/credits.sim.cjs holds the two to one answer.
+ */
+export function currentName(credit: ArtistCredit[] | undefined): string {
+  return (credit ?? [])
+    .map((entry) => `${entry.artist?.name || entry.name || ''}${entry.joinphrase ?? ''}`)
+    .join('')
+    .trim()
+}
+
+/**
+ * The editor's MusicBrainz query for an album, by its title and artist.
+ *
+ * Asks for the artist as CREDITED or as they are CALLED NOW, because the editor's artist field
+ * holds the current name once a release is picked, and `artist:` on a release group matches
+ * only the credit. Measured: `releasegroup:"Donda" AND artist:"Ye"` misses the Donda credited
+ * to Kanye West, which is the one that exists; `artistname:"Ye"` finds it. Without both, every
+ * album filed under its artist's current name could no longer find its own release group.
+ *
+ * Bracketed, so the AND binds to the whole OR - the type filter's trap.
+ */
+export function fieldedAlbumQuery(album: string, artist: string): string {
+  const quote = (text: string) => `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+  return `releasegroup:${quote(album)} AND (artist:${quote(artist)} OR artistname:${quote(artist)})`
+}
+
 /** Every artist id in a credit, in the order credited. Mirrors credit_ids() in src/artists.py. */
 export function creditIds(credit: ArtistCredit[] | undefined): string[] {
   const ids: string[] = []

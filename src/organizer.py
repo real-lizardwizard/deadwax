@@ -49,6 +49,23 @@ def sanitize_filename(name: str, fallback: str = "unknown") -> str:
     return (cleaned[:200] or fallback)
 
 
+def filed_artist(release: dict) -> str:
+    """
+    The artist folder an album is filed under: who it is BY, in their current name.
+
+    Not the credit. A release is credited to whatever the artist was calling themselves that
+    year - Ye's records say "Kanye West" until 2024 and "Ye" after - and filing by the credit
+    gives one artist a folder per name. `album_artist` is the current name, sent by the browser
+    from MusicBrainz's own `artist-credit[].artist.name`; a job queued before it existed has
+    only `artist`, and files exactly where it always would have.
+
+    The folder and the albumartist tag both come from here and must: the metadata queue's
+    misfiled check compares one against the other, so moving only the folder would flag every
+    album by everyone who has ever renamed.
+    """
+    return release.get("album_artist") or release.get("artist") or ""
+
+
 def build_album_dirname(release: dict, discriminator: str = "") -> str:
     """
     `Album (Year)`, plus ` [Edition]` when this release is a distinguishable edition.
@@ -92,7 +109,7 @@ def build_target_path(
     Tracks that couldn't be matched to the tracklist keep their original filename rather than
     being given a made-up number - a wrong track number is worse than none.
     """
-    artist = sanitize_filename(release.get("artist"), "Unknown Artist")
+    artist = sanitize_filename(filed_artist(release), "Unknown Artist")
 
     if track and track.get("position") and track.get("title"):
         filename = f"{int(track['position']):02d} - {sanitize_filename(track['title'])}.{extension}"
@@ -216,7 +233,7 @@ def resolve_album_dir(library_root: str, release: dict) -> tuple[Path, str]:
     jimbrainz has no MBIDs, and forking every one of those albums into a second folder would
     be far worse than sharing one.
     """
-    artist = sanitize_filename(release.get("artist"), "Unknown Artist")
+    artist = sanitize_filename(filed_artist(release), "Unknown Artist")
     artist_dir = Path(library_root) / artist
     wanted_mbid = (release.get("release_mbid") or "").strip()
 
@@ -388,8 +405,12 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
     """
     values = {
         "album": release.get("album"),
-        "albumartist": release.get("artist"),
-        #? overridden below by the TRACK's own credit where it has one - see the note there
+        #? Who the album is BY, in their current name - the same string that names its folder,
+        #? which is what lets one artist be one artist in every player that groups on this tag.
+        #? See filed_artist().
+        "albumartist": filed_artist(release) or None,
+        #? AS CREDITED - what the sleeve says. Overridden below by the TRACK's own credit where
+        #? it has one, which on an ordinary album is every track.
         "artist": release.get("artist"),
         #? Who this is, in MusicBrainz's terms, which is the one part of a credit that survives
         #? somebody renaming a band. jimbrainz already wrote the release and release-group ids

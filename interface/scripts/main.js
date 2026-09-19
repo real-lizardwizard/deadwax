@@ -1,6 +1,7 @@
 import { init} from './init.js';
 import {sleep} from './utils.js';
 import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel } from './sort.mjs';
+import { getArtistIds, getArtistNames, getCurrentArtistNames } from './credits.mjs';
 
 
 
@@ -937,9 +938,15 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
         .filter(Boolean);
 
     return {
+        // AS CREDITED - what the sleeve says, and so what a stranger typed into their folder
+        // name. The Soulseek search is built from this and the matcher scores against it, which
+        // is why it is not the current name: nobody's share is called "Ye - Donda".
         artist: releaseGroupContext.artist,
-        // the ids behind the credit. The NAME still comes from the context, because that is
-        // what names the folder and it is what the user picked.
+        // Who the album is BY, in their current name - what it is filed under, and the
+        // albumartist tag inside. Ye's albums are credited "Kanye West" and "Ye" depending on
+        // the year, and filing by the credit gave him two folders. From the release's own
+        // credit, the same one the ids below come from, so the name and the id can't disagree.
+        album_artist: getCurrentArtistNames(release['artist-credit']) || releaseGroupContext.albumArtist,
         artist_mbids: getArtistIds(release['artist-credit']),
         album: release.title || releaseGroupContext.album,
         year: rawDate ? rawDate.substring(0, 4) : releaseGroupContext.year,
@@ -968,8 +975,15 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
 function buildExpectedFromReleaseGroup(releaseGroupContext) {
     // No specific release picked, so there's no tracklist to match against. The matcher
     // drops the tracklist-dependent signals rather than scoring these as failures.
+    //
+    // The OTHER way a download starts, and the one the current-name change first missed: it
+    // does not go through buildExpectedFromRelease, so its folder name has to be set here too.
+    // Found by clicking Find on a card in the real page, where the request carried no
+    // album_artist at all - no test reaches this path.
     return {
         artist: releaseGroupContext.artist,
+        album_artist: releaseGroupContext.albumArtist,
+        artist_mbids: releaseGroupContext.artistMbids,
         album: releaseGroupContext.album,
         year: releaseGroupContext.year,
         release_mbid: null,
@@ -1388,29 +1402,8 @@ function renderCandidates() {
 
 
 
-// The join phrases ARE the punctuation MusicBrainz intends: " / " for a split, " & " for a
-// collaboration, " feat. " for a guest spot. Joining on ", " instead - which this did - invents
-// punctuation and turns a duet into what reads as two separate acts.
-//
-// Third copy of this rule, and they must agree: creditName() in ui/src/lib/release.ts and
-// credit_name() in src/artists.py. One of them names a folder, another writes the tag inside it.
-function getArtistNames(artistCredit) {
-    if (!artistCredit || !artistCredit.length) return 'N/A';
-    return artistCredit
-        .map(ac => `${ac.name || ac.artist?.name || ''}${ac.joinphrase ?? ''}`)
-        .join('')
-        .trim() || 'N/A';
-}
-
-// Every artist id in a credit, in the order credited. Mirrors creditIds()/credit_ids().
-function getArtistIds(artistCredit) {
-    const ids = [];
-    for (const entry of artistCredit || []) {
-        const id = entry.artist?.id;
-        if (id && !ids.includes(id)) ids.push(id);
-    }
-    return ids;
-}
+// getArtistNames, getCurrentArtistNames and getArtistIds live in credits.mjs, where a sim can
+// reach them - one of them names the folder a download is filed into.
 
 
 
@@ -2356,8 +2349,16 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
         : '';
     const releaseGroupId = releaseGroup.id;
     const artistId = getArtistId(releaseGroup['artist-credit']);
-    // carried down into the releases grid so each row can build a soulseek search for itself
-    const releaseGroupContext = { artist, album: title, year, releaseGroupId, artistId };
+    // carried down into the releases grid so each row can build a soulseek search for itself.
+    // `artist` is the credit (what Soulseek folders are named after); `albumArtist` is who the
+    // group is by NOW, which is what a download from the card itself is filed under - it has no
+    // release to take a credit from, so without this it filed by the credit and gave Ye two
+    // folders again. The ids ride along for the same reason.
+    const releaseGroupContext = {
+        artist, album: title, year, releaseGroupId, artistId,
+        albumArtist: getCurrentArtistNames(releaseGroup['artist-credit']) || artist,
+        artistMbids: getArtistIds(releaseGroup['artist-credit']),
+    };
     const imageWrapper = document.createElement('div');
     imageWrapper.className = 'results-box-image-container';
     imageWrapper.setAttribute('data-mbid', releaseGroupId);

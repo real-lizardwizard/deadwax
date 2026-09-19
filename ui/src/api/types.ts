@@ -790,6 +790,12 @@ export interface ArtistMatch {
   country: string
   type: string
   score?: number
+  /**
+   * The name this artist goes by that the search matched, when it isn't the name they go by
+   * NOW. Searching for Kanye West answers with an artist called Ye, and without this the row
+   * gives you nothing to connect the two.
+   */
+  matched_as: string
 }
 
 export interface ArtistImagesPlan {

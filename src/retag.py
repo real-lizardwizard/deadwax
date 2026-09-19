@@ -30,7 +30,7 @@ from src.logger import logger
 from src.library import find_cover_file
 from src.matching import AUDIO_EXTENSIONS, file_extension, match_tracks_to_files
 from src.api.coverart_endpoint import extension_for
-from src.organizer import (build_album_dirname, is_within, read_album_mbid,
+from src.organizer import (build_album_dirname, filed_artist, is_within, read_album_mbid,
                            sanitize_filename, tag_values, write_tags)
 
 #? Same vocabulary as the organizer's ORGANIZE_MODES, minus the copy/move distinction which
@@ -317,7 +317,7 @@ def _resolve_target(root: Path, source: Path, release: dict) -> tuple[Path | Non
     exactly as one downloaded fresh would have been - the folder layout stays one convention
     rather than two.
     """
-    artist = sanitize_filename(release.get("artist"), "Unknown Artist")
+    artist = sanitize_filename(filed_artist(release), "Unknown Artist")
     target = root / artist / build_album_dirname(release)
 
     if target == source:

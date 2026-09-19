@@ -18,9 +18,10 @@ import pytest
 from fastapi import HTTPException
 
 from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
-from src.artists import (ARTIST_ART_KINDS, ARTIST_ART_STEMS, artist_facts, best_per_kind,
-                         commons_file_url, commons_title, from_relations, from_theaudiodb,
-                         from_fanarttv, from_wikidata, safe_thumb_width, wikidata_id)
+from src.artists import (ARTIST_ART_KINDS, ARTIST_ART_STEMS, answers_to, artist_facts,
+                         artist_names, artist_query, best_per_kind, commons_file_url,
+                         commons_title, from_relations, from_theaudiodb, from_fanarttv,
+                         from_wikidata, safe_thumb_width, wikidata_id)
 from src.config import Config
 from tests.test_retag import write_flac
 
@@ -306,6 +307,115 @@ def test_social_links_are_named_after_where_they_go():
     assert [l["label"] for l in facts["links"]] == ["Twitter", "Facebook", "Instagram"]
 
 
+
+# ------------------------------------------------------- finding an artist who has been renamed
+#
+# MusicBrainz keeps one current name per artist and everything else as an alias, while each
+# release keeps the name it was CREDITED under. jimbrainz writes the credit into the tags and the
+# folder - correctly, the album really was credited that way - so the name on disk is the one
+# MusicBrainz has stopped answering to. Measured against the live API before this was written:
+# artist:"Kanye West" returned "Kanye West Tribute Band" and "Kanye West & Hatsune Miku", with
+# Ye nowhere in the answer.
+
+#? Ye's artist search result, trimmed to the fields that matter. Real: fetched from the live API.
+YE = {
+    "id": "164f0d73-1234-4e2c-8743-d77bf2191051", "name": "Ye", "sort-name": "Ye", "score": 100,
+    "disambiguation": "formerly Kanye West",
+    "aliases": [
+        {"name": "Ye", "type": "Artist name", "primary": True},
+        {"name": "KanYeWest", "type": "Search hint"},
+        {"name": "Kanye", "type": "Artist name"},
+        {"name": "Kayne West", "type": "Search hint"},
+        {"name": "Kanye West", "type": "Artist name", "primary": True},
+        {"name": "Kanye Omari West", "type": "Legal name"},
+    ],
+}
+
+
+def test_the_query_asks_about_aliases_as_well_as_current_names():
+    #? artist: alone cannot find anybody who has renamed, which is the entire bug
+    query = artist_query("Kanye West")
+    assert 'artist:"Kanye West"' in query and 'alias:"Kanye West"' in query
+
+
+def test_the_query_is_bracketed_so_anything_ANDed_on_cannot_split_the_OR():
+    assert artist_query("Ye").startswith("(") and artist_query("Ye").endswith(")")
+
+
+@pytest.mark.parametrize("name", ['A "Live" Band', "AC\\DC"])
+def test_a_name_with_lucene_punctuation_in_it_stays_one_phrase(name):
+    #? the picker's box takes whatever is typed into it, so a stray quote must not end the phrase
+    query = artist_query(name)
+    assert query.count('"') % 2 == 0
+    assert query.startswith("(artist:") and " OR alias:" in query
+
+
+def test_an_artist_answers_to_every_name_they_have_ever_gone_by():
+    names = artist_names(YE)
+    assert names[0] == "Ye", "their current name leads"
+    assert "Kanye West" in names and "Kanye Omari West" in names
+
+
+def test_the_same_name_twice_is_listed_once():
+    assert artist_names({"name": "Ye", "sort-name": "Ye", "aliases": [{"name": "ye"}]}) == ["Ye"]
+
+
+def test_a_renamed_artist_is_found_by_the_name_on_disk():
+    #? the fix: the folder says Kanye West because that is how the albums were credited
+    assert answers_to(YE, "Kanye West") == "Kanye West"
+    assert answers_to(YE, "kanye west") == "Kanye West", "and case is not the user's problem"
+    assert answers_to(YE, "Ye") == "Ye", "their current name still matches"
+
+
+def test_matching_stays_exact_and_never_fuzzy():
+    #? a loose comparison would give back the guarantee that makes an automatic match safe at all
+    assert answers_to(YE, "Kanye") == "Kanye", "an alias in full is a match"
+    assert answers_to(YE, "Kany") == ""
+    assert answers_to(YE, "Kanye West Tribute Band") == ""
+    assert answers_to(YE, "") == "" and answers_to(None, "Ye") == ""
+
+
+def test_how_a_name_was_typed_is_not_a_difference():
+    """
+    MusicBrainz sets names properly; folders and taggers do not.
+
+    JAY-Z is "JAŸ‐Z" in MusicBrainz and credited "Jay‐Z", both with a U+2010 HYPHEN, while any
+    folder anyone typed has a plain hyphen-minus. MusicBrainz's own index folds these - it
+    answers the search with score 100 - so only this comparison was missing them.
+    """
+    jay = {"id": "jz", "name": "JA\u0178\u2010Z", "score": 100,
+           "aliases": [{"name": "Jay\u2010Z", "type": "Artist name"}]}
+    assert answers_to(jay, "Jay-Z") == "JA\u0178\u2010Z"
+
+    assert answers_to({"name": "Mot\u00f6rhead"}, "Motorhead") == "Mot\u00f6rhead"
+    assert answers_to({"name": "Bj\u00f6rk"}, "BJORK") == "Bj\u00f6rk"
+    assert answers_to({"name": "Guns N\u2019 Roses"}, "Guns N' Roses") == "Guns N\u2019 Roses"
+
+
+def test_folding_a_spelling_is_not_the_same_as_matching_loosely():
+    #? it still has to be the WHOLE name - the guard this runs behind is what makes an automatic
+    #? match safe, and a fuzzy comparison would hand that back
+    assert answers_to({"name": "Bj\u00f6rk"}, "Bjork Gudmundsdottir") == ""
+    assert answers_to({"name": "Mot\u00f6rhead"}, "Motor") == ""
+
+
+def test_a_tribute_band_does_not_answer_to_the_artist_it_covers():
+    #? what the old query actually returned first, and what must never resolve automatically
+    tribute = {"id": "t1", "name": "Kanye West Tribute Band", "score": 100}
+    assert answers_to(tribute, "Kanye West") == ""
+
+
+def test_also_known_as_leaves_out_the_name_they_go_by_now():
+    #? it read "Ye, KanYeWest, Donda, Kanye, ..." - their own name first, then two typos
+    assert "Ye" not in artist_facts(YE)["aliases"]
+
+
+def test_the_names_they_are_credited_under_lead_the_misspellings():
+    aliases = artist_facts(YE)["aliases"]
+    assert aliases[0] == "Kanye West"
+    assert aliases.index("Kanye") < aliases.index("Kayne West"), "a real name beats a search hint"
+
+
 # ---------------------------------------------------------------- which folder is the artist's
 
 def test_the_artist_folder_is_the_one_their_albums_share():
@@ -565,3 +675,64 @@ def test_applying_refuses_a_picture_the_sources_never_offered(tmp_path, monkeypa
     #? a lie about the request
     assert "not one of this artist's own pictures" in refused.value.detail
     assert not (directory / "artist.jpg").exists()
+
+
+def test_a_library_credited_to_their_old_name_still_resolves_to_them(tmp_path, monkeypatch):
+    """
+    The whole point, at the level the page actually works.
+
+    A library filed before v0.6.15 carries no artist ids, so the only key is the folder name -
+    which is the CREDIT, and for anyone who has renamed that is now an alias. This used to
+    resolve to nothing at all, and offered a tribute band as the first thing to click instead.
+    """
+    import asyncio
+
+    from src.routes.library import _resolve_artist_mbid
+
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
+    album = tmp_path / "Kanye West" / "Graduation (2007)"
+    write_flac(album / "01 - Good Morning.flac", title="Good Morning", album="Graduation",
+               albumartist="Kanye West", artist="Kanye West", date="2007")
+
+    async def fake_search(name, limit=5):
+        #? what the live API answers for (artist:"Kanye West" OR alias:"Kanye West")
+        return {"artists": [YE, {"id": "tribute", "name": "Kanye West Tribute Band", "score": 77}]}
+
+    mbid, source, matches = asyncio.run(_resolve_artist_mbid(
+        fake_request(musicbrainz=SimpleNamespace(search_artists=fake_search)),
+        "Kanye West", [{"path": "Kanye West/Graduation (2007)"}], None,
+    ))
+
+    assert mbid == YE["id"] and source == "search"
+    #? and the row says which of their names it matched, or the answer "Ye" explains nothing
+    assert matches[0]["matched_as"] == "Kanye West"
+    assert matches[1]["matched_as"] == "", "the tribute band matched nothing, it merely scored"
+
+
+def test_two_artists_answering_to_one_name_is_still_refused(tmp_path, monkeypatch):
+    """
+    Matching on aliases must not weaken the guard it runs behind.
+
+    More names to match means MORE artists can tie, not fewer - and a tie is refused, because
+    the cost of picking wrong is another band's photograph in this band's folder.
+    """
+    import asyncio
+
+    from src.routes.library import _resolve_artist_mbid
+
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
+
+    async def fake_search(name, limit=5):
+        return {"artists": [
+            {"id": "grunge", "name": "Nirvana", "score": 100,
+             "disambiguation": "1980s-1990s US grunge band"},
+            {"id": "uk", "name": "Nirvana", "score": 97, "disambiguation": "60s band from the UK"},
+        ]}
+
+    mbid, source, matches = asyncio.run(_resolve_artist_mbid(
+        fake_request(musicbrainz=SimpleNamespace(search_artists=fake_search)),
+        "Nirvana", [], None,
+    ))
+
+    assert mbid is None and source is None
+    assert len(matches) == 2, "and both are offered as a choice instead"

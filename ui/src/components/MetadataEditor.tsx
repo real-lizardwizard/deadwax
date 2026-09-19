@@ -12,7 +12,9 @@ import { Loading, LoadingPanel } from './Loading'
 import { issueLabel, outstandingIssues } from '../lib/metadataQueue'
 import {
   buildRetagRelease,
+  currentName,
   describeRelease,
+  fieldedAlbumQuery,
   isCurrentRelease,
   releaseTrackCount,
   scoreReleaseGroupMatch,
@@ -311,7 +313,12 @@ export function MetadataEditor(
 
       if (seedFields) {
         const built = buildRetagRelease(full, {
-          artist: album.artist,
+          //? Who the album is BY, in their current name, because that is what it is filed
+          //? under - a download of the same release goes to the same folder. Seeding from the
+          //? files instead would re-file a Kanye West album under Kanye West every time it was
+          //? corrected, beside the Ye folder its newer albums arrive in. Only when a release is
+          //? PICKED: opening the editor still never rewrites what is on disk by itself.
+          artist: currentName(full['artist-credit']) || album.artist,
           album: album.album,
           releaseGroupMbid: groupMbid,
           firstReleaseDate,
@@ -358,7 +365,7 @@ export function MetadataEditor(
        * fielded search is exact enough to miss a slightly-off album title, and finding
        * something imperfect beats finding nothing.
        */
-      const fielded = `releasegroup:"${fields.album}" AND artist:"${fields.artist}"`
+      const fielded = fieldedAlbumQuery(fields.album, fields.artist)
       //? `false` turns off the eager best-match-releases fetch. This editor ranks the groups
       //? itself and then asks for the ones it wants, so that eager walk - five requests and
       //? 1.4 MB for an album like this one - was spent on a payload it dropped on the floor.
@@ -690,7 +697,7 @@ export function MetadataEditor(
             type="text"
             class="releases-filter-input"
             value={query}
-            placeholder={`releasegroup:"${fields.album}" AND artist:"${fields.artist}"`}
+            placeholder={fieldedAlbumQuery(fields.album, fields.artist)}
             title="Leave blank to search on the artist and album fields below"
             onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
             onKeyDown={(event) => { if (event.key === 'Enter') void search() }}

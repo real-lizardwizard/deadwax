@@ -435,3 +435,72 @@ def test_a_folder_with_unexpected_leftovers_is_reported_not_wiped(tmp_path):
 
     assert removed == []
     assert (folder / "something-we-did-not-download.mkv").exists()
+
+
+# ---------------------------------------------------------------- one artist, one folder
+#
+# A release is credited to whatever the artist was calling themselves that year. Ye's records
+# say "Kanye West" up to 2024 and "Ye" after, and filing by the credit put Donda in Kanye West/
+# and BULLY in Ye/ - one artist, two folders, and two artists in anything that groups on the
+# albumartist tag. `album_artist` is the current name, and it names the folder and that tag.
+
+YE = "164f0d73-1234-4e2c-8743-d77bf2191051"
+
+DONDA = {
+    "artist": "Kanye West", "album_artist": "Ye", "artist_mbids": [YE],
+    "album": "Donda", "year": "2021", "release_mbid": "donda",
+    "tracks": [{"position": 1, "title": "Donda Chant", "artist": "Kanye West",
+                "artist_mbids": [YE]}],
+}
+
+BULLY = {
+    "artist": "Ye", "album_artist": "Ye", "artist_mbids": [YE],
+    "album": "BULLY", "year": "2025", "release_mbid": "bully",
+    "tracks": [{"position": 1, "title": "KING", "artist": "Ye", "artist_mbids": [YE]}],
+}
+
+
+def test_an_artist_who_renamed_is_filed_under_one_folder(tmp_path):
+    donda = build_target_path(str(tmp_path), DONDA, DONDA["tracks"][0], "flac")
+    bully = build_target_path(str(tmp_path), BULLY, BULLY["tracks"][0], "flac")
+
+    assert donda.parent.parent == bully.parent.parent == tmp_path / "Ye"
+
+
+def test_a_job_queued_before_the_current_name_existed_files_where_it_always_did(tmp_path):
+    #? stored jobs carry the release denormalized, and one queued last week has no album_artist
+    old = {key: value for key, value in DONDA.items() if key != "album_artist"}
+    target = build_target_path(str(tmp_path), old, old["tracks"][0], "flac")
+    assert target.parent.parent == tmp_path / "Kanye West"
+
+
+def test_the_albumartist_tag_follows_the_folder_and_the_track_keeps_its_credit(tmp_path):
+    """
+    Folder and albumartist are one decision: the misfiled check compares them, so moving only
+    the folder would flag the whole discography. The TRACK artist stays the credit - it is what
+    the sleeve says, and a feature still reads as one.
+    """
+    from mutagen.flac import FLAC
+
+    source = tmp_path / "downloads" / "Donda"
+    source.mkdir(parents=True)
+    write_minimal_flac(source / "01 - Donda Chant.flac")
+
+    library = tmp_path / "music"
+    job = make_job([r"share\Kanye West\Donda\01 - Donda Chant.flac"], release=DONDA,
+                   directory=r"share\Kanye West\Donda")
+    execute_plan(plan_organization(job, str(tmp_path / "downloads"), str(library)), DONDA, mode="copy")
+
+    written = FLAC(str(library / "Ye" / "Donda (2021)" / "01 - Donda Chant.flac"))
+    assert written["albumartist"] == ["Ye"]
+    assert written["artist"] == ["Kanye West"]
+    assert written["musicbrainz_albumartistid"] == [YE]
+
+
+def test_the_download_request_does_not_drop_the_current_name():
+    #? pydantic drops an undeclared field without a word, which is how disc numbers and track
+    #? artists were each lost once - and losing this one files everything by its credit again
+    from src.routes.download import EnqueueRelease
+
+    assert EnqueueRelease(**DONDA).model_dump()["album_artist"] == "Ye"
+    assert EnqueueRelease(artist="Kanye West").model_dump()["album_artist"] is None

@@ -151,6 +151,8 @@ Files land as <code>{artist}/{album} ({year}) [{edition}]/{NN} - {title}.{ext}</
 The edition suffix is omitted for ordinary albums, and only appears when there's something to say. That includes <em>alternate performances</em> — an instrumental or acoustic version has the same track titles and numbers as the album it accompanies, so without a marker it would land in that album's folder, every file would be skipped as already-present, and the import would tell you there was nothing to do. The name comes from MusicBrainz's own disambiguation where it has one, then detected edition tags, then format or country — and two genuinely different releases that would still collide get separated by catalogue number.
 <br><br>
 The year is the <em>album's</em> year, not the pressing's, so a 2011 remaster of a 1975 record files under <code>Wish You Were Here (1975) [Remastered]</code> rather than landing in a different decade from the original. The file still records which pressing it actually is.
+<br><br>
+The artist folder is the artist's <em>current</em> name, so one artist is one folder however many names their records came out under. Ye's albums are credited "Kanye West" up to 2024 and "Ye" after; they all file under <code>Ye/</code>, with the <code>albumartist</code> tag to match, so players that group on that tag show one artist too. The credit isn't thrown away — each track's <code>artist</code> tag still says what the sleeve says, and the Soulseek search still asks for "Kanye West", because that's what people named their folders. Albums you already have under an old name move when you pick their release in the metadata editor; nothing goes looking for them on its own yet.
 </details>
 
 ### A library tab that knows what you've got
@@ -193,6 +195,8 @@ They're written into the artist's folder, so <em>other things read them too</em>
 | background | `fanart.jpg` | Kodi's fanart, and one of Jellyfin's backdrop names — one file serves both |
 | wide image | `landscape.jpg` | Kodi's landscape, Jellyfin's thumb |
 | clear art | `clearart.png` | Kodi |
+
+Finding the right artist copes with them having **renamed**, which is commoner than it sounds. MusicBrainz keeps one current name per artist and every previous one as an alias, while each release keeps the name it was *credited* under — so Ye's albums are credited Kanye West, your folder is called Kanye West, and MusicBrainz's artist is called Ye. jimbrainz searches aliases as well as current names, and compares them ignoring how a name happened to be typed, so `Motorhead` finds Motörhead and a plain hyphen finds JAŸ‐Z. The page says "Now: Ye" when MusicBrainz calls them something other than your folder does — which, since new albums file under the current name, mostly means albums that arrived before. Two artists genuinely sharing a name are still refused rather than guessed at — that's what the picker is for.
 
 A picker shows every candidate each source offered — TheAudioDB usually has four backgrounds — so you choose which one belongs at the top of the page rather than taking whatever sorted first. You can search MusicBrainz from inside it for the right artist, which is how you get past files with no MusicBrainz ids and the several bands that share a name, and any picture it found can be used in any slot — so a single photo can be both the square image and the background. Pictures already in the folder are left alone unless you tick "replace". Nothing is written into a folder that holds tracks: that's an album, and those filenames mean something else there.
 

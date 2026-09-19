@@ -171,6 +171,18 @@ export function ArtistDetails(
           <div class="artist-column">
             <h3 class="details-subheading">MusicBrainz</h3>
             <dl class="property-grid">
+              {/*
+                * Shown only when MusicBrainz calls them something else, which is the whole
+                * question it answers: your folder says Kanye West because that is what the
+                * albums were credited to, and MusicBrainz has said Ye since 2021. Rendering it
+                * unconditionally would put the folder's own name on the page twice.
+                */}
+              {facts.name && facts.name !== artist && (
+                <><dt>Now</dt><dd>{facts.name}
+                  {facts.disambiguation && (
+                    <span class="text default-muted"> ({facts.disambiguation})</span>
+                  )}</dd></>
+              )}
               {facts.type && <><dt>Type</dt><dd>{facts.type}</dd></>}
               {facts.area && <><dt>From</dt><dd>{facts.begin_area || facts.area}</dd></>}
               {facts.began && (
@@ -368,6 +380,9 @@ function ArtistImagePicker(
               <li key={match.mbid}>
                 <button type="button" onClick={() => void useArtist(match.mbid)}>
                   <strong>{match.name}</strong>
+                  {match.matched_as && match.matched_as !== match.name && (
+                    <span class="text default-muted"> · as {match.matched_as}</span>
+                  )}
                   {match.disambiguation && <span class="text default-muted"> {match.disambiguation}</span>}
                   <span class="text white-tertiary">
                     {[match.type, match.country].filter(Boolean).join(' · ')}

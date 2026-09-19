@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field
 
 from src.config import Config
 from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
-from src.artists import ARTIST_ART_KINDS, KIND_LABELS, artist_facts, best_per_kind
+from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, answers_to, artist_facts,
+                         best_per_kind)
 from src.api.artist_images_endpoint import ArtistImagesClient
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.library import (SCAN_FORMAT, delete_album, drain_cache_changes, find_artist_art,
@@ -302,6 +303,10 @@ class RetagRelease(BaseModel):
     corrected by hand ends up carrying exactly the tags one downloaded fresh would have.
     """
     artist: str = ""
+    #? the name the album is filed under, when it differs from `artist` - see EnqueueRelease.
+    #? The editor sends none: its artist field is the album artist already, and is seeded with
+    #? the current name when a release is picked.
+    album_artist: str | None = None
     #? every artist id in the release's credit, in the order credited
     artist_mbids: list[str] = Field(default_factory=list)
     album: str = ""
@@ -781,6 +786,25 @@ def _artist_summary(name: str, albums: list[dict]) -> dict:
     }
 
 
+def _match(artist: dict, wanted: str = "") -> dict:
+    """
+    One search result, as the picker lists it.
+
+    `matched_as` is the name this artist goes by that `wanted` matched, and it is on the row
+    because without it the list is baffling: search for Kanye West and the answer is an artist
+    called "Ye", with nothing on screen connecting the two.
+    """
+    return {
+        "mbid": artist.get("id"),
+        "name": artist.get("name"),
+        "disambiguation": artist.get("disambiguation") or "",
+        "country": artist.get("country") or "",
+        "type": artist.get("type") or "",
+        "score": artist.get("score"),
+        "matched_as": answers_to(artist, wanted),
+    }
+
+
 async def _resolve_artist_mbid(request: Request, name: str, albums: list[dict], given: str | None):
     """
     Which MusicBrainz artist this is, and how sure we are.
@@ -804,22 +828,18 @@ async def _resolve_artist_mbid(request: Request, name: str, albums: list[dict], 
     except (AttributeError, MusicBrainzUnavailable):
         return None, None, []
 
-    matches = [
-        {
-            "mbid": a.get("id"),
-            "name": a.get("name"),
-            "disambiguation": a.get("disambiguation") or "",
-            "country": a.get("country") or "",
-            "type": a.get("type") or "",
-            "score": a.get("score"),
-        }
-        for a in (found.get("artists") or [])[:5] if a.get("id")
-    ]
+    matches = [_match(a, name) for a in (found.get("artists") or [])[:5] if a.get("id")]
 
-    #? Believed only when one artist is both an exact name match and MusicBrainz's own top
-    #? score. Two bands sharing a name is common, and the wrong one writing its picture into
+    #? Believed only when one artist answers to this name exactly and carries MusicBrainz's own
+    #? top score. Two bands sharing a name is common, and the wrong one writing its picture into
     #? your folder is silent - so anything less certain goes back to the page as a choice.
-    exact = [m for m in matches if (m["name"] or "").casefold() == name.casefold()]
+    #?
+    #? The comparison is against every name they go by, not just their current one: the name on
+    #? disk is the one the release was CREDITED under, and for anyone who has renamed that is now
+    #? an alias. Judging on the current name alone meant Ye could never be matched from a library
+    #? full of albums by Kanye West. Matching more names makes this refuse MORE often rather than
+    #? less - a second artist answering to the same name fails the len() == 1 test, as before.
+    exact = [m for m in matches if m["matched_as"]]
     if len(exact) == 1 and (exact[0]["score"] or 0) >= 90:
         return exact[0]["mbid"], "search", matches
 
@@ -1070,15 +1090,5 @@ async def artist_search(request: Request, body: ArtistSearchRequest):
 
     return {
         "query": query,
-        "matches": [
-            {
-                "mbid": a.get("id"),
-                "name": a.get("name"),
-                "disambiguation": a.get("disambiguation") or "",
-                "country": a.get("country") or "",
-                "type": a.get("type") or "",
-                "score": a.get("score"),
-            }
-            for a in (found.get("artists") or [])[:8] if a.get("id")
-        ],
+        "matches": [_match(a, query) for a in (found.get("artists") or [])[:8] if a.get("id")],
     }

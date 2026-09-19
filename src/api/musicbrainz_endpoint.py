@@ -2,6 +2,7 @@ import asyncio
 import time
 import httpx
 from collections import deque, OrderedDict
+from src.artists import artist_query
 from src.config import Config
 from src.logger import logger
 class MusicBrainzUnavailable(Exception):
@@ -337,9 +338,13 @@ class MusicBrainzClient:
         The fallback behind read_artist_mbid: anything jimbrainz filed carries the id in its
         tags, and a library that predates it does not. A name is a far weaker key - there are
         several bands called Nirvana - so the caller checks the answer before believing it.
+
+        The query searches ALIASES as well as current names, because the name on disk is the
+        one the release was credited under and MusicBrainz keeps only the current one under
+        `artist:`. See artist_query() for what that cost before it did.
         """
         return await self.request_with_retries(
-            "artist/", {"query": f'artist:"{name}"', "fmt": "json", "limit": limit},
+            "artist/", {"query": artist_query(name), "fmt": "json", "limit": limit},
         )
 
     async def get_artist(self, artist_mbid: str) -> dict:

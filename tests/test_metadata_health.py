@@ -379,3 +379,14 @@ def test_a_file_with_no_title_tag_is_counted_by_the_scan(tmp_path, clear_cache):
 
     assert album["untitled_tracks"] == 1
     assert "untitled_tracks" in inspect_album(album)
+
+
+def test_an_album_filed_under_its_artists_current_name_is_not_misfiled():
+    """
+    Donda is filed under Ye/ with albumartist "Ye", while its tracks keep their credit, "Kanye
+    West". The check compares the folder with the ALBUM artist, which is the scan's `artist` -
+    so this must read as filed correctly, or every renamed artist's discography floods the queue.
+    """
+    album = {"path": "Ye/Donda (2021)", "artist": "Ye", "album": "Donda", "year": "2021",
+             "release_mbid": "donda", "track_count": 1}
+    assert "misfiled" not in inspect_album(album)

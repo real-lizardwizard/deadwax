@@ -85,7 +85,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             589 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             610 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
@@ -880,6 +880,111 @@ anything else I'd need for an artist page".
   artist "just opens in place" (v0.6.5's decision). So the artist page is desktop and tablet
   only. The phone rules for it are written and inert until that decision changes.
 
+### Artists who have renamed (v0.6.18)
+
+James: "so Ye shows up as Kanye, that seems like a gap somewhere" - and then "I want to make
+sure there won't be a ye folder and a kanye folder ... there should just be one folder with the
+most up-to-date name".
+
+- **MusicBrainz keeps ONE current name per artist and every other name as an alias, while each
+  release keeps the name it was CREDITED under.** Those two disagree for everyone who has ever
+  renamed, and jimbrainz writes the credit into the tags and the folder - rightly, the album
+  really was credited that way - so **the name on disk is the one MusicBrainz no longer answers
+  to**. Ye is credited "Kanye West" on all but two of his own albums.
+- **`artist:"..."` matches the current name ONLY.** Measured against the live API:
+  `artist:"Kanye West"` returned "Kanye West Tribute Band" (score 100) and "Kanye West &
+  Hatsune Miku", and **Ye was not in the answer at all**. So the artist page could not resolve
+  him, and the picker's search box - the documented escape hatch for exactly this - offered a
+  tribute band as the first thing to click. `artist_query()` asks
+  `(artist:"X" OR alias:"X")` now, which puts Ye back at 100. Bracketed, so anything ANDed on
+  later cannot split the OR - the same trap as the type filter.
+- **The exactness test had to learn the same thing, and the query alone would not have been
+  enough.** `_resolve_artist_mbid` compared against `a["name"]`, which is "Ye" - so even with
+  the artist found, "Kanye West" != "Ye" and it still refused. `answers_to()` compares against
+  every name they go by (name, sort-name, aliases). **This makes the guard refuse MORE often,
+  not less**: a second artist answering to the same name fails the `len(exact) == 1` test
+  exactly as two bands called Nirvana always did. Verified live - Nirvana and Cat Stevens (the
+  musician and a photographer) are both still refused and offered as a choice.
+- **How a name was TYPED is not a difference.** MusicBrainz sets names properly: JAY-Z is
+  `JAŸ‐Z` and is credited `Jay‐Z`, both with a U+2010 HYPHEN, while any folder a person typed
+  has a plain hyphen-minus. MusicBrainz's own index folds this (it answers the search at score
+  100); only our comparison missed. `_fold()` strips combining marks and maps the dash and
+  quote families to ASCII before comparing, so `Motorhead` finds Motörhead and `Bjork` finds
+  Björk. It is still WHOLE names only - "Bjork Gudmundsdottir" matches nothing - because the
+  refusal-on-ambiguity guard is what makes an automatic match safe at all.
+- **The match rows carry `matched_as`**, the name that matched in its own spelling, and the
+  picker shows it when it differs from the artist's current name. Search for Kanye West, get an
+  artist called Ye, and without it nothing on screen connects the two.
+- **The artist page says "Now" when MusicBrainz calls them something else** than your folder
+  does. Rendered only on a difference - unconditionally it would print the folder's own name on
+  the page twice.
+- **`facts["aliases"]` no longer lists the artist's own name**, and ranks MusicBrainz's "Artist
+  name" aliases ahead of its "Search hint" ones (which are deliberate misspellings, there to be
+  found by). It read "Ye, KanYeWest, Donda, Kanye, K. West, Kayne West" - their own name, then
+  two typos, before "Kanye West" ever appeared. It reads "Kanye West, カニエ・ウェスト, Kanye,
+  Yeezy" now.
+- **An album is FILED under its artist's current name, and the credit stays where it is read.**
+  Filing by the credit gave one artist a folder per name: Donda (credited "Kanye West") went to
+  `Kanye West/` and BULLY (credited "Ye") to `Ye/` - and the library tree, which groups on the
+  albumartist tag, showed two artists too. MusicBrainz carries both names in every credit:
+  `artist-credit[].name` is the sleeve, `artist-credit[].artist.name` is the artist now. So the
+  payload carries both, and they go to different places on purpose:
+  - `artist` - AS CREDITED. The Soulseek search is built from it and the matcher scores against
+    it, because a sharer's folder is called "Kanye West - Donda", never "Ye - Donda". It is also
+    the track `artist` tag (via each track's own credit), which is what the sleeve says.
+  - `album_artist` - the CURRENT names, joined with the credit's own join phrases. It names the
+    folder AND the `albumartist` tag, through `filed_artist()` in organizer.py.
+  **Those two must move together**: `_is_misfiled` compares the folder with the album artist,
+  so renaming only the folder would put every renamed artist's whole discography in the queue.
+  **Verified with live MusicBrainz payloads through the real `credits.mjs`**: Donda, BULLY and
+  The College Dropout all file under `Ye/`, while Soulseek still searches "Kanye West".
+- **There are TWO ways a download starts, and the first cut of this missed one.** Find on a
+  release ROW goes through `buildExpectedFromRelease`; Find on the release-group CARD goes
+  through `buildExpectedFromReleaseGroup`, which builds its own payload from the group's
+  context and had never carried anything but the credit - not even the artist ids, so a
+  download started from a card was tagged with no `musicbrainz_albumartistid` at all. Every
+  test passed with the gap open, because no test reaches main.js: it was found by clicking Find
+  on a card in the real page and reading the request, which had no `album_artist`. The group
+  context now carries `albumArtist` and `artistMbids` from the group's own credit. **Anything
+  added to a download's payload has to be added in BOTH builders** - and checked by clicking
+  both buttons, since only one of them is on the path any sim can see.
+  **Verified in the real page** (scratch database and library, slskd stubbed as logged out):
+  both Finds send `artist: "Kanye West"` and `album_artist: "Ye"` with Ye's id; the row's
+  carries all 32 tracks, each still credited "Kanye West".
+- **`album_artist` is DECLARED on `EnqueueRelease` and `RetagRelease`** - the pydantic trap a
+  third time (after `disc` and the track artist). A job queued before it existed has only
+  `artist` and files exactly where it always would have; `filed_artist()` falls back.
+- **The editor seeds its artist field with the current name when a release is PICKED**, so a
+  correction lands where a fresh download of the same release would. Only then - an album's
+  own release auto-selected on opening still seeds nothing, so opening the editor never
+  rewrites what is on disk by itself. **This is the only way an album already filed under an
+  old name moves**; nothing finds them automatically (see below).
+- **...which broke the editor's own search, and had to be fixed with it.** `artist:` on a
+  RELEASE GROUP matches the credit only, so once the field held "Ye", `releasegroup:"Donda" AND
+  artist:"Ye"` could no longer find the Donda credited to Kanye West - measured, through
+  jimbrainz's own client: the old query found 2 groups and not that one. `fieldedAlbumQuery()`
+  asks `(artist:"X" OR artistname:"X")`, and `artistname:` is what matches the current name:
+  10 groups, the real Donda among them. Without it every album filed by its current name could
+  no longer find its own release group. The placeholder shows the same string.
+  **Verified in the real editor** on a legacy `Kanye West/Donda (2021)`: opening it changed
+  nothing, picking a release seeded "Ye" and previewed `Kanye West/Donda (2021) → Ye/Donda
+  (2021)`, and re-searching with "Ye" in the field still listed Donda's releases.
+- **The rule for the current name lives in TWO places, and a sim holds them to one answer**:
+  `getCurrentArtistNames()` in `interface/scripts/credits.mjs` names a download's folder and
+  `currentName()` in `ui/src/lib/release.ts` seeds the editor's. The credit helpers moved out
+  of main.js into `credits.mjs` for this - main.js touches the DOM at module scope and cannot
+  be imported by a test, the same reason `sort.mjs` exists - and `ui/test/credits.sim.cjs` asks
+  every case of BOTH copies. If they drift, one album goes to one folder when downloaded and
+  another when corrected.
+- **Collaborations still get their own folder**, in current names: Watch the Throne files under
+  `JAŸ‐Z & Ye/`. That was always so (it was `Jay‐Z & Kanye West/`); only the names changed.
+- **NOT built: finding albums already filed under an old name.** The scan never talks to
+  MusicBrainz, so it cannot know `Kanye West/` is out of date. It COULD spot two artist folders
+  whose albums share a `musicbrainz_albumartistid` - but only for albums tagged with artist ids,
+  which nothing filed before v0.6.15 is, and the scan does not read that tag yet (it would mean
+  bumping `SCAN_FORMAT`). Until then such an album moves when its release is picked in the
+  editor, and the tree shows the old name as a second artist, which is at least visible.
+
 ### Artist credits, and the ids behind them (v0.6.15)
 
 Asked for as "better handling for multi-artist albums and tracks", and "get artist ID in the
@@ -890,7 +995,8 @@ metadata as well".
   names. Joining on ", " - which every part of this interface did - invents punctuation nobody
   chose and flattens a duet into what reads as two separate acts. The rule now lives in THREE
   places that must agree: `credit_name()` in `src/artists.py`, `creditName()` in
-  `ui/src/lib/release.ts`, and `getArtistNames()` in `main.js`. One names a folder, another
+  `ui/src/lib/release.ts`, and `getArtistNames()` in `interface/scripts/credits.mjs` (moved out
+  of main.js in v0.6.18 so a sim can reach it). One names a folder, another
   writes the tag inside it.
 - **A track keeps its OWN artist.** `tag_values` gave every track the release's artist, so
   applying a release to a compilation rewrote eighteen artists into one. The track's credit wins
@@ -1677,7 +1783,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 589 tests
+.venv/bin/python -m pytest tests/ -q  # 610 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1696,6 +1802,7 @@ node ui/test/downloads.sim.cjs  # the downloads panel's optimistic overlays, inc
 node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and relevance-as-no-op
 node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
+node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -1706,7 +1813,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 589 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 610 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

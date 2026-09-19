@@ -411,3 +411,20 @@ def test_the_instrumental_disc_does_not_claim_the_opening_track(tmp_path):
 
     assert (first["track_disc"], first["track_disc_position"]) == (1, 1)
     assert first["changes"]["discnumber"]["to"] == "1"
+
+
+def test_a_correction_files_under_the_artists_current_name(tmp_path):
+    """
+    The editor seeds its artist field with the current name when a release is picked, so an
+    album corrected by hand lands where the same release downloaded fresh would have - not back
+    in the folder named after whatever it happened to be credited to.
+    """
+    write_flac(tmp_path / "Kanye West" / "Donda (2021)" / "01.flac", title="Donda Chant",
+               album="Donda", albumartist="Kanye West", artist="Kanye West")
+
+    release = {"artist": "Kanye West", "album_artist": "Ye", "album": "Donda", "year": "2021",
+               "release_mbid": "donda", "tracks": []}
+    plan = plan_retag("Kanye West/Donda (2021)", release, str(tmp_path))
+
+    assert plan["moves"] is True
+    assert plan["target_path"] == "Ye/Donda (2021)"

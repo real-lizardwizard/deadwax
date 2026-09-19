@@ -55,7 +55,14 @@ class EnqueueFile(BaseModel):
 
 class EnqueueRelease(BaseModel):
     """What the download is *for*. Persisted with the job so organizing it later needs no network."""
+    #? as CREDITED - what the Soulseek search and the matcher work from
     artist: str = ""
+    #? Who the album is BY, in their current name: the folder it is filed under and the
+    #? albumartist tag inside. Declared, not left to ride along, because pydantic drops an
+    #? undeclared field without a word - and every album would then be filed by its credit
+    #? again, one folder per name an artist ever recorded under. Absent on jobs queued before it
+    #? existed, which fall back to `artist` and file exactly as they always would have.
+    album_artist: str | None = None
     album: str = ""
     year: str | None = None
     #? the release GROUP's first-release-date, i.e. when the album came out rather than when

@@ -21,6 +21,7 @@ actually has the pieces an artist page is made of is the one that needs a key:
     everything here treats it as optional and the page still works without it.
 """
 
+import unicodedata
 from urllib.parse import quote, urlparse
 
 #? The filename STEM each kind is written under. The square one is `artist`, and that is the
@@ -441,6 +442,124 @@ def artist_members(relations: list[dict] | None) -> list[dict]:
     return members
 
 
+#? ── Finding an artist by a name that is no longer theirs ────────────────────────────────────
+#?
+#? MusicBrainz keeps ONE current name per artist and records every other name as an alias, while
+#? each release keeps the name it was CREDITED under at the time. Those two disagree for every
+#? artist who has ever renamed, and the disagreement is not a corner case: Ye is credited
+#? "Kanye West" on all but two of his own albums, JAY-Z's artist name is "JAY-Z" while his
+#? credits say "Jay-Z", and the same goes for Yusuf/Cat Stevens, Diddy and Snoop.
+#?
+#? jimbrainz writes the CREDIT into the tags and the folder, which is right - the album really
+#? was credited that way - so the name on disk is the one MusicBrainz no longer answers to. A
+#? search for it found a tribute band and nothing else.
+
+
+def _quoted(name: str) -> str:
+    """A Lucene phrase that survives whatever was typed into it."""
+    return '"' + (name or "").replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def artist_query(name: str) -> str:
+    """
+    The MusicBrainz query for "which artist goes by this name", aliases included.
+
+    `artist:` matches an artist's CURRENT name only, so on its own it cannot find anybody who
+    has renamed - measured: `artist:"Kanye West"` returns "Kanye West Tribute Band" and
+    "Kanye West & Hatsune Miku", and Ye is not in the answer at all. `alias:` is the half that
+    matches the names they used to go by, and every release credited to one of them.
+
+    Fielded rather than free text, for the reason the search view is: a bare phrase leans on
+    whatever MusicBrainz's default field happens to cover today, and this says what it means.
+    Both clauses are bracketed so a caller can AND something onto the result without the OR
+    quietly binding to the last term - the same trap as the type filter.
+    """
+    phrase = _quoted(name)
+    return f"(artist:{phrase} OR alias:{phrase})"
+
+
+def artist_names(artist: dict | None) -> list[str]:
+    """
+    Every name an artist answers to: their own, their sort name, and all their aliases.
+
+    In that order, and de-duplicated case-insensitively, so the first entry is always what
+    MusicBrainz calls them now.
+    """
+    artist = artist or {}
+    names = [artist.get("name") or "", artist.get("sort-name") or ""]
+    names += [a.get("name") or "" for a in (artist.get("aliases") or [])]
+
+    seen: dict[str, str] = {}
+    for name in names:
+        if name and name.casefold() not in seen:
+            seen[name.casefold()] = name
+
+    return list(seen.values())
+
+
+#? The characters a name picks up on its way through a tagger, a keyboard and a filesystem.
+#? MusicBrainz sets its names properly - JAY-Z is "JAŸ‐Z" with a U+2010 HYPHEN, and is credited
+#? "Jay‐Z" with the same one - while the folder somebody typed has a plain hyphen-minus. Neither
+#? spelling means anything different, and MusicBrainz's own index already folds them, which is
+#? why the search finds the artist and only this comparison used to miss.
+_TYPOGRAPHY = str.maketrans({
+    "\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2013": "-", "\u2014": "-", "\u2015": "-",
+    "\u2212": "-", "\u2018": "'", "\u2019": "'", "\u02bc": "'", "\u00b4": "'", "\u0060": "'",
+    "\u201c": '"', "\u201d": '"', "\u00a0": " ",
+})
+
+
+def _fold(name: str) -> str:
+    """One spelling of a name, for comparing it against another spelling of the same name."""
+    stripped = "".join(
+        c for c in unicodedata.normalize("NFKD", name or "") if not unicodedata.combining(c)
+    )
+    return " ".join(stripped.translate(_TYPOGRAPHY).casefold().split())
+
+
+def answers_to(artist: dict | None, name: str) -> str:
+    """
+    The name this artist goes by that `name` is a spelling of, or '' if none is.
+
+    Whole names only, never fuzzy: the reason for checking at all is that MusicBrainz's own
+    score is not enough to risk writing one artist's photograph into another's folder, and a
+    loose comparison would hand that guarantee straight back. What is folded away is only how a
+    name was TYPED - case, accents, which dash, which apostrophe - none of which anybody means
+    as a distinction. Two artists who fold together both match, and a tie is refused by the
+    caller exactly as two artists sharing a name always were.
+
+    What it returns is the name that MATCHED, in its own spelling, because that is worth
+    showing: an answer of "Ye" explains nothing to somebody who searched for Kanye West.
+    """
+    wanted = _fold(name)
+    if not wanted:
+        return ""
+
+    return next((n for n in artist_names(artist) if _fold(n) == wanted), "")
+
+
+
+def _also_known_as(artist: dict | None) -> list[str]:
+    """Every other name on the artist, best first, without their current one."""
+    artist = artist or {}
+    current = (artist.get("name") or "").casefold()
+    aliases = artist.get("aliases") or []
+
+    #? stable sort, so within a rank MusicBrainz's own order is kept
+    ranked = sorted(
+        (a for a in aliases if a.get("name")),
+        key=lambda a: (a.get("type") != "Artist name", not a.get("primary")),
+    )
+
+    seen: dict[str, str] = {}
+    for alias in ranked:
+        name = alias["name"]
+        if name.casefold() != current and name.casefold() not in seen:
+            seen[name.casefold()] = name
+
+    return list(seen.values())
+
+
 def artist_facts(artist: dict | None) -> dict:
     """
     The artist, as a page wants it: no MusicBrainz shapes left for a component to unpick.
@@ -468,7 +587,11 @@ def artist_facts(artist: dict | None) -> dict:
         "genres": [g.get("name") for g in sorted(
             artist.get("genres") or [], key=lambda g: -(g.get("count") or 0),
         ) if g.get("name")][:8],
-        "aliases": [a.get("name") for a in (artist.get("aliases") or []) if a.get("name")][:6],
+        #? Names they ALSO go by - so their current name is not among them, and nor is the same
+        #? name twice in different locales. MusicBrainz returns aliases in no order at all, so
+        #? the ones it marks as an artist name lead and its search hints (deliberate misspellings,
+        #? there to be found by) bring up the rear, where they do not crowd out the real ones.
+        "aliases": _also_known_as(artist)[:6],
         "links": artist_links(artist.get("relations")),
         "members": artist_members(artist.get("relations")),
     }
