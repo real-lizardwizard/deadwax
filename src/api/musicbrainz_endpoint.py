@@ -347,6 +347,19 @@ class MusicBrainzClient:
             "artist/", {"query": artist_query(name), "fmt": "json", "limit": limit},
         )
 
+    async def get_artist_aliases(self, artist_mbid: str) -> dict:
+        """
+        One artist with their aliases and nothing else - what the Soulseek search needs to know
+        which names an artist has stopped using.
+
+        Deliberately not get_artist(): that one carries relations, tags and genres for a page,
+        which is a far larger payload to wait for in the middle of a search. Its own cache key,
+        so an artist searched twice in an hour costs one request.
+        """
+        return await self.request_with_retries(
+            f"artist/{artist_mbid}", {"inc": "aliases", "fmt": "json"}
+        )
+
     async def get_artist(self, artist_mbid: str) -> dict:
         """
         One artist, with everything an artist page shows.

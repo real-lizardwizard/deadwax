@@ -85,7 +85,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             610 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             629 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
@@ -985,6 +985,96 @@ most up-to-date name".
   bumping `SCAN_FORMAT`). Until then such an album moves when its release is picked in the
   editor, and the tree shows the old name as a second artist, which is at least visible.
 
+### Searching Soulseek under every name (v0.6.19)
+
+James: "make sure the same logic with ye works with the slskd search".
+
+- **The matcher never looks at the artist; the QUERY is the only place a name decides
+  anything.** `score_candidate` scores tracks, count, durations, edition, format and peer - not
+  one signal reads the artist - so a share filed as `Ye/` and one filed as `Kanye West/` score
+  identically once found. Finding them is the problem: Soulseek needs EVERY word of a query in a
+  share's path, so "Ye BULLY" cannot find `Kanye West/BULLY` at all, and "Kanye West Donda"
+  cannot find `Ye/Donda`.
+- **So it searches under every name a share might carry**: the CREDIT (what the album said when
+  the sharer got it), the CURRENT name (what jimbrainz and Picard's standardised names file
+  under), and FORMER names (what someone who never re-filed still uses). `search_names()` in
+  routes/download.py orders and dedupes them; an artist who never renamed is exactly one search.
+- **A former name is one MusicBrainz itself marks as former: an ENDED "Artist name" alias.**
+  Ye's record says exactly that of "Kanye West" (ended 2024). The rest of his aliases are not
+  folder names - "Kanye" and "Yeezy" are live nicknames, "Kanye Omari West" is a legal name, the
+  zh/ja entries are other languages' spellings - and each name costs a Soulseek search, so
+  `former_names()` is deliberately that narrow. Where editors never marked a name as ended there
+  is nothing to find and it degrades to credit + current, never to worse. Single-artist credits
+  only: a collaboration's names multiply, and its credit and current names are searched anyway.
+- **The alias lookup runs BESIDE the first round of searches, not before it.** It is a
+  MusicBrainz request, and MusicBrainz takes 30-60s on a bad day; looked up first, every search
+  of every album would have waited on it. Beside the first round (credit + current, which take
+  their full search timeout anyway), an artist who never renamed pays nothing even when
+  MusicBrainz is slow. A former name the first round didn't already cover is a SECOND round -
+  the only case that costs a second search's wait. `FORMER_NAMES_BUDGET_SECONDS` bounds the
+  lookup; past it, the search goes on without former names. `get_artist_aliases()` is its own
+  light request (`inc=aliases`) rather than the artist page's heavy one, and its own cache key.
+- **The searches in a round run side by side** (`SlskdClient.search_all`). slskd's
+  one-at-a-time limiter covers only STARTING a search - `StartAsync` returns once the search is
+  under way - so the starts go strictly in turn and the waiting is shared: two names cost barely
+  more than one. A refusal with nothing running is the answer (a logged-out slskd refuses every
+  search alike, so the rest are not asked); a refusal once one IS running narrows the search and
+  is logged, rather than failing it. `search(query)` is now the one-query case of this.
+- **The same file can come back from two searches**, from a share whose path holds both names
+  (`Kanye West/Ye - Donda`). `group_files_by_directory` keeps each (user, file) once - otherwise
+  the album counts its tracks twice, scores on a count it doesn't have, and is enqueued with
+  every file requested twice.
+- **`FindCandidatesRequest` had been DROPPING `album_artist` and `artist_mbids`** since v0.6.18:
+  the browser sent them and pydantic discarded them without a word - the trap a fourth time.
+  Both are declared now.
+- **Re-search only overrides when the query was EDITED.** The box shows the first of possibly
+  several queries, and re-searching sent the box's contents as an override - so pressing it
+  unchanged would have quietly searched one name of several. Hovering the box lists the others,
+  and "no matches" says every name it tried. That message is built with `textContent`: the
+  queries are MusicBrainz's names, third-party text, and the vanilla half has no escaping helper.
+- **Verified** over real HTTP against a stub slskd holding one share of BULLY filed under
+  `Kanye West/`, which matches the way Soulseek does, with the alias lookup going to LIVE
+  MusicBrainz: before, "Ye BULLY" and nothing; after, MusicBrainz gave "Kanye West" as a former
+  name, the second round searched "Kanye West BULLY", and the share came back scoring 1.0.
+  **NOT verified: a real Soulseek network.** Whether its matching tokenises the way the stub
+  does is inferred from the S&M2 failure (see "Never take a word apart"), and whether a
+  two-letter term like "Ye" is honoured, ignored or too broad is unknown.
+
+### A filed album appears on its own (v0.6.19)
+
+James: "when a new album gets organized, it takes quite a while for it to actually appear".
+
+- **It did not take a while; it never appeared at all until Rescan or a page reload.**
+  `useLibrary` loads once, when the tab is first opened, and deliberately never on a timer or on
+  switching tabs (a scan stats every folder). Nothing told it an album had been filed, and the
+  tab's "new" badge polled once a minute. Meanwhile the downloads poll - running in the
+  background whenever anything is downloading - watched the job turn `organized` and told nobody.
+- **The downloads poll says so now**, through `ui/src/lib/libraryEvents.ts`:
+  `newlyOrganized()` compares each poll with the last, and `announceAlbumsFiled()` tells the
+  library (which scans, if it has been opened) and the badge (which recounts). Three rules that
+  are pinned in `downloads.sim.cjs` because each is easy to break:
+  - **`organized` only.** The poller marks a job `complete` and THEN organizes it, so reacting
+    to `complete` would scan for an album that isn't there yet.
+  - **The first poll after the page loads only seeds.** Otherwise every album filed before you
+    arrived announces itself on every page load.
+  - **It must be caught on the tick that sees it.** With the panel closed the poll STOPS once
+    nothing is active, so the tick that sees `organized` is usually the last one. The previous
+    statuses live in a ref at the hook's level, not inside the effect, because the effect
+    restarts whenever the panel opens or a download is enqueued.
+- **A module, not a bridge entry.** Every Preact root renders from one bundle and so shares
+  module state; the window bridge is for reaching the VANILLA half, and adding Preact-to-Preact
+  signals to it would muddy "an empty bridge means the migration is done". (`refreshNewImports`
+  predates this and still goes through the bridge.)
+- **The library still never scans unasked**: it hears the announcement only once it has been
+  opened, and waits `FILED_GATHER_MS` so several albums landing together are one scan.
+- **The downloads poll quickens to 1s while a job is `organizing`** (`POLL_FILING_MS`). At the
+  5s background cadence the album appeared up to five seconds after landing. It costs nothing
+  against slskd: the server asks slskd only about queued and downloading jobs, so these polls
+  are one read of jimbrainz's own job table.
+- **Measured in the real page** (scratch database and library, the job driven through the same
+  store calls the poller makes, downloads panel closed): never, before; 5.6s with the
+  announcement alone; **1.5s** with the quicker poll while filing. No Rescan in any run.
+
 ### Artist credits, and the ids behind them (v0.6.15)
 
 Asked for as "better handling for multi-artist albums and tracks", and "get artist ID in the
@@ -1783,7 +1873,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 610 tests
+.venv/bin/python -m pytest tests/ -q  # 629 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1798,7 +1888,7 @@ npm run dev        # harness on :5173, proxies /jimbrainz + /styles to :8080 (st
 ```bash
 node ui/test/speed.sim.cjs      # the derived download rate, simulated against a known truth
 node ui/test/queue.sim.cjs      # the tab badge and the review queue agreeing on what's outstanding
-node ui/test/downloads.sim.cjs  # the downloads panel's optimistic overlays, incl. the wrong-prediction paths
+node ui/test/downloads.sim.cjs  # optimistic overlays incl. the wrong-prediction paths, and announcing filed albums
 node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and relevance-as-no-op
 node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
@@ -1813,7 +1903,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 610 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 629 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
@@ -1838,9 +1928,10 @@ A green suite here means the logic is sound, not that it works against real infr
 
 1. **Run it against real infrastructure. STARTED in v0.6.17, and it broke immediately** - the
    first live search came back `409 Conflict`, which is slskd's way of saying its own Soulseek
-   connection is down (see the gotcha above). Everything past that is still unexercised, so
-   watch specifically: the derived download speed (byte deltas, not `job.speed`), queue
-   position, cancel, and whether `SLSKD_DOWNLOAD_PATH` resolves to the same files slskd writes.
+   connection is down (see the gotcha above). By v0.6.19 albums were being downloaded AND
+   organized for real - James reported them filing, just appearing late - so the search,
+   enqueue, completion and filing path has run end to end at least once. Still unwatched: the
+   derived download speed (byte deltas, not `job.speed`), queue position, and cancel.
 2. **Merge to `main`.** It still holds v0.2.1, so the repo's default branch shows the old
    Lidarr README to anyone who visits, while `:latest` has been the slskd line since v0.3.0.
 3. Continue the port in the order in [docs/FRONTEND-MIGRATION.md](docs/FRONTEND-MIGRATION.md):

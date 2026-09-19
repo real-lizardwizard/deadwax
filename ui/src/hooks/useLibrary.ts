@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
 import * as api from '../api/library'
+import { onAlbumsFiled } from '../lib/libraryEvents'
 import type {
   LibraryAlbum, LibraryArtist, LibraryResponse, MetadataIssueType, MetadataQueueSummary,
 } from '../api/types'
@@ -43,6 +44,9 @@ export interface LibraryState {
 }
 
 type LoadMode = 'snapshot' | 'scan' | 'rescan'
+
+/** How long to wait for other downloads finishing at the same moment before scanning once. */
+const FILED_GATHER_MS = 1000
 
 /**
  * Load the library, once, when it's first needed.
@@ -134,6 +138,33 @@ export function useLibrary(enabled: boolean): LibraryState {
       if (first?.stale) await load('scan')
     })()
   }, [enabled, load])
+
+  /*
+   * An album filed by a download appears without a Rescan. Only once the library has been
+   * opened: until then nothing is on screen to update, and a scan nobody asked for is exactly
+   * the cost this hook exists to avoid - the tab's own first load will find it anyway.
+   *
+   * An ordinary scan, not a forced one - a new folder is new to the cache regardless - and
+   * gathered for a moment, so a handful of downloads finishing together is one scan, not one
+   * each.
+   */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const stopHearing = onAlbumsFiled(() => {
+      if (!started.current) return
+      if (timer !== undefined) clearTimeout(timer)
+      timer = setTimeout(() => {
+        timer = undefined
+        void load('scan')
+      }, FILED_GATHER_MS)
+    })
+
+    return () => {
+      stopHearing()
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }, [load])
 
   const reload = useCallback(
     async (force = false) => (await load(force ? 'rescan' : 'scan'))?.albums ?? [],

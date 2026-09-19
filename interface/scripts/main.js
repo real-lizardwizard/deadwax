@@ -901,7 +901,12 @@ document.addEventListener('keydown', (e) => {
 
 document.getElementById('candidates-requery-button').addEventListener('click', () => {
     if (!currentExpected) return;
-    runCandidateSearch({ ...currentExpected, query_override: candidatesQueryInput.value.trim() });
+    // Only an EDITED query overrides. The box shows the first of possibly several searches -
+    // an artist who has renamed is searched under each name - so re-running what it already
+    // says as an override would quietly drop every name but that one.
+    const typed = candidatesQueryInput.value.trim();
+    const edited = typed && typed !== lastCandidateResult?.query;
+    runCandidateSearch({ ...currentExpected, query_override: edited ? typed : '' });
 });
 
 
@@ -1010,6 +1015,10 @@ async function runCandidateSearch(expected) {
     try {
         const result = await findCandidates(expected);
         candidatesQueryInput.value = result.query;
+        // every name it was searched under, where there was more than one
+        candidatesQueryInput.title = (result.queries?.length ?? 0) > 1
+            ? `Also searched as: ${result.queries.slice(1).join(' · ')}`
+            : '';
         lastCandidateResult = result;
         renderCandidateFormatFilters(result.candidates);
         renderCandidates();
@@ -1306,11 +1315,19 @@ function renderCandidates() {
 
     if (!lastCandidateResult) return;
 
-    const { candidates, response_count } = lastCandidateResult;
+    const { candidates, response_count, queries } = lastCandidateResult;
 
     if (!candidates.length) {
-        candidatesScrollable.innerHTML =
-            `<h4 class="text default-muted candidates-status">no matches from ${response_count} responses — try editing the query above</h4>`;
+        // Say what was actually searched when it was more than the box shows: "no matches"
+        // after trying both Kanye West and Ye is a different fact from after trying one.
+        // Built with textContent: the queries are MusicBrainz's names, which is third-party text.
+        const searched = (queries?.length ?? 0) > 1
+            ? ` (searched as ${queries.map(q => `"${q}"`).join(' and ')})`
+            : '';
+        const status = document.createElement('h4');
+        status.className = 'text default-muted candidates-status';
+        status.textContent = `no matches from ${response_count} responses${searched} — try editing the query above`;
+        candidatesScrollable.replaceChildren(status);
         return;
     }
 

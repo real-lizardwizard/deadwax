@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'preact/hooks'
 
 import * as api from '../api/library'
 import { bridge } from '../bridge'
+import { onAlbumsFiled } from '../lib/libraryEvents'
 import type { NewImportsResponse } from '../api/types'
 
 /**
@@ -14,12 +15,11 @@ import type { NewImportsResponse } from '../api/types'
  * load. The poller records each album as it files it, so this is one indexed table read and can
  * safely run on mount.
  *
- * Polled slowly rather than pushed. The only thing that changes the count without the user
- * doing anything is a download finishing, which happens on the order of minutes; a live channel
- * for that would be a lot of machinery for a number next to a word. Acting on the queue calls
- * `refreshNewImports` through the bridge instead, so the badge reacts immediately to anything
- * *you* did — the library view lives in a different render tree and can't reach this state any
- * other way (see bridge.ts).
+ * Recounted the moment the downloads poll sees an album filed (lib/libraryEvents.ts), which is
+ * the one thing that changes the count without the user doing anything. The slow poll stays as
+ * a floor for whatever that misses - an album filed while this page was closed and not yet
+ * noticed, say. Acting on the queue calls `refreshNewImports` through the bridge, so the badge
+ * also reacts immediately to anything *you* did.
  */
 const POLL_INTERVAL_MS = 60_000
 
@@ -40,6 +40,7 @@ export function useNewImports(): NewImportsResponse & { refresh: () => void } {
     refresh()
 
     const timer = setInterval(refresh, POLL_INTERVAL_MS)
+    const stopHearing = onAlbumsFiled(refresh)
 
     //? Set rather than called: this is the entry the OTHER tree uses to say "I just reviewed
     //? something, recount". Registered here so it's always the live copy.
@@ -47,6 +48,7 @@ export function useNewImports(): NewImportsResponse & { refresh: () => void } {
 
     return () => {
       clearInterval(timer)
+      stopHearing()
       if (bridge().refreshNewImports === refresh) delete bridge().refreshNewImports
     }
   }, [refresh])

@@ -104,6 +104,8 @@ Each peer's files get grouped into (user, folder) candidates and scored on track
 <br><br>
 The speed on a candidate reads <code>peer avg</code> because that is what Soulseek reports: the peer's average upload rate across their whole history, to everyone. It is split between everyone they're serving at once and averaged over conditions that have since changed, so it is not a prediction of your transfer and routinely reads high. The free-slot and queue figures beside it are the better guide. jimbrainz weights it accordingly — peer health is the lowest of the six signals, an availability tiebreaker rather than a ranking criterion.
 <br><br>
+It searches under every name the artist has put records out under, because Soulseek needs every word of a search somewhere in a share's path — so a search for "Ye BULLY" can never find a share filed under <code>Kanye West/</code>. It tries the name on the release, the name the artist goes by now, and any name MusicBrainz marks as one they've stopped using, all at once rather than one after another. For an artist who never renamed, which is nearly everyone, that's one search as before, and it never waits on MusicBrainz to start. The query box shows the first name; hover it to see the others, and editing it searches exactly what you typed.
+<br><br>
 Once you've actually downloaded from someone, the row leads with <code>you got 780 KB/s</code> instead — what jimbrainz measured itself while bytes were moving, with queue time excluded. Nothing in the Soulseek protocol will tell you a transfer's speed before it starts, so this is the closest thing to an answer there is, and it's the one number on the row that was measured rather than claimed. It builds up as you use it: peers you've never downloaded from simply don't have it.
 </details>
 
@@ -170,7 +172,7 @@ The track list shows <em>whichever fields you want</em>. A Fields menu (or right
 <br><br>
 Multi-disc sets run disc by disc under "Disc 1", "Disc 2" headings, rather than dealing the two discs out alternately because both start at track 1. A track with no disc number reads as disc 1 — that's where it sorts, and how every player treats it — and the column says so in a dimmer grey, so it can't be mistaken for a disc number the file actually carries.
 <br><br>
-Opening the tab is instant after the first time. The last scan is saved in jimbrainz's database, so the library draws straight away from that, says how old it is, and checks the disk for changes underneath while you browse. That includes after a restart, which used to mean re-reading every tag in the library. Retags and deletes made in jimbrainz update the saved copy as they happen. If you change files with another program, use Rescan.
+Opening the tab is instant after the first time. The last scan is saved in jimbrainz's database, so the library draws straight away from that, says how old it is, and checks the disk for changes underneath while you browse. That includes after a restart, which used to mean re-reading every tag in the library. Retags and deletes made in jimbrainz update the saved copy as they happen, and an album jimbrainz files from a download turns up on its own a second or two after it lands — no Rescan, whichever tab you're on. If you change files with another program, use Rescan.
 <br><br>
 Cover art comes from a file beside the tracks, then from art embedded in the audio, then from the Cover Art Archive. Click a cover to see it full size; click again to zoom in on the spot you clicked, scroll to zoom by degrees, and drag to move around it.
 <br><br>

@@ -277,8 +277,14 @@ def group_files_by_directory(responses: list[dict]) -> list[dict]:
     """
     A peer's `files` list is flat and can span several of their folders, so an album isn't a
     response - it's a (user, directory) pair. Split them out and drop non-audio clutter.
+
+    The same file can arrive more than once: an artist who has renamed is searched under each
+    name, and a share whose path happens to hold both - "Kanye West/Ye - Donda" - answers both
+    searches. Kept once, or the album would count its tracks twice, score on a track count it
+    doesn't have, and be enqueued with every file requested twice.
     """
     candidates: dict[tuple[str, str], dict] = {}
+    seen: set[tuple[str, str]] = set()
 
     for response in responses:
         username = response.get("username", "")
@@ -289,6 +295,10 @@ def group_files_by_directory(responses: list[dict]) -> list[dict]:
 
             if not is_audio(filename):
                 continue
+
+            if (username, filename_full) in seen:
+                continue
+            seen.add((username, filename_full))
 
             key = (username, directory)
             if key not in candidates:

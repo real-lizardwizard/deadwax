@@ -7,6 +7,7 @@ import {
   activeCount as countActive, finishedIds, reconcile, visibleJobs, withAdded, withRemoved,
   type Overlays,
 } from '../lib/downloadOverlay'
+import { announceAlbumsFiled, newlyOrganized, statusesOf } from '../lib/libraryEvents'
 import { sampleSpeeds, type SpeedSamples } from '../lib/speed'
 
 /*
@@ -27,6 +28,15 @@ import { sampleSpeeds, type SpeedSamples } from '../lib/speed'
  */
 const POLL_OPEN_MS = 500
 const POLL_BACKGROUND_MS = 5000
+
+/*
+ * While an album is being FILED, faster than the background - it is about to appear in the
+ * library, and someone is usually waiting for it. At 5s the album showed up to five seconds
+ * after it landed. Cheap in a way the background cadence is not: an organizing job is past
+ * slskd (the server only asks slskd about queued and downloading jobs), so each of these is one
+ * read of jimbrainz's own job table.
+ */
+const POLL_FILING_MS = 1000
 
 export interface DownloadJobsState {
   jobs: DownloadJob[]
@@ -97,6 +107,14 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
    * nothing here can corrupt it, and the reconcile below simply stops overlaying once the
    * server's own answer says the same thing.
    */
+  /*
+   * Each job's status at the last poll, so the next one can tell which just became `organized`.
+   * A ref at the hook's level rather than inside the effect: the effect restarts whenever the
+   * panel opens or a download is enqueued, and a tracker that restarted with it would treat
+   * every restart as the first poll and miss whatever finished across it.
+   */
+  const statusesRef = useRef<ReturnType<typeof statusesOf> | null>(null)
+
   const [overlays, setOverlays] = useState<Overlays>(() => ({
     cancelling: new Set<number>(),
     cleared: new Set<number>(),
@@ -108,14 +126,23 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
 
     const tick = async (): Promise<void> => {
       let hasActive = false
+      let filing = false
 
       try {
         const response = await api.listJobs()
         if (cancelled) return
 
         hasActive = response.jobs.some(isActive)
+        filing = response.jobs.some((job) => job.status === 'organizing')
         setSpeeds(sampleSpeeds(samplesRef.current, response.jobs))
         setJobs(response.jobs)
+
+        //? Tell the library and the badge the moment an album lands. This is often the LAST
+        //? tick: with the panel closed, polling stops once nothing is active - so it has to be
+        //? noticed here, on the poll that sees it, or not at all.
+        const filed = newlyOrganized(statusesRef.current, response.jobs)
+        statusesRef.current = statusesOf(response.jobs)
+        if (filed.length) announceAlbumsFiled()
 
         //? Drop any overlay the freshly polled data now agrees with. Returns the same
         //? object when nothing changed, so this cannot cause a pointless re-render.
@@ -132,7 +159,10 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
       if (cancelled) return
       if (!hasActive && !open) return
 
-      timer = setTimeout(() => void tick(), open ? POLL_OPEN_MS : POLL_BACKGROUND_MS)
+      timer = setTimeout(
+        () => void tick(),
+        open ? POLL_OPEN_MS : filing ? POLL_FILING_MS : POLL_BACKGROUND_MS,
+      )
     }
 
     void tick()

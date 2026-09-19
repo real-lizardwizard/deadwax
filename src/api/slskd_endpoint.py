@@ -298,64 +298,110 @@ class SlskdClient:
         poll_interval: float = 0.5,
         max_wait: float = 25.0,
     ) -> list[dict]:
+        """One Soulseek search - see search_all(), which this is the one-query case of."""
+        return await self.search_all([query], search_timeout_ms, poll_interval, max_wait)
+
+
+    async def search_all(
+        self,
+        queries: list[str],
+        search_timeout_ms: int = 8000,
+        poll_interval: float = 0.5,
+        max_wait: float = 25.0,
+    ) -> list[dict]:
         """
-        Run a Soulseek search and wait for it to settle.
+        Run Soulseek searches side by side and wait for them all to settle.
 
         slskd searches are asynchronous: you POST one, peers trickle in responses, and it
         flips isComplete when the timeout expires. slskd_api is synchronous so every call goes
         through asyncio.to_thread, same as ping() already does.
+
+        Several at once because one album can be shared under several names - an artist who
+        has renamed is filed by some people under each - and every search costs the whole
+        search timeout. Run one after another, two names would double the wait; run together
+        they cost barely more than one. slskd's one-at-a-time limiter only covers STARTING a
+        search, which is why the starts below go strictly in turn and the waiting is shared.
+
+        Responses are returned as slskd gave them, one list for all the queries. The same share
+        found by two of them is merged where files are grouped (group_files_by_directory).
         """
-        logger.info(f"searching slskd for: {query}", extra={"frontend": True, "src": "slskd"})
         client = await self.get_client()
+        running: list[tuple[str, str]] = []
 
-        try:
-            state = await asyncio.to_thread(
-                client.searches.search_text,
-                searchText=query,
-                searchTimeout=search_timeout_ms,
-            )
+        for query in queries:
+            logger.info(f"searching slskd for: {query}", extra={"frontend": True, "src": "slskd"})
 
-        except HTTPError as exc:
-            #? slskd refused to START the search, which is a different thing from a search that
-            #? found nothing, and it always says why. See _explain_refusal.
-            reason = await self._explain_refusal(exc)
-            logger.error(reason, extra={"frontend": True, "src": "slskd"})
-            raise SlskdSearchRefused(
-                reason, getattr(getattr(exc, "response", None), "status_code", None)
-            ) from exc
+            try:
+                state = await asyncio.to_thread(
+                    client.searches.search_text,
+                    searchText=query,
+                    searchTimeout=search_timeout_ms,
+                )
 
-        search_id = state.get("id")
+            except HTTPError as exc:
+                #? slskd refused to START the search, which is a different thing from a search
+                #? that found nothing, and it always says why. See _explain_refusal.
+                reason = await self._explain_refusal(exc)
 
-        if not search_id:
-            logger.error("slskd did not return a search id", extra={"frontend": True, "src": "slskd"})
+                #? With nothing running, this IS the answer - and the rest would only be
+                #? refused for the same reason, so they are not even asked.
+                if not running:
+                    logger.error(reason, extra={"frontend": True, "src": "slskd"})
+                    raise SlskdSearchRefused(
+                        reason, getattr(getattr(exc, "response", None), "status_code", None)
+                    ) from exc
+
+                #? One is already under way, so losing another name narrows the search rather
+                #? than failing it. Said, because a narrower search is still worth knowing about.
+                logger.warning(
+                    f"{reason} - so it searched without {query!r}",
+                    extra={"frontend": True, "src": "slskd"},
+                )
+                continue
+
+            search_id = state.get("id")
+            if search_id:
+                running.append((query, search_id))
+            else:
+                logger.error(
+                    f"slskd did not return a search id for: {query}",
+                    extra={"frontend": True, "src": "slskd"},
+                )
+
+        if not running:
             return []
 
+        pending = {search_id for _, search_id in running}
         elapsed = 0.0
-        while elapsed < max_wait:
+        while pending and elapsed < max_wait:
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
 
-            state = await asyncio.to_thread(client.searches.state, search_id)
-            if state.get("isComplete"):
-                break
+            for search_id in list(pending):
+                state = await asyncio.to_thread(client.searches.state, search_id)
+                if state.get("isComplete"):
+                    pending.discard(search_id)
 
-        else:
+        if pending:
             logger.warning(
                 f"slskd search didnt complete within {max_wait}s, using whatever came back",
                 extra={"frontend": True, "src": "slskd"},
             )
 
-        responses = await asyncio.to_thread(client.searches.search_responses, search_id)
-        logger.info(
-            f"slskd returned {len(responses)} responses for: {query}",
-            extra={"frontend": True, "src": "slskd"},
-        )
+        responses: list[dict] = []
+        for query, search_id in running:
+            found = await asyncio.to_thread(client.searches.search_responses, search_id)
+            logger.info(
+                f"slskd returned {len(found)} responses for: {query}",
+                extra={"frontend": True, "src": "slskd"},
+            )
+            responses.extend(found)
 
-        #? don't let one-shot searches pile up in slskd's UI forever
-        try:
-            await asyncio.to_thread(client.searches.delete, search_id)
-        except Exception:
-            logger.warning(f"couldnt clean up slskd search {search_id}, harmless")
+            #? don't let one-shot searches pile up in slskd's UI forever
+            try:
+                await asyncio.to_thread(client.searches.delete, search_id)
+            except Exception:
+                logger.warning(f"couldnt clean up slskd search {search_id}, harmless")
 
         return responses
 

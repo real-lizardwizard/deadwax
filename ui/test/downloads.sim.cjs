@@ -20,13 +20,16 @@ const UI = path.resolve(__dirname, '..');
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'jimbrainz-downloads-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/downloadOverlay.ts', '--outDir', OUT, '--module', 'commonjs',
+  'src/lib/downloadOverlay.ts', 'src/lib/libraryEvents.ts', '--outDir', OUT, '--module', 'commonjs',
   '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' });
 
 const {
   visibleJobs, activeCount, reconcile, finishedIds, withAdded, withRemoved,
 } = require(path.join(OUT, 'lib/downloadOverlay.js'));
+const {
+  newlyOrganized, statusesOf, onAlbumsFiled, announceAlbumsFiled,
+} = require(path.join(OUT, 'lib/libraryEvents.js'));
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -149,6 +152,44 @@ console.log('\nthe prediction must not outlive its usefulness');
   //? Adding an id that is already overlaid must not duplicate or disturb the others.
   check('withAdded is idempotent', [...withAdded(new Set([1, 2]), [2, 3])], [1, 2, 3]);
   check('withRemoved ignores absent ids', [...withRemoved(new Set([1, 2]), [3])], [1, 2]);
+}
+
+/* ========================================================================== */
+console.log('\nan album appears as soon as it is filed (lib/libraryEvents.ts)');
+{
+  //? Before this, a filed album stayed invisible until Rescan: the library loads once, and the
+  //? downloads poll saw the job turn `organized` and told nobody.
+  const before = [job(1, 'organizing'), job(2, 'organized')];
+  const after = [job(1, 'organized'), job(2, 'organized')];
+
+  check('the first poll after the page loads only remembers - nothing filed earlier announces itself',
+        newlyOrganized(null, after), []);
+  check('a job that just became organized is announced',
+        newlyOrganized(statusesOf(before), after), [1]);
+  check('...once: the next poll, seeing it organized again, says nothing',
+        newlyOrganized(statusesOf(after), after), []);
+
+  //? The poller marks a job `complete` and only THEN files it, so `complete` must not count -
+  //? it would scan the library for an album that isn't there yet.
+  check('complete is not filed - it comes before organizing, not after',
+        newlyOrganized(statusesOf([job(3, 'downloading')]), [job(3, 'complete')]), []);
+  check('...nor is a download that failed, or was cancelled',
+        newlyOrganized(statusesOf([job(4, 'downloading'), job(5, 'queued')]),
+                       [job(4, 'failed'), job(5, 'cancelled')]), []);
+
+  //? The background poll runs every 5s, so a quick album can go straight from downloading to
+  //? organized between two polls, or appear for the first time already filed.
+  check('straight from downloading to organized between two polls still counts',
+        newlyOrganized(statusesOf([job(6, 'downloading')]), [job(6, 'organized')]), [6]);
+  check('a job first seen already organized, after the first poll, counts too',
+        newlyOrganized(statusesOf([]), [job(7, 'organized')]), [7]);
+
+  let heard = 0;
+  const stop = onAlbumsFiled(() => { heard += 1; });
+  announceAlbumsFiled();
+  stop();
+  announceAlbumsFiled();
+  check('a listener hears the announcement, and nothing after it stops listening', heard, 1);
 }
 
 /* ========================================================================== */

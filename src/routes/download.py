@@ -3,7 +3,9 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.api.slskd_endpoint import SlskdSearchRefused, build_search_query
+from src.artists import former_names
 from src.config import Config
 from src.logger import logger
 from src.matching import rank_candidates
@@ -34,7 +36,13 @@ class Track(BaseModel):
 
 
 class FindCandidatesRequest(BaseModel):
+    #? as CREDITED on this release - the name most shares of it will carry
     artist: str
+    #? The artist's CURRENT name, and their ids. Declared because the browser has sent both
+    #? since v0.6.18 and pydantic dropped them without a word; the search is now what they are
+    #? for. See search_names().
+    album_artist: str | None = None
+    artist_mbids: list[str] = Field(default_factory=list)
     album: str
     year: str | None = None
     #? the release GROUP's first-release-date, i.e. when the album came out rather than when
@@ -99,6 +107,74 @@ class EnqueueRequest(BaseModel):
     release: EnqueueRelease = Field(default_factory=EnqueueRelease)
 
 
+#? How long the Soulseek search will wait on MusicBrainz for an artist's former names. It runs
+#? ALONGSIDE the first round of searches, which take about as long as their timeout, so within
+#? this budget an artist who never renamed - nearly all of them - costs no extra time at all.
+FORMER_NAMES_BUDGET_SECONDS = 8.0
+
+
+def search_names(credit: str, current: str | None, former: list[str] | None = None) -> list[str]:
+    """
+    Every name an album might be shared under, most likely first.
+
+    What a stranger typed into their folder name is what the album said when they got it - the
+    CREDIT - or what they file that artist under now, which is the current name or, for someone
+    who never re-filed, a former one. Ye's Donda is credited "Kanye West" and BULLY "Ye", and
+    each is shared under both; Soulseek needs every word of a query in a path, so a search under
+    one name cannot find a share under the other at all.
+
+    Case-insensitive and in order, so an artist who never renamed is exactly one search.
+    """
+    names: dict[str, str] = {}
+    for name in [credit, current or "", *(former or [])]:
+        key = " ".join((name or "").split()).casefold()
+        if key and key not in names:
+            names[key] = name
+    return list(names.values())
+
+
+def _distinct(queries: list[str]) -> list[str]:
+    """Queries in order, each once - two names can boil down to the same search."""
+    seen: dict[str, str] = {}
+    for query in queries:
+        if query and query.casefold() not in seen:
+            seen[query.casefold()] = query
+    return list(seen.values())
+
+
+async def _former_names(request: Request, body: "FindCandidatesRequest") -> list[str]:
+    """
+    Names this release's artist has stopped using, if MusicBrainz says so in time. Never raises.
+
+    Only for a single-artist credit: a collaboration's names multiply (each artist, each name),
+    and its credit and current names are already searched. A MusicBrainz that is slow or down
+    costs nothing but the former names - the search goes on with what the release carried.
+    """
+    if len(body.artist_mbids) != 1:
+        return []
+
+    client = getattr(request.app.state, "musicbrainz_client", None)
+    if client is None:
+        return []
+
+    try:
+        artist = await asyncio.wait_for(
+            client.get_artist_aliases(body.artist_mbids[0]), timeout=FORMER_NAMES_BUDGET_SECONDS
+        )
+    except (asyncio.TimeoutError, MusicBrainzUnavailable) as e:
+        logger.debug(f"no former names for {body.artist}: {e or 'MusicBrainz took too long'}")
+        return []
+    except Exception as e:
+        logger.debug(f"no former names for {body.artist}: {e}")
+        return []
+
+    #? request_with_retries answers with an error dict rather than raising when it gives up
+    if not isinstance(artist, dict) or "error" in artist:
+        return []
+
+    return former_names(artist)
+
+
 @router.post("/find_candidates")
 async def find_candidates(request: Request, body: FindCandidatesRequest):
     """
@@ -108,14 +184,39 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
     requested edition are ranked down but deliberately still returned, since Soulseek folder
     names often omit edition text entirely and filtering would hide real results.
     """
+    lookup = None
+
     try:
         slskd_client = request.app.state.slskd_client
-        query = body.query_override or build_search_query(body.artist, body.album)
 
-        if not query:
+        if body.query_override:
+            #? typed by hand - searched exactly as typed, and only that
+            queries = [body.query_override]
+        else:
+            queries = _distinct([
+                build_search_query(name, body.album)
+                for name in search_names(body.artist, body.album_artist)
+            ])
+            lookup = asyncio.create_task(_former_names(request, body))
+
+        if not queries:
             raise HTTPException(status_code=400, detail="Could not build a search query")
 
-        responses = await slskd_client.search(query)
+        responses = await slskd_client.search_all(queries)
+
+        if lookup is not None:
+            #? Usually long finished - it had the whole first round to answer. A former name
+            #? the release itself did not carry is a second round, and the only case that
+            #? costs a second search's worth of waiting.
+            extra = [
+                query for query in _distinct([
+                    build_search_query(name, body.album) for name in await lookup
+                ])
+                if query.casefold() not in {q.casefold() for q in queries}
+            ]
+            if extra:
+                responses += await slskd_client.search_all(extra)
+                queries += extra
 
         expected = {
             "artist": body.artist,
@@ -129,7 +230,7 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
 
         if not candidates:
             logger.warning(
-                f"no usable candidates for: {query}",
+                f"no usable candidates for: {' / '.join(queries)}",
                 extra={"frontend": True, "src": "slskd"},
             )
 
@@ -143,7 +244,10 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
         await _attach_measured_speeds(request, serialized)
 
         return {
-            "query": query,
+            #? the first is what goes in the panel's query box, for editing
+            "query": queries[0],
+            #? every name it was searched under, so the panel can say so
+            "queries": queries,
             "response_count": len(responses),
             "candidates": serialized,
         }
@@ -161,6 +265,12 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
     except Exception as e:
         logger.error(f"Exception in /find_candidates endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error searching slskd: {e}")
+
+    finally:
+        #? however the search ended - a refusal, a failure, or an early 400 - the MusicBrainz
+        #? lookup running beside it has nobody left to answer
+        if lookup is not None and not lookup.done():
+            lookup.cancel()
 
 
 async def _attach_measured_speeds(request: Request, candidates: list[dict]) -> None:

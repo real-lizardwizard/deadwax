@@ -539,6 +539,35 @@ def answers_to(artist: dict | None, name: str) -> str:
 
 
 
+def former_names(artist: dict | None) -> list[str]:
+    """
+    The names an artist PERFORMED under and has stopped using, from MusicBrainz's aliases.
+
+    MusicBrainz says so precisely: an alias of type "Artist name" that has ENDED. Ye's record
+    carries "Kanye West" as exactly that (ended 2024) - while "Kanye" and "Yeezy" are live
+    nicknames, "Kanye Omari West" is a legal name, and the zh and ja entries are how other
+    languages spell him. None of those is how anybody names a folder, and every name here costs
+    a Soulseek search, so this is deliberately narrow: a former name is the one MusicBrainz
+    itself marks as former.
+
+    Where editors never marked a name as ended there is nothing to find, and the search simply
+    goes on with the names the release itself carries - an improvement that degrades to how
+    things were, never to worse.
+    """
+    artist = artist or {}
+    current = _fold(artist.get("name") or "")
+
+    names: dict[str, str] = {}
+    for alias in artist.get("aliases") or []:
+        name = alias.get("name") or ""
+        if alias.get("type") != "Artist name" or not alias.get("ended") or not name:
+            continue
+        if _fold(name) != current and _fold(name) not in names:
+            names[_fold(name)] = name
+
+    return list(names.values())
+
+
 def _also_known_as(artist: dict | None) -> list[str]:
     """Every other name on the artist, best first, without their current one."""
     artist = artist or {}
