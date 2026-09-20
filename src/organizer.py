@@ -576,7 +576,7 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
 
 def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[str]:
     """
-    Remove the now-empty slskd folders a completed move left behind.
+    Remove the slskd folders a completed move emptied of music.
 
     Every guard here is deliberate, because this is the only code in jimbrainz that deletes
     anything:
@@ -586,8 +586,17 @@ def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[s
       - the directory must resolve to somewhere inside the download root, so a stray path or
         symlink can't walk the delete out into the wider filesystem.
       - never the download root itself.
-      - rmdir, not rmtree: it refuses on a non-empty directory by construction. Anything left
-        is something we didn't put there, so it's reported and kept rather than assumed junk.
+      - NO AUDIO ANYWHERE BENEATH IT. That is the guard that replaced `rmdir` (v0.6.20, asked
+        for: "I'd like the album folder to be deleted when the songs are"). rmdir refuses a
+        non-empty folder by construction, which kept every share that came with a Thumbs.db, a
+        .md5 or a Scans/ folder - the tracks gone, the folder left for ever. Deleting whatever
+        is left is what was wanted; deleting audio is not, and audio left here is somebody
+        else's: a second job still downloading into the same peer folder, or files of it that
+        nobody asked for. Those are kept and reported exactly as before.
+
+    Note the sidecars worth having are already in the library by now - art, cue, log, nfo, txt,
+    m3u and sfv are moved with the tracks (COMPANION_EXTENSIONS). What a delete here takes is
+    the remainder, and it is named in the log so it is not taken silently.
     """
     if results.get("failed") or results.get("skipped"):
         return []
@@ -605,15 +614,38 @@ def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[s
             logger.warning(f"refusing to remove {directory}, it is not inside {download_root}")
             continue
 
-        try:
-            directory.rmdir()
-            removed.append(str(directory))
-            logger.info(f"removed empty download folder {directory.name}")
+        held_audio = [
+            entry for entry in directory.rglob("*")
+            if entry.is_file() and file_extension(entry.name) in AUDIO_EXTENSIONS
+        ]
 
-        except OSError:
-            leftovers = sorted(p.name for p in directory.iterdir())
+        if held_audio:
             logger.warning(
-                f"left {directory.name} in place, still holds: {', '.join(leftovers[:6])}",
+                f"left {directory.name} in place, it still holds "
+                f"{len(held_audio)} track(s) nothing filed",
+                extra={"frontend": True, "src": "slskd"},
+            )
+            continue
+
+        leftovers = sorted(entry.name for entry in directory.iterdir())
+
+        try:
+            shutil.rmtree(directory)
+            removed.append(str(directory))
+
+            if leftovers:
+                #? said out loud: these were deleted, not carried into the library
+                logger.info(
+                    f"removed {directory.name} and the {len(leftovers)} non-audio file(s) left "
+                    f"in it: {', '.join(leftovers[:6])}",
+                    extra={"frontend": True, "src": "slskd"},
+                )
+            else:
+                logger.info(f"removed empty download folder {directory.name}")
+
+        except OSError as e:
+            logger.warning(
+                f"left {directory.name} in place, it could not be removed: {e}",
                 extra={"frontend": True, "src": "slskd"},
             )
 

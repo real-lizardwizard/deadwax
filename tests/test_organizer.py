@@ -422,19 +422,77 @@ def test_the_download_root_itself_is_never_removed(tmp_path):
     assert root.exists()
 
 
-def test_a_folder_with_unexpected_leftovers_is_reported_not_wiped(tmp_path):
-    """rmdir refuses non-empty by construction - anything left is not ours to delete."""
+def test_leftovers_do_not_keep_an_emptied_download_folder_alive(tmp_path):
+    """
+    Asked for: "I'd like the album folder to be deleted when the songs are".
+
+    It used to use rmdir, which refuses a non-empty folder by construction - so every share
+    that came with a Thumbs.db, a checksum or a Scans/ folder kept its folder for ever with
+    the music gone out of it. The sidecars worth having (art, cue, log, nfo, txt, m3u, sfv)
+    moved into the library with the tracks before this runs.
+    """
+    from src.organizer import cleanup_source_dirs
+
+    root = tmp_path / "downloads"
+    folder = root / "MHTRTC"
+    (folder / "Scans").mkdir(parents=True)
+    (folder / "Scans" / "booklet.tif").write_bytes(b"x")
+    (folder / "Thumbs.db").write_bytes(b"x")
+
+    removed = cleanup_source_dirs({"source_dirs": [str(folder)]}, str(root), {"failed": 0, "skipped": 0})
+
+    assert removed == [str(folder)]
+    assert not folder.exists()
+
+
+def test_a_folder_that_still_holds_MUSIC_is_kept_whatever_else_is_in_it(tmp_path):
+    """
+    The guard that replaced rmdir, and the reason a plain rmtree would not do.
+
+    Audio still in there was never filed: a second job downloading into the same peer folder -
+    whose files are still arriving - or tracks of it nobody asked for. Deleting it would take
+    music that no library has a copy of.
+    """
     from src.organizer import cleanup_source_dirs
 
     root = tmp_path / "downloads"
     folder = root / "MHTRTC"
     folder.mkdir(parents=True)
-    (folder / "something-we-did-not-download.mkv").write_bytes(b"x")
+    (folder / "still-downloading.flac").write_bytes(b"x")
+    (folder / "Thumbs.db").write_bytes(b"x")
 
     removed = cleanup_source_dirs({"source_dirs": [str(folder)]}, str(root), {"failed": 0, "skipped": 0})
 
     assert removed == []
-    assert (folder / "something-we-did-not-download.mkv").exists()
+    assert (folder / "still-downloading.flac").exists()
+
+
+def test_music_in_a_SUBFOLDER_keeps_it_too(tmp_path):
+    #? a two-disc share, where one disc is another job's
+    from src.organizer import cleanup_source_dirs
+
+    root = tmp_path / "downloads"
+    folder = root / "MHTRTC"
+    (folder / "Disc 2").mkdir(parents=True)
+    (folder / "Disc 2" / "01.flac").write_bytes(b"x")
+
+    assert cleanup_source_dirs({"source_dirs": [str(folder)]}, str(root), {"failed": 0, "skipped": 0}) == []
+    assert (folder / "Disc 2" / "01.flac").exists()
+
+
+def test_a_half_finished_job_still_has_its_folder_left_alone(tmp_path):
+    #? unchanged, and load-bearing now that a delete takes the leftovers with it: a skip means
+    #? files of this download never reached the library
+    from src.organizer import cleanup_source_dirs
+
+    root = tmp_path / "downloads"
+    folder = root / "MHTRTC"
+    folder.mkdir(parents=True)
+    (folder / "note.txt").write_bytes(b"x")
+
+    assert cleanup_source_dirs({"source_dirs": [str(folder)]}, str(root), {"failed": 0, "skipped": 1}) == []
+    assert cleanup_source_dirs({"source_dirs": [str(folder)]}, str(root), {"failed": 1, "skipped": 0}) == []
+    assert folder.exists()
 
 
 # ---------------------------------------------------------------- one artist, one folder

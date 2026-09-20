@@ -85,7 +85,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             629 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             635 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
@@ -237,6 +237,28 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   need a scan to exist — absent at exactly the moment it has something to say. The poller writes
   one row as it files each download, and `/queue/new_imports` is a single indexed count that
   touches no filesystem. This is the only reason the import source is recorded at all.
+- **A move-organize clears the slskd folder out, and the line it will not cross is AUDIO**
+  (v0.6.20, asked for: "I'd like the album folder to be deleted when the songs are").
+  `cleanup_source_dirs` used `rmdir`, which refuses a non-empty folder by construction - so
+  every share that came with a `Thumbs.db`, a checksum or a `Scans/` folder kept its folder for
+  ever, emptied of music and reported in the log. It removes the folder and what is left in it
+  now, and NAMES what it took, because the sidecars worth keeping (art, cue, log, nfo, txt, m3u,
+  sfv - `COMPANION_EXTENSIONS`) have already moved into the library with the tracks, and what
+  remains is the part nobody chose to keep. A `Scans/` folder is the real cost of this and it is
+  the trade James asked for.
+  **Audio anywhere beneath it stops the delete dead**, which is the guard a plain `rmtree` would
+  not have: music still there was never filed - a second job downloading into the same peer
+  folder, its files still arriving, or tracks of it nobody asked for - and no library has a copy
+  of it. Those folders are kept and reported exactly as before. Every other guard is unchanged,
+  and the "nothing failed or was skipped" one matters MORE now: a skip means files of this
+  download never reached the library.
+- **The artist folder a re-file empties is removed too** (v0.6.20).
+  `_tidy_emptied_artist` after the move in `execute_retag`, with `rmdir` and never `rmtree`, so
+  another album or anything else kept in there means it stays and nothing is weighed up. Filing
+  under an artist's CURRENT name (v0.6.18) is what made this common: the last album leaves
+  `Kanye West/` for `Ye/` and the old folder stayed behind, empty, for ever. `delete_album` has
+  always done the same thing; this is the other half of it. The plan carries `library_root` so
+  the move can apply the same two guards - inside the library, never the library itself.
 - **Cancelling a download can remove its partial file, but only if you asked for it.**
   slskd keeps partials *deliberately*: it writes them to
   `<incomplete>/<username>/<remote path>/<file>` and, with `retry.partial` set to `Resume`,
@@ -1873,7 +1895,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 629 tests
+.venv/bin/python -m pytest tests/ -q  # 635 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1903,7 +1925,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 629 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 635 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

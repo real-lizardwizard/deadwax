@@ -428,3 +428,52 @@ def test_a_correction_files_under_the_artists_current_name(tmp_path):
 
     assert plan["moves"] is True
     assert plan["target_path"] == "Ye/Donda (2021)"
+
+
+def test_the_artist_folder_a_move_empties_is_removed(tmp_path):
+    """
+    Asked for: "I'd like the album folder to be deleted when the songs are".
+
+    Re-filing under the artist's current name (v0.6.18) is what makes this common - the last
+    album leaves `Kanye West/` for `Ye/`, and the folder it came from stayed behind empty.
+    """
+    write_flac(tmp_path / "Kanye West" / "Donda (2021)" / "01.flac", title="Donda Chant",
+               album="Donda", albumartist="Kanye West", artist="Kanye West")
+
+    release = {"artist": "Kanye West", "album_artist": "Ye", "album": "Donda", "year": "2021",
+               "release_mbid": "donda", "tracks": []}
+    plan = plan_retag("Kanye West/Donda (2021)", release, str(tmp_path))
+    results = execute_retag(plan, release, "apply")
+
+    assert results["moved_to"].endswith("Ye/Donda (2021)")
+    assert (tmp_path / "Ye" / "Donda (2021)" / "01.flac").exists()
+    assert not (tmp_path / "Kanye West").exists(), "the folder it left should not linger"
+
+
+def test_an_artist_folder_that_still_holds_something_is_left_alone(tmp_path):
+    """rmdir refuses a non-empty folder by construction - another album, or anything you keep."""
+    write_flac(tmp_path / "Kanye West" / "Donda (2021)" / "01.flac", title="Donda Chant",
+               album="Donda", albumartist="Kanye West", artist="Kanye West")
+    write_flac(tmp_path / "Kanye West" / "Graduation (2007)" / "01.flac", title="Good Morning",
+               album="Graduation", albumartist="Kanye West", artist="Kanye West")
+
+    release = {"artist": "Kanye West", "album_artist": "Ye", "album": "Donda", "year": "2021",
+               "release_mbid": "donda", "tracks": []}
+    execute_retag(plan_retag("Kanye West/Donda (2021)", release, str(tmp_path)), release, "apply")
+
+    assert (tmp_path / "Kanye West" / "Graduation (2007)" / "01.flac").exists()
+    assert (tmp_path / "Kanye West").is_dir()
+
+
+def test_the_library_root_itself_is_never_tidied_away(tmp_path):
+    #? an album sitting directly in the library has the ROOT as its parent
+    from src.retag import _tidy_emptied_artist
+
+    _tidy_emptied_artist(tmp_path, str(tmp_path))
+    assert tmp_path.is_dir()
+
+    outside = tmp_path.parent / "not-the-library"
+    outside.mkdir(exist_ok=True)
+    _tidy_emptied_artist(outside, str(tmp_path))
+    assert outside.is_dir(), "a folder outside the library is not ours to remove"
+    outside.rmdir()

@@ -279,6 +279,9 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
         "album_path": album_path,
         "source": str(source),
         "target": str(target) if target else None,
+        #? carried so execute_retag can tell whether the folder a move emptied is inside the
+        #? library and is not the library itself - the same guards delete_album uses
+        "library_root": str(root),
         "target_path": str(target.relative_to(root)) if target else None,
         "moves": bool(target and target != source),
         "edition_label": resolve_edition_label(release),
@@ -302,6 +305,7 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
 def _empty_plan(album_path: str, problem: str) -> dict:
     return {
         "album_path": album_path, "source": None, "target": None, "target_path": None,
+        "library_root": None,
         "moves": False, "edition_label": "", "files": [], "changed_file_count": 0,
         "file_count": 0, "matched_tracks": 0, "expected_tracks": 0,
         "art": {"action": "", "reason": "", "existing": None},
@@ -332,6 +336,36 @@ def _resolve_target(root: Path, source: Path, release: dict) -> tuple[Path | Non
         return None, f"'{target.name}' already exists, so the folder will be left where it is"
 
     return target, ""
+
+
+def _tidy_emptied_artist(artist_dir: Path, library_root: str | None) -> None:
+    """
+    Remove the artist folder a move just emptied - their last album left it behind.
+
+    Re-filing an album under the artist's current name (v0.6.18) is what makes this common:
+    the last album moves from `Kanye West/` to `Ye/` and the old folder stays for ever,
+    empty. Asked for in v0.6.20 alongside the download folders.
+
+    `rmdir`, never `rmtree`: it refuses a non-empty folder by construction, so another album,
+    a stray cover or anything else the user keeps there means the folder stays and nothing is
+    weighed up. Inside the library and never the library itself, as delete_album requires.
+    """
+    if not library_root:
+        return
+
+    root = Path(library_root)
+
+    try:
+        if artist_dir.resolve() == root.resolve() or not is_within(artist_dir, root):
+            return
+
+        artist_dir.rmdir()
+        logger.info(f"removed the now-empty {artist_dir.name}", extra={"frontend": True})
+
+    except OSError:
+        #? not empty, or not ours to remove. Either way it stays, and that is not a problem
+        #? worth reporting - the album itself moved.
+        pass
 
 
 def execute_retag(
@@ -437,6 +471,7 @@ def execute_retag(
                     f"re-filed {source.name} as {target.name}",
                     extra={"frontend": True},
                 )
+                _tidy_emptied_artist(source.parent, plan.get("library_root"))
             except Exception as e:
                 logger.error(f"could not move {source} to {target}: {e}")
                 results["problems"].append(f"tags were written but the folder could not be renamed: {e}")
