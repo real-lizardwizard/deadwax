@@ -12,6 +12,7 @@ from src.store import JobStore
 
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
+from src.api.lrclib_endpoint import lrclib
 from src.config import Config
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI):
     await app.state.slskd_client.close_client()
     await library.coverart_client.close_client()
     await library.artist_images_client.close_client()
+    await lrclib.close_client()
 
     cleanup_logging()
 

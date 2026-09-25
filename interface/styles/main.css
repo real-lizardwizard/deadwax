@@ -4197,6 +4197,34 @@ span.red { color: var(--red-text); }
     font-size: var(--text-2xs);
 }
 
+/*
+ * A track's lyrics, in the track view. Set as a column of short lines rather than a paragraph -
+ * that is how lyrics are read - and capped at a readable measure however wide the pane is.
+ * Synced lines carry their time in a narrow mono gutter, dimmed: it is there to be glanced at,
+ * not read, and the words are the point.
+ */
+.lyrics {
+    display: grid;
+    gap: var(--space-1);
+    max-width: 38em;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+.lyrics-line { display: grid; grid-template-columns: minmax(0, 1fr); }
+.lyrics.is-synced .lyrics-line { grid-template-columns: 3.2em minmax(0, 1fr); gap: var(--space-3); }
+.lyrics-line.is-gap { min-height: 0.75em; }
+.lyrics-time {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--main-muted-text);
+    text-align: right;
+    padding-top: 0.2em;
+}
+.lyrics-text { color: var(--white-text); overflow-wrap: anywhere; }
+.lyrics-kind { font-size: var(--text-2xs); font-weight: normal; text-transform: none; letter-spacing: 0; }
+.lyrics-source { margin-top: var(--space-2); font-size: var(--text-2xs); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.lyrics-none { font-size: var(--text-sm); }
+
 .details-raw { font-size: var(--text-xs); }
 .details-raw > summary { cursor: pointer; padding: var(--space-1) 0; color: var(--main-secondary-text); }
 .details-raw > summary:hover { color: var(--main-hover-text); }

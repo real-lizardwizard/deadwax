@@ -185,6 +185,22 @@ export function LibraryView({ active, onNavigate }: Props) {
   //? on the next render
   const stopBulk = useRef(false)
 
+  /**
+   * A bulk lyrics fetch in progress, or the summary of the last one. The same shape of run as
+   * the covers: one album at a time through the route a single click uses, watchable, stoppable.
+   * Counted in TRACKS, because that is what LRCLIB answers about - an album is rarely all or
+   * nothing.
+   */
+  const [bulkLyrics, setBulkLyrics] = useState<{
+    total: number
+    done: number
+    saved: number
+    missing: number
+    failed: number
+    running: boolean
+  } | null>(null)
+  const stopLyrics = useRef(false)
+
   //? the album awaiting a delete confirmation, or null
   const [deleting, setDeleting] = useState<LibraryAlbum | null>(null)
 
@@ -294,6 +310,19 @@ export function LibraryView({ active, onNavigate }: Props) {
   const artCandidates = useMemo(
     () => visibleGroups.flatMap((group) => group.editions)
                        .filter((album) => !album.art && album.release_mbid),
+    [visibleGroups],
+  )
+
+  /**
+   * Albums IN VIEW with no lyrics on disk at all.
+   *
+   * Not "any track missing": an album with one instrumental track would then be offered for
+   * ever, and every run would ask LRCLIB about it again. A partly-covered album is finished
+   * from its own Get lyrics button, which looks up only the tracks still without them.
+   */
+  const lyricsCandidates = useMemo(
+    () => visibleGroups.flatMap((group) => group.editions)
+                       .filter((album) => !album.lyrics_count),
     [visibleGroups],
   )
 
@@ -430,6 +459,41 @@ export function LibraryView({ active, onNavigate }: Props) {
     setBulkArt((current) => current && { ...current, running: false })
     //? one reload at the end rather than per album: each write already dropped that folder from
     //? the server's scan cache, so this picks up every new cover in a single pass
+    await reload(false)
+  }
+
+  /**
+   * Fetch lyrics for every candidate, one album at a time.
+   *
+   * Sequential between albums for the same reason as the covers; within an album the server
+   * already asks about a few tracks at once, which is as hard as LRCLIB should be leaned on.
+   */
+  const fetchAllLyrics = async () => {
+    const targets = lyricsCandidates
+    if (!targets.length) return
+
+    stopLyrics.current = false
+    let saved = 0
+    let missing = 0
+    let failed = 0
+    setBulkLyrics({ total: targets.length, done: 0, saved, missing, failed, running: true })
+
+    for (const [position, album] of targets.entries()) {
+      if (stopLyrics.current) break
+
+      try {
+        const summary = await libraryApi.fetchLyrics(album.path)
+        saved += summary.written + summary.replaced
+        missing += summary.missing + summary.instrumental
+        failed += summary.failed
+      } catch {
+        failed += album.track_count
+      }
+
+      setBulkLyrics({ total: targets.length, done: position + 1, saved, missing, failed, running: true })
+    }
+
+    setBulkLyrics((current) => current && { ...current, running: false })
     await reload(false)
   }
 
@@ -632,6 +696,31 @@ export function LibraryView({ active, onNavigate }: Props) {
           </button>
         )}
 
+        {loaded && lyricsCandidates.length > 0 && !bulkLyrics?.running && (
+          <button
+            type="button"
+            id="library-bulk-lyrics-button"
+            class="win-button"
+            title={`look up lyrics on LRCLIB for the ${lyricsCandidates.length} album(s) in view that `
+                 + 'have none, saving each as a .lrc beside its track - nothing else changes'}
+            onClick={() => void fetchAllLyrics()}
+          >
+            Get lyrics · {lyricsCandidates.length}
+          </button>
+        )}
+
+        {bulkLyrics?.running && (
+          <button
+            type="button"
+            id="library-bulk-lyrics-button"
+            class="win-button is-running"
+            title="Stop after the album currently being fetched"
+            onClick={() => { stopLyrics.current = true }}
+          >
+            <Loading label={`lyrics ${bulkLyrics.done}/${bulkLyrics.total} · stop`} />
+          </button>
+        )}
+
         <button
           type="button"
           class="win-button"
@@ -829,6 +918,8 @@ export function LibraryView({ active, onNavigate }: Props) {
             /* the server dropped the folder from its scan cache when it wrote the cover, so a
                plain reload picks up the new art_mtime and the URL changes with it */
             onArtFetched={() => void reload(false)}
+            /* a new .lrc changes the folder's mtime, which is also what re-reads the track's lyrics */
+            onLyricsFetched={() => void reload(false)}
             /* the server dropped the album from its scan cache when it wrote the tags, so a plain
                reload shows them - and it marked the album reviewed, which the badge recounts */
             onTagsEdited={() => {
@@ -858,6 +949,16 @@ export function LibraryView({ active, onNavigate }: Props) {
             {bulkArt.missing ? `, ${bulkArt.missing} had none on the Archive` : ''}
             {bulkArt.failed ? `, ${bulkArt.failed} failed - try those again` : ''}
             {bulkArt.done < bulkArt.total ? ` (stopped at ${bulkArt.done} of ${bulkArt.total})` : ''}
+          </span>
+        )}
+
+        {/* the same split for lyrics: "not on LRCLIB" is final, "failed" is worth another go */}
+        {bulkLyrics && !bulkLyrics.running && (
+          <span class="statusbar-note">
+            saved lyrics for {bulkLyrics.saved} track{bulkLyrics.saved === 1 ? '' : 's'}
+            {bulkLyrics.missing ? `, ${bulkLyrics.missing} not on LRCLIB or instrumental` : ''}
+            {bulkLyrics.failed ? `, ${bulkLyrics.failed} failed - try those again` : ''}
+            {bulkLyrics.done < bulkLyrics.total ? ` (stopped at ${bulkLyrics.done} of ${bulkLyrics.total} albums)` : ''}
           </span>
         )}
 

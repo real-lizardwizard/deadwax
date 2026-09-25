@@ -1,7 +1,8 @@
 import { Fragment, type ComponentChildren } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
-import type { LibraryAlbum, LibraryTrack, MetadataIssueType } from '../api/types'
+import * as libraryApi from '../api/library'
+import type { LibraryAlbum, LibraryTrack, MetadataIssueType, TrackLyrics } from '../api/types'
 import type { TrackDetailsState } from '../hooks/useTrackDetails'
 import { useTrackFields, type TrackFieldsState } from '../hooks/useTrackFields'
 import { formatAge, formatDuration, formatSize, trackTime } from '../lib/format'
@@ -16,7 +17,8 @@ import {
   visibleColumns, type TrackField, type TrackRow,
 } from '../lib/trackFields'
 import { ArtViewer } from './ArtViewer'
-import { AlbumArt, CoverGrid, coverSources, GetArtButton } from './LibraryParts'
+import { lyricTime } from '../lib/lyrics'
+import { AlbumArt, CoverGrid, coverSources, GetArtButton, GetLyricsButton } from './LibraryParts'
 import { Loading } from './Loading'
 import { ArtistDetails } from './ArtistDetails'
 import { TrackTagEditor } from './TrackTagEditor'
@@ -45,6 +47,8 @@ interface Props {
   onEdit: (album: LibraryAlbum) => void
   onDelete: (album: LibraryAlbum) => void
   onArtFetched: () => void
+  /** a fetch wrote .lrc files, so the scan's lyrics count - and the track view - want a reload */
+  onLyricsFetched: () => void
   /** After tags were edited by hand, so the library reloads what changed. */
   onTagsEdited: () => void
   onSearchArtist: (artist: string) => void
@@ -232,6 +236,7 @@ export function LibraryDetails(props: Props) {
               {tagLabel}
             </button>
             <GetArtButton album={album} onDone={props.onArtFetched} class="commandbar-button" />
+            <GetLyricsButton album={album} onDone={props.onLyricsFetched} class="commandbar-button" />
           </>
         )}
 
@@ -481,6 +486,9 @@ function AlbumDetails(
           ['Original year', album.original_year],
           ['Edition', multiple || album.edition ? album.edition || 'Standard' : null],
           ['Discs', album.disc_count > 1 ? String(album.disc_count) : null],
+          ['Lyrics', album.lyrics_count
+            ? `${album.lyrics_count === album.track_count ? 'Every track' : `${album.lyrics_count} of ${album.track_count} tracks`}, as .lrc files`
+            : 'None on disk'],
           ['Cover', album.art === 'file'
             ? 'An image file in the folder'
             : album.art === 'embedded' ? 'Embedded in the audio' : 'None on disk'],
@@ -1006,6 +1014,8 @@ function TrackDetailsView(
         )
       })}
 
+      <LyricsView album={album} track={track} />
+
       {/*
         Every tag the file carries, under its container's own name - including the ones the
         field menu has never heard of. The menu decides what gets a proper label; this is where
@@ -1027,6 +1037,81 @@ function TrackDetailsView(
         {file && <p class="text white-tertiary details-raw-note">{track.filename}</p>}
       </details>
     </section>
+  )
+}
+
+/**
+ * One track's lyrics, read from disk when the track is shown.
+ *
+ * Read on demand like the track's tags, never carried in the scan - thousands of songs' words in
+ * the library-wide payload would tax every visit for text shown one track at a time. Re-read
+ * when the album's folder changes, which is what a fetch writing a .lrc does, so lyrics that
+ * were just fetched appear without leaving the track.
+ */
+function LyricsView({ album, track }: { album: LibraryAlbum; track: LibraryTrack }) {
+  const [state, setState] = useState<{
+    key: string
+    lyrics?: TrackLyrics
+    error?: string
+  } | null>(null)
+
+  const key = `${album.path}\n${track.filename}\n${album.modified_at}\n${album.lyrics_count}`
+
+  useEffect(() => {
+    let live = true
+    setState({ key })
+    libraryApi.trackLyrics(album.path, track.filename).then(
+      (lyrics) => { if (live) setState({ key, lyrics }) },
+      (caught) => { if (live) setState({ key, error: String(caught?.message ?? caught) }) },
+    )
+    return () => { live = false }
+  }, [key])
+
+  const current = state?.key === key ? state : null
+  const lyrics = current?.lyrics
+
+  return (
+    <>
+      <h3 class="details-subheading">
+        Lyrics
+        {lyrics?.synced && <span class="lyrics-kind text default-muted">synced</span>}
+      </h3>
+
+      {!current || (!current.lyrics && !current.error)
+        ? <Loading label="reading lyrics" />
+        : current.error
+          ? <p class="text yellow">{current.error}</p>
+          : !lyrics?.lines.length
+            ? (
+              <p class="lyrics-none text white-tertiary">
+                No lyrics for this track on disk.
+                {album.lyrics_count < album.track_count ? ' Get lyrics, above, looks for them on LRCLIB.' : ''}
+              </p>
+            )
+            : (
+              <>
+                <div class={`lyrics${lyrics.synced ? ' is-synced' : ''}`}>
+                  {lyrics.lines.map((line, i) => (
+                    //? an empty synced line marks a break in the singing - it gets the space and
+                    //? not the time, which beside nothing reads like a line that failed to load
+                    line.text
+                      ? (
+                        <div key={i} class="lyrics-line">
+                          {lyrics.synced && (
+                            <span class="lyrics-time">{line.time === null ? '' : lyricTime(line.time)}</span>
+                          )}
+                          <span class="lyrics-text">{line.text}</span>
+                        </div>
+                      )
+                      : <div key={i} class="lyrics-line is-gap" />
+                  ))}
+                </div>
+                <p class="lyrics-source text white-tertiary">
+                  {lyrics.source === 'file' ? `From ${lyrics.lyrics_file}` : 'Embedded in the file'}
+                </p>
+              </>
+            )}
+    </>
   )
 }
 

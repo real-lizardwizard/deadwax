@@ -66,6 +66,12 @@ ORGANIZE_MODES = {
     "move": "Move into the library",
 }
 
+#? What FETCH_LYRICS can be set to, as the dropdown names them.
+LYRICS_CHOICES = {
+    "on": "Fetch lyrics as albums are filed",
+    "off": "Don't fetch lyrics automatically",
+}
+
 #? What COVER_ART_SIZE can be set to, as the dropdown names them. The keys are the Cover Art
 #? Archive's own sizes - see COVER_ART_SIZES in config.py, which a test keeps these in step with.
 COVER_ART_SIZE_CHOICES = {
@@ -272,6 +278,27 @@ def _cover_art_row() -> dict:
     )
 
 
+def _lyrics_row() -> dict:
+    """FETCH_LYRICS, as an on/off dropdown."""
+    value = Config.FETCH_LYRICS
+    known = value in LYRICS_CHOICES
+
+    return _setting(
+        "FETCH_LYRICS",
+        value,
+        effect=(
+            "Each album filed from a download has its lyrics looked up on LRCLIB"
+            if value == "on"
+            else "Lyrics are only fetched when you ask, from the library"
+            if value == "off"
+            else "unrecognised - lyrics are fetched as albums are filed"
+        ),
+        status="ok" if known else "error",
+        detail=None if known else f"expected one of {', '.join(LYRICS_CHOICES)}",
+        choices=LYRICS_CHOICES,
+    )
+
+
 @router.get("")
 @router.get("/")
 async def settings():
@@ -453,6 +480,17 @@ async def settings():
                 ),
                 "settings": [_cover_art_row()],
             },
+            {
+                "id": "lyrics",
+                "label": "Lyrics",
+                "note": (
+                    "From LRCLIB, saved as a .lrc file beside each track - synced where LRCLIB "
+                    "has timings, which Navidrome, Jellyfin and Kodi all read. A .lrc already "
+                    "there is never replaced. 'Get lyrics' in the library works whatever this "
+                    "is set to."
+                ),
+                "settings": [_lyrics_row()],
+            },
         ],
         "organize_modes": ORGANIZE_MODES,
         "organizing": {
@@ -507,6 +545,9 @@ def _validate(key: str, value: str) -> str | None:
 
     if key == "COVER_ART_SIZE" and value not in COVER_ART_SIZES:
         return f"expected one of {', '.join(COVER_ART_SIZES)}"
+
+    if key == "FETCH_LYRICS" and value not in LYRICS_CHOICES:
+        return f"expected one of {', '.join(LYRICS_CHOICES)}"
 
     return None
 

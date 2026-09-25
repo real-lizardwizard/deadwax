@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.config import Config
 from src.logger import logger
+from src.lyrics import fetch_album_lyrics
 from src.organizer import organize_job
 from src.peer_speed import RateAccumulator, measured_rate, observe
 from src.store import index_transfers_by_user, summarize_transfers
@@ -209,6 +210,7 @@ async def _organize_if_enabled(job: dict, store) -> None:
         else:
             await store.update_status(job["id"], "organized")
             await _enrol_for_review(job, results, store)
+            _fetch_lyrics_later(results)
 
     except Exception as e:
         logger.error(
@@ -216,6 +218,59 @@ async def _organize_if_enabled(job: dict, store) -> None:
             extra={"frontend": True, "src": "slskd"},
         )
         await store.update_status(job["id"], "complete", f"organize failed: {e}")
+
+
+#? Lyrics lookups in flight. asyncio holds only a WEAK reference to a task, so one nobody keeps
+#? can be collected half way through - the set is what keeps them alive until they finish.
+_lyrics_tasks: set[asyncio.Task] = set()
+
+
+def _filed_path(results: dict) -> str | None:
+    """Where an organized album landed, relative to LIBRARY_PATH, or None if it isn't inside it."""
+    album_dir = (results.get("plan") or {}).get("album_dir")
+
+    if not album_dir or not Config.LIBRARY_PATH:
+        return None
+
+    try:
+        return str(Path(album_dir).relative_to(Path(Config.LIBRARY_PATH)))
+    except ValueError:
+        return None
+
+
+def _fetch_lyrics_later(results: dict, client=None):
+    """
+    Look up lyrics for a just-filed album, without holding up anything else.
+
+    A TASK, not an await: LRCLIB can take seconds a track when it hasn't seen one before, and the
+    job is already organized and the album already in the library. Making the poller wait on
+    lyrics would delay every other download's progress for words nobody has asked to read yet.
+
+    Only reached for a job that really was organized, so a dry run fetches nothing - dry run
+    writes nothing, and a .lrc is a write. Never raises: failing to find lyrics says nothing
+    about whether the download worked.
+    """
+    if (Config.FETCH_LYRICS or "on") == "off":
+        return None
+
+    path = _filed_path(results)
+    if path is None:
+        return None
+
+    if client is None:
+        from src.api.lrclib_endpoint import lrclib
+        client = lrclib
+
+    async def run():
+        try:
+            await fetch_album_lyrics(path, Config.LIBRARY_PATH, client)
+        except Exception as e:
+            logger.warning(f"fetching lyrics for {path} failed: {e}")
+
+    task = asyncio.create_task(run())
+    _lyrics_tasks.add(task)
+    task.add_done_callback(_lyrics_tasks.discard)
+    return task
 
 
 async def _enrol_for_review(job: dict, results: dict, store) -> None:

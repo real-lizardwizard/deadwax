@@ -18,6 +18,8 @@ from src.logger import logger
 from src.metadata_health import ISSUE_TYPES, attach_issues
 from src.organizer import is_within
 from src.api.coverart_endpoint import CoverArtClient
+from src.api.lrclib_endpoint import lrclib
+from src.lyrics import fetch_album_lyrics, read_track_lyrics
 from src.retag import execute_retag, plan_cover_art, plan_retag, save_cover_art
 from src.track_tags import execute_tag_edits, plan_tag_edits
 
@@ -495,6 +497,57 @@ async def fetch_cover_art(request: Request, body: CoverArtRequest):
     except Exception as e:
         logger.error(f"Exception in /art/fetch endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching the cover art: {e}")
+
+
+class LyricsRequest(BaseModel):
+    #? relative to LIBRARY_PATH, as the scan reports it
+    album_path: str
+    #? off by default, like `replace` on a cover: a .lrc already there may have been corrected
+    #? by hand, or come from somewhere better than LRCLIB
+    replace: bool = False
+
+
+@router.post("/lyrics/fetch")
+async def fetch_lyrics(request: Request, body: LyricsRequest):
+    """
+    Look up lyrics on LRCLIB for every track of one album, and write each as a `.lrc` beside it.
+
+    Like /art/fetch it chooses nothing and so needs no preview: it asks about each file by the
+    tags the file already carries, only ADDS files, and leaves any `.lrc` already there alone.
+    A track LRCLIB has nothing for is reported, not failed - see fetch_album_lyrics().
+    """
+    if not Config.LIBRARY_PATH:
+        raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
+
+    summary = await fetch_album_lyrics(body.album_path, Config.LIBRARY_PATH, lrclib, body.replace)
+
+    if summary["problem"]:
+        raise HTTPException(status_code=400, detail=summary["problem"])
+
+    #? a new .lrc changes the folder's mtime, which the scan would notice on its own - but a
+    #? REPLACED one doesn't, and the scan's lyrics count is worth keeping exact either way
+    if summary["written"] or summary["replaced"]:
+        forget_cached_album(str(Path(Config.LIBRARY_PATH) / body.album_path))
+        await _persist_cache(request)
+
+    return summary
+
+
+@router.get("/lyrics")
+async def track_lyrics(album: str, file: str):
+    """
+    One track's lyrics, from the `.lrc` beside it or else the file's own tags. For the track viewer.
+
+    Copies /art's guard for the album, and the tag editor's for the file: `file` has to be an
+    audio file in the album's own listing, and every refusal is the same 404.
+    """
+    lyrics = await asyncio.to_thread(read_track_lyrics, album, Config.LIBRARY_PATH or "", file)
+
+    if lyrics is None:
+        logger.debug(f"no such track for lyrics: {album!r} / {file!r}")
+        raise HTTPException(status_code=404, detail="no such track")
+
+    return lyrics
 
 
 class TagEdit(BaseModel):

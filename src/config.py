@@ -216,6 +216,12 @@ class Config:
     #? something to be given. Read at the point of use, like everything else here.
     COVER_ART_SIZE = _env("COVER_ART_SIZE", "500")
 
+    #? on | off. Whether an album filed from a download gets its lyrics looked up on LRCLIB and
+    #? written as a .lrc beside each track. On by default because it only ever ADDS files, and
+    #? only once organizing actually writes - a dry run fetches nothing. Off is for anyone who
+    #? would rather this container didn't ask a third party about every track they download.
+    FETCH_LYRICS = _env("FETCH_LYRICS", "on")
+
     #? Optional, and artist banners are off without it. MusicBrainz has no artist images at all
     #? and Wikimedia Commons has a photograph at best, so TheAudioDB is the only source here
     #? with banners, logos and backgrounds - keyed by the same MusicBrainz artist id deadwax
@@ -256,6 +262,8 @@ class Config:
         "LIBRARY_PATH": "library",
         #? the cover art client reads it per fetch, so there is nothing to rebuild
         "COVER_ART_SIZE": None,
+        #? read by the poller as each album is filed, so nothing to rebuild
+        "FETCH_LYRICS": None,
         #? read per lookup by the artist image client, so nothing to rebuild here either
         "THEAUDIODB_KEY": None,
         "FANARTTV_KEY": None,

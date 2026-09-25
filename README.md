@@ -79,7 +79,7 @@ _Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** manag
 
 ### Upgrading from jimbrainz
 
-It's the same app under a new name, from 0.6.21. Point your compose file or Komodo stack at **`ghcr.io/real-lizardwizard/deadwax`** instead of `…/jimbrainz` — nothing redirects the old image name, and it stops getting updates at 0.6.20. Nothing else needs changing:
+It's the same app under a new name, and 0.7.0 is the first release under it. Point your compose file or Komodo stack at **`ghcr.io/real-lizardwizard/deadwax`** instead of `…/jimbrainz` — nothing redirects the old image name, and it stops getting updates at 0.6.20. Nothing else needs changing:
 
 - **Your database is found where it is.** A `DB_PATH=/config/jimbrainz.db` line keeps working as it is, and if you never set `DB_PATH`, the old `/config/jimbrainz.db` keeps being used until a `deadwax.db` exists. Don't rename the file by hand to "match" — leave it.
 - **Your browser keeps its layouts and preferences** — column widths, panel sizes, the library's fields and sort. They're carried over to the new name the first time the page loads.
@@ -89,8 +89,8 @@ It's the same app under a new name, from 0.6.21. Point your compose file or Komo
 
 | tag | what it is |
 | --- | --- |
-| `:latest` | **the current release** — slskd direct, no Lidarr. 0.6.x, and what the settings above describe. |
-| `:0.6.0` etc | pinned releases of that same line |
+| `:latest` | **the current release** — slskd direct, no Lidarr. 0.7.x, and what the settings above describe. |
+| `:0.7.0` etc | pinned releases of that same line (0.6.20 and older are under the old `jimbrainz` image name) |
 | `:experimental` | the `experimental/*` branch, rebuilt on every push. Ahead of `:latest`, and moves under you. |
 | `:0.2.1` and older | the original Lidarr-based line, still on `main`. Does **not** understand the settings above. |
 
@@ -218,6 +218,22 @@ A picker shows every candidate each source offered — TheAudioDB usually has fo
 
 Without a key you still get a photo where Commons has one, and the rest of the page is unaffected.
 
+### Lyrics
+<details>
+<summary style="font-style:italic">Synced where they exist, saved where your player looks</summary>
+Lyrics come from <a href="https://lrclib.net">LRCLIB</a> — free, no key, and the one source with <em>time-synced</em> lyrics for a large part of what people actually listen to. Each track's are saved as a <code>.lrc</code> file with the track's own name, right beside it: <code>07 - Roads.flac</code> gets <code>07 - Roads.lrc</code>. Navidrome reads those with no configuration at all (<code>.lrc</code> is in its default <code>LyricsPriority</code>), and Jellyfin and Kodi read them too. The audio files themselves aren't touched.
+<br><br>
+They're fetched three ways. <strong>As an album is filed</strong> from a download, in the background so it never holds anything up — <code>FETCH_LYRICS=off</code>, or the settings tab, turns that off. <strong>Get lyrics</strong> in an album's command bar fetches whatever tracks are still without. And <strong>Get lyrics · N</strong> in the library toolbar runs over every album in view that has none at all, one album at a time, stoppable, like Get covers.
+<br><br>
+Pick a track and its lyrics are under its properties, with the time beside each line when they're synced. Lyrics some other tagger embedded in the file show there too.
+<br><br>
+It's matched on the track's title, artist, album and <em>length</em>, and the length is what keeps it honest: a result more than two seconds out is a different recording — a live take, an edit — and its timings would be wrong. One only a little out, like a vinyl pressing that runs a few seconds longer than the CD, gives you its <em>words</em> without its timings. A <code>.lrc</code> already there is never replaced. What happened to each track is reported and kept apart: saved, not on LRCLIB, instrumental (nothing is written — an invented "instrumental" line would be a lyric nobody sang), or failed, which is worth trying again. LRCLIB gets busy under a long run and says so; deadwax waits and asks again before calling it a failure.
+<br><br>
+
+![A synced lyric sheet for Roads, with the time beside each line](assets/images/lyrics.png)
+
+</details>
+
 ### Fixing things that landed wrong
 <details>
 <summary style="font-style:italic">Pick the release an album really is, and write it back</summary>
@@ -302,16 +318,16 @@ Being lightweight and fast (and working _just enough_) was and is the only focus
 Theres no native feature to add entire discographies quickly (unless you type really fast). There are much better alternatives for that out there.
 </details>
 
-### Making use of any more metadata than what MusicBrainz has to offer
+### Metadata from anywhere but MusicBrainz
 <details>
-<summary style="font-style:italic">If anything is not on MusicBrainz deadwax cant reach it</summary>
-deadwax _only uses MusicBrainz_, if you need to add anything thats not on MusicBrainz it cant help you.
+<summary style="font-style:italic">Tags come from MusicBrainz, and only from MusicBrainz</summary>
+Everything deadwax writes into a file's tags comes from MusicBrainz, so if a release isn't there it can't tag it — you can still edit tags by hand. The pictures and lyrics are the exceptions, and they go in files beside the music rather than in the tags: covers from the Cover Art Archive, artist images from Wikimedia Commons (plus fanart.tv and TheAudioDB if you give them a key), and lyrics from LRCLIB.
 </details>
 
 ### Recommendations
 <details>
 <summary style="font-style:italic">deadwax can only be used for searching stuff and downloading it</summary>
-Theres no tracking of what you download or listen to, and no extra metadata other than MusicBrainz, so theres no cool recommendations.
+Theres no tracking of what you download or listen to, so theres nothing to base cool recommendations on.
 </details>
 
 ### Any kind of login

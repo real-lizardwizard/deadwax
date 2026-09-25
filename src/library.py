@@ -29,6 +29,7 @@ from pathlib import Path
 from src.logger import logger
 from src.artists import ARTIST_ART_STEMS
 from src.matching import AUDIO_EXTENSIONS, file_extension
+from src.lyrics import has_lyrics_file, lyrics_filename
 
 #? The shape of what read_album_dir() returns, as a number. BUMP IT whenever that dict gains,
 #? loses or changes a field. The cache below is persisted to SQLite and outlives the process,
@@ -37,7 +38,8 @@ from src.matching import AUDIO_EXTENSIONS, file_extension
 #? missing from every album nobody has touched since the upgrade.
 #?   1  the original shape
 #?   2  tracks carry `disc`, albums carry `disc_count`
-SCAN_FORMAT = 2
+#?   3  albums carry `lyrics_count`
+SCAN_FORMAT = 3
 
 #? path -> (mtime, album dict). Reading tags costs milliseconds per file and a real library
 #? is thousands of files, so a rescan re-reads only the folders that actually changed. The
@@ -431,6 +433,12 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
 
     tracks.sort(key=track_order)
 
+    #? tracks with a .lrc beside them, from the listing already in hand - no file is opened. Only
+    #? sidecars count: lyrics embedded by some other tool aren't seen here, which at worst offers
+    #? to fetch a .lrc for an album that has words already, and never the other way round.
+    names = {entry.name.lower() for entry in entries}
+    lyrics_count = sum(1 for t in tracks if has_lyrics_file(t["filename"], names))
+
     #? Recorded during the scan so the interface knows whether asking for art is worth a
     #? request at all. The embedded check costs one extra file open per album, which is
     #? cheap beside the per-track opens above and is cached with the rest of the album.
@@ -494,6 +502,7 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
         #? distinct disc numbers the files are TAGGED with, so 0 for an untagged album rather
         #? than a guessed 1. Above 1 is a multi-disc set, which the viewer splits by disc.
         "disc_count": len({t["disc"] for t in tracks if t["disc"]}),
+        "lyrics_count": lyrics_count,
         "total_size": sum(t["size"] for t in tracks),
         "duration": round(sum(t["length"] for t in tracks), 1),
         "formats": sorted({t["format"] for t in tracks if t["format"]}),
@@ -771,10 +780,16 @@ def summarize_for_deletion(directory: Path) -> dict:
     other: list[str] = []
     total = 0
 
-    for entry in sorted(directory.rglob("*")):
-        if not entry.is_file():
-            continue
+    entries = [entry for entry in sorted(directory.rglob("*")) if entry.is_file()]
 
+    #? A track's own .lrc belongs to the track, the way its cover belongs to the album - deadwax
+    #? writes one per track, and listing thirty of them as "might be the only copy of something"
+    #? would bury the rip log that line exists to warn about. One with no track beside it is
+    #? still listed.
+    lyrics = {entry.parent / lyrics_filename(entry.name) for entry in entries
+              if file_extension(entry.name) in AUDIO_EXTENSIONS}
+
+    for entry in entries:
         try:
             total += entry.stat().st_size
         except OSError:
@@ -783,7 +798,7 @@ def summarize_for_deletion(directory: Path) -> dict:
         extension = file_extension(entry.name)
         if extension in AUDIO_EXTENSIONS:
             audio += 1
-        elif extension not in IMAGE_EXTENSIONS:
+        elif extension not in IMAGE_EXTENSIONS and entry not in lyrics:
             other.append(entry.name)
 
     return {

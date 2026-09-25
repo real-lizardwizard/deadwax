@@ -65,6 +65,10 @@ services:
       # full is the original upload, often several MB. Also changeable in the settings tab.
       #- COVER_ART_SIZE=500
       #
+      # on | off - look up lyrics on LRCLIB for each album as it is filed, saved as a .lrc
+      # beside every track. Only adds files; a .lrc already there is never replaced.
+      #- FETCH_LYRICS=on
+      #
       # off | dry_run | copy | move. Starts at dry_run on purpose - organizing is the only
       # thing here that writes to your filesystem, so check the event log looks right before
       # switching to copy or move.

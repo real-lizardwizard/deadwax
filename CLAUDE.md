@@ -107,8 +107,11 @@ src/
                    CREDITS, which is why a split album no longer reads as a list.
   artist_art.py    artist images written into the artist's folder. The FIFTH writer, same
                    plan/execute split - see "The artist page".
+  lyrics.py        lyrics as a .lrc beside each track. The SIXTH writer, same split, and the
+                   network is passed in so none of it needs one to test - see "Lyrics".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
-                   artist_images_endpoint.py (Wikidata/Commons + TheAudioDB), app.py
+                   artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
+                   lrclib_endpoint.py (LRCLIB), app.py
   routes/          search_musicbrainz, download, monitor_slskd, interface_logs, library,
                    settings (editable since v0.5.1 - see "The settings tab")
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
@@ -120,7 +123,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             635 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             687 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -212,10 +215,11 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   scoped to what is on screen, so the facets compose with it, and it reports "no cover on the
   Archive" separately from "the request failed" — the first is a fact about the release and
   nothing can be done, the second is worth trying again.
-- **There are now FIVE writers to the user's filesystem**, and all but the smallest use the same
+- **There are now SIX writers to the user's filesystem**, and all but the smallest use the same
   plan/execute split: `organizer.py` files downloads in, `retag.py` corrects albums already
   there, `track_tags.py` writes tags edited by hand (v0.6.9), `artist_art.py` writes an artist's
-  pictures into their folder (v0.6.15), and `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
+  pictures into their folder (v0.6.15), `lyrics.py` writes a `.lrc` beside each track (v0.7.0),
+  and `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
   the write rather than trusting the plan, for the same reason the retag endpoint recomputes its
   own). A preview that disagrees with the write it previews is worse than no preview, so the
   first two derive the tags from one shared `organizer.tag_values()` rather than computing them
@@ -937,6 +941,65 @@ anything else I'd need for an artist page".
 - **Known gap:** on a phone the details pane is a sheet that opens for albums and tracks, and an
   artist "just opens in place" (v0.6.5's decision). So the artist page is desktop and tablet
   only. The phone rules for it are written and inert until that decision changes.
+
+### Lyrics (v0.7.0)
+
+James: "I want to work on also grabbing lyrics" - and chose, from options put to him, a `.lrc`
+beside each track, fetched as albums are filed, on demand from the library, and shown in the
+track view.
+
+- **LRCLIB, and only LRCLIB.** Free, no key, no account, and the only source with SYNCED lyrics
+  at any scale. It is keyed on the tags - artist, title, album, duration - not on MusicBrainz ids,
+  so an untagged library works too. It asks for a User-Agent naming the app, version and
+  homepage, which `LrclibClient.user_agent()` sends.
+- **A `.lrc` beside the track, never a tag inside it.** The audio is not touched, and Navidrome's
+  `LyricsPriority` default (".ttml,.yaml,.yml,.elrc,.lrc,.srt,.txt,embedded" - verified in its
+  source) finds `<same name>.lrc` with no configuration, the way `artist.*` is found. What is
+  written is LRCLIB's text untouched - synced when it has timings, plain otherwise - with NO
+  header: an `[ar:]` line a player doesn't understand would be drawn as a lyric.
+- **The DURATION is what keeps a match honest.** `/api/get` first (exact, LRCLIB's own ±2s);
+  on a miss, `/api/search` held to the same 2s by `choose_result()`, with the album as a
+  preference and never a requirement - a deluxe edition's longer album title is the usual reason
+  the exact lookup misses. The track artist is tried before the album artist.
+- **Near misses give WORDS, not timings.** A same-titled recording within 10%
+  (`WORDS_ONLY_TOLERANCE`) is used as plain lyrics. Found on the scratch library: Dummy's 2014
+  vinyl "Sour Times" is 245s where every LRCLIB copy is 247-254s, so the 2s rule refused all of
+  them - right about the timings, wrong about the words. 10% keeps a live take or an extended
+  mix, which can have different words, out.
+- **Outcomes are kept apart, as with covers.** `missing` and `instrumental` are facts about the
+  track; `failed` is LRCLIB not answering and is worth another go; `untagged` needs a title and
+  artist first; `kept` already had a `.lrc`. An instrumental writes NOTHING - an invented
+  "instrumental" line would be a lyric nobody sang. The price: an all-instrumental album is
+  offered by the bulk run every time, and asks LRCLIB again.
+- **LRCLIB answers 503 when leaned on** - measured, on a 118-track bulk run at three tracks at a
+  time, and it looked exactly like lyrics being missing until the misses were probed by hand and
+  most turned out to exist. So `CONCURRENCY` is 2 and the client waits and retries a 503/429
+  (`RETRY_PAUSES`) before calling it a failure.
+- **Filing fetches in a TASK, not an await** (`poller._fetch_lyrics_later`), held in a set
+  because asyncio keeps only a weak reference to a task. The job is already organized; making
+  the poller wait on LRCLIB would stall every other download's progress. Only reached for a job
+  that really was organized, so dry run fetches nothing. `FETCH_LYRICS` (on | off, default on)
+  gates it, and an unrecognised value counts as on - the settings row says so.
+- **The scan counts `.lrc` files from the listing it already has** (`lyrics_count`,
+  `SCAN_FORMAT` 3). It never opens a file for this, so lyrics another tool EMBEDDED aren't
+  counted - which at worst offers to fetch a `.lrc` for an album that has words already. The
+  track view does read embedded lyrics, as a fallback behind the `.lrc`.
+- **The bulk run takes albums with NO lyrics, not albums missing some.** Otherwise one
+  instrumental track keeps an album in the bulk run for ever. A partly-covered album is finished
+  from its own Get lyrics button, which looks up only the tracks still without.
+- **The album button keeps its result on screen** ("Lyrics · 9 of 10", the whole outcome in its
+  tooltip) for as long as you stay on that album. Without it the button either vanished (all
+  found) or came back looking untouched (some not on LRCLIB), and both read as the click having
+  done nothing.
+- **A track's own `.lrc` is left out of the delete confirmation's "other files".** That list
+  exists to warn about a rip log that might be the only copy; thirty `.lrc`s would bury it. A
+  `.lrc` with no track of its name is still listed.
+- **Re-filing needs nothing**: `execute_retag` moves the whole folder, so each `.lrc` travels
+  with its track. The hand tag editor renames nothing. If anything ever renames a TRACK file, it
+  has to rename that track's `.lrc` too.
+- **Verified against live LRCLIB** on the scratch library: Dummy's ten tracks all synced; after
+  the retry and the words-only rule, every gap on the Portishead albums filled, and Boards of
+  Canada's eleven instrumentals came back as instrumental rather than missing.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -1945,7 +2008,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 635 tests
+.venv/bin/python -m pytest tests/ -q  # 687 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -1975,7 +2038,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 635 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 687 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

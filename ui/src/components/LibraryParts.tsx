@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'preact/hooks'
 
 import * as libraryApi from '../api/library'
-import type { LibraryAlbum, MetadataIssueType } from '../api/types'
+import type { LibraryAlbum, LyricsSummary, MetadataIssueType } from '../api/types'
 import { albumArtUrl } from '../lib/format'
 import type { AlbumGroup } from '../lib/groupAlbums'
 import { groupNodeId } from '../lib/libraryTree'
+import { describeLyrics, lyricsOnDisk } from '../lib/lyrics'
 import { describeIssues, issueLabel } from '../lib/metadataQueue'
 import { Loading } from './Loading'
 
@@ -150,6 +151,72 @@ export function GetArtButton(
       onClick={(event) => void fetchArt(event as unknown as MouseEvent)}
     >
       {state === 'working' ? <Loading /> : state === 'failed' ? 'Retry cover' : 'Get cover'}
+    </button>
+  )
+}
+
+/**
+ * Fetch lyrics for every track of one album that doesn't have them yet.
+ *
+ * Rendered while any track lacks a `.lrc`, and - once it has run - for as long as you stay on
+ * that album, reading "Lyrics · 9 of 10" with the whole outcome in its tooltip. Without that
+ * the button would either vanish (every track found) or come back looking untouched (some not
+ * on LRCLIB), and both read as the click having done nothing.
+ */
+export function GetLyricsButton(
+  { album, onDone, class: className = 'commandbar-button' }:
+  { album: LibraryAlbum; onDone: () => void; class?: string },
+) {
+  const [run, setRun] = useState<{
+    path: string
+    state: 'working' | 'done' | 'failed'
+    summary?: LyricsSummary
+  } | null>(null)
+
+  //? a result belongs to the album it was fetched for, never to the next one selected
+  const mine = run && run.path === album.path ? run : null
+
+  if (!mine && album.lyrics_count >= album.track_count) return null
+
+  const getLyrics = async (event: MouseEvent) => {
+    event.stopPropagation()
+    const path = album.path
+    setRun({ path, state: 'working' })
+
+    try {
+      const summary = await libraryApi.fetchLyrics(path)
+      setRun({ path, state: 'done', summary })
+      if (summary.written || summary.replaced) onDone()
+    } catch (caught) {
+      setRun({ path, state: 'failed' })
+      console.error(caught)
+    }
+  }
+
+  const summary = mine?.state === 'done' ? mine.summary : undefined
+
+  return (
+    <button
+      type="button"
+      class={`${className}${mine?.state === 'failed' ? ' failed' : ''}`}
+      //? like Get cover: disabled only while in flight, so a passing outage is never a dead end
+      disabled={mine?.state === 'working'}
+      title={
+        summary
+          ? `${describeLyrics(summary)}.`
+            + (lyricsOnDisk(summary) < album.track_count ? ' Click to look again for the rest.' : '')
+          : mine?.state === 'failed'
+            ? 'the lyrics lookup failed - LRCLIB may be briefly unreachable. Click to try again.'
+            : 'look up lyrics on LRCLIB for the tracks here without them, and save each as a .lrc '
+              + 'beside the track. Nothing else about the album changes.'
+      }
+      onClick={(event) => void getLyrics(event as unknown as MouseEvent)}
+    >
+      {mine?.state === 'working'
+        ? <Loading />
+        : summary
+          ? `Lyrics · ${lyricsOnDisk(summary)} of ${album.track_count}`
+          : mine?.state === 'failed' ? 'Retry lyrics' : 'Get lyrics'}
     </button>
   )
 }

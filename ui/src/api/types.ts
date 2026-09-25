@@ -383,6 +383,11 @@ export interface LibraryAlbum {
   track_count: number
   /** Distinct disc numbers the files are TAGGED with — 0 when untagged, not a guessed 1. */
   disc_count: number
+  /**
+   * Tracks with a `.lrc` beside them. Lyrics embedded in the files by another tool aren't
+   * counted — the scan reads the folder listing for this, not the tags.
+   */
+  lyrics_count: number
   total_size: number
   /** seconds */
   duration: number
@@ -511,6 +516,47 @@ export interface TrackDetails {
 export interface TrackDetailsResponse {
   album: string
   files: TrackDetails[]
+}
+
+/**
+ * What happened to each track when lyrics were fetched for an album.
+ *
+ * `missing` and `instrumental` are facts about the track that asking again won't change;
+ * `failed` means LRCLIB didn't answer and is worth trying again; `untagged` needs the file's
+ * title and artist fixing first; `kept` already had a `.lrc`.
+ */
+export type LyricsOutcome =
+  | 'written' | 'replaced' | 'kept' | 'instrumental' | 'missing' | 'failed' | 'untagged'
+
+/** POST /library/lyrics/fetch */
+export interface LyricsSummary {
+  album_path: string
+  tracks: { filename: string; outcome: LyricsOutcome; synced?: boolean; detail?: string }[]
+  written: number
+  replaced: number
+  kept: number
+  instrumental: number
+  missing: number
+  failed: number
+  untagged: number
+  /** how many of the written or replaced ones carry timings */
+  synced: number
+}
+
+/** One line of lyrics. `time` is seconds from the start, or null for an unsynced line. */
+export interface LyricLine {
+  time: number | null
+  text: string
+}
+
+/** GET /library/lyrics — one track's lyrics, from the `.lrc` beside it or its own tags. */
+export interface TrackLyrics {
+  filename: string
+  /** 'file' is a .lrc beside the track, 'embedded' is in its tags, null is neither */
+  source: 'file' | 'embedded' | null
+  lyrics_file: string | null
+  synced: boolean
+  lines: LyricLine[]
 }
 
 /**

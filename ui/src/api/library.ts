@@ -2,8 +2,8 @@ import { get, post } from './http'
 import type {
   ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
   DeletionSummary,
-  LibraryResponse, NewImportsResponse, RetagPlan, RetagRelease, RetagResponse, TagEditPlan,
-  TagEditResponse, TrackDetailsResponse, TrackTagEdit,
+  LibraryResponse, LyricsSummary, NewImportsResponse, RetagPlan, RetagRelease, RetagResponse, TagEditPlan,
+  TagEditResponse, TrackDetailsResponse, TrackLyrics, TrackTagEdit,
 } from './types'
 
 /**
@@ -152,6 +152,30 @@ export function fetchCoverArt(
     //? editor sends one because it is showing you that release's cover as you decide.
     release_mbid: options.releaseMbid ?? null,
   })
+}
+
+/**
+ * Look up every track's lyrics on LRCLIB and save each as a `.lrc` beside it.
+ *
+ * Like fetchCoverArt it chooses nothing, so there is nothing to preview: each file is asked
+ * about by the tags it already carries, and a `.lrc` already there is kept unless `replace`.
+ * A track LRCLIB has nothing for is in the summary, not an error.
+ */
+export function fetchLyrics(
+  albumPath: string,
+  options: { replace?: boolean } = {},
+): Promise<LyricsSummary> {
+  return post<LyricsSummary>('/library/lyrics/fetch', {
+    album_path: albumPath,
+    replace: options.replace ?? false,
+  })
+}
+
+/** One track's lyrics as they are on disk now, for the track viewer. */
+export function trackLyrics(albumPath: string, filename: string): Promise<TrackLyrics> {
+  return get<TrackLyrics>(
+    `/library/lyrics?album=${encodeURIComponent(albumPath)}&file=${encodeURIComponent(filename)}`,
+  )
 }
 
 /** What deleting this album would remove. Touches nothing. */
