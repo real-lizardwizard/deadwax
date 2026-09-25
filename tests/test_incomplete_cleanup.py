@@ -1,7 +1,7 @@
 """
 Removing the partial files a cancelled download leaves behind.
 
-This deletes files jimbrainz did not create, in a folder belonging to another application, so
+This deletes files deadwax did not create, in a folder belonging to another application, so
 it is written and tested like delete_album() rather than like the organizer.
 
 The thing to understand before changing any of it: **slskd keeps partial files on purpose.** It

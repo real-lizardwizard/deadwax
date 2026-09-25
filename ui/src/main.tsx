@@ -36,7 +36,7 @@ function mount(id: string, node: VNode): void {
   const host = document.getElementById(id)
 
   if (!host) {
-    console.warn(`jimbrainz-ui: no #${id} in the page, skipping that mount`)
+    console.warn(`deadwax-ui: no #${id} in the page, skipping that mount`)
     return
   }
 

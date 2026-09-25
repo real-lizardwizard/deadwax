@@ -40,7 +40,7 @@ from urllib.parse import quote, urlparse
 #?   clearart   Kodi only, and harmless elsewhere
 #?
 #? Navidrome displays NONE of the five below the first: it has one artist image and no concept
-#? of a banner or a logo. They are here because jimbrainz's own artist page is made of them, and
+#? of a banner or a logo. They are here because deadwax's own artist page is made of them, and
 #? because anything else pointed at the same library can use them.
 #?
 #? The EXTENSION is whatever was actually fetched, as save_cover_art does it - every one of
@@ -165,7 +165,7 @@ def credit_name(credit: list[dict] | None) -> str:
     An artist credit as MusicBrainz itself renders it.
 
     The join phrases ARE the punctuation: a split release is "A / B", a collaboration "A & B",
-    a guest spot "A feat. B". Joining the names on ", " instead - which is what jimbrainz did
+    a guest spot "A feat. B". Joining the names on ", " instead - which is what deadwax did
     everywhere until now - invents punctuation MusicBrainz did not use and flattens a duet into
     what reads as a list of two separate acts.
     """
@@ -278,7 +278,7 @@ def from_theaudiodb(row: dict | None) -> list[dict]:
     return found
 
 
-#? fanart.tv's fields, and what each is to jimbrainz. The HD logo comes before the plain one so
+#? fanart.tv's fields, and what each is to deadwax. The HD logo comes before the plain one so
 #? that when both exist the better is offered first; 4K backgrounds are offered alongside the
 #? ordinary ones rather than instead of them, being several megabytes each.
 FANARTTV_FIELDS = (
@@ -450,7 +450,7 @@ def artist_members(relations: list[dict] | None) -> list[dict]:
 #? "Kanye West" on all but two of his own albums, JAY-Z's artist name is "JAY-Z" while his
 #? credits say "Jay-Z", and the same goes for Yusuf/Cat Stevens, Diddy and Snoop.
 #?
-#? jimbrainz writes the CREDIT into the tags and the folder, which is right - the album really
+#? deadwax writes the CREDIT into the tags and the folder, which is right - the album really
 #? was credited that way - so the name on disk is the one MusicBrainz no longer answers to. A
 #? search for it found a tribute band and nothing else.
 

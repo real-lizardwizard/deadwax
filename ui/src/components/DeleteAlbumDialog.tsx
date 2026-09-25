@@ -21,7 +21,7 @@ interface Props {
  * that folder might be the only copy, so they're named individually before they go.
  *
  * Deliberately not a browser confirm(): it can't show any of that, and this is the one
- * action in jimbrainz with no undo.
+ * action in deadwax with no undo.
  */
 export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
   const [summary, setSummary] = useState<DeletionSummary | null>(null)

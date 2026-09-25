@@ -207,7 +207,7 @@ def review_store(tmp_path):
 
 def test_first_seen_is_the_first_time_and_import_survives_later_scans(tmp_path):
     """
-    The whole reason record_albums_seen uses INSERT OR IGNORE. An album filed by jimbrainz has
+    The whole reason record_albums_seen uses INSERT OR IGNORE. An album filed by deadwax has
     to keep saying 'import' even though every subsequent scan sees it too - otherwise the
     "something new arrived" prompt is erased by the act of looking at the library.
     """
@@ -401,7 +401,7 @@ def test_an_unmatched_job_reports_no_failures_rather_than_omitting_them():
 
 def test_review_rows_for_albums_that_are_gone_are_forgotten(tmp_path):
     """
-    A row is keyed on the path, so a folder renamed outside jimbrainz orphans it. The tab badge
+    A row is keyed on the path, so a folder renamed outside deadwax orphans it. The tab badge
     counts an orphaned import row while the album is in no scan - so the interface reports an
     album wanting attention that it can neither name nor clear.
     """

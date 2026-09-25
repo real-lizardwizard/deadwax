@@ -6,7 +6,7 @@ import { onAlbumsFiled } from '../lib/libraryEvents'
 import type { NewImportsResponse } from '../api/types'
 
 /**
- * How many albums jimbrainz has filed that you haven't looked at yet.
+ * How many albums deadwax has filed that you haven't looked at yet.
  *
  * This is the "prompt me when a release gets added" half of the metadata queue, and it exists
  * as its own tiny hook because of one constraint: the library is deliberately not scanned until

@@ -1,5 +1,5 @@
 """
-jimbrainz.
+deadwax.
 
 __version__ is the ONE place the version number lives in this repo. Everything else derives
 from it or from the git tag - docker-publish.yml reads the tag, not this file.
@@ -14,4 +14,4 @@ value here is a wrong answer to "what version are you running", which is the fir
 asked about any bug report.
 """
 
-__version__ = "0.6.20"
+__version__ = "0.6.21"

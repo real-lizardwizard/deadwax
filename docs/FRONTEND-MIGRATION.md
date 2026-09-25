@@ -56,7 +56,7 @@ ui/
   index.html             # DEV HARNESS ONLY - not built, not served. See below.
   src/
     main.tsx             # mount table: element id -> component
-    bridge.ts            # window.jimbrainz - the seam with the vanilla app
+    bridge.ts            # window.deadwax - the seam with the vanilla app
     api/                 # types.ts + one wrapper module per backend module
     components/
     hooks/               # useDownloadJobs - polling, cadence, mutations
@@ -72,7 +72,7 @@ interface/               # existing vanilla app — stays until fully replaced
 **The build input is `src/main.tsx`, not `index.html`.** While the port is incremental the
 page users get is still the hand-written `interface/index.html`, which loads the bundle as one
 extra module script. So the build emits JS, not a page, and the entry filename is pinned
-unhashed (`jimbrainz-ui.js`) because a static HTML file has to name it. Split chunks keep
+unhashed (`deadwax-ui.js`) because a static HTML file has to name it. Split chunks keep
 their hashes.
 
 When the migration finishes and Vite owns the page, delete `rollupOptions.input` and let it
@@ -87,7 +87,7 @@ Two consequences worth knowing:
   component that imports CSS has to solve that. Don't discover it by accident.
 
 `ui/index.html` is a harness for building one component in isolation with HMR. It proxies
-`/jimbrainz`, `/styles` and `/assets` to `127.0.0.1:8080`, so start the backend first, and
+`/deadwax`, `/styles` and `/assets` to `127.0.0.1:8080`, so start the backend first, and
 remember it is *not* the real page — only `npm run build` updates that.
 
 ### Dockerfile
@@ -120,7 +120,7 @@ precisely the ported half of the interface.
 ## API surface to type — done
 
 All of this is typed in `ui/src/api/types.ts` with per-module wrappers beside it. Kept here as
-the reference. All prefixed `/jimbrainz/`.
+the reference. All prefixed `/deadwax/`.
 
 | endpoint | method | notes |
 | --- | --- | --- |
@@ -151,9 +151,9 @@ than from the current JS.
 
 Users have these set; don't orphan them.
 
-- `jimbrainz-download-defaults` — `{formatPreference, autoGrab}`, JSON, possibly partial
-- `jimbrainz-release-columns` — `{order, visible, widths}`, JSON
-- `jimbrainz-log-open` — the literal string `'1'`/`'0'`, **not** JSON. Writing `true` here
+- `deadwax-download-defaults` — `{formatPreference, autoGrab}`, JSON, possibly partial
+- `deadwax-release-columns` — `{order, visible, widths}`, JSON
+- `deadwax-log-open` — the literal string `'1'`/`'0'`, **not** JSON. Writing `true` here
   reads back as closed on any un-ported page.
 
 All three are handled in `ui/src/state/persisted.ts`. One thing is deliberately still owed:
@@ -221,7 +221,7 @@ Profiled, with numbers, in CLAUDE.md. Both are trivially reintroducible in Preac
 served frontend, and the Dockerfile's `ui` stage builds it. Until then both coexist — that's
 expected, not a mess to clean up prematurely.
 
-**The practical progress meter is `ui/src/bridge.ts`.** Every entry on `window.jimbrainz` is a
+**The practical progress meter is `ui/src/bridge.ts`.** Every entry on `window.deadwax` is a
 call the ported code still has to make into the old app, or vice versa. It holds two today
 (`refreshDownloads`, `closeOtherDropdowns`). Adding one is sometimes the right call for a
 panel in flight; leaving one is not. When the bridge is empty and `main.js` has nothing left

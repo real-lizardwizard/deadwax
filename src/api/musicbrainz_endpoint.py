@@ -335,7 +335,7 @@ class MusicBrainzClient:
         """
         Artists by name, for when the files don't say which one they are.
 
-        The fallback behind read_artist_mbid: anything jimbrainz filed carries the id in its
+        The fallback behind read_artist_mbid: anything deadwax filed carries the id in its
         tags, and a library that predates it does not. A name is a far weaker key - there are
         several bands called Nirvana - so the caller checks the answer before believing it.
 

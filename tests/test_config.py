@@ -150,7 +150,7 @@ DOTENV = "SLSKD_URL=http://from-dotenv:5030\nSLSKD_APIKEY=dotenv-key\n"
 
 def test_the_environment_beats_dotenv(tmp_path):
     """
-    The whole basis for configuring jimbrainz from a compose `environment:` block. python-dotenv
+    The whole basis for configuring deadwax from a compose `environment:` block. python-dotenv
     does not override variables that already exist, and switching it to `override=True` would
     silently invert this - the .env would start winning and a compose file would stop working
     with nothing to indicate why.
@@ -203,7 +203,7 @@ def test_nothing_configured_reports_no_source(tmp_path):
 
 # ---------------------------------------------------------------- the MusicBrainz user agent
 #
-# You say who you are; jimbrainz says what it is. The complaint that prompted this was having to
+# You say who you are; deadwax says what it is. The complaint that prompted this was having to
 # write the whole user agent by hand - including a version number nobody remembers to update.
 
 import pytest  # noqa: E402
@@ -221,16 +221,16 @@ def use(monkeypatch, email=None, useragent=None):
 def test_the_user_agent_is_the_email_plus_the_version_that_is_running(monkeypatch):
     use(monkeypatch, email="me@example.com")
 
-    assert Config.musicbrainz_user_agent() == f"jimbrainz/{__version__} ( me@example.com )"
+    assert Config.musicbrainz_user_agent() == f"deadwax/{__version__} ( me@example.com )"
 
 
 def test_the_version_comes_from_the_package_rather_than_anyone_typing_it():
-    assert build_user_agent("me@example.com") == f"jimbrainz/{__version__} ( me@example.com )"
+    assert build_user_agent("me@example.com") == f"deadwax/{__version__} ( me@example.com )"
 
 
 @pytest.mark.parametrize("written, contact", [
     #? this repo's own dev .env, in the shape MusicBrainz documents
-    ("jimbrainzDev/1.0 (dev-test@example.com)", "dev-test@example.com"),
+    ("deadwaxDev/1.0 (dev-test@example.com)", "dev-test@example.com"),
     #? the format the example compose file used to suggest
     ("AppName/1.1.1 ( github.com/YourUsername )", "github.com/YourUsername"),
     ("me@example.com", "me@example.com"),
@@ -254,7 +254,7 @@ def test_an_install_configured_the_old_way_keeps_working_and_reports_the_real_ve
     use(monkeypatch, useragent="lidbrainz/0.2.1 ( me@example.com )")
 
     assert Config.musicbrainz_contact() == ("me@example.com", "MUSICBRAINZ_USERAGENT")
-    assert Config.musicbrainz_user_agent() == f"jimbrainz/{__version__} ( me@example.com )"
+    assert Config.musicbrainz_user_agent() == f"deadwax/{__version__} ( me@example.com )"
 
 
 def test_the_email_wins_over_an_old_user_agent(monkeypatch):
@@ -293,7 +293,7 @@ def test_ordinary_contacts_pass(value):
     ("me at example dot com", "has spaces"),
     ("(me@example.com)", "without brackets"),
     #? somebody pasting their whole old user agent into the new field
-    ("jimbrainz/0.6 (me@example.com)", "without brackets"),
+    ("deadwax/0.6 (me@example.com)", "without brackets"),
     ("nobody", "doesn't look like"),
     ("mé@example.com", "plain ASCII"),
 ])
@@ -314,4 +314,30 @@ def test_the_musicbrainz_client_is_built_with_it(monkeypatch):
         await client.close_client()
         return agent
 
-    assert asyncio.run(built_agent()) == f"jimbrainz/{__version__} ( me@example.com )"
+    assert asyncio.run(built_agent()) == f"deadwax/{__version__} ( me@example.com )"
+
+
+# --- the database after the rename (jimbrainz -> deadwax, v0.6.21) ---------------------------
+#
+# An install that never set DB_PATH has everything in /config/jimbrainz.db. A default that
+# moved to an empty file would look like a wiped install, so the old file is used where it is.
+
+from src.config import default_db_path  # noqa: E402
+
+
+def test_a_fresh_install_gets_the_new_name(tmp_path):
+    new, legacy = tmp_path / "deadwax.db", tmp_path / "jimbrainz.db"
+    assert default_db_path(str(new), str(legacy)) == str(new)
+
+
+def test_an_install_from_before_the_rename_keeps_its_database(tmp_path):
+    new, legacy = tmp_path / "deadwax.db", tmp_path / "jimbrainz.db"
+    legacy.write_bytes(b"")
+    assert default_db_path(str(new), str(legacy)) == str(legacy)
+
+
+def test_once_the_new_database_exists_it_wins(tmp_path):
+    new, legacy = tmp_path / "deadwax.db", tmp_path / "jimbrainz.db"
+    legacy.write_bytes(b"")
+    new.write_bytes(b"")
+    assert default_db_path(str(new), str(legacy)) == str(new)

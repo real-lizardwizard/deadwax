@@ -65,7 +65,7 @@ export interface SettingGroup {
 }
 
 export interface ServerSettings {
-  /** The running jimbrainz version, from src/__init__.py. Rendered in the tab's footer. */
+  /** The running deadwax version, from src/__init__.py. Rendered in the tab's footer. */
   version: string
   /** Always false today. Present so the tab states it rather than implying it. */
   editable: boolean

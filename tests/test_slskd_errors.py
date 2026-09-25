@@ -1,5 +1,5 @@
 """
-What jimbrainz says when slskd refuses a search, and what it says about slskd's connection.
+What deadwax says when slskd refuses a search, and what it says about slskd's connection.
 
 This is the second entry on the "what the tests cannot tell you" list coming true, after
 "Completed, Rejected". Searching a live slskd failed with

@@ -7,7 +7,7 @@
  * user had typed a bad search.
  */
 
-const BASE = '/jimbrainz'
+const BASE = '/deadwax'
 
 /** A non-2xx response. `detail` is FastAPI's HTTPException detail when it sent one. */
 export class ApiError extends Error {

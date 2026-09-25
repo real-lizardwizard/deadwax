@@ -17,7 +17,7 @@ The desired tags come from organizer.tag_values(), shared with the download path
 preview cannot drift away from the write it is previewing.
 
 Everything here is guarded on staying inside LIBRARY_PATH. This is the second piece of code
-in jimbrainz that writes to the user's filesystem, and unlike the organizer it operates on
+in deadwax that writes to the user's filesystem, and unlike the organizer it operates on
 files the user already had rather than ones we just downloaded - so the cost of getting it
 wrong is somebody's actual music collection.
 """

@@ -13,7 +13,7 @@ const { execFileSync } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 
 const UI = path.resolve(__dirname, '..');
-const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'jimbrainz-queue-'));
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-queue-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/metadataQueue.ts', '--outDir', OUT, '--module', 'commonjs',
@@ -35,7 +35,7 @@ const album = (over) => ({
   needs_attention: false, severity: 0, imported: false, reviewed: false, ...over,
 });
 
-// exactly the case that was broken: jimbrainz filed it, its metadata is perfect, nobody looked
+// exactly the case that was broken: deadwax filed it, its metadata is perfect, nobody looked
 const cleanImport = album({ path: 'a/clean', imported: true, reviewed: false });
 const withIssues  = album({ path: 'a/broken', issues: ['no_release'], needs_attention: true, severity: 3 });
 const seenImport  = album({ path: 'a/seen', imported: true, reviewed: true });

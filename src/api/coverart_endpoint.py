@@ -96,7 +96,7 @@ class CoverArtClient:
         sent as the old one until a restart. Falls back rather than refusing - art is a nicety,
         and failing a retag because no contact was set would be out of proportion.
         """
-        return Config.musicbrainz_user_agent() or f"jimbrainz/{__version__}"
+        return Config.musicbrainz_user_agent() or f"deadwax/{__version__}"
 
     async def close_client(self) -> None:
         if self.client and not self.client.is_closed:

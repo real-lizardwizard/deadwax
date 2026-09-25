@@ -12,7 +12,7 @@ was being built), and re-fetching to organize a finished download would be a sil
 dependency to introduce.
 
 **Album review state.** Deliberately the *smallest* thing that makes the metadata queue work:
-when each album was first seen, whether jimbrainz filed it or merely found it, and which of
+when each album was first seen, whether deadwax filed it or merely found it, and which of
 its problems you have said you're happy with. What is wrong with an album is never stored -
 metadata_health.py derives that from the scan every time - because a written-down "needs
 attention" flag is a flag that goes stale the moment something fixes the album without
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS album_review (
     album_path      TEXT PRIMARY KEY,
     artist          TEXT,
     album           TEXT,
-    -- 'import' = jimbrainz filed it, so it is new and worth prompting about. 'scan' = it was
+    -- 'import' = deadwax filed it, so it is new and worth prompting about. 'scan' = it was
     -- already there when we looked.
     source          TEXT NOT NULL DEFAULT 'scan',
     first_seen      TEXT NOT NULL,
@@ -411,7 +411,7 @@ class JobStore:
 
         `INSERT OR IGNORE` is doing real work here rather than being defensive: `first_seen`
         has to mean the first time, and `source` has to keep saying 'import' for an album
-        jimbrainz filed even though every later scan sees it too. An album's row is written
+        deadwax filed even though every later scan sees it too. An album's row is written
         once and then only ever updated by an explicit action of the user's.
 
         `albums` are dicts carrying at least `path`; `artist` and `album` are stored purely so
@@ -624,7 +624,7 @@ class JobStore:
 
     async def new_import_summary(self, limit: int = 8) -> dict:
         """
-        Albums jimbrainz filed that you haven't looked at yet.
+        Albums deadwax filed that you haven't looked at yet.
 
         The one thing in the queue that can be answered without scanning the library, which is
         the whole reason the import source is recorded at all: the library is deliberately not

@@ -1,5 +1,5 @@
 """
-Editing tags by hand - the fourth thing in jimbrainz that writes to the user's filesystem.
+Editing tags by hand - the fourth thing in deadwax that writes to the user's filesystem.
 
 What these protect is mostly what it REFUSES, the same as the retag tests: a filename that is
 really a path, a tag that isn't on the list, a value that can't be what it claims, and any batch

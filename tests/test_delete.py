@@ -1,7 +1,7 @@
 """
 Deleting an album.
 
-The only code in jimbrainz that removes something the user did not just download, and the
+The only code in deadwax that removes something the user did not just download, and the
 only one with no undo - so nearly all of this is about what it refuses to do. The happy
 path is one test; the rest are guards.
 """

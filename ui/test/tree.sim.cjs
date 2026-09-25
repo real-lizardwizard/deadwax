@@ -13,7 +13,7 @@ const { execFileSync } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 
 const UI = path.resolve(__dirname, '..');
-const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'jimbrainz-tree-'));
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-tree-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/libraryTree.ts', 'src/lib/trackFields.ts', '--outDir', OUT, '--module', 'commonjs',

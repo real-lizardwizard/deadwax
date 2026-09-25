@@ -11,7 +11,7 @@ set -e
 
 PUID=${PUID:-1000}
 PGID=${PGID:-1000}
-APP_USER=jimbrainz
+APP_USER=deadwax
 
 if [ "$(id -u)" != "0" ]; then
     # Already unprivileged (docker run --user, or a platform that enforces it). Nothing to

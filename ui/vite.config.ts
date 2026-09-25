@@ -29,7 +29,7 @@ export default defineConfig({
         // `no-cache` for it - otherwise upgrading the container leaves people on the old
         // bundle, which is the "I upgraded and nothing changed" bug that middleware exists
         // to prevent.
-        entryFileNames: 'jimbrainz-ui.js',
+        entryFileNames: 'deadwax-ui.js',
         // Split chunks and assets keep their hashes and are served immutable. Same file
         // contents always mean the same URL, so caching them hard is safe.
         chunkFileNames: 'assets/[name]-[hash].js',
@@ -41,7 +41,7 @@ export default defineConfig({
   server: {
     proxy: {
       // dev against the real FastAPI backend, so no CORS handling is needed
-      '/jimbrainz': 'http://127.0.0.1:8080',
+      '/deadwax': 'http://127.0.0.1:8080',
       // the dev harness reuses the real stylesheet and fonts rather than a copy that can
       // drift out of sync with what production actually serves
       '/styles': 'http://127.0.0.1:8080',

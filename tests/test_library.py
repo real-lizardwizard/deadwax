@@ -131,7 +131,7 @@ def test_identity_follows_the_mbid_not_the_folder_name(tmp_path, clear_cache):
 
 def test_untagged_folders_stay_separate_albums(tmp_path, clear_cache):
     """
-    No MBIDs at all, as in any library predating jimbrainz. Two folders must stay two
+    No MBIDs at all, as in any library predating deadwax. Two folders must stay two
     albums - merging them because their tags look similar would hide something the user
     deliberately keeps apart.
     """
@@ -264,7 +264,7 @@ def make_client(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
     app = FastAPI()
-    app.include_router(library_route.router, prefix="/jimbrainz/library")
+    app.include_router(library_route.router, prefix="/deadwax/library")
     return TestClient(app)
 
 
@@ -273,7 +273,7 @@ def test_art_endpoint_serves_the_cover(tmp_path, monkeypatch, clear_cache):
     write_image(directory / "cover.jpg", b"\xff\xd8\xff real bytes")
 
     client = make_client(tmp_path, monkeypatch)
-    response = client.get("/jimbrainz/library/art",
+    response = client.get("/deadwax/library/art",
                           params={"album": "Tame Impala/The Slow Rush (2020)"})
 
     assert response.status_code == 200
@@ -284,7 +284,7 @@ def test_art_endpoint_serves_the_cover(tmp_path, monkeypatch, clear_cache):
 def test_art_endpoint_404s_when_there_is_no_art(tmp_path, monkeypatch, clear_cache):
     seed_album(tmp_path, "Tame Impala", "The Slow Rush (2020)", "The Slow Rush")
     client = make_client(tmp_path, monkeypatch)
-    assert client.get("/jimbrainz/library/art",
+    assert client.get("/deadwax/library/art",
                       params={"album": "Tame Impala/The Slow Rush (2020)"}).status_code == 404
 
 
@@ -303,7 +303,7 @@ def test_art_endpoint_refuses_to_read_outside_the_library(tmp_path, monkeypatch,
     seed_album(tmp_path, "Tame Impala", "The Slow Rush (2020)", "The Slow Rush")
     client = make_client(tmp_path, monkeypatch)
 
-    response = client.get("/jimbrainz/library/art", params={"album": attempt})
+    response = client.get("/deadwax/library/art", params={"album": attempt})
     assert response.status_code == 404
 
 
@@ -318,7 +318,7 @@ def test_art_endpoint_refuses_a_symlink_pointing_out_of_the_library(tmp_path, mo
     os.symlink(outside, tmp_path / "escape")
 
     client = make_client(tmp_path, monkeypatch)
-    assert client.get("/jimbrainz/library/art", params={"album": "escape"}).status_code == 404
+    assert client.get("/deadwax/library/art", params={"album": "escape"}).status_code == 404
 
 
 # ---------------------------------------------------------------- picking the RIGHT picture

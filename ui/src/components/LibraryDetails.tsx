@@ -498,7 +498,7 @@ function AlbumDetails(
             : <span class="text yellow">not tagged with a MusicBrainz release</span>],
           ['Folder', <span class="details-path">{album.path}</span>],
           ['First seen', album.first_seen
-            ? `${new Date(album.first_seen).toLocaleDateString()}${album.imported ? ', filed by jimbrainz' : ''}`
+            ? `${new Date(album.first_seen).toLocaleDateString()}${album.imported ? ', filed by deadwax' : ''}`
             : null],
         ]}
       />

@@ -223,7 +223,7 @@ function thaw(panel) {
   size already was. A panel whose remembered spot is off the edge of today's window comes back
   at the edge instead of where it was.
 */
-const SIZE_STORAGE_KEY = 'jimbrainz-panel-sizes';
+const SIZE_STORAGE_KEY = 'deadwax-panel-sizes';
 
 function readSizes() {
     try {

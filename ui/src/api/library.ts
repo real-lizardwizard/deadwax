@@ -94,7 +94,7 @@ export function applyTagEdits(albumPath: string, edits: TrackTagEdit[]): Promise
 /* ===== the metadata queue ===== */
 
 /**
- * Albums jimbrainz has filed that you haven't looked at yet.
+ * Albums deadwax has filed that you haven't looked at yet.
  *
  * Cheap on purpose — one indexed table read, no filesystem. Safe to call on page load, which
  * `listAlbums` deliberately is not.

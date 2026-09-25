@@ -9,7 +9,7 @@
  * Keep this small and keep it shrinking. Every entry is a piece of the old app the new one
  * still depends on, so an empty bridge is the signal that the migration is done.
  */
-export interface JimbrainzBridge {
+export interface DeadwaxBridge {
   /**
    * Closes the log dropdown. Set by main.js, called here when the downloads panel opens -
    * only one of the two should ever be open at a time. (The profile dropdown it also closed
@@ -51,7 +51,7 @@ export interface JimbrainzBridge {
 
 declare global {
   interface Window {
-    jimbrainz?: JimbrainzBridge
+    deadwax?: DeadwaxBridge
   }
 }
 
@@ -60,7 +60,7 @@ declare global {
  * Every call through the bridge is user-initiated and therefore long after load, but the
  * object itself has to be safe to touch first.
  */
-export function bridge(): JimbrainzBridge {
-  window.jimbrainz ??= {}
-  return window.jimbrainz
+export function bridge(): DeadwaxBridge {
+  window.deadwax ??= {}
+  return window.deadwax
 }

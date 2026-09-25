@@ -12,7 +12,7 @@ Two rules shape everything here:
   share a musicbrainz_albumid, however they happen to be named, so renaming a folder by hand
   doesn't split an album in two.
 
-  A folder we can't identify is its own album, not a match. Libraries that predate jimbrainz
+  A folder we can't identify is its own album, not a match. Libraries that predate deadwax
   have no MBIDs at all, and guessing that two untagged folders are "really" the same release
   would merge things the user deliberately keeps apart.
 
@@ -206,7 +206,7 @@ def find_artist_art(directory: Path) -> dict:
 
     Matched on the STEM with any image extension, the way every reader of these files works -
     Navidrome's ArtistArtPriority is literally `artist.*`. So a folder holding artist.png is
-    already served, and jimbrainz must not offer to "add" a picture that is plainly there.
+    already served, and deadwax must not offer to "add" a picture that is plainly there.
     """
     try:
         entries = sorted(p for p in directory.iterdir() if p.is_file())
@@ -244,7 +244,7 @@ def read_artist_mbid(directory: Path) -> str | None:
     The artist's MusicBrainz id, from the tags of a track in one of their albums.
 
     Cheaper and far more exact than searching MusicBrainz by name, which cannot tell three
-    bands called Nirvana apart. Anything jimbrainz filed carries the id; a library that predates
+    bands called Nirvana apart. Anything deadwax filed carries the id; a library that predates
     it may not, and then there is nothing here to find and the caller falls back to a search.
     """
     try:
@@ -397,7 +397,7 @@ def edition_from_dirname(name: str) -> str:
     """
     Pull the `[...]` suffix back out of a folder the organizer created.
 
-    build_album_dirname() writes the edition there, so for anything jimbrainz filed this is
+    build_album_dirname() writes the edition there, so for anything deadwax filed this is
     the label the user already sees on disk, and reusing it keeps the UI and the filesystem
     telling the same story. Folders from elsewhere simply have no suffix.
 
@@ -799,7 +799,7 @@ def delete_album(library_root: str, album_path: str) -> dict:
     """
     Remove an album folder and everything in it. There is no undo.
 
-    This is the only code in jimbrainz that deletes anything the user did not just download,
+    This is the only code in deadwax that deletes anything the user did not just download,
     so every guard is deliberate:
 
       - LIBRARY_PATH must be configured, and the path must be non-empty.

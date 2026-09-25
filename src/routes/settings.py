@@ -217,7 +217,7 @@ def _musicbrainz_rows() -> list[dict]:
             required=source != "MUSICBRAINZ_USERAGENT",
             effect=(
                 "Your email address. MusicBrainz asks every app for a way to reach whoever is "
-                "making its requests, and rate limits the ones without - jimbrainz writes the "
+                "making its requests, and rate limits the ones without - deadwax writes the "
                 f"rest of the user agent itself, so it always names the version running. {sent}"
             ),
             status="error" if email_problem else None,
@@ -229,21 +229,21 @@ def _musicbrainz_rows() -> list[dict]:
     #? Nobody configuring a new install should be shown a setting they no longer need.
     legacy = Config.MUSICBRAINZ_USERAGENT
     if legacy or "MUSICBRAINZ_USERAGENT" in Config.OVERRIDDEN:
-        old = "The old way of identifying jimbrainz: a whole user agent, written by hand."
+        old = "The old way of identifying deadwax: a whole user agent, written by hand."
         status, detail = "ok", None
 
         if source == "MUSICBRAINZ_EMAIL":
             effect = f"{old} Ignored now that MUSICBRAINZ_EMAIL is set, so you can remove it."
         elif source == "MUSICBRAINZ_USERAGENT":
             effect = (
-                f"{old} Only its contact, {contact}, is still used - jimbrainz fills in its "
+                f"{old} Only its contact, {contact}, is still used - deadwax fills in its "
                 f"own name and version now. Put that address in MUSICBRAINZ_EMAIL and this "
                 f"one can go."
             )
         elif legacy:
             effect, status = old, "error"
             detail = (
-                "There's no contact in it that jimbrainz can find, so it is sent exactly as "
+                "There's no contact in it that deadwax can find, so it is sent exactly as "
                 "written - and MusicBrainz rate limits a user agent without one. Set "
                 "MUSICBRAINZ_EMAIL instead."
             )
@@ -319,7 +319,7 @@ async def settings():
             {
                 "id": "connections",
                 "label": "Connections",
-                "note": "Where jimbrainz fetches metadata and downloads from.",
+                "note": "Where deadwax fetches metadata and downloads from.",
                 "settings": [
                     _setting(
                         "SLSKD_URL",
@@ -360,7 +360,7 @@ async def settings():
                         effect=(
                             "The other, and the one whose artwork is voted on by the people "
                             "using it. fanart.tv issues this key per application, so it has to "
-                            "be registered by you at fanart.tv rather than shipped with jimbrainz"
+                            "be registered by you at fanart.tv rather than shipped with deadwax"
                         ),
                     ),
                     _setting(
@@ -387,7 +387,7 @@ async def settings():
                     _setting(
                         "SLSKD_DOWNLOAD_PATH",
                         Config.SLSKD_DOWNLOAD_PATH,
-                        effect="Where slskd writes finished downloads, so jimbrainz can find them",
+                        effect="Where slskd writes finished downloads, so deadwax can find them",
                         status=download_status,
                         detail=download_detail,
                     ),

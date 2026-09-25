@@ -1,5 +1,5 @@
 /**
- * The jimbrainz backend, in types.
+ * The deadwax backend, in types.
  *
  * Derived from the server's own definitions, NOT from the current JS - the vanilla frontend
  * reads some fields loosely and omits others entirely, so copying it would enshrine its
@@ -154,7 +154,7 @@ export interface Candidate {
    */
   upload_speed: number
   /**
-   * What jimbrainz actually measured from this peer, in BYTES/sec, or absent.
+   * What deadwax actually measured from this peer, in BYTES/sec, or absent.
    *
    * The number `upload_speed` only pretends to be: the rate while bytes were genuinely
    * moving on transfers we ran ourselves, with queue time excluded (src/peer_speed.py).
@@ -415,7 +415,7 @@ export interface LibraryAlbum {
   severity: number
   /** ISO timestamp of when the album was first recorded, or null when nothing remembers it. */
   first_seen: string | null
-  /** jimbrainz filed this album rather than finding it. What the new-import prompt counts. */
+  /** deadwax filed this album rather than finding it. What the new-import prompt counts. */
   imported: boolean
   /** You've looked at it since. Doesn't clear its issues — see /queue/reviewed. */
   reviewed: boolean
@@ -437,7 +437,7 @@ export interface MetadataQueueSummary {
   total: number
   /** Outstanding count per issue code. Ignored issues are excluded. */
   by_issue: Record<string, number>
-  /** Albums jimbrainz filed that haven't been looked at yet. */
+  /** Albums deadwax filed that haven't been looked at yet. */
   new_imports: number
   ignored_albums: number
 }
@@ -514,7 +514,7 @@ export interface TrackDetailsResponse {
 }
 
 /**
- * GET /library/queue/new_imports — albums jimbrainz filed that you haven't looked at.
+ * GET /library/queue/new_imports — albums deadwax filed that you haven't looked at.
  *
  * The only part of the queue answerable without a scan, which is why it's a separate endpoint:
  * the library isn't read until its tab is opened, so a prompt that needed a scan would either
@@ -693,7 +693,7 @@ export interface DeleteResult extends DeletionSummary {
 
 /* ===== interface_logs ===== */
 
-export type LogSource = 'musicbrainz' | 'slskd' | 'jimbrainz' | (string & {})
+export type LogSource = 'musicbrainz' | 'slskd' | 'deadwax' | (string & {})
 
 /** Python levelnames - src/logger.py sends record.levelname straight through. */
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL' | (string & {})

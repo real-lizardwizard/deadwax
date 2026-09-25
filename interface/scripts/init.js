@@ -1,7 +1,7 @@
 import {convertTime, sleep} from './utils.js';
 
 async function pingMusicbrainz() {
-    const response = await fetch(`/jimbrainz/search_musicbrainz/ping`);
+    const response = await fetch(`/deadwax/search_musicbrainz/ping`);
 
     if (!response.ok) {
         const error = await response.json();
@@ -49,7 +49,7 @@ async function checkMusicbrainzPing() {
 }
 
 async function pingSlskd() {
-    const response = await fetch(`/jimbrainz/monitor_slskd/ping`);
+    const response = await fetch(`/deadwax/monitor_slskd/ping`);
 
     if (!response.ok) {
         const error = await response.json();
@@ -177,7 +177,7 @@ async function initEventStream({ refreshServerConfig }) {
         appendEvent('INFO', 'Loaded server config', 'slskd');
     }
 
-    eventSource = new EventSource('/jimbrainz/interface_logs/interface_logs');
+    eventSource = new EventSource('/deadwax/interface_logs/interface_logs');
     eventSource.onerror = function(error){
         const eventItem = appendEvent('ERROR', 'Failed to connect to backend');
 

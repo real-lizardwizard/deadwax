@@ -18,7 +18,7 @@ const os = require('os');
 const path = require('path');
 
 const UI = path.resolve(__dirname, '..');
-const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'jimbrainz-speed-'));
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-speed-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/speed.ts', '--outDir', OUT, '--module', 'commonjs',

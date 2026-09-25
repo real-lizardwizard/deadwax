@@ -111,7 +111,7 @@ def test_the_archive_is_told_who_is_asking_and_which_version(monkeypatch):
 
     _, seen = fetch(jpeg)
 
-    assert seen[0].headers["user-agent"] == f"jimbrainz/{__version__} ( me@example.com )"
+    assert seen[0].headers["user-agent"] == f"deadwax/{__version__} ( me@example.com )"
 
 
 def test_a_contact_changed_in_the_settings_tab_is_sent_without_a_restart(monkeypatch):

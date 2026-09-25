@@ -68,7 +68,7 @@ export function formatAge(unixSeconds: number | null | undefined, now = Date.now
  */
 export function albumArtUrl(album: { path: string; art_mtime?: number }): string {
   const version = album.art_mtime ?? 0
-  return `/jimbrainz/library/art?album=${encodeURIComponent(album.path)}&v=${version}`
+  return `/deadwax/library/art?album=${encodeURIComponent(album.path)}&v=${version}`
 }
 
 
@@ -80,5 +80,5 @@ export function albumArtUrl(album: { path: string; art_mtime?: number }): string
  */
 export function artistArtUrl(path: string, kind: string, version?: number | string): string {
   const bust = version === undefined ? '' : `&v=${encodeURIComponent(String(version))}`
-  return `/jimbrainz/library/artist/art?artist=${encodeURIComponent(path)}&kind=${encodeURIComponent(kind)}${bust}`
+  return `/deadwax/library/artist/art?artist=${encodeURIComponent(path)}&kind=${encodeURIComponent(kind)}${bust}`
 }

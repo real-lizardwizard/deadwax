@@ -52,7 +52,7 @@ export const trackNodeId = (album: LibraryAlbum, track: LibraryTrack) =>
 /**
  * When an album arrived, in unix seconds, or 0 when nothing says.
  *
- * The EARLIER of two imperfect clocks. `first_seen` is when jimbrainz first recorded the album:
+ * The EARLIER of two imperfect clocks. `first_seen` is when deadwax first recorded the album:
  * exact for anything filed or found since install, but every album that was already there on
  * the first scan shares that one moment. The folder's mtime is when its contents last changed:
  * usually when it was ripped or downloaded, though a cover added later moves it. The earlier of

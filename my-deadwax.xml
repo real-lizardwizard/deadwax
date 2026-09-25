@@ -1,17 +1,17 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>jimbrainz</Name>
-  <Repository>ghcr.io/real-lizardwizard/jimbrainz:latest</Repository>
-  <Registry>https://github.com/real-lizardwizard/jimbrainz/pkgs/container/jimbrainz</Registry>
+  <Name>deadwax</Name>
+  <Repository>ghcr.io/real-lizardwizard/deadwax:latest</Repository>
+  <Registry>https://github.com/real-lizardwizard/deadwax/pkgs/container/deadwax</Registry>
   <Network>bridge</Network>
   <Privileged>false</Privileged>
-  <Support>https://github.com/real-lizardwizard/jimbrainz</Support>
-  <Project>https://github.com/real-lizardwizard/jimbrainz</Project>
+  <Support>https://github.com/real-lizardwizard/deadwax</Support>
+  <Project>https://github.com/real-lizardwizard/deadwax</Project>
   <Overview>search bar for musicbrainz that downloads through slskd</Overview>
   <Category>Tools: Status:Stable</Category>
   <WebUI>http://[IP]:[PORT:8080]</WebUI>
   <TemplateURL>false</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/real-lizardwizard/jimbrainz/refs/heads/main/interface/assets/icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/real-lizardwizard/deadwax/refs/heads/main/interface/assets/icon.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>
@@ -22,7 +22,7 @@
   <Config Name="WebUI Port" Target="8080" Default="22000" Mode="tcp" Description="Port of the web ui" Type="Port" Display="always" Required="true" Mask="false">22000</Config>
   <Config Name="slskd URL" Target="SLSKD_URL" Default="http://localhost:5030" Mode="" Description="url of your slskd instance" Type="Variable" Display="always" Required="true" Mask="false"></Config>
   <Config Name="slskd API key" Target="SLSKD_APIKEY" Default="" Mode="" Description="API key for your slskd instance" Type="Variable" Display="always" Required="true" Mask="true"></Config>
-  <Config Name="MusicBrainz contact email" Target="MUSICBRAINZ_EMAIL" Default="" Mode="" Description="Your email address. MusicBrainz asks every app for a contact; jimbrainz writes the rest of its user agent itself, version included." Type="Variable" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="MusicBrainz contact email" Target="MUSICBRAINZ_EMAIL" Default="" Mode="" Description="Your email address. MusicBrainz asks every app for a contact; deadwax writes the rest of its user agent itself, version included." Type="Variable" Display="always" Required="true" Mask="false"></Config>
   <Config Name="cover art size" Target="COVER_ART_SIZE" Default="500" Mode="" Description="250 | 500 | 1200 | full. How big a cover to save from the Cover Art Archive - full is the original upload, often several MB. Also changeable in the settings tab." Type="Variable" Display="advanced" Required="false" Mask="false">500</Config>
   <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID to run as. On unraid this is usually 99 (nobody). Match slskd so file ownership stays consistent." Type="Variable" Display="always" Required="false" Mask="false">99</Config>
   <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID to run as. On unraid this is usually 100 (users). Match slskd so file ownership stays consistent." Type="Variable" Display="always" Required="false" Mask="false">100</Config>

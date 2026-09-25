@@ -1,7 +1,7 @@
 """
 Tests for the library organizer.
 
-This is the only code in jimbrainz that writes to the user's filesystem, so it gets the most
+This is the only code in deadwax that writes to the user's filesystem, so it gets the most
 paranoid coverage: everything below runs against real files in a pytest tmp_path, and the
 destructive cases (overwrite, collision, move-vs-copy) are asserted explicitly rather than
 assumed.

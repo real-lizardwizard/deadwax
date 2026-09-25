@@ -2650,7 +2650,7 @@ span.red { color: var(--red-text); }
 /*
   A cancel that has been asked for but not yet confirmed by the server.
 
-  Cancelling costs two sequential round-trips - one to jimbrainz which calls on to slskd,
+  Cancelling costs two sequential round-trips - one to deadwax which calls on to slskd,
   then a poll to see the result - and for both of them the row used to look exactly as it did
   before the click. Dimming it, plus the "cancelling…" status the row now renders, is what
   makes the button feel connected to anything. The progress bar keeps moving underneath
@@ -5027,7 +5027,7 @@ span.red { color: var(--red-text); }
 
 /*
  * Its own window rather than a browser confirm(), which can't show any of what is about to
- * go. This is the one action in jimbrainz with no undo, so it is worth the space to name the
+ * go. This is the one action in deadwax with no undo, so it is worth the space to name the
  * album, the folder, the track count and anything in there that isn't audio or artwork.
  *
  * Red-bordered and above the metadata editor, since it can be opened from a row behind it.
@@ -5217,7 +5217,7 @@ span.red { color: var(--red-text); }
 }
 
 /*
- * "new" - an album jimbrainz has just filed that you haven't looked at yet.
+ * "new" - an album deadwax has just filed that you haven't looked at yet.
  *
  * Deliberately not amber like the issue chips. Nothing is WRONG with a new album; the tab
  * badge is counting it and this is how you find which one it means, which was the whole

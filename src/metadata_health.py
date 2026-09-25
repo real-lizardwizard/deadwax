@@ -5,7 +5,7 @@ The library view could tell you what you have. It could not tell you what was *w
 what you have - so finding the album that arrived with no MusicBrainz id, or the one still
 filed under its pressing's year rather than the album's, meant opening the editor on every
 album in turn and reading its current-state line. That is the same "open it and check"
-busywork that made Lidarr's release picker useless, reproduced inside jimbrainz.
+busywork that made Lidarr's release picker useless, reproduced inside deadwax.
 
 Everything here is a pure function over the album dicts library.py already produces. No
 filesystem, no MusicBrainz, so the whole rule set is testable from fixtures - the same reason
@@ -248,7 +248,7 @@ def attach_issues(albums: list[dict], reviews: dict[str, dict] | None = None) ->
         album["needs_attention"] = bool(remaining)
         album["severity"] = worst_severity(remaining)
         album["first_seen"] = review.get("first_seen")
-        #? filed by jimbrainz rather than found sitting there, and not yet looked at. This is
+        #? filed by deadwax rather than found sitting there, and not yet looked at. This is
         #? what the tab badge counts, and the only reason the import source is recorded.
         album["imported"] = review.get("source") == "import"
         album["reviewed"] = bool(review.get("reviewed_at"))

@@ -62,7 +62,7 @@ const SORT_HINTS: Record<TreeSort, string> = {
   artist: "Artists A-Z, and each artist's albums in the order they came out",
   album: "Every album by title, whoever it's by",
   released: "The album's own year - the earliest of the editions you hold",
-  added: "When jimbrainz first saw each album, or its folder's date if that's earlier",
+  added: "When deadwax first saw each album, or its folder's date if that's earlier",
 }
 
 const DIRECTION_LABELS: Record<TreeSort, Record<SortDirection, string>> = {
@@ -107,7 +107,7 @@ export function LibraryView({ active, onNavigate }: Props) {
   const [queueOnly, setQueueOnly] = useState(false)
   /** Narrowed further to one kind of issue, or null for any. */
   const [issueFilter, setIssueFilter] = useState<string | null>(null)
-  /** Only albums jimbrainz just filed that haven't been looked at — what the tab badge counts. */
+  /** Only albums deadwax just filed that haven't been looked at — what the tab badge counts. */
   const [newOnly, setNewOnly] = useState(false)
   const [order, setOrderState] = useState(initialOrder)
   const { sort, direction } = order
@@ -636,7 +636,7 @@ export function LibraryView({ active, onNavigate }: Props) {
           type="button"
           class="win-button"
           disabled={loading && !stale}
-          title="Re-read every file, ignoring the cache - for when something changed that jimbrainz couldn't see, like a retag by another program"
+          title="Re-read every file, ignoring the cache - for when something changed that deadwax couldn't see, like a retag by another program"
           onClick={() => void reload(true)}
         >
           Rescan
@@ -699,7 +699,7 @@ export function LibraryView({ active, onNavigate }: Props) {
                 <button
                   type="button"
                   class={`library-facet newly-added${newOnly ? ' active' : ''}`}
-                  title="Albums jimbrainz just filed that you haven't looked at yet"
+                  title="Albums deadwax just filed that you haven't looked at yet"
                   onClick={() => setNewOnly((on) => !on)}
                 >
                   Newly added <span class="library-facet-count">{queue.new_imports}</span>

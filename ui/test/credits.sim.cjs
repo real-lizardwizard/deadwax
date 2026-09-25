@@ -16,7 +16,7 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const { pathToFileURL } = require('url');
 
 const UI = path.resolve(__dirname, '..');
-const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'jimbrainz-credits-'));
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-credits-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/release.ts', '--outDir', OUT,

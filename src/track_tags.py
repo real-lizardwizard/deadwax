@@ -7,7 +7,7 @@ wrong one for nearly everything else - a genre MusicBrainz doesn't carry, the on
 ended up on the wrong disc, a composer credit for six songs out of twelve. James asked for this
 by name, with a selection so that one change can go to many tracks.
 
-It is the fourth thing in jimbrainz that writes to the user's filesystem, and it is built the
+It is the fourth thing in deadwax that writes to the user's filesystem, and it is built the
 same way as the other three:
 
   plan_tag_edits()     - reads every file named and works out exactly what would change.
@@ -237,7 +237,7 @@ def execute_tag_edits(plan: dict, mode: str = "dry_run") -> dict:
         try:
             audio = mutagen.File(str(directory / entry["filename"]), easy=True)
             if audio is None:
-                raise ValueError("not a format jimbrainz can tag")
+                raise ValueError("not a format deadwax can tag")
 
             for key, change in entry["changes"].items():
                 if change["to"]:

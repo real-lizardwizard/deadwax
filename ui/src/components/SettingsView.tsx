@@ -369,7 +369,7 @@ export function SettingsView({ active }: { active: boolean }) {
       <div class="settings-scroll scrollable">
         <Section
           title="Downloads"
-          note="Applied when jimbrainz ranks Soulseek candidates and when you grab one."
+          note="Applied when deadwax ranks Soulseek candidates and when you grab one."
         >
           <div class="settings-radio-group" role="radiogroup" aria-label="Format preference">
             {FORMAT_PREFERENCES.map((format) => (
@@ -615,7 +615,7 @@ export function SettingsView({ active }: { active: boolean }) {
             </Section>
 
             <div class="settings-version">
-              jimbrainz <code>v{server.version}</code>
+              deadwax <code>v{server.version}</code>
             </div>
           </>
         ) : null}

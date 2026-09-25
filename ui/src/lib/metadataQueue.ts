@@ -25,7 +25,7 @@ export function outstandingIssues(album: LibraryAlbum): string[] {
 }
 
 /**
- * An album jimbrainz filed that you haven't looked at yet. What the tab badge counts.
+ * An album deadwax filed that you haven't looked at yet. What the tab badge counts.
  *
  * Kept separate from "has issues" because they are genuinely different questions, and
  * conflating them was a real bug: a freshly imported album with perfect metadata counted
@@ -45,7 +45,7 @@ export function isNewImport(album: LibraryAlbum): boolean {
  * press is what marks it reviewed — which is the only way the badge can ever reach zero. An
  * item you are told about but cannot act on is worse than no notification at all.
  *
- * Albums jimbrainz just filed come first: those are the ones you were prompted about, and
+ * Albums deadwax just filed come first: those are the ones you were prompted about, and
  * burying a fresh import under a hundred pre-existing gaps is how the prompt stops meaning
  * anything. After that it's worst-first, then alphabetical so the order is stable between
  * scans — an album that quietly changed places would make "next" feel like it skipped

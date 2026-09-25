@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>jimbrainz</title>
+    <title>deadwax</title>
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
     <!-- THANK YOU OLIVIA !!! ^^ -->
 <link rel="stylesheet" href="styles/main.css">
+<!-- carries preferences saved under the old name across; must run before any module - see the file -->
+<script src="scripts/rename-storage.js"></script>
 </head>
 <body >   <div class="background-layer" ></div>
 <div id="main-container">
@@ -19,13 +21,13 @@
   <pre> is aria-hidden because figlet art read aloud is gibberish; #brand-compact carries the
   accessible name at every size and is only visually hidden on desktop.
 -->
-<span id="brand-compact">jimbrainz</span>
+<span id="brand-compact">deadwax</span>
 <pre class="text default" aria-hidden="true">
-     _ _           ____            _
-    | (_)_ __ ___ | __ ) _ __ __ _(_)_ __  ____
- _  | | | '_ ` _ \|  _ \| '__/ _` | | '_ \|_  /
-| |_| | | | | | | | |_) | | | (_| | | | | |/ /
- \___/|_|_| |_| |_|____/|_|  \__,_|_|_| |_|/___|
+     _                _
+  __| | ___  __ _  __| |_      ____ ___  __
+ / _` |/ _ \/ _` |/ _` \ \ /\ / / _` \ \/ /
+| (_| |  __/ (_| | (_| |\ V  V / (_| |>  <
+ \__,_|\___|\__,_|\__,_| \_/\_/ \__,_/_/\_\
 </pre>
         </div>
         <div id="general-connection-status" class="text default"></div>
@@ -188,6 +190,6 @@
   Running from source without building ui/ leaves this 404ing and the downloads panel
   missing from the page. That's the one thing to check first if downloads "disappear".
 -->
-<script type="module" src="dist/jimbrainz-ui.js"></script>
+<script type="module" src="dist/deadwax-ui.js"></script>
 </body>
 </html>

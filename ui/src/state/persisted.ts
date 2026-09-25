@@ -11,27 +11,27 @@ import type { FormatPreference } from '../api/types'
  * rather than discarding the whole blob.
  */
 export const STORAGE_KEYS = {
-  downloadDefaults: 'jimbrainz-download-defaults',
-  releaseColumns: 'jimbrainz-release-columns',
-  logOpen: 'jimbrainz-log-open',
+  downloadDefaults: 'deadwax-download-defaults',
+  releaseColumns: 'deadwax-release-columns',
+  logOpen: 'deadwax-log-open',
   /**
    * Preferences owned by the settings tab that aren't download defaults.
    *
-   * A NEW key rather than more fields on jimbrainz-download-defaults, because that blob is
+   * A NEW key rather than more fields on deadwax-download-defaults, because that blob is
    * read and rewritten wholesale by the vanilla app too - anything it doesn't know about
    * would survive only until the next time main.js saved. New key, one writer.
    */
-  preferences: 'jimbrainz-preferences',
+  preferences: 'deadwax-preferences',
   /**
    * Which fields the library's track viewer shows. Its own key, written only by the viewer's
    * field menu - the same one-writer rule as `preferences` above, which the settings tab
    * rewrites wholesale from its own copy.
    */
-  libraryFields: 'jimbrainz-library-fields',
+  libraryFields: 'deadwax-library-fields',
   /** Where the library's splitter sits: the tree pane's width in px. */
-  libraryPaneWidth: 'jimbrainz-library-pane-width',
+  libraryPaneWidth: 'deadwax-library-pane-width',
   /** How the library tree is arranged, and which way round. */
-  librarySort: 'jimbrainz-library-sort',
+  librarySort: 'deadwax-library-sort',
 } as const
 
 /*
@@ -68,7 +68,7 @@ function readJson<T>(key: string): T | null {
   }
 }
 
-/* ===== jimbrainz-download-defaults ===== */
+/* ===== deadwax-download-defaults ===== */
 
 export interface DownloadDefaults {
   formatPreference: FormatPreference
@@ -104,7 +104,7 @@ export function useDownloadDefaults(): [
   return [value, update]
 }
 
-/* ===== jimbrainz-log-open ===== */
+/* ===== deadwax-log-open ===== */
 
 /**
  * Stored as the literal string '1' or '0', NOT as JSON. The vanilla app compares
@@ -122,7 +122,7 @@ export function useLogOpen(): [boolean, (open: boolean) => void] {
   return [open, update]
 }
 
-/* ===== jimbrainz-release-columns ===== */
+/* ===== deadwax-release-columns ===== */
 
 export interface ReleaseColumnState {
   order: string[]
@@ -155,7 +155,7 @@ export function writeReleaseColumnState(state: ReleaseColumnState): void {
   writeRaw(STORAGE_KEYS.releaseColumns, JSON.stringify(state))
 }
 
-/* ===== jimbrainz-library-fields ===== */
+/* ===== deadwax-library-fields ===== */
 
 /**
  * The viewer's field choices. `seen` is every field id that existed when this was written, so
@@ -202,7 +202,7 @@ export function writeLibraryFields(state: LibraryFieldState): void {
   writeRaw(STORAGE_KEYS.libraryFields, JSON.stringify(state))
 }
 
-/* ===== jimbrainz-library-pane-width ===== */
+/* ===== deadwax-library-pane-width ===== */
 
 export function readLibraryPaneWidth(): number | null {
   const n = Number(readRaw(STORAGE_KEYS.libraryPaneWidth))
@@ -213,7 +213,7 @@ export function writeLibraryPaneWidth(width: number): void {
   writeRaw(STORAGE_KEYS.libraryPaneWidth, String(Math.round(width)))
 }
 
-/* ===== jimbrainz-library-sort ===== */
+/* ===== deadwax-library-sort ===== */
 
 /**
  * Returned as plain strings on purpose: this is JSON a user can edit and an older version may
@@ -229,7 +229,7 @@ export function writeLibrarySort(value: { sort: string; direction: string }): vo
   writeRaw(STORAGE_KEYS.librarySort, JSON.stringify(value))
 }
 
-/* ===== jimbrainz-preferences ===== */
+/* ===== deadwax-preferences ===== */
 
 /**
  * Everything the settings tab owns that the server doesn't.
@@ -263,7 +263,7 @@ export interface Preferences {
   candidateCompleteOnly: boolean
 
   /* --- interface --- */
-  /** Open the log panel on load. Mirrors the existing jimbrainz-log-open key's job. */
+  /** Open the log panel on load. Mirrors the existing deadwax-log-open key's job. */
   logOpenOnStart: boolean
   /** Confirm before cancelling an in-flight download. */
   confirmCancel: boolean
@@ -284,7 +284,7 @@ export const PREFERENCE_FALLBACK: Preferences = {
  * Read preferences without a hook, for the vanilla half.
  *
  * main.js needs these at module scope to seed the limit stepper and the candidate filters,
- * and it cannot call a Preact hook. Exported through window.jimbrainz - see bridge.ts.
+ * and it cannot call a Preact hook. Exported through window.deadwax - see bridge.ts.
  *
  * Every field is validated rather than trusted: this is JSON from localStorage, which a user
  * can edit, an older version may have written, and a newer version may not recognise. A

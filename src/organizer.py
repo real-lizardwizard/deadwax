@@ -1,7 +1,7 @@
 """
 Turning a finished slskd download into a tagged, filed album.
 
-This is the only part of jimbrainz that writes to the user's filesystem, so it is built in
+This is the only part of deadwax that writes to the user's filesystem, so it is built in
 two halves that are deliberately kept apart:
 
   plan_organization()  - pure. Works out what *would* happen. No disk writes, fully testable.
@@ -188,7 +188,7 @@ def read_album_mbid(directory: Path) -> str | None:
     can and stops - every track in a folder belongs to the same release, so there is nothing
     to gain from opening the rest.
 
-    Returns None for a folder jimbrainz didn't organize (no MBID tag), which the caller must
+    Returns None for a folder deadwax didn't organize (no MBID tag), which the caller must
     treat as "unknown", NOT as "different" - guessing wrong there would fork someone's
     existing library into duplicate folders.
     """
@@ -230,7 +230,7 @@ def resolve_album_dir(library_root: str, release: dict) -> tuple[Path, str]:
     letting one silently overwrite (or, as before, be silently skipped against) the other.
 
     Crucially this does NOT treat an untagged folder as a collision. A library that predates
-    jimbrainz has no MBIDs, and forking every one of those albums into a second folder would
+    deadwax has no MBIDs, and forking every one of those albums into a second folder would
     be far worse than sharing one.
     """
     artist = sanitize_filename(filed_artist(release), "Unknown Artist")
@@ -413,7 +413,7 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
         #? it has one, which on an ordinary album is every track.
         "artist": release.get("artist"),
         #? Who this is, in MusicBrainz's terms, which is the one part of a credit that survives
-        #? somebody renaming a band. jimbrainz already wrote the release and release-group ids
+        #? somebody renaming a band. deadwax already wrote the release and release-group ids
         #? and not these, so nothing it filed could say who the artist WAS - which is also why
         #? the artist page has to fall back to searching by name.
         "musicbrainz_albumartistid": _mbids(release.get("artist_mbids")),
@@ -489,7 +489,7 @@ def write_tags(path: Path, release: dict, track: dict | None) -> None:
     Tag the file from the MusicBrainz release it came from.
 
     Writes the MusicBrainz IDs too, so the resulting library stays legible to Picard/beets
-    later instead of being a jimbrainz-only artifact. Tagging failures are logged and
+    later instead of being a deadwax-only artifact. Tagging failures are logged and
     tolerated: a filed-but-untagged file is a far better outcome than a half-organized album.
     """
     import mutagen
@@ -578,7 +578,7 @@ def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[s
     """
     Remove the slskd folders a completed move emptied of music.
 
-    Every guard here is deliberate, because this is the only code in jimbrainz that deletes
+    Every guard here is deliberate, because this is the only code in deadwax that deletes
     anything:
 
       - move only. copy exists precisely to leave the original alone.
@@ -676,7 +676,7 @@ def remove_incomplete_downloads(
     else's download. A basename that appears more than once, or whose parent folder isn't the
     one this job was downloading from, is left alone - `01 - Intro.flac` is not a rare name.
 
-    Every guard mirrors delete_album(), which is the other place in jimbrainz that removes data
+    Every guard mirrors delete_album(), which is the other place in deadwax that removes data
     the user did not just ask for.
     """
     results: dict = {"removed": [], "skipped": [], "problem": None}

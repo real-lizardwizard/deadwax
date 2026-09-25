@@ -9,7 +9,7 @@ network to be tested.
 
 Where the files go is decided in artists.py (ARTIST_ART_STEMS) and is not arbitrary: Navidrome
 reads `artist.*` out of an artist's folder with no configuration at all. The other five are for
-jimbrainz's own artist page and for anything else pointed at the same library.
+deadwax's own artist page and for anything else pointed at the same library.
 """
 
 from pathlib import Path

@@ -66,7 +66,7 @@ def fresh_cache():
 
 @pytest.fixture
 def store(tmp_path):
-    job_store = JobStore(str(tmp_path / "state" / "jimbrainz.db"))
+    job_store = JobStore(str(tmp_path / "state" / "deadwax.db"))
     job_store.init()
     return job_store
 
@@ -286,7 +286,7 @@ def make_client(root, monkeypatch, store=None):
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(root))
     app = FastAPI()
     app.state.store = store
-    app.include_router(library_route.router, prefix="/jimbrainz/library")
+    app.include_router(library_route.router, prefix="/deadwax/library")
     return TestClient(app)
 
 
@@ -295,7 +295,7 @@ def test_asking_for_a_snapshot_with_nothing_cached_gets_a_real_scan(tmp_path, mo
     seed_album(tmp_path)
     client = make_client(tmp_path, monkeypatch)
 
-    body = client.get("/jimbrainz/library/albums", params={"snapshot": "true"}).json()
+    body = client.get("/deadwax/library/albums", params={"snapshot": "true"}).json()
     assert body["stale"] is False
     assert body["album_count"] == 1
 
@@ -303,30 +303,30 @@ def test_asking_for_a_snapshot_with_nothing_cached_gets_a_real_scan(tmp_path, mo
 def test_a_snapshot_is_the_last_scan_not_the_current_disk(tmp_path, monkeypatch, store):
     directory = seed_album(tmp_path)
     client = make_client(tmp_path, monkeypatch, store)
-    client.get("/jimbrainz/library/albums")
+    client.get("/deadwax/library/albums")
 
     shutil.rmtree(directory)
 
-    snapshot = client.get("/jimbrainz/library/albums", params={"snapshot": "true"}).json()
+    snapshot = client.get("/deadwax/library/albums", params={"snapshot": "true"}).json()
     assert snapshot["stale"] is True
     assert snapshot["album_count"] == 1
     #? says when that was, so the interface can say how old it is
     assert snapshot["scanned_at"]
 
-    assert client.get("/jimbrainz/library/albums").json()["album_count"] == 0
+    assert client.get("/deadwax/library/albums").json()["album_count"] == 0
 
 
 def test_after_a_restart_the_snapshot_comes_from_the_database(tmp_path, monkeypatch, store):
     from src.routes import library as route
 
     seed_album(tmp_path)
-    make_client(tmp_path, monkeypatch, store).get("/jimbrainz/library/albums")
+    make_client(tmp_path, monkeypatch, store).get("/deadwax/library/albums")
 
     library.clear_scan_cache()
     route._cache_loaded_for = None  # the restart
 
     body = make_client(tmp_path, monkeypatch, store).get(
-        "/jimbrainz/library/albums", params={"snapshot": "true"}
+        "/deadwax/library/albums", params={"snapshot": "true"}
     ).json()
 
     assert body["stale"] is True
@@ -342,26 +342,26 @@ def test_a_snapshot_never_prunes_albums_it_has_not_seen(tmp_path, monkeypatch, s
     """
     seed_album(tmp_path)
     client = make_client(tmp_path, monkeypatch, store)
-    client.get("/jimbrainz/library/albums")
+    client.get("/deadwax/library/albums")
 
     just_filed = "Someone/Just Filed (2024)"
     run(store.record_albums_seen([{"path": just_filed, "artist": "Someone", "album": "Just Filed"}],
                                  source="import"))
 
-    client.get("/jimbrainz/library/albums", params={"snapshot": "true"})
+    client.get("/deadwax/library/albums", params={"snapshot": "true"})
     assert just_filed in run(store.album_reviews())
 
     #? and a real scan, which has looked, does prune it - so it is the snapshot guard doing this
-    client.get("/jimbrainz/library/albums")
+    client.get("/deadwax/library/albums")
     assert just_filed not in run(store.album_reviews())
 
 
 def test_deleting_an_album_drops_it_from_the_saved_scan(tmp_path, monkeypatch, store):
     seed_album(tmp_path)
     client = make_client(tmp_path, monkeypatch, store)
-    client.get("/jimbrainz/library/albums")
+    client.get("/deadwax/library/albums")
 
-    response = client.post("/jimbrainz/library/delete",
+    response = client.post("/deadwax/library/delete",
                            json={"album_path": "Tame Impala/The Slow Rush (2020)"})
     assert response.status_code == 200
 
@@ -377,7 +377,7 @@ def test_the_track_viewer_reads_every_tag_live(tmp_path, monkeypatch):
                custom_thing="kept anyway")
 
     client = make_client(tmp_path, monkeypatch)
-    response = client.get("/jimbrainz/library/tracks",
+    response = client.get("/deadwax/library/tracks",
                           params={"album": "Pink Floyd/The Dark Side of the Moon (1973)"})
 
     assert response.status_code == 200
@@ -395,7 +395,7 @@ def test_the_track_viewer_is_in_running_order(tmp_path, monkeypatch):
     two_disc_album(tmp_path)
     client = make_client(tmp_path, monkeypatch)
 
-    files = client.get("/jimbrainz/library/tracks",
+    files = client.get("/deadwax/library/tracks",
                        params={"album": "Pink Floyd/The Wall (1979)"}).json()["files"]
 
     assert [f["tags"]["title"] for f in files] == ["D1T1", "D1T2", "D2T1", "D2T2"]
@@ -411,7 +411,7 @@ def test_the_track_viewer_refuses_to_read_outside_the_library(tmp_path, monkeypa
     """The second endpoint that turns user input into a filesystem read, so it copies /art's guard."""
     seed_album(tmp_path)
     client = make_client(tmp_path, monkeypatch)
-    assert client.get("/jimbrainz/library/tracks", params={"album": attempt}).status_code == 404
+    assert client.get("/deadwax/library/tracks", params={"album": attempt}).status_code == 404
 
 
 # ---------------------------------------------------------------- disc numbers, written

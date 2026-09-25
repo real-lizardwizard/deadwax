@@ -456,7 +456,7 @@ async def cancel_job(request: Request, job_id: int):
 
     Anything already filed into the library stays. The half-finished file in slskd's INCOMPLETE
     folder is removed only when SLSKD_INCOMPLETE_PATH says where that folder is - slskd keeps
-    partials deliberately so a retried download can resume from them, so pointing jimbrainz at
+    partials deliberately so a retried download can resume from them, so pointing deadwax at
     it is the explicit "no, a cancelled download is finished with" signal.
     """
     try:
@@ -478,7 +478,7 @@ async def cancel_job(request: Request, job_id: int):
                 if await slskd_client.cancel_download(job["username"], transfer["id"]):
                     cancelled += 1
 
-        await store.update_status(job_id, "cancelled", "cancelled from jimbrainz")
+        await store.update_status(job_id, "cancelled", "cancelled from deadwax")
 
         #? After the transfers are cancelled, never before: slskd holds the file open while a
         #? transfer is live, and deleting it underneath would be a race with slskd's own writer.

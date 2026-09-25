@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 def start() -> FastAPI:
     logger.info("Starting API server")
     app = FastAPI(
-        title="jimbrainz",
+        title="deadwax",
         summary="Search MusicBrainz, download through slskd",
         lifespan=lifespan
     )
@@ -101,12 +101,12 @@ def start() -> FastAPI:
         return response
 
     logger.info("adding routers")
-    app.include_router(interface_logs.router, prefix="/jimbrainz/interface_logs", tags=["interface_logs"])
-    app.include_router(search_musicbrainz.router, prefix="/jimbrainz/search_musicbrainz", tags=["search_musicbrainz"])
-    app.include_router(monitor_slskd.router, prefix="/jimbrainz/monitor_slskd", tags=["monitor_slskd"])
-    app.include_router(download.router, prefix="/jimbrainz/download", tags=["download"])
-    app.include_router(library.router, prefix="/jimbrainz/library", tags=["library"])
-    app.include_router(settings.router, prefix="/jimbrainz/settings", tags=["settings"])
+    app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"])
+    app.include_router(search_musicbrainz.router, prefix="/deadwax/search_musicbrainz", tags=["search_musicbrainz"])
+    app.include_router(monitor_slskd.router, prefix="/deadwax/monitor_slskd", tags=["monitor_slskd"])
+    app.include_router(download.router, prefix="/deadwax/download", tags=["download"])
+    app.include_router(library.router, prefix="/deadwax/library", tags=["library"])
+    app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"])
 
     logger.info("mounting static interface files")
     interface_path = Path(__file__).parent.parent.parent / "interface"

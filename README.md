@@ -1,19 +1,21 @@
-# jimbrainz
+# deadwax
 
 <p align="center">
   <img src="interface/assets/icon.svg" width="128" height="128">
 </p>
 
 <p align="center">
-  <a href="https://github.com/real-lizardwizard/jimbrainz/releases"><img src="https://img.shields.io/github/v/release/real-lizardwizard/jimbrainz" alt="GitHub Release"></a>
-  <a href="https://github.com/real-lizardwizard/jimbrainz/pkgs/container/jimbrainz"><img src="https://img.shields.io/badge/ghcr.io-real--lizardwizard%2Fjimbrainz-blue" alt="Container image"></a>
+  <a href="https://github.com/real-lizardwizard/deadwax/releases"><img src="https://img.shields.io/github/v/release/real-lizardwizard/deadwax" alt="GitHub Release"></a>
+  <a href="https://github.com/real-lizardwizard/deadwax/pkgs/container/deadwax"><img src="https://img.shields.io/badge/ghcr.io-real--lizardwizard%2Fdeadwax-blue" alt="Container image"></a>
 </p>
+
+*Formerly **jimbrainz**. Dead wax is the blank ring between a record's last groove and its label, where the matrix number that tells one pressing from another is scratched — which is the whole idea here.*
 
 A one-page interface for finding music on MusicBrainz, pulling it down through slskd, and keeping the result tidy afterwards. Search is centred on specific **Releases** and **Release Groups** rather than artists — because most of the time you want one particular pressing of one album, not somebody's entire discography.
 
-Pick the release you actually want, and jimbrainz searches Soulseek, ranks what comes back against that release's real tracklist, and shows you why each candidate scored what it did. One click queues it; when it finishes it gets tagged from the MusicBrainz data and filed into your library. Then the **library tab** shows you what you've actually got — including when you're holding three different pressings of the same record — and lets you correct anything that landed wrong.
+Pick the release you actually want, and deadwax searches Soulseek, ranks what comes back against that release's real tracklist, and shows you why each candidate scored what it did. One click queues it; when it finishes it gets tagged from the MusicBrainz data and filed into your library. Then the **library tab** shows you what you've actually got — including when you're holding three different pressings of the same record — and lets you correct anything that landed wrong.
 
-![jimbrainz — twenty pressings of one album, with the tracklist of the one you picked](assets/images/search.png)
+![deadwax — twenty pressings of one album, with the tracklist of the one you picked](assets/images/search.png)
 
 <sub>Twenty pressings of *Dummy* — vinyl, CD, cassette, SHM-CD, across seven countries — with the tracklist of the one you picked. The filter column builds itself from whatever is on screen.</sub>
 
@@ -24,6 +26,10 @@ Pick the release you actually want, and jimbrainz searches Soulseek, ranks what 
   laptop and a completely misleading one about the app. A stub answered its status check so
   the pills show the ordinary working state. No screenshot claims a download happened.
 
+  The library is a throwaway one: real FLAC files tagged and filed by deadwax's own code from
+  real MusicBrainz releases, with covers from the Cover Art Archive - but the audio is quiet
+  noise of the right length, which is why its bitrate reads low for FLAC.
+
   A moving demo would still be worth having for the search -> candidates -> download flow.
   ffmpeg, for a README-sized GIF out of a screen recording (2-4MB rather than 21):
 
@@ -33,7 +39,7 @@ Pick the release you actually want, and jimbrainz searches Soulseek, ranks what 
 
 _Please note; this is a silly and fun container i made for my own server, its probably kinda shitty, the code is a mess, and theres certainly better alternatives out there. buuut if you like it thats awesome :)_<3
 
-> **Heads up:** this is a fork of [LidBrainz](https://github.com/dual-shock/lidbrainz) that has diverged a long way. LidBrainz sends things to Lidarr; jimbrainz cut Lidarr out entirely and talks to slskd directly. If you want the Lidarr version, go use the original — it's good.
+> **Heads up:** this is a fork of [LidBrainz](https://github.com/dual-shock/lidbrainz) that has diverged a long way. LidBrainz sends things to Lidarr; deadwax cut Lidarr out entirely and talks to slskd directly. If you want the Lidarr version, go use the original — it's good.
 
 ## Why not Lidarr?
 
@@ -41,7 +47,7 @@ Because of one specific thing that couldn't be fixed from the outside.
 
 When you pick a *particular* release — the 2011 remaster, the deluxe edition — and hand it to Lidarr, all of that detail dies at the API boundary. Lidarr's search command only takes an album id, so the plugin doing the actual Soulseek search rebuilds a generic query from scratch and grabs whatever comes back. Tubifarry's own maintainer [confirms Custom Formats can't target the release variant you selected](https://github.com/TypNull/Tubifarry/discussions/138).
 
-jimbrainz already knows everything about the release you clicked: its MBID, full tracklist with durations, edition tags, year, label. So it does the searching and the matching itself, and all of that context is actually used.
+deadwax already knows everything about the release you clicked: its MBID, full tracklist with durations, edition tags, year, label. So it does the searching and the matching itself, and all of that context is actually used.
 
 A caveat worth setting expectations on: this won't magically always find the exact remaster. Soulseek folder names are typed by strangers and frequently omit edition text entirely. What it does is *rank* candidates against your real tracklist and show its reasoning, so you can pick with actual information instead of hoping. Edition matching is a weighted signal, never a hard filter — filtering on it would hide perfectly good results.
 
@@ -51,25 +57,33 @@ _Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** manag
 
 ### Prerequisites:
 1. a running [slskd](https://slskd.org) instance reachable from this container, with an API key
-2. an email address to give MusicBrainz as a contact (jimbrainz builds the rest of its user agent itself)
+2. an email address to give MusicBrainz as a contact (deadwax builds the rest of its user agent itself)
 3. docker
 
 ### Environment:
-1. either clone the repo: ```git clone https://github.com/real-lizardwizard/jimbrainz.git``` <br> or just grab the ```docker-compose.example.yml``` file
+1. either clone the repo: ```git clone https://github.com/real-lizardwizard/deadwax.git``` <br> or just grab the ```docker-compose.example.yml``` file
 2. fill in the ```docker-compose.example.yml``` and rename it to just ```docker-compose.yml``` (here you can change the exposed port and docker network)
 3. put your settings in **either** place — whichever you prefer:
    - the ```environment:``` block of your compose file, which keeps everything about the container in one file. This is usually what you want when something like Komodo, Portainer or Dockge manages your stacks.
    - or ```.env.example```, filled in and renamed to just ```.env```, which keeps your slskd API key out of a file you might paste into a forum post.
 
-   Mixing them is fine: a setting in ```environment:``` wins over the same one in ```.env```, so you can keep the key in ```.env``` and the rest in compose. jimbrainz logs which source each setting came from when it starts, so you can check it picked up what you expected.
+   Mixing them is fine: a setting in ```environment:``` wins over the same one in ```.env```, so you can keep the key in ```.env``` and the rest in compose. deadwax logs which source each setting came from when it starts, so you can check it picked up what you expected.
 
-   MusicBrainz asks every app to identify itself with a way to contact whoever runs it, and rate limits the ones that don't ([their rules](https://MusicBrainz.org/doc/MusicBrainz_API/Rate_Limiting)). Set `MUSICBRAINZ_EMAIL` to your email address and jimbrainz does the rest: it sends `jimbrainz/<version> ( you@example.com )` with the version it's actually running filled in, so there's nothing to keep up to date when you upgrade. It can be set from the settings tab too. If you wrote a `MUSICBRAINZ_USERAGENT` by hand before this existed, it keeps working — its contact is lifted out and used — and the settings tab says so.
+   MusicBrainz asks every app to identify itself with a way to contact whoever runs it, and rate limits the ones that don't ([their rules](https://MusicBrainz.org/doc/MusicBrainz_API/Rate_Limiting)). Set `MUSICBRAINZ_EMAIL` to your email address and deadwax does the rest: it sends `deadwax/<version> ( you@example.com )` with the version it's actually running filled in, so there's nothing to keep up to date when you upgrade. It can be set from the settings tab too. If you wrote a `MUSICBRAINZ_USERAGENT` by hand before this existed, it keeps working — its contact is lifted out and used — and the settings tab says so.
 
-**`SLSKD_URL` has to be reachable from inside this container**, which is not always the address you type into your browser. If slskd is another container on the same docker network, use its service name and internal port — `http://slskd:5030` — rather than your host's IP and published port. It needs the scheme (`http://`) either way; jimbrainz says so specifically if it's missing.
+**`SLSKD_URL` has to be reachable from inside this container**, which is not always the address you type into your browser. If slskd is another container on the same docker network, use its service name and internal port — `http://slskd:5030` — rather than your host's IP and published port. It needs the scheme (`http://`) either way; deadwax says so specifically if it's missing.
 
 **The one that trips everyone up:** `SLSKD_DOWNLOAD_PATH` has to point at the *same files* slskd writes its finished downloads to, as seen from inside this container. If the two containers disagree about that path, organizing quietly finds nothing. It's the most likely first-run problem by a mile.
 
 `LIBRARY_PATH` is where organized music goes, and it's also what the library tab reads. If you don't set it, everything else still works — the library tab just tells you it isn't configured.
+
+### Upgrading from jimbrainz
+
+It's the same app under a new name, from 0.6.21. Point your compose file or Komodo stack at **`ghcr.io/real-lizardwizard/deadwax`** instead of `…/jimbrainz` — nothing redirects the old image name, and it stops getting updates at 0.6.20. Nothing else needs changing:
+
+- **Your database is found where it is.** A `DB_PATH=/config/jimbrainz.db` line keeps working as it is, and if you never set `DB_PATH`, the old `/config/jimbrainz.db` keeps being used until a `deadwax.db` exists. Don't rename the file by hand to "match" — leave it.
+- **Your browser keeps its layouts and preferences** — column widths, panel sizes, the library's fields and sort. They're carried over to the new name the first time the page loads.
+- If you had the page open during the upgrade, reload it.
 
 ### Which image tag?
 
@@ -94,7 +108,7 @@ Organizing starts in **`dry_run`** mode on purpose — it logs what it *would* d
 ### Release centered querying
 <details>
 <summary style="font-style:italic">Everything is a release group, not an artist</summary>
-Most tools use Artist objects as the "main" form of adding and storing data, i didnt like this as 99% of the time i dont want ALL the releases of an artist, i usually just want 1-2 albums. jimbrainz searches release groups, then lets you drill into the exact pressing you want.
+Most tools use Artist objects as the "main" form of adding and storing data, i didnt like this as 99% of the time i dont want ALL the releases of an artist, i usually just want 1-2 albums. deadwax searches release groups, then lets you drill into the exact pressing you want.
 </details>
 
 ### Ranked Soulseek candidates
@@ -102,11 +116,11 @@ Most tools use Artist objects as the "main" form of adding and storing data, i d
 <summary style="font-style:italic">Scored against the release you actually picked, with the reasoning shown</summary>
 Each peer's files get grouped into (user, folder) candidates and scored on track count, fuzzy title match against the real tracklist, track durations, format/bitrate, peer health, and edition/year. You see a score breakdown per candidate so it's obvious <em>why</em> one ranked above another — and can filter by free slot, complete albums only, format, or minimum score.
 <br><br>
-The speed on a candidate reads <code>peer avg</code> because that is what Soulseek reports: the peer's average upload rate across their whole history, to everyone. It is split between everyone they're serving at once and averaged over conditions that have since changed, so it is not a prediction of your transfer and routinely reads high. The free-slot and queue figures beside it are the better guide. jimbrainz weights it accordingly — peer health is the lowest of the six signals, an availability tiebreaker rather than a ranking criterion.
+The speed on a candidate reads <code>peer avg</code> because that is what Soulseek reports: the peer's average upload rate across their whole history, to everyone. It is split between everyone they're serving at once and averaged over conditions that have since changed, so it is not a prediction of your transfer and routinely reads high. The free-slot and queue figures beside it are the better guide. deadwax weights it accordingly — peer health is the lowest of the six signals, an availability tiebreaker rather than a ranking criterion.
 <br><br>
 It searches under every name the artist has put records out under, because Soulseek needs every word of a search somewhere in a share's path — so a search for "Ye BULLY" can never find a share filed under <code>Kanye West/</code>. It tries the name on the release, the name the artist goes by now, and any name MusicBrainz marks as one they've stopped using, all at once rather than one after another. For an artist who never renamed, which is nearly everyone, that's one search as before, and it never waits on MusicBrainz to start. The query box shows the first name; hover it to see the others, and editing it searches exactly what you typed.
 <br><br>
-Once you've actually downloaded from someone, the row leads with <code>you got 780 KB/s</code> instead — what jimbrainz measured itself while bytes were moving, with queue time excluded. Nothing in the Soulseek protocol will tell you a transfer's speed before it starts, so this is the closest thing to an answer there is, and it's the one number on the row that was measured rather than claimed. It builds up as you use it: peers you've never downloaded from simply don't have it.
+Once you've actually downloaded from someone, the row leads with <code>you got 780 KB/s</code> instead — what deadwax measured itself while bytes were moving, with queue time excluded. Nothing in the Soulseek protocol will tell you a transfer's speed before it starts, so this is the closest thing to an answer there is, and it's the one number on the row that was measured rather than claimed. It builds up as you use it: peers you've never downloaded from simply don't have it.
 </details>
 
 ### An artist's discography, in order
@@ -140,7 +154,7 @@ Releases show as a table with label, catalog number, barcode, quality, language/
 ### Downloads that remember what they're for
 <details>
 <summary style="font-style:italic">slskd only knows "bob is sending you 12 files"</summary>
-jimbrainz keeps the link between a download and the MusicBrainz release that started it, in a small sqlite database. That's what makes tagging possible later, and it's why the downloads panel can tell you what an in-flight transfer actually is — with live progress, queue position, and a real transfer rate worked out from byte deltas rather than slskd's cumulative average, which only ever creeps upward.
+deadwax keeps the link between a download and the MusicBrainz release that started it, in a small sqlite database. That's what makes tagging possible later, and it's why the downloads panel can tell you what an in-flight transfer actually is — with live progress, queue position, and a real transfer rate worked out from byte deltas rather than slskd's cumulative average, which only ever creeps upward.
 <br><br>
 Cancelling and clearing respond on the click rather than after the round-trip to slskd and back, so the buttons feel connected to something. The prediction is dropped the moment the server disagrees, and abandoned entirely if it never answers.
 </details>
@@ -148,7 +162,7 @@ Cancelling and clearing respond on the click rather than after the round-trip to
 ### Tagging and filing, with editions kept apart
 <details>
 <summary style="font-style:italic">Two pressings of one album no longer collide</summary>
-Files land as <code>{artist}/{album} ({year}) [{edition}]/{NN} - {title}.{ext}</code>, tagged from the MusicBrainz release — including MusicBrainz IDs, so the library stays readable by Picard and beets instead of being a jimbrainz-only artifact. Track numbers and titles come from the matched tracklist, so they're right even when the peer named everything "Track 04.mp3". It never overwrites an existing file. In move mode the slskd folder it came from is cleared away afterwards, leftover junk and all — the art and sidecars worth keeping have already moved into the library by then — unless music is still sitting in it, which means something in there was never filed and the folder stays. Re-filing an album that empties its old artist folder takes that folder with it too.
+Files land as <code>{artist}/{album} ({year}) [{edition}]/{NN} - {title}.{ext}</code>, tagged from the MusicBrainz release — including MusicBrainz IDs, so the library stays readable by Picard and beets instead of being a deadwax-only artifact. Track numbers and titles come from the matched tracklist, so they're right even when the peer named everything "Track 04.mp3". It never overwrites an existing file. In move mode the slskd folder it came from is cleared away afterwards, leftover junk and all — the art and sidecars worth keeping have already moved into the library by then — unless music is still sitting in it, which means something in there was never filed and the folder stays. Re-filing an album that empties its old artist folder takes that folder with it too.
 <br><br>
 The edition suffix is omitted for ordinary albums, and only appears when there's something to say. That includes <em>alternate performances</em> — an instrumental or acoustic version has the same track titles and numbers as the album it accompanies, so without a marker it would land in that album's folder, every file would be skipped as already-present, and the import would tell you there was nothing to do. The name comes from MusicBrainz's own disambiguation where it has one, then detected edition tags, then format or country — and two genuinely different releases that would still collide get separated by catalogue number.
 <br><br>
@@ -162,22 +176,22 @@ The artist folder is the artist's <em>current</em> name, so one artist is one fo
 <summary style="font-style:italic">Laid out like a file explorer, including when you're holding three versions of the same record</summary>
 Reads your library off disk with mutagen and shows it as a tree, the way Windows Explorer shows folders: artists at the top, their albums indented underneath when you open one, then the songs. Whatever you pick shows up in a pane on the right with its cover, its properties, what's wrong with it, and every track. The arrow keys walk the tree like Explorer's do, and you can drag the divider between the two panes.
 <br><br>
-Albums you hold more than one version of say so on their own row ("3 editions"), which was the entire point, and open to one row per edition. Identity comes from tags rather than folder names, so renaming a folder by hand doesn't split an album in two. Folders with no MusicBrainz id at all — i.e. anything that predates jimbrainz — are left as their own albums rather than being guessed at and merged.
+Albums you hold more than one version of say so on their own row ("3 editions"), which was the entire point, and open to one row per edition. Identity comes from tags rather than folder names, so renaming a folder by hand doesn't split an album in two. Folders with no MusicBrainz id at all — i.e. anything that predates deadwax — are left as their own albums rather than being guessed at and merged.
 <br><br>
 The search box matches song titles as well as artists and albums: type a song and the tree opens its album to show you where it is.
 <br><br>
-You can arrange it by artist, album, release date or date added, either way round. By artist it's the tree above; the other three list albums directly under headings (a letter, a year, a month), like Windows 7's music library did. "Date added" goes by when jimbrainz first saw an album, or its folder's date if that's earlier, so a library that was there before jimbrainz still sorts sensibly.
+You can arrange it by artist, album, release date or date added, either way round. By artist it's the tree above; the other three list albums directly under headings (a letter, a year, a month), like Windows 7's music library did. "Date added" goes by when deadwax first saw an album, or its folder's date if that's earlier, so a library that was there before deadwax still sorts sensibly.
 <br><br>
-The track list shows <em>whichever fields you want</em>. A Fields menu (or right-clicking the column headers) switches columns on and off: track and disc number, artist, genre, composer, label, catalogue number, ISRC, bitrate, sample rate, bit depth, channels, the MusicBrainz ids, and more. Drag a column's header sideways to move it, and its right-hand edge to size it, the way Explorer does — the edge stays under the cursor, and the columns to its left hold still rather than shuffling about under your hand; double-click that edge to give the column back its own width. The order and the widths are remembered along with which fields you picked, and Reset in the Fields menu puts all three back. Pick a single track and those same fields list down the pane, with every other tag the file carries underneath. Track details are read from the files when you look at them, so they show what's on disk now even if something other than jimbrainz changed the tags.
+The track list shows <em>whichever fields you want</em>. A Fields menu (or right-clicking the column headers) switches columns on and off: track and disc number, artist, genre, composer, label, catalogue number, ISRC, bitrate, sample rate, bit depth, channels, the MusicBrainz ids, and more. Drag a column's header sideways to move it, and its right-hand edge to size it, the way Explorer does — the edge stays under the cursor, and the columns to its left hold still rather than shuffling about under your hand; double-click that edge to give the column back its own width. The order and the widths are remembered along with which fields you picked, and Reset in the Fields menu puts all three back. Pick a single track and those same fields list down the pane, with every other tag the file carries underneath. Track details are read from the files when you look at them, so they show what's on disk now even if something other than deadwax changed the tags.
 <br><br>
 Multi-disc sets run disc by disc under "Disc 1", "Disc 2" headings, rather than dealing the two discs out alternately because both start at track 1. A track with no disc number reads as disc 1 — that's where it sorts, and how every player treats it — and the column says so in a dimmer grey, so it can't be mistaken for a disc number the file actually carries.
 <br><br>
-Opening the tab is instant after the first time. The last scan is saved in jimbrainz's database, so the library draws straight away from that, says how old it is, and checks the disk for changes underneath while you browse. That includes after a restart, which used to mean re-reading every tag in the library. Retags and deletes made in jimbrainz update the saved copy as they happen, and an album jimbrainz files from a download turns up on its own a second or two after it lands — no Rescan, whichever tab you're on. If you change files with another program, use Rescan.
+Opening the tab is instant after the first time. The last scan is saved in deadwax's database, so the library draws straight away from that, says how old it is, and checks the disk for changes underneath while you browse. That includes after a restart, which used to mean re-reading every tag in the library. Retags and deletes made in deadwax update the saved copy as they happen, and an album deadwax files from a download turns up on its own a second or two after it lands — no Rescan, whichever tab you're on. If you change files with another program, use Rescan.
 <br><br>
 Cover art comes from a file beside the tracks, then from art embedded in the audio, then from the Cover Art Archive. Click a cover to see it full size; click again to zoom in on the spot you clicked, scroll to zoom by degrees, and drag to move around it.
 <br><br>
 
-![The library tab, with an album's three editions listed under it](assets/images/library.png)
+![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience Edition in the pane](assets/images/library.png)
 
 </details>
 
@@ -185,7 +199,7 @@ Cover art comes from a file beside the tracks, then from art embedded in the aud
 
 Click an artist in the library and you get a page about them rather than a heading: who they are, where they're from, how long they've been going, what MusicBrainz tags them as, the current line-up with instruments (and how many members came before), their official site and socials named after where they actually go, and their albums oldest first.
 
-Above all that: their own pictures. **MusicBrainz has none** — the Cover Art Archive is for releases, and what musicbrainz.org shows on an artist page is a Wikimedia Commons photo reached through Wikidata. jimbrainz uses that too, and adds <strong>fanart.tv</strong> and <strong>TheAudioDB</strong> if you give either a key in the settings tab — between them they have the banners, logos, backgrounds and wide shots an artist page is actually made of. fanart.tv's artwork is voted on by the people using it, so jimbrainz offers the most-liked of each kind first; its key is issued per application rather than per person, so you register your own at fanart.tv.
+Above all that: their own pictures. **MusicBrainz has none** — the Cover Art Archive is for releases, and what musicbrainz.org shows on an artist page is a Wikimedia Commons photo reached through Wikidata. deadwax uses that too, and adds <strong>fanart.tv</strong> and <strong>TheAudioDB</strong> if you give either a key in the settings tab — between them they have the banners, logos, backgrounds and wide shots an artist page is actually made of. fanart.tv's artwork is voted on by the people using it, so deadwax offers the most-liked of each kind first; its key is issued per application rather than per person, so you register your own at fanart.tv.
 
 They're written into the artist's folder, so <em>other things read them too</em>:
 
@@ -198,7 +212,7 @@ They're written into the artist's folder, so <em>other things read them too</em>
 | wide image | `landscape.jpg` | Kodi's landscape, Jellyfin's thumb |
 | clear art | `clearart.png` | Kodi |
 
-Finding the right artist copes with them having **renamed**, which is commoner than it sounds. MusicBrainz keeps one current name per artist and every previous one as an alias, while each release keeps the name it was *credited* under — so Ye's albums are credited Kanye West, your folder is called Kanye West, and MusicBrainz's artist is called Ye. jimbrainz searches aliases as well as current names, and compares them ignoring how a name happened to be typed, so `Motorhead` finds Motörhead and a plain hyphen finds JAŸ‐Z. The page says "Now: Ye" when MusicBrainz calls them something other than your folder does — which, since new albums file under the current name, mostly means albums that arrived before. Two artists genuinely sharing a name are still refused rather than guessed at — that's what the picker is for.
+Finding the right artist copes with them having **renamed**, which is commoner than it sounds. MusicBrainz keeps one current name per artist and every previous one as an alias, while each release keeps the name it was *credited* under — so Ye's albums are credited Kanye West, your folder is called Kanye West, and MusicBrainz's artist is called Ye. deadwax searches aliases as well as current names, and compares them ignoring how a name happened to be typed, so `Motorhead` finds Motörhead and a plain hyphen finds JAŸ‐Z. The page says "Now: Ye" when MusicBrainz calls them something other than your folder does — which, since new albums file under the current name, mostly means albums that arrived before. Two artists genuinely sharing a name are still refused rather than guessed at — that's what the picker is for.
 
 A picker shows every candidate each source offered — TheAudioDB usually has four backgrounds — so you choose which one belongs at the top of the page rather than taking whatever sorted first. You can search MusicBrainz from inside it for the right artist, which is how you get past files with no MusicBrainz ids and the several bands that share a name, and any picture it found can be used in any slot — so a single photo can be both the square image and the background. Pictures already in the folder are left alone unless you tick "replace". Nothing is written into a folder that holds tracks: that's an album, and those filenames mean something else there.
 
@@ -218,7 +232,7 @@ Multi-disc releases are tagged per disc, the way MusicBrainz and every player nu
 Covers are saved at 500 × 500 unless you choose otherwise: <strong>Cover art</strong> in the settings tab offers 250, 500, 1200 or <em>full size</em>, which is the original upload — often thousands of pixels and several megabytes. It applies to "Get cover", the bulk fetch and the editor alike, and the editor says which size it will save.
 </details>
 
-Tags now record **who** as well as what: `musicbrainz_albumartistid` and `musicbrainz_artistid` go in alongside the release ids, so a library jimbrainz filed says which artist it means rather than leaving the name to be matched later. A track credited to somebody else — a split, a compilation, a guest spot — keeps its own artist instead of being given the album's, and credits read the way MusicBrainz writes them: "A / B", "A & B", "A feat. B", rather than everything flattened to a comma.
+Tags now record **who** as well as what: `musicbrainz_albumartistid` and `musicbrainz_artistid` go in alongside the release ids, so a library deadwax filed says which artist it means rather than leaving the name to be matched later. A track credited to somebody else — a split, a compilation, a guest spot — keeps its own artist instead of being given the album's, and credits read the way MusicBrainz writes them: "A / B", "A & B", "A feat. B", rather than everything flattened to a comma.
 
 ### Editing tags by hand
 <details>
@@ -243,7 +257,7 @@ It's permanent, there's no undo, and it says so. It refuses anything that isn't 
 <summary style="font-style:italic">Your preferences, and a straight answer about the container's configuration</summary>
 Two halves, deliberately kept apart. The top is <em>yours</em> - format preference, auto-grab, how a new search starts, where the Soulseek candidate filters begin - stored in your browser and saved as you change them.
 <br><br>
-The bottom is the container's configuration, and most of it is <strong>editable</strong>. Changing a setting stores an override in jimbrainz's own database and applies it <em>without a restart</em> — it does not write to your <code>.env</code>, because editing that from inside the container wouldn't affect the running process anyway. An override wins over the environment (the alternative would mean your edit silently reverting on the next restart), the row says so, and one click reverts it. Two settings can't be changed here and say why: <code>DB_PATH</code> is the database the overrides live in, and <code>PUID</code>/<code>PGID</code> are applied before Python even starts.
+The bottom is the container's configuration, and most of it is <strong>editable</strong>. Changing a setting stores an override in deadwax's own database and applies it <em>without a restart</em> — it does not write to your <code>.env</code>, because editing that from inside the container wouldn't affect the running process anyway. An override wins over the environment (the alternative would mean your edit silently reverting on the next restart), the row says so, and one click reverts it. Two settings can't be changed here and say why: <code>DB_PATH</code> is the database the overrides live in, and <code>PUID</code>/<code>PGID</code> are applied before Python even starts.
 <br><br>
 It still reports, which is half the point. For every setting: the value this container <em>actually received</em>, <strong>which file supplied it</strong> (your compose <code>environment:</code> block or <code>.env</code> — indistinguishable from the value alone, and always the first question when something's wrong), and what is broken about it if anything.
 <br><br>
@@ -274,7 +288,7 @@ The header is one row rather than four — the wordmark is set as text on a phon
 Measured at 375px: the header went from 161px to 47px, the search form from 450px to 146px, and a result card from 280px to 99px.
 <br><br>
 
-![jimbrainz on a phone](assets/images/mobile.png)
+![deadwax on a phone](assets/images/mobile.png)
 
 </details>
 
@@ -284,19 +298,19 @@ Being lightweight and fast (and working _just enough_) was and is the only focus
 
 ### Adding whole artist discographies at a time
 <details>
-<summary style="font-style:italic">jimbrainz only uses release groups, not artists</summary>
+<summary style="font-style:italic">deadwax only uses release groups, not artists</summary>
 Theres no native feature to add entire discographies quickly (unless you type really fast). There are much better alternatives for that out there.
 </details>
 
 ### Making use of any more metadata than what MusicBrainz has to offer
 <details>
-<summary style="font-style:italic">If anything is not on MusicBrainz jimbrainz cant reach it</summary>
-jimbrainz _only uses MusicBrainz_, if you need to add anything thats not on MusicBrainz it cant help you.
+<summary style="font-style:italic">If anything is not on MusicBrainz deadwax cant reach it</summary>
+deadwax _only uses MusicBrainz_, if you need to add anything thats not on MusicBrainz it cant help you.
 </details>
 
 ### Recommendations
 <details>
-<summary style="font-style:italic">jimbrainz can only be used for searching stuff and downloading it</summary>
+<summary style="font-style:italic">deadwax can only be used for searching stuff and downloading it</summary>
 Theres no tracking of what you download or listen to, and no extra metadata other than MusicBrainz, so theres no cool recommendations.
 </details>
 
@@ -314,13 +328,13 @@ Retagging and editing tags rewrite them in place, and deleting removes files for
 
 ## Installation (OpenMediaVault + Komodo)
 
-This is how jimbrainz actually runs: OpenMediaVault for the box, Komodo managing Docker.
+This is how deadwax actually runs: OpenMediaVault for the box, Komodo managing Docker.
 
-Komodo deploys compose stacks, so there's nothing jimbrainz-specific to learn — point a stack at this repo, or paste `docker-compose.example.yml` into one, and put the settings in the stack's environment (or in a `.env` beside it; which wins is described above).
+Komodo deploys compose stacks, so there's nothing deadwax-specific to learn — point a stack at this repo, or paste `docker-compose.example.yml` into one, and put the settings in the stack's environment (or in a `.env` beside it; which wins is described above).
 
 Four things are worth getting right the first time:
 
-1. **`PUID`/`PGID` should match whoever owns the media on your OMV share**, and should be the same pair slskd runs as. If the two disagree, jimbrainz files albums away as a user slskd can't write — or the other way round. OMV's shared folders commonly sit in the `users` group.
+1. **`PUID`/`PGID` should match whoever owns the media on your OMV share**, and should be the same pair slskd runs as. If the two disagree, deadwax files albums away as a user slskd can't write — or the other way round. OMV's shared folders commonly sit in the `users` group.
 2. **`SLSKD_URL` has to be reachable from inside this container.** If slskd is another stack on the same host, put both on one docker network and use its service name and internal port (`http://slskd:5030`) rather than the host address you type into your browser.
 3. **`SLSKD_DOWNLOAD_PATH` and the `/downloads` mount have to point at the same files slskd writes**, as this container sees them. It's the most likely first-run problem by a mile, and it fails quietly: organizing simply finds nothing.
 4. **Mount your library** where `LIBRARY_PATH` points, or the library tab has nothing to read.
@@ -329,12 +343,12 @@ Leave `ORGANIZE_MODE` on `dry_run` until the event log shows it finding your fil
 
 ## Installation (Unraid)
 
-**Inherited from [LidBrainz](https://github.com/dual-shock/lidbrainz), which this forked from, and untested since.** Its author ran Unraid and wrote this template and these notes; jimbrainz is developed and run against OpenMediaVault, so nobody here has put it in front of an Unraid box in a long while. The variables it sets are kept current with the app — the Unraid mechanics around them are upstream's, and it has never been published to the Community Applications plugin. Images are built and published to ghcr.io automatically on tagged releases either way.
+**Inherited from [LidBrainz](https://github.com/dual-shock/lidbrainz), which this forked from, and untested since.** Its author ran Unraid and wrote this template and these notes; deadwax is developed and run against OpenMediaVault, so nobody here has put it in front of an Unraid box in a long while. The variables it sets are kept current with the app — the Unraid mechanics around them are upstream's, and it has never been published to the Community Applications plugin. Images are built and published to ghcr.io automatically on tagged releases either way.
 
 ### how to manually add the template
-1. move/copy `my-jimbrainz.xml` to `/boot/config/plugins/dockerMan/templates-user/`
+1. move/copy `my-deadwax.xml` to `/boot/config/plugins/dockerMan/templates-user/`
 2. in the docker tab on Unraid, click "add container"
-3. the jimbrainz template should show up in the template dropdown, select it
+3. the deadwax template should show up in the template dropdown, select it
 
 ### how to set up the container
 1. pick a webui port thats not in use by any of your other containers
@@ -355,11 +369,11 @@ i didnt like using the MusicBrainz website as a search engine and then switching
 basically anyone who wants more functionality than whats mentioned above. if you want a full library manager with its own metadata pipeline, use Lidarr — genuinely.
 
 ## probable issues
-- **Organizing finds nothing:** almost always `SLSKD_DOWNLOAD_PATH` not pointing at the same files slskd writes. jimbrainz says so explicitly when this happens rather than pretending it worked.
+- **Organizing finds nothing:** almost always `SLSKD_DOWNLOAD_PATH` not pointing at the same files slskd writes. deadwax says so explicitly when this happens rather than pretending it worked.
 - **A download says it finished but the album isnt there:** if a folder with that name already existed, every file is skipped rather than overwritten, and the job now says so instead of reporting success. Usually means you already have that edition.
-- **Rate limiting:** MusicBrainz rate limits requests that don't carry a contact, so check `MUSICBRAINZ_EMAIL` is set — the settings tab shows the exact user agent being sent. jimbrainz also has a built-in rate limiter, so if you're getting rate limited more than you'd expect it's likely the contact.
-- **A search fails and says slskd isn't connected to Soulseek:** slskd's web API answers whether or not slskd has logged in to the Soulseek network, so jimbrainz can reach it perfectly while no search can possibly run. The connection pill reports that connection rather than just the API, and a failed search names which of the two is wrong — including when slskd is waiting on a VPN container to come up, which is the usual cause when slskd runs behind one. It answers `409 Conflict` in that state, which is not what the word suggests.
+- **Rate limiting:** MusicBrainz rate limits requests that don't carry a contact, so check `MUSICBRAINZ_EMAIL` is set — the settings tab shows the exact user agent being sent. deadwax also has a built-in rate limiter, so if you're getting rate limited more than you'd expect it's likely the contact.
+- **A search fails and says slskd isn't connected to Soulseek:** slskd's web API answers whether or not slskd has logged in to the Soulseek network, so deadwax can reach it perfectly while no search can possibly run. The connection pill reports that connection rather than just the API, and a failed search names which of the two is wrong — including when slskd is waiting on a VPN container to come up, which is the usual cause when slskd runs behind one. It answers `409 Conflict` in that state, which is not what the word suggests.
 - **A search returns nothing:** Soulseek search is a substring match over filenames people happened to type. Try the editable query box in the candidates panel — trimming it down often helps more than adding detail.
-- **MusicBrainz is just down sometimes:** it happens a lot. jimbrainz tells you thats what happened rather than showing you an empty result and letting you blame your search terms.
+- **MusicBrainz is just down sometimes:** it happens a lot. deadwax tells you thats what happened rather than showing you an empty result and letting you blame your search terms.
 - **The library tab is empty:** check `LIBRARY_PATH` is set and points at the same music the container can see. It says which of those is wrong.
 - the ui has many problems, i just wanted it to look pretty cause i like pretty things

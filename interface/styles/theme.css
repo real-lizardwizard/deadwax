@@ -1,6 +1,6 @@
 /*
   ============================================================================
-  jimbrainz design tokens
+  deadwax design tokens
   ============================================================================
 
   This file is the ONLY place raw values are allowed to live. main.css and the
@@ -48,7 +48,7 @@
   Noto Sans, bundled - chosen in v0.6.7 from six candidates set side by side.
 
   SELF-HOSTED, not a CDN: these files live in styles/font/noto-sans/ and are served by
-  jimbrainz itself, so the interface keeps working on a box with no internet access at all,
+  deadwax itself, so the interface keeps working on a box with no internet access at all,
   which is the reason a webfont CDN was never an option here. OFL.txt sits beside them.
 
   One variable-weight file (300-700) per script, split by unicode-range exactly as Google

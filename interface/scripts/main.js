@@ -52,7 +52,7 @@ function loadAllCoverImages(parentContainer) {
 
 async function fetchServerConfig() {
     console.log("getting server config")
-    const response = await fetch(`/jimbrainz/monitor_slskd/config`);
+    const response = await fetch(`/deadwax/monitor_slskd/config`);
 
     if (!response.ok) {
         const error = await response.json();
@@ -72,7 +72,7 @@ async function refreshServerConfig() {
 
     catch (error) {
         //? Nothing to render from it here any more. The settings tab owns displaying server
-        //? configuration and fetches its own, richer view from /jimbrainz/settings; this is
+        //? configuration and fetches its own, richer view from /deadwax/settings; this is
         //? still called because other code wants the returned object.
         return null;
     }
@@ -91,7 +91,7 @@ async function refreshServerConfig() {
  * preference when it builds a download request. There is no writer in this file any more.
  */
 
-const DOWNLOAD_DEFAULTS_STORAGE_KEY = 'jimbrainz-download-defaults';
+const DOWNLOAD_DEFAULTS_STORAGE_KEY = 'deadwax-download-defaults';
 
 function loadDownloadDefaults() {
     try {
@@ -131,7 +131,7 @@ const PREFERENCE_FALLBACK = {
 
 function loadPreferences() {
     try {
-        const saved = JSON.parse(localStorage.getItem('jimbrainz-preferences'));
+        const saved = JSON.parse(localStorage.getItem('deadwax-preferences'));
         return saved && typeof saved === 'object'
             ? { ...PREFERENCE_FALLBACK, ...saved }
             : { ...PREFERENCE_FALLBACK };
@@ -188,12 +188,12 @@ function getSettings() {
  * gone. Only the two calls that genuinely cross the boundary are left.
  *
  * This file is a module, so its functions aren't reachable from another bundle. Both sides
- * meet on window.jimbrainz instead. See ui/src/bridge.ts; keep it shrinking.
+ * meet on window.deadwax instead. See ui/src/bridge.ts; keep it shrinking.
  */
-window.jimbrainz = window.jimbrainz || {};
+window.deadwax = window.deadwax || {};
 
 // called by the panel when it opens - only one dropdown should be open at a time
-window.jimbrainz.closeOtherDropdowns = () => {
+window.deadwax.closeOtherDropdowns = () => {
     //? There used to be a download-profile dropdown to close here too. It was replaced by the
     //? settings tab in v0.5 and the element went with it, but these two calls stayed - and
     //? since this one threw on its FIRST line, the log was never closed at all. Opening the
@@ -231,7 +231,7 @@ window.jimbrainz.closeOtherDropdowns = () => {
     });
 })();
 
-window.jimbrainz.runSearch = ({ artist = '', album = '' } = {}) => {
+window.deadwax.runSearch = ({ artist = '', album = '' } = {}) => {
     artistSearchInput.value = artist;
     releaseSearchInput.value = album;
     handleSearch();
@@ -242,7 +242,7 @@ window.jimbrainz.runSearch = ({ artist = '', album = '' } = {}) => {
 
 /* ===== log dropdown (anchored under its own button in the top bar) ===== */
 
-const LOG_STATE_STORAGE_KEY = 'jimbrainz-log-open';
+const LOG_STATE_STORAGE_KEY = 'deadwax-log-open';
 const logControl = document.getElementById('log-control');
 const logToggleButton = document.getElementById('log-toggle-button');
 const logUnreadBadge = document.getElementById('log-unread-badge');
@@ -283,7 +283,7 @@ function isLogOpenSaved() {
 /*
  * Two separate ideas, deliberately:
  *
- *   jimbrainz-log-open remembers whether you left the log open, so it comes back how you
+ *   deadwax-log-open remembers whether you left the log open, so it comes back how you
  *   left it. That is session continuity.
  *
  *   logOpenOnStart (settings tab) is a standing instruction to open it regardless. It is for
@@ -308,7 +308,7 @@ logToggleButton.addEventListener('click', (e) => {
     //? The stopPropagation above also hides this click from the downloads panel's
     //? outside-click listener, so it has to be told - otherwise opening the log left both
     //? dropdowns open. The reverse direction is closeOtherDropdowns, further up.
-    if (open) window.jimbrainz?.closeDownloads?.();
+    if (open) window.deadwax?.closeDownloads?.();
 });
 
 /*
@@ -427,7 +427,7 @@ async function searchReleaseGroups(query) {
         limit: parseInt(limitValueDisplay.innerText)
     });
 
-    const response = await fetch(`/jimbrainz/search_musicbrainz/fully_search?${params}`);
+    const response = await fetch(`/deadwax/search_musicbrainz/fully_search?${params}`);
 
     if (!response.ok) {
         const error = await response.json();
@@ -444,7 +444,7 @@ async function fetchReleases(releaseGroupMbid) {
         release_group_mbid: releaseGroupMbid
     });
 
-    const response = await fetch(`/jimbrainz/search_musicbrainz/releases?${params}`);
+    const response = await fetch(`/deadwax/search_musicbrainz/releases?${params}`);
 
     if (!response.ok) {
         const error = await response.json();
@@ -725,7 +725,7 @@ async function loadDiscography(artistMbid, artistName) {
         const params = new URLSearchParams({ artist_mbid: artistMbid, types: 'album' });
         if (discographyStudioOnly) params.set('studio_only', 'true');
 
-        const response = await fetch(`/jimbrainz/search_musicbrainz/discography?${params}`);
+        const response = await fetch(`/deadwax/search_musicbrainz/discography?${params}`);
 
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
@@ -839,7 +839,7 @@ function renderSearchResults() {
 
 async function findCandidates(expected) {
     const settings = getSettings();
-    const response = await fetch(`/jimbrainz/download/find_candidates`, {
+    const response = await fetch(`/deadwax/download/find_candidates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...expected, format_preference: settings.formatPreference })
@@ -858,7 +858,7 @@ async function findCandidates(expected) {
 async function enqueueCandidate(candidate) {
     // the release travels with the download so the server can remember what these files are
     // for - slskd only ever knows "bob is sending you some files"
-    const response = await fetch(`/jimbrainz/download/enqueue`, {
+    const response = await fetch(`/deadwax/download/enqueue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -877,7 +877,7 @@ async function enqueueCandidate(candidate) {
     const result = await response.json();
     // show the new job straight away rather than on the panel's next timer tick. Optional
     // because the two bundles load independently - if it isn't there yet, the poll covers it.
-    window.jimbrainz?.refreshDownloads?.();
+    window.deadwax?.refreshDownloads?.();
     return result;
 }
 
@@ -1144,8 +1144,8 @@ function measuredSpeedMarkup(candidate) {
     const value = `${samples > 1 ? '~' : ''}${formatSpeed(candidate.measured_speed)}`;
 
     const hint = samples > 1
-        ? `Measured by jimbrainz over ${samples} transfers from this peer${when}. `
-        : `Measured by jimbrainz on one transfer from this peer${when}. `;
+        ? `Measured by deadwax over ${samples} transfers from this peer${when}. `
+        : `Measured by deadwax on one transfer from this peer${when}. `;
 
     const title = hint
         + 'This is what actually arrived while bytes were moving, with queue time excluded - '
@@ -1600,7 +1600,7 @@ const RELEASE_COLUMNS = [
     { id: 'disambiguation', label: 'Disambiguation', width: 170 },
 ];
 
-const COLUMN_STATE_STORAGE_KEY = 'jimbrainz-release-columns';
+const COLUMN_STATE_STORAGE_KEY = 'deadwax-release-columns';
 
 function defaultColumnState() {
     return {
@@ -1813,7 +1813,7 @@ function savePreference(key, value) {
     try {
         const current = loadPreferences();
         current[key] = value;
-        localStorage.setItem('jimbrainz-preferences', JSON.stringify(current));
+        localStorage.setItem('deadwax-preferences', JSON.stringify(current));
     }
 
     catch {
@@ -1971,7 +1971,7 @@ function updateResultsSummary() {
         //? The completeness claim is the whole value of a browse over a search, so it is
         //? stated rather than implied - and withdrawn honestly when it was capped.
         summary.title = discography.truncated
-            ? `this artist has more than jimbrainz will page through in one go, so this is not the complete discography`
+            ? `this artist has more than deadwax will page through in one go, so this is not the complete discography`
             : `every ${scope} credited to this artist on MusicBrainz`;
         return;
     }

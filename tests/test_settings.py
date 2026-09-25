@@ -427,7 +427,7 @@ def test_the_email_row_shows_exactly_what_will_be_sent(monkeypatch):
 
     assert row["status"] == "ok"
     assert row["editable"] is True
-    assert f"jimbrainz/{__version__} ( me@example.com )" in row["effect"]
+    assert f"deadwax/{__version__} ( me@example.com )" in row["effect"]
 
 
 def test_the_old_user_agent_row_is_gone_once_nothing_sets_it(monkeypatch):

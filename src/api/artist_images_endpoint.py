@@ -57,7 +57,7 @@ class ArtistImagesClient:
         Wikimedia asks every caller to identify itself, and this is the same string MusicBrainz
         is given.
         """
-        return Config.musicbrainz_user_agent() or f"jimbrainz/{__version__}"
+        return Config.musicbrainz_user_agent() or f"deadwax/{__version__}"
 
     async def _json(self, url: str, what: str) -> dict | None:
         try:
@@ -108,7 +108,7 @@ class ArtistImagesClient:
         One fanart.tv music response, looked up by MusicBrainz artist id.
 
         None when no key is configured, which is the ordinary case. fanart.tv issues a PROJECT
-        key per application rather than per person, so it cannot be shipped with jimbrainz and
+        key per application rather than per person, so it cannot be shipped with deadwax and
         has to be registered by whoever runs it; the personal key beside it is optional and only
         buys earlier sight of images added in the last week.
         """

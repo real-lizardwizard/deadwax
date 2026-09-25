@@ -1,4 +1,4 @@
-# jimbrainz — working context
+# deadwax — working context
 
 Read this before doing anything. It records decisions and hard-won gotchas that aren't
 recoverable from the code, so you don't re-litigate settled questions or re-discover
@@ -10,11 +10,11 @@ A fork of [LidBrainz](https://github.com/dual-shock/lidbrainz) that has diverged
 Upstream sends releases to Lidarr. **This fork removed Lidarr entirely and talks to slskd
 directly.**
 
-Repo: `real-lizardwizard/jimbrainz` · owner is James Barnett (jamesambarnett@gmail.com).
+Repo: `real-lizardwizard/deadwax` · owner is James Barnett (jamesambarnett@gmail.com).
 
 **Where it runs: OpenMediaVault, with Komodo managing Docker.** So compose is the deployment path
 that matters, and anything addressed to "your Unraid box" is wrong. The Unraid template
-(`my-jimbrainz.xml`) and the Unraid half of the README are INHERITED from upstream LidBrainz,
+(`my-deadwax.xml`) and the Unraid half of the README are INHERITED from upstream LidBrainz,
 whose author did run Unraid and wrote those first-person notes; they came through the fork
 untouched and nothing here has tested them since. **Don't read Unraid into the repo because those
 files are in it** - it produced a run of confidently wrong deployment advice before James said so.
@@ -26,6 +26,41 @@ files are in it** - it produced a run of confidently wrong deployment advice bef
 | `main` | the old Lidarr-based line, v0.2.1. Untouched by the rewrite, and now behind it. |
 | `experimental/slskdn-no-lidarr` | **all the work below.** slskd-direct, no Lidarr. Releases are tagged from here — v0.3.0 onward. |
 
+### The name (v0.6.21)
+
+It was called **jimbrainz** until v0.6.21, and git history before that says so. James asked for
+"a more creative name" and picked **deadwax** from a shortlist: dead wax is the blank ring between
+a record's last groove and its label, where the matrix number that tells one PRESSING from
+another is scratched - which is exactly the thing this project exists to care about. Lowercase,
+like slskd, and never sentence-case it.
+
+What a rename has to carry across, because an install that upgrades must not notice:
+
+- **Saved browser state.** Every localStorage key was `jimbrainz-*`. `interface/scripts/
+  rename-storage.js` copies each to `deadwax-*` (a key already under the new name wins) and
+  deletes the old one. It is a CLASSIC script in `<head>`, not a module, on purpose: module
+  scripts run after parsing in document order and `resize.js` reads its key before `main.js`,
+  so the move has to be finished before any of them start. The origin didn't change (it is host
+  and port), so the old keys are there to be found. Delete the script once nobody can be on
+  0.6.20 any more - not before.
+- **The database.** The default moved from `/config/jimbrainz.db` to `/config/deadwax.db`, and
+  an install that never set `DB_PATH` has everything in the old one. `default_db_path()` goes
+  on using the old file where it is while the new one doesn't exist, and says so in the log.
+  It never MOVES the file - that would be a write into someone's config volume for nothing.
+  An explicit `DB_PATH=/config/jimbrainz.db` in an existing compose file just keeps working;
+  **don't "tidy" it by renaming the file** - that is the one change that loses the data.
+- **The API prefix is `/deadwax/` with no alias for `/jimbrainz/`.** Only this page calls it,
+  and `index.html` is served no-cache, so a reload picks up the new paths. A tab left open
+  across the upgrade gets 404s until it is reloaded - accepted rather than kept forever.
+- **The image name follows the GitHub repo name** (`IMAGE_NAME: ${{ github.repository }}` in
+  docker-publish.yml), so the ghcr path only becomes `ghcr.io/real-lizardwizard/deadwax` once
+  the repo itself is renamed. Everything up to 0.6.20 stays published under the old package
+  name, and a Komodo stack has to be pointed at the new image by hand - nothing redirects it.
+- **The user agent** is now `deadwax/<version> ( email )`, built as before.
+- **Not renamed:** the local checkout folder (`~/Desktop/Code/jimbrainz`). The agent's memory
+  directory is keyed on that path, so moving it strands the memory. Rename both together or
+  neither.
+
 ### Why Lidarr was dropped
 
 Not preference — a specific failure. Pick a *particular* release (the 2011 remaster, the
@@ -35,7 +70,7 @@ The plugin doing the actual Soulseek search rebuilds a generic query and grabs w
 returns. Tubifarry's own maintainer
 [confirms Custom Formats can't target a selected release variant](https://github.com/TypNull/Tubifarry/discussions/138).
 
-jimbrainz already knows all of it, so it owns the search and the matching itself.
+deadwax already knows all of it, so it owns the search and the matching itself.
 
 **Honest limitation, stated in the README and worth preserving:** this does not reliably
 auto-detect remasters. Soulseek folder names are typed by strangers and often omit edition
@@ -88,7 +123,8 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
 tests/             635 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
-API routes are prefixed **`/jimbrainz/`** (renamed from `/lidbrainz/`).
+API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
+in v0.6.21 - see "The name").
 
 ### The flow
 
@@ -145,7 +181,7 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   and is the hook for the planned metadata manager: choosing an edition by hand should mean
   writing that field, not changing how editions are resolved.
   **An untagged folder is never treated as a different release** — libraries predating
-  jimbrainz have no MBIDs, and forking every one of those albums would be far worse than
+  deadwax have no MBIDs, and forking every one of those albums would be far worse than
   sharing a folder.
 - **Deleting an album is the only thing here that removes data the user did not just
   download, and it has no undo**, so `delete_album()` carries every guard: inside
@@ -208,7 +244,7 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   A "needs attention" flag that is stored is a flag that goes stale the moment something fixes
   the album without clearing it; deriving it means a fixed album leaves the queue on its own.
   The `album_review` table therefore holds four things and no verdicts: when an album was first
-  seen, whether jimbrainz filed it or merely found it, whether you've looked at it, and which
+  seen, whether deadwax filed it or merely found it, whether you've looked at it, and which
   issue codes you've accepted.
   **Ignores are per issue, not per album** — accepting that a bootleg will never be in
   MusicBrainz must not also silence the day its cover art goes missing.
@@ -218,7 +254,7 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   row, which is why `mark_album_reviewed()` takes a destination and the retag endpoint passes
   it.
 - **The tab badge and the queue must never count different things.** They did, and it produced
-  a notification that named no album: the badge counts albums jimbrainz *filed and you haven't
+  a notification that named no album: the badge counts albums deadwax *filed and you haven't
   looked at*, the queue counts albums with *outstanding issues*, and a freshly imported album
   with perfect tags is the first without being the second. It appeared in no facet, carried no
   chip, and the whole metadata section was hidden when nothing else was wrong — and it could
@@ -227,7 +263,7 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   `newly added` facet and a `new` row chip, and **stepping past one is what marks it seen**.
   A notification you cannot act on is worse than no notification.
 - **Prune review rows for albums that are gone.** A row is keyed on the album's path, so a
-  folder renamed or deleted outside jimbrainz orphans it — and an orphaned *import* row is
+  folder renamed or deleted outside deadwax orphans it — and an orphaned *import* row is
   counted by the badge while being in no scan, so it can be neither named nor cleared. The scan
   drops them, but **only after a scan that actually found albums**: an empty library is far more
   often an unmounted volume than a deleted collection, and wiping every ignore the moment a
@@ -305,7 +341,7 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
 - **Capitalization: sentence case in the markup, and let CSS do any uppercasing.** Several
   labels are rendered uppercase by `text-transform`, so the source string still has to read
   correctly when that rule is not applied. Proper nouns keep their own casing, and **`slskd`
-  and `jimbrainz` are lowercase brand names** — never sentence-case them, rephrase so they are
+  and `deadwax` are lowercase brand names** — never sentence-case them, rephrase so they are
   not sentence-initial instead.
 
 ### Panels move as well as resize
@@ -415,7 +451,7 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   blank and it resolved to `Afterburner (2020)` — the standard album's own folder.
 - **`resolve_album_dir()`'s escalation does not save you here**, and the reason is a
   deliberate decision documented above: it shares a folder when the existing one is
-  UNTAGGED, which is the common case for any library that predates jimbrainz. The fix has to
+  UNTAGGED, which is the common case for any library that predates deadwax. The fix has to
   be that the two never resolve to the same name in the first place.
 - **`instrumental`, `acoustic` and `a cappella` are therefore in the edition vocabulary**, and
   that vocabulary exists in THREE places which must stay in step: `EDITION_PATTERNS` in
@@ -477,7 +513,7 @@ on one — the whole thing was the desktop layout with `flex-wrap` turned on.
 - **The units comment stays.** BYTES/sec, not bits — see the note in `matching.py`. Two
   separate things were once wrong here: the units (fixed earlier) and the meaning (fixed now).
   An older comment calling it "our download speed" is what the interface then went and claimed.
-- **jimbrainz already weights it correctly**, and that did not need changing: `score_peer()`
+- **deadwax already weights it correctly**, and that did not need changing: `score_peer()`
   grants at most 0.2 for speed, and `peer` carries **0.08 of 1.0** in `WEIGHTS` — the lowest
   of the six signals. It is an availability tiebreaker, never a ranking criterion.
 - **`.candidate-peer` had to gain `flex-wrap: wrap`.** The three chips fitted while the speed
@@ -536,7 +572,7 @@ store keeps one row per peer.
 ### The downloads panel's optimistic overlays
 
 - **Cancel and "clear finished" update the screen BEFORE the server answers, not after.**
-  Both actions cost two sequential round-trips — one to jimbrainz, which itself calls on to
+  Both actions cost two sequential round-trips — one to deadwax, which itself calls on to
   slskd, and then a poll to see the result — and until v0.5.2 the row was pixel-identical for
   the whole of both. That is what "the buttons feel laggy" actually was: not slowness, but a
   UI that showed nothing at all while it waited to be told it was allowed to.
@@ -589,7 +625,7 @@ full-width album cards (`LibraryAlbumRow`, deleted), whose middle was mostly emp
   group headings - initial, year, month - the way Windows 7's music library did "Arrange by".
   Each sort starts its natural way round (names A-Z, release date oldest first like the search
   tab, date added newest first) and one button flips it; the choice is saved in
-  `jimbrainz-library-sort` and validated on read. Undated albums sink in both directions.
+  `deadwax-library-sort` and validated on read. Undated albums sink in both directions.
 - **"Date added" is the EARLIER of `first_seen` and the folder's mtime** (`albumAddedAt`).
   `first_seen` is exact for anything since install, but every album present on the first scan
   shares that one moment; the folder mtime spreads those out but moves when a cover is added.
@@ -611,13 +647,13 @@ full-width album cards (`LibraryAlbumRow`, deleted), whose middle was mostly emp
 - **`/library/tracks` is the third endpoint that turns user input into a filesystem read**
   (with `/art` and `/deletion_summary`), and copies `/art`'s guard exactly, identical 404
   included. Tested with the same traversal cases.
-- **Field choices have their own storage key** (`jimbrainz-library-fields`) and one writer - the
+- **Field choices have their own storage key** (`deadwax-library-fields`) and one writer - the
   details pane's single `useTrackFields` instance, which the menu and the table both read.
   It stores `seen` beside `visible`, so a field added in a later version takes its own default
   instead of staying hidden for everyone who ever touched the menu. Pinned in the sim. Since
   v0.6.9 the same key and writer also hold the columns' `order` and `widths` - see "Arranging
   the track viewer's columns".
-- **The splitter's width is persisted (`jimbrainz-library-pane-width`) and capped in CSS** at
+- **The splitter's width is persisted (`deadwax-library-pane-width`) and capped in CSS** at
   `100% - 340px`, so a width saved in a big window can't swallow the details in a small one.
 - **What fits on a tree row depends on the TREE's width, not the window's.** `#library-nav` is
   a size container, and `@container` rules drop the issue chip, then the year, as it narrows.
@@ -738,7 +774,7 @@ tool beside it.
 Asked for: "use the current version automatically ... and have the user only set the email".
 
 - **`MUSICBRAINZ_EMAIL` is the setting; the user agent is BUILT, on every call**, as
-  `jimbrainz/<__version__> ( email )` - MusicBrainz's documented shape. Nothing stores the
+  `deadwax/<__version__> ( email )` - MusicBrainz's documented shape. Nothing stores the
   finished string, so the version can't go stale and a contact changed in the settings tab
   applies at once. `Config.musicbrainz_user_agent()` is the only place it is made.
 - **An old `MUSICBRAINZ_USERAGENT` keeps working.** `contact_from_useragent()` lifts the contact
@@ -758,7 +794,7 @@ Asked for: "use the current version automatically ... and have the user only set
   not from `Config.check()`, which runs before them - an email set in the tab would otherwise
   be logged as missing on every restart.
 - **Verified against the live API:** the dev `.env`'s hand-written user agent was rebuilt as
-  `jimbrainz/0.6.9 ( dev-test@example.com )`, and MusicBrainz answered 200.
+  `deadwax/0.6.9 ( dev-test@example.com )`, and MusicBrainz answered 200.
 
 ### Cover art size (v0.6.9)
 
@@ -813,7 +849,7 @@ Asked for: "reorder and resize columns in the library metadata".
   give the column its own width back. Reset in the Fields menu restores fields, order and widths.
 - **The order covers EVERY column, hidden ones and the title included**, so a field you hide and
   show again comes back where you put it. The title moves like any other column but can't hide.
-- **Same key and same single writer as the field choices** (`jimbrainz-library-fields`,
+- **Same key and same single writer as the field choices** (`deadwax-library-fields`,
   `useTrackFields`). `order` is written only once it differs from the default, and `widths` only
   once there are some, so a later version's defaults still reach anybody who never arranged
   anything. `reconcileOrder` places a column the saved order has never heard of beside its
@@ -862,14 +898,14 @@ anything else I'd need for an artist page".
   VOTED on by the people using them - so `from_fanarttv()` offers the most-liked of each kind
   first. Both are optional and everything degrades to "a photograph, where Commons has one".
   **fanart.tv's key is a PROJECT key, issued per application rather than per person**, so it
-  cannot ship with jimbrainz and has to be registered by whoever runs it; `FANARTTV_PERSONAL_KEY`
+  cannot ship with deadwax and has to be registered by whoever runs it; `FANARTTV_PERSONAL_KEY`
   beside it is optional and only buys sight of images added in the last week.
 - **The square image is written as `artist.*`, and that is the whole point of writing files at
   all.** Navidrome reads it with no configuration: `ArtistArtPriority` defaults to
   `"artist.*, album/artist.*, external"`. Writing it as `folder.*` - what Jellyfin and Kodi call
   an artist thumb - would be invisible to Navidrome AND sits in its COVER ART priority, so in a
   folder that turned out to hold audio it would be read as that album's cover. The other five
-  (`banner`, `fanart`, `logo`, `landscape`, `clearart`) are what jimbrainz's own page is made of;
+  (`banner`, `fanart`, `logo`, `landscape`, `clearart`) are what deadwax's own page is made of;
   Navidrome displays none of them, Kodi and Jellyfin read them, nothing else notices.
 - **A folder holding TRACKS is refused.** That folder is an album to the scanner, and dropping
   `artist.*` into it means something else entirely to every reader of these files.
@@ -879,7 +915,7 @@ anything else I'd need for an artist page".
   silently useless, which is worse to debug.
 - **Applying only honours a URL the artist's own sources just offered.** The apply route
   recomputes the candidate list exactly as it recomputes the plan. Without it, `choices` could
-  name any address - inside the network this container sits in - and jimbrainz would fetch it
+  name any address - inside the network this container sits in - and deadwax would fetch it
   and write the answer into the library under a name other tools read. Pinned by a test.
 - **Which artist this is comes from the TAGS first, and a name search is only believed when it
   is unambiguous** (one exact name match, MusicBrainz score >= 90). Several bands share a name,
@@ -910,7 +946,7 @@ most up-to-date name".
 
 - **MusicBrainz keeps ONE current name per artist and every other name as an alias, while each
   release keeps the name it was CREDITED under.** Those two disagree for everyone who has ever
-  renamed, and jimbrainz writes the credit into the tags and the folder - rightly, the album
+  renamed, and deadwax writes the credit into the tags and the folder - rightly, the album
   really was credited that way - so **the name on disk is the one MusicBrainz no longer answers
   to**. Ye is credited "Kanye West" on all but two of his own albums.
 - **`artist:"..."` matches the current name ONLY.** Measured against the live API:
@@ -984,7 +1020,7 @@ most up-to-date name".
 - **...which broke the editor's own search, and had to be fixed with it.** `artist:` on a
   RELEASE GROUP matches the credit only, so once the field held "Ye", `releasegroup:"Donda" AND
   artist:"Ye"` could no longer find the Donda credited to Kanye West - measured, through
-  jimbrainz's own client: the old query found 2 groups and not that one. `fieldedAlbumQuery()`
+  deadwax's own client: the old query found 2 groups and not that one. `fieldedAlbumQuery()`
   asks `(artist:"X" OR artistname:"X")`, and `artistname:` is what matches the current name:
   10 groups, the real Donda among them. Without it every album filed by its current name could
   no longer find its own release group. The placeholder shows the same string.
@@ -1018,7 +1054,7 @@ James: "make sure the same logic with ye works with the slskd search".
   share's path, so "Ye BULLY" cannot find `Kanye West/BULLY` at all, and "Kanye West Donda"
   cannot find `Ye/Donda`.
 - **So it searches under every name a share might carry**: the CREDIT (what the album said when
-  the sharer got it), the CURRENT name (what jimbrainz and Picard's standardised names file
+  the sharer got it), the CURRENT name (what deadwax and Picard's standardised names file
   under), and FORMER names (what someone who never re-filed still uses). `search_names()` in
   routes/download.py orders and dedupes them; an artist who never renamed is exactly one search.
 - **A former name is one MusicBrainz itself marks as former: an ENDED "Artist name" alias.**
@@ -1092,7 +1128,7 @@ James: "when a new album gets organized, it takes quite a while for it to actual
 - **The downloads poll quickens to 1s while a job is `organizing`** (`POLL_FILING_MS`). At the
   5s background cadence the album appeared up to five seconds after landing. It costs nothing
   against slskd: the server asks slskd only about queued and downloading jobs, so these polls
-  are one read of jimbrainz's own job table.
+  are one read of deadwax's own job table.
 - **Measured in the real page** (scratch database and library, the job driven through the same
   store calls the poller makes, downloads panel closed): never, before; 5.6s with the
   announcement alone; **1.5s** with the quicker poll while filing. No Rescan in any run.
@@ -1114,7 +1150,7 @@ metadata as well".
   applying a release to a compilation rewrote eighteen artists into one. The track's credit wins
   where it has one; `albumartist` stays the release's, which is what the two tags are for.
 - **The artist ids are written at last**: `musicbrainz_albumartistid` and `musicbrainz_artistid`.
-  Nothing jimbrainz filed had ever recorded WHO an artist was, only which release - which is why
+  Nothing deadwax filed had ever recorded WHO an artist was, only which release - which is why
   the artist page has to fall back to searching by name at all.
 - **One id is a string, several are a list**, and `read_current_tags` reads back the same shape.
   Get that wrong and a file disagrees with itself on every preview: a bare string on one side, a
@@ -1172,8 +1208,8 @@ metadata as well".
   listed at the same time. "Why did nothing get filed" has four possible causes across two
   groups; discovering them one at a time is how people conclude the feature is broken rather
   than misconfigured.
-- **Client preferences are a separate storage key (`jimbrainz-preferences`), not more fields
-  on `jimbrainz-download-defaults`.** That older blob is read and rewritten wholesale by
+- **Client preferences are a separate storage key (`deadwax-preferences`), not more fields
+  on `deadwax-download-defaults`.** That older blob is read and rewritten wholesale by
   `main.js` too, so any field it did not know about would survive only until the next time it
   saved. New key, one writer.
 - **Every preference is genuinely wired to behaviour**, and the vanilla half reads them at
@@ -1348,7 +1384,7 @@ Each of these cost real time. Don't rediscover them.
   that trusts the property. `main.css` now forces `[hidden]` to win. **`hidden` reading
   `true` is not evidence an element is hidden — measure it.**
 - **The downloads panel vanishes if `ui/` hasn't been built.** `interface/index.html` loads
-  `dist/jimbrainz-ui.js`, which is gitignored and generated. Running from source without
+  `dist/deadwax-ui.js`, which is gitignored and generated. Running from source without
   `npm run build` leaves it 404ing and that panel simply absent. Check this first.
 - **Don't derive an overlay's subject from a list that a write reloads.** The metadata editor
   originally resolved its album by looking `review.paths[index]` up in `albums` on every
@@ -1543,7 +1579,7 @@ Each of these cost real time. Don't rediscover them.
   so the app spent its time telling the user that its own politeness was a fault. It is at debug
   now. A real 429 from the server is still reported.
 - **docker-compose: `environment:` beats `env_file`, and that is now a supported way to
-  configure jimbrainz — but only with LITERAL values.** Both sources work and may be mixed
+  configure deadwax — but only with LITERAL values.** Both sources work and may be mixed
   (`load_dotenv()` does not override existing variables, so the environment wins; there is a
   subprocess test pinning that, because flipping it to `override=True` would invert the
   precedence with nothing to show for it).
@@ -1601,9 +1637,23 @@ The README's images are captured from the running app; `interface/_shot.html` an
 do it. Both are temporary and neither is committed — **the harness must not ship**, it is
 same-origin with the app by design.
 
+**v0.6.21 did it more simply, and that is the way to do it again when there is network.**
+Playwright's Python package (the driver only - no browser download) in a scratch venv, launched
+against the Brave already installed (`executable_path`), `device_scale_factor=2` at 1440x900 and
+390x844. The server ran from a `.claude/launch.json` entry with an `env` block pointing
+`DB_PATH`, `LIBRARY_PATH` and `SLSKD_URL` into the scratchpad - `load_dotenv()` never overrides
+what is already set, so the dev `.env` can't leak in. The LIBRARY was generated: MusicBrainz
+releases fetched by id, filed and tagged through `organizer.build_target_path()` and
+`write_tags()` so it is exactly what deadwax files, ffmpeg writing quiet pink noise of each
+track's length as FLAC (~200 kbps, so 1 GB for ten albums), covers from the Archive. Two
+things to know: `build_target_path()` called directly gives every non-XE/XW pressing a country
+suffix (`[GB]`, `[AU]`) - that IS what deadwax would name them (see `resolve_edition_label`),
+and the capture renamed them by hand for tidier pictures; and a wait on
+`.track-table-row` is what says the library pane has drawn.
+
 - **`--screenshot` and `--virtual-time-budget` cannot do this, and two attempts hung proving
   it.** The flag fires once load settles, which is before any driving has happened. Virtual
-  time is the usual answer and it does not work here either: jimbrainz polls continuously, so
+  time is the usual answer and it does not work here either: deadwax polls continuously, so
   the network never goes idle and virtual time never drains. What works is driving over CDP
   and waiting on a REAL condition — the harness sets `document.title` to `READY` when it has
   finished, and the driver polls for that.
@@ -1700,7 +1750,7 @@ same-origin with the app by design.
   thread parked. Running rolldown's own CLI on the same input finished in **68ms**:
   `node --import <shim>.mjs node_modules/rolldown/bin/cli.mjs -c <config>.mjs`, with a config of
   `input: src/main.tsx`, `tsconfig: tsconfig.json` (it reads jsx/jsxImportSource from there),
-  `platform: 'browser'` and `output.file: ../interface/dist/jimbrainz-ui.js`. The Preact preset
+  `platform: 'browser'` and `output.file: ../interface/dist/deadwax-ui.js`. The Preact preset
   only adds dev-time plugins, so a production bundle loses nothing. It is a LOCAL workaround -
   Docker builds on node:22 through vite as normal, and the real fix is still the Node upgrade.
 - **This checkout lives in iCloud-optimised storage, and much of it is evicted.** `ls -lO`
@@ -1711,8 +1761,8 @@ same-origin with the app by design.
   NOT this: 0% CPU and parked threads, where a fetch shows I/O.)
 - **Which `launch.json` the browser preview tool reads depends on the session's working
   directory.** Sessions started in `~/Desktop/Code` read THAT folder's `.claude/launch.json`;
-  the v0.6.9 session, started in this repo, read `jimbrainz/.claude/launch.json` - and when asked
-  for a name that wasn't in it, it started the plain `jimbrainz` config instead of failing:
+  the v0.6.9 session, started in this repo, read this repo's own `.claude/launch.json` - and when asked
+  for a name that wasn't in it, it started the plain `deadwax` config instead of failing:
   against the REAL `.devdata` database, with no library. **Check the name `preview_start`
   reports back before doing anything that writes.** The pattern is otherwise unchanged: a
   throwaway library of real FLACs with real tags and a throwaway database, both in the
@@ -1834,12 +1884,12 @@ the page, and ported panels mount into it via one extra module script.
 **How the two halves coexist:**
 
 - `interface/index.html` provides empty mount points (`#downloads-root`, `#tabs-root`,
-  `#library-root`) and loads `dist/jimbrainz-ui.js` after `main.js`. The mount points are
+  `#library-root`) and loads `dist/deadwax-ui.js` after `main.js`. The mount points are
   `display: contents` where they sit inside a flex row, so the layout is untouched.
 - Ported components reuse the **existing class names and IDs verbatim**, so `main.css` applies
   unchanged. A visual difference means a porting mistake, not a restyle.
 - Both files are ES modules and can't call each other, so cross-boundary calls meet on
-  `window.jimbrainz` (`ui/src/bridge.ts`). Four entries today: `refreshDownloads`,
+  `window.deadwax` (`ui/src/bridge.ts`). Four entries today: `refreshDownloads`,
   `closeOtherDropdowns`, `runSearch`, `refreshNewImports`. **An empty bridge means the
   migration is done.**
 
@@ -1894,7 +1944,7 @@ compile time.
 ## Local development
 
 ```bash
-.venv/bin/python -m src.main          # needs .env; DB_PATH=.devdata/jimbrainz.db
+.venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
 .venv/bin/python -m pytest tests/ -q  # 635 tests
 ```
 
@@ -1904,7 +1954,7 @@ Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm got
 npm install
 npm run build      # tsc --noEmit && vite build -> interface/dist/, required to see downloads
 npm run typecheck  # tsc alone; runs on older Node when the build won't
-npm run dev        # harness on :5173, proxies /jimbrainz + /styles to :8080 (start the backend first)
+npm run dev        # harness on :5173, proxies /deadwax + /styles to :8080 (start the backend first)
 ```
 
 ```bash
@@ -1978,8 +2028,8 @@ A green suite here means the logic is sound, not that it works against real infr
    overflow, what genuine `signals` distributions look like, or whether the query box and
    re-search behave against a live search. **Stubbing the fetch is a cheap way to look at
    this panel again** — it needs no slskd and takes one `window.fetch` override.
-8. **Recapture `assets/images/library.png`.** It still shows the pre-v0.6.5 album-row library;
-   the README text describes the explorer. Use the screenshot harness described above.
+8. ~~Recapture `assets/images/library.png`~~ **Done in v0.6.21**, with the other four, for the
+   rename. See "Capturing screenshots" for how the library was built.
 9. **An album stored one folder per disc shows as "editions".** The scan treats every folder
    holding audio as an album, so `Album (Disc 1)` and `Album (Disc 2)` group as two editions of
    one album - and applying the release to each tags them correctly (the title matcher finds

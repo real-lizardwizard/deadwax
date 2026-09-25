@@ -1,7 +1,7 @@
 """
 Applying a release to an album already in the library.
 
-This is the second thing in jimbrainz that writes to the user's filesystem, and unlike the
+This is the second thing in deadwax that writes to the user's filesystem, and unlike the
 organizer it operates on files the user already had rather than ones we just downloaded. The
 guards matter more than the happy path here, so most of these are about what it refuses.
 """

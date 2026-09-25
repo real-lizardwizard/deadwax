@@ -7,7 +7,7 @@ from src.logger import logger
 #? Which names the environment already held before .env was read.
 #?
 #? python-dotenv does not override existing variables, so anything in here won the tie - which
-#? is precisely what makes configuring jimbrainz from a compose `environment:` block work at
+#? is precisely what makes configuring deadwax from a compose `environment:` block work at
 #? all. Captured rather than inferred afterwards, because once load_dotenv() has run the two
 #? sources are indistinguishable in os.environ, and "check your .env" is unhelpful advice to
 #? somebody who configured everything in their compose file.
@@ -88,7 +88,24 @@ def describe_slskd_url(url: str | None) -> str | None:
 #? agent written by hand in a compose file goes on claiming whichever version it was written
 #? against long after the image has moved on, and the contact is the only part of it that was
 #? ever the user's to supply.
-APP_NAME = "jimbrainz"
+APP_NAME = "deadwax"
+
+#? The database's default home, and where it lived while the project was called jimbrainz
+#? (renamed to deadwax in v0.6.21). An install that never set DB_PATH has every job, ignore,
+#? override and saved scan in the OLD file, and a new default pointing somewhere empty would
+#? greet it with a blank slate and no word of why. So the old file keeps being used - read in
+#? place, never moved, since moving it is a write into somebody's config volume that nothing
+#? here needs. Only when the new file doesn't exist yet: once it does, it is the database.
+DEFAULT_DB_PATH = "/config/deadwax.db"
+LEGACY_DB_PATH = "/config/jimbrainz.db"
+
+
+def default_db_path(new: str = DEFAULT_DB_PATH, legacy: str = LEGACY_DB_PATH) -> str:
+    """The database to use when DB_PATH is not set: the old one, if that is where the data is."""
+    if not os.path.exists(new) and os.path.exists(legacy):
+        return legacy
+    return new
+
 
 #? What the Cover Art Archive will serve for a release's front cover. The numbers are its fixed
 #? thumbnail sizes; `full` is whatever was originally uploaded, which has no fixed size at all.
@@ -96,7 +113,7 @@ COVER_ART_SIZES = ("250", "500", "1200", "full")
 
 
 def build_user_agent(contact: str) -> str:
-    """`jimbrainz/<version> ( contact )` - MusicBrainz's documented shape, spaces and all."""
+    """`deadwax/<version> ( contact )` - MusicBrainz's documented shape, spaces and all."""
     return f"{APP_NAME}/{__version__} ( {contact} )"
 
 
@@ -105,7 +122,7 @@ def contact_from_useragent(value: str | None) -> str | None:
     The contact inside a user agent written by hand, the way MUSICBRAINZ_USERAGENT used to be.
 
     MusicBrainz documents the form `App/1.0 ( contact )`, and the bracketed contact is the only
-    part of it that was ever the user's own - the name and version describe jimbrainz. So an
+    part of it that was ever the user's own - the name and version describe deadwax. So an
     install configured the old way keeps working after an upgrade: the contact is lifted out,
     and the rest is rebuilt around it with the version actually running.
 
@@ -150,7 +167,7 @@ def describe_contact(value: str | None) -> str | None:
         return "has characters a web request header can't carry - use plain ASCII"
 
     if "(" in text or ")" in text:
-        return "wants just the address, without brackets - jimbrainz writes the rest itself"
+        return "wants just the address, without brackets - deadwax writes the rest itself"
 
     if any(c.isspace() or not c.isprintable() for c in text):
         return "has spaces in it - it should be one address, like you@example.com"
@@ -164,7 +181,7 @@ def describe_contact(value: str | None) -> str | None:
 load_dotenv()
 class Config:
     #? The contact MusicBrainz asks every app for: an email address, or a web address. It is the
-    #? only part of the user agent that is yours - jimbrainz writes its own name and version
+    #? only part of the user agent that is yours - deadwax writes its own name and version
     #? around it, so the version sent is always the one running. See musicbrainz_user_agent().
     MUSICBRAINZ_EMAIL = _env("MUSICBRAINZ_EMAIL")
 
@@ -186,7 +203,7 @@ class Config:
     #? slskd's own behaviour, where a partial file is retained so a retry can resume from it.
     SLSKD_INCOMPLETE_PATH = _env("SLSKD_INCOMPLETE_PATH")
     LIBRARY_PATH = _env("LIBRARY_PATH")
-    DB_PATH = _env("DB_PATH", "/config/jimbrainz.db")
+    DB_PATH = _env("DB_PATH") or default_db_path()
 
     #? off | dry_run | copy | move. Defaults to dry_run deliberately: organizing is the only
     #? thing here that writes to your filesystem, so a fresh install reports what it would
@@ -194,14 +211,14 @@ class Config:
     ORGANIZE_MODE = _env("ORGANIZE_MODE", "dry_run")
 
     #? How big a cover to fetch from the Cover Art Archive: 250 | 500 | 1200 | full. 500 is the
-    #? size jimbrainz always fetched, and it stays the default - `full` pulls the original
+    #? size deadwax always fetched, and it stays the default - `full` pulls the original
     #? upload, which is often several megabytes, so it is something to choose rather than
     #? something to be given. Read at the point of use, like everything else here.
     COVER_ART_SIZE = _env("COVER_ART_SIZE", "500")
 
     #? Optional, and artist banners are off without it. MusicBrainz has no artist images at all
     #? and Wikimedia Commons has a photograph at best, so TheAudioDB is the only source here
-    #? with banners, logos and backgrounds - keyed by the same MusicBrainz artist id jimbrainz
+    #? with banners, logos and backgrounds - keyed by the same MusicBrainz artist id deadwax
     #? already holds. Everything else about an artist page works without it.
     THEAUDIODB_KEY = _env("THEAUDIODB_KEY")
 
@@ -372,7 +389,7 @@ class Config:
 
         elif user_agent:
             logger.error(
-                "MUSICBRAINZ_USERAGENT has no contact in it that jimbrainz can find, so it is "
+                "MUSICBRAINZ_USERAGENT has no contact in it that deadwax can find, so it is "
                 "sent exactly as written - and MusicBrainz rate limits requests without one. "
                 "Set MUSICBRAINZ_EMAIL to your email address.",
                 extra={"frontend": True},
@@ -399,6 +416,12 @@ class Config:
     def check(cls):
         #? MusicBrainz is reported separately, by report_musicbrainz(), once the settings tab's
         #? overrides are in - see its docstring for why it can't happen here.
+
+        if cls.DB_PATH == LEGACY_DB_PATH and not _env("DB_PATH"):
+            logger.info(
+                f"using the database from before the rename, {LEGACY_DB_PATH} - nothing needs "
+                f"doing, it will go on being used where it is"
+            )
 
         #? Named before anything else, because an empty environment variable beating a good
         #? .env line is invisible from the value alone - the setting simply reads as unset

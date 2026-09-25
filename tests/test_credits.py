@@ -2,10 +2,10 @@
 Artist credits: who a track is by, and saying so in MusicBrainz's terms.
 
 Until now every track was tagged with the RELEASE's artist, so applying a release to a
-compilation rewrote eighteen different artists into one, and nothing jimbrainz filed recorded
+compilation rewrote eighteen different artists into one, and nothing deadwax filed recorded
 an artist id at all - which is why the artist page has to fall back to searching by name.
 
-The test that matters most here is the last one: a file jimbrainz has just tagged must report
+The test that matters most here is the last one: a file deadwax has just tagged must report
 NO changes when the preview looks at it again. Multi-valued tags are where that goes wrong -
 one side a string, the other a one-item list - and the symptom is an album that can never say
 "nothing to change" however many times you apply it.
@@ -63,7 +63,7 @@ RELEASE = {
 
 
 def test_the_album_artist_id_is_written():
-    """The thing nothing jimbrainz filed had until now."""
+    """The thing nothing deadwax filed had until now."""
     values = tag_values(RELEASE, None)
     assert values["musicbrainz_albumartistid"] == ["id-dgd", "id-tilian"]
     assert values["albumartist"] == "Dance Gavin Dance / Tilian"
@@ -98,7 +98,7 @@ def test_nothing_is_written_when_musicbrainz_supplied_no_ids():
 
 # ---------------------------------------------------------------- the round trip
 
-def test_a_file_jimbrainz_just_tagged_reports_no_changes(tmp_path):
+def test_a_file_deadwax_just_tagged_reports_no_changes(tmp_path):
     """
     The phantom diff, which is what multi-valued tags get wrong.
 

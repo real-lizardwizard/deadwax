@@ -17,7 +17,7 @@ const { execFileSync } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 
 const UI = path.resolve(__dirname, '..');
-const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'jimbrainz-downloads-'));
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-downloads-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/downloadOverlay.ts', 'src/lib/libraryEvents.ts', '--outDir', OUT, '--module', 'commonjs',

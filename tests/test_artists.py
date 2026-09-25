@@ -311,7 +311,7 @@ def test_social_links_are_named_after_where_they_go():
 # ------------------------------------------------------- finding an artist who has been renamed
 #
 # MusicBrainz keeps one current name per artist and everything else as an alias, while each
-# release keeps the name it was CREDITED under. jimbrainz writes the credit into the tags and the
+# release keeps the name it was CREDITED under. deadwax writes the credit into the tags and the
 # folder - correctly, the album really was credited that way - so the name on disk is the one
 # MusicBrainz has stopped answering to. Measured against the live API before this was written:
 # artist:"Kanye West" returned "Kanye West Tribute Band" and "Kanye West & Hatsune Miku", with
@@ -491,7 +491,7 @@ def test_a_symlink_pointing_out_of_the_library_is_refused(tmp_path):
     assert plan_artist_art("Escape", ["thumb"], str(tmp_path))["problems"]
 
 
-def test_a_kind_jimbrainz_does_not_write_is_ignored(tmp_path):
+def test_a_kind_deadwax_does_not_write_is_ignored(tmp_path):
     seed_artist(tmp_path)
     assert plan_artist_art(ARTIST, ["mascot"], str(tmp_path))["problems"] == ["no images asked for"]
 
@@ -636,7 +636,7 @@ def test_applying_refuses_a_picture_the_sources_never_offered(tmp_path, monkeypa
     The one that keeps this endpoint from being a fetcher for whatever it is told.
 
     Without it, `choices` would name any URL - inside this container's network, or on the host -
-    and jimbrainz would GET it and write the answer into the library under a name other tools
+    and deadwax would GET it and write the answer into the library under a name other tools
     read. So apply recomputes the candidate list and only honours a URL that is in it, exactly
     as it recomputes the plan rather than accepting one back.
     """

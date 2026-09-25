@@ -23,7 +23,7 @@ import { sampleSpeeds, type SpeedSamples } from '../lib/speed'
  * feed progress and status, and their bytes accumulate into the next window rather than being
  * thrown away. Changing the numbers here does not change how often the speed updates.
  *
- * Each open poll is one request to jimbrainz and, while anything is downloading, one onward
+ * Each open poll is one request to deadwax and, while anything is downloading, one onward
  * request to slskd. Going below ~500ms starts being rude to slskd for no visible gain.
  */
 const POLL_OPEN_MS = 500
@@ -34,7 +34,7 @@ const POLL_BACKGROUND_MS = 5000
  * library, and someone is usually waiting for it. At 5s the album showed up to five seconds
  * after it landed. Cheap in a way the background cadence is not: an organizing job is past
  * slskd (the server only asks slskd about queued and downloading jobs), so each of these is one
- * read of jimbrainz's own job table.
+ * read of deadwax's own job table.
  */
 const POLL_FILING_MS = 1000
 
@@ -52,7 +52,7 @@ export interface DownloadJobsState {
    * Jobs whose cancel has been asked for but not yet confirmed by the server.
    *
    * Rendered as "cancelling…" so the click has a visible consequence immediately. Cancelling
-   * costs two sequential round-trips - one to jimbrainz and on to slskd, then a poll to see
+   * costs two sequential round-trips - one to deadwax and on to slskd, then a poll to see
    * the result - and until this existed the row was identical for both of them.
    */
   cancelling: ReadonlySet<number>
@@ -98,7 +98,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
   /*
    * Optimistic overlays, applied on top of whatever the last poll returned.
    *
-   * Both actions in this panel used to await a round-trip to jimbrainz - which itself calls
+   * Both actions in this panel used to await a round-trip to deadwax - which itself calls
    * slskd - and THEN a further poll before anything on screen moved. That is the latency:
    * not that the app was slow, but that it showed nothing at all until the server had
    * finished agreeing. These make the click land immediately and let the poll confirm it.

@@ -122,7 +122,7 @@ def test_resolve_album_dir_shares_a_folder_with_the_same_release(tmp_path):
 
 def test_resolve_album_dir_shares_a_folder_it_cannot_identify(tmp_path):
     """
-    A library that predates jimbrainz has no MBID tags. Treating "unknown" as "different"
+    A library that predates deadwax has no MBID tags. Treating "unknown" as "different"
     would fork every one of those albums into a duplicate folder, which is far worse than
     sharing one.
     """

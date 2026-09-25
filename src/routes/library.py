@@ -151,7 +151,7 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
         await store.record_albums_seen(result["albums"])
 
         #? Only after a scan that found something. An orphaned row - one whose folder was
-        #? renamed or removed outside jimbrainz - is counted by the tab badge but has no album
+        #? renamed or removed outside deadwax - is counted by the tab badge but has no album
         #? in this list to put a chip on and no queue entry to step through, so it reports an
         #? album needing attention that it cannot name or clear. Guarded on the scan being
         #? trustworthy because an empty library is far more often an unmounted volume than a
@@ -227,7 +227,7 @@ async def art(album: str):
     An album's cover, from a file beside the tracks or from inside the audio itself.
 
     `album` is a path RELATIVE to LIBRARY_PATH, exactly as the scan reports it. That makes
-    this the only endpoint in jimbrainz that turns user input into a filesystem read, so it
+    this the only endpoint in deadwax that turns user input into a filesystem read, so it
     is checked before it is used:
 
       - the resolved directory must sit inside LIBRARY_PATH. `is_within` resolves both sides
@@ -595,7 +595,7 @@ class QueueRequest(BaseModel):
 @router.get("/queue/new_imports")
 async def new_imports(request: Request):
     """
-    Albums jimbrainz has filed that you haven't looked at yet.
+    Albums deadwax has filed that you haven't looked at yet.
 
     Answerable without touching the filesystem, which is the entire point of it: the library is
     deliberately not scanned until you open its tab, so a "you have new albums" prompt that
@@ -1024,7 +1024,7 @@ async def artist_images_apply(request: Request, body: ArtistImagesRequest):
     wanted, refused = {}, []
     for kind, url in chosen.items():
         if kind not in ARTIST_ART_KINDS:
-            refused.append(f"{kind} is not an artist image jimbrainz writes")
+            refused.append(f"{kind} is not an artist image deadwax writes")
         elif url not in offered:
             refused.append(f"the {kind} chosen is not one of this artist's own pictures")
         else:

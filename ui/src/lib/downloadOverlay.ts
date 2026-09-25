@@ -7,7 +7,7 @@ import { isActive } from './jobs'
  * WHAT PROBLEM THIS SOLVES
  *
  * Both actions in that panel cost two sequential round-trips before anything could change on
- * screen: one to jimbrainz - which itself calls on to slskd - and then a poll to see the
+ * screen: one to deadwax - which itself calls on to slskd - and then a poll to see the
  * result. Until both landed, the row was pixel-identical to how it looked before the click.
  * That is the "latency": not that the app was slow, but that it showed nothing at all while
  * it waited for the server to agree.

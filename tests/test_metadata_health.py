@@ -348,7 +348,7 @@ def test_an_album_with_no_suffix_is_also_clean(tmp_path, clear_cache):
 
 
 def test_an_untagged_folder_is_flagged_for_everything_it_lacks(tmp_path, clear_cache):
-    """A library that predates jimbrainz: files with a title and nothing else."""
+    """A library that predates deadwax: files with a title and nothing else."""
     directory = tmp_path / "Some Artist" / "some album"
     for n in (1, 2):
         write_flac(directory / f"track{n}.flac", title=f"Track {n}")
