@@ -36,6 +36,30 @@ export function describeLyrics(summary: LyricsSummary): string {
   return parts.join(', ')
 }
 
+/** What a re-time run did, across however many albums it covered. */
+export interface RetimeTotals {
+  retimed: number
+  unchanged: number
+  custom: number
+  failed: number
+}
+
+/**
+ * One sentence for a re-time run. "Left alone" is spelled out, because it is the part that
+ * might surprise: those files are not LRCLIB's timings any more - corrected by hand, from
+ * somewhere else, or LRCLIB's copy has changed since - and re-timing them would undo that.
+ */
+export function describeRetime(totals: RetimeTotals): string {
+  const parts = [`re-timed ${totals.retimed} track${totals.retimed === 1 ? '' : 's'}`]
+  if (totals.unchanged) parts.push(`${totals.unchanged} already at this lead`)
+  if (totals.custom) {
+    parts.push(`${totals.custom} left alone - not LRCLIB's timings any more, so edited by hand or `
+      + 'from somewhere else')
+  }
+  if (totals.failed) parts.push(`${totals.failed} failed - try again`)
+  return parts.join(', ')
+}
+
 /** `83.4` -> `1:23`. How a synced line's time is shown beside it. */
 export function lyricTime(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds))

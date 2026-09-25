@@ -4225,6 +4225,16 @@ span.red { color: var(--red-text); }
 .lyrics-source { margin-top: var(--space-2); font-size: var(--text-2xs); font-family: var(--font-mono); overflow-wrap: anywhere; }
 .lyrics-none { font-size: var(--text-sm); }
 
+/* The settings tab's "Re-time saved lyrics": a button and a sentence saying what it did. */
+.settings-retime {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+.settings-retime-note { font-size: var(--text-xs); color: var(--white-secondary-text); min-width: 0; }
+
 .details-raw { font-size: var(--text-xs); }
 .details-raw > summary { cursor: pointer; padding: var(--space-1) 0; color: var(--main-secondary-text); }
 .details-raw > summary:hover { color: var(--main-hover-text); }

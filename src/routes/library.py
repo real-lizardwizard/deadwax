@@ -505,6 +505,9 @@ class LyricsRequest(BaseModel):
     #? off by default, like `replace` on a cover: a .lrc already there may have been corrected
     #? by hand, or come from somewhere better than LRCLIB
     replace: bool = False
+    #? re-time the .lrc files already there to LYRICS_LEAD_MS instead of fetching missing ones -
+    #? only those still exactly LRCLIB's lyrics, see lyrics.timing_delta()
+    retime: bool = False
 
 
 @router.post("/lyrics/fetch")
@@ -519,14 +522,17 @@ async def fetch_lyrics(request: Request, body: LyricsRequest):
     if not Config.LIBRARY_PATH:
         raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
 
-    summary = await fetch_album_lyrics(body.album_path, Config.LIBRARY_PATH, lrclib, body.replace)
+    summary = await fetch_album_lyrics(
+        body.album_path, Config.LIBRARY_PATH, lrclib, body.replace,
+        lead_ms=Config.lyrics_lead_ms(), retime=body.retime,
+    )
 
     if summary["problem"]:
         raise HTTPException(status_code=400, detail=summary["problem"])
 
     #? a new .lrc changes the folder's mtime, which the scan would notice on its own - but a
     #? REPLACED one doesn't, and the scan's lyrics count is worth keeping exact either way
-    if summary["written"] or summary["replaced"]:
+    if summary["written"] or summary["replaced"] or summary["retimed"]:
         forget_cached_album(str(Path(Config.LIBRARY_PATH) / body.album_path))
         await _persist_cache(request)
 

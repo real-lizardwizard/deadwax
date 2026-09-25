@@ -163,11 +163,14 @@ export function fetchCoverArt(
  */
 export function fetchLyrics(
   albumPath: string,
-  options: { replace?: boolean } = {},
+  options: { replace?: boolean; retime?: boolean } = {},
 ): Promise<LyricsSummary> {
   return post<LyricsSummary>('/library/lyrics/fetch', {
     album_path: albumPath,
     replace: options.replace ?? false,
+    //? re-time the .lrc files already there to LYRICS_LEAD_MS, leaving any that aren't
+    //? LRCLIB's timings untouched - see lyrics.timing_delta() on the server
+    retime: options.retime ?? false,
   })
 }
 

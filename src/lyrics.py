@@ -25,10 +25,24 @@ lyric.
 
 An existing `.lrc` is never replaced unless asked. It may be hand-corrected, or from a source
 better than this one, and the same instinct keeps a cover the user chose.
+
+THE LEAD (LYRICS_LEAD_MS, v0.7.1). LRCLIB's timings are set by people tapping along, so a line
+tends to be stamped a moment after it is sung. On a song whose lines come less than a second
+apart that is enough for a player to show the line just sung - James saw it in Amperfy on Five
+Finger Death Punch's "American Capitalist", where every LRCLIB copy agrees to 0.16s, so the data
+was consistent and simply late. The lead moves every timestamp EARLIER by a fixed amount as the
+file is written. It is written into the timestamps themselves, not as an `[offset:]` tag:
+Amperfy reads that tag and never applies it, and a player that did apply it on top of shifted
+timestamps would move them twice.
+
+Changing the lead re-times files already saved (`retime`), and that has to be safe to run over
+a whole library, repeatedly: see timing_delta(), which is how a file deadwax wrote is told apart
+from one somebody corrected, with nothing recorded anywhere.
 """
 
 import asyncio
 import re
+from contextlib import aclosing
 from pathlib import Path
 
 from src.logger import logger
@@ -181,19 +195,22 @@ def choose_result(results: list[dict], lookup: dict) -> dict | None:
     return max(usable, key=rank)
 
 
-def render_lyrics(result: dict | None) -> tuple[str | None, str]:
+def render_lyrics(result: dict | None, lead_ms: int = 0) -> tuple[str | None, str]:
     """
     What to write for one LRCLIB answer, and what kind it is.
 
     Kinds: `synced`, `plain`, `instrumental` (LRCLIB says there are no words, so nothing is
     written - an invented "♪ instrumental ♪" line would be a lyric nobody sang), and `missing`.
+
+    `lead_ms` moves synced lyrics earlier - see the module note. Plain lyrics have no times to
+    move.
     """
     if not result:
         return None, "missing"
 
     synced = (result.get("syncedLyrics") or "").strip()
     if synced and not result.get("words_only"):
-        return _normalise(synced), "synced"
+        return shift_lrc(_normalise(synced), lead_ms), "synced"
 
     plain = (result.get("plainLyrics") or "").strip()
     if plain:
@@ -213,6 +230,78 @@ def render_lyrics(result: dict | None) -> tuple[str | None, str]:
 
 def _normalise(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+
+
+def shift_lrc(text: str, lead_ms: int) -> str:
+    """
+    Every timestamp in `text` moved `lead_ms` EARLIER (later, if negative), and nothing else.
+
+    A line cannot start before the song does, so a time the lead would take below zero is held
+    at zero. Each stamp keeps its own precision - LRCLIB writes hundredths, some files write
+    thousandths - so a file shifted by zero is byte-for-byte the file it was.
+    """
+    if not lead_ms:
+        return text
+
+    def moved(match: re.Match) -> str:
+        minutes, seconds = match.group(1), match.group(2).replace(":", ".")
+        total = int(minutes) * 60_000 + round(float(seconds) * 1000)
+        total = max(0, total - lead_ms)
+
+        if len(seconds.partition(".")[2]) >= 3:
+            whole, fraction = divmod(total, 1000)
+            return f"[{whole // 60:02d}:{whole % 60:02d}.{fraction:03d}]"
+
+        #? hundredths, LRCLIB's own precision - rounded as a whole, so 59.996s becomes 1:00.00
+        whole, fraction = divmod(round(total / 10), 100)
+        return f"[{whole // 60:02d}:{whole % 60:02d}.{fraction:02d}]"
+
+    return TIMESTAMP.sub(moved, text)
+
+
+def _timed(lines: list[dict]) -> list[dict]:
+    """Every line but the blank untimed ones - the gaps between verses."""
+    return [line for line in lines if line["time"] is not None or line["text"]]
+
+
+#? How far a re-computed time may sit from the file's and still count as the same stamp: the
+#? rounding of a lead into hundredths, with room to spare. Far below any real editing.
+RETIME_SLACK_MS = 15
+
+
+def timing_delta(existing: str, source: str) -> int | None:
+    """
+    How many milliseconds EARLIER than `source` the lines in `existing` are, or None.
+
+    None means `existing` is not `source` moved by a constant: different words, a different
+    number of lines, or timings changed line by line - which is what a hand correction or
+    another source looks like. That is the whole test for "deadwax wrote this and nobody has
+    touched it since", and it needs nothing recorded: a file written at any earlier lead,
+    including 0.7.0's, which had none, passes it with that lead as the answer.
+
+    Lines the lead pushed against zero are allowed for: they sit at 0, not at their time minus
+    the lead.
+    """
+    #? blank lines with no time are the gaps between verses, which LRCLIB writes into synced
+    #? lyrics too - counting them as "unsynced" made every song with verses look hand-edited,
+    #? which is how Portishead's "Wandering Star" was first left alone
+    mine, theirs = _timed(parse_lrc(existing)), _timed(parse_lrc(source))
+
+    if (not mine or len(mine) != len(theirs)
+            or any(line["time"] is None for line in mine + theirs)
+            or [line["text"] for line in mine] != [line["text"] for line in theirs]):
+        return None
+
+    gaps = sorted(round((b["time"] - a["time"]) * 1000)
+                  for a, b in zip(mine, theirs) if a["time"] > 0)
+    delta = gaps[len(gaps) // 2] if gaps else 0
+
+    for a, b in zip(mine, theirs):
+        expected = max(0, round(b["time"] * 1000) - delta)
+        if abs(expected - round(a["time"] * 1000)) > RETIME_SLACK_MS:
+            return None
+
+    return delta
 
 
 # ------------------------------------------------------------------ reading what is on disk
@@ -356,11 +445,16 @@ def _listing(directory: Path) -> list[Path]:
         return []
 
 
-def plan_lyrics(album_path: str, library_root: str, replace: bool = False) -> dict:
+def plan_lyrics(
+    album_path: str, library_root: str, replace: bool = False, retime: bool = False,
+) -> dict:
     """
     What fetching lyrics for this album would look up, and which tracks it would leave alone.
 
     Reads the folder and the tags; writes nothing and asks nothing of the network.
+
+    `retime` turns it round: only tracks that HAVE a `.lrc` are looked at, and only synced ones
+    - a plain file has no times to move, so it is settled here without asking LRCLIB anything.
     """
     directory = _album_directory(album_path, library_root)
     if directory is None:
@@ -376,8 +470,19 @@ def plan_lyrics(album_path: str, library_root: str, replace: bool = False) -> di
 
         existing = has_lyrics_file(entry.name, names)
         lookup = read_lookup(entry)
+        current = None
 
-        if existing and not replace:
+        if retime:
+            current = _read_lyrics_file(directory, entries, entry.name) if existing else None
+            if not existing:
+                skip = "absent"
+            elif not current or not TIMESTAMP.search(current):
+                skip = "plain"
+            elif lookup is None:
+                skip = "untagged"
+            else:
+                skip = None
+        elif existing and not replace:
             skip = "kept"
         elif lookup is None:
             skip = "untagged"
@@ -388,11 +493,24 @@ def plan_lyrics(album_path: str, library_root: str, replace: bool = False) -> di
             "filename": entry.name,
             "lyrics_file": lyrics_filename(entry.name),
             "existing": existing,
+            "current": current,
             "lookup": lookup,
             "skip": skip,
         })
 
     return {"album_path": album_path, "tracks": tracks, "problem": None}
+
+
+def _read_lyrics_file(directory: Path, entries: list[Path], audio_name: str) -> str | None:
+    wanted = lyrics_filename(audio_name).lower()
+    sidecar = next((e for e in entries if e.name.lower() == wanted), None)
+    if sidecar is None:
+        return None
+    try:
+        return sidecar.read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        logger.warning(f"could not read {sidecar}: {e}")
+        return None
 
 
 def execute_lyrics(
@@ -435,7 +553,10 @@ def execute_lyrics(
     return {"written": written, "problems": problems}
 
 
-async def fetch_album_lyrics(album_path: str, library_root: str, client, replace: bool = False) -> dict:
+async def fetch_album_lyrics(
+    album_path: str, library_root: str, client, replace: bool = False,
+    lead_ms: int = 0, retime: bool = False,
+) -> dict:
     """
     Look up and write lyrics for every track of one album that needs them.
 
@@ -446,8 +567,14 @@ async def fetch_album_lyrics(album_path: str, library_root: str, client, replace
     things: `written`/`replaced` happened; `kept` is a `.lrc` already there; `instrumental` and
     `missing` are facts about the track that asking again won't change; `failed` is worth asking
     again; `untagged` needs the tags fixing first.
+
+    `retime` re-times the `.lrc` files already there to `lead_ms` instead, and only those that
+    are LRCLIB's lyrics untouched (timing_delta): `retimed` were rewritten, `unchanged` were
+    already at this lead, `custom` are left alone because they are not LRCLIB's timings any
+    more - corrected by hand, from somewhere else, or LRCLIB's copy has since changed - and
+    `plain` have no times to move.
     """
-    plan = await asyncio.to_thread(plan_lyrics, album_path, library_root, replace)
+    plan = await asyncio.to_thread(plan_lyrics, album_path, library_root, replace, retime)
 
     if plan["problem"]:
         return {"album_path": album_path, "tracks": [], "problem": plan["problem"], **_counts([])}
@@ -458,13 +585,28 @@ async def fetch_album_lyrics(album_path: str, library_root: str, client, replace
         if track["skip"]:
             return {"filename": track["filename"], "outcome": track["skip"]}, None
 
+        if retime:
+            #? the entry this file was written FROM - whichever one it is a constant shift of
+            async with semaphore:
+                try:
+                    source, delta = await _find_source(client, track["lookup"], track["current"])
+                except LyricsUnavailable as e:
+                    return {"filename": track["filename"], "outcome": "failed", "detail": str(e)}, None
+
+            if source is None:
+                return {"filename": track["filename"], "outcome": "custom"}, None
+            if abs(delta - lead_ms) <= RETIME_SLACK_MS:
+                return {"filename": track["filename"], "outcome": "unchanged"}, None
+            text, _ = render_lyrics(source, lead_ms)
+            return {"filename": track["filename"], "outcome": "retimed", "synced": True}, text
+
         async with semaphore:
             try:
                 result = await client.find(track["lookup"])
             except LyricsUnavailable as e:
                 return {"filename": track["filename"], "outcome": "failed", "detail": str(e)}, None
 
-        text, kind = render_lyrics(result)
+        text, kind = render_lyrics(result, lead_ms)
         if text is None:
             return {"filename": track["filename"], "outcome": kind}, None
 
@@ -474,7 +616,8 @@ async def fetch_album_lyrics(album_path: str, library_root: str, client, replace
     answers = await asyncio.gather(*(look_up(track) for track in plan["tracks"]))
 
     texts = {entry["filename"]: text for entry, text in answers if text is not None}
-    results = await asyncio.to_thread(execute_lyrics, album_path, library_root, texts, replace)
+    #? a re-time rewrites files that are there by definition, so it always replaces
+    results = await asyncio.to_thread(execute_lyrics, album_path, library_root, texts, replace or retime)
 
     written = set(results["written"])
     outcomes = []
@@ -486,6 +629,17 @@ async def fetch_album_lyrics(album_path: str, library_root: str, client, replace
 
     summary = {"album_path": album_path, "tracks": outcomes, "problem": None,
                "problems": results["problems"], **_counts(outcomes)}
+
+    if retime:
+        if summary["retimed"] or summary["failed"]:
+            logger.info(
+                f"lyrics for {Path(album_path).name}: {summary['retimed']} re-timed to a "
+                f"{lead_ms}ms lead"
+                + (f", {summary['custom']} left alone" if summary["custom"] else "")
+                + (f", {summary['failed']} failed" if summary["failed"] else ""),
+                extra={"frontend": True},
+            )
+        return summary
 
     found = summary["written"] + summary["replaced"]
     if found or summary["failed"]:
@@ -500,9 +654,42 @@ async def fetch_album_lyrics(album_path: str, library_root: str, client, replace
     return summary
 
 
+async def _find_source(client, lookup: dict, existing: str) -> tuple[dict | None, int | None]:
+    """
+    The LRCLIB entry `existing` was written from, and the lead it was written at - or (None, None).
+
+    Asks batch by batch and stops at the first match, so the usual case costs one request. A
+    client without batches (the tests' stand-in) is asked the ordinary way.
+    """
+    if hasattr(client, "candidates"):
+        #? closed on the way out, so stopping early never leaves a request half asked
+        async with aclosing(client.candidates(lookup)) as batches:
+            async for batch in batches:
+                source, delta = _source_of(existing, batch)
+                if source is not None:
+                    return source, delta
+        return None, None
+
+    found = await client.find(lookup)
+    return _source_of(existing, [found] if found else [])
+
+
+def _source_of(existing: str, entries: list[dict]) -> tuple[dict | None, int | None]:
+    """The first entry whose synced lyrics `existing` is a constant shift of, and that shift."""
+    for entry in entries:
+        synced = (entry or {}).get("syncedLyrics") or ""
+        if not synced:
+            continue
+        delta = timing_delta(existing, _normalise(synced))
+        if delta is not None:
+            return {**entry, "words_only": False}, delta
+    return None, None
+
+
 def _counts(outcomes: list[dict]) -> dict:
     counts = {kind: 0 for kind in
-              ("written", "replaced", "kept", "instrumental", "missing", "failed", "untagged")}
+              ("written", "replaced", "kept", "instrumental", "missing", "failed", "untagged",
+               "retimed", "unchanged", "custom", "plain", "absent")}
     for entry in outcomes:
         counts[entry["outcome"]] = counts.get(entry["outcome"], 0) + 1
     counts["synced"] = sum(1 for entry in outcomes if entry.get("synced"))

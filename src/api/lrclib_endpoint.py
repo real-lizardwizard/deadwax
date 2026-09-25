@@ -33,7 +33,7 @@ HOMEPAGE = "https://github.com/real-lizardwizard/deadwax"
 
 #? How long to wait before asking again after a 503 or 429, and so how many times to ask. A
 #? Retry-After header is honoured when it is shorter than a few seconds.
-RETRY_PAUSES = (1.0, 3.0)
+RETRY_PAUSES = (1.0, 3.0, 6.0)
 
 
 def _retry_after(response: httpx.Response, default: float) -> float:
@@ -96,6 +96,32 @@ class LrclibClient:
                 return chosen
 
         return None
+
+    async def candidates(self, lookup: dict):
+        """
+        Every LRCLIB entry that could be this track, in BATCHES: the exact match, then the search's.
+
+        For RE-TIMING, which needs the entry a file was written FROM, not the best one now.
+        LRCLIB holds several entries for most songs, and which one the exact lookup answers
+        with can change as entries are added. Batches, so the caller stops at the first that
+        matches: the exact entry nearly always does, and a whole library re-timed at two requests
+        a track is what makes LRCLIB answer 503. No duration filter - re-timing checks the words
+        and every timing against the file itself, which is stricter.
+        """
+        duration = lookup.get("duration") or 0
+        title = lookup["title"]
+
+        for artist in lookup["artists"]:
+            if lookup.get("album") and duration:
+                exact = await self._get("/api/get", {
+                    "track_name": title, "artist_name": artist,
+                    "album_name": lookup["album"], "duration": round(duration),
+                })
+                if exact:
+                    yield [exact]
+
+            results = await self._get("/api/search", {"track_name": title, "artist_name": artist})
+            yield [r for r in (results if isinstance(results, list) else []) if isinstance(r, dict)]
 
     async def _get(self, path: str, params: dict):
         for attempt, pause in enumerate((*RETRY_PAUSES, None)):

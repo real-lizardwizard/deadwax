@@ -50,8 +50,9 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from src import __version__
-from src.config import (COVER_ART_SIZES, Config, build_user_agent, describe_contact,
-                        describe_slskd_url, setting_source, shadowed_by_empty_env)
+from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, Config, build_user_agent,
+                        describe_contact, describe_slskd_url, parse_lyrics_lead,
+                        setting_source, shadowed_by_empty_env)
 from src.logger import logger
 
 router = APIRouter()
@@ -299,6 +300,30 @@ def _lyrics_row() -> dict:
     )
 
 
+def _lyrics_lead_row() -> dict:
+    """LYRICS_LEAD_MS, in words that say which way it moves them."""
+    lead = parse_lyrics_lead(Config.LYRICS_LEAD_MS)
+
+    if lead is None:
+        effect = "unrecognised - LRCLIB's timings are written as they are"
+    elif lead > 0:
+        effect = f"Synced lyrics are written {lead} ms earlier than LRCLIB times them"
+    elif lead < 0:
+        effect = f"Synced lyrics are written {-lead} ms later than LRCLIB times them"
+    else:
+        effect = "Synced lyrics are written with LRCLIB's own timings"
+
+    return _setting(
+        "LYRICS_LEAD_MS",
+        Config.LYRICS_LEAD_MS,
+        effect=effect,
+        status="ok" if lead is not None else "error",
+        detail=None if lead is not None else (
+            f"expected a whole number of milliseconds, at most {LYRICS_LEAD_LIMIT_MS} either way"
+        ),
+    )
+
+
 @router.get("")
 @router.get("/")
 async def settings():
@@ -487,9 +512,10 @@ async def settings():
                     "From LRCLIB, saved as a .lrc file beside each track - synced where LRCLIB "
                     "has timings, which Navidrome, Jellyfin and Kodi all read. A .lrc already "
                     "there is never replaced. 'Get lyrics' in the library works whatever this "
-                    "is set to."
+                    "is set to. A new lead applies to lyrics fetched from then on; re-time the "
+                    "ones already saved below."
                 ),
-                "settings": [_lyrics_row()],
+                "settings": [_lyrics_row(), _lyrics_lead_row()],
             },
         ],
         "organize_modes": ORGANIZE_MODES,
@@ -548,6 +574,10 @@ def _validate(key: str, value: str) -> str | None:
 
     if key == "FETCH_LYRICS" and value not in LYRICS_CHOICES:
         return f"expected one of {', '.join(LYRICS_CHOICES)}"
+
+    if key == "LYRICS_LEAD_MS" and parse_lyrics_lead(value) is None:
+        return (f"expected a whole number of milliseconds, at most {LYRICS_LEAD_LIMIT_MS} "
+                f"either way - 300, say, or -200 to move them later")
 
     return None
 

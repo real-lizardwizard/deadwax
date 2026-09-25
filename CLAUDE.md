@@ -123,7 +123,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             687 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             723 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -1000,6 +1000,57 @@ track view.
 - **Verified against live LRCLIB** on the scratch library: Dummy's ten tracks all synced; after
   the retry and the words-only rule, every gap on the Portishead albums filled, and Boards of
   Canada's eleven instrumentals came back as instrumental rather than missing.
+
+#### The lead (v0.7.1)
+
+James, in Amperfy: "the lyrics I'm seeing are the lyrics from the line that was just sung" - and
+"it varies, it's not always exactly one line", on Five Finger Death Punch's "American
+Capitalist".
+
+- **It was the DATA, and slightly.** Checked before touching anything: deadwax writes LRCLIB's
+  text untouched; Navidrome's LRC parser reads LRCLIB's format exactly right (`model/
+  lyrics_lrc.go` - trims the space after the stamp, `.37` is 370ms, keeps empty break lines);
+  Amperfy picks the current line correctly and refreshes it ten times a second
+  (`LyricsView.scroll(toTime:)`, `updateLyricsTimeInterval` 0.1s). And LRCLIB's twenty entries
+  for that song agree to 0.16s. What's left is that LRCLIB is tapped along by people and lands
+  a moment late - invisible on most songs, a whole line on one whose lines are under a second
+  apart ("I'm a red blooded" 25.10, "Rough neck" 26.56, "Son of a bitch" 27.47). "It varies" is
+  the tell: a fixed late offset, not an off-by-one.
+- **`LYRICS_LEAD_MS`, global, default 0** (asked for as global). Moves every synced timestamp
+  earlier as the file is written; negative moves them later; plain lyrics are untouched; held at
+  zero at the start of the song; each stamp keeps its own precision. Validated as a whole number
+  within 5000 either way, which is what catches seconds typed where milliseconds were meant.
+- **Into the TIMESTAMPS, never an `[offset:]` tag.** Amperfy parses the OpenSubsonic `offset`
+  and never applies it (it appears only in `SsLyricsParserDelegate`), and a player that did
+  apply it on top of shifted stamps would move them twice.
+- **Re-timing is stateless, and that is the design, not a shortcut.** Nothing records which lead
+  a file was written at. `timing_delta()` asks whether the file is an LRCLIB entry's words with
+  every timed line moved by ONE constant, and that constant is the lead it was written at - 0
+  for 0.7.0's files, which recorded nothing either. Anything else - a line retimed by hand,
+  different words, another source - is `custom` and left alone. So re-timing is idempotent
+  (`unchanged` on a second run), moves from the old lead rather than on top of it, and can't
+  touch a file deadwax didn't write. A hash table was considered and rejected: it would know
+  nothing about 0.7.0's files, which are exactly the ones that need re-timing.
+- **It matches against EVERY LRCLIB entry for the song, not just today's best.** Which entry
+  `/api/get` answers with changes as entries are added: "Wandering Star" was written from one
+  and answered with another an hour later, and was wrongly left alone. `candidates()` yields the
+  exact entry and then the search's, in batches, and `_find_source()` stops at the first match -
+  one request a track in the usual case, because two a track across a library is what makes
+  LRCLIB answer 503.
+- **Blank untimed lines are verse gaps, not "unsynced".** LRCLIB writes them into synced lyrics;
+  counting them made every song with verses look hand-edited. `_timed()` drops them before
+  comparing; a line with WORDS and no stamp still fails the test.
+- **The re-time button lives in the settings tab, beside the lead** - that is the moment it is
+  wanted - and is refused while the lead has an unsaved edit, since it re-times to the SAVED
+  value. It walks the library album by album through `/library/lyrics/fetch?retime`, like the
+  bulk covers. **It reads a REAL scan, not the snapshot**: writing a `.lrc` forgets that album
+  from the saved scan, so a snapshot after an earlier run is missing exactly the albums that run
+  touched - measured, 87 tracks of 104 on a second run.
+- **Verified** in the real page on the scratch library: a 300ms lead re-timed 102 files written
+  by 0.7.0 ("Roads" 50.30 -> 50.00), then both "Wandering Star"s once matching used every entry;
+  a file edited by hand stayed byte-for-byte; a second and third run changed nothing and covered
+  all 105; "abc" was refused on save. **Not verified: that 300 is the right number** for
+  Amperfy - the tap test (tap a line, see whether it lands mid-word) is how to find out.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -2008,7 +2059,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 687 tests
+.venv/bin/python -m pytest tests/ -q  # 723 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2038,7 +2089,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 687 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 723 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

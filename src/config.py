@@ -112,6 +112,21 @@ def default_db_path(new: str = DEFAULT_DB_PATH, legacy: str = LEGACY_DB_PATH) ->
 COVER_ART_SIZES = ("250", "500", "1200", "full")
 
 
+#? How far LYRICS_LEAD_MS may move lyrics either way. Five seconds is far past any tapping lag;
+#? a larger number is almost certainly seconds typed where milliseconds were meant.
+LYRICS_LEAD_LIMIT_MS = 5000
+
+
+def parse_lyrics_lead(value: str | None) -> int | None:
+    """A lyrics lead in milliseconds, or None if `value` isn't one - a whole number within the limit."""
+    text = (value or "").strip().removesuffix("ms").strip()
+    try:
+        lead = int(text or "0")
+    except ValueError:
+        return None
+    return lead if abs(lead) <= LYRICS_LEAD_LIMIT_MS else None
+
+
 def build_user_agent(contact: str) -> str:
     """`deadwax/<version> ( contact )` - MusicBrainz's documented shape, spaces and all."""
     return f"{APP_NAME}/{__version__} ( {contact} )"
@@ -222,6 +237,12 @@ class Config:
     #? would rather this container didn't ask a third party about every track they download.
     FETCH_LYRICS = _env("FETCH_LYRICS", "on")
 
+    #? Milliseconds to move synced lyrics EARLIER as they are written - negative moves them
+    #? later. LRCLIB's timings are tapped along by people and land a moment after the line is
+    #? sung, which on a fast song shows the line just sung. 0 writes LRCLIB's timings as they
+    #? are. See lyrics.py for why it goes into the timestamps and not an [offset:] tag.
+    LYRICS_LEAD_MS = _env("LYRICS_LEAD_MS", "0")
+
     #? Optional, and artist banners are off without it. MusicBrainz has no artist images at all
     #? and Wikimedia Commons has a photograph at best, so TheAudioDB is the only source here
     #? with banners, logos and backgrounds - keyed by the same MusicBrainz artist id deadwax
@@ -264,6 +285,8 @@ class Config:
         "COVER_ART_SIZE": None,
         #? read by the poller as each album is filed, so nothing to rebuild
         "FETCH_LYRICS": None,
+        #? read as each .lrc is written, so nothing to rebuild
+        "LYRICS_LEAD_MS": None,
         #? read per lookup by the artist image client, so nothing to rebuild here either
         "THEAUDIODB_KEY": None,
         "FANARTTV_KEY": None,
@@ -327,6 +350,11 @@ class Config:
                 f"applied {len(cls.OVERRIDDEN)} setting(s) from the settings tab: "
                 f"{', '.join(sorted(cls.OVERRIDDEN))}"
             )
+
+    @classmethod
+    def lyrics_lead_ms(cls) -> int:
+        """LYRICS_LEAD_MS as a number. Anything unreadable is 0 - LRCLIB's own timings."""
+        return parse_lyrics_lead(cls.LYRICS_LEAD_MS) or 0
 
     @classmethod
     def musicbrainz_contact(cls) -> tuple[str | None, str | None]:

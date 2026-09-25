@@ -263,7 +263,7 @@ def _fetch_lyrics_later(results: dict, client=None):
 
     async def run():
         try:
-            await fetch_album_lyrics(path, Config.LIBRARY_PATH, client)
+            await fetch_album_lyrics(path, Config.LIBRARY_PATH, client, lead_ms=Config.lyrics_lead_ms())
         except Exception as e:
             logger.warning(f"fetching lyrics for {path} failed: {e}")
 

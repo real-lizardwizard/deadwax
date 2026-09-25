@@ -527,6 +527,9 @@ export interface TrackDetailsResponse {
  */
 export type LyricsOutcome =
   | 'written' | 'replaced' | 'kept' | 'instrumental' | 'missing' | 'failed' | 'untagged'
+  // a re-time's own: rewritten to the lead, already at it, left alone as not LRCLIB's
+  // timings any more, no timings to move, and no .lrc to re-time at all
+  | 'retimed' | 'unchanged' | 'custom' | 'plain' | 'absent'
 
 /** POST /library/lyrics/fetch */
 export interface LyricsSummary {
@@ -539,6 +542,11 @@ export interface LyricsSummary {
   missing: number
   failed: number
   untagged: number
+  retimed: number
+  unchanged: number
+  custom: number
+  plain: number
+  absent: number
   /** how many of the written or replaced ones carry timings */
   synced: number
 }

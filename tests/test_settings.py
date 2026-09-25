@@ -494,3 +494,11 @@ def test_the_cover_art_size_accepts_only_what_the_archive_serves():
 
 def test_organize_mode_is_offered_as_a_choice_too():
     assert set(find(call_settings(), "ORGANIZE_MODE")["choices"]) == set(ORGANIZE_MODES)
+
+
+def test_the_lyrics_lead_takes_milliseconds_and_refuses_anything_else():
+    assert _validate("LYRICS_LEAD_MS", "300") is None
+    assert _validate("LYRICS_LEAD_MS", "-200") is None
+    assert "whole number of milliseconds" in _validate("LYRICS_LEAD_MS", "0.3")
+    assert "whole number of milliseconds" in _validate("LYRICS_LEAD_MS", "30000")
+    assert _validate("FETCH_LYRICS", "sometimes") is not None

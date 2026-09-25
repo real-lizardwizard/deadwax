@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import {
   getServerSettings, saveServerSettings,
   type ServerSetting, type ServerSettings, type SettingUpdate,
 } from '../api/settings'
+import * as libraryApi from '../api/library'
 import type { FormatPreference } from '../api/types'
-import { LoadingPanel } from './Loading'
+import { describeRetime, type RetimeTotals } from '../lib/lyrics'
+import { Loading, LoadingPanel } from './Loading'
 import {
   useDownloadDefaults, usePreferences,
   type DownloadDefaults, type Preferences,
@@ -212,6 +214,97 @@ function SettingRow({
       {reverting ? <div class="settings-env-effect">Will revert to the environment on save.</div> : null}
 
       {setting.detail && !edited ? <div class="settings-env-detail">{setting.detail}</div> : null}
+    </div>
+  )
+}
+
+/**
+ * Re-time the lyrics already saved to the lead that is saved now.
+ *
+ * Lives beside LYRICS_LEAD_MS because that is the moment it is wanted: a new lead only applies
+ * to lyrics fetched from then on, and the ones already on disk move only when asked. It walks
+ * the library one album at a time through the same route the library's Get lyrics uses, so it
+ * can be watched and stopped, and the server rewrites only files that are still exactly
+ * LRCLIB's lyrics - running it twice, or after changing the lead again, is safe.
+ *
+ * Refused while the lead has an unsaved edit. It re-times to the SAVED lead, and running it with
+ * a different number sitting in the box would do something other than what the screen says.
+ */
+function RetimeLyrics({ unsaved }: { unsaved: boolean }) {
+  const [run, setRun] = useState<(RetimeTotals & {
+    total: number
+    done: number
+    running: boolean
+    error?: string
+  }) | null>(null)
+  const stop = useRef(false)
+
+  const start = async () => {
+    stop.current = false
+    const totals = { retimed: 0, unchanged: 0, custom: 0, failed: 0 }
+    setRun({ ...totals, total: 0, done: 0, running: true })
+
+    let albums
+    try {
+      //? a REAL scan, not the saved one: writing a .lrc drops that album from the saved scan so
+      //? it is read again, so a snapshot taken after an earlier run is missing exactly the albums
+      //? that run touched - measured, a second run covered 87 tracks of 104
+      albums = (await libraryApi.listAlbums()).albums
+        .filter((album) => album.lyrics_count > 0)
+    } catch (caught) {
+      setRun({ ...totals, total: 0, done: 0, running: false, error: `couldn't read the library - ${String(caught)}` })
+      return
+    }
+
+    let done = 0
+    for (const album of albums) {
+      if (stop.current) break
+      try {
+        const summary = await libraryApi.fetchLyrics(album.path, { retime: true })
+        totals.retimed += summary.retimed
+        totals.unchanged += summary.unchanged
+        totals.custom += summary.custom
+        totals.failed += summary.failed
+      } catch {
+        totals.failed += album.lyrics_count
+      }
+      done += 1
+      setRun({ ...totals, total: albums.length, done, running: true })
+    }
+
+    setRun({ ...totals, total: albums.length, done, running: false })
+  }
+
+  return (
+    <div class="settings-retime">
+      {run?.running ? (
+        <button type="button" class="win-button is-running" onClick={() => { stop.current = true }}>
+          <Loading label={run.total ? `re-timing ${run.done}/${run.total} albums · stop` : 'reading the library'} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          class="win-button"
+          disabled={unsaved}
+          title={unsaved
+            ? 'Save the new lead first - this re-times to the lead that is saved'
+            : 'Move the timings of lyrics already saved to the lead above. Only files that are '
+              + "still exactly LRCLIB's lyrics are touched."}
+          onClick={() => void start()}
+        >
+          Re-time saved lyrics
+        </button>
+      )}
+
+      <span class="settings-retime-note">
+        {unsaved
+          ? 'Save the new lead first.'
+          : run?.error
+            ? run.error
+            : run && !run.running
+              ? `${describeRetime(run)}${run.done < run.total ? ` (stopped at ${run.done} of ${run.total} albums)` : '.'}`
+              : 'Lyrics saved before the lead changed keep their old timings until re-timed.'}
+      </span>
     </div>
   )
 }
@@ -597,6 +690,9 @@ export function SettingsView({ active }: { active: boolean }) {
                     />
                   ))}
                 </div>
+                {group.id === 'lyrics' && (
+                  <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />
+                )}
               </Section>
             ))}
 

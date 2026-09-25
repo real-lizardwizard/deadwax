@@ -459,3 +459,269 @@ def test_an_outage_raises_rather_than_passing_for_no_lyrics(handler, monkeypatch
 def test_the_lrc_is_named_after_the_audio_file():
     assert lyrics_filename("01 - Mysterons.flac") == "01 - Mysterons.lrc"
     assert lyrics_filename("Track.v2.mp3") == "Track.v2.lrc"
+
+
+# ------------------------------------------------------------------ the lead (v0.7.1)
+#
+# LRCLIB's timings are tapped along by people and land a moment late, which on a fast song shows
+# the line just sung - seen in Amperfy on "American Capitalist". The lead moves them earlier as
+# they are written, and re-timing moves files already saved, but only files that are still
+# exactly LRCLIB's lyrics.
+
+from src.config import parse_lyrics_lead  # noqa: E402
+from src.lyrics import shift_lrc, timing_delta  # noqa: E402
+
+AMERICAN_CAPITALIST = "[00:25.10] I'm a red blooded\n[00:26.56] Rough neck\n[00:27.47] Son of a bitch\n"
+
+
+def test_the_lead_moves_every_line_earlier_and_nothing_else():
+    assert shift_lrc(AMERICAN_CAPITALIST, 300) == (
+        "[00:24.80] I'm a red blooded\n[00:26.26] Rough neck\n[00:27.17] Son of a bitch\n")
+
+
+def test_no_lead_leaves_the_file_byte_for_byte():
+    assert shift_lrc(AMERICAN_CAPITALIST, 0) == AMERICAN_CAPITALIST
+
+
+def test_a_line_cannot_start_before_the_song_does():
+    assert shift_lrc("[00:00.20] Intro\n", 300) == "[00:00.00] Intro\n"
+
+
+def test_each_stamp_keeps_its_precision_and_minutes_carry():
+    assert shift_lrc("[01:00.100] a\n[01:00.05] b\n", 200) == "[00:59.900] a\n[00:59.85] b\n"
+
+
+def test_a_negative_lead_moves_them_later():
+    assert shift_lrc("[00:59.90] a\n", -200) == "[01:00.10] a\n"
+
+
+def test_header_tags_are_not_timestamps():
+    assert shift_lrc("[ar:Five Finger Death Punch]\n[00:25.10] a\n", 300) == (
+        "[ar:Five Finger Death Punch]\n[00:24.80] a\n")
+
+
+def test_rendering_applies_the_lead_to_synced_lyrics_only():
+    assert render_lyrics(result(syncedLyrics=AMERICAN_CAPITALIST), 300)[0].startswith("[00:24.80]")
+    assert render_lyrics(result(syncedLyrics=None, plainLyrics="Words"), 300) == ("Words\n", "plain")
+
+
+def test_the_delta_is_the_lead_a_file_was_written_at():
+    assert timing_delta(AMERICAN_CAPITALIST, AMERICAN_CAPITALIST) == 0
+    assert timing_delta(shift_lrc(AMERICAN_CAPITALIST, 300), AMERICAN_CAPITALIST) == 300
+    assert timing_delta(shift_lrc(AMERICAN_CAPITALIST, -250), AMERICAN_CAPITALIST) == -250
+
+
+def test_lines_held_at_zero_by_the_lead_still_count_as_shifted():
+    source = "[00:00.20] Intro\n[00:10.00] Verse\n"
+    assert timing_delta(shift_lrc(source, 300), source) == 300
+
+
+def test_one_line_retimed_by_hand_is_not_a_shift():
+    edited = AMERICAN_CAPITALIST.replace("[00:26.56]", "[00:26.10]")
+    assert timing_delta(edited, AMERICAN_CAPITALIST) is None
+
+
+def test_different_words_are_not_a_shift():
+    assert timing_delta(AMERICAN_CAPITALIST.replace("Rough neck", "Roughneck"), AMERICAN_CAPITALIST) is None
+    assert timing_delta("[00:25.10] I'm a red blooded\n", AMERICAN_CAPITALIST) is None
+
+
+@pytest.mark.parametrize("value, lead", [
+    ("300", 300), ("-200", -200), (" 300ms ", 300), ("", 0), (None, 0), ("0", 0),
+    ("abc", None), ("1.5", None), ("9000", None),
+])
+def test_the_lead_setting_is_a_whole_number_of_milliseconds(value, lead):
+    assert parse_lyrics_lead(value) == lead
+
+
+def test_new_lyrics_are_written_at_the_lead(tmp_path):
+    directory = seed(tmp_path)
+    client = FakeLrclib({"One More Year": result(syncedLyrics=AMERICAN_CAPITALIST)})
+
+    run(fetch_album_lyrics(ALBUM, str(tmp_path), client, lead_ms=300))
+
+    assert (directory / "01 - One More Year.lrc").read_text().startswith("[00:24.80]")
+
+
+def retime_client():
+    return FakeLrclib({"One More Year": result(syncedLyrics=AMERICAN_CAPITALIST),
+                       "Instant Destiny": result(syncedLyrics=AMERICAN_CAPITALIST)})
+
+
+def test_a_file_written_before_the_lead_existed_is_retimed(tmp_path):
+    """0.7.0 wrote LRCLIB's timings unchanged - a lead of 0 - and recorded nothing."""
+    directory = seed(tmp_path)
+    (directory / "01 - One More Year.lrc").write_text(AMERICAN_CAPITALIST)
+
+    summary = run(fetch_album_lyrics(ALBUM, str(tmp_path), retime_client(), lead_ms=300, retime=True))
+
+    assert summary["retimed"] == 1
+    assert (directory / "01 - One More Year.lrc").read_text() == shift_lrc(AMERICAN_CAPITALIST, 300)
+
+
+def test_retiming_twice_to_the_same_lead_changes_nothing_the_second_time(tmp_path):
+    directory = seed(tmp_path)
+    lrc = directory / "01 - One More Year.lrc"
+    lrc.write_text(AMERICAN_CAPITALIST)
+
+    run(fetch_album_lyrics(ALBUM, str(tmp_path), retime_client(), lead_ms=300, retime=True))
+    once = lrc.read_text()
+    summary = run(fetch_album_lyrics(ALBUM, str(tmp_path), retime_client(), lead_ms=300, retime=True))
+
+    assert summary["unchanged"] == 1
+    assert lrc.read_text() == once
+
+
+def test_changing_the_lead_again_moves_from_the_old_lead_not_on_top_of_it(tmp_path):
+    directory = seed(tmp_path)
+    lrc = directory / "01 - One More Year.lrc"
+    lrc.write_text(shift_lrc(AMERICAN_CAPITALIST, 300))
+
+    run(fetch_album_lyrics(ALBUM, str(tmp_path), retime_client(), lead_ms=500, retime=True))
+
+    assert lrc.read_text() == shift_lrc(AMERICAN_CAPITALIST, 500)
+
+
+def test_a_file_corrected_by_hand_is_left_alone(tmp_path):
+    directory = seed(tmp_path)
+    corrected = AMERICAN_CAPITALIST.replace("[00:26.56]", "[00:26.10]")
+    (directory / "01 - One More Year.lrc").write_text(corrected)
+
+    summary = run(fetch_album_lyrics(ALBUM, str(tmp_path), retime_client(), lead_ms=300, retime=True))
+
+    assert summary["custom"] == 1
+    assert (directory / "01 - One More Year.lrc").read_text() == corrected
+
+
+def test_plain_lyrics_have_nothing_to_retime_and_lrclib_is_not_asked(tmp_path):
+    directory = seed(tmp_path)
+    (directory / "01 - One More Year.lrc").write_text("Just words\n")
+    client = retime_client()
+
+    summary = run(fetch_album_lyrics(ALBUM, str(tmp_path), client, lead_ms=300, retime=True))
+
+    assert (summary["plain"], summary["absent"]) == (1, 1)
+    assert client.asked == []
+    assert (directory / "01 - One More Year.lrc").read_text() == "Just words\n"
+
+
+def test_a_retime_never_writes_lyrics_a_track_did_not_have(tmp_path):
+    directory = seed(tmp_path)
+
+    run(fetch_album_lyrics(ALBUM, str(tmp_path), retime_client(), lead_ms=300, retime=True))
+
+    assert not list(directory.glob("*.lrc"))
+
+
+def test_lrclib_being_down_leaves_the_file_and_says_failed(tmp_path):
+    directory = seed(tmp_path)
+    (directory / "01 - One More Year.lrc").write_text(AMERICAN_CAPITALIST)
+    client = FakeLrclib({"One More Year": LyricsUnavailable("LRCLIB answered 503")})
+
+    summary = run(fetch_album_lyrics(ALBUM, str(tmp_path), client, lead_ms=300, retime=True))
+
+    assert summary["failed"] == 1
+    assert (directory / "01 - One More Year.lrc").read_text() == AMERICAN_CAPITALIST
+
+
+def test_the_route_retimes_at_the_configured_lead(tmp_path, monkeypatch):
+    from src.routes import library as routes
+
+    directory = seed(tmp_path)
+    (directory / "01 - One More Year.lrc").write_text(AMERICAN_CAPITALIST)
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
+    monkeypatch.setattr(Config, "LYRICS_LEAD_MS", "400")
+    monkeypatch.setattr(routes, "lrclib", retime_client())
+    forgotten: list[str] = []
+    monkeypatch.setattr(routes, "forget_cached_album", forgotten.append)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+
+    summary = run(routes.fetch_lyrics(request, routes.LyricsRequest(album_path=ALBUM, retime=True)))
+
+    assert summary["retimed"] == 1
+    assert (directory / "01 - One More Year.lrc").read_text() == shift_lrc(AMERICAN_CAPITALIST, 400)
+    assert forgotten == [str(directory)]
+
+
+def test_a_filed_album_gets_its_lyrics_at_the_configured_lead(tmp_path, monkeypatch):
+    from src import poller
+
+    directory = seed(tmp_path)
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
+    monkeypatch.setattr(Config, "FETCH_LYRICS", "on")
+    monkeypatch.setattr(Config, "LYRICS_LEAD_MS", "300")
+
+    async def go():
+        await poller._fetch_lyrics_later({"plan": {"album_dir": str(directory)}}, retime_client())
+
+    run(go())
+    assert (directory / "01 - One More Year.lrc").read_text() == shift_lrc(AMERICAN_CAPITALIST, 300)
+
+
+def test_a_retime_finds_the_entry_a_file_came_from_among_several(tmp_path):
+    """
+    LRCLIB holds several entries per song, and which one the exact lookup answers with changes
+    as entries are added - Portishead's "Wandering Star" was written from one and answered with
+    another an hour later. The file is re-timed against the one it actually came from.
+    """
+    directory = seed(tmp_path)
+    (directory / "01 - One More Year.lrc").write_text(AMERICAN_CAPITALIST)
+    newer = AMERICAN_CAPITALIST.replace("[00:26.56]", "[00:26.90]")
+
+    class SeveralEntries(FakeLrclib):
+        async def candidates(self, lookup):
+            self.asked.append(lookup)
+            yield [result(syncedLyrics=newer)]
+            yield [result(albumName="a single"), result(syncedLyrics=AMERICAN_CAPITALIST)]
+
+    summary = run(fetch_album_lyrics(ALBUM, str(tmp_path), SeveralEntries({}), lead_ms=300, retime=True))
+
+    assert summary["retimed"] == 1
+    assert (directory / "01 - One More Year.lrc").read_text() == shift_lrc(AMERICAN_CAPITALIST, 300)
+
+
+def test_the_client_offers_the_exact_entry_then_the_search():
+    def handler(request):
+        if request.url.path == "/api/get":
+            return httpx.Response(200, json=result(albumName="exact"))
+        return httpx.Response(200, json=[result(albumName="searched")])
+
+    async def go():
+        client = LrclibClient()
+        client.client = httpx.AsyncClient(base_url=BASE_URL, transport=httpx.MockTransport(handler))
+        try:
+            return [[entry["albumName"] for entry in batch] async for batch in client.candidates(LOOKUP)]
+        finally:
+            await client.close_client()
+
+    assert run(go()) == [["exact"], ["searched"]]
+
+
+def test_a_retime_that_matches_the_exact_entry_asks_nothing_more(tmp_path):
+    """One request a track, not two - a whole library at two a track is what makes LRCLIB answer 503."""
+    directory = seed(tmp_path)
+    (directory / "01 - One More Year.lrc").write_text(AMERICAN_CAPITALIST)
+    batches_taken = []
+
+    class Counting(FakeLrclib):
+        async def candidates(self, lookup):
+            batches_taken.append("exact")
+            yield [result(syncedLyrics=AMERICAN_CAPITALIST)]
+            batches_taken.append("search")
+            yield []
+
+    run(fetch_album_lyrics(ALBUM, str(tmp_path), Counting({}), lead_ms=300, retime=True))
+
+    assert batches_taken == ["exact"]
+
+
+def test_the_gaps_between_verses_do_not_make_a_file_look_edited():
+    """LRCLIB writes untimed blank lines between verses into synced lyrics - "Wandering Star" has them."""
+    verses = "[00:12.36] Please, could you stay awhile\n\n[00:17.54] For it's such a lovely day\n"
+    assert timing_delta(verses, verses) == 0
+    assert timing_delta(shift_lrc(verses, 300), verses) == 300
+
+
+def test_a_line_whose_timestamp_was_removed_is_still_an_edit():
+    source = "[00:12.36] Please\n[00:17.54] For it's such a lovely day\n"
+    assert timing_delta("[00:12.36] Please\nFor it's such a lovely day\n", source) is None
