@@ -10,12 +10,17 @@ from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, answers_to, artist_facts
                          best_per_kind)
 from src.api.artist_images_endpoint import ArtistImagesClient
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
-from src.library import (SCAN_FORMAT, delete_album, drain_cache_changes, find_artist_art,
+from src.config import COVER_ART_SIZES
+from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, plan_disc_art,
+                          save_disc_art)
+from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, delete_album, drain_cache_changes,
+                         embedded_pictures, find_artist_art, find_disc_art,
                          forget_cached_album, load_album_art, load_artist_art,
                          read_album_details, read_artist_mbid, scan_library, seed_cache,
                          snapshot_library, summarize_for_deletion)
 from src.logger import logger
 from src.metadata_health import ISSUE_TYPES, attach_issues
+from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import is_within
 from src.api.coverart_endpoint import CoverArtClient
 from src.api.lrclib_endpoint import lrclib
@@ -554,6 +559,128 @@ async def track_lyrics(album: str, file: str):
         raise HTTPException(status_code=404, detail="no such track")
 
     return lyrics
+
+
+def _album_dir_or_404(album: str, what: str) -> Path:
+    """/art's guard, for the endpoints that serve a picture: inside the library, or the same 404."""
+    root_path = Config.LIBRARY_PATH or ""
+    if not root_path or not album:
+        raise HTTPException(status_code=404, detail="no such album")
+
+    root = Path(root_path)
+    directory = root / album
+    if not is_within(directory, root) or not directory.is_dir():
+        logger.warning(f"refused library {what} request outside the library: {album!r}")
+        raise HTTPException(status_code=404, detail="no such album")
+    return directory
+
+
+def _listed(directory: Path, name: str) -> Path | None:
+    """`name` as an entry of the folder's own listing - never joined onto a path before matching."""
+    try:
+        return next((entry for entry in directory.iterdir() if entry.is_file() and entry.name == name), None)
+    except OSError:
+        return None
+
+
+@router.get("/tracks/picture")
+async def track_picture(album: str, file: str, index: int = 0):
+    """
+    One picture embedded in one track, for the track view.
+
+    A player shows a song's OWN picture over its album's cover, so this is how you see which
+    songs carry one - and what it is. The file must be an audio file in the album's listing.
+    """
+    directory = _album_dir_or_404(album, "picture")
+    entry = _listed(directory, file)
+    if entry is None or file_extension(entry.name) not in AUDIO_EXTENSIONS:
+        raise HTTPException(status_code=404, detail="no such track")
+
+    pictures = await asyncio.to_thread(embedded_pictures, entry)
+    if not 0 <= index < len(pictures):
+        raise HTTPException(status_code=404, detail="no such picture")
+
+    picture = pictures[index]
+    return Response(content=picture["data"], media_type=picture["mime"],
+                    headers={"Cache-Control": "private, max-age=300"})
+
+
+@router.get("/disc_art")
+async def disc_art(album: str, file: str):
+    """One CD art image beside an album's tracks - only names the scan counts as disc art."""
+    directory = _album_dir_or_404(album, "disc art")
+    entry = _listed(directory, file)
+    if entry is None or entry.name not in find_disc_art([entry]):
+        raise HTTPException(status_code=404, detail="no such image")
+
+    mime = MIME_BY_EXTENSION.get(file_extension(entry.name), "image/jpeg")
+    return Response(content=await asyncio.to_thread(entry.read_bytes), media_type=mime,
+                    headers={"Cache-Control": "private, max-age=300"})
+
+
+class DiscArtRequest(BaseModel):
+    #? relative to LIBRARY_PATH, as the scan reports it
+    album_path: str
+
+
+@router.post("/disc_art/fetch")
+async def fetch_disc_art(request: Request, body: DiscArtRequest):
+    """
+    Save a picture of the disc beside an album's tracks, as `disc.<ext>` or `disc<N>.<ext>`.
+
+    Like /art/fetch it chooses nothing, so it needs no preview: the release comes from the
+    album's own tags. The Cover Art Archive's "Medium" images for that exact release first,
+    then fanart.tv's disc art for its release group when a key is set - see src/disc_art.py.
+    Refused when the album already has deadwax's own disc art, so nothing is ever overwritten.
+    """
+    if not Config.LIBRARY_PATH:
+        raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
+
+    plan = await asyncio.to_thread(plan_disc_art, body.album_path, Config.LIBRARY_PATH)
+    if plan["problem"]:
+        raise HTTPException(status_code=400, detail=plan["problem"])
+    if plan["existing"]:
+        raise HTTPException(status_code=400, detail=f"this album already has CD art: {', '.join(plan['existing'])}")
+    if not plan["release_mbid"]:
+        raise HTTPException(status_code=400, detail="not tagged with a MusicBrainz release - match it to one first")
+
+    size = Config.COVER_ART_SIZE if Config.COVER_ART_SIZE in COVER_ART_SIZES else "500"
+    images = await coverart_client.release_images(plan["release_mbid"])
+    chosen = choose_from_caa(images or [], plan["discs"], size)
+    source, fetch = "the Cover Art Archive", coverart_client.fetch_image
+
+    if not chosen:
+        cdart = await artist_images_client.fanarttv_cdart(plan["release_group_mbid"] or "")
+        chosen = choose_from_fanarttv(cdart or [], plan["discs"])
+        source, fetch = "fanart.tv", artist_images_client.fetch
+
+    if not chosen:
+        if images is None:
+            raise HTTPException(status_code=502, detail="the Cover Art Archive couldn't be reached - try again")
+        raise HTTPException(
+            status_code=404,
+            detail="no CD art on the Cover Art Archive for this release"
+                   + (", or on fanart.tv for the album" if (Config.FANARTTV_KEY or "").strip()
+                      else " - a fanart.tv key in the settings tab adds another source"),
+        )
+
+    files = []
+    for disc, url in chosen.items():
+        got = await fetch(url)
+        if got:
+            files.append((disc_art_filename(disc, got[1]), got[0]))
+
+    if not files:
+        raise HTTPException(status_code=502, detail=f"the CD art couldn't be downloaded from {source} - try again")
+
+    results = await asyncio.to_thread(save_disc_art, body.album_path, Config.LIBRARY_PATH, files)
+    if not results["written"]:
+        raise HTTPException(status_code=500, detail="; ".join(results["problems"]) or "nothing was written")
+
+    forget_cached_album(str(Path(Config.LIBRARY_PATH) / body.album_path))
+    await _persist_cache(request)
+
+    return {"written": results["written"], "source": source}
 
 
 class TagEdit(BaseModel):

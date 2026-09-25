@@ -30,6 +30,8 @@ THEAUDIODB_ARTIST = "https://www.theaudiodb.com/api/v1/json/{key}/artist-mb.php?
 #? page, whatever key you send. The webservice host answers properly - a bad key gets
 #? `401 {"error":"invalid API key"}` - and is what every other client uses.
 FANARTTV_ARTIST = "https://webservice.fanart.tv/v3/music/{mbid}"
+#? an album's artwork by RELEASE GROUP id - its `cdart` is disc art, numbered per disc
+FANARTTV_ALBUM = "https://webservice.fanart.tv/v3/music/albums/{mbid}"
 
 #? An artist page asks for a handful of pictures at once, and a Commons original can be a 20 MB
 #? scan. Generous enough for a real background, mean enough that one artist can't fill the disk.
@@ -122,6 +124,28 @@ class ArtistImagesClient:
             params += f"&client_key={quote(personal)}"
 
         return await self._json(FANARTTV_ARTIST.format(mbid=artist_mbid) + params, "fanart.tv")
+
+    async def fanarttv_cdart(self, release_group_mbid: str) -> list[dict] | None:
+        """
+        fanart.tv's disc art for an album, by release group id - or None without a key.
+
+        Lives here rather than beside the Cover Art Archive client because it is the same host,
+        the same key and the same request as the artist lookup above.
+        """
+        key = (Config.FANARTTV_KEY or "").strip()
+        if not key or not release_group_mbid:
+            return None
+
+        params = f"?api_key={quote(key)}"
+        personal = (Config.FANARTTV_PERSONAL_KEY or "").strip()
+        if personal:
+            params += f"&client_key={quote(personal)}"
+
+        data = await self._json(FANARTTV_ALBUM.format(mbid=release_group_mbid) + params, "fanart.tv")
+        albums = (data or {}).get("albums") or {}
+        album = albums.get(release_group_mbid) or (next(iter(albums.values()), None) if albums else None)
+        cdart = (album or {}).get("cdart")
+        return [art for art in cdart if isinstance(art, dict)] if isinstance(cdart, list) else []
 
     async def candidates(self, artist: dict) -> list[dict]:
         """

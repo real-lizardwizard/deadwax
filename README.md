@@ -218,6 +218,18 @@ A picker shows every candidate each source offered — TheAudioDB usually has fo
 
 Without a key you still get a photo where Commons has one, and the rest of the page is unaffected.
 
+### CD art, and the pictures inside your files
+<details>
+<summary style="font-style:italic">Why a song can show a different picture from its album, and what to do about it</summary>
+Players don't always show a song with its album's cover. Navidrome (and so Amperfy, and every other Subsonic app on top of it) shows a song's <strong>own embedded picture</strong> when its file has one, and otherwise the <strong>disc's</strong> picture when the song has a disc number — which it looks for as a <code>disc*</code> or <code>cd*</code> image beside the tracks. Files off Soulseek often carry a picture somebody else embedded, and downloads often come with a <code>cd.jpg</code> scan, so a song can end up showing another edition's sleeve or a photo of the CD.
+<br><br>
+The track view now shows what a file carries: <strong>Pictures in this file</strong> lists each one with its type (front cover, the disc itself, back cover…), its real size, and a click to see it full size. An album's properties say how many of its tracks carry their own picture, and a <strong>Picture</strong> column in the Fields menu marks which ones.
+<br><br>
+<strong>Get CD art</strong> puts a proper picture of the disc in that slot, as <code>disc.jpg</code> beside the tracks — or <code>disc1.jpg</code>, <code>disc2.jpg</code> for each disc of a set, which is how Navidrome matches them to their disc. It comes from the Cover Art Archive's pictures of the disc for the <em>exact release</em> the album is tagged with, then from fanart.tv's disc art if you've given it a key. A <code>disc.*</code> file sits ahead of a download's <code>cd.jpg</code> in every player's order, so the scan stops being what shows without being deleted. There's a <strong>Get CD art · N</strong> in the library toolbar for everything in view, and it never replaces CD art that's already there.
+<br><br>
+If you'd rather songs always showed the album's cover in Navidrome, that's two of <em>its</em> settings: <code>ND_ENABLEMEDIAFILECOVERART=false</code> and <code>ND_DISCARTPRIORITY=cover.*, folder.*, front.*, embedded</code>.
+</details>
+
 ### Lyrics
 <details>
 <summary style="font-style:italic">Synced where they exist, saved where your player looks</summary>

@@ -181,6 +181,16 @@ export function trackLyrics(albumPath: string, filename: string): Promise<TrackL
   )
 }
 
+/**
+ * Save a picture of the disc beside an album's tracks, as disc.<ext> or disc<N>.<ext>.
+ *
+ * Chooses nothing, like fetchCoverArt: the release comes from the album's own tags. A 404 means
+ * neither the Cover Art Archive nor fanart.tv has one; a 502, that one couldn't be reached.
+ */
+export function fetchDiscArt(albumPath: string): Promise<{ written: string[]; source: string }> {
+  return post('/library/disc_art/fetch', { album_path: albumPath })
+}
+
 /** What deleting this album would remove. Touches nothing. */
 export function deletionSummary(albumPath: string): Promise<DeletionSummary> {
   return get<DeletionSummary>(`/library/deletion_summary?album=${encodeURIComponent(albumPath)}`)

@@ -388,6 +388,11 @@ export interface LibraryAlbum {
    * counted — the scan reads the folder listing for this, not the tags.
    */
   lyrics_count: number
+  /**
+   * Images beside the tracks that players take for the DISC's picture - `disc*` and `cd*`.
+   * Navidrome shows one for any song with a disc number, in place of the album's cover.
+   */
+  disc_art: string[]
   total_size: number
   /** seconds */
   duration: number
@@ -511,6 +516,23 @@ export interface TrackDetails {
   tags: Record<string, string>
   /** Every tag in the file under its container's own name. Pictures and blobs are left out. */
   raw: [string, string][]
+  /**
+   * Pictures embedded in the file, without their bytes - /library/tracks/picture serves those.
+   * A player shows a song's OWN picture over its album's cover, which is how a song comes to
+   * show a sleeve that doesn't match its album.
+   */
+  pictures: EmbeddedPicture[]
+}
+
+export interface EmbeddedPicture {
+  index: number
+  /** ID3's picture type (3 is the front cover, 6 the disc); null for MP4, which has none */
+  type: number | null
+  label: string
+  mime: string
+  /** bytes */
+  size: number
+  description: string
 }
 
 export interface TrackDetailsResponse {

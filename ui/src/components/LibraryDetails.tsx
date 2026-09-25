@@ -2,10 +2,10 @@ import { Fragment, type ComponentChildren } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import * as libraryApi from '../api/library'
-import type { LibraryAlbum, LibraryTrack, MetadataIssueType, TrackLyrics } from '../api/types'
+import type { LibraryAlbum, LibraryTrack, MetadataIssueType, TrackDetails, TrackLyrics } from '../api/types'
 import type { TrackDetailsState } from '../hooks/useTrackDetails'
 import { useTrackFields, type TrackFieldsState } from '../hooks/useTrackFields'
-import { formatAge, formatDuration, formatSize, trackTime } from '../lib/format'
+import { discArtUrl, formatAge, formatDuration, formatSize, trackPictureUrl, trackTime } from '../lib/format'
 import type { AlbumGroup } from '../lib/groupAlbums'
 import {
   editionNodeId, groupAddedAt, nodeIdForAlbum, trackNodeId, type Selected,
@@ -16,9 +16,9 @@ import {
   clampWidth, columnLayout, fieldById, FIELD_GROUPS, isFlexible, TITLE_COLUMN, TRACK_FIELDS,
   visibleColumns, type TrackField, type TrackRow,
 } from '../lib/trackFields'
-import { ArtViewer } from './ArtViewer'
+import { ArtViewer, type ViewerImage } from './ArtViewer'
 import { lyricTime } from '../lib/lyrics'
-import { AlbumArt, CoverGrid, coverSources, GetArtButton, GetLyricsButton } from './LibraryParts'
+import { AlbumArt, CoverGrid, coverSources, GetArtButton, GetDiscArtButton, GetLyricsButton } from './LibraryParts'
 import { Loading } from './Loading'
 import { ArtistDetails } from './ArtistDetails'
 import { TrackTagEditor } from './TrackTagEditor'
@@ -49,6 +49,8 @@ interface Props {
   onArtFetched: () => void
   /** a fetch wrote .lrc files, so the scan's lyrics count - and the track view - want a reload */
   onLyricsFetched: () => void
+  /** a fetch wrote disc art, which the scan lists, so it wants a reload */
+  onDiscArtFetched: () => void
   /** After tags were edited by hand, so the library reloads what changed. */
   onTagsEdited: () => void
   onSearchArtist: (artist: string) => void
@@ -84,6 +86,8 @@ export function LibraryDetails(props: Props) {
   const layout = useTrackFields()
   const [menuOpen, setMenuOpen] = useState(false)
   const [viewing, setViewing] = useState<LibraryAlbum | null>(null)
+  //? any other pictures opened full size - a track's embedded ones, an album's disc art
+  const [viewingPictures, setViewingPictures] = useState<ViewerImage[] | null>(null)
 
   const album = selected.kind === 'album' || selected.kind === 'track' ? selected.album : null
   const group = selected.kind === 'group' || selected.kind === 'album' || selected.kind === 'track'
@@ -185,6 +189,7 @@ export function LibraryDetails(props: Props) {
             onSelect={props.onSelect}
             onSearchArtist={props.onSearchArtist}
             onOpenArt={setViewing}
+            onViewPictures={setViewingPictures}
             onHeaderMenu={() => setMenuOpen(true)}
           />
         )
@@ -198,6 +203,7 @@ export function LibraryDetails(props: Props) {
             visible={layout.visible}
             onSelect={props.onSelect}
             onOpenArt={setViewing}
+            onViewPictures={setViewingPictures}
           />
         )
     }
@@ -237,6 +243,7 @@ export function LibraryDetails(props: Props) {
             </button>
             <GetArtButton album={album} onDone={props.onArtFetched} class="commandbar-button" />
             <GetLyricsButton album={album} onDone={props.onLyricsFetched} class="commandbar-button" />
+            <GetDiscArtButton album={album} onDone={props.onDiscArtFetched} class="commandbar-button" />
           </>
         )}
 
@@ -314,6 +321,10 @@ export function LibraryDetails(props: Props) {
         />
       )}
 
+      {viewingPictures && (
+        <ArtViewer images={viewingPictures} onClose={() => setViewingPictures(null)} />
+      )}
+
       {editingTags && (
         <TrackTagEditor
           album={editingTags.album}
@@ -373,7 +384,7 @@ function IssueList(
 function AlbumDetails(
   {
     album, group, details, layout, checked, issueTypes, onTick, onTickAll, onSelect,
-    onSearchArtist, onOpenArt, onHeaderMenu,
+    onSearchArtist, onOpenArt, onViewPictures, onHeaderMenu,
   }:
   {
     album: LibraryAlbum
@@ -387,10 +398,18 @@ function AlbumDetails(
     onSelect: (id: string) => void
     onSearchArtist: (artist: string) => void
     onOpenArt: (album: LibraryAlbum) => void
+    onViewPictures: (images: ViewerImage[]) => void
     onHeaderMenu: () => void
   },
 ) {
   const multiple = group.editions.length > 1
+
+  //? which tracks carry their OWN picture, from the files as read now - a player shows it in
+  //? place of the album's cover, so this is where a song's odd sleeve comes from
+  const withPictures = details.files
+    ? album.tracks.filter((track) => details.files?.get(track.filename)?.pictures.length).length
+    : null
+  const discArt = album.disc_art ?? []
   const facts = [
     album.original_year && album.original_year !== album.year
       ? `${album.original_year} (this press ${album.year})`
@@ -489,6 +508,35 @@ function AlbumDetails(
           ['Lyrics', album.lyrics_count
             ? `${album.lyrics_count === album.track_count ? 'Every track' : `${album.lyrics_count} of ${album.track_count} tracks`}, as .lrc files`
             : 'None on disk'],
+          ['CD art', discArt.length
+            ? (
+              <span class="details-disc-art">
+                {discArt.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    class="details-disc-thumb"
+                    title={`${name} - what players show for a song with a disc number. Click to view.`}
+                    onClick={() => onViewPictures(discArt.map((file) => ({
+                      label: file,
+                      sources: [discArtUrl(album.path, file, album.modified_at)],
+                    })))}
+                  >
+                    <img src={discArtUrl(album.path, name, album.modified_at)} alt={name} loading="lazy" />
+                    <span>{name}</span>
+                  </button>
+                ))}
+              </span>
+            )
+            : 'None on disk'],
+          ['Embedded art', withPictures === null
+            ? (details.loading ? '…' : null)
+            : withPictures
+              ? (withPictures === album.track_count
+                ? 'Every track carries its own picture, which players show instead of the cover'
+                : `${withPictures} of ${album.track_count} track${album.track_count === 1 ? '' : 's'} `
+                  + `${withPictures === 1 ? 'carries its' : 'carry their'} own picture, which players show instead of the cover`)
+              : 'None - every track shows the album\'s cover'],
           ['Cover', album.art === 'file'
             ? 'An image file in the folder'
             : album.art === 'embedded' ? 'Embedded in the audio' : 'None on disk'],
@@ -927,7 +975,7 @@ function GroupDetails(
 /* ------------------------------------------------------------------ one track */
 
 function TrackDetailsView(
-  { album, group, track, details, visible, onSelect, onOpenArt }:
+  { album, group, track, details, visible, onSelect, onOpenArt, onViewPictures }:
   {
     album: LibraryAlbum
     group: AlbumGroup
@@ -936,6 +984,7 @@ function TrackDetailsView(
     visible: string[]
     onSelect: (id: string) => void
     onOpenArt: (album: LibraryAlbum) => void
+    onViewPictures: (images: ViewerImage[]) => void
   },
 ) {
   const file = details.files?.get(track.filename)
@@ -1014,6 +1063,8 @@ function TrackDetailsView(
         )
       })}
 
+      <PicturesView album={album} file={file} loading={details.loading} onView={onViewPictures} />
+
       <LyricsView album={album} track={track} />
 
       {/*
@@ -1037,6 +1088,82 @@ function TrackDetailsView(
         {file && <p class="text white-tertiary details-raw-note">{track.filename}</p>}
       </details>
     </section>
+  )
+}
+
+/** A picture's size - embedded art is usually tens of KB, which formatSize would call 0 MB. */
+function pictureBytes(bytes: number): string {
+  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : formatSize(bytes)
+}
+
+/**
+ * The pictures stored inside one track's file.
+ *
+ * Built because songs in a player showed sleeves that didn't match their album: a player shows
+ * a song's OWN picture in place of the album's cover, and a file from a stranger often carries
+ * one - another edition's sleeve, a low-resolution copy, a scan of the disc. Each is labelled
+ * with its declared type, and its real pixel size once it loads.
+ */
+function PicturesView(
+  { album, file, loading, onView }:
+  {
+    album: LibraryAlbum
+    file: TrackDetails | undefined
+    loading: boolean
+    onView: (images: ViewerImage[]) => void
+  },
+) {
+  const [sizes, setSizes] = useState<Record<string, string>>({})
+  const pictures = file?.pictures ?? []
+  const url = (index: number) => trackPictureUrl(album.path, file?.filename ?? '', index, album.modified_at)
+
+  const images = (): ViewerImage[] => pictures.map((picture) => ({
+    label: `${picture.label} · ${file?.filename ?? ''}`,
+    sources: [url(picture.index)],
+  }))
+
+  return (
+    <>
+      <h3 class="details-subheading">Pictures in this file</h3>
+      {!file
+        ? (loading ? <Loading label="reading the file" /> : null)
+        : !pictures.length
+          ? (
+            <p class="lyrics-none text white-tertiary">
+              None - a player shows the album's cover for this song, or its CD art if the song has a disc number.
+            </p>
+          )
+          : (
+            <div class="details-pictures">
+              {pictures.map((picture) => {
+                const key = `${file.filename}:${picture.index}`
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    class="details-picture"
+                    title="Click to view full size"
+                    onClick={() => onView(images())}
+                  >
+                    <img
+                      src={url(picture.index)}
+                      alt={picture.label}
+                      onLoad={(event) => {
+                        const img = event.currentTarget as HTMLImageElement
+                        setSizes((known) => ({ ...known, [key]: `${img.naturalWidth} × ${img.naturalHeight}` }))
+                      }}
+                    />
+                    <span class="details-picture-label">{picture.label}</span>
+                    <span class="details-picture-facts text white-tertiary">
+                      {[sizes[key], pictureBytes(picture.size), picture.mime.replace('image/', '').toUpperCase()]
+                        .filter(Boolean).join(' · ')}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+    </>
   )
 }
 

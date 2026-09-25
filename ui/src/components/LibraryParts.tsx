@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 
+import { ApiError } from '../api/http'
 import * as libraryApi from '../api/library'
 import type { LibraryAlbum, LyricsSummary, MetadataIssueType } from '../api/types'
 import { albumArtUrl } from '../lib/format'
@@ -217,6 +218,61 @@ export function GetLyricsButton(
         : summary
           ? `Lyrics · ${lyricsOnDisk(summary)} of ${album.track_count}`
           : mine?.state === 'failed' ? 'Retry lyrics' : 'Get lyrics'}
+    </button>
+  )
+}
+
+/**
+ * Fetch a picture of the disc for one album, saved as disc.<ext> beside the tracks.
+ *
+ * Rendered for albums that name a release and have none of deadwax's own `disc*` images. A
+ * `cd.jpg` scan a download brought with it doesn't hide it: a fetched `disc.*` sits ahead of
+ * that in every reader's order, so fetching is how a stray scan stops being what players show.
+ *
+ * "None found" and "couldn't reach" are told apart, and both stay clickable - an archive that
+ * was briefly away is worth asking again, and nothing here should latch into a dead end.
+ */
+export function GetDiscArtButton(
+  { album, onDone, class: className = 'commandbar-button' }:
+  { album: LibraryAlbum; onDone: () => void; class?: string },
+) {
+  const [run, setRun] = useState<{ path: string; state: 'working' | 'none' | 'failed'; detail?: string } | null>(null)
+  const mine = run && run.path === album.path ? run : null
+
+  const hasOwn = (album.disc_art ?? []).some((name) => name.toLowerCase().startsWith('disc'))
+  if (!album.release_mbid || hasOwn) return null
+
+  const getDiscArt = async (event: MouseEvent) => {
+    event.stopPropagation()
+    const path = album.path
+    setRun({ path, state: 'working' })
+
+    try {
+      await libraryApi.fetchDiscArt(path)
+      setRun(null)
+      onDone()
+    } catch (caught) {
+      const detail = caught instanceof Error ? caught.message : String(caught)
+      setRun({ path, state: caught instanceof ApiError && caught.status === 404 ? 'none' : 'failed', detail })
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      class={`${className}${mine?.state === 'failed' ? ' failed' : ''}`}
+      disabled={mine?.state === 'working'}
+      title={
+        mine?.detail
+          ? `${mine.detail}. Click to try again.`
+          : 'download a picture of the disc for this release and save it as disc.jpg beside the '
+            + 'tracks - what players show for a song with a disc number. Nothing else changes.'
+      }
+      onClick={(event) => void getDiscArt(event as unknown as MouseEvent)}
+    >
+      {mine?.state === 'working'
+        ? <Loading />
+        : mine?.state === 'none' ? 'No CD art found' : mine?.state === 'failed' ? 'Retry CD art' : 'Get CD art'}
     </button>
   )
 }

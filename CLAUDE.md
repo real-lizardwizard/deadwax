@@ -109,6 +109,8 @@ src/
                    plan/execute split - see "The artist page".
   lyrics.py        lyrics as a .lrc beside each track. The SIXTH writer, same split, and the
                    network is passed in so none of it needs one to test - see "Lyrics".
+  disc_art.py      CD art as disc.<ext> / disc<N>.<ext>. The SEVENTH writer - choosing is pure,
+                   writing is narrow - see "CD art and embedded pictures".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), app.py
@@ -123,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             723 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             768 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -215,11 +217,11 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   scoped to what is on screen, so the facets compose with it, and it reports "no cover on the
   Archive" separately from "the request failed" — the first is a fact about the release and
   nothing can be done, the second is worth trying again.
-- **There are now SIX writers to the user's filesystem**, and all but the smallest use the same
+- **There are now SEVEN writers to the user's filesystem**, and all but the smallest use the same
   plan/execute split: `organizer.py` files downloads in, `retag.py` corrects albums already
   there, `track_tags.py` writes tags edited by hand (v0.6.9), `artist_art.py` writes an artist's
   pictures into their folder (v0.6.15), `lyrics.py` writes a `.lrc` beside each track (v0.7.0),
-  and `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
+  `save_disc_art()` writes CD art (v0.7.2), and `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
   the write rather than trusting the plan, for the same reason the retag endpoint recomputes its
   own). A preview that disagrees with the write it previews is worse than no preview, so the
   first two derive the tags from one shared `organizer.tag_values()` rather than computing them
@@ -941,6 +943,57 @@ anything else I'd need for an artist page".
 - **Known gap:** on a phone the details pane is a sheet that opens for albums and tracks, and an
   artist "just opens in place" (v0.6.5's decision). So the artist page is desktop and tablet
   only. The phone rules for it are written and inert until that decision changes.
+
+### CD art and embedded pictures (v0.7.2)
+
+James: "on the individual songs in amperfy, the cover art doesn't always match the album" - and,
+once the answer was in, "add the view and let's add grabbing cd art".
+
+- **Why songs show other pictures, read in Navidrome's source, not guessed.** `MediaFile.
+  CoverArtID()` (model/mediafile.go): a file with an embedded picture is shown with THAT
+  (`EnableMediaFileCoverArt`, default true); otherwise a song with a disc number gets the DISC's
+  artwork, whose default priority is `disc*.*, cd*.*, cover.*, folder.*, front.*, discsubtitle,
+  embedded` (conf/configuration.go). So two routes to a mismatch, and deadwax fed both: it never
+  touches embedded pictures, and the organizer carries every image beside a download's tracks
+  into the library - `cd.jpg` scans included - as companions.
+- **The track view lists a file's pictures** (`describe_pictures` -> `pictures` on the track
+  details, bytes served by `/library/tracks/picture`, the file matched against the folder's own
+  listing like the tag editor's). `embedded_pictures()` is now the ONE reader of every container
+  - FLAC blocks, Ogg's base64'd METADATA_BLOCK_PICTURE (which `read_embedded_art` had never
+  read at all), ID3 APIC, MP4 covr - and `read_embedded_art` picks from it by type as before.
+  Real pixel sizes are measured by the browser as the image loads, not parsed server-side.
+- **The album's properties count tracks carrying their own picture**, from the live details, and
+  a `Picture` field (default off) marks them in the table. Neither is in the scan, which would
+  mean opening every file's picture blocks for a count.
+- **CD art is written as `disc.<ext>`, or `disc<N>.<ext>` per disc of a set.** Navidrome's
+  `fromExternalFile` (core/artwork/disc.go) matches a NUMBER after the glob's prefix to that disc
+  and lets an unnumbered file stand in for any disc; Kodi and Jellyfin read `disc.*`. `disc`
+  before `cd` in that order is also what makes a fetched image outrank a download's `cd.jpg`
+  without deleting the scan - so a `cd*` file does NOT hide Get CD art; only deadwax's own
+  `disc*` does.
+- **Sources: the Cover Art Archive's "Medium" images for the EXACT release first**, then
+  fanart.tv's `cdart` for the release group (needs the key already in settings). The release
+  comes from the album's tags, as a cover's does, so it chooses nothing and needs no preview.
+  Size follows `COVER_ART_SIZE`. The route computes every URL itself from the sources' own
+  listings; nothing a caller sends is fetched.
+- **Numbering a set's images is done only where it is safe**: by the image's own comment ("CD2",
+  "Disc 1" - measured on In Rainbows' discbox), or in upload order when there are exactly as many
+  images as discs; otherwise one unnumbered image stands for every disc. "DiscID: ..." (Third's
+  comment) is deliberately NOT a disc number. A right picture on the wrong disc beats an
+  invented order.
+- **Never replaces CD art**: the route refuses an album with deadwax's own `disc*`, and the
+  writer only writes names matching `disc\d*.(jpg|png|...)`, re-checking containment.
+- **`disc_art` is in the scan (SCAN_FORMAT 4)** - listed from the directory the scan already
+  reads, no file opened. `/library/disc_art` serves only names that count as disc art.
+- **Not built: replacing or stripping embedded pictures.** That is the other real fix, and
+  "embedding art" is still on the deliberately-not-built list - it writes into every audio file.
+  The Navidrome settings in the README are the no-deadwax-change way to have songs always show
+  the cover.
+- **Verified in the real page** on the scratch library, with the live Archive: Dummy got
+  `disc.jpg`; In Rainbows got `disc1.jpg` and `disc2.jpg` from its "CD1"/"CD2" comments; an album
+  with only a `cd.jpg` scan and nothing on the Archive said so and pointed at fanart.tv; a track
+  with Third's cover embedded showed "Front cover, 500 x 500", one with a disc scan "Media (the
+  disc itself)".
 
 ### Lyrics (v0.7.0)
 
@@ -2059,7 +2112,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 723 tests
+.venv/bin/python -m pytest tests/ -q  # 768 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2089,7 +2142,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 723 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 768 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -201,6 +201,17 @@ export function LibraryView({ active, onNavigate }: Props) {
   } | null>(null)
   const stopLyrics = useRef(false)
 
+  /** A bulk CD art fetch in progress, or the summary of the last one - the covers' shape again. */
+  const [bulkDisc, setBulkDisc] = useState<{
+    total: number
+    done: number
+    written: number
+    missing: number
+    failed: number
+    running: boolean
+  } | null>(null)
+  const stopDisc = useRef(false)
+
   //? the album awaiting a delete confirmation, or null
   const [deleting, setDeleting] = useState<LibraryAlbum | null>(null)
 
@@ -323,6 +334,17 @@ export function LibraryView({ active, onNavigate }: Props) {
   const lyricsCandidates = useMemo(
     () => visibleGroups.flatMap((group) => group.editions)
                        .filter((album) => !album.lyrics_count),
+    [visibleGroups],
+  )
+
+  /**
+   * Albums IN VIEW that CD art could be fetched for: they name a release, and have none of
+   * deadwax's own `disc*` images. A download's `cd.jpg` scan doesn't count - see GetDiscArtButton.
+   */
+  const discCandidates = useMemo(
+    () => visibleGroups.flatMap((group) => group.editions)
+                       .filter((album) => album.release_mbid
+                         && !(album.disc_art ?? []).some((name) => name.toLowerCase().startsWith('disc'))),
     [visibleGroups],
   )
 
@@ -494,6 +516,35 @@ export function LibraryView({ active, onNavigate }: Props) {
     }
 
     setBulkLyrics((current) => current && { ...current, running: false })
+    await reload(false)
+  }
+
+  /** Fetch CD art for every candidate, one album at a time - the covers' run, the covers' reasons. */
+  const fetchAllDiscArt = async () => {
+    const targets = discCandidates
+    if (!targets.length) return
+
+    stopDisc.current = false
+    let written = 0
+    let missing = 0
+    let failed = 0
+    setBulkDisc({ total: targets.length, done: 0, written, missing, failed, running: true })
+
+    for (const [position, album] of targets.entries()) {
+      if (stopDisc.current) break
+
+      try {
+        await libraryApi.fetchDiscArt(album.path)
+        written += 1
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 404) missing += 1
+        else failed += 1
+      }
+
+      setBulkDisc({ total: targets.length, done: position + 1, written, missing, failed, running: true })
+    }
+
+    setBulkDisc((current) => current && { ...current, running: false })
     await reload(false)
   }
 
@@ -693,6 +744,31 @@ export function LibraryView({ active, onNavigate }: Props) {
             onClick={() => { stopBulk.current = true }}
           >
             <Loading label={`${bulkArt.done}/${bulkArt.total} · stop`} />
+          </button>
+        )}
+
+        {loaded && discCandidates.length > 0 && !bulkDisc?.running && (
+          <button
+            type="button"
+            id="library-bulk-disc-button"
+            class="win-button"
+            title={`fetch a picture of the disc for the ${discCandidates.length} album(s) in view that `
+                 + 'have a release but no CD art - saved as disc.jpg, nothing else changes'}
+            onClick={() => void fetchAllDiscArt()}
+          >
+            Get CD art · {discCandidates.length}
+          </button>
+        )}
+
+        {bulkDisc?.running && (
+          <button
+            type="button"
+            id="library-bulk-disc-button"
+            class="win-button is-running"
+            title="Stop after the album currently being fetched"
+            onClick={() => { stopDisc.current = true }}
+          >
+            <Loading label={`CD art ${bulkDisc.done}/${bulkDisc.total} · stop`} />
           </button>
         )}
 
@@ -920,6 +996,7 @@ export function LibraryView({ active, onNavigate }: Props) {
             onArtFetched={() => void reload(false)}
             /* a new .lrc changes the folder's mtime, which is also what re-reads the track's lyrics */
             onLyricsFetched={() => void reload(false)}
+            onDiscArtFetched={() => void reload(false)}
             /* the server dropped the album from its scan cache when it wrote the tags, so a plain
                reload shows them - and it marked the album reviewed, which the badge recounts */
             onTagsEdited={() => {
@@ -949,6 +1026,15 @@ export function LibraryView({ active, onNavigate }: Props) {
             {bulkArt.missing ? `, ${bulkArt.missing} had none on the Archive` : ''}
             {bulkArt.failed ? `, ${bulkArt.failed} failed - try those again` : ''}
             {bulkArt.done < bulkArt.total ? ` (stopped at ${bulkArt.done} of ${bulkArt.total})` : ''}
+          </span>
+        )}
+
+        {bulkDisc && !bulkDisc.running && (
+          <span class="statusbar-note">
+            fetched CD art for {bulkDisc.written} album{bulkDisc.written === 1 ? '' : 's'}
+            {bulkDisc.missing ? `, ${bulkDisc.missing} had none to find` : ''}
+            {bulkDisc.failed ? `, ${bulkDisc.failed} failed - try those again` : ''}
+            {bulkDisc.done < bulkDisc.total ? ` (stopped at ${bulkDisc.done} of ${bulkDisc.total})` : ''}
           </span>
         )}
 

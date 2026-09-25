@@ -72,6 +72,18 @@ export function albumArtUrl(album: { path: string; art_mtime?: number }): string
 }
 
 
+/** One picture embedded in one track - `index` as the track's details list them. */
+export function trackPictureUrl(albumPath: string, filename: string, index: number, version = 0): string {
+  return `/deadwax/library/tracks/picture?album=${encodeURIComponent(albumPath)}`
+    + `&file=${encodeURIComponent(filename)}&index=${index}&v=${version}`
+}
+
+/** One CD art image beside an album's tracks. `version` is the folder's mtime, which a new file moves. */
+export function discArtUrl(albumPath: string, name: string, version = 0): string {
+  return `/deadwax/library/disc_art?album=${encodeURIComponent(albumPath)}`
+    + `&file=${encodeURIComponent(name)}&v=${Math.round(version)}`
+}
+
 /**
  * One of an artist's own images, off disk.
  *

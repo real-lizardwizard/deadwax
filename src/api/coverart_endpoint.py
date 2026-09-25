@@ -173,5 +173,52 @@ class CoverArtClient:
         return (data, content_type), "ok"
 
 
+    async def release_images(self, release_mbid: str) -> list[dict] | None:
+        """
+        Every image the Archive holds for a release, with its types and comment - or None.
+
+        None means the Archive couldn't be asked; an empty list means it has nothing for this
+        release. The two are kept apart for the same reason a cover's 404 is: one is a fact
+        about the release, the other is worth trying again.
+        """
+        if not release_mbid:
+            return []
+
+        try:
+            client = await self.get_client()
+            response = await client.get(f"/release/{release_mbid}",
+                                        headers={"User-Agent": self.user_agent()})
+        except Exception as e:
+            logger.warning(f"could not reach the Cover Art Archive: {e}")
+            return None
+
+        if response.status_code == 404:
+            return []
+        if response.status_code != 200:
+            logger.warning(f"the Cover Art Archive answered {response.status_code} for {release_mbid}")
+            return None
+
+        try:
+            images = response.json().get("images")
+        except ValueError:
+            return None
+        return [image for image in images if isinstance(image, dict)] if isinstance(images, list) else []
+
+    async def fetch_image(self, url: str) -> tuple[bytes, str] | None:
+        """One image by the address the Archive's own listing gave - never one a caller sent."""
+        try:
+            client = await self.get_client()
+            response = await client.get(url, headers={"User-Agent": self.user_agent()})
+        except Exception as e:
+            logger.warning(f"could not fetch an image from the Cover Art Archive: {e}")
+            return None
+
+        mime = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+        if response.status_code != 200 or mime not in MIME_EXTENSIONS or len(response.content) < 1024:
+            logger.warning(f"an Archive image answered {response.status_code} as {mime or 'nothing'}")
+            return None
+        return response.content, mime
+
+
 def extension_for(mime: str) -> str:
     return MIME_EXTENSIONS.get(mime, "jpg")

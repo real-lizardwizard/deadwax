@@ -185,6 +185,16 @@ export const TRACK_FIELDS: readonly TrackField[] = [
   { id: 'musicbrainz_artistid', label: 'Artist ID', group: 'MusicBrainz', width: '19em', mono: true, initial: false, fromScan: false, value: tag('musicbrainz_artistid') },
 
   {
+    //? which songs carry their OWN picture - what a player shows instead of the album's cover
+    id: 'pictures', label: 'Picture', group: 'File', width: '9em',
+    initial: false, fromScan: false,
+    value: ({ details }) => {
+      const [first, ...rest] = details?.pictures ?? []
+      if (!first) return ''
+      return rest.length ? `${first.label} +${rest.length}` : first.label
+    },
+  },
+  {
     id: 'size', label: 'Size', group: 'File', width: '5em', mono: true,
     initial: false, fromScan: true, value: ({ track }) => formatSize(track.size),
   },

@@ -39,7 +39,8 @@ from src.lyrics import has_lyrics_file, lyrics_filename
 #?   1  the original shape
 #?   2  tracks carry `disc`, albums carry `disc_count`
 #?   3  albums carry `lyrics_count`
-SCAN_FORMAT = 3
+#?   4  albums carry `disc_art`
+SCAN_FORMAT = 4
 
 #? path -> (mtime, album dict). Reading tags costs milliseconds per file and a real library
 #? is thousands of files, so a rescan re-reads only the folders that actually changed. The
@@ -138,68 +139,131 @@ PICTURE_TYPE_PREFERENCE = {
 UNRANKED_PICTURE_PREFERENCE = 2
 
 
-def _best_picture(pictures: list) -> object | None:
-    """The most cover-like picture in the list, by its declared type."""
-    if not pictures:
-        return None
+#? What each picture type IS, in the words the track view shows. The numbers are ID3's APIC
+#? types, which FLAC and Ogg pictures reuse; MP4 has no types at all.
+PICTURE_TYPE_LABELS = {
+    0: "Other", 1: "File icon", 2: "Other file icon", 3: "Front cover", 4: "Back cover",
+    5: "Leaflet page", 6: "Media (the disc itself)", 7: "Lead artist", 8: "Artist",
+    9: "Conductor", 10: "Band", 11: "Composer", 12: "Lyricist", 13: "Recording location",
+    14: "During recording", 15: "During performance", 16: "Video capture", 17: "A bright fish",
+    18: "Illustration", 19: "Band logo", 20: "Publisher logo",
+}
 
-    return min(
-        pictures,
-        key=lambda p: PICTURE_TYPE_PREFERENCE.get(getattr(p, "type", 0), UNRANKED_PICTURE_PREFERENCE),
-    )
 
-
-def read_embedded_art(path: Path) -> tuple[bytes, str] | None:
+def embedded_pictures(path: Path) -> list[dict]:
     """
-    Cover art stored inside the audio file itself.
+    Every picture stored inside one audio file: `{data, mime, type, description}`, in file order.
 
-    Every container does this differently, and mutagen's `easy` interface deliberately
-    doesn't expose any of it, so this opens the file again without it. Worth the second open:
-    a lot of libraries have no separate cover file and would otherwise show nothing.
-
-    Picks by picture TYPE rather than by order - see PICTURE_TYPE_PREFERENCE.
+    Every container does this differently, and mutagen's `easy` interface deliberately exposes
+    none of it, so the file is opened again without it. `type` is None for MP4, which has no
+    picture types.
     """
     import mutagen
 
     try:
         audio = mutagen.File(str(path))
     except Exception:
-        return None
+        return []
 
     if audio is None:
-        return None
+        return []
 
-    #? FLAC and Ogg: a list of picture blocks
-    picture = _best_picture(list(getattr(audio, "pictures", None) or []))
-    if picture is not None:
-        return bytes(picture.data), (picture.mime or "image/jpeg")
+    found: list[dict] = []
+
+    def add(data, mime, kind, description=""):
+        if data:
+            found.append({"data": bytes(data), "mime": mime or "image/jpeg",
+                          "type": kind, "description": str(description or "")})
+
+    #? FLAC: a list of picture blocks
+    for picture in list(getattr(audio, "pictures", None) or []):
+        add(picture.data, picture.mime, picture.type, picture.desc)
 
     tags = getattr(audio, "tags", None)
     if tags is None:
+        return found
+
+    #? Ogg Vorbis and Opus: the same FLAC picture block, base64'd into a comment
+    try:
+        if not found and "metadata_block_picture" in tags:
+            import base64
+            from mutagen.flac import Picture
+            for encoded in tags["metadata_block_picture"]:
+                try:
+                    picture = Picture(base64.b64decode(encoded))
+                    add(picture.data, picture.mime, picture.type, picture.desc)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    #? MP3: APIC frames, keyed as APIC:description so an exact lookup misses them - and a file
+    #? with both a cover and a disc scan has two of them
+    try:
+        for key in list(tags.keys()):
+            if str(key).startswith("APIC"):
+                frame = tags[key]
+                add(frame.data, getattr(frame, "mime", None), getattr(frame, "type", 0),
+                    getattr(frame, "desc", ""))
+    except Exception:
+        pass
+
+    #? MP4/M4A: 'covr' atoms, whose format is a flag on the value rather than a mime type
+    try:
+        for cover in tags.get("covr") or []:
+            fmt = getattr(cover, "imageformat", None)
+            add(bytes(cover), "image/png" if fmt == 14 else "image/jpeg", None)
+    except Exception:
+        pass
+
+    return found
+
+
+def read_embedded_art(path: Path) -> tuple[bytes, str] | None:
+    """
+    Cover art stored inside the audio file itself.
+
+    Picks by picture TYPE rather than by order - see PICTURE_TYPE_PREFERENCE. A file with no
+    types (MP4) gives its first.
+    """
+    pictures = embedded_pictures(path)
+    if not pictures:
         return None
 
-    #? MP3: APIC frames, keyed as APIC:description so an exact lookup misses them - and a
-    #? file with both a cover and a disc scan has two of them
-    try:
-        frames = [tags[key] for key in tags.keys() if key.startswith("APIC")]
-        frame = _best_picture(frames)
-        if frame is not None:
-            return bytes(frame.data), (getattr(frame, "mime", None) or "image/jpeg")
-    except Exception:
-        pass
+    best = min(pictures, key=lambda p: PICTURE_TYPE_PREFERENCE.get(
+        p["type"] if p["type"] is not None else 0, UNRANKED_PICTURE_PREFERENCE))
+    return best["data"], best["mime"]
 
-    #? MP4/M4A: a 'covr' atom, whose format is a flag on the value rather than a mime type
-    try:
-        covers = tags.get("covr")
-        if covers:
-            cover = covers[0]
-            fmt = getattr(cover, "imageformat", None)
-            mime = "image/png" if fmt == 14 else "image/jpeg"
-            return bytes(cover), mime
-    except Exception:
-        pass
 
-    return None
+def describe_pictures(path: Path) -> list[dict]:
+    """The pictures in a file as the track view lists them - everything but the bytes."""
+    return [
+        {
+            "index": index,
+            "type": picture["type"],
+            "label": (PICTURE_TYPE_LABELS.get(picture["type"], f"Type {picture['type']}")
+                      if picture["type"] is not None else "Cover"),
+            "mime": picture["mime"],
+            "size": len(picture["data"]),
+            "description": picture["description"],
+        }
+        for index, picture in enumerate(embedded_pictures(path))
+    ]
+
+
+#? Image files a player takes for a DISC's picture rather than the album's: Navidrome's
+#? DiscArtPriority default is "disc*.*, cd*.*, cover.*, ...", Kodi and Jellyfin read disc.*.
+#? Anchored and optionally numbered, like NON_COVER_PATTERN, so "Discovery.jpg" isn't one.
+DISC_ART_PATTERN = re.compile(r"(disc|cd)[\s._-]*\d*")
+
+
+def find_disc_art(entries: list[Path]) -> list[str]:
+    """The disc images in a folder listing, by name - deadwax's own `disc*` and a download's `cd*`."""
+    return sorted(
+        entry.name for entry in entries
+        if file_extension(entry.name) in IMAGE_EXTENSIONS
+        and DISC_ART_PATTERN.fullmatch(entry.stem.strip().lower())
+    )
 
 
 def find_artist_art(directory: Path) -> dict:
@@ -503,6 +567,8 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
         #? than a guessed 1. Above 1 is a multi-disc set, which the viewer splits by disc.
         "disc_count": len({t["disc"] for t in tracks if t["disc"]}),
         "lyrics_count": lyrics_count,
+        #? disc images beside the tracks - what a player shows for a song with a disc number
+        "disc_art": find_disc_art(entries),
         "total_size": sum(t["size"] for t in tracks),
         "duration": round(sum(t["length"] for t in tracks), 1),
         "formats": sorted({t["format"] for t in tracks if t["format"]}),
@@ -1047,6 +1113,10 @@ def read_track_details(path: Path) -> dict | None:
         "disc": _track_number(tags.get("discnumber", "")),
         "tags": tags,
         "raw": _raw_tags(path),
+        #? what is embedded, without the bytes - /library/tracks/picture serves those. A player
+        #? shows a song's OWN picture over the album's, which is how songs came to show covers
+        #? that don't match their album - see find_disc_art for the other way
+        "pictures": describe_pictures(path),
     }
 
 
