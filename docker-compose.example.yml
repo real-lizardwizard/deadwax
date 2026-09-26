@@ -36,9 +36,12 @@ services:
       #
       # Optional. slskd's INCOMPLETE folder, which is a different directory from the completed
       # downloads above. Set it (and mount it below) and cancelling a download also deletes the
-      # half-finished file it left behind. Leave it out and that file stays, which is slskd's
-      # own behaviour - it keeps partials so a retried download can RESUME from them rather
-      # than starting over, so this is only junk for a transfer you meant to abandon.
+      # half-finished file it left behind, and the empty folders slskd leaves in there after
+      # every finished download are cleared every ten minutes (only ever EMPTY ones - a
+      # partial file and the folders holding it are never touched). Leave it out and both
+      # stay, which is slskd's own behaviour - it keeps partials so a retried download can
+      # RESUME from them rather than starting over, so one is only junk for a transfer you
+      # meant to abandon.
       #- SLSKD_INCOMPLETE_PATH=/incomplete
 
       # ----- uncomment to configure deadwax here instead of in .env -----

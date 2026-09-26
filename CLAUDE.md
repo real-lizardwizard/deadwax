@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             789 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             796 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -315,6 +315,19 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   guess misfiles a track, whereas here a wrong guess deletes somebody else's download. An
   ambiguous basename, or one whose parent folder isn't this job's, is skipped and reported.
   Every other guard mirrors `delete_album()`.
+- **The EMPTY folders in slskd's incomplete folder are slskd's, and deadwax clears them (v0.9.6).**
+  James found them piling up. From slskd's source: a download is written under
+  `<incomplete>/<user>/<remote path>/`, every level created for it, and on completion
+  `FileService.MoveFile(deleteSourceDirectoryIfEmptyAfterMove: true)` deletes only the ONE folder
+  the file sat in. Every level above stays, empty, for every download ever finished.
+  `remove_empty_incomplete_dirs()` (organizer.py) sweeps them at poller start and every
+  `EMPTY_DIR_SWEEP_POLLS` (ten minutes), under the same opt-in, `SLSKD_INCOMPLETE_PATH`.
+  It can't delete a file - `rmdir` only, links never followed, never the root - and it leaves a
+  folder modified in the last `EMPTY_DIR_MIN_AGE_SECONDS` (10 min) alone, because slskd creates
+  a download's folders and THEN opens its file, and an rmdir between the two fails the download.
+  **Ages are read before anything is removed**: removing a child moves the parent's mtime, and
+  judging the parent by that would stop the sweep one level up on every pass. A failed
+  download's partial, and the path holding it, is never touched - slskd resumes from it.
 - **A cancelled job leaves slskd's list too, and it takes a SECOND ask (v0.9.5).** deadwax had
   always cancelled with `remove=true` and slskd always answered 204 - and removed nothing, so
   cancelled jobs piled up in slskd's UI. Read in slskd's source, not guessed:
@@ -2288,7 +2301,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 789 tests
+.venv/bin/python -m pytest tests/ -q  # 796 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2331,7 +2344,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 789 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 796 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

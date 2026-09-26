@@ -503,7 +503,10 @@ class Config:
         else: logger.info(f"SLSKD_DOWNLOAD_PATH found!")
 
         if cls.SLSKD_INCOMPLETE_PATH:
-            logger.info("SLSKD_INCOMPLETE_PATH found! cancelled downloads will take their partial files with them")
+            logger.info(
+                "SLSKD_INCOMPLETE_PATH found! cancelled downloads will take their partial files "
+                "with them, and empty folders left in it are cleared"
+            )
 
         else:
             logger.info(

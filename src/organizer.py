@@ -16,8 +16,10 @@ instead of scattering a music library.
 """
 
 import asyncio
+import os
 import re
 import shutil
+import time
 from pathlib import Path
 
 from src.editions import edition_discriminator, resolve_edition_label
@@ -661,6 +663,62 @@ def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[s
                 f"left {directory.name} in place, it could not be removed: {e}",
                 extra={"frontend": True, "src": "slskd"},
             )
+
+    return removed
+
+
+#? a folder touched more recently than this is left alone - see remove_empty_incomplete_dirs
+EMPTY_DIR_MIN_AGE_SECONDS = 600
+
+
+def remove_empty_incomplete_dirs(incomplete_root: str, now: float | None = None,
+                                 min_age: float = EMPTY_DIR_MIN_AGE_SECONDS) -> list[str]:
+    """
+    Remove EMPTY folders from slskd's incomplete folder. Returns the ones removed.
+
+    James: "there seem to be a lot of empty folders in /downloads/incomplete, but I'm not sure
+    why they weren't deleted". Read in slskd's source: a download is written to
+    `<incomplete>/<username>/<remote path>/<file>`, with every level created for it, and when it
+    finishes FileService.MoveFile(deleteSourceDirectoryIfEmptyAfterMove: true) deletes the ONE
+    folder the file sat in, if empty. Every level above it - the username, each folder of the
+    peer's share path - is left behind, empty, for every download ever completed. deadwax's own
+    cancel cleanup only ever tidied above a partial it had removed.
+
+    Nothing here can delete a file: rmdir refuses a folder with anything in it, and the walk
+    never follows a link. Two more guards:
+
+    - never the root itself, which is slskd's configured folder;
+    - never a folder modified in the last `min_age` seconds. slskd creates a download's folders
+      and then opens its file inside them, and an rmdir landing between the two would fail that
+      download. A new download's folder is new by definition, so it is always too young here.
+      The ages are read BEFORE anything is removed: removing a child moves its parent's mtime,
+      and judging the parent by that would stop the sweep one level up every time.
+    """
+    root = Path(incomplete_root) if incomplete_root else None
+    if root is None or not root.is_dir():
+        return []
+
+    now = time.time() if now is None else now
+    ages: dict[str, float] = {}
+    for current, dirs, _files in os.walk(root, followlinks=False):
+        for name in dirs:
+            path = os.path.join(current, name)
+            try:
+                if not os.path.islink(path):
+                    ages[path] = os.stat(path).st_mtime
+            except OSError:
+                continue
+
+    removed: list[str] = []
+    #? deepest first, so a parent is only looked at once its children have had their turn
+    for path in sorted(ages, key=lambda p: p.count(os.sep), reverse=True):
+        if now - ages[path] < min_age:
+            continue
+        try:
+            os.rmdir(path)
+            removed.append(path)
+        except OSError:
+            continue  # not empty, or not ours to remove - either way, left exactly as it was
 
     return removed
 

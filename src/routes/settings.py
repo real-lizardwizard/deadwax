@@ -481,8 +481,10 @@ async def settings():
                         Config.SLSKD_INCOMPLETE_PATH,
                         effect=(
                             "The slskd partial-download folder. Optional: set it and cancelling "
-                            "a download also deletes its half-finished file, leave it unset "
-                            "and slskd keeps the partial so a retry can resume from it"
+                            "a download also deletes its half-finished file, and the empty "
+                            "folders slskd leaves behind there are cleared every ten minutes. "
+                            "Leave it unset and slskd keeps the partial so a retry can resume "
+                            "from it"
                         ),
                         status=incomplete_status,
                         detail=incomplete_detail,

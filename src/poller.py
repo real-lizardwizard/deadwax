@@ -18,7 +18,7 @@ from src.config import Config
 from src.library import note_library_changed
 from src.logger import logger
 from src.lyrics import fetch_album_lyrics
-from src.organizer import organize_job
+from src.organizer import organize_job, remove_empty_incomplete_dirs
 from src.peer_speed import RateAccumulator, measured_rate, observe
 from src.store import index_transfers_by_user, settled_transfer_ids, summarize_transfers
 
@@ -410,17 +410,47 @@ async def tidy_cancelled_on_start(slskd_client, store) -> int:
         return 0
 
 
+#? every ten minutes at the poll interval - the empty-folder sweep is a walk of slskd's
+#? incomplete folder, cheap but not free, and nothing about it is urgent
+EMPTY_DIR_SWEEP_POLLS = 120
+
+
+async def sweep_empty_incomplete_dirs() -> int:
+    """
+    Remove empty folders slskd left in its incomplete folder, when deadwax has been told where
+    that is (SLSKD_INCOMPLETE_PATH - the same opt-in as removing a cancelled download's partial
+    file). See organizer.remove_empty_incomplete_dirs for why they pile up. Never raises.
+    """
+    root = Config.SLSKD_INCOMPLETE_PATH or ""
+    if not root:
+        return 0
+    try:
+        removed = await asyncio.to_thread(remove_empty_incomplete_dirs, root)
+    except Exception as e:
+        logger.error(f"couldn't sweep empty folders from {root}: {e}")
+        return 0
+    if removed:
+        logger.info(f"removed {len(removed)} empty folder(s) from slskd's incomplete folder")
+    return len(removed)
+
+
 async def run_download_poller(slskd_client, store) -> None:
     logger.info("download poller started")
     missing_counts: dict[int, int] = {}
     rate_samples: dict[int, RateAccumulator] = {}
 
     await tidy_cancelled_on_start(slskd_client, store)
+    await sweep_empty_incomplete_dirs()
+    polls = 0
 
     while True:
         try:
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
             await poll_downloads_once(slskd_client, store, missing_counts, rate_samples)
+
+            polls += 1
+            if polls % EMPTY_DIR_SWEEP_POLLS == 0:
+                await sweep_empty_incomplete_dirs()
 
         except asyncio.CancelledError:
             logger.info("download poller stopped")

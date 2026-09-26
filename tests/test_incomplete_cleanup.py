@@ -155,3 +155,106 @@ def test_files_that_were_never_written_are_not_an_error(tmp_path):
     assert result["removed"] == []
     assert result["skipped"] == []
     assert result["problem"] is None
+
+
+# ----- empty folders slskd leaves behind (v0.9.6) -----
+#
+# slskd writes to <incomplete>/<user>/<remote path>/<file>, creating every level, and on
+# completion deletes only the one folder the file sat in. Everything above stays, empty, for
+# every download it ever finished - which is what James found piling up.
+
+import os  # noqa: E402
+
+from src.organizer import EMPTY_DIR_MIN_AGE_SECONDS, remove_empty_incomplete_dirs  # noqa: E402
+
+OLD = 1_000_000.0
+NOW = OLD + EMPTY_DIR_MIN_AGE_SECONDS + 1
+
+
+def age(*paths, at=OLD):
+    for path in paths:
+        os.utime(path, (at, at))
+
+
+def test_the_levels_slskd_leaves_above_a_finished_download_are_removed(tmp_path):
+    #? what a completed download leaves: slskd removed "Dummy", nothing above it
+    left = tmp_path / "bob" / "@@music" / "Portishead"
+    left.mkdir(parents=True)
+    age(left, left.parent, left.parent.parent)
+
+    removed = remove_empty_incomplete_dirs(str(tmp_path), now=NOW)
+
+    assert sorted(Path(p).relative_to(tmp_path).as_posix() for p in removed) == [
+        "bob", "bob/@@music", "bob/@@music/Portishead"]
+    assert tmp_path.is_dir() and list(tmp_path.iterdir()) == []
+
+
+def test_a_folder_with_a_partial_in_it_and_everything_above_it_stays(tmp_path):
+    #? a FAILED download's partial is what lets slskd resume it - it and its path stay
+    kept = seed(tmp_path, "bob", "Album", "01 - One.flac")
+    empty = tmp_path / "alice" / "Other"
+    empty.mkdir(parents=True)
+    age(kept, kept.parent, empty, empty.parent)
+
+    remove_empty_incomplete_dirs(str(tmp_path), now=NOW)
+
+    assert (kept / "01 - One.flac").is_file()
+    assert not (tmp_path / "alice").exists()
+
+
+def test_a_folder_slskd_has_only_just_made_is_left_for_it(tmp_path):
+    #? created for a download that is about to open its file inside it
+    fresh = tmp_path / "bob" / "New Album"
+    fresh.mkdir(parents=True)
+    age(fresh.parent)
+    age(fresh, at=NOW - 5)
+
+    remove_empty_incomplete_dirs(str(tmp_path), now=NOW)
+
+    assert fresh.is_dir()
+    assert fresh.parent.is_dir()  # not empty: it holds the fresh one
+
+
+def test_the_root_itself_is_never_removed_even_when_empty(tmp_path):
+    root = tmp_path / "incomplete"
+    root.mkdir()
+    age(root)
+    assert remove_empty_incomplete_dirs(str(root), now=NOW) == []
+    assert root.is_dir()
+
+
+def test_a_link_out_of_the_folder_is_not_followed(tmp_path):
+    outside = tmp_path / "outside" / "empty"
+    outside.mkdir(parents=True)
+    root = tmp_path / "incomplete"
+    root.mkdir()
+    (root / "link").symlink_to(outside.parent)
+    age(outside, outside.parent)
+
+    remove_empty_incomplete_dirs(str(root), now=NOW)
+
+    assert outside.is_dir()
+    assert (root / "link").is_symlink()
+
+
+def test_no_folder_configured_does_nothing():
+    assert remove_empty_incomplete_dirs("", now=NOW) == []
+
+
+def test_the_poller_sweeps_only_where_it_has_been_told_to(tmp_path, monkeypatch):
+    import asyncio
+
+    from src.config import Config
+    from src.poller import sweep_empty_incomplete_dirs
+
+    left = tmp_path / "bob" / "share"
+    left.mkdir(parents=True)
+    age(left, left.parent)
+
+    monkeypatch.setattr(Config, "SLSKD_INCOMPLETE_PATH", None)
+    assert asyncio.run(sweep_empty_incomplete_dirs()) == 0
+    assert left.is_dir()
+
+    monkeypatch.setattr(Config, "SLSKD_INCOMPLETE_PATH", str(tmp_path))
+    assert asyncio.run(sweep_empty_incomplete_dirs()) == 2
+    assert not (tmp_path / "bob").exists()
