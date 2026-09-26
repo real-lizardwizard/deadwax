@@ -30,8 +30,8 @@ from src.logger import logger
 from src.library import find_cover_file
 from src.matching import AUDIO_EXTENSIONS, file_extension, match_tracks_to_files
 from src.api.coverart_endpoint import extension_for
-from src.organizer import (build_album_dirname, filed_artist, is_within, read_album_mbid,
-                           sanitize_filename, tag_values, write_tags)
+from src.organizer import (build_album_dirname, country_in_folder, filed_artist, is_within,
+                           read_album_mbid, sanitize_filename, tag_values, write_tags)
 
 #? Same vocabulary as the organizer's ORGANIZE_MODES, minus the copy/move distinction which
 #? has no meaning here - a retag either happens or it doesn't.
@@ -284,7 +284,7 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
         "library_root": str(root),
         "target_path": str(target.relative_to(root)) if target else None,
         "moves": bool(target and target != source),
-        "edition_label": resolve_edition_label(release),
+        "edition_label": resolve_edition_label(release, with_country=country_in_folder()),
         "files": changes,
         "changed_file_count": sum(1 for c in changes if c["changes"]),
         "file_count": len(audio_files),

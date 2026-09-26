@@ -181,7 +181,8 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   `{artist}/{album} ({year}) [{edition}]`, with the suffix omitted for ordinary
   single-edition albums so the common case stays clean. The label is resolved by
   `editions.py` from MusicBrainz's own `disambiguation` first, then detected edition tags,
-  then format/country — and a collision with a *different* release escalates to the
+  then a notable format (the COUNTRY only when `COUNTRY_IN_FOLDER` is on - off by default since
+  v0.8.3, asked for) — and a collision with a *different* release escalates to the
   catalogue number and finally the release id. `release.edition_label` overrides all of it
   and is the hook for the planned metadata manager: choosing an edition by hand should mean
   writing that field, not changing how editions are resolved.
@@ -1852,9 +1853,9 @@ what is already set, so the dev `.env` can't leak in. The LIBRARY was generated:
 releases fetched by id, filed and tagged through `organizer.build_target_path()` and
 `write_tags()` so it is exactly what deadwax files, ffmpeg writing quiet pink noise of each
 track's length as FLAC (~200 kbps, so 1 GB for ten albums), covers from the Archive. Two
-things to know: `build_target_path()` called directly gives every non-XE/XW pressing a country
-suffix (`[GB]`, `[AU]`) - that IS what deadwax would name them (see `resolve_edition_label`),
-and the capture renamed them by hand for tidier pictures; and a wait on
+things to know: `build_target_path()` called directly gave every non-XE/XW pressing a country
+suffix (`[GB]`, `[AU]`) - that WAS what deadwax named them until v0.8.3 made the country opt-in
+(`COUNTRY_IN_FOLDER`), and the capture renamed them by hand for tidier pictures; and a wait on
 `.track-table-row` is what says the library pane has drawn.
 
 - **`--screenshot` and `--virtual-time-budget` cannot do this, and two attempts hung proving

@@ -73,6 +73,10 @@ services:
       # singing a little; if lines land a beat late in your player, try 300.
       #- LYRICS_LEAD_MS=0
       #
+      # on | off - name a regional pressing's folder by its country: Dummy (1994) [GB].
+      # Off by default; different pressings still get their own folders, by catalogue number.
+      #- COUNTRY_IN_FOLDER=off
+      #
       # off | dry_run | copy | move. Starts at dry_run on purpose - organizing is the only
       # thing here that writes to your filesystem, so check the event log looks right before
       # switching to copy or move.

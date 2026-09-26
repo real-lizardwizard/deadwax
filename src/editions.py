@@ -78,7 +78,7 @@ def _from_edition_tags(tags: list[str] | None) -> str:
     return ", ".join(tag.title() for tag in sorted({_tidy(t) for t in tags if _tidy(t)}))
 
 
-def resolve_edition_label(release: dict) -> str:
+def resolve_edition_label(release: dict, with_country: bool = False) -> str:
     """
     A short human-readable name for this edition, or '' when there is nothing to say.
 
@@ -92,10 +92,14 @@ def resolve_edition_label(release: dict) -> str:
                             present for releases whose disambiguation is empty.
       4. format            only when it is not a plain CD/digital - a vinyl pressing beside a
                             CD is a real distinction worth seeing.
-      5. country           regional pressings, when nothing above distinguished them.
+      5. country           regional pressings, when nothing above distinguished them -
+                            ONLY with `with_country`, which COUNTRY_IN_FOLDER turns on. Off by
+                            default since v0.8.3 (asked for): an ordinary UK or US CD was
+                            filed as `Dummy (1994) [GB]` with nothing to tell it from.
 
     Returns '' for an ordinary single-edition album, which is the common case and should not
-    grow a suffix.
+    grow a suffix. Two DIFFERENT releases that come out the same still never share a folder -
+    resolve_album_dir() separates them by catalogue number, whatever this returns.
     """
     override = _tidy(release.get("edition_label"))
     if override:
@@ -113,7 +117,7 @@ def resolve_edition_label(release: dict) -> str:
     if media_format and media_format.lower() not in UNMARKED_FORMATS:
         return _sentence_case(media_format)[:MAX_LABEL_LENGTH]
 
-    country = _tidy(release.get("country"))
+    country = _tidy(release.get("country")) if with_country else ""
     #? XW is MusicBrainz for "worldwide", which distinguishes nothing
     if country and country.upper() not in {"XW", "XE"}:
         return country.upper()[:MAX_LABEL_LENGTH]

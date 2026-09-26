@@ -66,6 +66,18 @@ def filed_artist(release: dict) -> str:
     return release.get("album_artist") or release.get("artist") or ""
 
 
+def country_in_folder() -> bool:
+    """
+    Whether a release's country may name its folder - COUNTRY_IN_FOLDER, off unless set to "on".
+
+    Read here, at the one place folder names are made, so the organizer, the metadata editor's
+    preview and its write all agree. An unrecognised value is off: the default, and the one that
+    writes less into somebody's folder names.
+    """
+    from src.config import Config
+    return (Config.COUNTRY_IN_FOLDER or "off").strip().lower() == "on"
+
+
 def build_album_dirname(release: dict, discriminator: str = "") -> str:
     """
     `Album (Year)`, plus ` [Edition]` when this release is a distinguishable edition.
@@ -89,7 +101,8 @@ def build_album_dirname(release: dict, discriminator: str = "") -> str:
     year = (release.get("original_year") or release.get("year") or "").strip()
     name = f"{album} ({year})" if year else album
 
-    parts = [part for part in (resolve_edition_label(release), discriminator) if part]
+    label = resolve_edition_label(release, with_country=country_in_folder())
+    parts = [part for part in (label, discriminator) if part]
     if parts:
         name = f"{name} [{' - '.join(parts)}]"
 

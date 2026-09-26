@@ -67,6 +67,12 @@ ORGANIZE_MODES = {
     "move": "Move into the library",
 }
 
+#? What COUNTRY_IN_FOLDER can be set to, as the dropdown names them.
+COUNTRY_CHOICES = {
+    "off": "Leave the country out of folder names",
+    "on": "Name a regional pressing by its country",
+}
+
 #? What FETCH_LYRICS can be set to, as the dropdown names them.
 LYRICS_CHOICES = {
     "on": "Fetch lyrics as albums are filed",
@@ -276,6 +282,26 @@ def _cover_art_row() -> dict:
         status="ok" if known else "error",
         detail=None if known else f"expected one of {', '.join(COVER_ART_SIZES)}",
         choices=COVER_ART_SIZE_CHOICES,
+    )
+
+
+def _country_row() -> dict:
+    """COUNTRY_IN_FOLDER, saying what a folder would look like either way."""
+    value = (Config.COUNTRY_IN_FOLDER or "off").strip().lower()
+    known = value in COUNTRY_CHOICES
+
+    return _setting(
+        "COUNTRY_IN_FOLDER",
+        Config.COUNTRY_IN_FOLDER,
+        effect=(
+            "A pressing nothing else tells apart is named by its country: Dummy (1994) [GB]"
+            if value == "on"
+            else "No country in folder names: Dummy (1994). Two different pressings of one album "
+                 "are still kept apart, by catalogue number"
+        ),
+        status="ok" if known else "error",
+        detail=None if known else f"expected one of {', '.join(COUNTRY_CHOICES)}",
+        choices=COUNTRY_CHOICES,
     )
 
 
@@ -493,6 +519,7 @@ async def settings():
                         ),
                         choices={mode: mode for mode in ORGANIZE_MODES},
                     ),
+                    _country_row(),
                 ],
             },
             {
@@ -571,6 +598,9 @@ def _validate(key: str, value: str) -> str | None:
 
     if key == "COVER_ART_SIZE" and value not in COVER_ART_SIZES:
         return f"expected one of {', '.join(COVER_ART_SIZES)}"
+
+    if key == "COUNTRY_IN_FOLDER" and value not in COUNTRY_CHOICES:
+        return f"expected one of {', '.join(COUNTRY_CHOICES)}"
 
     if key == "FETCH_LYRICS" and value not in LYRICS_CHOICES:
         return f"expected one of {', '.join(LYRICS_CHOICES)}"

@@ -51,10 +51,47 @@ def test_falls_back_to_format_but_only_a_notable_one():
     assert resolve_edition_label({**BASE, "media_format": "Digital Media"}) == ""
 
 
-def test_falls_back_to_country_ignoring_the_worldwide_codes():
-    assert resolve_edition_label({**BASE, "country": "JP"}) == "JP"
+def test_the_country_names_no_folder_by_default():
+    """
+    Off since v0.8.3, asked for: most CDs are some country's, so an ordinary UK pressing was
+    filed as `Dummy (1994) [GB]` with nothing to tell it from.
+    """
+    assert resolve_edition_label({**BASE, "country": "JP"}) == ""
+    assert build_album_dirname({**BASE, "country": "GB"}) == "The Slow Rush (2020)"
+
+
+def test_with_the_country_on_it_falls_back_to_country_ignoring_the_worldwide_codes():
+    assert resolve_edition_label({**BASE, "country": "JP"}, with_country=True) == "JP"
     #? XW/XE are MusicBrainz for "worldwide"/"Europe-wide" and distinguish nothing
-    assert resolve_edition_label({**BASE, "country": "XW"}) == ""
+    assert resolve_edition_label({**BASE, "country": "XW"}, with_country=True) == ""
+
+
+def test_the_folder_follows_the_setting(monkeypatch):
+    from src.config import Config
+    monkeypatch.setattr(Config, "COUNTRY_IN_FOLDER", "on")
+    assert build_album_dirname({**BASE, "country": "GB"}) == "The Slow Rush (2020) [GB]"
+    monkeypatch.setattr(Config, "COUNTRY_IN_FOLDER", "sideways")
+    assert build_album_dirname({**BASE, "country": "GB"}) == "The Slow Rush (2020)"
+
+
+def test_two_regional_pressings_still_get_their_own_folders_without_the_country(tmp_path, monkeypatch):
+    """
+    With nothing but the country between them, a UK and a Japanese CD resolve to the same
+    name - and the second is kept apart by its catalogue number, as a different release
+    always has been. Only the first one's folder loses its suffix.
+    """
+    uk = {**BASE, "country": "GB", "release_mbid": "uk-release", "catalog_number": "828 522-2"}
+    japan = {**BASE, "country": "JP", "release_mbid": "jp-release", "catalog_number": "POCD-1153"}
+
+    import src.organizer as organizer
+
+    first, _ = resolve_album_dir(str(tmp_path), uk)
+    first.mkdir(parents=True)
+    monkeypatch.setattr(organizer, "read_album_mbid", lambda directory: "uk-release")
+    second, _ = resolve_album_dir(str(tmp_path), japan)
+
+    assert first.name == "The Slow Rush (2020)"
+    assert second.name == "The Slow Rush (2020) [POCD-1153]"
 
 
 def test_explicit_label_overrides_everything():

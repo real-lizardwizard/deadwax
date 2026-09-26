@@ -237,6 +237,12 @@ class Config:
     #? would rather this container didn't ask a third party about every track they download.
     FETCH_LYRICS = _env("FETCH_LYRICS", "on")
 
+    #? on | off. Whether a release's COUNTRY may name its folder when nothing else tells the
+    #? pressing apart - `Dummy (1994) [GB]`. Off by default since v0.8.3, when James asked for
+    #? it gone: most CDs are some country's, so most albums grew a suffix that said nothing
+    #? anyone needed. Two different releases still never share a folder - see editions.py.
+    COUNTRY_IN_FOLDER = _env("COUNTRY_IN_FOLDER", "off")
+
     #? Milliseconds to move synced lyrics EARLIER as they are written - negative moves them
     #? later. LRCLIB's timings are tapped along by people and land a moment after the line is
     #? sung, which on a fast song shows the line just sung. 0 writes LRCLIB's timings as they
@@ -285,6 +291,8 @@ class Config:
         "COVER_ART_SIZE": None,
         #? read by the poller as each album is filed, so nothing to rebuild
         "FETCH_LYRICS": None,
+        #? read each time a folder name is made, so nothing to rebuild
+        "COUNTRY_IN_FOLDER": None,
         #? read as each .lrc is written, so nothing to rebuild
         "LYRICS_LEAD_MS": None,
         #? read per lookup by the artist image client, so nothing to rebuild here either

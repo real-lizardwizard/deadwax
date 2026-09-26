@@ -502,3 +502,9 @@ def test_the_lyrics_lead_takes_milliseconds_and_refuses_anything_else():
     assert "whole number of milliseconds" in _validate("LYRICS_LEAD_MS", "0.3")
     assert "whole number of milliseconds" in _validate("LYRICS_LEAD_MS", "30000")
     assert _validate("FETCH_LYRICS", "sometimes") is not None
+
+
+def test_the_country_setting_takes_on_or_off():
+    assert _validate("COUNTRY_IN_FOLDER", "off") is None
+    assert _validate("COUNTRY_IN_FOLDER", "on") is None
+    assert _validate("COUNTRY_IN_FOLDER", "sometimes") is not None
