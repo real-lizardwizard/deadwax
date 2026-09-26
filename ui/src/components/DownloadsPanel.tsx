@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { bridge } from '../bridge'
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { PendingDownload } from '../lib/downloadOverlay'
+import { handleDownloadRequests } from '../lib/downloadRequests'
 import { DownloadJobRow } from './DownloadJobRow'
 
 /**
@@ -36,18 +37,19 @@ export function DownloadsPanel() {
     clearFinished,
   } = useDownloadJobs(open)
 
-  // let the vanilla app poke us after it enqueues something - and enqueue THROUGH us, so the
-  // row appears on the click rather than once slskd has connected to the peer
+  // let the vanilla app poke us after it enqueues something
   useEffect(() => {
     const shared = bridge()
     shared.refreshDownloads = refresh
-    shared.enqueueDownload = enqueue
 
     return () => {
       delete shared.refreshDownloads
-      delete shared.enqueueDownload
     }
-  }, [refresh, enqueue])
+  }, [refresh])
+
+  // and take every download request, so the row appears on the click rather than once slskd
+  // has connected to the peer (lib/downloadRequests.ts)
+  useEffect(() => handleDownloadRequests(enqueue), [enqueue])
 
   // and shut us when the log opens - only one dropdown at a time, in both directions
   useEffect(() => {

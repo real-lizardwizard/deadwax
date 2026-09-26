@@ -183,10 +183,18 @@ export interface FindCandidatesRequest {
   format_preference?: FormatPreference
   /** Lets the UI re-run a tweaked query when the generated one finds nothing. */
   query_override?: string | null
+  /**
+   * The rest of what main.js's buildExpectedFromRelease puts in the payload - album_artist,
+   * artist_mbids, disambiguation and so on - which is also the release the download is filed
+   * as. Passed through untouched.
+   */
+  [field: string]: unknown
 }
 
 export interface FindCandidatesResponse {
   query: string
+  /** Every query it searched under - more than one when the artist has renamed. */
+  queries?: string[]
   response_count: number
   candidates: Candidate[]
 }

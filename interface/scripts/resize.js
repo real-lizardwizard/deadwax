@@ -19,8 +19,8 @@
  * HOW IT ATTACHES
  *
  * One delegated listener on the document rather than handles injected per panel. That
- * matters here because these panels come from both halves of the app - the log and the
- * candidates window are rendered by main.js, the downloads and metadata windows by Preact -
+ * matters here because these panels come from both halves of the app - the log is rendered
+ * by main.js, the downloads, candidates and metadata windows by Preact -
  * and a delegated listener needs no mount hook, no cleanup, and no cross-boundary call. A
  * panel added to PANELS works whichever half draws it, and whenever it appears.
  */

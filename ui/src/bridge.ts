@@ -9,7 +9,7 @@
  * Keep this small and keep it shrinking. Every entry is a piece of the old app the new one
  * still depends on, so an empty bridge is the signal that the migration is done.
  */
-import type { EnqueueRequest, EnqueueResponse } from './api/types'
+import type { FindCandidatesRequest } from './api/types'
 
 export interface DeadwaxBridge {
   /**
@@ -33,13 +33,11 @@ export interface DeadwaxBridge {
   refreshDownloads?: () => void
 
   /**
-   * Queues a download through the downloads panel. Set here, called by main.js's candidates
-   * panel when you press Download, so the panel shows the download from the click (v0.9.9)
-   * rather than once slskd has connected to the peer. main.js falls back to its own request
-   * when this isn't there yet. Goes away when the candidates panel is ported and can call the
-   * hook's enqueue directly.
+   * Opens the Soulseek candidates window for a release and searches for it. Set by the ported
+   * CandidatesPanel (v0.9.10), called by the vanilla releases grid's Find buttons, which build
+   * the release payload - it goes when the grid is ported.
    */
-  enqueueDownload?: (body: EnqueueRequest) => Promise<EnqueueResponse>
+  openCandidates?: (release: FindCandidatesRequest, label: string) => void
 
   /**
    * Runs a MusicBrainz search on the vanilla side. Set by main.js, called from the library

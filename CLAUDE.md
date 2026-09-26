@@ -574,6 +574,8 @@ without asking whether it still answered the question on screen.
   begins (they were the last result's formats), and the query box is cleared on a new album's
   Find - left holding the old album's query, Re-search took it for an edit and searched it.
   Closing the panel supersedes its search: reopening always searches afresh.
+  (**Ported to Preact in v0.9.10** - `components/CandidatesPanel.tsx`, the same rules as a
+  `Search` state value and `lib/latest.ts`; see "The candidates panel in Preact".)
   **Reproduced before fixing** against a fake slskd that answers slowly on demand (8s for one
   album, 2s for another): the old main.js showed All Mine's peers under "Glory Box", and Glory
   Box's folder under "All Mine" - enqueued as All Mine. The fixed one shows each under its own.
@@ -604,6 +606,41 @@ without asking whether it still answered the question on screen.
   cancel by stopping and deleting every search it started (`_abandon`). **Verified live**
   against the slow fake slskd: hanging up 1.5s into an 8s search, slskd was told to stop and
   delete it at once. It needed the middleware fix below first - see the gotcha.
+
+### The candidates panel in Preact (v0.9.10)
+
+One of the 1.0 items, and first because the quality filters and "retry with the next peer" build
+on it. `components/CandidatesPanel.tsx` mounted into `#candidates-root` (`display: contents`, so
+`#candidates-window` stays a child of `#main-container`); its logic is `lib/candidates.ts`, pinned
+by `ui/test/candidates.sim.cjs`. About 500 lines left main.js, with the dead download-defaults
+reader (`getSettings`) that only it used.
+
+- **Same ids and classes as the vanilla markup**, so main.css applies unchanged and resize.js
+  still moves it by `#candidates-header` - delegated from the document, so it never cared who
+  drew it. **Verified with a real pointer drag**: 128px each way moved it exactly there, once
+  transitions were off. With them on, the frame-starved preview pane left the entrance
+  transition part-played and the drag landed half a window off-screen - the harness trap in
+  "Tooling and environment", not a bug; measure only after a screenshot has forced a paint.
+- **Opened through the bridge (`openCandidates`)** by the vanilla releases grid's two Find
+  buttons, which still build the release payload (`buildExpectedFromRelease` and
+  `buildExpectedFromReleaseGroup`) - that payload is also what the download is filed as, so
+  the builders stay in main.js until the grid is ported. `openCandidatesPanel` in main.js is a
+  one-line forwarder.
+- **Download goes through `lib/downloadRequests.ts`** to the downloads panel's `enqueue`, so the
+  "asking slskd..." row still appears on the click. A module rather than the bridge, because
+  both panels are in this bundle; the downloads panel registers its handler while mounted.
+- **Everything the vanilla panel learned is kept**: one `Search` value only the newest request
+  becomes (`lib/latest.ts`, and the aborted request now stops the search in slskd), each row
+  downloading as the release it was searched for, filters applied to an answer that lands after
+  they changed, format chips cleared per search, the query box cleared per album, and
+  `queryOverride` (only an EDITED query overrides - an unedited Re-search searches every name
+  again). Filter defaults are read once from preferences, as the vanilla module scope did.
+- **One small addition:** Enter in the query box re-searches.
+- **Verified in the real page** against the slow fake slskd: results, free-slot and format
+  filters, the Signals dropdown (badge, outside-click close, reset), an edited and an unedited
+  Re-search (override sent, then not), Download (the pending row at 60ms, "Queued ✓", enqueued
+  as All Mine), Escape, and both 0.9.2 races - a filter ticked mid-search kept "Searching" up,
+  and Glory Box-then-All Mine showed All Mine with slskd told to stop the Glory Box search.
 
 ### Browsing a discography, and ordering results
 
@@ -804,7 +841,8 @@ store keeps one row per peer.
   until it has looked the peer up and CONNECTED to them (`DownloadService.EnqueueAsync`:
   `GetUserEndPointAsync`, then `ConnectToUserAsync`), seconds for a firewalled peer. The panel
   had nothing to show for all of it. Now the Download button goes through the panel's own
-  `enqueue` (bridge `enqueueDownload`, falling back to a plain fetch if the bundle isn't there),
+  `enqueue` (through `lib/downloadRequests.ts` since the candidates panel was ported in v0.9.10 -
+  a bridge entry, `enqueueDownload`, until then),
   which lays a `PendingDownload` overlay - "asking slskd…", the loading sweep along its empty
   track, counted as active so the badge moves too - and hands over to the real row when a poll
   brings the job (`visiblePending` hides it on that same poll, so both are never drawn). A
@@ -2272,7 +2310,7 @@ the page, and ported panels mount into it via one extra module script.
 
 | ported | still vanilla |
 | --- | --- |
-| Downloads panel, tab shell, library explorer (tree + details pane), metadata editor, metadata queue, delete dialog, cover viewer, tag editor (v0.6.9 - born in Preact) | search bar, releases grid, filter column, candidates panel, log |
+| Downloads panel, tab shell, library explorer (tree + details pane), metadata editor, metadata queue, delete dialog, cover viewer, tag editor (v0.6.9 - born in Preact), candidates panel (v0.9.10) | search bar, releases grid, filter column, log |
 
 **How the two halves coexist:**
 
@@ -2283,7 +2321,7 @@ the page, and ported panels mount into it via one extra module script.
   unchanged. A visual difference means a porting mistake, not a restyle.
 - Both files are ES modules and can't call each other, so cross-boundary calls meet on
   `window.deadwax` (`ui/src/bridge.ts`). Entries today: `refreshDownloads`,
-  `enqueueDownload` (v0.9.9), `closeDownloads`, `closeOtherDropdowns`, `runSearch`,
+  `openCandidates` (v0.9.10), `closeDownloads`, `closeOtherDropdowns`, `runSearch`,
   `refreshNewImports`. **An empty bridge means the migration is done.**
 
 Why, from measurements of the original code:
@@ -2361,6 +2399,7 @@ node ui/test/credits.sim.cjs    # credited vs current artist names - the folder 
 node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes about it
 node ui/test/owned.sim.cjs      # which search results the library already holds - by pressing, by album, and "maybe" by name
 node ui/test/latest.sim.cjs     # only the newest answer counts - both copies of the guard, answers arriving out of order
+node ui/test/candidates.sim.cjs # the candidates panel's filters, the edited-query rule, and what a row says
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -2413,7 +2452,7 @@ A green suite here means the logic is sound, not that it works against real infr
 2. **Merge to `main`.** It still holds v0.2.1, so the repo's default branch shows the old
    Lidarr README to anyone who visits, while `:latest` has been the slskd line since v0.3.0.
 3. Continue the port in the order in [docs/FRONTEND-MIGRATION.md](docs/FRONTEND-MIGRATION.md):
-   candidates panel, filter column, releases grid, top bar.
+   ~~candidates panel~~ (done, v0.9.10), filter column, releases grid, top bar.
 4. ~~A Settings tab~~ **Done in v0.5.** It landed exactly as this entry predicted — one
    `TABS` entry, a `#settings-root` pane, one `[data-tab]` rule, no structural change. It
    also replaced the "download profile" dropdown, which is gone from the top bar.

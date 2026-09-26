@@ -14,6 +14,7 @@ the how.
 | Tab shell | **done** — `Tabs.tsx`. Search/Library, built to take Settings as a third. |
 | Metadata editor | **done** — `MetadataEditor.tsx`, an overlay from the library reusing the candidates-window shape. Pick a release *or* type the fields directly; the release the album is already tagged with sorts first and is badged `current`. |
 | Library window | **done** — `LibraryView.tsx` + `src/library.py`. An Explorer-style tree (`LibraryTree.tsx`, `lib/libraryTree.ts`: artist → album → edition → track) beside a details pane (`LibraryDetails.tsx`) with a user-chosen set of track fields - reorderable and resizable by their headers since v0.6.9 (`lib/trackFields.ts`). Replaced the one-row-per-album list in v0.6.5. |
+| Candidates panel | **done** (v0.9.10) — `CandidatesPanel.tsx` + `lib/candidates.ts`. Opened by the vanilla Find buttons through the bridge (`openCandidates`); downloads go to the downloads panel through `lib/downloadRequests.ts`. |
 | Tag editor | **done** — `TrackTagEditor.tsx` (v0.6.9), born in Preact rather than ported. Edits tags by hand on one track or every ticked one; only the fields you change are sent (`lib/tagEdit.ts`), and the preview comes from the same planner the write recomputes (`src/track_tags.py`). |
 | Multi-stage Dockerfile | **done** — `ui` stage builds into `interface/dist`. |
 | Cache-header fix | **done** — hashed chunks immutable, entry bundle revalidates. |
@@ -168,7 +169,7 @@ drop it.
 | --- | --- | --- | --- |
 | 1 | ~~**Library window**~~ | *new* | **done.** `LibraryView.tsx` + `src/library.py`. Edition-aware; artist/album names hand off to a search through the bridge. Rebuilt as a tree + details pane in v0.6.5. |
 | 2 | ~~Downloads panel~~ | ~~`renderDownloads` + 81 lines of manual reconciliation~~ | **done.** `key={job.id}` deleted all of it. Went first; see ground rule 2. |
-| 3 | Candidates panel | `renderCandidates`, filters, signal sliders | self-contained |
+| 3 | ~~Candidates panel~~ | ~~`renderCandidates`, filters, signal sliders~~ | **done** (v0.9.10). The Find buttons that open it are the releases grid's and still build its payload. |
 | 4 | Filter column | `renderFacets`, tri-state facets | |
 | 5 | Releases grid | `buildReleasesGrid` (312 lines) | hardest. Consider TanStack Table via `preact/compat` — it replaces the column resize/reorder/visibility code wholesale, and TanStack Virtual fixes the DOM-size problem structurally |
 | 6 | Top bar, log, profile | `init.js` + dropdowns | |

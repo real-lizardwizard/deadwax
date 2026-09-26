@@ -74,12 +74,14 @@ export function put<T>(path: string, body?: unknown): Promise<T> {
   })
 }
 
-export function post<T>(path: string, body?: unknown): Promise<T> {
+export function post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   return request<T>(path, {
     method: 'POST',
     ...(body === undefined
       ? {}
       : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    //? lib/latest.ts aborts a request that has been superseded - see there
+    ...(signal ? { signal } : {}),
   })
 }
 

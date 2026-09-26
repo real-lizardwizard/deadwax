@@ -9,8 +9,14 @@ import type {
   JobsResponse,
 } from './types'
 
-export function findCandidates(body: FindCandidatesRequest): Promise<FindCandidatesResponse> {
-  return post<FindCandidatesResponse>('/download/find_candidates', body)
+/**
+ * Search Soulseek for a release. Aborting it (the signal) also stops the search in slskd - the
+ * server notices the dropped connection (unless_abandoned in routes/download.py).
+ */
+export function findCandidates(
+  body: FindCandidatesRequest, signal?: AbortSignal,
+): Promise<FindCandidatesResponse> {
+  return post<FindCandidatesResponse>('/download/find_candidates', body, signal)
 }
 
 export function enqueue(body: EnqueueRequest): Promise<EnqueueResponse> {

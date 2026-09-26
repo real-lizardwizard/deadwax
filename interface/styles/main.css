@@ -2687,7 +2687,8 @@ span.red { color: var(--red-text); }
  * direct flex child of #top-bar-actions and every rule below applies exactly as it did when
  * the markup was hand-written in index.html.
  */
-#downloads-root {
+#downloads-root,
+#candidates-root {
     display: contents;
 }
 

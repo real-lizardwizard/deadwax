@@ -1,5 +1,6 @@
 import { render, type VNode } from 'preact'
 
+import { CandidatesPanel } from './components/CandidatesPanel'
 import { DownloadsPanel } from './components/DownloadsPanel'
 import { LibraryView } from './components/LibraryView'
 import { SettingsView } from './components/SettingsView'
@@ -69,4 +70,5 @@ function renderShell(active: TabId): void {
 }
 
 mount('downloads-root', <DownloadsPanel />)
+mount('candidates-root', <CandidatesPanel />)
 renderShell('search')

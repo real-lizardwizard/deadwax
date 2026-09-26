@@ -80,6 +80,23 @@ const DOWNLOAD_DEFAULTS_FALLBACK: DownloadDefaults = {
   autoGrab: false,
 }
 
+const FORMAT_PREFERENCES: readonly FormatPreference[] = ['any', 'prefer_lossless', 'lossless_only']
+
+/**
+ * A one-off read for code that isn't a component - the candidates panel reads it per search,
+ * so a preference changed in the settings tab applies to the very next one (as main.js's
+ * getSettings() did). An unknown format falls back rather than being sent.
+ */
+export function readDownloadDefaults(): DownloadDefaults {
+  const saved = readJson<Partial<DownloadDefaults>>(STORAGE_KEYS.downloadDefaults) ?? {}
+  return {
+    formatPreference: FORMAT_PREFERENCES.includes(saved.formatPreference as FormatPreference)
+      ? saved.formatPreference as FormatPreference
+      : DOWNLOAD_DEFAULTS_FALLBACK.formatPreference,
+    autoGrab: saved.autoGrab === true,
+  }
+}
+
 /**
  * Merged over the fallback rather than replacing it: the vanilla app persists whatever
  * partial object it happens to hold, so a stored blob may be missing either field.
