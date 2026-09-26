@@ -26,6 +26,7 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 
 const {
   visibleJobs, activeCount, reconcile, finishedIds, withAdded, withRemoved,
+  withPending, settlePending, visiblePending, withoutRefused,
 } = require(path.join(OUT, 'lib/downloadOverlay.js'));
 const {
   newlyOrganized, statusesOf, onAlbumsFiled, announceAlbumsFiled,
@@ -44,6 +45,7 @@ const job = (id, status) => ({ id, status, artist: 'a', album: 'b', username: 'u
 const overlays = (cancelling = [], cleared = []) => ({
   cancelling: new Set(cancelling),
   cleared: new Set(cleared),
+  pending: [],
 });
 
 const ids = (jobs) => jobs.map((j) => j.id);
@@ -155,6 +157,35 @@ console.log('\nthe prediction must not outlive its usefulness');
 }
 
 /* ========================================================================== */
+console.log('\na download shows from the click, not from slskd connecting to the peer (v0.9.9)');
+
+{
+  const asked = { key: 'p1', artist: 'Portishead', album: 'Dummy', username: 'bob' };
+  const jobs = [job(3, 'organized')];
+
+  const waiting = withPending(overlays(), asked);
+  check('drawn the instant Download is pressed', visiblePending(jobs, waiting).map((p) => p.key), ['p1']);
+  check('...and counted as active, so the badge moves too', activeCount(jobs, waiting), 1);
+
+  //? slskd accepted and handed back job 7 - but no poll has brought it yet
+  const accepted = settlePending(waiting, 'p1', { jobId: 7 });
+  check('still drawn until a poll brings the job', visiblePending(jobs, accepted).length, 1);
+
+  //? the poll that brings it must never draw both
+  const withJob = [job(7, 'queued'), ...jobs];
+  check('not drawn beside the job that replaced it', visiblePending(withJob, accepted).length, 0);
+  check('reconcile then lets go of it', reconcile(withJob, accepted).pending.length, 0);
+  check('...counting the job once, not twice', activeCount(withJob, reconcile(withJob, accepted)), 1);
+
+  const refused = settlePending(waiting, 'p1', { error: "slskd couldn't queue it: bob is offline" });
+  check('a refusal says why, and stays', visiblePending(jobs, refused).map((p) => p.error),
+        ["slskd couldn't queue it: bob is offline"]);
+  check('...and is no longer active', activeCount(jobs, refused), 0);
+  check('"clear finished" takes a refusal', withoutRefused(refused).pending.length, 0);
+  check('...but never one still waiting on slskd', withoutRefused(waiting).pending.length, 1);
+  check('an unchanged clear returns the identical object', withoutRefused(waiting) === waiting, true);
+}
+
 console.log('\nan album appears as soon as it is filed (lib/libraryEvents.ts)');
 {
   //? Before this, a filed album stayed invisible until Rescan: the library loads once, and the

@@ -195,7 +195,12 @@ export interface EnqueueRequest {
   username: string
   files: CandidateFile[]
   directory?: string
-  /** Persisted denormalized with the job so organizing later needs no MusicBrainz call. */
+  /**
+   * Persisted denormalized with the job so organizing later needs no MusicBrainz call. The
+   * named fields are the ones read on this side; the vanilla candidates panel sends the whole
+   * payload built by buildExpectedFromRelease (album_artist, artist_mbids, disambiguation...),
+   * which passes through untouched.
+   */
   release?: {
     artist?: string
     album?: string
@@ -203,6 +208,7 @@ export interface EnqueueRequest {
     release_mbid?: string | null
     edition_tags?: string[]
     tracks?: Track[]
+    [field: string]: unknown
   }
 }
 

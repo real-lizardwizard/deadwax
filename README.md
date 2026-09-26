@@ -168,7 +168,7 @@ The marks come from the saved scan, so they cost nothing and never hold a search
 <summary style="font-style:italic">slskd only knows "bob is sending you 12 files"</summary>
 deadwax keeps the link between a download and the MusicBrainz release that started it, in a small sqlite database. That's what makes tagging possible later, and it's why the downloads panel can tell you what an in-flight transfer actually is — with live progress, queue position, and a real transfer rate worked out from byte deltas rather than slskd's cumulative average, which only ever creeps upward.
 <br><br>
-Cancelling and clearing respond on the click rather than after the round-trip to slskd and back, so the buttons feel connected to something. The prediction is dropped the moment the server disagrees, and abandoned entirely if it never answers. A cancelled download also leaves slskd's own transfer list, once slskd has finished cancelling it, rather than sitting in its history for ever.
+Cancelling and clearing respond on the click rather than after the round-trip to slskd and back, so the buttons feel connected to something. The prediction is dropped the moment the server disagrees, and abandoned entirely if it never answers. A cancelled download also leaves slskd's own transfer list, once slskd has finished cancelling it, rather than sitting in its history for ever. A new download is in the panel the moment you press Download, reading <em>asking slskd…</em> while slskd connects to the peer (which can take a few seconds), and if slskd can't queue it, the row says why — usually that the peer is offline.
 </details>
 
 ### Tagging and filing, with editions kept apart

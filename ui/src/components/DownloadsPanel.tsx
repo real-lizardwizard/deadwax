@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { bridge } from '../bridge'
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
+import type { PendingDownload } from '../lib/downloadOverlay'
 import { DownloadJobRow } from './DownloadJobRow'
 
 /**
@@ -28,20 +29,25 @@ export function DownloadsPanel() {
     finishedCount,
     error,
     cancelling,
+    pending,
     refresh,
+    enqueue,
     cancel,
     clearFinished,
   } = useDownloadJobs(open)
 
-  // let the vanilla app poke us after it enqueues something
+  // let the vanilla app poke us after it enqueues something - and enqueue THROUGH us, so the
+  // row appears on the click rather than once slskd has connected to the peer
   useEffect(() => {
     const shared = bridge()
     shared.refreshDownloads = refresh
+    shared.enqueueDownload = enqueue
 
     return () => {
       delete shared.refreshDownloads
+      delete shared.enqueueDownload
     }
-  }, [refresh])
+  }, [refresh, enqueue])
 
   // and shut us when the log opens - only one dropdown at a time, in both directions
   useEffect(() => {
@@ -152,6 +158,7 @@ export function DownloadsPanel() {
         <div class="scrollable" id="downloads-scrollable">
           <DownloadsList
             jobs={jobs}
+            pending={pending}
             trackingEnabled={trackingEnabled}
             speeds={speeds}
             cancelling={cancelling}
@@ -165,13 +172,14 @@ export function DownloadsPanel() {
 
 interface ListProps {
   jobs: ReturnType<typeof useDownloadJobs>['jobs']
+  pending: PendingDownload[]
   trackingEnabled: boolean
   speeds: Map<number, number>
   cancelling: ReadonlySet<number>
   onCancel: (jobId: number) => Promise<void>
 }
 
-function DownloadsList({ jobs, trackingEnabled, speeds, cancelling, onCancel }: ListProps) {
+function DownloadsList({ jobs, pending, trackingEnabled, speeds, cancelling, onCancel }: ListProps) {
   // an unwritable database is not a broken app - downloads still work, they're just not
   // remembered - so this says which knob to turn rather than reading as a crash
   if (!trackingEnabled) {
@@ -182,12 +190,13 @@ function DownloadsList({ jobs, trackingEnabled, speeds, cancelling, onCancel }: 
     )
   }
 
-  if (!jobs.length) {
+  if (!jobs.length && !pending.length) {
     return <h4 class="text default-muted candidates-status">Nothing downloaded yet</h4>
   }
 
   return (
     <>
+      {pending.map((download) => <PendingDownloadRow key={download.key} download={download} />)}
       {jobs.map((job) => (
         <DownloadJobRow
           key={job.id}
@@ -198,5 +207,38 @@ function DownloadsList({ jobs, trackingEnabled, speeds, cancelling, onCancel }: 
         />
       ))}
     </>
+  )
+}
+
+/**
+ * A download asked for that isn't a job yet - slskd is still connecting to the peer, or said
+ * no. Same markup and classes as DownloadJobRow so it sits in the list as one of them; no
+ * cancel button, since there is nothing in slskd to cancel until it answers.
+ */
+function PendingDownloadRow({ download }: { download: PendingDownload }) {
+  const refused = download.error !== undefined
+  return (
+    <div class="download-job is-pending">
+      <div class="download-job-head">
+        <h4 class="text white download-job-title">
+          {download.artist || 'unknown'} — {download.album || 'unknown'}
+        </h4>
+        <span class={`download-job-status ${refused ? 'bad' : 'mid'}`}>
+          {refused ? 'refused' : 'asking slskd…'}
+        </span>
+      </div>
+
+      <div class="download-job-meta">
+        <span class="text default-secondary download-job-user">{download.username}</span>
+        <span class="text default-muted">·</span>
+        <span class={`download-job-detail text ${refused ? 'red' : 'default-muted'}`}>
+          {refused ? download.error : 'connecting to the peer'}
+        </span>
+      </div>
+
+      <div class={`download-progress-track${refused ? '' : ' is-waiting'}`}>
+        <div class="download-progress-fill" style={{ width: '0%' }} />
+      </div>
+    </div>
   )
 }

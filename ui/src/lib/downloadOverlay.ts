@@ -21,14 +21,60 @@ import { isActive } from './jobs'
  * server. See ui/test/downloads.sim.cjs.
  */
 
+/**
+ * A download asked for and not yet a job (v0.9.9, asked for: "I would like it if the downloads
+ * showed up in the downloads pane a bit quicker").
+ *
+ * A job is only recorded once slskd accepts the enqueue, and slskd doesn't answer until it has
+ * looked the peer up and connected to them - seconds, more for a firewalled peer - so the pane
+ * had nothing to show for all of that. This is shown instead, from the click. It becomes the
+ * real row when the job appears in a poll (`jobId` set and seen), or says why when slskd
+ * refuses (`error` set) and then stays, like any finished row, until "clear finished".
+ */
+export interface PendingDownload {
+  key: string
+  artist: string
+  album: string
+  username: string
+  jobId?: number
+  error?: string
+}
+
 export interface Overlays {
   /** Cancels asked for but not yet confirmed by the server. */
   cancelling: ReadonlySet<number>
   /** Finished jobs optimistically removed by "clear finished". */
   cleared: ReadonlySet<number>
+  /** Downloads asked for that aren't jobs yet, newest first. */
+  pending: readonly PendingDownload[]
 }
 
-export const NO_OVERLAYS: Overlays = { cancelling: new Set(), cleared: new Set() }
+export const NO_OVERLAYS: Overlays = { cancelling: new Set(), cleared: new Set(), pending: [] }
+
+/** A pending download still waiting on slskd - it counts as active, a refused one doesn't. */
+export function isWaiting(pending: PendingDownload): boolean {
+  return pending.error === undefined
+}
+
+export function withPending(overlays: Overlays, pending: PendingDownload): Overlays {
+  return { ...overlays, pending: [pending, ...overlays.pending] }
+}
+
+/** Record slskd's answer on one pending download. */
+export function settlePending(
+  overlays: Overlays, key: string, outcome: { jobId: number } | { error: string },
+): Overlays {
+  return {
+    ...overlays,
+    pending: overlays.pending.map((p) => (p.key === key ? { ...p, ...outcome } : p)),
+  }
+}
+
+/** "Clear finished" takes the refused ones with it; the ones still waiting stay. */
+export function withoutRefused(overlays: Overlays): Overlays {
+  const pending = overlays.pending.filter(isWaiting)
+  return pending.length === overlays.pending.length ? overlays : { ...overlays, pending }
+}
 
 /**
  * The jobs the panel should render, with the overlays applied.
@@ -44,6 +90,17 @@ export function visibleJobs(jobs: readonly DownloadJob[], overlays: Overlays): D
 
 export function activeCount(jobs: readonly DownloadJob[], overlays: Overlays): number {
   return jobs.filter((job) => isActive(job) && !overlays.cancelling.has(job.id)).length
+    + overlays.pending.filter(isWaiting).length
+}
+
+/**
+ * The pending downloads to draw: not yet a job in the list. One whose job has turned up is
+ * dropped here as well as by reconcile, so the poll that brings the job can never draw both.
+ */
+export function visiblePending(jobs: readonly DownloadJob[], overlays: Overlays): PendingDownload[] {
+  if (!overlays.pending.length) return []
+  const ids = new Set(jobs.map((job) => job.id))
+  return overlays.pending.filter((p) => p.jobId === undefined || !ids.has(p.jobId))
 }
 
 /**
@@ -80,9 +137,15 @@ export function reconcile(jobs: readonly DownloadJob[], overlays: Overlays): Ove
     if (next.size !== cleared.size) cleared = next
   }
 
-  return cancelling === overlays.cancelling && cleared === overlays.cleared
+  let pending = overlays.pending
+  if (pending.some((p) => p.jobId !== undefined && byId.has(p.jobId))) {
+    //? Confirmed when its job is in the list - the real row takes over from here
+    pending = pending.filter((p) => p.jobId === undefined || !byId.has(p.jobId))
+  }
+
+  return cancelling === overlays.cancelling && cleared === overlays.cleared && pending === overlays.pending
     ? overlays
-    : { cancelling, cleared }
+    : { cancelling, cleared, pending }
 }
 
 /** The finished jobs "clear finished" would remove. */

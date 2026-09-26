@@ -1004,15 +1004,23 @@ async function enqueueCandidate(candidate, release) {
     // candidate was SEARCHED for, handed in by the row that drew it, never "whichever panel is
     // open now": those differed whenever a slow search landed after another album's Find, and
     // the download was filed as the other album.
+    const body = {
+        username: candidate.username,
+        files: candidate.files,
+        directory: candidate.directory,
+        release: release || {},
+    };
+
+    //? Through the downloads panel when it's there (v0.9.9), so the download shows in it from
+    //? the click - slskd doesn't answer an enqueue until it has connected to the peer, which
+    //? takes seconds, and the panel used to show nothing for all of them. It refreshes itself.
+    const viaPanel = window.deadwax?.enqueueDownload;
+    if (viaPanel) return viaPanel(body);
+
     const response = await fetch(`/deadwax/download/enqueue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            username: candidate.username,
-            files: candidate.files,
-            directory: candidate.directory,
-            release: release || {},
-        })
+        body: JSON.stringify(body),
     });
 
     if (!response.ok) {

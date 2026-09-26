@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             807 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             812 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -798,6 +798,25 @@ store keeps one row per peer.
   confirms, the prediction is abandoned and the truth reasserts itself. An optimistic state
   that outlives its request stops being a prediction and becomes a lie — a row stuck on
   "cancelling…" while the file is still arriving is worse than never having said it.
+- **A download is in the panel from the CLICK (v0.9.9, asked for: "I would like it if the
+  downloads showed up in the downloads pane a bit quicker").** A job is recorded only once slskd
+  accepts the enqueue - kept, so a refusal never leaves a phantom job - and slskd doesn't answer
+  until it has looked the peer up and CONNECTED to them (`DownloadService.EnqueueAsync`:
+  `GetUserEndPointAsync`, then `ConnectToUserAsync`), seconds for a firewalled peer. The panel
+  had nothing to show for all of it. Now the Download button goes through the panel's own
+  `enqueue` (bridge `enqueueDownload`, falling back to a plain fetch if the bundle isn't there),
+  which lays a `PendingDownload` overlay - "asking slskd…", the loading sweep along its empty
+  track, counted as active so the badge moves too - and hands over to the real row when a poll
+  brings the job (`visiblePending` hides it on that same poll, so both are never drawn). A
+  refusal turns it into "refused" with slskd's own words and it stays, like any finished row,
+  until "clear finished". Measured with a fake slskd taking 4s to enqueue: row in the panel at
+  52ms, real row ~250ms after slskd answered.
+  **slskd's reason needed its own fix**: slskd_api's `transfers.enqueue` returns `response.ok`
+  and drops the body, and its session RAISES on a non-2xx (a response hook calling
+  `raise_for_status`), so `SlskdClient.enqueue` posts on that session itself and reads the
+  body off the `HTTPError` - "User bob appears to be offline" rather than "refused".
+- **`/jobs` asks for queue positions side by side** (v0.9.9) - one after another, every queued
+  job added a slskd round trip to every poll of the panel.
 
 ### The library explorer (v0.6.5)
 
@@ -2263,9 +2282,9 @@ the page, and ported panels mount into it via one extra module script.
 - Ported components reuse the **existing class names and IDs verbatim**, so `main.css` applies
   unchanged. A visual difference means a porting mistake, not a restyle.
 - Both files are ES modules and can't call each other, so cross-boundary calls meet on
-  `window.deadwax` (`ui/src/bridge.ts`). Four entries today: `refreshDownloads`,
-  `closeOtherDropdowns`, `runSearch`, `refreshNewImports`. **An empty bridge means the
-  migration is done.**
+  `window.deadwax` (`ui/src/bridge.ts`). Entries today: `refreshDownloads`,
+  `enqueueDownload` (v0.9.9), `closeDownloads`, `closeOtherDropdowns`, `runSearch`,
+  `refreshNewImports`. **An empty bridge means the migration is done.**
 
 Why, from measurements of the original code:
 
@@ -2319,7 +2338,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 807 tests
+.venv/bin/python -m pytest tests/ -q  # 812 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2362,7 +2381,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 807 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 812 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

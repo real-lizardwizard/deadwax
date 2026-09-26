@@ -9,6 +9,8 @@
  * Keep this small and keep it shrinking. Every entry is a piece of the old app the new one
  * still depends on, so an empty bridge is the signal that the migration is done.
  */
+import type { EnqueueRequest, EnqueueResponse } from './api/types'
+
 export interface DeadwaxBridge {
   /**
    * Closes the log dropdown. Set by main.js, called here when the downloads panel opens -
@@ -29,6 +31,15 @@ export interface DeadwaxBridge {
    * download so the new job appears at once instead of on the next timer tick.
    */
   refreshDownloads?: () => void
+
+  /**
+   * Queues a download through the downloads panel. Set here, called by main.js's candidates
+   * panel when you press Download, so the panel shows the download from the click (v0.9.9)
+   * rather than once slskd has connected to the peer. main.js falls back to its own request
+   * when this isn't there yet. Goes away when the candidates panel is ported and can call the
+   * hook's enqueue directly.
+   */
+  enqueueDownload?: (body: EnqueueRequest) => Promise<EnqueueResponse>
 
   /**
    * Runs a MusicBrainz search on the vanilla side. Set by main.js, called from the library

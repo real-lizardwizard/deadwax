@@ -6361,6 +6361,22 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 /* a card's releases on their way - the sweep says so, and a second click won't fire again */
 .fetch-releases-button:disabled { cursor: progress; }
 
+/*
+ * A download asked for that slskd hasn't answered yet (v0.9.9) - the same sweep as every other
+ * "working" in the app, run along the row's empty progress track. There is no progress to show
+ * until slskd has connected to the peer, and a track sitting at 0% reads as stuck.
+ */
+.download-progress-track.is-waiting {
+    --jb-loading-tile: 120px;
+    background-image: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
+    background-size: var(--jb-loading-tile) 100%;
+    background-repeat: repeat-x;
+    animation: jb-loading-sweep 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .download-progress-track.is-waiting { animation: none; background-image: none; background-color: var(--accent-muted); }
+}
+
 /* ============================================================================
  * ? RESPONSIVE  --  KEEP THIS LAST IN THE FILE
  *

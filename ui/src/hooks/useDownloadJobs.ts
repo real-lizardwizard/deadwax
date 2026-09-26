@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import * as api from '../api/download'
-import type { DownloadJob } from '../api/types'
+import type { DownloadJob, EnqueueRequest, EnqueueResponse } from '../api/types'
 import { isActive } from '../lib/jobs'
 import {
-  activeCount as countActive, finishedIds, reconcile, visibleJobs, withAdded, withRemoved,
-  type Overlays,
+  NO_OVERLAYS, activeCount as countActive, finishedIds, reconcile, settlePending,
+  visibleJobs, visiblePending, withAdded, withPending, withRemoved, withoutRefused,
+  type Overlays, type PendingDownload,
 } from '../lib/downloadOverlay'
 import { announceAlbumsFiled, newlyOrganized, statusesOf } from '../lib/libraryEvents'
 import { sampleSpeeds, type SpeedSamples } from '../lib/speed'
@@ -56,7 +57,15 @@ export interface DownloadJobsState {
    * the result - and until this existed the row was identical for both of them.
    */
   cancelling: ReadonlySet<number>
+  /** Downloads asked for that slskd hasn't answered yet, or refused. See PendingDownload. */
+  pending: PendingDownload[]
   refresh: () => void
+  /**
+   * Queue a download, with a row in the panel from the click rather than from slskd's answer.
+   * Resolves with the new job, or rejects with slskd's reason, so the button that asked can
+   * say so too.
+   */
+  enqueue: (body: EnqueueRequest) => Promise<EnqueueResponse>
   cancel: (jobId: number) => Promise<void>
   clearFinished: () => Promise<void>
 }
@@ -115,10 +124,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
    */
   const statusesRef = useRef<ReturnType<typeof statusesOf> | null>(null)
 
-  const [overlays, setOverlays] = useState<Overlays>(() => ({
-    cancelling: new Set<number>(),
-    cleared: new Set<number>(),
-  }))
+  const [overlays, setOverlays] = useState<Overlays>(() => NO_OVERLAYS)
 
   useEffect(() => {
     let cancelled = false
@@ -174,7 +180,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
   }, [open, nonce])
 
   /** Stop overlaying ids the server never confirmed. See OPTIMISTIC_TTL_MS. */
-  const expire = useCallback((key: keyof Overlays, ids: number[]) => {
+  const expire = useCallback((key: 'cancelling' | 'cleared', ids: number[]) => {
     setTimeout(() => {
       setOverlays((current) => ({ ...current, [key]: withRemoved(current[key], ids) }))
     }, OPTIMISTIC_TTL_MS)
@@ -201,8 +207,45 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
     [refresh, expire],
   )
 
+  const pendingKey = useRef(0)
+
+  const enqueue = useCallback(async (body: EnqueueRequest): Promise<EnqueueResponse> => {
+    const key = `pending-${++pendingKey.current}`
+    //? Set BEFORE the request goes out, as with cancel - the row is the click's answer
+    setOverlays((current) => withPending(current, {
+      key,
+      artist: String(body.release?.artist ?? ''),
+      album: String(body.release?.album ?? ''),
+      username: body.username,
+    }))
+
+    try {
+      const result = await api.enqueue(body)
+      if (typeof result.job_id === 'number') {
+        //? handed to the real row when a poll brings the job - see reconcile
+        setOverlays((current) => settlePending(current, key, { jobId: result.job_id }))
+        //? a job that never shows in a poll (a race with "clear finished", say) must not
+        //? stand as "asking slskd" for ever
+        setTimeout(() => {
+          setOverlays((current) => ({ ...current, pending: current.pending.filter((p) => p.key !== key) }))
+        }, OPTIMISTIC_TTL_MS)
+      } else {
+        //? accepted but untracked - an unwritable database. Nothing will ever replace the row.
+        setOverlays((current) => ({ ...current, pending: current.pending.filter((p) => p.key !== key) }))
+      }
+      refresh()
+      return result
+    } catch (caught) {
+      const error = caught instanceof Error ? caught.message : 'slskd refused the download'
+      setOverlays((current) => settlePending(current, key, { error }))
+      throw caught
+    }
+  }, [refresh])
+
   const clearFinished = useCallback(async () => {
     const ids = finishedIds(jobs)
+    //? the refused placeholders are finished too, and go with them
+    setOverlays((current) => withoutRefused(current))
     if (!ids.length) return
 
     setOverlays((current) => ({ ...current, cleared: withAdded(current.cleared, ids) }))
@@ -220,17 +263,20 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
 
   //? What the panel renders: the polled jobs with the overlays applied.
   const shown = useMemo(() => visibleJobs(jobs, overlays), [jobs, overlays])
-  const active = useMemo(() => countActive(shown, overlays), [shown, overlays])
+  const pending = useMemo(() => visiblePending(jobs, overlays), [jobs, overlays])
+  const active = useMemo(() => countActive(shown, { ...overlays, pending }), [shown, overlays, pending])
 
   return {
     jobs: shown,
     trackingEnabled,
     speeds,
     activeCount: active,
-    finishedCount: shown.length - active,
+    finishedCount: shown.length + pending.length - active,
     error,
     cancelling: overlays.cancelling,
+    pending,
     refresh,
+    enqueue,
     cancel,
     clearFinished,
   }

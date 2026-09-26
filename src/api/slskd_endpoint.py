@@ -1,4 +1,6 @@
 import asyncio
+from urllib.parse import quote
+from types import SimpleNamespace
 import re
 import traceback
 import slskd_api
@@ -437,10 +439,19 @@ class SlskdClient:
         return responses
 
 
-    async def enqueue(self, username: str, files: list[dict]) -> bool:
+    async def enqueue(self, username: str, files: list[dict]) -> tuple[bool, str]:
         """
         Queue a download. `files` must be [{'filename': ..., 'size': ...}] exactly as returned
         by search_responses - slskd matches on those two fields.
+
+        Returns (accepted, slskd's reason when it wasn't). slskd_api's own enqueue returns only
+        `response.ok` and drops the body, which is where slskd says WHY - usually that the peer
+        is offline, from the exception its enqueue threw looking the peer up. So the request is
+        made on slskd_api's session directly, the same URL and payload, and the body kept.
+
+        Slow on purpose, and the reason the downloads panel shows a placeholder the moment you
+        click (v0.9.9): slskd does not answer until it has looked up the peer's address and
+        opened a connection to them, which takes seconds for a firewalled peer.
         """
         logger.info(
             f"queueing {len(files)} files from {username}",
@@ -449,21 +460,33 @@ class SlskdClient:
         client = await self.get_client()
 
         payload = [{"filename": f["filename"], "size": f["size"]} for f in files]
+        transfers = client.transfers
+        url = transfers.api_url + f"/transfers/downloads/{quote(username)}"
 
         try:
-            ok = await asyncio.to_thread(client.transfers.enqueue, username=username, files=payload)
-
-            if ok:
+            #? slskd_api's session RAISES on a non-2xx (a response hook calling
+            #? raise_for_status), so a refusal arrives as an HTTPError carrying the response
+            response = await asyncio.to_thread(transfers.session.post, url, json=payload)
+            if response.ok:
                 logger.info(f"queued {len(files)} files from {username}", extra={"frontend": True, "src": "slskd"})
-            else:
-                logger.error(f"slskd refused the download from {username}", extra={"frontend": True, "src": "slskd"})
+                return True, ""
+            refused = response
 
-            return bool(ok)
+        except HTTPError as exc:
+            refused = getattr(exc, "response", None)
+            if refused is None:
+                logger.error(f"failed to queue download from {username}: {exc}", extra={"frontend": True, "src": "slskd"})
+                return False, f"couldn't reach slskd to queue it: {exc}"
 
-        except Exception:
+        except Exception as e:
             logger.error(f"failed to queue download from {username}", extra={"frontend": True, "src": "slskd"})
             logger.error(traceback.format_exc())
-            return False
+            return False, f"couldn't reach slskd to queue it: {e}"
+
+        said = slskd_said(SimpleNamespace(response=refused))
+        reason = f"slskd couldn't queue it: {said}" if said else f"slskd refused the download ({refused.status_code})"
+        logger.error(f"{reason} - from {username}", extra={"frontend": True, "src": "slskd"})
+        return False, reason
 
 
     async def cancel_download(self, username: str, transfer_id: str, remove: bool = True) -> bool:

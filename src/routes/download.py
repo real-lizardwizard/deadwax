@@ -389,10 +389,12 @@ async def enqueue(request: Request, body: EnqueueRequest):
         slskd_client = request.app.state.slskd_client
         files = [f.model_dump() for f in body.files]
 
-        ok = await slskd_client.enqueue(body.username, files)
+        ok, reason = await slskd_client.enqueue(body.username, files)
 
         if not ok:
-            raise HTTPException(status_code=502, detail="slskd refused the download")
+            #? slskd's own words where it gave any - "bob is offline" is an answer, "refused"
+            #? is a shrug. The downloads panel shows this on the row you just asked for.
+            raise HTTPException(status_code=502, detail=reason or "slskd refused the download")
 
         #? record only after slskd accepts, so a rejected download never leaves a phantom job
         job_id = await request.app.state.store.create_job(
@@ -432,24 +434,29 @@ async def jobs(request: Request):
             downloads = await request.app.state.slskd_client.get_downloads()
             transfers_by_user = index_transfers_by_user(downloads)
 
-        merged = []
-        for job in stored:
-            summary = (summarize_transfers(job, transfers_by_user)
-                       if job["status"] in OPEN_STATUSES
-                       else {"progress": 100.0 if job["status"] != "failed" else 0.0,
-                             "state": None, "speed": 0, "bytes_transferred": 0,
-                             "files_done": len(job["files"]) if job["status"] != "failed" else 0,
-                             "files_total": len(job["files"]), "matched": False})
+        summaries = [
+            summarize_transfers(job, transfers_by_user)
+            if job["status"] in OPEN_STATUSES
+            else {"progress": 100.0 if job["status"] != "failed" else 0.0,
+                  "state": None, "speed": 0, "bytes_transferred": 0,
+                  "files_done": len(job["files"]) if job["status"] != "failed" else 0,
+                  "files_total": len(job["files"]), "matched": False}
+            for job in stored
+        ]
 
-            queue_position = None
+        #? Only for jobs actually sat in a queue, and only the first file - slskd answers this
+        #? one transfer at a time, so asking for every file every poll would hammer it for
+        #? information that's identical across the folder anyway. Asked side by side (v0.9.9):
+        #? one after another, every queued job added a round trip to every poll of the panel.
+        async def position(job, summary):
             if job["status"] == "queued" and summary.get("matched"):
-                #? only for jobs actually sat in a queue, and only the first file - slskd
-                #? answers this one transfer at a time, so asking for every file every poll
-                #? would hammer it for information that's identical across the folder anyway
-                queue_position = await _first_queue_position(
-                    request.app.state.slskd_client, job, transfers_by_user
-                )
+                return await _first_queue_position(request.app.state.slskd_client, job, transfers_by_user)
+            return None
 
+        positions = await asyncio.gather(*(position(j, sm) for j, sm in zip(stored, summaries)))
+
+        merged = []
+        for job, summary, queue_position in zip(stored, summaries, positions):
             merged.append({
                 "id": job["id"],
                 "artist": job["artist"],
