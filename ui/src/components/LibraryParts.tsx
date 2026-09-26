@@ -114,19 +114,24 @@ export function GetArtButton(
   { album, onDone, class: className = 'commandbar-button' }:
   { album: LibraryAlbum; onDone: () => void; class?: string },
 ) {
-  const [state, setState] = useState<'idle' | 'working' | 'failed'>('idle')
+  //? keyed to the album it ran for, like Get lyrics and Get CD art below: this one instance
+  //? serves every album you select, and "working" or "Retry cover" belonged to the last one
+  const [run, setRun] = useState<{ path: string; state: 'working' | 'failed' } | null>(null)
+  const state = run && run.path === album.path ? run.state : 'idle'
 
   if (album.art || !album.release_mbid) return null
 
   const fetchArt = async (event: MouseEvent) => {
     event.stopPropagation()
-    setState('working')
+    const path = album.path
+    setRun({ path, state: 'working' })
 
     try {
-      await libraryApi.fetchCoverArt(album.path)
+      await libraryApi.fetchCoverArt(path)
+      setRun((now) => (now?.path === path ? null : now))
       onDone()
     } catch (caught) {
-      setState('failed')
+      setRun((now) => (now?.path === path ? { path, state: 'failed' } : now))
       console.error(caught)
     }
   }
@@ -184,12 +189,14 @@ export function GetLyricsButton(
     const path = album.path
     setRun({ path, state: 'working' })
 
+    //? only over this album's own run - an answer for the album you left must not end the
+    //? "working" of one you started since
     try {
       const summary = await libraryApi.fetchLyrics(path)
-      setRun({ path, state: 'done', summary })
+      setRun((now) => (now?.path === path ? { path, state: 'done', summary } : now))
       if (summary.written || summary.replaced) onDone()
     } catch (caught) {
-      setRun({ path, state: 'failed' })
+      setRun((now) => (now?.path === path ? { path, state: 'failed' } : now))
       console.error(caught)
     }
   }
@@ -249,11 +256,12 @@ export function GetDiscArtButton(
 
     try {
       await libraryApi.fetchDiscArt(path)
-      setRun(null)
+      setRun((now) => (now?.path === path ? null : now))
       onDone()
     } catch (caught) {
       const detail = caught instanceof Error ? caught.message : String(caught)
-      setRun({ path, state: caught instanceof ApiError && caught.status === 404 ? 'none' : 'failed', detail })
+      const state = caught instanceof ApiError && caught.status === 404 ? 'none' : 'failed'
+      setRun((now) => (now?.path === path ? { path, state, detail } : now))
     }
   }
 

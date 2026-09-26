@@ -487,7 +487,8 @@ row. Matching is `interface/scripts/owned.mjs`, pure, pinned by `ui/test/owned.s
 - **Fetched BESIDE the search, never before it**, and laid onto what is already on screen when
   it lands - in place, never by re-rendering a grid, which would snap shut a tracklist you had
   just opened. A failed or unconfigured lookup leaves no marks at all rather than "nothing held"
-  on every card. One request in flight at a time (`ownedRequest`).
+  on every card. One request in flight at a time (`ownedRequest`), and one more after it when
+  asked again meanwhile (`ownedAgain`, v0.9.2).
 - **An album filed while you look marks itself.** `announceAlbumsFiled()` in
   `ui/src/lib/libraryEvents.ts` also dispatches `deadwax:albums-filed` on `window`, which
   main.js listens for. A window event rather than a bridge entry: it is a one-way notice the
@@ -506,6 +507,65 @@ row. Matching is `interface/scripts/owned.mjs`, pure, pinned by `ui/test/owned.s
   Radiohead - OK Computer" folder (made for the check, then removed) gave "Maybe in your
   library"; `deadwax:albums-filed` re-fetched `/library/owned` and re-laid the marks with no
   duplicates.
+
+### Only the newest answer counts (v0.9.2)
+
+James: "when a search function is loading, if I switch to another album or edition before the
+search is completed, something breaks ... it's as if it can't handle more than one action at
+once." It could; what it couldn't do was tell two apart. Everywhere below, an answer was drawn
+without asking whether it still answered the question on screen.
+
+- **The one rule: anything that fetches and then draws asks `current()` first.**
+  `interface/scripts/latest.mjs` and its Preact copy `ui/src/lib/latest.ts` are ten lines:
+  `begin()` starts a request, supersedes the one before (and ABORTS its fetch, which gives the
+  browser its connection back - a Soulseek search holds one for as long as it takes), and
+  returns `current()`. A superseded request that fails is dropped silently, catch and all.
+  `ui/test/latest.sim.cjs` runs both copies with answers arriving in whatever order it says.
+  **New async UI goes through one of these.** `useLibrary` already did the same with a counter;
+  it was the exception.
+- **The candidates panel was the reported case, and there were three bugs in it.** State was
+  three loose globals - the release whose Find was pressed last (`currentExpected`), the last
+  result that came back (`lastCandidateResult`), and whatever the screen said. So:
+  1. ticking a filter mid-search called `renderCandidates()`, which drew the PREVIOUS search's
+     result over "Searching";
+  2. a slow search landing after another album's Find drew its candidates under the new
+     album's label;
+  3. and Download sent `currentExpected` as the release - **filing album A's folder as album
+     B**. The worst of the three, since it writes to the library.
+  It is one value now, `candidateSearch = {release, pending, result, error}`, which only the
+  newest search becomes, and each row enqueues with the release IT was searched for.
+  `renderCandidates()` draws whatever state that is, so a filter ticked mid-search redraws the
+  "Searching" panel and the answer lands filtered. The format chips are cleared when a search
+  begins (they were the last result's formats), and the query box is cleared on a new album's
+  Find - left holding the old album's query, Re-search took it for an edit and searched it.
+  Closing the panel supersedes its search: reopening always searches afresh.
+  **Reproduced before fixing** against a fake slskd that answers slowly on demand (8s for one
+  album, 2s for another): the old main.js showed All Mine's peers under "Glory Box", and Glory
+  Box's folder under "All Mine" - enqueued as All Mine. The fixed one shows each under its own.
+- **The results area has one guard for search AND discography** (`resultsRequests`), because
+  they share the screen: a search while a browse was loading used to draw and then have the
+  browse land on it. Only the newest may put the Search button back (`setSearchLoading`). A
+  superseded search is still CACHED - it is the right answer to its own query.
+- **A card's Fetch releases** fires once (a second click threw, finding the button it removes
+  already gone), skips drawing into a card a newer render has replaced (its grid would have
+  joined `mountedReleaseGrids` and the facets while being on no screen), and - asked for in the
+  same breath - shows the `.loading-blocks` sweep as "Fetching releases" while it waits.
+- **The metadata editor was the dangerous one.** Pick a pressing, then another before the first's
+  tracklist arrived, and the first landed LAST and became `selected` - what Apply writes - under
+  the second's highlight. `releaseRequests` guards `loadRelease` (including its failure path,
+  which would otherwise clear the selection you moved on to), `searchRequests` the search, and
+  the retag preview effect gained a `live` flag: the debounce stopped a preview not yet SENT,
+  not one already out when the fields changed. Verified: first pick delayed 5s, second pick
+  highlighted, the only preview sent was the second's.
+- **Also:** the artist page's refresh after saving pictures (the page is not remounted per
+  artist, so it could draw the artist you'd left), the artist picker's search and pick, and the
+  library's Get cover / Get lyrics / Get CD art buttons, whose results are keyed to the album
+  they ran for and now only replace that album's own run. `refreshOwned()` re-asks once when
+  asked during a request, since that request may predate the change it is being asked about.
+- **NOT done: cancelling server-side.** An aborted `find_candidates` still runs to the end of its
+  slskd search on the server - uvicorn doesn't cancel a handler when the client goes. slskd
+  runs searches side by side (only STARTING one is serialised), so it costs slskd a search, not
+  the user a wait.
 
 ### Browsing a discography, and ordering results
 
@@ -2234,6 +2294,7 @@ node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), tick
 node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
 node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes about it
 node ui/test/owned.sim.cjs      # which search results the library already holds - by pressing, by album, and "maybe" by name
+node ui/test/latest.sim.cjs     # only the newest answer counts - both copies of the guard, answers arriving out of order
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { applyArtistImages, fetchArtist, previewArtistImages, searchArtists } from '../api/library'
 import type {
   ArtistImageCandidate, ArtistImagesPreview, ArtistMatch, ArtistSummary,
 } from '../api/types'
 import { artistArtUrl, formatSize } from '../lib/format'
+import { latestOnly } from '../lib/latest'
 import type { AlbumGroup } from '../lib/groupAlbums'
 import { Loading } from './Loading'
 import { ArtistIcon, CoverGrid } from './LibraryParts'
@@ -78,11 +79,17 @@ export function ArtistDetails(
   const art = summary?.art ?? {}
   const path = summary?.path ?? null
 
+  //? this page isn't remounted per artist, so an answer about the artist you've since left
+  //? would be drawn on the page of the one you went to - the effects above say `live` for this
+  const shown = useRef(artist)
+  shown.current = artist
+
   const refresh = useCallback(async () => {
     const [found, again] = await Promise.all([
       fetchArtist(artist),
       previewArtistImages(artist, { artistMbid: lookup?.mbid ?? null }),
     ])
+    if (shown.current !== artist) return
     setSummary(found)
     setLookup(again)
     setVersion((n) => n + 1)
@@ -279,6 +286,8 @@ function ArtistImagePicker(
   const [replace, setReplace] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
+  //? a search and a pick both replace what's shown - only the newest may (lib/latest.ts)
+  const requests = useMemo(latestOnly, [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -299,31 +308,36 @@ function ArtistImagePicker(
   }, [preview.candidates])
 
   const search = async () => {
+    const request = requests.begin()
     setSearching(true)
     setSaved(null)
     try {
       const result = await searchArtists(query)
+      if (!request.current()) return
       setMatches(result.matches)
       if (result.matches.length === 0) setSaved(`Nothing in MusicBrainz goes by "${query}".`)
     } catch {
-      setSaved('MusicBrainz could not be reached.')
+      if (request.current()) setSaved('MusicBrainz could not be reached.')
     } finally {
-      setSearching(false)
+      if (request.current()) setSearching(false)
     }
   }
 
+  //? picking one act and then another used to show - and save - whichever answered last
   const useArtist = async (mbid: string) => {
+    const request = requests.begin()
     setSearching(true)
     try {
       const next = await previewArtistImages(artist, { artistMbid: mbid })
+      if (!request.current()) return
       setPreview(next)
       setChosen(bestUrls(next))
       setMatches([])
       setExpanded({})
     } catch {
-      setSaved('That artist could not be loaded.')
+      if (request.current()) setSaved('That artist could not be loaded.')
     } finally {
-      setSearching(false)
+      if (request.current()) setSearching(false)
     }
   }
 

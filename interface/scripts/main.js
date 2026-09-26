@@ -4,6 +4,7 @@ import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel 
 import { getArtistIds, getArtistNames, getCurrentArtistNames } from './credits.mjs';
 import { chooseBase, diffTracklists, formatSeconds, releaseTracks, summarizeDiff } from './tracklistDiff.mjs';
 import { buildOwnedIndex, describeFolders, describeGroupOwnership, ownedForGroup, ownedForRelease } from './owned.mjs';
+import { isAbort, latestOnly } from './latest.mjs';
 
 
 
@@ -423,13 +424,13 @@ function setSearchLoading(on) {
 }
 
 
-async function searchReleaseGroups(query) {
+async function searchReleaseGroups(query, signal) {
     const params = new URLSearchParams({
         query: query,
         limit: parseInt(limitValueDisplay.innerText)
     });
 
-    const response = await fetch(`/deadwax/search_musicbrainz/fully_search?${params}`);
+    const response = await fetch(`/deadwax/search_musicbrainz/fully_search?${params}`, { signal });
 
     if (!response.ok) {
         const error = await response.json();
@@ -633,10 +634,15 @@ async function handleSearch() {
         query = `(${query}) AND ${typeFilter}`;
     }
 
+    //? this search is now the question the results area answers - an earlier search, or a
+    //? discography browse, still in flight is dropped when it lands (see latest.mjs)
+    const request = resultsRequests.begin();
+
     try {
         let limit = parseInt(limitValueDisplay.innerText);
         const cached = searchCache[query];
         if (cached && cached.limit === limit) {
+            setSearchLoading(false);
             processSearchResults(cached.results);
         }
 
@@ -646,16 +652,20 @@ async function handleSearch() {
             // worked. A cache hit skips this because it returns in the same tick.
             setSearchLoading(true);
             try {
-                const results = await searchReleaseGroups(query);
+                const results = await searchReleaseGroups(query, request.signal);
+                //? cached even when superseded - it is still the right answer to ITS query
                 searchCache[query] = { results, limit };
+                if (!request.current()) return;
                 processSearchResults(results);
             } finally {
-                setSearchLoading(false);
+                //? only the newest search may say searching is over
+                if (request.current()) setSearchLoading(false);
             }
         }
     }
 
     catch (error) {
+        if (!request.current() || isAbort(error)) return;
         console.error(`Search error: ${error.message}`);
         // surface it in the results area - a silent console error looks like "no matches",
         // which sends people rewording a search that never actually ran
@@ -695,6 +705,14 @@ let lastResults = null;
  */
 let discography = null;
 
+/*
+ * Who may write the results area: the newest search OR browse, one guard for both because they
+ * share the screen. Searching while a discography is still loading used to show the search and
+ * then have the discography land on top of it; two searches answered in whatever order
+ * MusicBrainz felt like.
+ */
+const resultsRequests = latestOnly();
+
 /** The order the results are displayed in. Persisted; see the settings tab. */
 let currentSort = (() => {
     const saved = loadPreferences().searchSort;
@@ -712,12 +730,18 @@ let currentSort = (() => {
  */
 let ownedIndex = null;
 let ownedRequest = null;
+//? asked again while a request was out: that request may have started before the change it
+//? is being asked about, so its answer can't be the last word - one more goes when it lands
+let ownedAgain = false;
 
 /** Every card on screen: its chip slot, and what it can be matched by. Cleared per render. */
 const renderedGroups = new Map();
 
 function refreshOwned() {
-    if (ownedRequest) return ownedRequest;
+    if (ownedRequest) {
+        ownedAgain = true;
+        return ownedRequest;
+    }
 
     ownedRequest = (async () => {
         try {
@@ -734,6 +758,10 @@ function refreshOwned() {
         }
         finally {
             ownedRequest = null;
+            if (ownedAgain) {
+                ownedAgain = false;
+                void refreshOwned();
+            }
         }
     })();
 
@@ -824,6 +852,9 @@ async function loadDiscography(artistMbid, artistName) {
     if (!artistMbid) return;
     void refreshOwned();
 
+    const request = resultsRequests.begin();
+    //? a search superseded by this can't be the one to put the Search button back
+    setSearchLoading(false);
     const container = document.getElementById('search-results-scrollable');
     container.innerHTML = '<div class="loading-panel">Asking MusicBrainz…</div>';
 
@@ -831,7 +862,7 @@ async function loadDiscography(artistMbid, artistName) {
         const params = new URLSearchParams({ artist_mbid: artistMbid, types: 'album' });
         if (discographyStudioOnly) params.set('studio_only', 'true');
 
-        const response = await fetch(`/deadwax/search_musicbrainz/discography?${params}`);
+        const response = await fetch(`/deadwax/search_musicbrainz/discography?${params}`, { signal: request.signal });
 
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
@@ -839,6 +870,7 @@ async function loadDiscography(artistMbid, artistName) {
         }
 
         const data = await response.json();
+        if (!request.current()) return;
 
         //? A failed browse answers 200 with a `problem` rather than raising, exactly as the
         //? releases fetch does - so an outage would otherwise render as "this artist has
@@ -857,6 +889,7 @@ async function loadDiscography(artistMbid, artistName) {
     }
 
     catch (error) {
+        if (!request.current() || isAbort(error)) return;
         console.error(`Discography error: ${error.message}`);
         discography = null;
         container.innerHTML =
@@ -869,6 +902,8 @@ async function loadDiscography(artistMbid, artistName) {
 let discographyStudioOnly = true;
 
 function closeDiscography() {
+    //? back to the search - a browse still loading must not land on top of it
+    resultsRequests.supersede();
     discography = null;
     renderSearchResults();
 }
@@ -944,12 +979,13 @@ function renderSearchResults() {
     updateDiscographyControls();
 }
 
-async function findCandidates(expected) {
+async function findCandidates(expected, signal) {
     const settings = getSettings();
     const response = await fetch(`/deadwax/download/find_candidates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...expected, format_preference: settings.formatPreference })
+        body: JSON.stringify({ ...expected, format_preference: settings.formatPreference }),
+        signal,
     });
 
     if (!response.ok) {
@@ -962,9 +998,12 @@ async function findCandidates(expected) {
 
 
 
-async function enqueueCandidate(candidate) {
+async function enqueueCandidate(candidate, release) {
     // the release travels with the download so the server can remember what these files are
-    // for - slskd only ever knows "bob is sending you some files"
+    // for - slskd only ever knows "bob is sending you some files". It is the release the
+    // candidate was SEARCHED for, handed in by the row that drew it, never "whichever panel is
+    // open now": those differed whenever a slow search landed after another album's Find, and
+    // the download was filed as the other album.
     const response = await fetch(`/deadwax/download/enqueue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -972,7 +1011,7 @@ async function enqueueCandidate(candidate) {
             username: candidate.username,
             files: candidate.files,
             directory: candidate.directory,
-            release: currentExpected || {},
+            release: release || {},
         })
     });
 
@@ -995,10 +1034,29 @@ async function enqueueCandidate(candidate) {
 const candidatesWindow = document.getElementById('candidates-window');
 const candidatesScrollable = document.getElementById('candidates-scrollable');
 const candidatesQueryInput = document.getElementById('candidates-query-input');
-let currentExpected = null;
+
+/*
+ * THE search the panel is showing, as one value: the release it is for, and - once it has
+ * answered - its result or its error. `pending` until then.
+ *
+ * It used to be three loose globals - the release whose Find was pressed last, the last result
+ * that came back, and whatever the screen was showing - and nothing tied them together. So
+ * ticking a filter mid-search redrew the PREVIOUS search's result over the "Searching" panel,
+ * and a slow search landing after another album's Find drew its candidates under the new
+ * album's name and enqueued them as the new album. One value can't disagree with itself, and
+ * `candidateRequests` makes sure only the newest search ever becomes it.
+ */
+let candidateSearch = null;
+const candidateRequests = latestOnly();
+
+/** The query the box last showed an answer for; an edit is measured against it. */
+let lastShownQuery = '';
 
 function setCandidatesOpen(open) {
     candidatesWindow.classList.toggle('open', open);
+    //? a closed panel's search can never be seen - reopening always searches afresh - so let
+    //? it go, and the browser have its connection back
+    if (!open) candidateRequests.supersede();
 }
 
 document.getElementById('candidates-close-button').addEventListener('click', () => setCandidatesOpen(false));
@@ -1007,13 +1065,13 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('candidates-requery-button').addEventListener('click', () => {
-    if (!currentExpected) return;
+    if (!candidateSearch) return;
     // Only an EDITED query overrides. The box shows the first of possibly several searches -
     // an artist who has renamed is searched under each name - so re-running what it already
     // says as an override would quietly drop every name but that one.
     const typed = candidatesQueryInput.value.trim();
-    const edited = typed && typed !== lastCandidateResult?.query;
-    runCandidateSearch({ ...currentExpected, query_override: edited ? typed : '' });
+    const edited = typed && typed !== lastShownQuery;
+    runCandidateSearch(candidateSearch.release, edited ? typed : '');
 });
 
 
@@ -1107,35 +1165,45 @@ function buildExpectedFromReleaseGroup(releaseGroupContext) {
 
 
 async function openCandidatesPanel(expected, label) {
-    currentExpected = expected;
     document.getElementById('candidates-release-label').textContent = label;
+    //? the last album's query, left in the box, would be taken for an edit by Re-search
+    candidatesQueryInput.value = '';
+    candidatesQueryInput.title = '';
+    lastShownQuery = '';
     setCandidatesOpen(true);
-    await runCandidateSearch(expected);
+    await runCandidateSearch(expected, '');
 }
 
 
 
-async function runCandidateSearch(expected) {
-    candidatesScrollable.innerHTML =
-        `<div class="loading-panel">Searching Soulseek for this release…</div>`;
+async function runCandidateSearch(release, queryOverride) {
+    const request = candidateRequests.begin();
+    candidateSearch = { release, pending: true, result: null, error: null };
+    //? the format chips were the last result's formats, and filtering this search by them
+    //? would be filtering on a question nobody has answered yet
+    renderCandidateFormatFilters([]);
+    renderCandidates();
 
     try {
-        const result = await findCandidates(expected);
+        const result = await findCandidates({ ...release, query_override: queryOverride }, request.signal);
+        if (!request.current()) return;
+
+        candidateSearch = { release, pending: false, result, error: null };
         candidatesQueryInput.value = result.query;
+        lastShownQuery = result.query;
         // every name it was searched under, where there was more than one
         candidatesQueryInput.title = (result.queries?.length ?? 0) > 1
             ? `Also searched as: ${result.queries.slice(1).join(' · ')}`
             : '';
-        lastCandidateResult = result;
         renderCandidateFormatFilters(result.candidates);
         renderCandidates();
     }
 
     catch (error) {
+        if (!request.current() || isAbort(error)) return;
         console.error(`Candidate search error: ${error.message}`);
-        lastCandidateResult = null;
-        candidatesScrollable.innerHTML =
-            `<h4 class="text red candidates-status">search failed: ${error.message}</h4>`;
+        candidateSearch = { release, pending: false, result: null, error: error.message };
+        renderCandidates();
     }
 }
 
@@ -1150,7 +1218,6 @@ const SIGNAL_LABELS = {
     peer: 'peer',
 };
 
-let lastCandidateResult = null;
 /*
  * Seeded from the settings tab's preferences rather than hard-coded.
  *
@@ -1417,12 +1484,31 @@ function candidatePassesFilters(candidate) {
     return true;
 }
 
+/*
+ * Draws `candidateSearch`, whatever state it is in - so a filter ticked mid-search redraws the
+ * "Searching" panel it is already showing, and the answer, when it lands, is drawn through the
+ * filters as they are THEN rather than as they were when the search began.
+ */
 function renderCandidates() {
     candidatesScrollable.innerHTML = '';
 
-    if (!lastCandidateResult) return;
+    if (!candidateSearch) return;
 
-    const { candidates, response_count, queries } = lastCandidateResult;
+    if (candidateSearch.pending) {
+        candidatesScrollable.innerHTML =
+            `<div class="loading-panel">Searching Soulseek for this release…</div>`;
+        return;
+    }
+
+    if (candidateSearch.error) {
+        //? textContent: slskd's own words are in there, and they are third-party text
+        const status = textElement('h4', 'text red candidates-status', `search failed: ${candidateSearch.error}`);
+        candidatesScrollable.replaceChildren(status);
+        return;
+    }
+
+    const { release } = candidateSearch;
+    const { candidates, response_count, queries } = candidateSearch.result;
 
     if (!candidates.length) {
         // Say what was actually searched when it was more than the box shows: "no matches"
@@ -1508,7 +1594,7 @@ function renderCandidates() {
             button.textContent = 'Queueing…';
 
             try {
-                await enqueueCandidate(candidate);
+                await enqueueCandidate(candidate, release);
                 button.textContent = 'Queued ✓';
                 box.classList.add('queued');
             }
@@ -2793,8 +2879,28 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
         const fetchButton = div.querySelector('.fetch-releases-button');
 
         fetchButton.addEventListener('click', async () => {
+            //? one fetch per card at a time: a second click used to start a second request, and
+            //? whichever landed second found the button it removes already gone, and threw
+            if (fetchButton.disabled) return;
+            fetchButton.disabled = true;
+
+            //? asked for: "a graphic for when you press find releases so you can see that it's
+            //? searching". MusicBrainz takes seconds on a good day and a minute on a bad one, and
+            //? the button used to sit there unchanged the whole time. The same sweep the library
+            //? uses for "working" (.loading-blocks), and put back as it was if the fetch fails,
+            //? since the button is then the retry.
+            const buttonLabel = fetchButton.querySelector('.releaseName');
+            buttonLabel.textContent = 'Fetching releases';
+            buttonLabel.classList.add('loading-blocks');
+            fetchButton.setAttribute('aria-busy', 'true');
+
             try {
                 const result = await fetchReleases(releaseGroupId);
+
+                //? a newer search or browse has redrawn the results since this was asked for.
+                //? Building the grid anyway would put a card nobody can see into the filter
+                //? facets and the results count - they are built from every MOUNTED grid.
+                if (!div.isConnected) return;
 
                 const fetchedReleases = sortReleasesByDateDesc(result.releases);
 
@@ -2848,6 +2954,13 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
                 // The server already logs the reason to the event log over SSE; the button
                 // staying put is what tells you it can be retried.
                 console.error(`Fetch releases error: ${error.message}`);
+            }
+
+            finally {
+                fetchButton.disabled = false;
+                buttonLabel.textContent = 'Fetch releases';
+                buttonLabel.classList.remove('loading-blocks');
+                fetchButton.removeAttribute('aria-busy');
             }
         });
     }

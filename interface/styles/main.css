@@ -6358,6 +6358,9 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 /* the edition cell's "—" means "nothing to say", and now there is something */
 .release-row.is-owned .edition-blank { display: none; }
 
+/* a card's releases on their way - the sweep says so, and a second click won't fire again */
+.fetch-releases-button:disabled { cursor: progress; }
+
 /* ============================================================================
  * ? RESPONSIVE  --  KEEP THIS LAST IN THE FILE
  *

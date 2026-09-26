@@ -7,6 +7,7 @@ import type {
   LibraryAlbum, MetadataIssueType, Release, RetagPlan, RetagRelease,
 } from '../api/types'
 import { albumArtUrl } from '../lib/format'
+import { latestOnly } from '../lib/latest'
 import { ArtViewer } from './ArtViewer'
 import { Loading, LoadingPanel } from './Loading'
 import { issueLabel, outstandingIssues } from '../lib/metadataQueue'
@@ -212,6 +213,16 @@ export function MetadataEditor(
   const [selected, setSelected] = useState<Release | null>(null)
   const [loadingRelease, setLoadingRelease] = useState(false)
 
+  /*
+   * ...and only the NEWEST pick's tracklist may become `selected`. Pick one pressing and then
+   * another before the first had arrived, and the first used to land LAST - becoming what Apply
+   * would write while the second was the one highlighted. The worst place in the app for an old
+   * answer to win, because what it wins is a write. Same for the search, whose older answer
+   * would replace the list and auto-select from it. See lib/latest.ts.
+   */
+  const releaseRequests = useMemo(latestOnly, [])
+  const searchRequests = useMemo(latestOnly, [])
+
   //? seeded from what's on disk, so the editor opens showing the album as it is rather than
   //? empty boxes you have to fill before anything makes sense
   const [fields, setFields] = useState<Fields>({
@@ -295,6 +306,7 @@ export function MetadataEditor(
    * because somebody opened the editor.
    */
   const loadRelease = async (release: Release, seedFields: boolean) => {
+    const request = releaseRequests.begin()
     setSelectedId(release.id)
     setLoadingRelease(true)
     setSearchError(null)
@@ -307,6 +319,7 @@ export function MetadataEditor(
 
     try {
       const detail = await musicbrainz.getRelease(release.id)
+      if (!request.current()) return
       const full = { ...detail, _groupMbid: groupMbid, _firstReleaseDate: firstReleaseDate } as Release
 
       setSelected(full)
@@ -334,6 +347,9 @@ export function MetadataEditor(
         })
       }
     } catch (caught) {
+      //? a pick since then owns the selection - failing to load one you've moved on from
+      //? must not clear the one you're looking at
+      if (!request.current()) return
       //? Cleared rather than left pointing at a release we could not load. Leaving it selected
       //? would let Apply run against an empty tracklist, which is the one outcome this split
       //? exists to prevent.
@@ -346,11 +362,12 @@ export function MetadataEditor(
           : caught instanceof Error ? caught.message : 'could not load that release',
       )
     } finally {
-      setLoadingRelease(false)
+      if (request.current()) setLoadingRelease(false)
     }
   }
 
   const search = useCallback(async () => {
+    const request = searchRequests.begin()
     setSearching(true)
     setSearchError(null)
 
@@ -370,10 +387,12 @@ export function MetadataEditor(
       //? itself and then asks for the ones it wants, so that eager walk - five requests and
       //? 1.4 MB for an album like this one - was spent on a payload it dropped on the floor.
       const first = await musicbrainz.fullySearch(query.trim() || fielded, 25, false)
+      if (!request.current()) return
 
       let groups = first['release-groups'] ?? []
       if (!groups.length && !query.trim()) {
         const loose = await musicbrainz.fullySearch(`${fields.artist} ${fields.album}`.trim(), 25, false)
+        if (!request.current()) return
         groups = loose['release-groups'] ?? []
       }
 
@@ -410,6 +429,7 @@ export function MetadataEditor(
         //? number and track COUNT, all of which survive - not the contents of all 58 of them.
         //? The tracklist of whichever one gets picked is fetched by loadRelease below.
         const detail = await musicbrainz.getReleases(group.id, false)
+        if (!request.current()) return
         for (const release of detail.releases ?? []) {
           //? the group's date, not the release's - it's the album's year, and the folder is
           //? named after it so a remaster doesn't refile the record under its reissue year
@@ -432,6 +452,7 @@ export function MetadataEditor(
       //? corrections the user made by hand simply because they opened the editor.
       if (current) void loadRelease(current, false)
     } catch (caught) {
+      if (!request.current()) return
       setSearchError(
         caught instanceof MusicBrainzUnavailable
           ? "MusicBrainz is unreachable right now, so there's nothing to match against. " +
@@ -442,13 +463,15 @@ export function MetadataEditor(
       )
       setReleases([])
     } finally {
-      setSearching(false)
-      setSearched(true)
+      if (request.current()) {
+        setSearching(false)
+        setSearched(true)
+      }
     }
     //? the year fields are dependencies because the group ranking reads them - without them
     //? this callback would close over whatever they held when it was last rebuilt, and
     //? correcting the year would change the query without changing which group won
-  }, [query, album, fields.artist, fields.album, fields.year, fields.originalYear])
+  }, [query, album, fields.artist, fields.album, fields.year, fields.originalYear, searchRequests])
 
   /*
    * Search as soon as the panel opens. You opened it to match this album against something,
@@ -529,19 +552,30 @@ export function MetadataEditor(
      */
     if (loadingRelease) return
 
+    //? the debounce only stops a preview that hasn't been SENT; one already out when the fields
+    //? change again must not land over the newer one's, or the preview describes a payload that
+    //? Apply is no longer going to write
+    let live = true
+
     const timer = setTimeout(async () => {
       try {
-        setPlan(await libraryApi.previewRetag(album.path, payload, fetchArt))
+        const next = await libraryApi.previewRetag(album.path, payload, fetchArt)
+        if (!live) return
+        setPlan(next)
         setApplyError(null)
       } catch (caught) {
+        if (!live) return
         setApplyError(caught instanceof Error ? caught.message : 'could not work out the changes')
         setPlan(null)
       } finally {
-        setPlanning(false)
+        if (live) setPlanning(false)
       }
     }, PREVIEW_DEBOUNCE_MS)
 
-    return () => clearTimeout(timer)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
   }, [album.path, payload, fetchArt, loadingRelease])
 
   const apply = async () => {
