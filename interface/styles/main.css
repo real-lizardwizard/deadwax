@@ -767,8 +767,15 @@ body {
     opacity: 0;
 }
 
+/*
+  No height cap once open. It was `max-height: 1000px`, left over from an open animation that
+  no longer exists, and with `overflow: hidden` above it that CLIPPED the list rather than
+  scrolling it: Dummy's 20 pressings with one tracklist open measure 1377px, so the last few
+  were cut off with no way to reach them. The page's own results pane is what scrolls.
+*/
 .results-box > .release-group-releases.expanded {
-    max-height: 1000px;
+    max-height: none;
+    overflow: visible;
     opacity: 1;
     padding-top: 10px;
 }
