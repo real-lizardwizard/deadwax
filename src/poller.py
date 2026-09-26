@@ -20,7 +20,7 @@ from src.logger import logger
 from src.lyrics import fetch_album_lyrics
 from src.organizer import organize_job
 from src.peer_speed import RateAccumulator, measured_rate, observe
-from src.store import index_transfers_by_user, summarize_transfers
+from src.store import index_transfers_by_user, settled_transfer_ids, summarize_transfers
 
 
 POLL_INTERVAL_SECONDS = 5.0
@@ -311,10 +311,111 @@ async def _enrol_for_review(job: dict, results: dict, store) -> None:
     )
 
 
+#? how long a cancelled job's transfers are waited on before the tidy gives up. slskd settles a
+#? cancel in well under a second when the peer is reachable; this is the generous end.
+TIDY_WAIT_SECONDS = 30.0
+TIDY_INTERVAL_SECONDS = 1.0
+
+
+async def tidy_cancelled_transfers(slskd_client, jobs: list[dict]) -> tuple[int, int]:
+    """
+    Take cancelled jobs' transfers out of slskd's own list. One pass: returns (removed, still
+    waiting to settle).
+
+    Asked for: "make sure a canceled job also gets removed from slskd's UI. Currently there's a
+    bunch of canceled jobs just sitting there." deadwax always cancelled with `remove=true`,
+    and slskd always answered 204 - and removed nothing. Read in slskd's source
+    (TransfersController.CancelDownloadAsync, DownloadService): it calls TryCancel and then
+    Remove on the same line, but TryCancel on a live transfer only SIGNALS its cancellation
+    token, and the transfer reaches "Completed, Cancelled" when its task notices, a moment
+    later. Remove only touches transfers already in a completed state, so it updates nothing and
+    says nothing. A transfer slskd had lost track of (no token) is cancelled synchronously and
+    WAS removed, which is why it only happened most of the time.
+
+    So this asks again once slskd reports the transfer settled - the same call, which on a
+    completed transfer is a no-op cancel and a real remove. Removal is slskd's soft delete: the
+    record stays in its database, it just leaves the list.
+    """
+    downloads = await slskd_client.get_downloads()
+    transfers_by_user = index_transfers_by_user(downloads)
+
+    removed = waiting = 0
+    for job in jobs:
+        settled, unsettled = settled_transfer_ids(job, transfers_by_user)
+        waiting += unsettled
+        for transfer_id in settled:
+            if await slskd_client.cancel_download(job["username"], transfer_id, remove=True):
+                removed += 1
+
+    return removed, waiting
+
+
+#? held so asyncio's weak reference can't drop a tidy mid-wait, as with lyrics
+_tidy_tasks: set[asyncio.Task] = set()
+
+
+def tidy_cancelled_later(slskd_client, job: dict, sleep=asyncio.sleep) -> asyncio.Task:
+    """
+    Keep tidying one just-cancelled job until slskd has let go of all of it, or
+    TIDY_WAIT_SECONDS pass. A task rather than an await: the cancel answers at once, and the
+    downloads panel already shows it as cancelling without waiting on this.
+    """
+    async def run():
+        waited = 0.0
+        total = 0
+        while True:
+            removed, waiting = await tidy_cancelled_transfers(slskd_client, [job])
+            total += removed
+            if not waiting or waited >= TIDY_WAIT_SECONDS:
+                break
+            await sleep(TIDY_INTERVAL_SECONDS)
+            waited += TIDY_INTERVAL_SECONDS
+
+        if waiting:
+            #? left for the next start-up sweep or "clear finished", which try again
+            logger.warning(
+                f"slskd was still cancelling {waiting} transfer(s) of {job['artist']} - {job['album']} "
+                f"after {int(TIDY_WAIT_SECONDS)}s, so they're still in its list",
+                extra={"frontend": True, "src": "slskd"},
+            )
+        elif total:
+            logger.debug(f"removed {total} cancelled transfer(s) from slskd's list")
+
+    task = asyncio.create_task(run())
+    _tidy_tasks.add(task)
+    task.add_done_callback(_tidy_tasks.discard)
+    return task
+
+
+async def tidy_cancelled_on_start(slskd_client, store) -> int:
+    """
+    Once, on start: anything cancelled before a restart, or before this tidy existed, whose job
+    is still in the downloads list. A job already cleared from the list can't be matched to its
+    transfers any more, so those are left to slskd's own "clear completed". Never raises - a
+    start-up nicety must not stop the poller starting.
+    """
+    try:
+        cancelled = await store.jobs_with_status(("cancelled",))
+        if not cancelled:
+            return 0
+        removed, _ = await tidy_cancelled_transfers(slskd_client, cancelled)
+        if removed:
+            logger.info(
+                f"removed {removed} cancelled transfer(s) from slskd's list",
+                extra={"frontend": True, "src": "slskd"},
+            )
+        return removed
+    except Exception as e:
+        logger.error(f"couldn't tidy cancelled transfers on start: {e}")
+        return 0
+
+
 async def run_download_poller(slskd_client, store) -> None:
     logger.info("download poller started")
     missing_counts: dict[int, int] = {}
     rate_samples: dict[int, RateAccumulator] = {}
+
+    await tidy_cancelled_on_start(slskd_client, store)
 
     while True:
         try:

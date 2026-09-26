@@ -10,6 +10,7 @@ from src.config import Config
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
+from src.poller import tidy_cancelled_later, tidy_cancelled_transfers
 from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, index_transfers_by_user,
                        summarize_transfers)
 
@@ -480,6 +481,10 @@ async def cancel_job(request: Request, job_id: int):
 
         await store.update_status(job_id, "cancelled", "cancelled from deadwax")
 
+        #? slskd removes a transfer from its list only once the cancel has SETTLED, which is a
+        #? moment after this - so the removal is asked for again when it has (see poller.py)
+        tidy_cancelled_later(slskd_client, job)
+
         #? After the transfers are cancelled, never before: slskd holds the file open while a
         #? transfer is live, and deleting it underneath would be a race with slskd's own writer.
         removed = await asyncio.to_thread(
@@ -522,7 +527,18 @@ async def cancel_job(request: Request, job_id: int):
 async def clear_jobs(request: Request):
     """Forget finished jobs. Anything still moving is deliberately left alone."""
     try:
-        removed = await request.app.state.store.delete_jobs(CLEARABLE_STATUSES)
+        store = request.app.state.store
+
+        #? the last chance to take a cancelled job's transfers out of slskd's list - once its
+        #? row is gone nothing can match them to it. Best effort: failing it clears anyway.
+        try:
+            cancelled = await store.jobs_with_status(("cancelled",))
+            if cancelled:
+                await tidy_cancelled_transfers(request.app.state.slskd_client, cancelled)
+        except Exception as e:
+            logger.error(f"couldn't tidy cancelled transfers before clearing: {e}")
+
+        removed = await store.delete_jobs(CLEARABLE_STATUSES)
         return {"status": "ok", "removed": removed}
 
     except Exception as e:

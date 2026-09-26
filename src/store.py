@@ -275,6 +275,27 @@ class JobStore:
             logger.error("failed to read open download jobs")
             return []
 
+    async def jobs_with_status(self, statuses: tuple[str, ...]) -> list[dict]:
+        """Every job in one of `statuses`, oldest first."""
+        if not self.available:
+            return []
+
+        def read():
+            placeholders = ",".join("?" for _ in statuses)
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"SELECT * FROM jobs WHERE status IN ({placeholders}) ORDER BY id",
+                    statuses,
+                ).fetchall()
+                return [self._row_to_job(r) for r in rows]
+
+        try:
+            return await asyncio.to_thread(read)
+
+        except Exception:
+            logger.error(f"failed to read jobs in {statuses}")
+            return []
+
     async def update_status(self, job_id: int, status: str, error: str | None = None) -> None:
         if not self.available:
             return
@@ -938,6 +959,30 @@ def summarize_transfers(job: dict, transfers_by_user: dict[str, list[dict]]) -> 
         "failure_reason": reasons[0] if reasons else None,
         "matched": True,
     }
+
+
+def settled_transfer_ids(job: dict, transfers_by_user: dict[str, list[dict]]) -> tuple[list[str], int]:
+    """
+    A job's transfers slskd still lists, split by whether it can let go of them yet.
+
+    Returns (ids that have SETTLED - any "Completed, ..." state - and so can be removed from
+    slskd's list, how many are still listed but not settled). slskd will only remove a transfer
+    once it has completed, and a cancelled one gets there a moment AFTER the cancel returns -
+    see tidy_cancelled_transfers in poller.py for why that moment is the whole problem.
+    """
+    wanted = {f["filename"] for f in job.get("files") or []}
+    settled: list[str] = []
+    unsettled = 0
+
+    for transfer in transfers_by_user.get(job.get("username", ""), []):
+        if transfer.get("filename") not in wanted or not transfer.get("id"):
+            continue
+        if "Completed" in str(transfer.get("state") or ""):
+            settled.append(transfer["id"])
+        else:
+            unsettled += 1
+
+    return settled, unsettled
 
 
 def index_transfers_by_user(downloads: list[dict]) -> dict[str, list[dict]]:
