@@ -53,7 +53,7 @@ A caveat worth setting expectations on: this won't magically always find the exa
 
 ## Installation
 
-_Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** managing Docker, so the compose file below is the path that gets used day to day — see [below](#installation-openmediavault--komodo). There's also an Unraid template [further down](#installation-unraid), inherited from the project this forked from._
+_Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** managing Docker, so the compose file below is the way to run it — see [below](#installation-openmediavault--komodo) for the parts worth getting right the first time. It's an ordinary compose stack, so anything else that runs one will do._
 
 ### Prerequisites:
 1. a running [slskd](https://slskd.org) instance reachable from this container, with an API key
@@ -382,24 +382,6 @@ Four things are worth getting right the first time:
 4. **Mount your library** where `LIBRARY_PATH` points, or the library tab has nothing to read.
 
 Leave `ORGANIZE_MODE` on `dry_run` until the event log shows it finding your files, then switch it to `copy` or `move`.
-
-## Installation (Unraid)
-
-**Inherited from [LidBrainz](https://github.com/dual-shock/lidbrainz), which this forked from, and untested since.** Its author ran Unraid and wrote this template and these notes; deadwax is developed and run against OpenMediaVault, so nobody here has put it in front of an Unraid box in a long while. The variables it sets are kept current with the app — the Unraid mechanics around them are upstream's, and it has never been published to the Community Applications plugin. Images are built and published to ghcr.io automatically on tagged releases either way.
-
-### how to manually add the template
-1. move/copy `my-deadwax.xml` to `/boot/config/plugins/dockerMan/templates-user/`
-2. in the docker tab on Unraid, click "add container"
-3. the deadwax template should show up in the template dropdown, select it
-
-### how to set up the container
-1. pick a webui port thats not in use by any of your other containers
-2. to access slskd through its hostname, select the same docker network as your slskd instance
-3. fill in the required fields, see the .env.example configuration if youre unsure what to put there
-4. point the `/downloads` mapping at the same folder slskd writes finished downloads to
-5. point the `/music` mapping at your library if you want the library tab to do anything
-
-it should now run just like any other Unraid docker container, and you can automatically pull eventual updates through the docker tab.
 
 ## who is this for?
 

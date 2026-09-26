@@ -13,11 +13,11 @@ directly.**
 Repo: `real-lizardwizard/deadwax` · owner is James Barnett (jamesambarnett@gmail.com).
 
 **Where it runs: OpenMediaVault, with Komodo managing Docker.** So compose is the deployment path
-that matters, and anything addressed to "your Unraid box" is wrong. The Unraid template
-(`my-deadwax.xml`) and the Unraid half of the README are INHERITED from upstream LidBrainz,
-whose author did run Unraid and wrote those first-person notes; they came through the fork
-untouched and nothing here has tested them since. **Don't read Unraid into the repo because those
-files are in it** - it produced a run of confidently wrong deployment advice before James said so.
+that matters, and anything addressed to "your Unraid box" is wrong. **The Unraid template
+(`my-deadwax.xml`) and the Unraid half of the README were CUT in v0.9.3, on James's instruction.**
+They were inherited from upstream LidBrainz, whose author ran Unraid; nothing here had tested them
+since the fork, and reading Unraid into the repo because they were in it produced a run of
+confidently wrong deployment advice. Don't bring them back.
 
 ### Branches
 
