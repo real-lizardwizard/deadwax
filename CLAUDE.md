@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             768 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             772 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -430,9 +430,18 @@ preview on Dummy and The Slow Rush first, then built with the MOST COMMON trackl
   release is identical by title and differs only in "Borderline" being 36s longer - the case
   that band exists for. Lengths are the TRACK's (this pressing's), falling back to the
   recording's, because the track is what differs between pressings.
-- **Chips ride in the TITLE cell, not a column**, so they show on a phone, where the grid keeps
-  only its first columns in view, and so the column state (order, widths, visibility) didn't
-  need a new entry.
+- **Chips ride in the EDITION cell, not a column of their own** (the title cell until v0.9.0) -
+  they say what's different about the pressing, which is the edition's job, and edition LEADS
+  the row, so they show on a phone, where the grid keeps only its first columns in view. With
+  the edition column hidden they fall back to the title cell.
+- **Edition is the first column (v0.9.0, asked for: "the title should be pretty much the same
+  for every edition").** A layout is saved WHOLE the first time any column is resized, hidden or
+  moved, so a new default alone never reaches anyone who has touched the grid.
+  `COLUMN_ORDER_VERSION` (2) moves edition ahead of title ONCE, and only in a saved layout still
+  holding the two in the old default's first places: one arranged by hand is left as arranged,
+  and a deliberate "title first" saved afterwards is kept because the version has moved on.
+  `ReleaseColumnState` in persisted.ts carries `orderVersion` so the eventual port can't drop
+  it. **Verified** with all four cases seeded in localStorage.
 - **Still lazy**: a release's change list is built on first expand, and its own full tracklist
   (vinyl sides and all) on a second click - the 711ms rule. The diffs behind the chips are
   computed once per release and kept in a Map, since the body re-renders on every filter change.
@@ -2152,7 +2161,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 768 tests
+.venv/bin/python -m pytest tests/ -q  # 772 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2183,7 +2192,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 768 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 772 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

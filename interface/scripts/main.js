@@ -1585,9 +1585,11 @@ const EDITION_TAG_COLORS = {
 
 const MIN_COLUMN_WIDTH = 50;
 
+//? Edition FIRST (v0.9.0, asked for): the title is the same on nearly every release of an album,
+//? and the edition is what tells this row from the next one.
 const RELEASE_COLUMNS = [
-    { id: 'title', label: 'Title', width: 220 },
-    { id: 'edition', label: 'Edition', width: 160 },
+    { id: 'edition', label: 'Edition', width: 180 },
+    { id: 'title', label: 'Title', width: 200 },
     { id: 'format', label: 'Format', width: 110 },
     { id: 'tracks', label: 'Tracks', width: 80 },
     { id: 'status', label: 'Status', width: 90 },
@@ -1603,8 +1605,14 @@ const RELEASE_COLUMNS = [
 
 const COLUMN_STATE_STORAGE_KEY = 'deadwax-release-columns';
 
+//? Bumped when the DEFAULT order changes in a way a saved layout should pick up. A layout is
+//? saved whole the first time any column is resized, hidden or moved, so without this a new
+//? default never reaches anyone who has touched the grid. 2 = edition before title (v0.9.0).
+const COLUMN_ORDER_VERSION = 2;
+
 function defaultColumnState() {
     return {
+        orderVersion: COLUMN_ORDER_VERSION,
         order: RELEASE_COLUMNS.map(c => c.id),
         visible: Object.fromEntries(RELEASE_COLUMNS.map(c => [c.id, true])),
         widths: Object.fromEntries(RELEASE_COLUMNS.map(c => [c.id, c.width])),
@@ -1625,6 +1633,13 @@ function loadColumnState() {
             if (!order.includes(id)) order.push(id);
         }
 
+        //? edition before title, ONCE, and only where the saved layout still has the two in the
+        //? old default's first places - a layout arranged by hand is left as it was arranged,
+        //? and a deliberate "title first" after this is kept, because the version moves on
+        if ((saved.orderVersion || 1) < 2 && order[0] === 'title' && order[1] === 'edition') {
+            order.splice(0, 2, 'edition', 'title');
+        }
+
         const visible = {};
         const widths = {};
         const savedWidths = (saved.widths && typeof saved.widths === 'object') ? saved.widths : {};
@@ -1636,7 +1651,7 @@ function loadColumnState() {
             widths[id] = (typeof savedWidth === 'number' && savedWidth >= MIN_COLUMN_WIDTH) ? savedWidth : def.width;
         }
 
-        return { order, visible, widths };
+        return { orderVersion: COLUMN_ORDER_VERSION, order, visible, widths };
     }
 
     catch {
@@ -2174,23 +2189,29 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
             expandCell.textContent = totalTracks > 0 ? '▷' : '';
             row.appendChild(expandCell);
 
+            //? the tracklist chips say what's different about this pressing, which is the
+            //? edition cell's job - and it leads the row, so they stay in view on a phone.
+            //? With the edition column hidden they fall back to the title cell.
+            const chipsIn = visibleOrder.includes('edition') ? 'edition' : 'title';
+            const chips = base && totalTracks > 0
+                ? buildTracklistChips(release === baseRelease ? null : diffFor(release))
+                : null;
+
             for (const id of visibleOrder) {
                 const td = document.createElement('td');
                 td.className = `releases-col-${id}`;
 
                 if (id === 'title') {
                     td.innerHTML = `<h4 class="text white releaseGridTitle"><a href="https://musicbrainz.org/release/${releaseId}" target="_blank" rel="noopener noreferrer">${title}</a></h4>`;
-                    //? in the title cell rather than a column of its own, so it shows on a phone,
-                    //? where the grid keeps only its first columns in view
-                    if (base && totalTracks > 0) {
-                        td.appendChild(buildTracklistChips(release === baseRelease ? null : diffFor(release)));
-                    }
+                    if (chips && chipsIn === 'title') td.appendChild(chips);
                 }
 
                 else if (id === 'edition') {
+                    //? no dash when there are chips beneath: "—" over "+1 track" reads as a blank
                     td.innerHTML = editionTags.length
                         ? editionTags.map(tag => `<h4 class="text ${EDITION_TAG_COLORS[tag] || 'default'} edition-tag" title="${disambiguation}">${tag}</h4>`).join('')
-                        : `<h4 class="text default-muted">—</h4>`;
+                        : (chips ? '' : `<h4 class="text default-muted">—</h4>`);
+                    if (chips) td.appendChild(chips);
                 }
 
                 else if (id === 'format') {

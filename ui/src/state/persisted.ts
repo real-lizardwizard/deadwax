@@ -125,6 +125,8 @@ export function useLogOpen(): [boolean, (open: boolean) => void] {
 /* ===== deadwax-release-columns ===== */
 
 export interface ReleaseColumnState {
+  /** 2 since edition moved before title (v0.9.0) - see COLUMN_ORDER_VERSION in main.js */
+  orderVersion?: number
   order: string[]
   visible: Record<string, boolean>
   widths: Record<string, number>
@@ -145,6 +147,7 @@ export function readReleaseColumnState(): ReleaseColumnState | null {
   if (!saved || !Array.isArray(saved.order) || typeof saved.visible !== 'object') return null
 
   return {
+    ...(typeof saved.orderVersion === 'number' ? { orderVersion: saved.orderVersion } : {}),
     order: saved.order,
     visible: saved.visible ?? {},
     widths: saved.widths ?? {},
