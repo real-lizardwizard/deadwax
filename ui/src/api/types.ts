@@ -170,6 +170,14 @@ export interface Candidate {
   has_free_slot: boolean
   total_size: number
   bitrates: number[]
+  /**
+   * What the sharer's client reported, per distinct value across the folder (v0.9.11). Empty
+   * means UNKNOWN - lossy files have no bit depth, and many clients report nothing - never low.
+   */
+  bit_depths: number[]
+  /** Hz, e.g. 44100 / 96000. Empty means unknown. */
+  sample_rates: number[]
+  variable_bitrate: boolean
   files: CandidateFile[]
 }
 

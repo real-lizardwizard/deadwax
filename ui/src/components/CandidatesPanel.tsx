@@ -4,9 +4,10 @@ import * as api from '../api/download'
 import type { Candidate, FindCandidatesRequest, FindCandidatesResponse } from '../api/types'
 import { bridge } from '../bridge'
 import {
-  EDITION_TAG_COLORS, PEER_SPEED_HINT, SIGNAL_LABELS, activeSignalCount, bitrateText,
-  candidateKey, measuredSpeed, noSignalMinimums, passesFilters, peerSpeedLabel, queryOverride,
-  resultFormats, scoreClass, trackSummary, type CandidateFilters,
+  EDITION_TAG_COLORS, NO_QUALITY_FILTERS, PEER_SPEED_HINT, SIGNAL_LABELS, SORT_LABELS,
+  activeQualityCount, activeSignalCount, bitrateText, candidateKey, depthRateText, measuredSpeed,
+  noSignalMinimums, passesFilters, peerSpeedLabel, queryOverride, resultFormats, scoreClass,
+  sortCandidates, trackSummary, type CandidateFilters, type CandidateSort, type QualityFilters,
 } from '../lib/candidates'
 import { requestDownload } from '../lib/downloadRequests'
 import { formatSize } from '../lib/format'
@@ -59,8 +60,10 @@ export function CandidatesPanel() {
       minScore: preferences.candidateMinScore,
       formats: new Set(),
       minSignals: noSignalMinimums(),
+      quality: { ...NO_QUALITY_FILTERS },
     }
   })
+  const [sort, setSort] = useState<CandidateSort>('score')
 
   const run = useCallback(async (release: FindCandidatesRequest, override: string) => {
     const request = requests.begin()
@@ -227,10 +230,21 @@ export function CandidatesPanel() {
               ))}
             </div>
             <SignalsControl filters={filters} setFilters={setFilters} />
+            <QualityControl filters={filters} setFilters={setFilters} />
+            <label class="candidate-sort">
+              <span class="text default-secondary">Sort</span>
+              <select
+                id="candidate-sort"
+                value={sort}
+                onChange={(event) => setSort((event.target as HTMLSelectElement).value as CandidateSort)}
+              >
+                {Object.entries(SORT_LABELS).map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+              </select>
+            </label>
           </div>
         </div>
         <div class="scrollable" id="candidates-scrollable">
-          <CandidatesBody search={search} filters={filters} downloads={downloads} onDownload={download} />
+          <CandidatesBody search={search} filters={filters} sort={sort} downloads={downloads} onDownload={download} />
         </div>
       </div>
     </div>
@@ -309,16 +323,121 @@ function SignalsControl(
   )
 }
 
+/** Choices for the quality selects - 0 is "any". */
+const BITRATE_CHOICES = [0, 128, 192, 256, 320]
+const DEPTH_CHOICES = [0, 16, 24]
+const RATE_CHOICES = [0, 44100, 48000, 88200, 96000, 176400, 192000]
+
+/*
+ * Quality filters (v0.9.11), in a dropdown beside Signals and built the same way, badge
+ * included. Judged against a folder's worst file, and unknown never satisfies a minimum - see
+ * QualityFilters in lib/candidates.ts for the one exception (lossless vs a bitrate floor).
+ */
+function QualityControl(
+  { filters, setFilters }:
+  { filters: CandidateFilters; setFilters: (update: (current: CandidateFilters) => CandidateFilters) => void },
+) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const active = activeQualityCount(filters.quality)
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [open])
+
+  const set = (field: keyof QualityFilters, value: number) => setFilters((current) => ({
+    ...current, quality: { ...current.quality, [field]: Number.isFinite(value) && value > 0 ? value : 0 },
+  }))
+
+  const select = (field: keyof QualityFilters, choices: number[], label: (n: number) => string) => (
+    <select
+      value={filters.quality[field]}
+      onChange={(event) => set(field, Number((event.target as HTMLSelectElement).value))}
+    >
+      {choices.map((n) => <option key={n} value={n}>{n ? label(n) : 'any'}</option>)}
+    </select>
+  )
+
+  const size = (field: 'minSizeMb' | 'maxSizeMb', placeholder: string) => (
+    <input
+      type="number"
+      min="0"
+      step="50"
+      inputMode="numeric"
+      placeholder={placeholder}
+      value={filters.quality[field] || ''}
+      onInput={(event) => set(field, Number((event.target as HTMLInputElement).value))}
+    />
+  )
+
+  return (
+    <div
+      ref={root}
+      class={`releases-columns-control${open ? ' open' : ''}${active ? ' has-active' : ''}`}
+      id="candidate-quality-control"
+    >
+      <button
+        type="button"
+        id="candidate-quality-button"
+        class="columns-toggle-button"
+        onClick={(event) => { event.stopPropagation(); setOpen((o) => !o) }}
+      >
+        Quality ▾
+        {active > 0 && <span class="signals-badge">{active}</span>}
+      </button>
+      <div class="columns-dropdown" id="candidate-quality-options" onClick={(event) => event.stopPropagation()}>
+        <label class="candidate-quality-row">
+          <span class="text default-secondary">Bitrate at least</span>
+          {select('minBitrate', BITRATE_CHOICES, (n) => `${n} kbps`)}
+        </label>
+        <label class="candidate-quality-row">
+          <span class="text default-secondary">Bit depth at least</span>
+          {select('minBitDepth', DEPTH_CHOICES, (n) => `${n}-bit`)}
+        </label>
+        <label class="candidate-quality-row">
+          <span class="text default-secondary">Sample rate at least</span>
+          {select('minSampleRate', RATE_CHOICES, (n) => `${n % 1000 ? (n / 1000).toFixed(1) : n / 1000} kHz`)}
+        </label>
+        <div class="candidate-quality-row">
+          <span class="text default-secondary">Album size, MB</span>
+          <span class="candidate-quality-range">
+            {size('minSizeMb', 'min')}
+            <span class="text default-muted">to</span>
+            {size('maxSizeMb', 'max')}
+          </span>
+        </div>
+        <p class="text default-muted candidate-quality-note">
+          Judged by the folder's worst file. Many clients don't report bit depth or sample rate,
+          and a folder that didn't say is left out by those two.
+        </p>
+        <button
+          type="button"
+          class="signals-reset-button"
+          onClick={() => setFilters((current) => ({ ...current, quality: { ...NO_QUALITY_FILTERS } }))}
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /*
  * Whatever state the search is in - so a filter ticked mid-search redraws the "Searching" panel
  * it is already showing, and the answer, when it lands, is drawn through the filters as they
  * are THEN rather than as they were when the search began.
  */
 function CandidatesBody(
-  { search, filters, downloads, onDownload }:
+  { search, filters, sort, downloads, onDownload }:
   {
     search: Search | null
     filters: CandidateFilters
+    sort: CandidateSort
     downloads: ReadonlyMap<string, DownloadState>
     onDownload: (candidate: Candidate) => void
   },
@@ -348,7 +467,7 @@ function CandidatesBody(
     )
   }
 
-  const visible = candidates.filter((candidate) => passesFilters(candidate, filters))
+  const visible = sortCandidates(candidates.filter((candidate) => passesFilters(candidate, filters)), sort)
 
   if (!visible.length) {
     return (
@@ -392,7 +511,8 @@ function CandidateRow(
             <span class="text default-secondary">{trackSummary(candidate)}</span>
             <span class="text default-muted">·</span>
             <span class="text default-secondary">
-              {(candidate.formats.join(', ') || 'unknown') + bitrateText(candidate.bitrates)}
+              {(candidate.formats.join(', ') || 'unknown') + depthRateText(candidate)
+                + bitrateText(candidate.bitrates, candidate.variable_bitrate)}
             </span>
             {size && (
               <>

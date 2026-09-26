@@ -24,6 +24,70 @@ export interface CandidateFilters {
   formats: ReadonlySet<string>
   /** Per-signal minimums, 0-100. 0 is off. */
   minSignals: Readonly<Record<string, number>>
+  /** What the files must be at least, and how big the folder may be. See QualityFilters. */
+  quality: QualityFilters
+}
+
+/**
+ * Quality filters (v0.9.11, asked for: "filter and search by bitrate and depth, maybe by file
+ * size"). Every field 0 = off. Each is judged against the folder's WORST file - a 320 album
+ * with one 128 track is not a 320 album.
+ *
+ * UNKNOWN cannot satisfy a minimum, as with the signal sliders: many clients report no bit depth
+ * or sample rate, and a folder that might be 16/44 must not pass "24-bit". One exception, and
+ * only for bitrate: a lossless folder with no reported bitrate passes a bitrate minimum, because
+ * any lossless file is above any lossy bitrate you could ask for, and hiding every unreported
+ * FLAC behind "at least 320" would be absurd.
+ */
+export interface QualityFilters {
+  /** kbps */
+  minBitrate: number
+  /** bits */
+  minBitDepth: number
+  /** Hz */
+  minSampleRate: number
+  /** MB, the folder's total */
+  minSizeMb: number
+  maxSizeMb: number
+}
+
+export const NO_QUALITY_FILTERS: QualityFilters = {
+  minBitrate: 0, minBitDepth: 0, minSampleRate: 0, minSizeMb: 0, maxSizeMb: 0,
+}
+
+export const LOSSLESS_FORMATS: ReadonlySet<string> = new Set(['flac', 'alac', 'ape', 'wav', 'aiff', 'aif', 'wv'])
+
+function allLossless(candidate: Candidate): boolean {
+  return candidate.formats.length > 0 && candidate.formats.every((f) => LOSSLESS_FORMATS.has(f))
+}
+
+const MB = 1024 * 1024
+
+export function passesQuality(candidate: Candidate, quality: QualityFilters): boolean {
+  if (quality.minBitrate) {
+    const bitrates = candidate.bitrates ?? []
+    if (bitrates.length) {
+      if (Math.min(...bitrates) < quality.minBitrate) return false
+    } else if (!allLossless(candidate)) {
+      return false
+    }
+  }
+  if (quality.minBitDepth) {
+    const depths = candidate.bit_depths ?? []
+    if (!depths.length || Math.min(...depths) < quality.minBitDepth) return false
+  }
+  if (quality.minSampleRate) {
+    const rates = candidate.sample_rates ?? []
+    if (!rates.length || Math.min(...rates) < quality.minSampleRate) return false
+  }
+  if (quality.minSizeMb && candidate.total_size < quality.minSizeMb * MB) return false
+  if (quality.maxSizeMb && candidate.total_size > quality.maxSizeMb * MB) return false
+  return true
+}
+
+/** How many quality filters are on - the badge on the Quality button. */
+export function activeQualityCount(quality: QualityFilters): number {
+  return Object.values(quality).filter(Boolean).length
 }
 
 export function noSignalMinimums(): Record<string, number> {
@@ -48,7 +112,68 @@ export function passesFilters(candidate: Candidate, filters: CandidateFilters): 
     if (Math.round(value * 100) < minimum) return false
   }
 
-  return true
+  return passesQuality(candidate, filters.quality)
+}
+
+export type CandidateSort = 'score' | 'quality' | 'size_desc' | 'size_asc'
+
+export const SORT_LABELS: Readonly<Record<CandidateSort, string>> = {
+  score: 'Best match',
+  quality: 'Highest quality',
+  size_desc: 'Largest first',
+  size_asc: 'Smallest first',
+}
+
+/**
+ * A folder's quality as a sortable tuple: lossless first, then the WORST file's bit depth,
+ * sample rate and bitrate. Unknowns count as zero, so a folder that reported nothing sorts
+ * below one that reported something modest - it earns no place it can't show.
+ */
+export function qualityRank(candidate: Candidate): number[] {
+  const worst = (values: readonly number[] | undefined) => (values?.length ? Math.min(...values) : 0)
+  return [
+    allLossless(candidate) ? 1 : 0,
+    worst(candidate.bit_depths),
+    worst(candidate.sample_rates),
+    worst(candidate.bitrates),
+  ]
+}
+
+/**
+ * The list in the chosen order. Always a copy; ties keep the server's order, which is the match
+ * score - so "Highest quality" among equals still puts the better match first.
+ */
+export function sortCandidates(candidates: readonly Candidate[], sort: CandidateSort): Candidate[] {
+  const list = [...candidates]
+  if (sort === 'score') return list
+  if (sort === 'size_desc') return list.sort((a, b) => b.total_size - a.total_size)
+  if (sort === 'size_asc') return list.sort((a, b) => a.total_size - b.total_size)
+  return list.sort((a, b) => {
+    const x = qualityRank(a)
+    const y = qualityRank(b)
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return y[i]! - x[i]!
+    return 0
+  })
+}
+
+/**
+ * " 24-bit 96kHz", " 16-24-bit 44.1-96kHz", or '' - what the client reported, appended after the
+ * format like the bitrate. Nothing is guessed: a lossless file that didn't say says nothing.
+ */
+export function depthRateText(candidate: Candidate): string {
+  const range = (values: readonly number[] | undefined, format: (n: number) => string) => {
+    if (!values?.length) return ''
+    const low = Math.min(...values)
+    const high = Math.max(...values)
+    return low === high ? format(low) : `${format(low).replace(/[a-zA-Z-]+$/, '')}-${format(high)}`
+  }
+  const depth = range(candidate.bit_depths, (n) => `${n}-bit`)
+  const rate = range(candidate.sample_rates, (n) => `${trimRate(n / 1000)}kHz`)
+  return [depth, rate].filter(Boolean).map((part) => ` ${part}`).join('')
+}
+
+function trimRate(khz: number): string {
+  return Number.isInteger(khz) ? String(khz) : khz.toFixed(1)
 }
 
 /** How many per-signal minimums are set - the badge on the Signals button. */
@@ -82,12 +207,12 @@ export function trackSummary(candidate: Candidate): string {
     : `${candidate.audio_file_count} files`
 }
 
-/** " 320kbps", " 256-320kbps", or '' - appended to the formats. */
-export function bitrateText(bitrates: readonly number[] | undefined): string {
+/** " 320kbps", " 256-320kbps", " VBR 245kbps", or '' - appended to the formats. */
+export function bitrateText(bitrates: readonly number[] | undefined, variable = false): string {
   if (!bitrates?.length) return ''
   const low = Math.min(...bitrates)
   const high = Math.max(...bitrates)
-  return ` ${low === high ? low : `${low}-${high}`}kbps`
+  return ` ${variable ? 'VBR ' : ''}${low === high ? low : `${low}-${high}`}kbps`
 }
 
 /*

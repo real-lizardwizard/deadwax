@@ -371,6 +371,14 @@ def score_candidate(candidate: dict, expected: dict, format_preference: str = "p
         "has_free_slot": bool(response.get("hasFreeUploadSlot")),
         "total_size": sum(f.get("size", 0) or 0 for f in files),
         "bitrates": sorted({f["bitRate"] for f in files if f.get("bitRate")}),
+        #? What the sharer's client reported about each file, where it reported anything - slskd
+        #? passes Soulseek's file attributes through as bitDepth/sampleRate/isVariableBitRate.
+        #? Lossy files have no bit depth, and plenty of clients report nothing at all, so an
+        #? empty list means "unknown", never "low". The candidates panel filters and sorts on
+        #? these (v0.9.11, asked for: "filter and search by bitrate and depth").
+        "bit_depths": sorted({f["bitDepth"] for f in files if f.get("bitDepth")}),
+        "sample_rates": sorted({f["sampleRate"] for f in files if f.get("sampleRate")}),
+        "variable_bitrate": any(bool(f.get("isVariableBitRate")) for f in files),
     }
 
 

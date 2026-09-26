@@ -2889,6 +2889,65 @@ span.red { color: var(--red-text); }
     border-color: var(--white-secondary-text);
 }
 
+/* the candidates panel's quality filters (v0.9.11) - the Signals dropdown's shape, with selects */
+#candidate-quality-options {
+    min-width: 280px;
+    gap: var(--space-2);
+}
+
+#candidate-quality-control.has-active .columns-toggle-button {
+    color: var(--main-hover-text);
+    border-color: var(--main-secondary-text);
+}
+
+.candidate-quality-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--font-family-condensed);
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.candidate-quality-row select,
+.candidate-sort select,
+.candidate-quality-range input {
+    height: var(--control-sm);
+    padding: 0 var(--space-1);
+    background: var(--gloss-button);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    color: var(--white-text);
+    font-size: var(--text-xs);
+}
+
+.candidate-quality-range {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.candidate-quality-range input {
+    width: 5.5em;
+    background: var(--background-color-input);
+}
+
+.candidate-quality-note {
+    margin: 0;
+    max-width: 280px;
+    white-space: normal;
+    font-size: var(--text-2xs);
+}
+
+.candidate-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-family: var(--font-family-condensed);
+    font-size: 0.85em;
+}
+
 
 #downloads-toolbar {
     display: flex;
@@ -7104,6 +7163,23 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
         min-width: 32px;
         min-height: 32px;
     }
+
+    /*
+     * The candidates panel's Signals and Quality dropdowns hang off the whole filter row on a
+     * phone rather than off their buttons. Anchored right under a button near the LEFT of a
+     * 375px row, a 260-280px dropdown ran off the screen's left edge - measured, -107px - and
+     * that had been so for Signals since it was built; Quality (v0.9.11) found it.
+     */
+    #candidate-filters { position: relative; }
+    #candidate-signals-control,
+    #candidate-quality-control { position: static; }
+    #candidate-signal-sliders,
+    #candidate-quality-options {
+        left: 0;
+        right: 0;
+        min-width: 0;
+    }
+    .candidate-quality-note { max-width: none; }
 }
 
 @media (max-width: 420px) {

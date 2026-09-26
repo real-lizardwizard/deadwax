@@ -39,8 +39,9 @@ const candidate = (fields = {}) => ({
 
 const filters = (fields = {}) => ({
   freeSlotOnly: false, completeOnly: false, minScore: 0, formats: new Set(),
-  minSignals: C.noSignalMinimums(), ...fields,
+  minSignals: C.noSignalMinimums(), quality: { ...C.NO_QUALITY_FILTERS }, ...fields,
 });
+const quality = (fields) => filters({ quality: { ...C.NO_QUALITY_FILTERS, ...fields } });
 
 console.log('filters');
 check('nothing set lets everything through', C.passesFilters(candidate(), filters()), true);
@@ -52,6 +53,37 @@ check('a format chip keeps folders offering that format', C.passesFilters(candid
 check('a signal minimum is a minimum', C.passesFilters(candidate(), filters({ minSignals: { ...C.noSignalMinimums(), peer: 25 } })), false);
 check('an UNJUDGED signal cannot satisfy a minimum', C.passesFilters(candidate(), filters({ minSignals: { ...C.noSignalMinimums(), duration_match: 5 } })), false);
 check('the badge counts the minimums set', C.activeSignalCount(filters({ minSignals: { ...C.noSignalMinimums(), peer: 10, edition: 5 } })), 2);
+
+console.log('\nquality (v0.9.11)');
+const mp3 = (bitrates, extra = {}) => candidate({ formats: ['mp3'], bitrates, bit_depths: [], sample_rates: [], ...extra });
+const flac = (extra = {}) => candidate({ formats: ['flac'], bitrates: [], bit_depths: [], sample_rates: [], ...extra });
+check('a bitrate floor is judged by the WORST file', [mp3([320]), mp3([128, 320])].map((c) => C.passesFilters(c, quality({ minBitrate: 320 }))), [true, false]);
+check('a lossy folder that reported no bitrate fails a floor', C.passesFilters(mp3([]), quality({ minBitrate: 192 })), false);
+check('...but a lossless one passes it - lossless is above any lossy bitrate', C.passesFilters(flac(), quality({ minBitrate: 320 })), true);
+check('a bit-depth floor', [flac({ bit_depths: [24] }), flac({ bit_depths: [16, 24] })].map((c) => C.passesFilters(c, quality({ minBitDepth: 24 }))), [true, false]);
+check('an UNREPORTED depth never passes "24-bit"', C.passesFilters(flac(), quality({ minBitDepth: 24 })), false);
+check('a sample-rate floor', [flac({ sample_rates: [96000] }), flac({ sample_rates: [44100] })].map((c) => C.passesFilters(c, quality({ minSampleRate: 88200 }))), [true, false]);
+const mb = 1024 * 1024;
+check('album size range', [100, 300, 900].map((m) => C.passesFilters(candidate({ total_size: m * mb }), quality({ minSizeMb: 200, maxSizeMb: 800 }))), [false, true, false]);
+check('the badge counts what is on', C.activeQualityCount({ ...C.NO_QUALITY_FILTERS, minBitDepth: 24, maxSizeMb: 800 }), 2);
+
+console.log('\nsorting');
+const pool = [
+  mp3([320], { username: 'lossy320', total_size: 90 * mb }),
+  flac({ username: 'cd', bit_depths: [16], sample_rates: [44100], total_size: 300 * mb }),
+  flac({ username: 'hires', bit_depths: [24], sample_rates: [96000], total_size: 900 * mb }),
+  flac({ username: 'silent', total_size: 280 * mb }),
+];
+check('best match keeps the server order', C.sortCandidates(pool, 'score').map((c) => c.username), ['lossy320', 'cd', 'hires', 'silent']);
+check('highest quality: lossless first, then depth and rate; unreported sorts below reported', C.sortCandidates(pool, 'quality').map((c) => c.username), ['hires', 'cd', 'silent', 'lossy320']);
+check('largest and smallest', [C.sortCandidates(pool, 'size_desc')[0].username, C.sortCandidates(pool, 'size_asc')[0].username], ['hires', 'lossy320']);
+check('sorting copies - the result is never reordered in place', pool[0].username, 'lossy320');
+
+console.log('\nwhat a row says about quality');
+check('depth and rate as reported', C.depthRateText(flac({ bit_depths: [24], sample_rates: [96000] })), ' 24-bit 96kHz');
+check('mixed folders as ranges', C.depthRateText(flac({ bit_depths: [16, 24], sample_rates: [44100, 96000] })), ' 16-24-bit 44.1-96kHz');
+check('nothing reported, nothing said', C.depthRateText(flac()), '');
+check('VBR is said', C.bitrateText([245], true), ' VBR 245kbps');
 
 console.log('\nre-search');
 check('an unedited box is not an override - it would drop every other name', C.queryOverride('Ye Donda', 'Ye Donda'), '');

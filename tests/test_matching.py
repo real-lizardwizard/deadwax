@@ -315,6 +315,33 @@ def test_bitrates_collected_from_lossy_files():
     assert ranked[0]["bitrates"] == [320]
 
 
+def test_bit_depth_and_sample_rate_are_what_the_client_reported():
+    """Filtered and sorted on in the candidates panel (v0.9.11); empty means unknown, not low."""
+    hires = [dict(make_file(r"share\Album\01 - Wildlife Analysis.flac", length=87),
+                  bitDepth=24, sampleRate=96000),
+             dict(make_file(r"share\Album\02 - An Eagle in Your Mind.flac", length=383),
+                  bitDepth=16, sampleRate=44100)]
+    silent = [make_file(r"other\Album\01 - Wildlife Analysis.mp3", length=87, bitrate=256)]
+    vbr = [dict(make_file(r"third\Album\01 - Wildlife Analysis.mp3", length=87, bitrate=245),
+                isVariableBitRate=True)]
+
+    ranked = {c["username"]: c for c in rank_candidates(
+        [make_response("alice", hires), make_response("bob", silent), make_response("cat", vbr)],
+        EXPECTED_BASE, format_preference="any")}
+
+    assert (ranked["alice"]["bit_depths"], ranked["alice"]["sample_rates"]) == ([16, 24], [44100, 96000])
+    assert (ranked["bob"]["bit_depths"], ranked["bob"]["sample_rates"]) == ([], [])
+    assert [ranked[u]["variable_bitrate"] for u in ("alice", "bob", "cat")] == [False, False, True]
+
+
+def test_the_quality_fields_reach_the_panel():
+    from src.routes.download import _serialize_candidate
+    files = [dict(make_file(r"share\Album\01 - Wildlife Analysis.flac", length=87), bitDepth=24, sampleRate=48000)]
+    candidate = rank_candidates([make_response("alice", files)], EXPECTED_BASE, format_preference="any")[0]
+    sent = _serialize_candidate(candidate)
+    assert (sent["bit_depths"], sent["sample_rates"], sent["variable_bitrate"]) == ([24], [48000], False)
+
+
 def test_empty_responses_produce_no_candidates():
     assert rank_candidates([], EXPECTED_BASE) == []
 

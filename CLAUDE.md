@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             812 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             814 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -641,6 +641,36 @@ reader (`getSettings`) that only it used.
   Re-search (override sent, then not), Download (the pending row at 60ms, "Queued ✓", enqueued
   as All Mine), Escape, and both 0.9.2 races - a filter ticked mid-search kept "Searching" up,
   and Glory Box-then-All Mine showed All Mine with slskd told to stop the Glory Box search.
+
+### Filtering candidates by quality (v0.9.11)
+
+James: "infrastructure to filter and search by bitrate and depth, maybe by file size". slskd
+passes Soulseek's file attributes through - `bitRate`, `bitDepth`, `sampleRate`,
+`isVariableBitRate` - when the sharer's client reports them; the candidate carried only the
+bitrates. It now carries `bit_depths`, `sample_rates` (distinct values across the folder) and
+`variable_bitrate`, and the panel filters and sorts on them (`lib/candidates.ts`, pinned in
+`candidates.sim.cjs`).
+
+- **Judged by the folder's WORST file.** A 320 album with one 128 track is not a 320 album.
+- **Unknown never satisfies a minimum**, the rule the signal sliders already had: an empty list
+  means the client didn't say, never "low", and a folder that might be 16/44 must not pass
+  "24-bit". **One exception, bitrate only**: an all-lossless folder with no reported bitrate
+  passes a bitrate floor, because any lossless file beats any lossy bitrate - hiding every
+  unreported FLAC behind "at least 320" would be absurd.
+- **Size is the folder's total**, a min and a max in MB.
+- **"Search by" became a SORT** - best match (the server's order), highest quality (lossless,
+  then the worst file's depth, rate and bitrate; unreported sorts below reported), largest,
+  smallest. Soulseek searches can't be narrowed by quality - slskd's search options are peer
+  and count limits, nothing about the files - so filtering and ordering the answer is the whole
+  of it. Ties keep the match order.
+- **The row says what it knows**: `flac 24-bit 96kHz 3000kbps`, ranges for mixed folders,
+  `VBR` where any file said so, and nothing invented for a file that reported nothing.
+- **Phones: Signals and Quality hang off the whole filter row.** Right-anchored under a button
+  near the left of a 375px row, the dropdown ran off the screen (-107px measured). That was true
+  of Signals since it was built; nobody had opened it on a phone.
+- **Verified in the real page** against a fake slskd offering a 24/96 FLAC, a 16/44.1 FLAC and a
+  320 MP3: 24-bit kept only the first, a 320 floor kept all three (the FLACs by rule), a 500 MB
+  ceiling dropped the 858 MB hi-res folder, and the quality sort put hi-res, CD, MP3 in that order.
 
 ### Browsing a discography, and ordering results
 
@@ -2376,7 +2406,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 812 tests
+.venv/bin/python -m pytest tests/ -q  # 814 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2420,7 +2450,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 812 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 814 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -376,6 +376,9 @@ def _serialize_candidate(candidate: dict) -> dict:
         "has_free_slot": candidate["has_free_slot"],
         "total_size": candidate["total_size"],
         "bitrates": candidate["bitrates"],
+        "bit_depths": candidate.get("bit_depths", []),
+        "sample_rates": candidate.get("sample_rates", []),
+        "variable_bitrate": candidate.get("variable_bitrate", False),
         "files": [
             {"filename": f["filename"], "size": f.get("size", 0)}
             for f in candidate["files"]
