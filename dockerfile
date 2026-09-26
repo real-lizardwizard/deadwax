@@ -42,5 +42,12 @@ ENV PYTHONUNBUFFERED=1 \
     PUID=1000 \
     PGID=1000
 
+# So Komodo (or anything else watching) can tell "running" from "working" - see /deadwax/health
+# in src/api/app.py for what it does and deliberately doesn't count. Python rather than curl,
+# which the slim image doesn't have; the port is fixed at 8080 in src/main.py. The start period
+# covers a first start's database setup.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/deadwax/health', timeout=4).status == 200 else 1)"]
+
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["python", "-m", "src.main"]

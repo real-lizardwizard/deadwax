@@ -383,6 +383,8 @@ Four things are worth getting right the first time:
 
 Leave `ORGANIZE_MODE` on `dry_run` until the event log shows it finding your files, then switch it to `copy` or `move`.
 
+The image has a healthcheck, so Komodo shows whether deadwax is actually working rather than just running. It only judges deadwax itself: slskd being logged out or MusicBrainz being down shows up in the app's connection pills, not as an unhealthy container, because restarting deadwax wouldn't fix either.
+
 ## who is this for?
 
 Most of the music i listen to is on MusicBrainz, so this app uses MusicBrainz to find things and slskd to fetch them.

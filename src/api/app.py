@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings
 from src.logger import logger, cleanup_logging
@@ -14,6 +14,7 @@ from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
 from src.config import Config
+from src import __version__
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,6 +38,8 @@ async def lifespan(app: FastAPI):
     poller_task = asyncio.create_task(
         run_download_poller(app.state.slskd_client, app.state.store)
     )
+    #? kept where /health can see it - see there
+    app.state.poller_task = poller_task
 
     yield
     logger.info("Shutting down API server...")
@@ -109,6 +112,27 @@ def start() -> FastAPI:
     app.include_router(download.router, prefix="/deadwax/download", tags=["download"])
     app.include_router(library.router, prefix="/deadwax/library", tags=["library"])
     app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"])
+
+    @app.get("/deadwax/health")
+    async def health():
+        """
+        Whether this container is doing its job, for the image's HEALTHCHECK - so Komodo can tell
+        "running" from "working".
+
+        Deliberately about deadwax ALONE. slskd being logged out, or MusicBrainz being down (which
+        it often is), is a fact about another service: marking deadwax unhealthy for it would
+        have an orchestrator restart a container that restarting cannot fix. The connection
+        pills are where those are reported.
+
+        What does make it unhealthy is the download poller having stopped: it catches every
+        error per pass, so it only ends if something has gone badly wrong, and without it no
+        download is ever tracked or filed while the page goes on looking fine.
+        """
+        poller = getattr(app.state, "poller_task", None)
+        running = poller is not None and not poller.done()
+        body = {"status": "ok" if running else "unhealthy", "version": __version__,
+                "poller": "running" if running else "stopped"}
+        return JSONResponse(body, status_code=200 if running else 503)
 
     logger.info("mounting static interface files")
     interface_path = Path(__file__).parent.parent.parent / "interface"
