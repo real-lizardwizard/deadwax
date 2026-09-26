@@ -324,10 +324,41 @@ class SlskdClient:
 
         Responses are returned as slskd gave them, one list for all the queries. The same share
         found by two of them is merged where files are grouped (group_files_by_directory).
+
+        CANCELLING this - which the route does when the page that asked has gone - stops and
+        deletes every search it started, rather than leaving slskd to run them out to their
+        timeout for nobody. See _abandon.
         """
         client = await self.get_client()
         running: list[tuple[str, str]] = []
 
+        try:
+            return await self._run_searches(client, queries, running, search_timeout_ms,
+                                            poll_interval, max_wait)
+        except asyncio.CancelledError:
+            await self._abandon(client, running)
+            raise
+
+
+    async def _abandon(self, client, running: list[tuple[str, str]]) -> None:
+        """
+        Stop and delete searches nobody is waiting for any more.
+
+        Before this, a search the page had given up on - another album's Find pressed, the
+        panel closed - ran in slskd to its full timeout and was then scored and returned into a
+        closed connection. Stopping it frees slskd for the search that replaced it. Each step is
+        best effort: a search that already finished can't be stopped, and that's fine.
+        """
+        for query, search_id in running:
+            for step in (client.searches.stop, client.searches.delete):
+                try:
+                    await asyncio.to_thread(step, search_id)
+                except Exception:
+                    pass
+            logger.info(f"stopped the abandoned search for: {query}", extra={"frontend": True, "src": "slskd"})
+
+
+    async def _run_searches(self, client, queries, running, search_timeout_ms, poll_interval, max_wait):
         for query in queries:
             logger.info(f"searching slskd for: {query}", extra={"frontend": True, "src": "slskd"})
 

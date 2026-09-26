@@ -77,8 +77,7 @@ def start() -> FastAPI:
     #? index.html can name it (see ui/vite.config.ts), which is exactly what makes it mutable.
     REVALIDATE_PREFIXES = ("/scripts/", "/styles/", "/assets/", "/dist/")
 
-    @app.middleware("http")
-    async def revalidate_interface_assets(request, call_next):
+    class RevalidateInterfaceAssets:
         """
         Make the browser revalidate the interface files instead of trusting its cache.
 
@@ -91,19 +90,40 @@ def start() -> FastAPI:
         The hashed-asset carve-out matters as the Preact migration lands: matching only
         /scripts/ and /styles/ would have left the new bundle uncovered and reintroduced that
         exact bug for the half of the interface that had been ported.
+
+        PLAIN ASGI, not @app.middleware("http") (v0.9.8). That decorator is Starlette's
+        BaseHTTPMiddleware, whose wrapped `receive` cannot be checked without blocking - so
+        `request.is_disconnected()` answered False for every request in the app, for ever, and
+        a Soulseek search the page had abandoned ran on to its timeout with nobody to tell it.
+        This only touches the response's headers and passes `receive` through untouched.
         """
-        response = await call_next(request)
 
-        path = request.url.path
+        def __init__(self, inner):
+            self.inner = inner
 
-        #? checked first - /dist/assets/x-HASH.js matches both tuples
-        if path.startswith(IMMUTABLE_PREFIXES):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                return await self.inner(scope, receive, send)
 
-        elif path == "/" or path.startswith(REVALIDATE_PREFIXES):
-            response.headers["Cache-Control"] = "no-cache"
+            path = scope.get("path", "")
+            #? checked first - /dist/assets/x-HASH.js matches both tuples
+            if path.startswith(IMMUTABLE_PREFIXES):
+                policy = b"public, max-age=31536000, immutable"
+            elif path == "/" or path.startswith(REVALIDATE_PREFIXES):
+                policy = b"no-cache"
+            else:
+                return await self.inner(scope, receive, send)
 
-        return response
+            async def send_with_policy(message):
+                if message["type"] == "http.response.start":
+                    headers = [(k, v) for k, v in message.get("headers", []) if k.lower() != b"cache-control"]
+                    headers.append((b"cache-control", policy))
+                    message = {**message, "headers": headers}
+                await send(message)
+
+            await self.inner(scope, receive, send_with_policy)
+
+    app.add_middleware(RevalidateInterfaceAssets)
 
     logger.info("adding routers")
     app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"])

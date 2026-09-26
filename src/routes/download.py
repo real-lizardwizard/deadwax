@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
@@ -176,6 +176,42 @@ async def _former_names(request: Request, body: "FindCandidatesRequest") -> list
     return former_names(artist)
 
 
+class ClientGone(Exception):
+    """The request's client disconnected before the work finished."""
+
+
+#? how often a long request looks to see whether anybody is still waiting for it
+DISCONNECT_CHECK_SECONDS = 0.5
+
+
+async def unless_abandoned(request: Request, work, check_every: float | None = None):
+    """
+    Await `work`, cancelling it if the client goes away first (raising ClientGone).
+
+    The browser aborts a Soulseek search the page no longer wants (latest.mjs, v0.9.2), but
+    uvicorn does not cancel a handler when its client disconnects - so the search ran on in
+    slskd to its full timeout, was scored, and was returned into a closed connection. This
+    notices the disconnect and cancels the work, which stops the searches (search_all).
+    """
+    check_every = DISCONNECT_CHECK_SECONDS if check_every is None else check_every
+    task = asyncio.ensure_future(work)
+    try:
+        while True:
+            done, _ = await asyncio.wait({task}, timeout=check_every)
+            if done:
+                return task.result()
+            if await request.is_disconnected():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                raise ClientGone()
+    finally:
+        if not task.done():
+            task.cancel()
+
+
 @router.post("/find_candidates")
 async def find_candidates(request: Request, body: FindCandidatesRequest):
     """
@@ -203,21 +239,30 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
         if not queries:
             raise HTTPException(status_code=400, detail="Could not build a search query")
 
-        responses = await slskd_client.search_all(queries)
+        async def search():
+            responses = await slskd_client.search_all(queries)
 
-        if lookup is not None:
-            #? Usually long finished - it had the whole first round to answer. A former name
-            #? the release itself did not carry is a second round, and the only case that
-            #? costs a second search's worth of waiting.
-            extra = [
-                query for query in _distinct([
-                    build_search_query(name, body.album) for name in await lookup
-                ])
-                if query.casefold() not in {q.casefold() for q in queries}
-            ]
-            if extra:
-                responses += await slskd_client.search_all(extra)
-                queries += extra
+            if lookup is not None:
+                #? Usually long finished - it had the whole first round to answer. A former
+                #? name the release itself did not carry is a second round, and the only case
+                #? that costs a second search's worth of waiting.
+                extra = [
+                    query for query in _distinct([
+                        build_search_query(name, body.album) for name in await lookup
+                    ])
+                    if query.casefold() not in {q.casefold() for q in queries}
+                ]
+                if extra:
+                    responses += await slskd_client.search_all(extra)
+                    queries.extend(extra)
+
+            return responses
+
+        try:
+            responses = await unless_abandoned(request, search())
+        except ClientGone:
+            #? nobody to answer - the page moved on, and the searches have been stopped
+            return Response(status_code=204)
 
         expected = {
             "artist": body.artist,

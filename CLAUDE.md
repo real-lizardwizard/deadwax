@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             800 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             807 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -597,10 +597,13 @@ without asking whether it still answered the question on screen.
   library's Get cover / Get lyrics / Get CD art buttons, whose results are keyed to the album
   they ran for and now only replace that album's own run. `refreshOwned()` re-asks once when
   asked during a request, since that request may predate the change it is being asked about.
-- **NOT done: cancelling server-side.** An aborted `find_candidates` still runs to the end of its
-  slskd search on the server - uvicorn doesn't cancel a handler when the client goes. slskd
-  runs searches side by side (only STARTING one is serialised), so it costs slskd a search, not
-  the user a wait.
+- **Cancelled server-side too, since v0.9.8.** uvicorn doesn't cancel a handler when its client
+  goes, so an aborted `find_candidates` used to run its slskd search to the full timeout and
+  answer into a closed connection. `unless_abandoned()` (routes/download.py) now checks
+  `request.is_disconnected()` every half second and cancels the work, and `search_all` answers a
+  cancel by stopping and deleting every search it started (`_abandon`). **Verified live**
+  against the slow fake slskd: hanging up 1.5s into an 8s search, slskd was told to stop and
+  delete it at once. It needed the middleware fix below first - see the gotcha.
 
 ### Browsing a discography, and ordering results
 
@@ -1834,6 +1837,15 @@ Each of these cost real time. Don't rediscover them.
   some slskd versions, so it is read defensively and omitted when absent.
   The state string (`"Connected, LoggedIn"`, `"Disconnected"`) is a .NET flags enum and is only
   ever QUOTED BACK, never parsed - the booleans beside it are the contract.
+- **`@app.middleware("http")` made `request.is_disconnected()` a permanent False, app-wide.**
+  That decorator is Starlette's `BaseHTTPMiddleware`, whose wrapped `receive` has to be awaited
+  to learn anything, and `is_disconnected()` only peeks - inside an already-cancelled scope, so
+  the peek is always cancelled before the disconnect can arrive. Found when the v0.9.8 abandoned-
+  search fix did nothing live while its tests passed (they call the route directly, with no
+  middleware). The cache-header middleware is plain ASGI now (`RevalidateInterfaceAssets` in
+  app.py), and `test_no_middleware_hides_a_disconnect_from_the_routes` refuses any
+  BaseHTTPMiddleware coming back. **Don't add another `@app.middleware("http")`** - write it as
+  ASGI, touching `send` only.
 - **A 409 costs one extra request, on the failure path only.** `_explain_refusal()` asks slskd
   how its connection is doing, because "not connected, and it is waiting for its VPN" is an
   answer and "not connected" is a shrug. If that request fails too it is dropped silently and
@@ -2307,7 +2319,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 800 tests
+.venv/bin/python -m pytest tests/ -q  # 807 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2350,7 +2362,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 800 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 807 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

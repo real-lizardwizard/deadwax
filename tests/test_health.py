@@ -43,3 +43,30 @@ def test_the_dockerfile_asks_the_same_address():
     dockerfile = (Path(__file__).resolve().parent.parent / "dockerfile").read_text()
     assert "HEALTHCHECK" in dockerfile
     assert "http://127.0.0.1:8080/deadwax/health" in dockerfile
+
+
+# ----- the cache-header middleware, rewritten as plain ASGI in v0.9.8 -----
+#
+# It was @app.middleware("http") - Starlette's BaseHTTPMiddleware, whose wrapped receive made
+# request.is_disconnected() answer False for every request, so an abandoned Soulseek search could
+# never be noticed. The rewrite must set exactly the headers the old one did.
+
+def test_the_interface_is_revalidated_and_hashed_assets_are_cached_hard():
+    client = client_with(SimpleNamespace(done=lambda: False))
+    assert client.get("/").headers["cache-control"] == "no-cache"
+    assert client.get("/scripts/main.js").headers["cache-control"] == "no-cache"
+    assert client.get("/styles/main.css").headers["cache-control"] == "no-cache"
+    assert client.get("/dist/assets/app-0123abcd.js").headers["cache-control"] == \
+        "public, max-age=31536000, immutable"
+
+
+def test_the_api_is_left_alone():
+    client = client_with(SimpleNamespace(done=lambda: False))
+    assert "cache-control" not in client.get("/deadwax/health").headers
+
+
+def test_no_middleware_hides_a_disconnect_from_the_routes():
+    """BaseHTTPMiddleware is what broke is_disconnected() - none may come back."""
+    from starlette.middleware.base import BaseHTTPMiddleware
+    app = start()
+    assert not any(m.cls is BaseHTTPMiddleware for m in app.user_middleware)
