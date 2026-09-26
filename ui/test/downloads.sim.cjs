@@ -46,6 +46,7 @@ const overlays = (cancelling = [], cleared = []) => ({
   cancelling: new Set(cancelling),
   cleared: new Set(cleared),
   pending: [],
+  retrying: new Set(),
 });
 
 const ids = (jobs) => jobs.map((j) => j.id);
@@ -184,6 +185,19 @@ console.log('\na download shows from the click, not from slskd connecting to the
   check('"clear finished" takes a refusal', withoutRefused(refused).pending.length, 0);
   check('...but never one still waiting on slskd', withoutRefused(waiting).pending.length, 1);
   check('an unchanged clear returns the identical object', withoutRefused(waiting) === waiting, true);
+}
+
+console.log('\ntrying the next peer (v0.9.12)');
+
+{
+  const failed = [job(4, 'failed'), job(5, 'organized')];
+  const asked = { ...overlays(), retrying: new Set([4]) };
+  check('a failed job being moved on counts as active from the click', activeCount(failed, asked), 1);
+  check('...still retrying while the poll says failed', [...reconcile(failed, asked).retrying], [4]);
+  const moved = [job(4, 'queued'), job(5, 'organized')];
+  check('let go of once a poll shows it moving again', [...reconcile(moved, asked).retrying], []);
+  check('...and counted once, as the queued job it now is', activeCount(moved, reconcile(moved, asked)), 1);
+  check('let go of if the job is cleared away', [...reconcile([job(5, 'organized')], asked).retrying], []);
 }
 
 console.log('\nan album appears as soon as it is filed (lib/libraryEvents.ts)');

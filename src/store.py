@@ -48,7 +48,14 @@ CREATE TABLE IF NOT EXISTS jobs (
     status        TEXT NOT NULL,
     error         TEXT,
     created_at    TEXT NOT NULL,
-    updated_at    TEXT NOT NULL
+    updated_at    TEXT NOT NULL,
+    -- The runners-up from the candidates list the download was picked from (v0.9.12), in the
+    -- order it was SHOWN - the user's filters and sort, not the server's ranking - so "try the
+    -- next peer" means the next one they would have picked. JSON, [{username, directory, files,
+    -- score}]. Existing databases gain these two through JOB_COLUMNS in init().
+    alternatives_json  TEXT NOT NULL DEFAULT '[]',
+    -- Every (username, directory) this job has been downloaded from, the current one included.
+    tried_json         TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 
@@ -149,6 +156,16 @@ CREATE TABLE IF NOT EXISTS library_scan (
 );
 """
 
+#? Columns added to `jobs` after it first shipped, with the definition an existing database is
+#? given - see JobStore.init. Keep in step with SCHEMA.
+JOB_COLUMNS = {
+    "alternatives_json": "TEXT NOT NULL DEFAULT '[]'",
+    "tried_json": "TEXT NOT NULL DEFAULT '[]'",
+}
+
+#? how many runners-up a job keeps - enough to get past a run of offline peers, not the whole list
+MAX_ALTERNATIVES = 10
+
 #? queued/downloading/complete are phase 2. organizing/organized land with the organizer.
 OPEN_STATUSES = ("queued", "downloading")
 TERMINAL_STATUSES = ("organized", "failed", "cancelled")
@@ -176,6 +193,12 @@ class JobStore:
 
             with self._connect() as connection:
                 connection.executescript(SCHEMA)
+                #? CREATE TABLE IF NOT EXISTS never alters a table that is already there, so a
+                #? column added since a database was made has to be added to it by hand
+                existing = {row["name"] for row in connection.execute("PRAGMA table_info(jobs)")}
+                for column, definition in JOB_COLUMNS.items():
+                    if column not in existing:
+                        connection.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
 
             self.available = True
             logger.info(f"job store ready at {self.path}")
@@ -198,11 +221,14 @@ class JobStore:
         job = dict(row)
         job["release"] = json.loads(job.pop("release_json"))
         job["files"] = json.loads(job.pop("files_json"))
+        job["alternatives"] = json.loads(job.pop("alternatives_json", None) or "[]")
+        job["tried"] = json.loads(job.pop("tried_json", None) or "[]")
         return job
 
     # sqlite3 is blocking, so every call hops to a worker thread to keep the loop free.
 
-    async def create_job(self, username: str, directory: str, files: list[dict], release: dict) -> int | None:
+    async def create_job(self, username: str, directory: str, files: list[dict], release: dict,
+                         alternatives: list[dict] | None = None) -> int | None:
         if not self.available:
             return None
 
@@ -211,8 +237,9 @@ class JobStore:
                 cursor = connection.execute(
                     """
                     INSERT INTO jobs (release_mbid, artist, album, year, username, directory,
-                                      release_json, files_json, status, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)
+                                      release_json, files_json, status, created_at, updated_at,
+                                      alternatives_json, tried_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)
                     """,
                     (
                         release.get("release_mbid"),
@@ -225,6 +252,8 @@ class JobStore:
                         json.dumps(files),
                         _now(),
                         _now(),
+                        json.dumps((alternatives or [])[:MAX_ALTERNATIVES]),
+                        json.dumps([{"username": username, "directory": directory}]),
                     ),
                 )
                 return cursor.lastrowid
@@ -274,6 +303,52 @@ class JobStore:
         except Exception:
             logger.error("failed to read open download jobs")
             return []
+
+    async def move_to_peer(self, job_id: int, username: str, directory: str, files: list[dict],
+                           tried: list[dict]) -> bool:
+        """
+        Point a job at another peer's folder and start it again, recording where it has been.
+
+        The same job rather than a new one: it is the same album, it keeps its place in the
+        list, and "try the next peer" should read as the download carrying on, not as a second
+        download appearing beside a dead one.
+        """
+        if not self.available:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                connection.execute(
+                    """
+                    UPDATE jobs SET username = ?, directory = ?, files_json = ?, tried_json = ?,
+                                    status = 'queued', error = NULL, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (username, directory, json.dumps(files), json.dumps(tried), _now(), job_id),
+                )
+
+        try:
+            await asyncio.to_thread(write)
+            return True
+
+        except Exception:
+            logger.error(f"failed to move job {job_id} to {username}")
+            return False
+
+    async def record_tried(self, job_id: int, tried: list[dict]) -> None:
+        """Remember peers a retry asked and was refused by, so the next retry skips them."""
+        if not self.available:
+            return
+
+        def write():
+            with self._connect() as connection:
+                connection.execute("UPDATE jobs SET tried_json = ?, updated_at = ? WHERE id = ?",
+                                   (json.dumps(tried), _now(), job_id))
+
+        try:
+            await asyncio.to_thread(write)
+        except Exception:
+            logger.error(f"failed to record the peers tried for job {job_id}")
 
     async def jobs_with_status(self, statuses: tuple[str, ...]) -> list[dict]:
         """Every job in one of `statuses`, oldest first."""

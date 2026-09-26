@@ -47,9 +47,14 @@ export interface Overlays {
   cleared: ReadonlySet<number>
   /** Downloads asked for that aren't jobs yet, newest first. */
   pending: readonly PendingDownload[]
+  /**
+   * Failed or cancelled jobs moving to the next peer (v0.9.12), until a poll shows them
+   * active again - "trying next peer…" from the click, like cancelling.
+   */
+  retrying: ReadonlySet<number>
 }
 
-export const NO_OVERLAYS: Overlays = { cancelling: new Set(), cleared: new Set(), pending: [] }
+export const NO_OVERLAYS: Overlays = { cancelling: new Set(), cleared: new Set(), pending: [], retrying: new Set() }
 
 /** A pending download still waiting on slskd - it counts as active, a refused one doesn't. */
 export function isWaiting(pending: PendingDownload): boolean {
@@ -89,7 +94,10 @@ export function visibleJobs(jobs: readonly DownloadJob[], overlays: Overlays): D
 }
 
 export function activeCount(jobs: readonly DownloadJob[], overlays: Overlays): number {
-  return jobs.filter((job) => isActive(job) && !overlays.cancelling.has(job.id)).length
+  return jobs.filter((job) => isActive(job)
+    ? !overlays.cancelling.has(job.id)
+    //? a failed job moving to its next peer is about to be active again - count it from the click
+    : overlays.retrying.has(job.id)).length
     + overlays.pending.filter(isWaiting).length
 }
 
@@ -137,15 +145,27 @@ export function reconcile(jobs: readonly DownloadJob[], overlays: Overlays): Ove
     if (next.size !== cleared.size) cleared = next
   }
 
+  let retrying = overlays.retrying
+  if (retrying.size) {
+    const next = new Set(retrying)
+    //? Confirmed when the job is moving again - or gone, cleared from under it
+    for (const id of retrying) {
+      const job = byId.get(id)
+      if (!job || isActive(job)) next.delete(id)
+    }
+    if (next.size !== retrying.size) retrying = next
+  }
+
   let pending = overlays.pending
   if (pending.some((p) => p.jobId !== undefined && byId.has(p.jobId))) {
     //? Confirmed when its job is in the list - the real row takes over from here
     pending = pending.filter((p) => p.jobId === undefined || !byId.has(p.jobId))
   }
 
-  return cancelling === overlays.cancelling && cleared === overlays.cleared && pending === overlays.pending
+  return cancelling === overlays.cancelling && cleared === overlays.cleared
+    && pending === overlays.pending && retrying === overlays.retrying
     ? overlays
-    : { cancelling, cleared, pending }
+    : { cancelling, cleared, pending, retrying }
 }
 
 /** The finished jobs "clear finished" would remove. */

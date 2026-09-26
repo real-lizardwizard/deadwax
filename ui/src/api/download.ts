@@ -7,6 +7,7 @@ import type {
   FindCandidatesRequest,
   FindCandidatesResponse,
   JobsResponse,
+  RetryResponse,
 } from './types'
 
 /**
@@ -26,6 +27,11 @@ export function enqueue(body: EnqueueRequest): Promise<EnqueueResponse> {
 /** Stored jobs merged with live progress from slskd. Safe to poll; see useDownloadJobs. */
 export function listJobs(): Promise<JobsResponse> {
   return get<JobsResponse>('/download/jobs')
+}
+
+/** Move a failed or cancelled job to the next peer from the list it was picked from. */
+export function retryJob(jobId: number): Promise<RetryResponse> {
+  return post<RetryResponse>(`/download/jobs/${jobId}/retry`)
 }
 
 export function cancelJob(jobId: number): Promise<CancelJobResponse> {

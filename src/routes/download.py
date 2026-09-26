@@ -10,7 +10,7 @@ from src.config import Config
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
-from src.poller import tidy_cancelled_later, tidy_cancelled_transfers
+from src.poller import retry_next_peer, tidy_cancelled_later, tidy_cancelled_transfers, untried_alternatives
 from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, index_transfers_by_user,
                        summarize_transfers)
 
@@ -101,11 +101,23 @@ class EnqueueRelease(BaseModel):
     edition_label: str | None = None
 
 
+class Alternative(BaseModel):
+    """A runner-up from the candidates list - somewhere else the same album could come from."""
+    username: str
+    directory: str = ""
+    files: list[EnqueueFile]
+    score: float | None = None
+
+
 class EnqueueRequest(BaseModel):
     username: str
     files: list[EnqueueFile]
     directory: str = ""
     release: EnqueueRelease = Field(default_factory=EnqueueRelease)
+    #? The rest of the list as it was SHOWN when this was picked (v0.9.12), for "try the next
+    #? peer". Declared - pydantic drops an undeclared field without a word, the trap this file
+    #? has fallen into four times - and optional, so a caller that sends none still works.
+    alternatives: list[Alternative] = Field(default_factory=list)
 
 
 #? How long the Soulseek search will wait on MusicBrainz for an artist's former names. It runs
@@ -405,6 +417,7 @@ async def enqueue(request: Request, body: EnqueueRequest):
             directory=body.directory,
             files=files,
             release=body.release.model_dump(),
+            alternatives=[a.model_dump() for a in body.alternatives],
         )
 
         return {"status": "ok", "queued": len(files), "job_id": job_id}
@@ -461,6 +474,9 @@ async def jobs(request: Request):
         merged = []
         for job, summary, queue_position in zip(stored, summaries, positions):
             merged.append({
+                #? how many other peers "try next peer" could still move it to - 0 hides the button
+                "alternatives_left": len(untried_alternatives(job)),
+                "attempt": max(1, len(job.get("tried") or [])),
                 "id": job["id"],
                 "artist": job["artist"],
                 "album": job["album"],
@@ -576,6 +592,32 @@ async def cancel_job(request: Request, job_id: int):
     except Exception as e:
         logger.error(f"Exception in /jobs/{job_id}/cancel: {e}")
         raise HTTPException(status_code=500, detail=f"Error cancelling download: {e}")
+
+
+#? what "try the next peer" can start again - anything still moving is left to finish
+RETRYABLE_STATUSES = ("failed", "cancelled")
+
+
+@router.post("/jobs/{job_id}/retry")
+async def retry_job(request: Request, job_id: int):
+    """
+    Move a failed or cancelled download to the next peer from the list it was picked from
+    (v0.9.12). Answers 200 either way: `moved` false with a `problem` - every peer refused, or
+    none left to try - is an outcome to show on the row, not a server error.
+    """
+    store = request.app.state.store
+    job = await store.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="No such download job")
+    if job["status"] not in RETRYABLE_STATUSES:
+        raise HTTPException(status_code=409, detail=f"this download is {job['status']}, not failed or cancelled")
+
+    try:
+        return await retry_next_peer(request.app.state.slskd_client, store, job)
+    except Exception as e:
+        logger.error(f"Exception in /jobs/{job_id}/retry: {e}")
+        raise HTTPException(status_code=500, detail=f"Error trying the next peer: {e}")
 
 
 @router.post("/jobs/clear")

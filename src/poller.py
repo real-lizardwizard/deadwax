@@ -18,7 +18,7 @@ from src.config import Config
 from src.library import note_library_changed
 from src.logger import logger
 from src.lyrics import fetch_album_lyrics
-from src.organizer import organize_job, remove_empty_incomplete_dirs
+from src.organizer import organize_job, remove_empty_incomplete_dirs, remove_incomplete_downloads
 from src.peer_speed import RateAccumulator, measured_rate, observe
 from src.store import index_transfers_by_user, settled_transfer_ids, summarize_transfers
 
@@ -76,6 +76,7 @@ async def poll_downloads_once(
                 missing_counts.pop(job_id, None)
                 if rate_samples is not None:
                     rate_samples.pop(job_id, None)
+                await _auto_retry(slskd_client, store, job)
 
             continue
 
@@ -122,6 +123,7 @@ async def poll_downloads_once(
             #? measures nothing and records nothing - see measured_rate().
             await _settle_peer_speed(job, store, rate_samples)
             await store.update_status(job_id, "failed", detail)
+            await _auto_retry(slskd_client, store, job)
             continue
 
         if job["status"] == "queued" and summary["progress"] > 0:
@@ -348,6 +350,82 @@ async def tidy_cancelled_transfers(slskd_client, jobs: list[dict]) -> tuple[int,
                 removed += 1
 
     return removed, waiting
+
+
+def untried_alternatives(job: dict) -> list[dict]:
+    """
+    The runners-up a retry may still move a job to, in the order they were shown.
+
+    Skips every PEER already tried, not just every folder: a peer who refused one folder or went
+    offline is the likeliest to do it again, and the point of the next peer is a different one.
+    """
+    tried_users = {t.get("username") for t in job.get("tried") or []} | {job.get("username")}
+    return [a for a in job.get("alternatives") or [] if a.get("username") not in tried_users]
+
+
+#? how many runners-up one retry will ask before giving up - each ask can take seconds while
+#? slskd connects to the peer, and a string of offline peers shouldn't hold a click for a minute
+RETRY_ASKS = 3
+
+
+async def retry_next_peer(slskd_client, store, job: dict) -> dict:
+    """
+    Move a failed or cancelled job to the next peer from the list it was picked from.
+
+    Returns {"moved", "username", "directory", "left", "problem"}. slskd is asked to queue each
+    runner-up in turn until one accepts (at most RETRY_ASKS); every peer asked is recorded as
+    tried, accepted or not, so the next retry never asks them again. On success the job points at
+    the new folder and is queued again - the same job, carrying on - and the old attempt's settled
+    transfers leave slskd's list, and its partials go too where SLSKD_INCOMPLETE_PATH is set
+    (they are another peer's, so nothing will resume from them).
+    """
+    candidates = untried_alternatives(job)
+    tried = list(job.get("tried") or [{"username": job["username"], "directory": job.get("directory")}])
+    problem = None if candidates else "no other peers to try - search again for more"
+
+    for alternative in candidates[:RETRY_ASKS]:
+        files = alternative.get("files") or []
+        ok, reason = await slskd_client.enqueue(alternative["username"], files)
+        tried.append({"username": alternative["username"], "directory": alternative.get("directory")})
+
+        if not ok:
+            problem = reason or f"{alternative['username']} refused"
+            continue
+
+        #? the attempt being left behind: out of slskd's list once settled, partials removed
+        try:
+            await tidy_cancelled_transfers(slskd_client, [job])
+            await asyncio.to_thread(remove_incomplete_downloads, Config.SLSKD_INCOMPLETE_PATH or "",
+                                    job.get("files") or [], job.get("directory") or "")
+        except Exception as e:
+            logger.warning(f"couldn't tidy the previous attempt of job {job['id']}: {e}")
+
+        await store.move_to_peer(job["id"], alternative["username"], alternative.get("directory") or "",
+                                 files, tried)
+        logger.info(
+            f"trying the next peer for {job.get('artist')} - {job.get('album')}: {alternative['username']}",
+            extra={"frontend": True, "src": "slskd"},
+        )
+        moved = {**job, "username": alternative["username"], "tried": tried}
+        return {"moved": True, "username": alternative["username"],
+                "directory": alternative.get("directory"),
+                "left": len(untried_alternatives(moved)), "problem": None}
+
+    await store.record_tried(job["id"], tried)
+    return {"moved": False, "username": None, "directory": None,
+            "left": len(untried_alternatives({**job, "tried": tried})), "problem": problem}
+
+
+async def _auto_retry(slskd_client, store, job: dict) -> None:
+    """After a failure, when AUTO_RETRY_PEER is on and there is a runner-up to try."""
+    if (Config.AUTO_RETRY_PEER or "off").strip().lower() != "on" or not untried_alternatives(job):
+        return
+    outcome = await retry_next_peer(slskd_client, store, job)
+    if not outcome["moved"]:
+        logger.warning(
+            f"couldn't move {job.get('artist')} - {job.get('album')} to another peer: {outcome['problem']}",
+            extra={"frontend": True, "src": "slskd"},
+        )
 
 
 #? held so asyncio's weak reference can't drop a tidy mid-wait, as with lyrics

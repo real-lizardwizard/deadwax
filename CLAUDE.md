@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             814 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             825 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -671,6 +671,41 @@ bitrates. It now carries `bit_depths`, `sample_rates` (distinct values across th
 - **Verified in the real page** against a fake slskd offering a 24/96 FLAC, a 16/44.1 FLAC and a
   320 MP3: 24-bit kept only the first, a 320 floor kept all three (the FLACs by rule), a 500 MB
   ceiling dropped the 858 MB hi-res folder, and the quality sort put hi-res, CD, MP3 in that order.
+
+### Trying the next peer (v0.9.12)
+
+One of the 1.0 fixes, long on the "deliberately not built" list because the candidates weren't
+kept after enqueueing. They are now.
+
+- **A job keeps the rest of the list AS IT WAS SHOWN** - the user's filters and sort, not the
+  server's ranking - up to `MAX_ALTERNATIVES` (10), in `alternatives_json`; `tried_json` records
+  every (username, directory) it has been downloaded from. The filters say what they'd accept,
+  so the next peer respects them. `EnqueueRequest.alternatives` is DECLARED (the pydantic trap,
+  a fifth time avoided rather than hit) and optional.
+- **The first schema change to `jobs` since it shipped.** `CREATE TABLE IF NOT EXISTS` never alters
+  an existing table, so `JobStore.init` adds any column in `JOB_COLUMNS` that `PRAGMA table_info`
+  doesn't list. Keep `JOB_COLUMNS` and SCHEMA in step; a test builds an old table and opens it.
+- **The next peer is a different PEER** (`untried_alternatives`): a peer who refused or went
+  offline once is the likeliest to again, so every username already tried is skipped, whatever
+  the folder.
+- **`retry_next_peer` (poller.py)** asks slskd to queue runners-up in turn until one accepts, at most
+  `RETRY_ASKS` (3) per retry - each ask can take seconds while slskd connects - and records every
+  peer asked, accepted or not. On success the SAME job moves (`store.move_to_peer`): new peer,
+  folder and files, back to `queued`, error cleared - it reads as the download carrying on, not a
+  second one beside a dead one. The old attempt's settled transfers leave slskd's list and its
+  partials go where `SLSKD_INCOMPLETE_PATH` is set (another peer's, so nothing resumes from them).
+- **Button always, automatic only when asked.** `POST /download/jobs/{id}/retry` (failed or
+  cancelled only, 409 otherwise; a refusal from every peer is a 200 with `moved: false` and a
+  `problem`, shown on the row). `AUTO_RETRY_PEER` (off by default, a new Downloads group in the
+  settings tab) has the poller do the same on both of its failure paths. Off because the next
+  peer down may be a different pressing or a worse rip, a choice somebody should see being made.
+- **The row**: "↻ next peer" on a failed or cancelled job with `alternatives_left`, "trying next
+  peer…" from the click (a `retrying` overlay, reconciled when a poll shows it active), "try N"
+  once moved, and the retry's problem in red when nothing would take it.
+- **Verified in the real page** against the slow fake slskd: a job picked from three peers stored
+  the other two in the order shown; marked failed, "next peer" asked the offline one (refused),
+  then the MP3 peer (accepted), and the row read "queued · mp3-peer · try 3"; failed again with
+  nothing left, the button was gone.
 
 ### Browsing a discography, and ordering results
 
@@ -2406,7 +2441,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 814 tests
+.venv/bin/python -m pytest tests/ -q  # 825 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2450,7 +2485,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 814 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 825 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
@@ -2539,6 +2574,5 @@ Worth knowing before someone "fixes" one of these:
   The bulk operation that would be genuinely safe is folder renames to match the convention,
   since those are fully determined by the tags and need no MusicBrainz guess: `misfiled` is
   already its own facet, so that is where it would hang.
-- **Retrying a rejected download.** The job now reaches `failed` and says the peer refused it,
-  but picking a different peer is still a manual re-search. The candidates are not kept after
-  enqueueing, so "try the next one" would mean storing them with the job.
+- ~~Retrying a rejected download~~ **Built in v0.9.12, one of the 1.0 items** - the candidates
+  are stored with the job now. See "Trying the next peer".

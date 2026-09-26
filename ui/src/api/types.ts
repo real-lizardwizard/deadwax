@@ -99,6 +99,13 @@ export interface DownloadJob {
   failure_reason?: string | null
   /** Whether slskd currently knows about any of this job's files. */
   matched: boolean
+  /**
+   * How many other peers "try next peer" could still move this job to (v0.9.12) - the
+   * runners-up it was picked from that haven't been tried. 0 hides the button.
+   */
+  alternatives_left?: number
+  /** Which attempt this is: 1 for the peer first picked, 2 after one retry, and so on. */
+  attempt?: number
 }
 
 export interface JobsResponse {
@@ -226,6 +233,24 @@ export interface EnqueueRequest {
     tracks?: Track[]
     [field: string]: unknown
   }
+  /** The rest of the list as shown, in order - where "try next peer" goes (v0.9.12). */
+  alternatives?: EnqueueAlternative[]
+}
+
+/** A runner-up from the candidates list, kept with the job for "try next peer" (v0.9.12). */
+export interface EnqueueAlternative {
+  username: string
+  directory: string
+  files: CandidateFile[]
+  score?: number
+}
+
+export interface RetryResponse {
+  moved: boolean
+  username: string | null
+  directory: string | null
+  left: number
+  problem: string | null
 }
 
 export interface EnqueueResponse {

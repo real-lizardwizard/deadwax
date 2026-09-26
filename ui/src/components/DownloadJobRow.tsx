@@ -16,6 +16,11 @@ interface Props {
    */
   cancelling: boolean
   onCancel: (jobId: number) => Promise<void>
+  /** Moving to the next peer, until a poll shows it going again (v0.9.12). */
+  retrying: boolean
+  /** Why the last retry didn't move it, or null. */
+  retryProblem: string | null
+  onRetry: (jobId: number) => Promise<void>
 }
 
 /**
@@ -29,8 +34,10 @@ interface Props {
  * this element when the job was organized. Nothing styles `.download-job.queued` - the only
  * rule is `.candidate-box.queued` - so it was dead.
  */
-export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel }: Props) {
+export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying, retryProblem, onRetry }: Props) {
   const statusClass = JOB_STATUS_CLASS[job.status] ?? ''
+  //? a failed or cancelled download with runners-up left can move to the next of them
+  const canRetry = (job.status === 'failed' || job.status === 'cancelled') && (job.alternatives_left ?? 0) > 0
   const percent = Math.round(job.progress || 0)
 
   const cancel = async (event: MouseEvent) => {
@@ -71,9 +78,21 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel }: Props) 
           status it is in the middle of leaving. Showing "downloading" for the two round-trips
           a cancel takes is what made the button feel like it did nothing.
         */}
-        <span class={`download-job-status ${cancelling ? 'mid' : statusClass}`}>
-          {cancelling ? 'cancelling…' : job.status}
+        <span class={`download-job-status ${cancelling || retrying ? 'mid' : statusClass}`}>
+          {cancelling ? 'cancelling…' : retrying ? 'trying next peer…' : job.status}
         </span>
+
+        {canRetry && !retrying && (
+          <button
+            type="button"
+            class="download-retry-button"
+            title={`Move this download to the next peer from the list you picked it from - `
+              + `${job.alternatives_left} other peer${job.alternatives_left === 1 ? '' : 's'} left`}
+            onClick={(event) => { event.stopPropagation(); void onRetry(job.id) }}
+          >
+            ↻ next peer
+          </button>
+        )}
 
         {/* cancelling only means anything while something is still moving */}
         {isActive(job) && (
@@ -92,9 +111,14 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel }: Props) 
       <div class="download-job-meta">
         <span class="text default-secondary download-job-user">{job.username}</span>
         <span class="text default-muted">·</span>
-        <span class={`download-job-detail text ${jobDetailClass(job)}`}>
-          {jobDetailText(job, liveSpeed)}
+        <span class={`download-job-detail text ${retryProblem ? 'red' : jobDetailClass(job)}`}>
+          {retryProblem ?? jobDetailText(job, liveSpeed)}
         </span>
+        {(job.attempt ?? 1) > 1 && (
+          <span class="text default-muted" title="Moved to another peer after the one before failed">
+            · try {job.attempt}
+          </span>
+        )}
       </div>
 
       <div class="download-progress-track">

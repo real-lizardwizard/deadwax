@@ -80,6 +80,10 @@ services:
       # Off by default; different pressings still get their own folders, by catalogue number.
       #- COUNTRY_IN_FOLDER=off
       #
+      # on | off - move a failed download to the next peer from the list you picked it from, by
+      # itself. Off by default; "Try next peer" on the download works either way.
+      #- AUTO_RETRY_PEER=off
+      #
       # off | dry_run | copy | move. Starts at dry_run on purpose - organizing is the only
       # thing here that writes to your filesystem, so check the event log looks right before
       # switching to copy or move.

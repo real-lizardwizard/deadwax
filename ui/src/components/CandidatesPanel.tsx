@@ -121,6 +121,12 @@ export function CandidatesPanel() {
     if (search) void run(search.release, queryOverride(query, shownQuery))
   }
 
+  //? the list as it is SHOWN - through the filters, in the chosen order
+  const visible = useMemo(
+    () => sortCandidates((search?.result?.candidates ?? []).filter((c) => passesFilters(c, filters)), sort),
+    [search, filters, sort],
+  )
+
   const download = async (candidate: Candidate) => {
     if (!search?.result) return
     const key = candidateKey(candidate)
@@ -134,6 +140,12 @@ export function CandidatesPanel() {
         directory: candidate.directory,
         //? the release this candidate was SEARCHED for - never "whichever panel is open now"
         release: { ...release },
+        //? the rest of the list as you see it, in order, for "try next peer" (v0.9.12) - the
+        //? filters you set are what you'd accept, so the next peer respects them too
+        alternatives: visible
+          .filter((c) => candidateKey(c) !== key)
+          .slice(0, 10)
+          .map((c) => ({ username: c.username, directory: c.directory, files: c.files, score: c.score })),
       })
       setDownloads((current) => new Map(current).set(key, 'queued'))
     } catch (caught) {
@@ -244,7 +256,7 @@ export function CandidatesPanel() {
           </div>
         </div>
         <div class="scrollable" id="candidates-scrollable">
-          <CandidatesBody search={search} filters={filters} sort={sort} downloads={downloads} onDownload={download} />
+          <CandidatesBody search={search} visible={visible} downloads={downloads} onDownload={download} />
         </div>
       </div>
     </div>
@@ -433,11 +445,11 @@ function QualityControl(
  * are THEN rather than as they were when the search began.
  */
 function CandidatesBody(
-  { search, filters, sort, downloads, onDownload }:
+  { search, visible, downloads, onDownload }:
   {
     search: Search | null
-    filters: CandidateFilters
-    sort: CandidateSort
+    /** The result through the filters, in the chosen order - computed once, in the panel. */
+    visible: Candidate[]
     downloads: ReadonlyMap<string, DownloadState>
     onDownload: (candidate: Candidate) => void
   },
@@ -466,8 +478,6 @@ function CandidatesBody(
       </h4>
     )
   }
-
-  const visible = sortCandidates(candidates.filter((candidate) => passesFilters(candidate, filters)), sort)
 
   if (!visible.length) {
     return (

@@ -59,6 +59,12 @@ export interface DownloadJobsState {
   cancelling: ReadonlySet<number>
   /** Downloads asked for that slskd hasn't answered yet, or refused. See PendingDownload. */
   pending: PendingDownload[]
+  /** Failed or cancelled jobs moving to their next peer, until a poll shows them moving. */
+  retrying: ReadonlySet<number>
+  /** Why the last "try next peer" didn't move a job, by job id - every peer refused, say. */
+  retryProblems: ReadonlyMap<number, string>
+  /** Move a failed or cancelled job to the next peer from the list it was picked from. */
+  retry: (jobId: number) => Promise<void>
   refresh: () => void
   /**
    * Queue a download, with a row in the panel from the click rather than from slskd's answer.
@@ -208,6 +214,30 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
   )
 
   const pendingKey = useRef(0)
+  const [retryProblems, setRetryProblems] = useState<ReadonlyMap<number, string>>(() => new Map())
+
+  const retry = useCallback(async (jobId: number) => {
+    setOverlays((current) => ({ ...current, retrying: withAdded(current.retrying, [jobId]) }))
+    setRetryProblems((current) => {
+      if (!current.has(jobId)) return current
+      const next = new Map(current)
+      next.delete(jobId)
+      return next
+    })
+
+    const giveUp = (problem: string) => {
+      setOverlays((current) => ({ ...current, retrying: withRemoved(current.retrying, [jobId]) }))
+      setRetryProblems((current) => new Map(current).set(jobId, problem))
+    }
+
+    try {
+      const outcome = await api.retryJob(jobId)
+      if (outcome.moved) refresh()
+      else giveUp(outcome.problem ?? 'no other peer would take it')
+    } catch (caught) {
+      giveUp(caught instanceof Error ? caught.message : 'the retry failed')
+    }
+  }, [refresh])
 
   const enqueue = useCallback(async (body: EnqueueRequest): Promise<EnqueueResponse> => {
     const key = `pending-${++pendingKey.current}`
@@ -275,6 +305,9 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
     error,
     cancelling: overlays.cancelling,
     pending,
+    retrying: overlays.retrying,
+    retryProblems,
+    retry,
     refresh,
     enqueue,
     cancel,

@@ -2778,6 +2778,21 @@ span.red { color: var(--red-text); }
     color: var(--white-tertiary-text);
 }
 
+/* "try the next peer" on a failed or cancelled download (v0.9.12) - quiet until it's wanted */
+.download-retry-button {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 0 var(--space-2);
+    height: 20px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    color: var(--white-secondary-text);
+    font-size: var(--text-2xs);
+    cursor: pointer;
+}
+.download-retry-button:hover { color: var(--white-text); border-color: var(--accent-ring); }
+
 .download-job-status.good { color: var(--green-text); }
 .download-job-status.mid { color: var(--yellow-text); }
 .download-job-status.bad { color: var(--red-text); }

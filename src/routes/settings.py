@@ -73,6 +73,12 @@ COUNTRY_CHOICES = {
     "on": "Name a regional pressing by its country",
 }
 
+#? What AUTO_RETRY_PEER can be set to, as the dropdown names them.
+AUTO_RETRY_CHOICES = {
+    "off": "Leave a failed download for me to retry",
+    "on": "Move a failed download to the next peer by itself",
+}
+
 #? What FETCH_LYRICS can be set to, as the dropdown names them.
 LYRICS_CHOICES = {
     "on": "Fetch lyrics as albums are filed",
@@ -305,6 +311,27 @@ def _country_row() -> dict:
     )
 
 
+def _auto_retry_row() -> dict:
+    """AUTO_RETRY_PEER, as an on/off dropdown."""
+    value = (Config.AUTO_RETRY_PEER or "off").strip().lower()
+    known = value in AUTO_RETRY_CHOICES
+    return _setting(
+        "AUTO_RETRY_PEER",
+        Config.AUTO_RETRY_PEER,
+        effect=(
+            "A download that fails moves to the next peer from the list you picked it from, "
+            "up to three asks each time, skipping any peer already tried"
+            if value == "on"
+            else "A failed download waits for you - 'Try next peer' on its row moves it on. The "
+                 "next peer down may be a different pressing or a worse rip, which is why this "
+                 "is off unless you turn it on"
+        ),
+        status="ok" if known else "error",
+        detail=None if known else f"expected one of {', '.join(AUTO_RETRY_CHOICES)}",
+        choices=AUTO_RETRY_CHOICES,
+    )
+
+
 def _lyrics_row() -> dict:
     """FETCH_LYRICS, as an on/off dropdown."""
     value = Config.FETCH_LYRICS
@@ -525,6 +552,16 @@ async def settings():
                 ],
             },
             {
+                "id": "downloads",
+                "label": "Downloads",
+                "note": (
+                    "A download keeps the rest of the candidates list it was picked from, as "
+                    "it was shown - your filters and sort - so a failed one can move to the "
+                    "next peer instead of starting the search again."
+                ),
+                "settings": [_auto_retry_row()],
+            },
+            {
                 "id": "cover-art",
                 "label": "Cover art",
                 "note": (
@@ -603,6 +640,9 @@ def _validate(key: str, value: str) -> str | None:
 
     if key == "COUNTRY_IN_FOLDER" and value not in COUNTRY_CHOICES:
         return f"expected one of {', '.join(COUNTRY_CHOICES)}"
+
+    if key == "AUTO_RETRY_PEER" and value not in AUTO_RETRY_CHOICES:
+        return f"expected one of {', '.join(AUTO_RETRY_CHOICES)}"
 
     if key == "FETCH_LYRICS" and value not in LYRICS_CHOICES:
         return f"expected one of {', '.join(LYRICS_CHOICES)}"

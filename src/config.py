@@ -243,6 +243,12 @@ class Config:
     #? anyone needed. Two different releases still never share a folder - see editions.py.
     COUNTRY_IN_FOLDER = _env("COUNTRY_IN_FOLDER", "off")
 
+    #? on | off. When a download fails, move it to the next peer from the list it was picked
+    #? from, by itself (v0.9.12). Off by default: the next peer down is ranked against the same
+    #? release but may be a different pressing or a worse rip, and that is a choice somebody
+    #? should see being made. "Try next peer" on a failed download works either way.
+    AUTO_RETRY_PEER = _env("AUTO_RETRY_PEER", "off")
+
     #? Milliseconds to move synced lyrics EARLIER as they are written - negative moves them
     #? later. LRCLIB's timings are tapped along by people and land a moment after the line is
     #? sung, which on a fast song shows the line just sung. 0 writes LRCLIB's timings as they
@@ -293,6 +299,8 @@ class Config:
         "FETCH_LYRICS": None,
         #? read each time a folder name is made, so nothing to rebuild
         "COUNTRY_IN_FOLDER": None,
+        #? read by the poller as each download fails, so nothing to rebuild
+        "AUTO_RETRY_PEER": None,
         #? read as each .lrc is written, so nothing to rebuild
         "LYRICS_LEAD_MS": None,
         #? read per lookup by the artist image client, so nothing to rebuild here either
