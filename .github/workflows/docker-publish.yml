@@ -13,7 +13,13 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # An image is only built from code whose tests pass. Before this, a tag published whatever it
+  # pointed at, and :latest moved with it.
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   build-and-publish:
+    needs: tests
     runs-on: ubuntu-latest
     permissions:
       contents: write

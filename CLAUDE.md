@@ -2303,6 +2303,16 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 `.env`, `.devdata/`, `run_dev.sh`, `.claude/`, `node_modules/`, `interface/dist/` are gitignored.
 
+**CI (v0.9.4): `.github/workflows/tests.yml`** runs pytest on Python 3.12 (the oldest this claims)
+and 3.14 (what the image ships), `npm run build` on Node 22 (typecheck included, as the image
+does it) and every `ui/test/*.sim.cjs`, each on its own so a failure names itself.
+**`docker-publish.yml` calls it and its build `needs:` it**, so a tag whose tests fail publishes
+no image and moves no `:latest`. To keep one push from being tested twice, `tests.yml`'s own push
+trigger ignores `experimental/**` - those, and `v*` tags, are tested through the publish
+workflow's call instead. **A new sim is picked up by the glob; a new Python test dependency has
+to be added to the workflow's install step** - `requirements.txt` is the image's, and pytest is
+deliberately not in it.
+
 ## What the tests cannot tell you
 
 All 780 tests are fixture-driven, and **nothing in the suite has ever talked to a real

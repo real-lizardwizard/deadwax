@@ -1,0 +1,83 @@
+name: Tests
+
+# Everything that proves the logic is sound, on every change - until now it only ever ran on the
+# laptop it was written on. It says nothing about real slskd (see "What the tests cannot tell
+# you" in CLAUDE.md); it says the matching, filing and state logic does what the tests claim.
+#
+# Three ways in, and no push is tested twice:
+#   - a pull request, anywhere;
+#   - a push to any branch the image workflow does NOT build - it calls this itself, through
+#     workflow_call, so that a failing test stops an image from being published at all;
+#   - that call, for experimental/** pushes and v* tags.
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - 'experimental/**'
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the oldest this claims to run on; 3.14 is what the image ships
+        python: ['3.12', '3.14']
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install
+        run: |
+          python -m pip install -r requirements.txt
+          # the only thing the tests need beyond the app itself; pinned to what they were
+          # written against
+          python -m pip install pytest==9.1.1
+
+      - name: pytest
+        run: python -m pytest tests/ -q
+
+  interface:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          # the same major the image builds the interface with (dockerfile's node:22 stage)
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - run: npm ci
+
+      # tsc --noEmit and then vite build, exactly as the image does - a type error fails here
+      # before it can fail a release
+      - run: npm run build
+
+      # The sims are plain Node scripts that exit non-zero on a failure - there is no JS test
+      # runner in this repo. Each is run on its own so one failing names itself in the log.
+      - name: sims
+        run: |
+          status=0
+          for sim in test/*.sim.cjs; do
+            echo "::group::${sim}"
+            node "${sim}" || { echo "::error file=ui/${sim}::${sim} failed"; status=1; }
+            echo "::endgroup::"
+          done
+          exit "${status}"
