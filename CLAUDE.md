@@ -407,6 +407,45 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
 - **`thaw()` only deletes the frozen flag.** It used to wipe the inline geometry, which would
   now undo a move the instant the panel closed.
 
+### One tracklist per release group (v0.8.2)
+
+James: "instead of having a tracklist for each release, just having a base tracklist from the first
+release and then each release shows the changes it would make to that tracklist" - tried in a
+preview on Dummy and The Slow Rush first, then built with the MOST COMMON tracklist as the base.
+
+- **The base is the most common tracklist, not the first release** (`chooseBase` in
+  `interface/scripts/tracklistDiff.mjs`). The first release is whatever the sort put on top; on
+  Dummy it was a vinyl whose lengths MusicBrainz lists ~10s short of every CD, and every CD read
+  as ten changes. Chosen from ALL the group's releases, never the filtered rows, so it holds
+  still while the filter column narrows the table. The release that stands for it is the first
+  holding that tracklist, and its chip says "The tracklist above".
+- **Tracks pair by folded title along the longest common run**, so a bonus track in the middle
+  is one added track and shifts nothing after it; an added and a removed track of about the
+  same length are one rename. Curly and straight apostrophes fold together - Dummy's pressings
+  have both "It's a Fire" and "It’s a Fire", and half of them would otherwise show a rename.
+- **Three bands of length difference**: within `LENGTH_TOLERANCE_S` (2s) is rounding and
+  nothing; past it is a length change, summarised on one line; past `OTHER_VERSION_S` (15s) or
+  8% is "another version" and listed like a track change. The Slow Rush's single-mix digital
+  release is identical by title and differs only in "Borderline" being 36s longer - the case
+  that band exists for. Lengths are the TRACK's (this pressing's), falling back to the
+  recording's, because the track is what differs between pressings.
+- **Chips ride in the TITLE cell, not a column**, so they show on a phone, where the grid keeps
+  only its first columns in view, and so the column state (order, widths, visibility) didn't
+  need a new entry.
+- **Still lazy**: a release's change list is built on first expand, and its own full tracklist
+  (vinyl sides and all) on a second click - the 711ms rule. The diffs behind the chips are
+  computed once per release and kept in a Map, since the body re-renders on every filter change.
+- **Third-party text goes in with `textContent`**, never `innerHTML`: these are MusicBrainz's
+  titles. (The older full-tracklist rows still interpolate the recording title into innerHTML,
+  as they always have - not changed here.)
+- **The same clipping bug lived one level down**: `.release-tracks.expanded` was capped at
+  `max-height: 5000px`, which a large box set's tracklist can exceed. `none` now, like the
+  release list's own 1000px cap fixed in v0.8.1.
+- **Verified in the real page** on both albums: Dummy "shared by 12 of 20", the 1995 UK CD and
+  the US promo +1 track, the ten-track pressings −1 track; The Slow Rush "shared by 9 of 10",
+  only the Japanese CD (+1 track) and the single mix (1 other version, 3:58 -> 4:34) differing.
+  No horizontal overflow at 375px.
+
 ### Browsing a discography, and ordering results
 
 - **The search cannot answer "everything this artist released, in order", and a sort control
@@ -2132,6 +2171,7 @@ node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and re
 node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
 node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
+node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes about it
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with

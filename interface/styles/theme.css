@@ -316,6 +316,10 @@
     --red-secondary-text:   #ef4444;
     --yellow-text:          #fbbf24;
     --yellow-secondary-text: #d97706;
+    /* tinted fills for chips, like --accent-muted: the text colour at 12% */
+    --green-muted:          #34d3991f;
+    --red-muted:            #f871711f;
+    --yellow-muted:         #fbbf241f;
 
     /*
       Glow tokens, retained and neutralised.

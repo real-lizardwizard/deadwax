@@ -2,6 +2,7 @@ import { init} from './init.js';
 import {sleep} from './utils.js';
 import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel } from './sort.mjs';
 import { getArtistIds, getArtistNames, getCurrentArtistNames } from './credits.mjs';
+import { chooseBase, diffTracklists, formatSeconds, releaseTracks, summarizeDiff } from './tracklistDiff.mjs';
 
 
 
@@ -2010,6 +2011,18 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
     table.appendChild(tbody);
     tableScroll.appendChild(table);
 
+    //? ONE tracklist for the group - the most common one - and every release below shows only
+    //? what it changes. Chosen from ALL the group's releases, never the filtered ones, so the
+    //? base holds still while the filter column narrows the rows. See tracklistDiff.mjs.
+    const base = chooseBase(releases);
+    const baseRelease = base ? releases[base.index] : null;
+    const diffs = new Map();
+    const diffFor = (release) => {
+        if (!diffs.has(release)) diffs.set(release, diffTracklists(base.tracks, releaseTracks(release)));
+        return diffs.get(release);
+    };
+
+    if (base) wrapper.appendChild(buildBaseTracklist(base));
     wrapper.appendChild(tableScroll);
 
     let colElements = {};
@@ -2167,6 +2180,11 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
 
                 if (id === 'title') {
                     td.innerHTML = `<h4 class="text white releaseGridTitle"><a href="https://musicbrainz.org/release/${releaseId}" target="_blank" rel="noopener noreferrer">${title}</a></h4>`;
+                    //? in the title cell rather than a column of its own, so it shows on a phone,
+                    //? where the grid keeps only its first columns in view
+                    if (base && totalTracks > 0) {
+                        td.appendChild(buildTracklistChips(release === baseRelease ? null : diffFor(release)));
+                    }
                 }
 
                 else if (id === 'edition') {
@@ -2262,28 +2280,19 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
                 // ~711ms per release group and roughly half of every node in the document -
                 // markup that is display:none until someone clicks the row. Keep this lazy:
                 // it is the fix for "Expanding one release group: 711ms" in CLAUDE.md.
+                //? With a base, a release that ISN'T it opens to what it changes, and its own full
+                //? tracklist is one more click - built lazily in turn. The base itself, and any
+                //? release in a group with nothing to compare against, opens to its tracklist.
                 let tracksBuilt = false;
                 const buildTracks = () => {
                     if (tracksBuilt) return;
                     tracksBuilt = true;
-                    const frag = document.createDocumentFragment();
-                    for (const disc of media) {
-                        for (const track of (disc.tracks || [])) {
-                            const { minutes, seconds } = millisecondsToMinutesAndSeconds(track.recording?.length);
-                            const recordingTitle = track.recording?.title || 'N/A';
-                            const recordingId = track.recording?.id;
-                            const lengthStr = minutes === 'N/A' ? 'N/A' : `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                            const trackDiv = document.createElement('div');
-                            trackDiv.className = 'track';
-                            trackDiv.innerHTML = `
-                                <h4 class="text default trackNumber">${track.number}.${track.position}</h4>
-                                <h4 class="text white trackName"><a href="https://musicbrainz.org/recording/${recordingId}" target="_blank" rel="noopener noreferrer">${recordingTitle}</a></h4>
-                                <h4 class="text white-tertiary trackLength">[${lengthStr}]</h4>
-                            `;
-                            frag.appendChild(trackDiv);
-                        }
+                    if (base && release !== baseRelease) {
+                        tracksContainer.appendChild(buildTracklistChanges(diffFor(release), media));
                     }
-                    tracksContainer.appendChild(frag);
+                    else {
+                        tracksContainer.appendChild(buildFullTracklist(media));
+                    }
                 };
 
                 row.addEventListener('click', (e) => {
@@ -2315,6 +2324,176 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
     mountedReleaseGrids.add({ rerender, releases });
 
     return wrapper;
+}
+
+/** Every track of a release, as the grid has always listed them. */
+function buildFullTracklist(media) {
+    const frag = document.createDocumentFragment();
+    for (const disc of media) {
+        for (const track of (disc.tracks || [])) {
+            const { minutes, seconds } = millisecondsToMinutesAndSeconds(track.recording?.length);
+            const recordingTitle = track.recording?.title || 'N/A';
+            const recordingId = track.recording?.id;
+            const lengthStr = minutes === 'N/A' ? 'N/A' : `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            const trackDiv = document.createElement('div');
+            trackDiv.className = 'track';
+            trackDiv.innerHTML = `
+                <h4 class="text default trackNumber">${track.number}.${track.position}</h4>
+                <h4 class="text white trackName"><a href="https://musicbrainz.org/recording/${recordingId}" target="_blank" rel="noopener noreferrer">${recordingTitle}</a></h4>
+                <h4 class="text white-tertiary trackLength">[${lengthStr}]</h4>
+            `;
+            frag.appendChild(trackDiv);
+        }
+    }
+    return frag;
+}
+
+/** A small element with text set safely - these are MusicBrainz's titles, third-party text. */
+function textElement(tag, className, text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = text;
+    return element;
+}
+
+/**
+ * The group's one tracklist, above its releases: the most common one, and how many share it.
+ */
+function buildBaseTracklist(base) {
+    const block = document.createElement('div');
+    block.className = 'releases-base';
+
+    const head = document.createElement('div');
+    head.className = 'releases-base-head';
+    head.appendChild(textElement('h4', 'text white', 'Tracklist'));
+    head.appendChild(textElement('span', 'text default-muted',
+        base.count === base.total
+            ? `the same on all ${base.total} releases`
+            : `shared by ${base.count} of ${base.total} releases - each one below shows only what it changes`));
+    block.appendChild(head);
+
+    const list = document.createElement('ol');
+    list.className = 'releases-base-list';
+    base.tracks.forEach((track, index) => {
+        const item = document.createElement('li');
+        item.appendChild(textElement('span', 'text default-muted releases-base-number', String(index + 1)));
+        item.appendChild(textElement('span', 'text white releases-base-title', track.title));
+        item.appendChild(textElement('span', 'text white-tertiary releases-base-length', formatSeconds(track.length)));
+        list.appendChild(item);
+    });
+    block.appendChild(list);
+
+    return block;
+}
+
+/** What a release's row says about its tracklist; `diff` null means it IS the base. */
+function buildTracklistChips(diff) {
+    const chips = document.createElement('span');
+    chips.className = 'tracklist-chips';
+
+    const summary = diff ? summarizeDiff(diff) : [{ kind: 'base', label: 'The tracklist above' }];
+    for (const chip of summary) {
+        chips.appendChild(textElement('span', `tracklist-chip is-${chip.kind}`, chip.label));
+    }
+    return chips;
+}
+
+/**
+ * What one release changes about the base, and a way to its own full tracklist.
+ *
+ * Positions are this release's own running positions; an added track says what it follows,
+ * so it reads against the base above.
+ */
+function buildTracklistChanges(diff, media) {
+    const frag = document.createDocumentFragment();
+    const changes = document.createElement('div');
+    changes.className = 'tracklist-changes';
+
+    const row = (mark, markClass, position, text, length) => {
+        const line = document.createElement('div');
+        line.className = 'tracklist-change';
+        line.appendChild(textElement('span', `tracklist-change-mark ${markClass}`, mark));
+        line.appendChild(textElement('span', 'text default-muted tracklist-change-position', position ? String(position) : ''));
+        const body = document.createElement('span');
+        body.className = 'text white tracklist-change-text';
+        if (typeof text === 'string') body.textContent = text; else body.appendChild(text);
+        line.appendChild(body);
+        line.appendChild(textElement('span', 'text white-tertiary tracklist-change-length', length || ''));
+        changes.appendChild(line);
+    };
+
+    const withNote = (title, note) => {
+        const span = document.createElement('span');
+        span.appendChild(document.createTextNode(title));
+        if (note) span.appendChild(textElement('span', 'text default-muted tracklist-change-note', ` ${note}`));
+        return span;
+    };
+
+    const ordered = [
+        ...diff.added.map((c) => ({ ...c, kind: 'added' })),
+        ...diff.removed.map((c) => ({ ...c, kind: 'removed' })),
+        ...diff.renamed.map((c) => ({ ...c, kind: 'renamed' })),
+        ...diff.versions.map((c) => ({ ...c, kind: 'version' })),
+    ].sort((x, y) => x.position - y.position);
+
+    for (const change of ordered) {
+        if (change.kind === 'added') {
+            row('+', 'is-added', change.position, withNote(change.title, change.after ? `after ${change.after}` : 'at the start'), formatSeconds(change.length));
+        }
+        else if (change.kind === 'removed') {
+            row('−', 'is-removed', change.position, withNote(change.title, 'not on this release'), formatSeconds(change.length));
+        }
+        else if (change.kind === 'renamed') {
+            row('~', 'is-renamed', change.position, withNote(change.to, `was ${change.from}`), '');
+        }
+        else {
+            const longer = change.delta > 0;
+            row('≈', 'is-version', change.position,
+                withNote(change.title, `${Math.abs(change.delta)}s ${longer ? 'longer' : 'shorter'} - likely another mix or edit`),
+                `${formatSeconds(change.from)} → ${formatSeconds(change.to)}`);
+        }
+    }
+
+    if (diff.lengths.length) {
+        const shown = diff.lengths.slice(0, 4)
+            .map((c) => `${c.title} ${c.delta > 0 ? '+' : '−'}${Math.abs(c.delta)}s`).join(', ');
+        row('±', 'is-lengths', null,
+            withNote(`${diff.lengths.length} length${diff.lengths.length === 1 ? '' : 's'} differ slightly`,
+                shown + (diff.lengths.length > 4 ? ', …' : '')), '');
+    }
+
+    //? what is NOT listed, so an empty-looking change list can't read as "not loaded" - and
+    //? nothing at all when every other track is already in the lengths line above
+    if (!ordered.length && !diff.lengths.length) {
+        changes.appendChild(textElement('div', 'text default-muted tracklist-change-summary', 'The same as the tracklist above'));
+    }
+    else if (diff.same) {
+        changes.appendChild(textElement('div', 'text default-muted tracklist-change-summary',
+            `${diff.same} other track${diff.same === 1 ? ' matches' : 's match'} the tracklist above`));
+    }
+
+    //? the release's own numbering, sides and all, is still one click away - built when asked
+    const full = document.createElement('div');
+    full.className = 'tracklist-full';
+    const toggle = textElement('button', 'tracklist-full-toggle', "Show this release's full tracklist");
+    toggle.type = 'button';
+    let built = false;
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!built) {
+            built = true;
+            full.appendChild(buildFullTracklist(media));
+        }
+        full.classList.toggle('expanded');
+        toggle.textContent = full.classList.contains('expanded')
+            ? "Hide this release's full tracklist"
+            : "Show this release's full tracklist";
+    });
+    changes.appendChild(toggle);
+    changes.appendChild(full);
+
+    frag.appendChild(changes);
+    return frag;
 }
 
 function millisecondsToMinutesAndSeconds(ms) {

@@ -1214,7 +1214,7 @@ body {
 }
 
 .release-tracks.expanded {
-    max-height: 5000px;
+    max-height: none;  /* a cap here clips a big box set's tracks, as 1000px did the releases */
     opacity: 1;
     padding-top: 5px;
 }
@@ -1234,6 +1234,90 @@ body {
 .trackName a:hover {
     text-decoration: underline;
 }
+
+/*
+  ONE tracklist per release group - the most common - above its releases, and each release
+  says only what it changes (tracklistDiff.mjs). Chips ride in the title cell so they survive
+  the phone layout, which keeps only the grid's first columns in view.
+*/
+.releases-base {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+}
+.releases-base-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); }
+.releases-base-head > span { font-size: var(--text-xs); }
+.releases-base-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    /* columns, not a grid: a tracklist reads DOWN, 1-2-3 then on to the next column */
+    columns: 16em;
+    column-gap: var(--space-5);
+    font-size: var(--text-xs);
+}
+.releases-base-list > li {
+    display: grid;
+    grid-template-columns: 2em minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    min-width: 0;
+    break-inside: avoid;
+    padding-bottom: 2px;
+}
+.releases-base-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.releases-base-number, .releases-base-length { font-family: var(--font-mono); }
+
+.tracklist-chips { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
+.tracklist-chip {
+    font-size: var(--text-2xs);
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    color: var(--white-secondary-text);
+    background: var(--surface-raised);
+}
+.tracklist-chip.is-same { background: transparent; color: var(--white-tertiary-text); padding-left: 0; }
+.tracklist-chip.is-base { background: var(--accent-muted); color: var(--accent-hover); }
+.tracklist-chip.is-added { background: var(--green-muted); color: var(--green-text); }
+.tracklist-chip.is-removed { background: var(--red-muted); color: var(--red-text); }
+.tracklist-chip.is-renamed,
+.tracklist-chip.is-version { background: var(--yellow-muted); color: var(--yellow-text); }
+
+.tracklist-changes { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); }
+.tracklist-change {
+    display: grid;
+    /* the lengths follow the text; the row spans the whole table and far right is far away */
+    grid-template-columns: 1.2em 2em minmax(0, max-content) auto;
+    justify-content: start;
+    gap: var(--space-2);
+    align-items: baseline;
+}
+.tracklist-change-mark { font-family: var(--font-mono); text-align: center; color: var(--white-tertiary-text); }
+.tracklist-change-mark.is-added { color: var(--green-text); }
+.tracklist-change-mark.is-removed { color: var(--red-text); }
+.tracklist-change-mark.is-renamed,
+.tracklist-change-mark.is-version { color: var(--yellow-text); }
+.tracklist-change-position, .tracklist-change-length { font-family: var(--font-mono); }
+.tracklist-change-text { overflow-wrap: anywhere; }
+.tracklist-change-note { font-size: var(--text-2xs); }
+.tracklist-change-summary { margin-top: var(--space-1); }
+.tracklist-full-toggle {
+    align-self: flex-start;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin-top: var(--space-1);
+    font: inherit;
+    font-size: var(--text-xs);
+    color: var(--main-secondary-text);
+    cursor: pointer;
+}
+.tracklist-full-toggle:hover { color: var(--main-hover-text); text-decoration: underline; }
+.tracklist-full { display: none; flex-direction: column; gap: 2px; padding-top: var(--space-1); }
+.tracklist-full.expanded { display: flex; }
 
 
 
