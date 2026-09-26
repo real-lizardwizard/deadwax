@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from src.config import Config
+from src.library import note_library_changed
 from src.logger import logger
 from src.lyrics import fetch_album_lyrics
 from src.organizer import organize_job
@@ -209,6 +210,9 @@ async def _organize_if_enabled(job: dict, store) -> None:
 
         else:
             await store.update_status(job["id"], "organized")
+            #? the cache doesn't know about this folder yet, so the next "what do I own" asks the
+            #? disk rather than the saved scan - see /library/owned
+            note_library_changed()
             await _enrol_for_review(job, results, store)
             _fetch_lyrics_later(results)
 

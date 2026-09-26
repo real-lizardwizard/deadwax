@@ -40,7 +40,8 @@ from src.lyrics import has_lyrics_file, lyrics_filename
 #?   2  tracks carry `disc`, albums carry `disc_count`
 #?   3  albums carry `lyrics_count`
 #?   4  albums carry `disc_art`
-SCAN_FORMAT = 4
+#?   5  albums carry `release_group_mbid`
+SCAN_FORMAT = 5
 
 #? path -> (mtime, album dict). Reading tags costs milliseconds per file and a real library
 #? is thousands of files, so a rescan re-reads only the folders that actually changed. The
@@ -57,6 +58,23 @@ _album_cache: dict[str, tuple[float, dict]] = {}
 #? re-read - comparing two whole caches would cost more than the save it decides on.
 _dirty: set[str] = set()
 _removed: set[str] = set()
+
+#? Whether something has changed the library since the last full walk, so the cache can no
+#? longer answer for it on its own: a folder forgotten after a retag, art fetch or delete, or an
+#? album the poller just filed. Starts True - the disk may have changed while the container was
+#? down. `/library/owned` reads it to decide between the saved scan and a real one; the library
+#? tab doesn't need it, because it always scans for real underneath its snapshot.
+_behind = True
+
+
+def note_library_changed() -> None:
+    """Say the library changed behind the cache's back - the poller calls this as it files."""
+    global _behind
+    _behind = True
+
+
+def library_is_behind() -> bool:
+    return _behind
 
 #? Serialises scans. Two at once would both re-read every changed folder, and the tidy-up
 #? loop at the end of one iterates the cache while the other mutates it. Snapshots do NOT take
@@ -432,7 +450,28 @@ def read_track(path: Path) -> dict | None:
         "date": _first(audio, "date"),
         "originaldate": _first(audio, "originaldate"),
         "release_mbid": _first(audio, "musicbrainz_albumid"),
+        #? which ALBUM this is, whichever pressing - what the search view marks a whole
+        #? release-group card as held by. Easy MP4 has no name for it; see read_album_dir
+        "release_group_mbid": _first(audio, "musicbrainz_releasegroupid"),
     }
+
+
+#? Where Picard writes the release-group id in an MP4 file. mutagen's easy MP4 layer has no
+#? name for it, so it is read raw - once per ALBUM, not per track, and only for an m4a album
+#? whose easy read found nothing.
+MP4_RELEASE_GROUP_ATOM = "----:com.apple.iTunes:MusicBrainz Release Group Id"
+
+
+def _mp4_release_group(entries: list[Path]) -> str:
+    first = next((e for e in entries if file_extension(e.name) in {"m4a", "alac", "aac"}), None)
+    if first is None:
+        return ""
+    try:
+        from mutagen.mp4 import MP4
+        values = (MP4(str(first)).tags or {}).get(MP4_RELEASE_GROUP_ATOM) or []
+        return bytes(values[0]).decode("utf-8", "replace").strip() if values else ""
+    except Exception:
+        return ""
 
 
 def track_order(track: dict) -> tuple:
@@ -538,6 +577,8 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
     date = _commonest([t["date"] for t in tracks])
     original_date = _commonest([t["originaldate"] for t in tracks])
     release_mbid = _commonest([t["release_mbid"] for t in tracks])
+    release_group_mbid = (_commonest([t.get("release_group_mbid", "") for t in tracks])
+                          or _mp4_release_group(entries))
 
     try:
         relative = str(directory.relative_to(library_root))
@@ -555,6 +596,7 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
         "original_year": original_date[:4] if original_date else "",
         "edition": edition_from_dirname(directory.name),
         "release_mbid": release_mbid,
+        "release_group_mbid": release_group_mbid,
         #? '' means no art on disk. The interface falls back to the Cover Art Archive when
         #? there's a release MBID, exactly as the search view already does.
         "art": art,
@@ -616,6 +658,7 @@ def forget_cached_album(directory: str) -> None:
     _album_cache.pop(directory, None)
     _dirty.discard(directory)
     _removed.add(directory)
+    note_library_changed()
 
 
 def seed_cache(entries: list[tuple[str, float, dict]]) -> int:
@@ -793,6 +836,9 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
         _album_cache.pop(path, None)
         _dirty.discard(path)
         _removed.add(path)
+
+    global _behind
+    _behind = False
 
     return albums, reused
 

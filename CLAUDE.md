@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             772 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             780 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -455,6 +455,57 @@ preview on Dummy and The Slow Rush first, then built with the MOST COMMON trackl
   the US promo +1 track, the ten-track pressings −1 track; The Slow Rush "shared by 9 of 10",
   only the Japanese CD (+1 track) and the single mix (1 other version, 3:58 -> 4:34) differing.
   No horizontal overflow at 375px.
+
+### What's already in the library, in the search (v0.9.1)
+
+James: "I need a way to see which editions are already in my library when I'm searching for new
+ones." A card says "In your library" (with "· N editions" past one), and each pressing held is
+marked on its own row - an "In your library" chip in the edition cell and a purple edge on the
+row. Matching is `interface/scripts/owned.mjs`, pure, pinned by `ui/test/owned.sim.cjs`.
+
+- **Three ways to match, surest first**: the RELEASE id (this exact pressing - what marks a
+  row), the RELEASE-GROUP id (some pressing of this album - what marks a card, before its
+  releases are even fetched), and NAME, for folders with no MusicBrainz ids at all. A name
+  match says "Maybe in your library", dashed: the name can't say which edition, or for certain
+  that it is the same album. **A folder that IS tagged is never matched by name** - it has
+  already answered by id, and a tagged album of another group must not be claimed because the
+  title happens to agree. Names fold like the artist matcher's (accents, a leading "The", "&"
+  vs "and", bracketed asides) and are tried under the credit AND the current name, since an
+  old folder is called whatever the sleeve said.
+- **The scan reads `musicbrainz_releasegroupid` now (SCAN_FORMAT 5).** Easy MP4 has no key for
+  it, so an m4a album reads Picard's freeform atom (`MP4_RELEASE_GROUP_ATOM`) raw, once per
+  album. An album with a release id and no group id is still caught at card level through the
+  pressings the page has fetched (`registerGroupReleases`).
+- **`/library/owned` answers from the SAVED SCAN unless deadwax itself changed the library.**
+  A full scan per search would stat every folder on every search, which on a network share or
+  a spun-down array is the whole wait - the reason the snapshot exists. So `library.py` keeps a
+  `_behind` flag: set at start-up, by every `forget_cached_album()` (retag, art, lyrics,
+  delete, tag edits) and by the poller as it files a job; cleared by a full walk. Behind means
+  the next answer is a real scan. **The cost, stated in the README: an album copied in by
+  another program is unmarked until a Rescan or the library tab's own scan**, the same rule
+  the library tab already lives by.
+- **Fetched BESIDE the search, never before it**, and laid onto what is already on screen when
+  it lands - in place, never by re-rendering a grid, which would snap shut a tracklist you had
+  just opened. A failed or unconfigured lookup leaves no marks at all rather than "nothing held"
+  on every card. One request in flight at a time (`ownedRequest`).
+- **An album filed while you look marks itself.** `announceAlbumsFiled()` in
+  `ui/src/lib/libraryEvents.ts` also dispatches `deadwax:albums-filed` on `window`, which
+  main.js listens for. A window event rather than a bridge entry: it is a one-way notice the
+  Preact half gives, not a call the vanilla half needs an answer from, and "an empty bridge
+  means the migration is done" should stay true of it. Guarded on `typeof window` for the sims.
+- **`.tracklist-chips` is a BLOCK now, not inline-flex** - fixed alongside, and a 0.9.0 bug.
+  The edition cell is `nowrap` with `overflow: hidden`, so on a pressing with an edition TAG
+  the chips ran inline after it and were clipped to "ANNIVERSARY ...". Nothing showed while
+  only the base-tracklist chip and diffs sat alone in the cell.
+- **On a phone the card's chip overflows its text column** into the empty space under Find -
+  the column is ~80px at 375px beside the match chip and button. Measured: no document
+  overflow, the chip ends at 274px of 375. Deliberate rather than wrapping the label over
+  three lines.
+- **Verified in the real page** on the scratch library: Dummy's card read "In your library · 2
+  editions", its 2014 vinyl and 1994 CD rows marked and no others; an untagged "Old Rips/
+  Radiohead - OK Computer" folder (made for the check, then removed) gave "Maybe in your
+  library"; `deadwax:albums-filed` re-fetched `/library/owned` and re-laid the marks with no
+  duplicates.
 
 ### Browsing a discography, and ordering results
 
@@ -2161,7 +2212,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 772 tests
+.venv/bin/python -m pytest tests/ -q  # 780 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2182,6 +2233,7 @@ node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filt
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
 node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
 node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes about it
+node ui/test/owned.sim.cjs      # which search results the library already holds - by pressing, by album, and "maybe" by name
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -2192,7 +2244,7 @@ HMR — **not** the real page. The real page is still `interface/index.html` ser
 
 ## What the tests cannot tell you
 
-All 772 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 780 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

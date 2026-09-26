@@ -3,6 +3,7 @@ import {sleep} from './utils.js';
 import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel } from './sort.mjs';
 import { getArtistIds, getArtistNames, getCurrentArtistNames } from './credits.mjs';
 import { chooseBase, diffTracklists, formatSeconds, releaseTracks, summarizeDiff } from './tracklistDiff.mjs';
+import { buildOwnedIndex, describeFolders, describeGroupOwnership, ownedForGroup, ownedForRelease } from './owned.mjs';
 
 
 
@@ -595,6 +596,8 @@ updateTypeFilterButton();
 
 
 async function handleSearch() {
+    //? beside the search, never before it: the marks fill in when the answer lands
+    void refreshOwned();
     const release = releaseSearchInput.value.trim();
     let artist = artistSearchInput.value.trim();
 
@@ -698,6 +701,107 @@ let currentSort = (() => {
     return isSortMode(saved) ? saved : DEFAULT_SORT;
 })();
 
+/*
+ * What's already in the library, so the search can say so (v0.9.1, asked for: "a way to see
+ * which editions are already in my library when I'm searching for new ones").
+ *
+ * Fetched BESIDE each search rather than before it - /library/owned may have to walk the disk
+ * after something changed, and a search must never wait on that - and the marks are laid onto
+ * the cards and rows already on screen when it lands. In place, never by re-rendering: a grid
+ * rebuilt under you snaps shut the tracklist you had just opened. Matching is owned.mjs's.
+ */
+let ownedIndex = null;
+let ownedRequest = null;
+
+/** Every card on screen: its chip slot, and what it can be matched by. Cleared per render. */
+const renderedGroups = new Map();
+
+function refreshOwned() {
+    if (ownedRequest) return ownedRequest;
+
+    ownedRequest = (async () => {
+        try {
+            const response = await fetch('/deadwax/library/owned');
+            if (!response.ok) return;
+            const data = await response.json();
+            //? no library configured: no marks at all, rather than "nothing held" on every card
+            ownedIndex = data.problem ? null : buildOwnedIndex(data.albums);
+            applyOwnedMarks();
+        }
+        catch (error) {
+            //? marks are a nicety - a failed lookup leaves the search exactly as it was
+            console.debug(`couldn't read the library for ownership marks: ${error.message}`);
+        }
+        finally {
+            ownedRequest = null;
+        }
+    })();
+
+    return ownedRequest;
+}
+
+//? an album filed while you're looking should mark itself, not wait for the next search -
+//? the Preact downloads poll announces it (lib/libraryEvents.ts)
+window.addEventListener('deadwax:albums-filed', () => void refreshOwned());
+
+/** Lay the current marks on every card and pressing already on screen. */
+function applyOwnedMarks() {
+    for (const groupId of renderedGroups.keys()) renderOwnedChip(groupId);
+    for (const row of document.querySelectorAll('.release-row[data-release-id]')) {
+        markOwnedRow(row, row.dataset.releaseId);
+    }
+}
+
+function renderOwnedChip(groupId) {
+    const entry = renderedGroups.get(groupId);
+    if (!entry) return;
+
+    const ownership = describeGroupOwnership(ownedForGroup(ownedIndex, {
+        groupId,
+        releaseIds: [...entry.releaseIds],
+        title: entry.title,
+        artists: entry.artists,
+    }));
+
+    entry.slot.replaceChildren();
+    if (!ownership) return;
+
+    const chip = textElement('span', `owned-chip is-${ownership.kind}`, ownership.label);
+    chip.title = ownership.title;
+    entry.slot.appendChild(chip);
+}
+
+/** A card's pressings as the page learns them - they catch a folder tagged with no group id. */
+function registerGroupReleases(groupId, releases) {
+    const entry = renderedGroups.get(groupId);
+    if (!entry) return;
+    for (const release of releases || []) entry.releaseIds.add(release.id);
+    renderOwnedChip(groupId);
+}
+
+/** The "In your library" chip on one pressing's row, added or taken away. */
+function markOwnedRow(row, releaseId) {
+    const held = ownedForRelease(ownedIndex, releaseId);
+    row.classList.toggle('is-owned', held.length > 0);
+    row.querySelector('.tracklist-chip.is-owned')?.remove();
+    if (!held.length) {
+        //? a chips box made only to hold this one goes with it
+        const empty = row.querySelector('.tracklist-chips:empty');
+        if (empty) empty.remove();
+        return;
+    }
+
+    let chips = row.querySelector('.tracklist-chips');
+    if (!chips) {
+        chips = document.createElement('span');
+        chips.className = 'tracklist-chips';
+        (row.querySelector('.releases-col-edition') || row.querySelector('.releases-col-title'))?.appendChild(chips);
+    }
+    const chip = textElement('span', 'tracklist-chip is-owned', 'In your library');
+    chip.title = `Already in your library:\n${describeFolders(held)}`;
+    chips.prepend(chip);
+}
+
 function processSearchResults(results) {
     lastSearchRan = true;
     lastResults = results;
@@ -718,6 +822,7 @@ function processSearchResults(results) {
  */
 async function loadDiscography(artistMbid, artistName) {
     if (!artistMbid) return;
+    void refreshOwned();
 
     const container = document.getElementById('search-results-scrollable');
     container.innerHTML = '<div class="loading-panel">Asking MusicBrainz…</div>';
@@ -802,6 +907,7 @@ function renderSearchResults() {
     const container = document.getElementById('search-results-scrollable');
     container.innerHTML = '';
     mountedReleaseGrids.clear();
+    renderedGroups.clear();
 
     const releaseGroups = discography
         ? discography.groups
@@ -2039,6 +2145,7 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
 
     if (base) wrapper.appendChild(buildBaseTracklist(base));
     wrapper.appendChild(tableScroll);
+    registerGroupReleases(releaseGroupId, releases);
 
     let colElements = {};
 
@@ -2183,6 +2290,7 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
 
             const row = document.createElement('tr');
             row.className = 'release-row';
+            row.dataset.releaseId = releaseId;
 
             const expandCell = document.createElement('td');
             expandCell.className = 'releases-col-expand';
@@ -2210,7 +2318,7 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
                     //? no dash when there are chips beneath: "—" over "+1 track" reads as a blank
                     td.innerHTML = editionTags.length
                         ? editionTags.map(tag => `<h4 class="text ${EDITION_TAG_COLORS[tag] || 'default'} edition-tag" title="${disambiguation}">${tag}</h4>`).join('')
-                        : (chips ? '' : `<h4 class="text default-muted">—</h4>`);
+                        : (chips ? '' : `<h4 class="text default-muted edition-blank">—</h4>`);
                     if (chips) td.appendChild(chips);
                 }
 
@@ -2280,6 +2388,7 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
             row.appendChild(actionCell);
 
             tbody.appendChild(row);
+            markOwnedRow(row, releaseId);
 
             if (totalTracks > 0) {
                 row.classList.add('has-tracks');
@@ -2599,6 +2708,7 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
                     <a href="https://musicbrainz.org/release-group/${releaseGroupId}" target="_blank" rel="noopener noreferrer">${title} (${year})</a>
                 </h3>
                 <h3 class="text white-tertiary releaseGrpType">&nbsp;[${typeDisplay}] &nbsp;</h3>
+                <span class="owned-chip-slot"></span>
             </div>
             <div class="non-shrinkable">
                 ${scoreMarkup}
@@ -2635,6 +2745,15 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
     }
 
     div.innerHTML = html;
+
+    //? registered before any grid is built below, which is what adds its pressings to it
+    renderedGroups.set(releaseGroupId, {
+        slot: div.querySelector('.owned-chip-slot'),
+        title,
+        artists: [artist, releaseGroupContext.albumArtist],
+        releaseIds: new Set(),
+    });
+    renderOwnedChip(releaseGroupId);
 
     const artistButton = div.querySelector('.releaseGrpArtistButton');
     if (artistButton) {

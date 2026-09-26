@@ -14,7 +14,7 @@ from src.config import COVER_ART_SIZES
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, plan_disc_art,
                           save_disc_art)
 from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, delete_album, drain_cache_changes,
-                         embedded_pictures, find_artist_art, find_disc_art,
+                         embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
                          forget_cached_album, load_album_art, load_artist_art,
                          read_album_details, read_artist_mbid, scan_library, seed_cache,
                          snapshot_library, summarize_for_deletion)
@@ -209,6 +209,44 @@ async def albums(request: Request, snapshot: bool = False):
     except Exception as e:
         logger.error(f"Exception in /albums endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error scanning library: {e}")
+
+
+#? What the search view needs to mark an album as held - and nothing else. The full scan
+#? carries every track of every album, which is far more than "do I have this" wants.
+OWNED_FIELDS = ("path", "artist", "album", "year", "edition", "release_mbid",
+                "release_group_mbid", "formats", "track_count")
+
+
+@router.get("/owned")
+async def owned(request: Request):
+    """
+    Every album in the library, reduced to what says WHICH album and edition it is.
+
+    For the search view, which marks the release groups and the pressings you already hold
+    (v0.9.1, asked for: "a way to see which editions are already in my library when I'm
+    searching for new ones"). The matching is done there, in interface/scripts/owned.mjs.
+
+    Answers from the saved scan when nothing has changed since the last full walk, and walks
+    the library otherwise - after a retag, an art fetch, a delete, or an album the poller
+    filed (library_is_behind). Searching must not stat every folder on a spun-down array each
+    time; it also must not tell you a record you downloaded ten minutes ago isn't here.
+    """
+    root = Config.LIBRARY_PATH or ""
+    if not root:
+        return {"albums": [], "problem": "LIBRARY_PATH is not set", "stale": False}
+
+    await _ensure_cache_loaded(request)
+
+    result = None if library_is_behind() else await asyncio.to_thread(snapshot_library, root)
+    if result is None:
+        result = await asyncio.to_thread(scan_library, root, False)
+        await _persist_cache(request, result)
+
+    return {
+        "albums": [{field: album.get(field) for field in OWNED_FIELDS} for album in result["albums"]],
+        "problem": result.get("problem"),
+        "stale": bool(result.get("stale")),
+    }
 
 
 @router.post("/rescan")

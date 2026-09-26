@@ -27,9 +27,17 @@ export function onAlbumsFiled(listener: Listener): () => void {
   }
 }
 
+/**
+ * The vanilla search view hears it as a window event instead - it can't import this module,
+ * and marking a search result as held is a one-way notice, not a call it needs an answer from,
+ * so it doesn't earn a bridge entry either. Guarded, because the sims run this in Node.
+ */
+export const ALBUMS_FILED_EVENT = 'deadwax:albums-filed'
+
 export function announceAlbumsFiled(): void {
   //? a copy, so a listener that unsubscribes while being told cannot skip the next one
   for (const listener of [...listeners]) listener()
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(ALBUMS_FILED_EVENT))
 }
 
 /**

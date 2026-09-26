@@ -153,6 +153,16 @@ Releases show as a table with label, catalog number, barcode, quality, language/
 Above the table is the album's <strong>tracklist, once</strong> — the one most of its releases share — and each release says only what it changes about it: <em>+1 track</em>, <em>−1 track</em>, <em>1 renamed</em>, or <em>Same tracklist</em>. Open one to see exactly what: the bonus track and what it comes after, the song it's missing, and any track far enough off the usual length to be <em>another version</em> — The Slow Rush has two digital releases whose tracklists are identical apart from "Borderline" running 36 seconds longer, which is a different mix and nothing else would tell you. A second or two of difference is rounding and is ignored; a bit more is listed as a length change. Each release's own full tracklist, vinyl sides and all, is one more click.
 </details>
 
+### Seeing what you already have
+<details>
+<summary style="font-style:italic">Before you download a fourth copy of Dummy</summary>
+Search results say which albums are already in your library — <em>In your library · 2 editions</em> on the card — and inside it, each pressing you hold is marked on its own row with a purple edge, so the one you don't have yet is the one without. Hover either for the folders it found.
+<br><br>
+It goes by the MusicBrainz ids in your tags, so it knows the <em>pressing</em>, not just the album: every album deadwax filed or corrected has them. A folder with no ids at all, from a library older than deadwax, can only be matched by artist and album name, so it says <em>Maybe in your library</em> — the name can't tell which edition it is. Matching its release in the metadata editor settles it.
+<br><br>
+The marks come from the saved scan, so they cost nothing and never hold a search up. Anything deadwax does to the library — filing a download, applying a release, deleting — is caught up on by the next search, and an album filed while you're looking marks itself. Something copied in by another program appears after a Rescan, as it does in the library tab.
+</details>
+
 ### Downloads that remember what they're for
 <details>
 <summary style="font-style:italic">slskd only knows "bob is sending you 12 files"</summary>

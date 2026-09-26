@@ -1270,7 +1270,11 @@ body {
 .releases-base-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .releases-base-number, .releases-base-length { font-family: var(--font-mono); }
 
-.tracklist-chips { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
+/*
+ * A block, on a line of its own: the edition cell is nowrap and clips, so inline chips after an
+ * edition tag ran off its end - "ANNIVERSARY ..." with every chip cut away.
+ */
+.tracklist-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
 .tracklist-chip {
     font-size: var(--text-2xs);
     padding: 1px var(--space-2);
@@ -6325,6 +6329,34 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 
 .artist-images-footer > .win-button:last-of-type { margin-left: 0; }
 .artist-images-footer > .settings-check { margin-right: auto; }
+
+/*
+ * What the library already holds, on a search card and on each pressing (v0.9.1).
+ * An OUTLINE rather than a fill, so it never reads as one of the tracklist chips beside it -
+ * those say what a pressing changes; this says you have it.
+ */
+.owned-chip-slot { display: inline-flex; align-items: baseline; }
+.owned-chip-slot:empty { display: none; }
+.owned-chip,
+.tracklist-chip.is-owned {
+    font-size: var(--text-2xs);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--accent-ring);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--accent-hover);
+    white-space: nowrap;
+    cursor: help;
+}
+.owned-chip::before,
+.tracklist-chip.is-owned::before { content: "\2713\00a0"; }
+.owned-chip { align-self: center; margin-left: var(--space-1); }
+/* a folder with no ids matched by name alone - said, but quieter */
+.owned-chip.is-maybe { border-style: dashed; border-color: var(--border-strong); color: var(--white-secondary-text); }
+.owned-chip.is-maybe::before { content: "?\00a0"; }
+.release-row.is-owned > td:first-child { box-shadow: inset 2px 0 var(--accent); }
+/* the edition cell's "—" means "nothing to say", and now there is something */
+.release-row.is-owned .edition-blank { display: none; }
 
 /* ============================================================================
  * ? RESPONSIVE  --  KEEP THIS LAST IN THE FILE
