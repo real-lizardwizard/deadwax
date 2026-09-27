@@ -90,29 +90,22 @@ async function refreshServerConfig() {
  * any more, so the vanilla reader went with the panel in v0.9.10.
  */
 
-function setLabel(elementId, text) {
-    const el = document.getElementById(elementId);
-    if (el) el.textContent = text || '\u2014';
-}
-
 /*
  * Client preferences owned by the settings tab, read fresh rather than cached at load. The
  * settings tab writes them while this page is up, so a cached copy would go stale the moment
  * somebody changed one - and the point of a default is that the next thing you do uses it.
  *
  * The fallback is duplicated from PREFERENCE_FALLBACK in ui/src/state/persisted.ts because
- * the two files are separate ES modules that cannot import each other. Keep them in step
- * until the search view is ported and this copy goes away.
+ * the two files are separate ES modules that cannot import each other. It holds only the
+ * fields this file reads, and each must match that copy's value - until the search view is
+ * ported and this copy goes away.
  */
+//? only the four this file reads - the candidate filters went to Preact with the panel (v0.9.10)
 const PREFERENCE_FALLBACK = {
     searchLimit: 50,
     searchStudioOnly: false,
     searchSort: 'year_asc',
-    candidateMinScore: 0,
-    candidateFreeSlotOnly: false,
-    candidateCompleteOnly: false,
     logOpenOnStart: false,
-    confirmCancel: true,
 };
 
 function loadPreferences() {

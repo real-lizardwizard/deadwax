@@ -170,7 +170,7 @@ class MusicBrainzClient:
             self.client = None
 
 
-    async def request_with_retries(self, endpoint: str, params: dict, retry: bool = True) -> dict: #TODO turning retry on and off to be implemented
+    async def request_with_retries(self, endpoint: str, params: dict) -> dict:
         #? Before the rate limiter, not after: the whole point is to not spend a turn of the
         #? budget - and therefore up to a second of somebody's time - on a question already
         #? answered. See ResponseCache for what does and does not get stored.

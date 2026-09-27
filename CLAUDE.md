@@ -41,8 +41,9 @@ What a rename has to carry across, because an install that upgrades must not not
   deletes the old one. It is a CLASSIC script in `<head>`, not a module, on purpose: module
   scripts run after parsing in document order and `resize.js` reads its key before `main.js`,
   so the move has to be finished before any of them start. The origin didn't change (it is host
-  and port), so the old keys are there to be found. Delete the script once nobody can be on
-  0.6.20 any more - not before.
+  and port), so the old keys are there to be found. **Deleted in v0.9.18**, ahead of 1.0: the
+  one install there is upgraded through it long ago. Anyone jumping straight from 0.6.20 or
+  earlier to 1.0 starts with default browser preferences - nothing on the server is affected.
 - **The database.** The default moved from `/config/jimbrainz.db` to `/config/deadwax.db`, and
   an install that never set `DB_PATH` has everything in the old one. `default_db_path()` goes
   on using the old file where it is while the new one doesn't exist, and says so in the log.
@@ -1913,9 +1914,8 @@ stay; the CRT overlay, the text-glow and the ░▒▓ chrome go.
   row the box sits BEFORE its label (`.settings-row:has(.settings-check)`), where a desktop
   checkbox lives. Radios got the same well, round with a dot, so the settings tab's format
   choice matches. The old `accent-color` rules on individual inputs are inert now. The
-  `#format-preference-select` rules in main.css are DEAD - that element left with the v0.5
-  profile dropdown and exists nowhere in the markup or scripts - so they don't need to stay
-  in step with the shared rule; they need deleting when someone next tidies that corner.
+  `#format-preference-select` rules (and the rest of that dead profile-popover block) were
+  deleted in v0.9.18.
 - **Accent is spent, not sprinkled.** Solid purple fills appear on exactly three controls:
   Search, the metadata editor's Apply, and the tag editor's Apply (v0.6.9). Both Applies write
   tags to disk with no undo, so they must not look like the Cancel button beside them.
