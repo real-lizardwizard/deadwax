@@ -147,29 +147,53 @@ def match_tracks_to_files(expected_tracks: list[dict], files: list[dict]) -> dic
 
     Returned mapping is reused later by the organizer: it's what lets us write correct track
     numbers and titles even when the peer named everything "Track 04.mp3".
+
+    Scores exactly as title_similarity() does, pair for pair, and picks exactly what calling it on
+    every pair would (v0.9.28, which a test holds it to). It is just not done that way: this runs
+    for every folder a search returns, inside the request, and 300 folders of 12 tracks meant
+    25,000 fresh SequenceMatchers. So each file's name is normalised and indexed once, a perfect
+    1.0 ends the search for that track (the first one found was always the one kept), and a pair
+    difflib's cheap upper bounds say can't beat the best so far is never fully compared.
     """
-    remaining = list(files)
+    remaining = []
+    for candidate_file in files:
+        _, filename = split_remote_path(candidate_file.get("filename", ""))
+        stem = normalize(filename_stem(filename))
+        if stem:  #? a file with no name to compare can never score above 0
+            #? the stem is the matcher's second sequence, as in title_similarity - difflib indexes
+            #? that one, so it is done once per file here rather than once per pair
+            remaining.append((candidate_file, stem, SequenceMatcher(None, "", stem)))
+
     mapping: dict[int, dict] = {}
 
     for track in expected_tracks:
-        best_file = None
+        title = normalize(track.get("title", ""))
+        best = None
         best_score = 0.0
 
-        for candidate_file in remaining:
-            _, filename = split_remote_path(candidate_file.get("filename", ""))
-            score = title_similarity(track.get("title", ""), filename)
+        for entry in remaining if title else ():
+            _, stem, matcher = entry
+            if title in stem:
+                score = 1.0
+            else:
+                matcher.set_seq1(title)
+                if matcher.real_quick_ratio() <= best_score or matcher.quick_ratio() <= best_score:
+                    continue
+                score = matcher.ratio()
 
             if score > best_score:
                 best_score = score
-                best_file = candidate_file
+                best = entry
+                if score == 1.0:
+                    break
 
-        if best_file is not None and best_score >= TITLE_MATCH_THRESHOLD:
+        if best is not None and best_score >= TITLE_MATCH_THRESHOLD:
             mapping[track.get("position")] = {
-                "file": best_file,
+                "file": best[0],
                 "score": round(best_score, 3),
                 "track": track,
             }
-            remaining.remove(best_file)
+            remaining.remove(best)
 
     return mapping
 

@@ -130,7 +130,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             869 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             870 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2657,6 +2657,18 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
   The vanilla scripts got the same treatment with `tsc --allowJs --checkJs --noUnusedLocals`,
   keeping only its unused-name diagnostics (the type errors are noise on untyped code): an
   `img` created and never used, and an `artistId` that `buildReleasesGrid` took and ignored.
+- **Ranking candidates is four times faster, with identical results (v0.9.28).** 97% of it was
+  `match_tracks_to_files`: every expected track against every file of every folder, each pair a
+  fresh `SequenceMatcher` over names normalised again for every pair. On 300 folders of 12 tracks
+  that is 25,650 of them, 278ms, and it ran ON the event loop, holding up every other request.
+  Now each file's name is normalised and indexed once, and only the title changes per
+  comparison. A perfect 1.0 ends the search for that track, since the first one found was
+  always the one kept. A pair that difflib's cheap upper bounds (`real_quick_ratio`,
+  `quick_ratio`) rule out is never fully compared. **68ms, and the whole ranking of the
+  benchmark came out byte-identical** (every folder, score and signal).
+  `test_the_fast_matcher_pairs_exactly_as_title_similarity_would` holds it to the pair-by-pair
+  definition on 200 awkward random cases, and fails when mutated to keep the last tie. The
+  ranking also runs in `asyncio.to_thread` now. `title_similarity` stays as the definition.
 
 ## Frontend migration (in progress)
 
@@ -2733,7 +2745,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 869 tests
+.venv/bin/python -m pytest tests/ -q  # 870 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2777,7 +2789,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 869 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 870 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

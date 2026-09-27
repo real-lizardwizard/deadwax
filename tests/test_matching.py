@@ -382,3 +382,39 @@ def test_the_new_markers_do_not_disturb_the_existing_ones():
     assert detect_edition_tags("Album (2011 Remaster)") == {"REMASTER"}
     #? a release can genuinely be both
     assert detect_edition_tags("Album (Deluxe) [Instrumental]") == {"DELUXE", "INSTRUMENTAL"}
+
+
+def test_the_fast_matcher_pairs_exactly_as_title_similarity_would():
+    """
+    match_tracks_to_files skips work title_similarity() would do - a name normalised once, a
+    perfect match ending the search, pairs difflib's upper bounds rule out (v0.9.28) - and must
+    still choose exactly what calling it on every pair chooses. Held here against that plain
+    version, on names built to be awkward: numbered, bare "Track NN", near-misses, one title
+    inside another, duplicates, and files with no name at all.
+    """
+    from src.matching import TITLE_MATCH_THRESHOLD, match_tracks_to_files, split_remote_path
+
+    def plainly(tracks, files):
+        remaining, mapping = list(files), {}
+        for track in tracks:
+            best, best_score = None, 0.0
+            for f in remaining:
+                score = title_similarity(track.get("title", ""), split_remote_path(f["filename"])[1])
+                if score > best_score:
+                    best, best_score = f, score
+            if best is not None and best_score >= TITLE_MATCH_THRESHOLD:
+                mapping[track["position"]] = {"file": best, "score": round(best_score, 3), "track": track}
+                remaining.remove(best)
+        return mapping
+
+    titles = ["Roads", "Road", "Sour Times", "Sour Times (Nobody Loves Me)", "It's a Fire",
+              "Its A Fire", "Numb", "Glory Box", "", "Wandering Star", "Wandering Stars"]
+    names = ["01 - Roads.flac", "Road.mp3", "Track 03.mp3", "04 sour times.flac", "Sour Times (live).flac",
+             "its a fire.flac", "Numb (edit).mp3", "glory-box.flac", ".flac", "10 - Wandering Star.flac",
+             "Wandering Star.flac", "11 - Elysium.flac", "Numb.flac"]
+    import random
+    rng = random.Random(28)
+    for _ in range(200):
+        tracks = [{"position": n, "title": t} for n, t in enumerate(rng.sample(titles, rng.randint(1, len(titles))), 1)]
+        files = [{"filename": f"@@peer\\share\\Album\\{name}"} for name in rng.sample(names, rng.randint(0, len(names)))]
+        assert match_tracks_to_files(tracks, files) == plainly(tracks, files), (tracks, files)

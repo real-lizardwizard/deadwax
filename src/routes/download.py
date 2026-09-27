@@ -288,7 +288,9 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
             "tracks": [t.model_dump() for t in body.tracks],
         }
 
-        candidates = rank_candidates(responses, expected, body.format_preference)
+        #? in a thread: scoring every folder a search returns is plain CPU, and done on the event
+        #? loop it held up every other request - the downloads poll included - while it ran
+        candidates = await asyncio.to_thread(rank_candidates, responses, expected, body.format_preference)
 
         if not candidates:
             logger.warning(
