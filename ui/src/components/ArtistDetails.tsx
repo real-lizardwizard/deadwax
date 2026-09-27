@@ -220,7 +220,7 @@ export function ArtistDetails(
             {facts.links.length > 0 && (
               <div class="artist-links">
                 {facts.links.slice(0, 8).map((link) => (
-                  <a key={link.url} href={link.url} target="_blank" rel="noreferrer noopener">
+                  <a key={link.url} href={link.url} title={link.url} target="_blank" rel="noreferrer noopener">
                     {link.label}
                   </a>
                 ))}

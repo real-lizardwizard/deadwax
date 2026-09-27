@@ -177,6 +177,9 @@ metadata editor it shows your cover and the release's side by side.
 
 Select an artist (on a phone, tap it twice) for their page: a photograph, the facts MusicBrainz
 has (type, origin, active years, other names, members), links, and their albums in your library.
+Two links of the same kind say where each one goes (**Official site · portishead.co.uk**, and
+**(archived)** for a page kept on the Wayback Machine), and every link's full address is in its
+tooltip.
 
 Which artist this is comes from the files' MusicBrainz artist ids. When the files have none, a
 name search is used, but only when exactly one artist has that name. For a name several artists

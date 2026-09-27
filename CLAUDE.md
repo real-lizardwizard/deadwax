@@ -130,7 +130,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             874 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             880 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -1472,6 +1472,16 @@ anything else I'd need for an artist page".
   dead one** - the only candidates are Commons photographs, all of them of kind `thumb`, so
   every other row reads "none found" and the square is the only thing selectable. Which is
   exactly how it was reported.
+- **Links that would share a label say where each goes (v0.9.34).** Portishead read "Official
+  site Official site ... YouTube YouTube". `_tell_apart` in artists.py (pure) adds the host where
+  the hosts differ, and the deepest path segment that differs where they don't (YouTube's
+  `/channel/<id>` - the ids, cut to 10 characters; the tooltip has the whole address). A host the
+  whole group shares is never added ("YouTube · youtube.com" says nothing), so what nothing else
+  separates is numbered. A Wayback Machine address is read as the page it archived:
+  "godiscs.co.uk (archived)", not "web.archive.org". A link alone under its label is untouched.
+  The dedupe is on the PLACE now (host without www, path, query, archived), not the exact string:
+  http and https, or a trailing slash, of one page is one link. Verified on the live Portishead
+  record, at 1024 and 375px.
 - ~~Known gap: on a phone the artist page is unreachable~~ **Closed in v0.9.31**: tapping an
   artist opens it in place, as before, and tapping it again, open, opens the sheet with its page
   (`activate` in LibraryView: `row.kind !== 'artist' || row.open`). The phone rules written for
@@ -2896,7 +2906,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 874 tests
+.venv/bin/python -m pytest tests/ -q  # 880 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2940,7 +2950,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 874 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 880 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

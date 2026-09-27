@@ -307,6 +307,86 @@ def test_social_links_are_named_after_where_they_go():
     assert [l["label"] for l in facts["links"]] == ["Twitter", "Facebook", "Instagram"]
 
 
+#? Portishead's own links, as the live API gave them - the ones that read "Official site Official
+#? site ... YouTube YouTube" on the page.
+PORTISHEAD_LINKS = [
+    {"type": "official homepage",
+     "url": {"resource": "https://web.archive.org/web/19961105112827/http://www.godiscs.co.uk/porthead.html"}},
+    {"type": "official homepage", "url": {"resource": "http://www.portishead.co.uk/"}},
+    {"type": "social network", "url": {"resource": "https://twitter.com/Portisheadinfo"}},
+    {"type": "youtube", "url": {"resource": "https://www.youtube.com/channel/UC243a5RnwmItLvwhl0YOxbg"}},
+    {"type": "youtube", "url": {"resource": "https://www.youtube.com/channel/UCIACO5JyTM0l1HNykt91E6g"}},
+    {"type": "lyrics", "url": {"resource": "https://genius.com/artists/Portishead"}},
+    {"type": "lyrics", "url": {"resource": "https://muzikum.eu/en/122-6105/portishead/lyrics.html"}},
+]
+
+
+def test_links_that_share_a_label_are_told_apart():
+    """By host where the hosts differ, and by the part of the path that differs where they don't."""
+    labels = [l["label"] for l in artist_facts({"name": "Portishead", "relations": PORTISHEAD_LINKS})["links"]]
+    assert labels == [
+        #? an archived page is named after the site it archived - "web.archive.org" says nothing
+        "Official site · godiscs.co.uk (archived)",
+        "Official site · portishead.co.uk",
+        "Twitter",
+        #? /channel/ is the same on both, so it's the ids that differ, cut short
+        "YouTube · UC243a5Rnw…",
+        "YouTube · UCIACO5JyT…",
+        "Lyrics · genius.com",
+        "Lyrics · muzikum.eu",
+    ]
+
+
+def test_a_link_alone_under_its_label_is_left_as_it_was():
+    facts = artist_facts({"name": "A band", "relations": [
+        {"type": "official homepage", "url": {"resource": "https://band.com/"}},
+        {"type": "youtube", "url": {"resource": "https://www.youtube.com/@band"}},
+        {"type": "social network", "url": {"resource": "https://x.com/band"}},
+        {"type": "social network", "url": {"resource": "https://twitter.com/band"}},
+    ]})
+    #? X and Twitter are two labels already, so neither needs telling apart
+    assert [l["label"] for l in facts["links"]] == ["Official site", "X", "Twitter", "YouTube"]
+
+
+def test_two_accounts_on_one_site_are_named_by_account():
+    facts = artist_facts({"name": "A band", "relations": [
+        {"type": "social network", "url": {"resource": "https://twitter.com/band"}},
+        {"type": "social network", "url": {"resource": "https://twitter.com/band_archive"}},
+        {"type": "bandcamp", "url": {"resource": "https://band.bandcamp.com/"}},
+        {"type": "bandcamp", "url": {"resource": "https://sideproject.bandcamp.com/"}},
+    ]})
+    assert [l["label"] for l in facts["links"]] == [
+        "Twitter · band", "Twitter · band_archive",
+        "Bandcamp · band.bandcamp.com", "Bandcamp · sideproject.bandcamp.com",
+    ]
+
+
+def test_the_same_page_written_two_ways_is_one_link():
+    """Nothing written beside a second copy could make it a different place, so it isn't shown."""
+    facts = artist_facts({"name": "A band", "relations": [
+        {"type": "official homepage", "url": {"resource": "http://www.band.com/"}},
+        {"type": "official homepage", "url": {"resource": "https://band.com"}},
+    ]})
+    assert facts["links"] == [{"label": "Official site", "url": "http://www.band.com/"}]
+
+
+def test_an_archived_copy_of_a_live_site_is_still_its_own_link():
+    facts = artist_facts({"name": "A band", "relations": [
+        {"type": "official homepage", "url": {"resource": "https://band.com/"}},
+        {"type": "official homepage", "url": {"resource": "https://web.archive.org/web/2001id_/http://band.com/"}},
+    ]})
+    #? one site, so naming it would say nothing - "(archived)" is the whole difference
+    assert [l["label"] for l in facts["links"]] == ["Official site", "Official site (archived)"]
+
+
+def test_links_nothing_else_tells_apart_are_numbered():
+    facts = artist_facts({"name": "A band", "relations": [
+        {"type": "youtube", "url": {"resource": "https://www.youtube.com/watch?v=one"}},
+        {"type": "youtube", "url": {"resource": "https://www.youtube.com/watch?v=two"}},
+    ]})
+    assert [l["label"] for l in facts["links"]] == ["YouTube 1", "YouTube 2"]
+
+
 
 # ------------------------------------------------------- finding an artist who has been renamed
 #

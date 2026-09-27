@@ -21,8 +21,9 @@ actually has the pieces an artist page is made of is the one that needs a key:
     everything here treats it as optional and the page still works without it.
 """
 
+import re
 import unicodedata
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 #? The filename STEM each kind is written under. The square one is `artist`, and that is the
 #? whole reason this lands anywhere useful: **Navidrome reads it with no configuration at all**,
@@ -350,15 +351,94 @@ def _host_label(url: str) -> str:
     return SOCIAL_NAMES.get(host) or (host.split(".")[0].capitalize() if host else "Link")
 
 
+#? /web/<timestamp>/<the page it archived> - the timestamp can carry a suffix, like 2011id_
+WAYBACK_PATH = re.compile(r"^/web/[^/]+/(.+)$")
+
+#? a path segment longer than this is an id (a YouTube channel is 24 characters) and is cut short;
+#? the link's tooltip carries the whole address
+SEGMENT_CHARS = 16
+
+
+def _where(url: str) -> tuple[str, list[str], bool]:
+    """
+    Where a link goes: its host without "www.", its path's segments, and whether it's an archive.
+
+    A Wayback Machine address is read as the page it archived, since "web.archive.org" says only
+    that it's an archive, and MusicBrainz keeps a band's long-gone sites that way.
+    """
+    parsed = urlparse(url)
+    host = parsed.netloc.lower().removeprefix("www.")
+    archived = WAYBACK_PATH.match(parsed.path) if host == "web.archive.org" else None
+    if archived:
+        original = archived.group(1)
+        inner_host, segments, _ = _where(original if "://" in original else f"http://{original}")
+        return inner_host, segments, True
+    return host, [unquote(s) for s in parsed.path.split("/") if s], False
+
+
+def _telling_segment(mine: list[str], twins: list[list[str]]) -> str | None:
+    """The deepest segment of this path that its twins (same host, itself included) don't all share."""
+    for i in reversed(range(len(mine))):
+        if any(len(twin) <= i or twin[i] != mine[i] for twin in twins):
+            segment = mine[i]
+            return segment if len(segment) <= SEGMENT_CHARS else segment[:10] + "…"
+    return None
+
+
+def _tell_apart(links: list[dict]) -> None:
+    """
+    Give links that share a label something to tell them apart, in place.
+
+    Portishead has two official sites and two YouTube channels, and read "Official site Official
+    site ... YouTube YouTube". Each gets its host, or where the hosts match, the part of the path
+    that differs: "Official site · portishead.co.uk", "YouTube · UC243a5Rnw…". A link alone under
+    its label is left exactly as it was.
+    """
+    groups: dict[str, list[dict]] = {}
+    for link in links:
+        groups.setdefault(link["label"], []).append(link)
+
+    for label, group in groups.items():
+        if len(group) < 2:
+            continue
+        places = [_where(link["url"]) for link in group]
+        one_host = len({host for host, _, _ in places}) == 1
+
+        for link, (host, segments, archived) in zip(group, places):
+            twins = [other for other_host, other, _ in places if other_host == host]
+            segment = _telling_segment(segments, twins) if len(twins) > 1 else None
+            if segment is not None:
+                where = segment if one_host else f"{host}/{segment}"
+            else:
+                #? the host tells nothing when every link here has it ("YouTube · youtube.com")
+                where = None if one_host else host
+            link["label"] = label + (f" · {where}" if where else "") + (" (archived)" if archived else "")
+
+        #? addresses differing only in their query string still collide, so number what's left
+        counts: dict[str, int] = {}
+        for link in group:
+            counts[link["label"]] = counts.get(link["label"], 0) + 1
+        if any(count > 1 for count in counts.values()):
+            numbered: dict[str, int] = {}
+            for link in group:
+                if counts[link["label"]] > 1:
+                    numbered[link["label"]] = numbered.get(link["label"], 0) + 1
+                    link["label"] += f" {numbered[link['label']]}"
+
+
 def artist_links(relations: list[dict] | None) -> list[dict]:
     """
     The artist's links, grouped and de-duplicated, in LINK_GROUPS order.
 
     "Social network" covers every one of them in MusicBrainz's vocabulary, so a band with a
     Twitter, a Facebook and an Instagram got three links all labelled "Social" and no way to
-    tell which was which. Those are named after where they actually go.
+    tell which was which. Those are named after where they actually go, and links that would
+    still share a label are told apart by `_tell_apart`.
+
+    The same page reached as http and https, or with and without "www." or a trailing slash, is
+    one link: nothing written beside the second could make it a different place.
     """
-    seen: set[str] = set()
+    seen: set[tuple] = set()
     links = []
 
     for wanted, label in LINK_GROUPS.items():
@@ -366,11 +446,16 @@ def artist_links(relations: list[dict] | None) -> list[dict]:
             if relation.get("type") != wanted:
                 continue
             url = (relation.get("url") or {}).get("resource", "")
-            if url and url not in seen:
-                seen.add(url)
+            if not url:
+                continue
+            host, segments, archived = _where(url)
+            place = (host, tuple(segments), urlparse(url).query, archived)
+            if place not in seen:
+                seen.add(place)
                 links.append({"label": _host_label(url) if wanted == "social network" else label,
                               "url": url})
 
+    _tell_apart(links)
     return links
 
 
