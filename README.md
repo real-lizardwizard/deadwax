@@ -301,7 +301,9 @@ It's permanent, there's no undo, and it says so. It refuses anything that isn't 
 ### A settings tab that tells you why something isn't working
 <details>
 <summary style="font-style:italic">Your preferences, and a straight answer about the container's configuration</summary>
-Two halves, deliberately kept apart. The top is <em>yours</em> - format preference, auto-grab, how a new search starts, where the Soulseek candidate filters begin - stored in your browser and saved as you change them.
+Split into tabs — Search, Downloads, Library, Connections and Interface — and a tab says when it holds an unsaved change or a setting that needs attention, so neither can hide behind one you aren't looking at. One save button covers every tab.
+<br><br>
+Two kinds of setting, deliberately kept apart. Some are <em>yours</em> - format preference, auto-grab, how a new search starts, where the Soulseek candidate filters begin - stored in your browser.
 <br><br>
 The bottom is the container's configuration, and most of it is <strong>editable</strong>. Changing a setting stores an override in deadwax's own database and applies it <em>without a restart</em> — it does not write to your <code>.env</code>, because editing that from inside the container wouldn't affect the running process anyway. An override wins over the environment (the alternative would mean your edit silently reverting on the next restart), the row says so, and one click reverts it. Two settings can't be changed here and say why: <code>DB_PATH</code> is the database the overrides live in, and <code>PUID</code>/<code>PGID</code> are applied before Python even starts.
 <br><br>

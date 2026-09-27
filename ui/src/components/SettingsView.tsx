@@ -1,17 +1,81 @@
+import type { ComponentChildren } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import {
   getServerSettings, saveServerSettings,
-  type ServerSetting, type ServerSettings, type SettingUpdate,
+  type ServerSetting, type ServerSettings, type SettingGroup as ServerSettingsGroup, type SettingUpdate,
 } from '../api/settings'
 import * as libraryApi from '../api/library'
 import type { FormatPreference } from '../api/types'
 import { describeRetime, type RetimeTotals } from '../lib/lyrics'
 import { Loading, LoadingPanel } from './Loading'
 import {
-  useDownloadDefaults, usePreferences,
+  readSettingsTab, useDownloadDefaults, usePreferences, writeSettingsTab,
   type DownloadDefaults, type Preferences,
 } from '../state/persisted'
+
+/* ===== tabs (v0.9.15) ===== */
+
+export type SettingsTab = 'search' | 'downloads' | 'library' | 'connections' | 'interface'
+
+const SETTINGS_TABS: readonly { id: SettingsTab; label: string; hint: string }[] = [
+  { id: 'search', label: 'Search', hint: 'Where a new MusicBrainz search starts' },
+  { id: 'downloads', label: 'Downloads', hint: 'Choosing and fetching from Soulseek' },
+  { id: 'library', label: 'Library', hint: 'Paths, organizing, covers and lyrics' },
+  { id: 'connections', label: 'Connections', hint: 'slskd, MusicBrainz and the picture sources' },
+  { id: 'interface', label: 'Interface', hint: 'This browser' },
+]
+
+/**
+ * Which tab a server group belongs on. The server names its groups; a group this doesn't know
+ * yet goes under Library rather than nowhere, so a setting added later is never unreachable.
+ */
+export function tabForGroup(groupId: string): SettingsTab {
+  if (groupId === 'connections') return 'connections'
+  if (groupId === 'downloads') return 'downloads'
+  return 'library'
+}
+
+/** Which tab each preference sits on - for marking a tab that holds an unsaved edit. */
+const PREFERENCE_TAB: Readonly<Record<string, SettingsTab>> = {
+  searchLimit: 'search', searchStudioOnly: 'search', searchSort: 'search',
+  confirmCancel: 'downloads', logOpenOnStart: 'interface',
+}
+
+function prefTab(key: string): SettingsTab {
+  return PREFERENCE_TAB[key] ?? (key.startsWith('candidate') ? 'downloads' : 'interface')
+}
+
+/**
+ * A mark per tab: 'attention' when a server setting on it needs it (or, for Library, when
+ * organizing is blocked), else 'unsaved' when it holds an edit, else nothing.
+ */
+export function tabMarks(
+  server: ServerSettings | null,
+  draftEnv: Record<string, unknown>,
+  draftPrefs: Record<string, unknown>,
+  draftDefaults: Record<string, unknown>,
+): Partial<Record<SettingsTab, 'attention' | 'unsaved'>> {
+  const marks: Partial<Record<SettingsTab, 'attention' | 'unsaved'>> = {}
+  const groupOf = new Map<string, string>()
+  for (const group of server?.groups ?? []) {
+    for (const setting of group.settings) {
+      groupOf.set(setting.key, group.id)
+      if (setting.status === 'error') marks[tabForGroup(group.id)] = 'attention'
+    }
+  }
+  if (server && !server.organizing.enabled && server.organizing.blockers.length) marks.library = 'attention'
+
+  const unsaved = (tab: SettingsTab) => { if (!marks[tab]) marks[tab] = 'unsaved' }
+  for (const key of Object.keys(draftEnv)) unsaved(tabForGroup(groupOf.get(key) ?? ''))
+  for (const key of Object.keys(draftPrefs)) unsaved(prefTab(key))
+  if (Object.keys(draftDefaults).length) unsaved('downloads')
+  return marks
+}
+
+function isTab(value: string | null): value is SettingsTab {
+  return SETTINGS_TABS.some((entry) => entry.id === value)
+}
 
 /**
  * The settings tab.
@@ -330,6 +394,16 @@ export function SettingsView({ active }: { active: boolean }) {
   const [draftDefaults, setDraftDefaults] = useState<Partial<DownloadDefaults>>({})
   const [draftEnv, setDraftEnv] = useState<Record<string, string | null>>({})
 
+  //? remembered per browser, validated on read - a stale or hand-edited value opens Search
+  const [tab, setTab] = useState<SettingsTab>(() => {
+    const saved = readSettingsTab()
+    return isTab(saved) ? saved : 'search'
+  })
+  const chooseTab = (next: SettingsTab) => {
+    setTab(next)
+    writeSettingsTab(next)
+  }
+
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [justSaved, setJustSaved] = useState(false)
@@ -457,9 +531,121 @@ export function SettingsView({ active }: { active: boolean }) {
 
   if (!active) return null
 
+  const serverGroups = (tab: SettingsTab) =>
+    (server?.groups ?? []).filter((group) => tabForGroup(group.id) === tab)
+
+  const renderGroup = (group: ServerSettingsGroup) => (
+    <Section key={group.id} title={group.label} note={group.note}>
+      <div class="settings-env-list">
+        {group.settings.map((setting) => (
+          <SettingRow
+            key={setting.key}
+            setting={setting}
+            draft={draftEnv[setting.key]}
+            onEdit={editEnv}
+            onRevert={revertEnv}
+          />
+        ))}
+      </div>
+      {group.id === 'lyrics' && (
+        <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />
+      )}
+    </Section>
+  )
+
+  //? the server half of a tab: its groups once they have loaded, or why they haven't
+  const serverPart = (tab: SettingsTab, children?: ComponentChildren) => (
+    <>
+      {loading && !server ? <LoadingPanel label="Reading configuration" /> : null}
+      {error ? (
+        <div class="settings-error">
+          <h4 class="text red">Could not read the server configuration</h4>
+          <p class="text default-muted">{error}</p>
+        </div>
+      ) : null}
+      {server ? (
+        <>
+          {children}
+          {serverGroups(tab).map(renderGroup)}
+        </>
+      ) : null}
+    </>
+  )
+
+  const marks = tabMarks(server, draftEnv, draftPrefs, draftDefaults)
+
   return (
     <div id="settings-content">
-      <div class="settings-scroll scrollable">
+      {/*
+        Tabs (v0.9.15, asked for: "some tabs for settings organization instead of a long list").
+        Outside the scroller, like the save bar, so they never scroll away. A tab says when it
+        holds an unsaved change or a setting that needs attention, so neither hides behind one
+        you aren't looking at; the save bar still saves every tab at once.
+      */}
+      <div class="settings-tabs" role="tablist" aria-label="Settings">
+        {SETTINGS_TABS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            role="tab"
+            id={`settings-tab-${entry.id}`}
+            aria-selected={tab === entry.id}
+            class={`view-tab settings-tab${tab === entry.id ? ' active' : ''}`}
+            title={entry.hint}
+            onClick={() => chooseTab(entry.id)}
+          >
+            {entry.label}
+            {marks[entry.id] === 'attention' && <span class="settings-tab-mark is-attention" title="A setting here needs attention" />}
+            {marks[entry.id] === 'unsaved' && <span class="settings-tab-mark" title="Unsaved changes here" />}
+          </button>
+        ))}
+      </div>
+
+      <div class="settings-scroll scrollable" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
+        {tab === 'search' && (
+          <>
+        <Section
+          title="Search"
+          note="Starting values for a new search. Both can still be changed per-search without changing the default."
+        >
+          <Row
+            label="Results per search"
+            hint="How many release groups MusicBrainz is asked for. It caps a page at 100."
+            htmlFor="pref-search-limit"
+            control={
+              <div class="settings-number">
+                <input
+                  id="pref-search-limit"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={shownPrefs.searchLimit}
+                  onInput={(e) =>
+                    editPref('searchLimit', Number((e.currentTarget as HTMLInputElement).value))
+                  }
+                />
+              </div>
+            }
+          />
+
+          <Row
+            label="Studio albums only, by default"
+            hint="Excludes live albums, compilations, interviews and demos from the query — which is what makes it worth doing, since MusicBrainz spends the limit on whatever matches"
+            htmlFor="pref-studio-only"
+            control={
+              <Checkbox
+                id="pref-studio-only"
+                checked={shownPrefs.searchStudioOnly}
+                onChange={(v) => editPref('searchStudioOnly', v)}
+              />
+            }
+          />
+        </Section>
+          </>
+        )}
+
+        {tab === 'downloads' && (
+          <>
         <Section
           title="Downloads"
           note="Applied when deadwax ranks Soulseek candidates and when you grab one."
@@ -511,45 +697,6 @@ export function SettingsView({ active }: { active: boolean }) {
             }
           />
         </Section>
-
-        <Section
-          title="Search"
-          note="Starting values for a new search. Both can still be changed per-search without changing the default."
-        >
-          <Row
-            label="Results per search"
-            hint="How many release groups MusicBrainz is asked for. It caps a page at 100."
-            htmlFor="pref-search-limit"
-            control={
-              <div class="settings-number">
-                <input
-                  id="pref-search-limit"
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={shownPrefs.searchLimit}
-                  onInput={(e) =>
-                    editPref('searchLimit', Number((e.currentTarget as HTMLInputElement).value))
-                  }
-                />
-              </div>
-            }
-          />
-
-          <Row
-            label="Studio albums only, by default"
-            hint="Excludes live albums, compilations, interviews and demos from the query — which is what makes it worth doing, since MusicBrainz spends the limit on whatever matches"
-            htmlFor="pref-studio-only"
-            control={
-              <Checkbox
-                id="pref-studio-only"
-                checked={shownPrefs.searchStudioOnly}
-                onChange={(v) => editPref('searchStudioOnly', v)}
-              />
-            }
-          />
-        </Section>
-
         <Section
           title="Soulseek candidates"
           note="Where the filters in the candidates panel start. Changing them there is temporary; changing them here is the default."
@@ -605,7 +752,65 @@ export function SettingsView({ active }: { active: boolean }) {
             }
           />
         </Section>
+            {serverPart('downloads')}
+          </>
+        )}
 
+        {tab === 'library' && (
+          <>
+            <p class="settings-section-note">
+              These come from your compose file or <code>.env</code>. Changing one here stores an
+              override that wins over the environment and applies without a restart — the row
+              says so, and can be reverted.
+            </p>
+            {serverPart('library', server && (
+              <div class={`settings-verdict${server.organizing.enabled ? ' ok' : ''}`} role="status">
+                <span class="settings-verdict-title">
+                  {server.organizing.enabled
+                    ? 'Organizing is active — finished downloads will be tagged and filed.'
+                    : 'Organizing will not file anything right now.'}
+                </span>
+
+                {server.organizing.blockers.length ? (
+                  <ul class="settings-verdict-list">
+                    {server.organizing.blockers.map((blocker) => (
+                      <li key={blocker}>{blocker}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ))}
+            {server ? (
+              <Section
+                title="Organize modes"
+                note="What ORGANIZE_MODE can be set to, least to most destructive."
+              >
+                <div class="settings-env-list">
+                  {Object.entries(server.organize_modes).map(([mode, description]) => (
+                    <div key={mode} class="settings-mode">
+                      <code class="settings-mode-name">{mode}</code>
+                      <span class="settings-mode-note">{description}</span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            ) : null}
+          </>
+        )}
+
+        {tab === 'connections' && (
+          <>
+            <p class="settings-section-note">
+              Where deadwax finds slskd and MusicBrainz, and the keys for the picture sources. Set
+              in your compose file or <code>.env</code>, and overridable here without a restart.
+              Two settings can't be changed here at all, and say why.
+            </p>
+            {serverPart('connections')}
+          </>
+        )}
+
+        {tab === 'interface' && (
+          <>
         <Section title="Interface">
           <Row
             label="Open the log on start"
@@ -637,84 +842,13 @@ export function SettingsView({ active }: { active: boolean }) {
             }
           />
         </Section>
-
-        {/* ===== server configuration ===== */}
-
-        <div class="settings-divider">
-          <h3 class="settings-section-title">Server configuration</h3>
-          <p class="settings-section-note">
-            These come from your compose file or <code>.env</code>. Changing one here stores an
-            override that wins over the environment and applies without a restart — the row
-            says so, and can be reverted. Two of them can't be changed here at all, and say
-            why.
-          </p>
-        </div>
-
-        {loading && !server ? <LoadingPanel label="Reading configuration" /> : null}
-
-        {error ? (
-          <div class="settings-error">
-            <h4 class="text red">Could not read the server configuration</h4>
-            <p class="text default-muted">{error}</p>
-          </div>
-        ) : null}
-
-        {server ? (
-          <>
-            <div class={`settings-verdict${server.organizing.enabled ? ' ok' : ''}`} role="status">
-              <span class="settings-verdict-title">
-                {server.organizing.enabled
-                  ? 'Organizing is active — finished downloads will be tagged and filed.'
-                  : 'Organizing will not file anything right now.'}
-              </span>
-
-              {server.organizing.blockers.length ? (
-                <ul class="settings-verdict-list">
-                  {server.organizing.blockers.map((blocker) => (
-                    <li key={blocker}>{blocker}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-
-            {server.groups.map((group) => (
-              <Section key={group.id} title={group.label} note={group.note}>
-                <div class="settings-env-list">
-                  {group.settings.map((setting) => (
-                    <SettingRow
-                      key={setting.key}
-                      setting={setting}
-                      draft={draftEnv[setting.key]}
-                      onEdit={editEnv}
-                      onRevert={revertEnv}
-                    />
-                  ))}
-                </div>
-                {group.id === 'lyrics' && (
-                  <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />
-                )}
-              </Section>
-            ))}
-
-            <Section
-              title="Organize modes"
-              note="What ORGANIZE_MODE can be set to, least to most destructive."
-            >
-              <div class="settings-env-list">
-                {Object.entries(server.organize_modes).map(([mode, description]) => (
-                  <div key={mode} class="settings-mode">
-                    <code class="settings-mode-name">{mode}</code>
-                    <span class="settings-mode-note">{description}</span>
-                  </div>
-                ))}
+            {server ? (
+              <div class="settings-version">
+                deadwax <code>v{server.version}</code>
               </div>
-            </Section>
-
-            <div class="settings-version">
-              deadwax <code>v{server.version}</code>
-            </div>
+            ) : null}
           </>
-        ) : null}
+        )}
       </div>
 
       {/*

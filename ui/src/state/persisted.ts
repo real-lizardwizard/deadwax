@@ -32,6 +32,8 @@ export const STORAGE_KEYS = {
   libraryPaneWidth: 'deadwax-library-pane-width',
   /** How the library tree is arranged, and which way round. */
   librarySort: 'deadwax-library-sort',
+  /** Which settings tab was open last (v0.9.15). The literal tab id, not JSON. */
+  settingsTab: 'deadwax-settings-tab',
 } as const
 
 /*
@@ -247,6 +249,14 @@ export function readLibrarySort(): { sort: string; direction: string } | null {
 
 export function writeLibrarySort(value: { sort: string; direction: string }): void {
   writeRaw(STORAGE_KEYS.librarySort, JSON.stringify(value))
+}
+
+export function readSettingsTab(): string | null {
+  return readRaw(STORAGE_KEYS.settingsTab)
+}
+
+export function writeSettingsTab(tab: string): void {
+  writeRaw(STORAGE_KEYS.settingsTab, tab)
 }
 
 /* ===== deadwax-preferences ===== */

@@ -3689,6 +3689,35 @@ span.red { color: var(--red-text); }
     background-color: var(--accent);
 }
 
+/*
+ * The settings tab's own tabs (v0.9.15) - the view tabs' look, a step smaller, and inset to line
+ * up with the settings column below. A mark after the label: amber when a setting there needs
+ * attention, a dot of accent when it holds an unsaved change.
+ */
+.settings-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    flex-shrink: 0;
+    padding-inline: max(var(--space-5), calc((100% - 820px) / 2));
+    padding-top: var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+}
+.settings-tab {
+    font-size: var(--text-xs);
+    padding: var(--space-2) var(--space-3);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+.settings-tab-mark {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background-color: var(--accent);
+}
+.settings-tab-mark.is-attention { background-color: var(--yellow-text); }
+
 /* ---- the library: an explorer ----
  *
  * A tree on the left, the selected thing in detail on the right, a toolbar above and a status

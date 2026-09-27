@@ -1713,6 +1713,20 @@ metadata as well".
 
 ### The settings tab
 
+- **Tabs since v0.9.15** (asked for: "some tabs for settings organization instead of a long
+  list"): Search, Downloads, Library, Connections, Interface, in a strip outside the scroller
+  so it never scrolls away. Server groups are placed by `tabForGroup()` - `connections`,
+  `downloads`, and everything else (paths, organizing, cover art, lyrics, and any group added
+  later, so nothing is ever unreachable) under Library. `tabMarks()` puts an amber mark on a tab
+  with a setting whose status is `error` (Library also when organizing is blocked) and an
+  accent dot on one holding an unsaved edit - drafts span tabs and the save bar still saves all
+  of them, so an edit must not hide behind a tab you've left. The last tab is remembered in
+  `deadwax-settings-tab` (the literal id, validated on read). The server's AUTO_RETRY_PEER group
+  is labelled "When a download fails", beside the client's own "Downloads" section on that tab.
+  **Verified in the real page**: each tab showed its sections, an edit on Search marked Search
+  while Library was open, the choice survived in storage, and at 375px the strip wrapped to two
+  rows with no overflow.
+
 - **The server half is EDITABLE as of v0.5.1**, via exactly the persistence story the
   previous version of this note said it would need: a `settings` table in the sqlite DB, with
   the environment as the fallback. It is NOT written to `.env` — editing that from inside the

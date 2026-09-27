@@ -553,7 +553,7 @@ async def settings():
             },
             {
                 "id": "downloads",
-                "label": "Downloads",
+                "label": "When a download fails",
                 "note": (
                     "A download keeps the rest of the candidates list it was picked from, as "
                     "it was shown - your filters and sort - so a failed one can move to the "
