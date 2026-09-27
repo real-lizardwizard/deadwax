@@ -521,6 +521,8 @@ export interface LibraryResponse {
   scan_seconds: number
   /** How many folders came from cache rather than being re-read. */
   cached: number
+  /** The answer's ETag, which is a hash of its body - see loadScan() in api/library.ts. */
+  etag: string | null
   /** The metadata queue, derived from this scan rather than stored. */
   queue: MetadataQueueSummary
   /** Every issue code the server can raise, keyed by code. The labels the UI renders. */

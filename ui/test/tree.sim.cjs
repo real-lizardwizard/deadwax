@@ -16,7 +16,8 @@ const UI = path.resolve(__dirname, '..');
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-tree-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/libraryTree.ts', 'src/lib/trackFields.ts', 'src/lib/groupAlbums.ts', '--outDir', OUT, '--module', 'commonjs',
+  'src/lib/libraryTree.ts', 'src/lib/trackFields.ts', 'src/lib/groupAlbums.ts', 'src/api/library.ts',
+  '--outDir', OUT, '--module', 'commonjs',
   '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' });
 
@@ -24,6 +25,7 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 const tree = require(path.join(OUT, 'lib/libraryTree.js'));
 const fields = require(path.join(OUT, 'lib/trackFields.js'));
 const grouping = require(path.join(OUT, 'lib/groupAlbums.js'));
+const libraryApi = require(path.join(OUT, 'api/library.js'));
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -183,6 +185,23 @@ console.log('\nwhat an album\'s folders are called (v0.9.13)');
     grouping.folderSummary([ed(true, 1), ed(true, 1)]).label, '2 disc folders');
   check('a split release beside a real second edition',
     grouping.folderSummary([ed(true, 2), ed(true, 2), ed(false, 2)]).label, '2 editions · split discs');
+}
+
+console.log('\ntracks arrive compact and are put back together (v0.9.20, filled in place since v0.9.25)');
+{
+  const response = { albums: [{
+    path: 'A/B', tracks: [
+      { filename: '01.flac', title: 'One' },
+      { filename: '02.flac', title: 'Two', artist: 'A Guest' },
+      { filename: '03.flac', title: '03', has_title_tag: false },
+    ],
+    track_defaults: { artist: 'A', album: 'B', date: '1994' },
+  }] };
+  const [album] = libraryApi.expandTracks(response).albums;
+  check('a track takes the album\'s shared values', [album.tracks[0].artist, album.tracks[0].album, album.tracks[0].date], ['A', 'B', '1994']);
+  check('but its OWN value wins where it differs', album.tracks[1].artist, 'A Guest');
+  check('has_title_tag is true unless the track said otherwise', album.tracks.map((t) => t.has_title_tag), [true, true, false]);
+  check('the defaults are gone once used', 'track_defaults' in album, false);
 }
 
 console.log(failures ? `\n${failures} FAILED\n` : '\nall passed\n');

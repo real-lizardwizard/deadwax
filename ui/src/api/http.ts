@@ -66,16 +66,17 @@ export function get<T>(path: string): Promise<T> {
 }
 
 /**
- * A request whose response HEADERS matter too - the library scan sends the fields that change on
- * every scan as headers, so its body can be answered 304 when the library hasn't changed (v0.9.20).
+ * A successful response, left for the caller to read - for the library scan, whose HEADERS matter
+ * as much as its body: the fields that change on every scan come as headers, so an unchanged
+ * library's body is a 304 (v0.9.20), and its ETag says whether the body needs reading at all.
  */
-export async function requestWithHeaders<T>(path: string, init?: RequestInit): Promise<{ body: T; headers: Headers }> {
+export async function fetchOk(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${BASE}${path}`, init)
   if (!response.ok) {
     const detail = await readDetail(response)
     throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`)
   }
-  return { body: (await response.json()) as T, headers: response.headers }
+  return response
 }
 
 export function put<T>(path: string, body?: unknown): Promise<T> {

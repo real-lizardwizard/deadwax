@@ -61,6 +61,10 @@ const FILED_GATHER_MS = 1000
  * Then a real scan runs underneath it and replaces it. The real scan is cheap when little has
  * changed, but "cheap" still means statting every folder, which on a network share or a
  * spun-down array is exactly the wait this exists to hide.
+ *
+ * When the real scan finds exactly what the saved one said - the usual case - its body is not
+ * even read: the ETags match, so only the scan's time and staleness are updated, and nothing
+ * re-renders but the summary (v0.9.25). See loadScan().
  */
 export function useLibrary(enabled: boolean): LibraryState {
   const [albums, setAlbums] = useState<LibraryAlbum[]>([])
@@ -85,6 +89,8 @@ export function useLibrary(enabled: boolean): LibraryState {
   const latest = useRef(0)
   const inFlight = useRef(0)
   const started = useRef(false)
+  //? the answer on screen, whose ETag lets an identical one go unread
+  const shown = useRef<LibraryResponse | null>(null)
 
   const load = useCallback(async (mode: LoadMode): Promise<LibraryResponse | null> => {
     const id = ++latest.current
@@ -92,11 +98,19 @@ export function useLibrary(enabled: boolean): LibraryState {
     setLoading(true)
 
     try {
-      const result = mode === 'rescan'
-        ? await api.rescan()
-        : await api.listAlbums({ snapshot: mode === 'snapshot' })
+      const answer = await api.loadScan(mode, shown.current?.etag ?? null)
+      //? an unchanged answer is what's on screen with new scan times - and a caller of reload()
+      //? still gets the albums, which are the ones it would have got
+      const result = 'unchanged' in answer ? { ...shown.current!, ...answer } : answer
 
-      if (id === latest.current) {
+      if (id === latest.current && 'unchanged' in answer) {
+        shown.current = result
+        setScanSeconds(result.scan_seconds)
+        setScannedAt(result.scanned_at ?? null)
+        setStale(Boolean(result.stale))
+        setError(null)
+      } else if (id === latest.current) {
+        shown.current = result
         setAlbums(result.albums)
         setArtists(result.artists)
         //? both derived from this same scan, so they can't disagree with the album list they

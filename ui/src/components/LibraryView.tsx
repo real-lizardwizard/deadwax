@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { ApiError } from '../api/http'
 import * as libraryApi from '../api/library'
@@ -95,6 +95,9 @@ function initialOrder(): { sort: TreeSort; direction: SortDirection } {
  * because every answer to it is an album in this library - the views narrow the same tree, and
  * reviewing opens the same editor the command bar does.
  */
+/** How long the library filter waits for typing to pause before re-filtering the tree. */
+const FILTER_SETTLE_MS = 200
+
 export function LibraryView({ active, onNavigate }: Props) {
   const {
     albums, queue, issueTypes, reviewTracking, problem, error, loading, loaded,
@@ -229,7 +232,21 @@ export function LibraryView({ active, onNavigate }: Props) {
     [groups, sort, direction],
   )
 
-  const needle = filter.trim().toLowerCase()
+  /*
+   * The tree follows the box once typing pauses (v0.9.25). A broad match opens every artist and
+   * album it touches, and rendering that on each keystroke - "t", "tr", "tra" - measured 300-400ms
+   * a key on a thousand albums, for trees nobody wanted to see. Emptying the box applies at once.
+   */
+  const [needle, setNeedle] = useState('')
+  useEffect(() => {
+    const settled = filter.trim().toLowerCase()
+    if (!settled) {
+      setNeedle('')
+      return
+    }
+    const timer = setTimeout(() => setNeedle(settled), FILTER_SETTLE_MS)
+    return () => clearTimeout(timer)
+  }, [filter])
   const facetOn = multiOnly || queueOnly || newOnly || issueFilter !== null
   const filtering = needle !== '' || facetOn
 
@@ -350,7 +367,9 @@ export function LibraryView({ active, onNavigate }: Props) {
 
   /* ----- tree interaction ----- */
 
-  const setOpen = (id: string, open: boolean) => {
+  //? these three only set state, so they never change - which is what lets the tree below skip
+  //? a render when nothing it shows has (see `tree`)
+  const setOpen = useCallback((id: string, open: boolean) => {
     setExpanded((current) => {
       const next = new Set(current)
       if (open) next.add(id)
@@ -363,10 +382,10 @@ export function LibraryView({ active, onNavigate }: Props) {
       else next.add(id)
       return next
     })
-  }
+  }, [])
 
   /** A click in the tree: select it and open it, which is how you walk down into the library. */
-  const activate = (row: NodeRow) => {
+  const activate = useCallback((row: NodeRow) => {
     setSelectedId(row.id)
     if ((row.kind === 'artist' || row.kind === 'group' || row.kind === 'edition') && !row.open) {
       setOpen(row.id, true)
@@ -374,12 +393,31 @@ export function LibraryView({ active, onNavigate }: Props) {
     //? a phone opens the details as a sheet for anything with details worth a whole screen;
     //? tapping an artist just opens it in place
     if (row.kind !== 'artist') setSheetOpen(true)
-  }
+  }, [setOpen])
 
-  const selectFromKeyboard = (id: string) => {
+  const selectFromKeyboard = useCallback((id: string) => {
     setSelectedId(id)
     setFocusToken((n) => n + 1)
-  }
+  }, [])
+
+  /*
+   * The tree as an element made once per change to what it shows (v0.9.25). Preact skips a
+   * component whose element is the very one it rendered last time, and this view re-renders on
+   * every keystroke in the filter box - which, with a broad match on screen, meant diffing
+   * twelve thousand rows per key (65ms each, measured) for a filter that hadn't settled yet.
+   */
+  const tree = useMemo(() => (
+    <LibraryTree
+      rows={rows}
+      selected={selectedId}
+      focusToken={focusToken}
+      revealToken={revealToken}
+      issueTypes={issueTypes}
+      onActivate={activate}
+      onSelect={selectFromKeyboard}
+      onToggle={setOpen}
+    />
+  ), [rows, selectedId, focusToken, revealToken, issueTypes, activate, selectFromKeyboard, setOpen])
 
   /** Something in the details pane was picked: select it, and open the tree down to it. */
   const selectFromPane = (id: string) => {
@@ -938,16 +976,7 @@ export function LibraryView({ active, onNavigate }: Props) {
               <p class="text default-muted library-status">Nothing matches that</p>
             )}
 
-            <LibraryTree
-              rows={rows}
-              selected={selectedId}
-              focusToken={focusToken}
-              revealToken={revealToken}
-              issueTypes={issueTypes}
-              onActivate={activate}
-              onSelect={selectFromKeyboard}
-              onToggle={setOpen}
-            />
+            {tree}
           </div>
         </nav>
 

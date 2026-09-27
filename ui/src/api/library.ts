@@ -1,43 +1,66 @@
-import { get, post, requestWithHeaders } from './http'
+import { fetchOk, get, post } from './http'
 import type {
   ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
   DeletionSummary,
-  LibraryAlbum, LibraryResponse, LibraryTrack, LyricsSummary, NewImportsResponse, RetagPlan,
+  LibraryAlbum, LibraryResponse, LyricsSummary, NewImportsResponse, RetagPlan,
   RetagRelease, RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackLyrics,
   TrackTagEdit,
 } from './types'
 
-/**
- * Everything currently in LIBRARY_PATH.
- *
- * The server caches per folder on mtime, so this is cheap to call again — but the first scan
- * of a large library reads tags off every file and can take seconds. Treat it as a load, not
- * a poll.
- *
- * `snapshot` answers from the saved scan without touching the disk, marked `stale`, and falls
- * through to a real scan when nothing has been saved yet. It is what makes the tab open at once.
- */
-export async function listAlbums(options: { snapshot?: boolean } = {}): Promise<LibraryResponse> {
-  return fromWire(await requestWithHeaders<LibraryResponse>(options.snapshot ? '/library/albums?snapshot=true' : '/library/albums'))
-}
+/** What a scan says about itself in its headers - see _SCAN_HEADERS in src/routes/library.py. */
+export type ScanMeta = Pick<LibraryResponse, 'scanned_at' | 'scan_seconds' | 'cached' | 'stale' | 'etag'>
+
+/** A scan whose body is the one already on screen: only what its headers say is new. */
+export type UnchangedScan = ScanMeta & { unchanged: true }
 
 /**
- * A scan as it arrives: the fields that change on every scan come as headers (so an unchanged
- * library's body is a 304 - see _SCAN_HEADERS in src/routes/library.py), and the tracks compact.
- * Both are undone here, at the one place albums arrive.
+ * Everything currently in LIBRARY_PATH: the saved scan (`snapshot`, from the cache, touching no
+ * disk - what makes the tab open at once), a scan, or a forced rescan.
+ *
+ * The server caches per folder on mtime, so a scan is cheap to repeat - but the first one of a
+ * large library reads tags off every file and can take seconds. Treat it as a load, not a poll.
+ *
+ * `shownEtag` is the ETag of the albums already on screen. The ETag is a hash of the body, so an
+ * answer carrying the same one IS what's on screen, and it isn't read at all (v0.9.25): opening
+ * the tab fetches the snapshot and then the scan, and when nothing changed - nearly always - the
+ * scan used to be parsed, rebuilt and re-rendered for nothing, 140ms of a thousand albums on a
+ * fast machine.
  */
-function fromWire({ body, headers }: { body: LibraryResponse; headers: Headers }): LibraryResponse {
+export async function loadScan(
+  mode: 'snapshot' | 'scan' | 'rescan',
+  shownEtag: string | null = null,
+): Promise<LibraryResponse | UnchangedScan> {
+  const response = mode === 'rescan'
+    ? await fetchOk('/library/rescan', { method: 'POST' })
+    : await fetchOk(mode === 'snapshot' ? '/library/albums?snapshot=true' : '/library/albums')
+
+  const meta = scanMeta(response.headers)
+  if (shownEtag && meta.etag === shownEtag) {
+    void response.body?.cancel()
+    return { ...meta, unchanged: true }
+  }
+  //? the tracks arrive compact; undone here, at the one place albums arrive
+  return expandTracks({ ...((await response.json()) as LibraryResponse), ...meta })
+}
+
+/** A real scan, always read whole - for a caller with nothing on screen to compare it to. */
+export async function listAlbums(): Promise<LibraryResponse> {
+  //? with no ETag to match, loadScan always reads the body
+  return (await loadScan('scan')) as LibraryResponse
+}
+
+function scanMeta(headers: Headers): ScanMeta {
   const number = (name: string) => {
     const value = headers.get(name)
     return value === null || value === '' ? null : Number(value)
   }
-  return expandTracks({
-    ...body,
+  return {
     scanned_at: number('X-Scanned-At'),
     scan_seconds: number('X-Scan-Seconds') ?? 0,
     cached: number('X-Scan-Cached') ?? 0,
     stale: headers.get('X-Scan-Stale') === '1',
-  })
+    etag: headers.get('ETag'),
+  }
 }
 
 /**
@@ -48,12 +71,16 @@ function fromWire({ body, headers }: { body: LibraryResponse; headers: Headers }
  */
 export function expandTracks(response: LibraryResponse): LibraryResponse {
   for (const album of response.albums ?? []) {
-    const wire = album as LibraryAlbum & { track_defaults?: Partial<LibraryTrack> }
+    const wire = album as LibraryAlbum & { track_defaults?: Record<string, unknown> }
     const defaults = wire.track_defaults
     if (!defaults) continue
-    //? the wire track is partial - it is the defaults that make it whole
-    album.tracks = album.tracks.map((track) =>
-      ({ ...defaults, has_title_tag: true, ...(track as Partial<LibraryTrack>) }) as LibraryTrack)
+    const fields = Object.keys(defaults)
+    //? filled in place, not rebuilt with spreads: the same tracks, and 3ms rather than 35 for a
+    //? thousand albums (measured) - these objects are fresh from JSON.parse and nobody else's
+    for (const track of album.tracks as unknown as Record<string, unknown>[]) {
+      for (const field of fields) if (!(field in track)) track[field] = defaults[field]
+      if (!('has_title_tag' in track)) track['has_title_tag'] = true
+    }
     delete wire.track_defaults
   }
   return response
@@ -71,10 +98,6 @@ export function trackDetails(albumPath: string): Promise<TrackDetailsResponse> {
 }
 
 /** Drop the server's per-folder cache and read everything again. */
-export async function rescan(): Promise<LibraryResponse> {
-  return fromWire(await requestWithHeaders<LibraryResponse>('/library/rescan', { method: 'POST' }))
-}
-
 /**
  * What applying this release to that album would change. Writes nothing.
  *

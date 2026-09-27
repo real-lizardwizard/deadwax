@@ -134,7 +134,7 @@ the reference. All prefixed `/deadwax/`.
 | `download/jobs` | GET | `{jobs[], tracking_enabled}`. `files_failed` is only present when slskd matched transfers — optional, not always-zero. |
 | `download/jobs/{id}/cancel` | POST | |
 | `download/jobs/clear` | POST | |
-| `library/albums` | GET | `{albums[], artists[], library_path, problem, ...}`. `problem` is a setup message (unset/missing LIBRARY_PATH), NOT an error — render it, don't throw. Since v0.9.20 tracks arrive compact (`track_defaults`) and the per-scan fields as `X-Scan-*` headers, with an ETag — read it through `listAlbums()`, which undoes both. |
+| `library/albums` | GET | `{albums[], artists[], library_path, problem, ...}`. `problem` is a setup message (unset/missing LIBRARY_PATH), NOT an error — render it, don't throw. Since v0.9.20 tracks arrive compact (`track_defaults`) and the per-scan fields as `X-Scan-*` headers, with an ETag — read it through `loadScan()` or `listAlbums()` in `ui/src/api/library.ts`, which undo both. |
 | `library/rescan` | POST | same shape; drops the server's per-folder mtime cache |
 | `library/retag/preview` | POST | `{album_path, release, fetch_art}` → a plan. Writes nothing and fetches nothing, deliberately a separate endpoint from apply rather than a flag. |
 | `library/retag/apply` | POST | same body; recomputes the plan server-side and executes it. Returns `{plan, results}`. |

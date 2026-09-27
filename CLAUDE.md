@@ -2597,6 +2597,30 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
   **Verified end to end**: a download queued from the candidates panel and then cancelled
   showed "next peer, 2 other peers left", and the older failed rows with no peers left showed
   no button.
+- **The library tab on a thousand albums (v0.9.25).** Measured in the real page against the
+  generated library (1,060 folders, 980 albums, 12,720 tracks), with a timer heartbeat for
+  main-thread stalls, since the pane's long-task observer reports nothing:
+  - **An unchanged scan is not read.** Opening the tab drew the snapshot, then parsed, rebuilt
+    and re-rendered the scan behind it: a second stall of 150-200ms for a body that was
+    byte-identical. The ETag is a hash of the body, so `loadScan(mode, shownEtag)` compares it
+    with the one on screen and, on a match, cancels the body and updates only the scan fields
+    from the headers. That is the usual case. `useLibrary` keeps what's on screen in `shown`;
+    `listAlbums()` stays for the settings tab's re-time, which has nothing to compare against.
+  - **`expandTracks` fills in place**: 35ms of object spreads became 3ms, with identical content
+    (checked). `tree.sim.cjs` pins that a track's own value still wins.
+  - **The filter settles for 200ms** (`FILTER_SETTLE_MS`) before the tree follows it; emptying
+    it applies at once. A broad match opens everything it touches, and "t", "tr", "tra" each
+    rendered that tree for nobody.
+  - **The tree is a memoised element**, with its three callbacks made stable (they only set
+    state). The view re-renders on every keystroke, and with 12,720 rows on screen each key
+    diffed all of them: **65ms a key, now 5-7ms.** Preact skips a component whose element is
+    the one it rendered last, so this needs no `preact/compat`.
+  - **Still slow: the first render of a HUGE result.** 12,720 rows is about 160ms of JS and 180ms
+    of layout once warm, more cold. The real fix is windowing the tree, which is a bigger
+    change (varying row heights, focus kept on rows scrolled out of the window, ARIA
+    positions) and hasn't been made. `content-visibility: auto` was tried: it cut layout but
+    added render time, a net 20%, and it brings paint containment and guessed heights. Not
+    kept. A real library meets this only with a very broad song search.
 
 ## Frontend migration (in progress)
 
@@ -2690,7 +2714,7 @@ node ui/test/speed.sim.cjs      # the derived download rate, simulated against a
 node ui/test/queue.sim.cjs      # the tab badge and the review queue agreeing on what's outstanding
 node ui/test/downloads.sim.cjs  # optimistic overlays incl. the wrong-prediction paths, and announcing filed albums
 node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and relevance-as-no-op
-node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices
+node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices, compact tracks
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
 node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
 node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes about it
