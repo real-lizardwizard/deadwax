@@ -55,6 +55,7 @@ the tab's own overrides are stored, and `PUID`/`PGID` are used before the app st
 | `ORGANIZE_MODE` | `dry_run` | what happens when a download finishes. `off`: nothing. `dry_run`: the log says where each file would go, and nothing is written. `copy`: files are tagged and copied into the library, and slskd's copies stay. `move`: files are tagged and moved, and slskd's emptied folder is removed. See [Organizing](organizing.md). |
 | `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | how an album's folder is named. The artist folder above it is always the artist. See [folder names](organizing.md#folder-names). |
 | `COUNTRY_IN_FOLDER` | `off` | `on` lets a release's country name its folder when nothing else tells the pressing apart, as in `Dummy (1994) [GB]`. Two different releases never share a folder either way. |
+| `RETAG_RENAME_WAIT` | `20` | seconds the metadata editor waits between writing an album's new tags and renaming its folder, when an apply changes both. Navidrome keeps plays, ratings and favourites across either change, but not both at once. `0` renames straight away. From 0 to 300. |
 
 ### Soulseek searches (Settings → Downloads)
 
@@ -86,6 +87,7 @@ the tab's own overrides are stored, and `PUID`/`PGID` are used before the app st
 | setting | default | what it does |
 | --- | --- | --- |
 | `PUID` / `PGID` | `1000` / `1000` | the user and group the app runs as, and so the owner of every file it writes. Match them to slskd and your other media containers. |
+| `TRUSTED_ORIGINS` | | environment only. deadwax refuses changes that another website sends, by checking each request's `Origin` against the address it's being reached at. Behind a reverse proxy that rewrites the `Host` header (nginx does unless told `proxy_set_header Host $host`), every change looks foreign. List the address you open deadwax at here, comma-separated with the scheme, e.g. `https://music.example.com`. It can't be set in the settings tab, because it guards that tab's own save. |
 
 ## Preferences (per browser)
 

@@ -125,7 +125,11 @@ and album tags. You:
 4. **Cover art**: tick **download cover art** to save the release's cover from the Cover Art
    Archive, and compare it with the one you have (**Compare full size**) before replacing it.
 5. **Apply** writes the tags, fetches the cover and moves the folder. There's no undo, which is
-   why the preview shows everything first.
+   why the preview shows everything first. When the apply changes both the album's tags and its
+   folder, it writes the tags, pauses (20 seconds by default, `RETAG_RENAME_WAIT`), then
+   renames. That pause lets Navidrome see the new tags first and keep the album's plays,
+   ratings and favourites, which it loses when both change at once. The preview says so, and
+   the button counts it down.
 
 ![The metadata editor on an untagged rip of Third: its issues listed, the release picked, and the preview of the tags, the cover and the folder move](../assets/images/editor.png)
 

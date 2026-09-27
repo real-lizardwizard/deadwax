@@ -908,6 +908,14 @@ export function MetadataEditor(
                   </div>
                 )}
 
+                {/* said before the click, so a paused Apply doesn't read as stuck (v1.0.1) */}
+                {plan.moves && Boolean(plan.rename_wait) && (
+                  <h5 class="text white-tertiary metadata-status">
+                    {`Writes the tags first and renames ${plan.rename_wait}s later, so Navidrome keeps `
+                      + `this album's plays, ratings and favourites.`}
+                  </h5>
+                )}
+
                 {/* the discs of one release stored one folder per disc (v0.9.13) */}
                 {plan.merge && plan.merge_detail && (
                   <h5 class="text default metadata-status">
@@ -1014,7 +1022,9 @@ export function MetadataEditor(
               disabled={!plan || plan.empty || planning || applying || loadingRelease}
               onClick={() => void apply()}
             >
-              {applying ? <Loading label="Applying" /> : 'Apply'}
+              {applying
+                ? <Loading label={plan?.rename_wait ? `Applying, renaming in ${plan.rename_wait}s` : 'Applying'} />
+                : 'Apply'}
             </button>
           )}
         </div>

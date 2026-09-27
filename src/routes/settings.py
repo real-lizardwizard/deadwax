@@ -50,8 +50,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from src import __version__
-from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, SEARCH_TIMEOUT_RANGE, Config,
-                        build_user_agent, parse_search_timeout,
+from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config,
+                        build_user_agent, parse_rename_wait, parse_search_timeout,
                         describe_contact, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env)
 from src.logger import logger
@@ -368,6 +368,29 @@ def _album_folder_row() -> dict:
     )
 
 
+def _rename_wait_row() -> dict:
+    """RETAG_RENAME_WAIT, in seconds."""
+    value = Config.RETAG_RENAME_WAIT
+    seconds = parse_rename_wait(value)
+    low, high = RENAME_WAIT_RANGE
+    if seconds is None:
+        effect = "unrecognised - applying a release waits 20s before renaming"
+    elif seconds == 0:
+        effect = ("Applying a release renames the folder straight away. Navidrome loses the album's "
+                  "plays, ratings and favourites when its tags and folder change together")
+    else:
+        effect = (f"Applying a release that changes an album's tags AND its folder writes the tags, "
+                  f"waits {seconds}s for Navidrome to see them, then renames - so Navidrome keeps "
+                  f"the album's plays, ratings and favourites. 0 renames straight away")
+    return _setting(
+        "RETAG_RENAME_WAIT",
+        value,
+        effect=effect,
+        status="ok" if seconds is not None else "error",
+        detail=None if seconds is not None else f"expected whole seconds, {low} to {high}",
+    )
+
+
 def _search_timeout_row() -> dict:
     """SLSKD_SEARCH_TIMEOUT, in seconds."""
     value = Config.SLSKD_SEARCH_TIMEOUT
@@ -604,6 +627,7 @@ async def settings():
                     ),
                     _country_row(),
                     _album_folder_row(),
+                    _rename_wait_row(),
                 ],
             },
             {
@@ -712,6 +736,10 @@ def _validate(key: str, value: str) -> str | None:
     if key == "SLSKD_SEARCH_TIMEOUT" and parse_search_timeout(value) is None:
         low, high = SEARCH_TIMEOUT_RANGE
         return f"expected whole seconds, {low} to {high} - 8 is the default"
+
+    if key == "RETAG_RENAME_WAIT" and parse_rename_wait(value) is None:
+        low, high = RENAME_WAIT_RANGE
+        return f"expected whole seconds, {low} to {high} - 20 is the default, 0 renames straight away"
 
     if key == "AUTO_RETRY_PEER" and value not in AUTO_RETRY_CHOICES:
         return f"expected one of {', '.join(AUTO_RETRY_CHOICES)}"

@@ -25,6 +25,8 @@ confidently wrong deployment advice. Don't bring them back.
 | --- | --- |
 | `main` | **the release line since 1.0.0** (2026-09-27, asked for), fast-forwarded to experimental. Until then it held the old Lidarr-based v0.2.1, which is still tag `v0.2.1`. |
 | `experimental/slskdn-no-lidarr` | **all the work below.** slskd-direct, no Lidarr. v0.3.0 to v0.9.2 were tagged from here, and `:experimental` is built from it. |
+| `player-spike` | **the multi-user and phone-player work, from 1.0.0** (moved there on 2026-09-27, asked for). 1.0.1 is its first commit. Local only: nothing builds an image from it. |
+| `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2), kept for step 1's port. Everything after it on that branch shipped on experimental. |
 
 ### The name (v0.6.21)
 
@@ -118,7 +120,8 @@ src/
                    writing is narrow - see "CD art and embedded pictures".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
-                   lrclib_endpoint.py (LRCLIB), app.py
+                   lrclib_endpoint.py (LRCLIB), app.py, same_origin.py (refuses
+                   writes another website asks for - see "The 1.0.1 fixes")
   routes/          search_musicbrainz, download, monitor_slskd, interface_logs, library,
                    settings (editable since v0.5.1 - see "The settings tab")
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
@@ -130,7 +133,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             880 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             913 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -812,6 +815,62 @@ template()` is the one reader of the setting, beside `country_in_folder()`.
   remaster] and Portishead/Dummy (1994)`, then `1975 - Wish You Were Here [2011 remaster]` and
   `1994 - Dummy` once `{year} - {album} [{edition}]` was saved; `{year}` alone was refused
   ("it needs {album}"); reverting put the default back.
+
+### The 1.0.1 fixes (step 0 of the multi-user plan)
+
+Four problems found while planning multi-user deadwax (the plan is a Claude Doc, linked from
+the agent's memory), each affecting the single-user install as it stands. Shipped together.
+
+- **Writes another website asks for are refused** (`src/api/same_origin.py`, plain ASGI and the
+  OUTERMOST middleware). A page elsewhere could make the browser POST to deadwax: FastAPI reads
+  a JSON body with no Content-Type, and body-less routes (cancel, retry, clear, rescan) take a
+  form post. A cookie can't fix that later either, because every port on one host is the SAME
+  site to a browser, so Navidrome's, slskd's and the NAS's own pages count as same-site. So the
+  guard checks what browsers attach to every cross-origin POST and can't be told to forge:
+  `Origin` (falling back to `Referer`) must name the host:port deadwax is reached at, via `Host`
+  or `X-Forwarded-Host` (a cross-site page can't set that without a preflight). Scheme is
+  ignored so TLS-terminating proxies work; `null` is refused; a request with neither header
+  (curl, scripts, the HEALTHCHECK's GET) passes. `TRUSTED_ORIGINS` is ENVIRONMENT-ONLY on
+  purpose: it guards the settings tab's own save. **Residual risk: DNS rebinding** (Origin and
+  Host both the attacker's name) gets past it; logins will close that, since a session cookie
+  is bound to deadwax's own host name. **Verified** in the real page: its own Rescan passed, and
+  a page on another port POSTing to rescan and enqueue got 403 on both, logged.
+- **A second copy of a held release isn't filed beside the first** (`existing_track_keys`,
+  `_planned_track_key` in organizer.py). `resolve_album_dir` shares a folder holding the same
+  release, and `execute_plan` only refused an exact existing filename, so a FLAC and then an
+  MP3 landed side by side (one album, each track twice in Navidrome); a grab without a
+  tracklist keeps the sharer's filenames and did it even in one format. Now a planned track
+  whose (disc, track) is already in the folder gets `duplicate_of` and is skipped. Keys come
+  from the files' own tags, with the `NN - ` name as a fallback. A matched track is numbered
+  exactly as `tag_values` numbers it (per disc on multi-disc, running otherwise), and an
+  unmatched file is asked its own tags. A MISSING track still files, so a later download
+  fills gaps. Skipped duplicates count as skipped, so a move's clean-up keeps the slskd folder
+  (unfiled music is in it), and an all-duplicate job ends "already in the store: all N
+  track(s) were already there".
+- **A card's Find downloads a real pressing** (`representativeRelease` in tracklistDiff.mjs,
+  pinned in `tracklist.sim.cjs`). It sent `release_mbid: null` and `tracks: []`, so the album
+  filed untagged (or kept the sharer's release id) and no "already held" check could ever match
+  it. It now uses the card's pressings (or fetches them, with a sweep on the button). It picks
+  the group's most common tracklist (chooseBase), then Official, then CD or Digital Media only,
+  then the earliest date. It builds the payload with the ROW's builder, `buildExpectedFromRelease`,
+  so both Finds send the same shape. MusicBrainz unreachable falls back to the old group-level
+  payload, which now carries `release_group_mbid`. A `findRequests` latestOnly guard means a
+  slow lookup never opens over a newer Find. `write_tags` also deletes a sharer's
+  `musicbrainz_albumid` when the job names no release, since `tag_values` skips empty values.
+  **Verified** in the real page: Dummy's card sent an 11-track Official CD pressing; the
+  2009 box set's card fetched first and sent its EU 2xCD pressing.
+- **Apply-release is two steps when it has to be** (`changes_player_ids`, `move_retagged` in
+  retag.py; the route in library.py). Navidrome keeps every user's plays, ratings, favourites
+  and playlist entries across a retag in place, or a rename with the same tags, but NOT both in
+  one scan (phase 1 maps old to new album ids only at the same path; phase 2 pairs missing
+  tracks only by the same PID). A one-step apply was exactly that. When an apply changes an id
+  tag (`musicbrainz_albumid`, title, track or disc number) AND moves or merges, the route writes
+  the tags, sleeps `RETAG_RENAME_WAIT` seconds (default 20: the watcher reacts after 5s, a
+  one-folder scan takes about a second), then renames. The preview carries `rename_wait`, so the
+  editor says it up front and Apply reads "Applying, renaming in Ns". **A fixed wait is the
+  stopgap**: with the Navidrome connection (step 1), poll `getScanStatus` instead. **Verified** in
+  the real page with a 6s wait: tags written, then the wait, then "re-filed Third rip as Third
+  (2008) [...]".
 
 ### Browsing a discography, and ordering results
 
@@ -2906,7 +2965,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 880 tests
+.venv/bin/python -m pytest tests/ -q  # 913 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2950,7 +3009,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 880 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 913 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

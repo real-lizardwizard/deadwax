@@ -107,6 +107,23 @@ const SLOW_RUSH = [['One More Year', 322], ['Instant Destiny', 193], ['Borderlin
   check('a track with no length is never a length change', T.isSameTracklist(T.diffTracklists(T.releaseTracks(release('b', DUMMY_10)), T.releaseTracks(unknown))), true);
   check('formatSeconds', [T.formatSeconds(257), T.formatSeconds(null)], ['4:17', '']);
 
+  console.log('\nthe pressing a card\'s Find downloads as (v1.0.1)');
+  const pressed = (id, tracks, extra) => ({ ...release(id, tracks), ...extra });
+  const cd = { status: 'Official', media: undefined };
+  const dummyGroup = [
+    pressed('2017-vinyl', DUMMY_10, { status: 'Official', date: '2017-01-01', format: '12" Vinyl' }),
+    pressed('promo', DUMMY_10, { status: 'Promotion', date: '1994-06-01', format: 'CD' }),
+    pressed('us-cd', withFire("'"), { status: 'Official', date: '1995-01-01', format: 'CD' }),
+    pressed('uk-cd', DUMMY_10, { status: 'Official', date: '1994-08-22', format: 'CD' }),
+    pressed('eu-cd', DUMMY_10, { status: 'Official', date: '1994-09-01', format: 'CD' }),
+  ].map(({ format, ...r }) => ({ ...r, media: r.media.map((m) => ({ ...m, format })) }));
+  check('the most common tracklist, Official, CD, earliest', T.representativeRelease(dummyGroup).id, 'uk-cd');
+  check('an Official vinyl beats a CD promo when nothing plainer shares its tracklist',
+    T.representativeRelease(dummyGroup.filter((r) => ['2017-vinyl', 'promo'].includes(r.id))).id, '2017-vinyl');
+  check('a lone pressing with tracks is chosen', T.representativeRelease([release('only', DUMMY_10)]).id, 'only');
+  check('no tracks anywhere: nothing to stand for the album', T.representativeRelease([{ id: 'x', media: [] }, cd]), null);
+  check('an empty group: nothing', T.representativeRelease([]), null);
+
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
   process.exit(failures ? 1 : 0);
 })();

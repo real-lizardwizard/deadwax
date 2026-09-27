@@ -1,7 +1,7 @@
 import { init} from './init.js';
 import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel } from './sort.mjs';
 import { getArtistIds, getArtistNames, getCurrentArtistNames } from './credits.mjs';
-import { chooseBase, diffTracklists, formatSeconds, releaseTracks, summarizeDiff } from './tracklistDiff.mjs';
+import { chooseBase, diffTracklists, formatSeconds, releaseTracks, representativeRelease, summarizeDiff } from './tracklistDiff.mjs';
 import { buildOwnedIndex, describeFolders, describeGroupOwnership, ownedForGroup, ownedForRelease } from './owned.mjs';
 import { isAbort, latestOnly } from './latest.mjs';
 
@@ -363,12 +363,12 @@ async function searchReleaseGroups(query, signal) {
 
 
 
-async function fetchReleases(releaseGroupMbid) {
+async function fetchReleases(releaseGroupMbid, signal = undefined) {
     const params = new URLSearchParams({
         release_group_mbid: releaseGroupMbid
     });
 
-    const response = await fetch(`/deadwax/search_musicbrainz/releases?${params}`);
+    const response = await fetch(`/deadwax/search_musicbrainz/releases?${params}`, { signal });
 
     if (!response.ok) {
         const error = await response.json();
@@ -910,8 +910,15 @@ function renderSearchResults() {
  * Both go when the grid is ported.
  */
 function openCandidatesPanel(expected, label) {
+    //? a card's Find still looking up its pressings must not open over a Find pressed since
+    findRequests.supersede();
     window.deadwax?.openCandidates?.(expected, label);
 }
+
+//? The card-level Find looks up the album's pressings before it opens anything (v1.0.1), which
+//? can take MusicBrainz a while - so only the newest Find may open the panel. Every open
+//? supersedes whatever lookup is still waiting.
+const findRequests = latestOnly();
 
 
 function buildExpectedFromRelease(release, releaseGroupContext) {
@@ -982,7 +989,9 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
 
 function buildExpectedFromReleaseGroup(releaseGroupContext) {
     // No specific release picked, so there's no tracklist to match against. The matcher
-    // drops the tracklist-dependent signals rather than scoring these as failures.
+    // drops the tracklist-dependent signals rather than scoring these as failures. Since
+    // v1.0.1 this is only the fallback, for when MusicBrainz can't say which pressings the
+    // album has: a card's Find normally stands for a real pressing (representativeRelease).
     //
     // The OTHER way a download starts, and the one the current-name change first missed: it
     // does not go through buildExpectedFromRelease, so its folder name has to be set here too.
@@ -995,6 +1004,7 @@ function buildExpectedFromReleaseGroup(releaseGroupContext) {
         album: releaseGroupContext.album,
         year: releaseGroupContext.year,
         release_mbid: null,
+        release_group_mbid: releaseGroupContext.releaseGroupId || null,
         edition_tags: [],
         tracks: [],
     };
@@ -2280,11 +2290,54 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
         });
     }
 
-    div.querySelector('.addButton').addEventListener('click', async () => {
-        await openCandidatesPanel(
-            buildExpectedFromReleaseGroup(releaseGroupContext),
-            `${artist} - ${title}`
-        );
+    //? the album's pressings, once anything on this card has fetched them - the search's best
+    //? match arrives with them, Fetch releases fills them in, and so does the Find below
+    let knownReleases = releases?.length ? releases : null;
+
+    const findButton = div.querySelector('.addButton');
+    findButton.addEventListener('click', async () => {
+        if (findButton.disabled) return;
+
+        /*
+         * Find on the CARD downloads the album as ONE real pressing (v1.0.1). It used to send no
+         * release at all, so the album was filed with no release id - untagged, or carrying the
+         * id the sharer's own tagger wrote - and nothing could ever tell afterwards that it was
+         * already held. representativeRelease picks the least surprising pressing: the most
+         * common tracklist, Official, CD or digital, earliest. Its tracklist also gives the
+         * matcher something to score against, which the group-level search never had.
+         */
+        const request = findRequests.begin();
+        let pressings = knownReleases;
+        if (!pressings) {
+            findButton.disabled = true;
+            findButton.classList.add('loading-blocks');
+            findButton.setAttribute('aria-busy', 'true');
+            try {
+                pressings = (await fetchReleases(releaseGroupId, request.signal)).releases || [];
+                knownReleases = pressings.length ? pressings : null;
+            }
+            catch (error) {
+                if (!request.current() || isAbort(error)) return;
+                //? MusicBrainz is unreachable more often than anyone would like: fall back to the
+                //? album as a whole, which searches exactly as a card's Find always did
+                pressings = [];
+            }
+            finally {
+                findButton.disabled = false;
+                findButton.classList.remove('loading-blocks');
+                findButton.removeAttribute('aria-busy');
+            }
+        }
+        if (!request.current() || !div.isConnected) return;
+
+        const pressing = representativeRelease(pressings);
+        if (!pressing) {
+            openCandidatesPanel(buildExpectedFromReleaseGroup(releaseGroupContext), `${artist} - ${title}`);
+            return;
+        }
+        const expected = buildExpectedFromRelease(pressing, releaseGroupContext);
+        const editionSuffix = expected.edition_tags.length ? ` [${expected.edition_tags.join(', ')}]` : '';
+        openCandidatesPanel(expected, `${artist} - ${expected.album}${editionSuffix}`);
     });
 
     if (releases?.length) {
@@ -2321,6 +2374,7 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
 
                 fetchButton.parentElement.querySelector('hr').remove();
                 fetchButton.remove();
+                knownReleases = result.releases?.length ? result.releases : knownReleases;
                 mountReleases(div, sortReleasesByDateDesc(result.releases), releaseGroupId, releaseGroupContext);
 
                 /*

@@ -103,6 +103,44 @@ export function chooseBase(releases) {
   };
 }
 
+//? formats a folder name shouldn't be built around when a plainer pressing exists - a vinyl or
+//? cassette pressing's format ends up as the edition label ("[12" Vinyl]")
+const PLAIN_FORMATS = ['CD', 'Digital Media'];
+
+/**
+ * The one pressing a group-level Find downloads as (v1.0.1).
+ *
+ * A Find on an album's card used to send no release at all, so the album was filed with no
+ * release id - untagged, or carrying whatever id the sharer's own tagger wrote - and nothing
+ * could later tell it was already held. It now stands for a real pressing, chosen to be the
+ * least surprising one: its tracklist is the group's most common (what a Soulseek folder most
+ * likely holds, and what chooseBase shows), then an Official release over a promo or bootleg,
+ * then a CD or digital release over vinyl or cassette, then the earliest. Null when no release
+ * in the group lists any tracks.
+ */
+export function representativeRelease(releases) {
+  const withTracks = releases.filter((release) => releaseTracks(release).length);
+  if (!withTracks.length) return null;
+
+  const base = chooseBase(withTracks);
+  const key = base ? tracklistKey(base.tracks) : null;
+  const pool = key ? withTracks.filter((release) => tracklistKey(releaseTracks(release)) === key) : withTracks;
+
+  const plain = (release) => (release.media || []).length > 0
+    && release.media.every((medium) => PLAIN_FORMATS.includes(medium.format));
+  const date = (release) => release.date || release['release-events']?.[0]?.date || '9999';
+  const rank = (release) => [release.status === 'Official' ? 0 : 1, plain(release) ? 0 : 1, date(release)];
+
+  return pool.reduce((best, release) => {
+    const [a, b] = [rank(release), rank(best)];
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] < b[i]) return release;
+      if (a[i] > b[i]) return best;
+    }
+    return best;
+  });
+}
+
 /** Whether a difference in length is another version of the song rather than rounding. */
 export function isOtherVersion(deltaSeconds, baseSeconds) {
   return Math.abs(deltaSeconds) >= Math.max(OTHER_VERSION_S, (baseSeconds || 0) * OTHER_VERSION_SHARE);
