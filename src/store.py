@@ -170,6 +170,8 @@ MAX_ALTERNATIVES = 10
 OPEN_STATUSES = ("queued", "downloading")
 #? what "clear finished" is allowed to delete - anything still moving is excluded
 CLEARABLE_STATUSES = ("complete", "organized", "failed", "cancelled")
+#? what "try the next peer" can start again - anything still moving is left to finish
+RETRYABLE_STATUSES = ("failed", "cancelled")
 
 
 def _now() -> str:
@@ -218,7 +220,8 @@ class JobStore:
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> dict:
         job = dict(row)
-        job["release"] = json.loads(job.pop("release_json"))
+        if "release_json" in job:  # list_jobs() leaves it out
+            job["release"] = json.loads(job.pop("release_json"))
         job["files"] = json.loads(job.pop("files_json"))
         job["alternatives"] = json.loads(job.pop("alternatives_json", None) or "[]")
         job["tried"] = json.loads(job.pop("tried_json", None) or "[]")
@@ -265,13 +268,31 @@ class JobStore:
             return None
 
     async def list_jobs(self, limit: int = 50) -> list[dict]:
+        """
+        The newest jobs as the downloads panel polls them - twice a second while it's open.
+
+        Without the stored release, and with the runners-up cut down to their usernames - and read
+        at all only for a job "try the next peer" can restart, the one place the panel counts
+        them (v0.9.24). Fifty jobs used to decode 1.4 MB of JSON a poll, nearly all of it the
+        runners-up's file lists; even having SQLite pull out just the usernames cost 3ms, for
+        rows that mostly finished long ago. get_job() has the whole row.
+        """
         if not self.available:
             return []
 
         def read():
             with self._connect() as connection:
                 rows = connection.execute(
-                    "SELECT * FROM jobs ORDER BY id DESC LIMIT ?", (limit,)
+                    """
+                    SELECT id, release_mbid, artist, album, year, username, directory, files_json,
+                           status, error, created_at, updated_at, tried_json,
+                           CASE WHEN status IN ({retryable}) THEN
+                               (SELECT json_group_array(json_object('username', json_extract(value, '$.username')))
+                                  FROM json_each(alternatives_json))
+                           ELSE '[]' END AS alternatives_json
+                      FROM jobs ORDER BY id DESC LIMIT ?
+                    """.format(retryable=", ".join("?" * len(RETRYABLE_STATUSES))),
+                    (*RETRYABLE_STATUSES, limit),
                 ).fetchall()
                 return [self._row_to_job(r) for r in rows]
 

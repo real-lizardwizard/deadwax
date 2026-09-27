@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.poller import untried_alternatives  # noqa: E402
 from src.store import (  # noqa: E402
     JobStore,
     index_transfers_by_user,
@@ -147,9 +148,36 @@ def test_store_roundtrip(tmp_path):
     assert len(jobs) == 1
     assert jobs[0]["status"] == "queued"
     assert jobs[0]["username"] == "bob"
-    # the release is stored denormalized so organizing never needs MusicBrainz again
-    assert jobs[0]["release"]["tracks"][0]["title"] == "x"
     assert jobs[0]["files"][0]["filename"] == "share/album/01.flac"
+    # the release is stored denormalized so organizing never needs MusicBrainz again
+    assert asyncio.run(store.get_job(job_id))["release"]["tracks"][0]["title"] == "x"
+
+
+def test_the_panels_list_carries_what_it_reads_and_no_more(tmp_path):
+    """
+    list_jobs() is polled twice a second with the panel open. It leaves out the stored release,
+    and reads the runners-up - as usernames, which is all "how many peers are left" needs - only
+    for a job "try the next peer" can restart. get_job() still has the whole row.
+    """
+    store = JobStore(str(tmp_path / "jobs.db"))
+    store.init()
+    alternatives = [{"username": f"peer{n}", "directory": "d", "files": [{"filename": "f", "size": 1}], "score": 0.5}
+                    for n in range(3)]
+    job_id = asyncio.run(store.create_job("bob", "share/album", [{"filename": "01.flac", "size": 1}],
+                                          {"artist": "a", "album": "b", "tracks": [{"title": "x"}]}, alternatives))
+
+    queued = asyncio.run(store.list_jobs())[0]
+    assert "release" not in queued
+    assert queued["alternatives"] == [], "still downloading: nothing reads them"
+
+    asyncio.run(store.update_status(job_id, "failed", "peer vanished"))
+    failed = asyncio.run(store.list_jobs())[0]
+    assert failed["alternatives"] == [{"username": "peer0"}, {"username": "peer1"}, {"username": "peer2"}]
+    assert untried_alternatives(failed) == failed["alternatives"]
+
+    whole = asyncio.run(store.get_job(job_id))
+    assert whole["alternatives"] == alternatives
+    assert whole["release"]["tracks"] == [{"title": "x"}]
 
 
 def test_store_status_transitions(tmp_path):

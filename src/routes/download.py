@@ -11,8 +11,8 @@ from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
 from src.poller import retry_next_peer, tidy_cancelled_later, tidy_cancelled_transfers, untried_alternatives
-from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, index_transfers_by_user,
-                       summarize_transfers)
+from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
+                       index_transfers_by_user, summarize_transfers)
 
 router = APIRouter()
 
@@ -478,8 +478,6 @@ async def jobs(request: Request):
         merged = []
         for job, summary, queue_position in zip(stored, summaries, positions):
             merged.append({
-                #? how many other peers "try next peer" could still move it to - 0 hides the button
-                "alternatives_left": len(untried_alternatives(job)),
                 "attempt": max(1, len(job.get("tried") or [])),
                 "id": job["id"],
                 "artist": job["artist"],
@@ -492,6 +490,10 @@ async def jobs(request: Request):
                 "created_at": job["created_at"],
                 "queue_position": queue_position,
                 **summary,
+                #? how many other peers "try next peer" could still move it to - only where it can
+                #? (list_jobs reads the runners-up for no other job), and 0 hides the button
+                **({"alternatives_left": len(untried_alternatives(job))}
+                   if job["status"] in RETRYABLE_STATUSES else {}),
             })
 
         return {"jobs": merged, "tracking_enabled": store.available}
@@ -597,9 +599,6 @@ async def cancel_job(request: Request, job_id: int):
         logger.error(f"Exception in /jobs/{job_id}/cancel: {e}")
         raise HTTPException(status_code=500, detail=f"Error cancelling download: {e}")
 
-
-#? what "try the next peer" can start again - anything still moving is left to finish
-RETRYABLE_STATUSES = ("failed", "cancelled")
 
 
 @router.post("/jobs/{job_id}/retry")

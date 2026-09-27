@@ -130,7 +130,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             866 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             867 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2585,6 +2585,18 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
   outside click. **A range slider's own drag was never affected**: Chrome keeps the pointer on
   the slider, so its click lands on the slider. Measured by dragging one on the OLD build,
   because the first draft of this change assumed otherwise.
+- **The downloads poll reads only what the panel shows (v0.9.24).** `list_jobs()` runs twice a
+  second with the panel open, and decoded every job in full: the stored release, and up to ten
+  runners-up with their whole file lists. 50 jobs came to 1.4 MB of JSON and 7.2ms a poll on
+  this Mac (a NAS CPU is several times slower). The panel reads neither. It now selects no
+  release, and extracts the runners-up's usernames in SQL, and only for failed or cancelled
+  jobs, the only rows that show "next peer". It sends `alternatives_left` for those rows only.
+  Even that extraction costs 3ms over fifty rows, which is why it is gated. **1.3-1.6ms now.**
+  `get_job()` still returns the whole row, so the retry and the organizer are unchanged.
+  `RETRYABLE_STATUSES` moved into store.py, where both the route and the query read it.
+  **Verified end to end**: a download queued from the candidates panel and then cancelled
+  showed "next peer, 2 other peers left", and the older failed rows with no peers left showed
+  no button.
 
 ## Frontend migration (in progress)
 
@@ -2661,7 +2673,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 866 tests
+.venv/bin/python -m pytest tests/ -q  # 867 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2705,7 +2717,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 866 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 867 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
