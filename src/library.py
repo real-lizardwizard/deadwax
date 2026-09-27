@@ -42,7 +42,8 @@ from src.lyrics import has_lyrics_file, lyrics_filename
 #?   4  albums carry `disc_art`
 #?   5  albums carry `release_group_mbid`
 #?   6  albums carry `discs`, the disc numbers their files are tagged with
-SCAN_FORMAT = 6
+#?   7  albums carry `albumartist_mbids` - WHO the album is by, as MusicBrainz ids
+SCAN_FORMAT = 7
 
 #? path -> (mtime, album dict). Reading tags costs milliseconds per file and a real library
 #? is thousands of files, so a rescan re-reads only the folders that actually changed. The
@@ -381,6 +382,15 @@ def load_album_art(directory: Path) -> tuple[bytes, str] | None:
     return None
 
 
+def _all(audio, key: str) -> list[str]:
+    """Every value of a tag, stripped, empties dropped - [] when absent."""
+    try:
+        values = audio.get(key) or []
+    except Exception:
+        return []
+    return [text for text in (str(v).strip() for v in values) if text]
+
+
 def _first(audio, key: str) -> str:
     """mutagen's easy interface returns lists. Take the first value, or ''."""
     try:
@@ -454,6 +464,10 @@ def read_track(path: Path) -> dict | None:
         #? which ALBUM this is, whichever pressing - what the search view marks a whole
         #? release-group card as held by. Easy MP4 has no name for it; see read_album_dir
         "release_group_mbid": _first(audio, "musicbrainz_releasegroupid"),
+        #? who the album is BY, as ids - every one of them, a collaboration carries several.
+        #? What notices one artist filed under two names (v0.9.14): the names differ, the id
+        #? doesn't. Written by deadwax since v0.6.15 and by Picard, absent from older rips.
+        "albumartist_mbids": _all(audio, "musicbrainz_albumartistid"),
     }
 
 
@@ -580,6 +594,8 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
     release_mbid = _commonest([t["release_mbid"] for t in tracks])
     release_group_mbid = (_commonest([t.get("release_group_mbid", "") for t in tracks])
                           or _mp4_release_group(entries))
+    #? the commonest SET of ids, kept as a list - a collaboration is several ids at once
+    albumartist_mbids = _commonest(["\n".join(t.get("albumartist_mbids") or []) for t in tracks])
 
     try:
         relative = str(directory.relative_to(library_root))
@@ -612,6 +628,7 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
         #? WHICH discs - what tells "disc 2 of this release, in a folder of its own" from a
         #? second copy of the same release (v0.9.13; see _mark_multi_edition)
         "discs": sorted({t["disc"] for t in tracks if t["disc"]}),
+        "albumartist_mbids": albumartist_mbids.split("\n") if albumartist_mbids else [],
         "lyrics_count": lyrics_count,
         #? disc images beside the tracks - what a player shows for a song with a disc number
         "disc_art": find_disc_art(entries),
@@ -720,6 +737,7 @@ def _unreadable(library_root: str, problem: str) -> dict:
 def _assemble(albums: list[dict], library_root: str, **extra) -> dict:
     """The response shape shared by a real scan and a snapshot, so the two cannot drift."""
     _mark_multi_edition(albums)
+    _mark_artist_under_two_names(albums)
     albums.sort(key=lambda a: (a["artist"].lower(), a["album"].lower(), a["edition"].lower()))
 
     return {
@@ -881,6 +899,34 @@ def split_disc_folders(group: list[dict]) -> list[list[dict]]:
 
 def _disc_label(discs: list[int]) -> str:
     return f"Disc {discs[0]}" if len(discs) == 1 else f"Discs {', '.join(str(d) for d in discs)}"
+
+
+def _mark_artist_under_two_names(albums: list[dict]) -> None:
+    """
+    Flag albums whose ARTIST is also filed under another folder name (v0.9.14).
+
+    An artist who renamed ends up in two folders - `Kanye West/` for the albums filed before
+    v0.6.18 or by another tool, `Ye/` for the ones since - and the scan has no way to know which
+    name is current: it never talks to MusicBrainz. What it can see is one artist id under two
+    folder names, which is the whole of the problem, so every such album carries
+    `artist_folders` (all the names) and the metadata queue says so. The artist page, which does
+    ask MusicBrainz, is where it is fixed.
+
+    Single-artist albums only: a collaboration's folder is its own (`JAŸ‐Z & Ye/`), and
+    comparing it with either artist's would flag every collaboration anyone ever made.
+    """
+    folders: dict[str, set[str]] = {}
+    for album in albums:
+        album["artist_folders"] = []
+        ids = album.get("albumartist_mbids") or []
+        parent = Path(album.get("path") or "").parent.name
+        if len(ids) == 1 and parent:
+            folders.setdefault(ids[0], set()).add(parent)
+
+    for album in albums:
+        ids = album.get("albumartist_mbids") or []
+        if len(ids) == 1 and len(folders.get(ids[0], ())) > 1:
+            album["artist_folders"] = sorted(folders[ids[0]])
 
 
 def _mark_multi_edition(albums: list[dict]) -> None:

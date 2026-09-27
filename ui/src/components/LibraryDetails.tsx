@@ -53,6 +53,8 @@ interface Props {
   onDiscArtFetched: () => void
   /** After tags were edited by hand, so the library reloads what changed. */
   onTagsEdited: () => void
+  /** After an artist's albums moved under their current name (v0.9.14). */
+  onArtistRefiled: () => void
   onSearchArtist: (artist: string) => void
   onSearchAlbum: (group: AlbumGroup) => void
   /** Phones only: the pane is a sheet over the tree there, and this closes it. */
@@ -163,6 +165,7 @@ export function LibraryDetails(props: Props) {
             artist={selected.node.artist}
             groups={selected.node.groups}
             onSelect={props.onSelect}
+            onRefiled={props.onArtistRefiled}
           />
         )
       case 'group':

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
-import { applyArtistImages, fetchArtist, previewArtistImages, searchArtists } from '../api/library'
+import {
+  applyArtistImages, applyArtistRefile, fetchArtist, previewArtistImages, previewArtistRefile, searchArtists,
+  type ArtistRefilePlan,
+} from '../api/library'
 import type {
   ArtistImageCandidate, ArtistImagesPreview, ArtistMatch, ArtistSummary,
 } from '../api/types'
@@ -34,17 +37,20 @@ const LOOKUP_DELAY_MS = 400
 const MEMBERS_SHOWN = 10
 
 export function ArtistDetails(
-  { artist, groups, onSelect }:
+  { artist, groups, onSelect, onRefiled }:
   {
     artist: string
     groups: readonly AlbumGroup[]
     onSelect: (id: string) => void
+    /** Albums moved under the artist's current name - the library wants a reload (v0.9.14). */
+    onRefiled: () => void
   },
 ) {
   const [summary, setSummary] = useState<ArtistSummary | null>(null)
   const [lookup, setLookup] = useState<ArtistImagesPreview | null>(null)
   const [looking, setLooking] = useState(false)
   const [picking, setPicking] = useState(false)
+  const [refiling, setRefiling] = useState(false)
   //? the art URLs name a KIND, not a file, so replacing artist.jpg leaves the address unchanged
   //? and the five-minute cache would go on serving the old one
   const [version, setVersion] = useState(0)
@@ -188,7 +194,17 @@ export function ArtistDetails(
                 <><dt>Now</dt><dd>{facts.name}
                   {facts.disambiguation && (
                     <span class="text default-muted"> ({facts.disambiguation})</span>
-                  )}</dd></>
+                  )}
+                  {/* the fix for an artist filed under an old name (v0.9.14) */}
+                  <button
+                    type="button"
+                    class="win-button artist-refile-button"
+                    title={`Move these albums into ${facts.name}/, as a download filed today would be`}
+                    onClick={() => setRefiling(true)}
+                  >
+                    Move albums to {facts.name}
+                  </button>
+                </dd></>
               )}
               {facts.type && <><dt>Type</dt><dd>{facts.type}</dd></>}
               {facts.area && <><dt>From</dt><dd>{facts.begin_area || facts.area}</dd></>}
@@ -241,6 +257,14 @@ export function ArtistDetails(
       <h3 class="details-subheading">Albums</h3>
       <CoverGrid groups={byYear} showArtist={false} onSelect={onSelect} />
 
+      {refiling && (
+        <ArtistRefileDialog
+          artist={artist}
+          artistMbid={lookup?.mbid ?? null}
+          onClose={() => setRefiling(false)}
+          onDone={() => { setRefiling(false); onRefiled() }}
+        />
+      )}
       {picking && path && lookup && (
         <ArtistImagePicker
           artist={artist}
@@ -525,4 +549,119 @@ function describe(facts: ArtistImagesPreview['facts'], summary: ArtistSummary | 
   }
 
   return parts.filter(Boolean).join(' · ')
+}
+
+/**
+ * Moving an artist's albums under the name MusicBrainz uses now (v0.9.14) - previewed first, as
+ * every writer here is: which albums move and where, what the tags become, and what stays and
+ * why. The server recomputes the plan on apply. See src/artist_refile.py.
+ */
+function ArtistRefileDialog(
+  { artist, artistMbid, onClose, onDone }:
+  { artist: string; artistMbid: string | null; onClose: () => void; onDone: () => void },
+) {
+  const [plan, setPlan] = useState<ArtistRefilePlan | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [applying, setApplying] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    previewArtistRefile(artist, artistMbid).then(
+      (found) => { if (live) setPlan(found) },
+      (caught) => { if (live) setError(caught instanceof Error ? caught.message : 'could not work out the moves') },
+    )
+    return () => { live = false }
+  }, [artist, artistMbid])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      onClose()
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [onClose])
+
+  const apply = async () => {
+    setApplying(true)
+    setError(null)
+    try {
+      const { results } = await applyArtistRefile(artist, artistMbid)
+      if (results.failed.length) {
+        setError(results.failed.map((f) => `${f.album}: ${f.reason}`).join('; '))
+        setApplying(false)
+        return
+      }
+      onDone()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'the move failed')
+      setApplying(false)
+    }
+  }
+
+  return (
+    <div id="artist-refile" role="dialog" aria-modal="true" aria-label="Move albums" onClick={onClose}>
+      <div class="artist-images-frame artist-refile-frame" onClick={(event) => event.stopPropagation()}>
+        <div class="window-titlebar">
+          <span class="window-title">Move {artist}'s albums{plan?.current_name ? ` to ${plan.current_name}` : ''}</span>
+          <button type="button" class="window-close" title="Close (Esc)" onClick={onClose}>✕</button>
+        </div>
+
+        <div class="artist-images-body">
+          {!plan && !error && <Loading label="Working out the moves" />}
+          {plan && (
+            <>
+              <p class="text white-tertiary artist-note">
+                Each album moves into <strong>{plan.to_folder}/</strong> keeping its own folder name,
+                and its album artist tag becomes {plan.current_name} - where a download filed today
+                would put it. Each track's own artist is what the sleeve credited, and stays.
+              </p>
+              {plan.problems.map((problem) => <p key={problem} class="text yellow">{problem}</p>)}
+              {plan.moves.length > 0 && (
+                <ul class="artist-refile-list">
+                  {plan.moves.map((move) => (
+                    <li key={move.path}>
+                      <span class="text white-tertiary">{move.path}</span>
+                      <span class="text default"> → {move.target_path}</span>
+                      <span class="text default-muted"> · {move.files} track{move.files === 1 ? '' : 's'}
+                        {move.retag.length ? `, ${move.retag.length} retagged` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {plan.refused.length > 0 && (
+                <ul class="artist-refile-list is-refused">
+                  {plan.refused.map((refused) => (
+                    <li key={refused.path}>
+                      <span class="text white-tertiary">{refused.path}</span>
+                      <span class="text yellow"> stays - {refused.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {plan.empty && !plan.problems.length && (
+                <p class="text default-muted">Nothing to move - every album is already filed under {plan.current_name}.</p>
+              )}
+            </>
+          )}
+          {error && <p class="text red">{error}</p>}
+        </div>
+
+        <div class="artist-images-footer">
+          {/* the images dialog's save button, and in the same place - the accent stays spent on
+              the three Apply/Search buttons it is kept for */}
+          <button
+            type="button"
+            class="win-button is-default"
+            disabled={!plan || plan.empty || plan.problems.length > 0 || applying}
+            onClick={() => void apply()}
+          >
+            {applying ? <Loading label="Moving" /> : `Move ${plan?.moves.length ?? ''} album${plan?.moves.length === 1 ? '' : 's'}`}
+          </button>
+          <button type="button" class="win-button" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
 }

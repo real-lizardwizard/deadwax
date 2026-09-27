@@ -68,6 +68,13 @@ ISSUE_TYPES: dict[str, dict] = {
                 "another folder. Applying the release in the editor merges them into one.",
         "severity": WRONG,
     },
+    "artist_split": {
+        "label": "Artist under two names",
+        "hint": "this artist's albums are filed under more than one folder name - usually a "
+                "rename, like Kanye West and Ye. The artist page can move them all under the "
+                "name MusicBrainz uses now.",
+        "severity": WRONG,
+    },
     "misfiled": {
         "label": "Folder off-convention",
         "hint": "the folder is not named the way these tags say it should be, so its name "
@@ -183,6 +190,10 @@ def inspect_album(album: dict) -> list[str]:
     #? set by library._mark_multi_edition, which is the one place that sees the other folders
     if album.get("split_discs"):
         found.append("split_discs")
+
+    #? set by library._mark_artist_under_two_names, which sees every album at once
+    if album.get("artist_folders"):
+        found.append("artist_split")
 
     if _is_misfiled(album):
         found.append("misfiled")

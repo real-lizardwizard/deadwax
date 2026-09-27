@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from src.config import Config
 from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
+from src.artist_refile import execute_artist_refile, plan_artist_refile
 from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, answers_to, artist_facts,
                          best_per_kind)
 from src.api.artist_images_endpoint import ArtistImagesClient
@@ -1040,6 +1041,13 @@ async def _resolve_artist_mbid(request: Request, name: str, albums: list[dict], 
     if given:
         return given, "given", []
 
+    #? the scan has read the album-artist ids since v0.9.14 - an album by this artist alone
+    #? answers without opening a file
+    for album in albums:
+        ids = album.get("albumartist_mbids") or []
+        if len(ids) == 1:
+            return ids[0], "tags", []
+
     root = Path(Config.LIBRARY_PATH or "")
     for album in albums[:3]:
         mbid = await asyncio.to_thread(read_artist_mbid, root / album["path"])
@@ -1284,6 +1292,79 @@ async def artist_images_apply(request: Request, body: ArtistImagesRequest):
         "results": results,
         "art": await asyncio.to_thread(find_artist_art, directory),
     }
+
+
+class ArtistRefileRequest(BaseModel):
+    artist: str
+    #? as with the images, the page passes the id it was shown so applying doesn't look again
+    artist_mbid: str | None = None
+
+
+async def _refile_plan(request: Request, body: ArtistRefileRequest) -> tuple[dict, list[str]]:
+    """The re-filing plan for an artist, computed afresh - by preview and by apply alike."""
+    scan = await _scan_with_queue(request, force=False, snapshot=True)
+    albums = _artist_albums(scan, body.artist)
+    if not albums:
+        raise HTTPException(status_code=404, detail="no such artist")
+
+    mbid, _source, matches = await _resolve_artist_mbid(request, body.artist, albums, body.artist_mbid)
+    if not mbid:
+        problem = ("more than one artist in MusicBrainz goes by this name - pick one with "
+                   "'Use another picture' first" if matches else
+                   "this artist isn't in MusicBrainz under that name, and the files don't say who they are")
+        return plan_artist_refile(Config.LIBRARY_PATH or "", [], "", None), [problem]
+
+    try:
+        found = await request.app.state.musicbrainz_client.get_artist(mbid)
+    except (AttributeError, MusicBrainzUnavailable):
+        found = {"error": True}
+    if "error" in found:
+        return plan_artist_refile(Config.LIBRARY_PATH or "", [], "", None), ["MusicBrainz could not be reached just now"]
+
+    current = artist_facts(found).get("name") or ""
+    return await asyncio.to_thread(plan_artist_refile, Config.LIBRARY_PATH or "", albums, current, mbid), []
+
+
+@router.post("/artist/refile/preview")
+async def artist_refile_preview(request: Request, body: ArtistRefileRequest):
+    """
+    Which of this artist's albums would move under the name MusicBrainz uses now, and which
+    can't (v0.9.14). Reads tags, writes nothing. See src/artist_refile.py.
+    """
+    plan, problems = await _refile_plan(request, body)
+    return {**plan, "problems": plan["problems"] + problems}
+
+
+@router.post("/artist/refile/apply")
+async def artist_refile_apply(request: Request, body: ArtistRefileRequest):
+    """
+    Move them. The plan is recomputed here, never taken back from the page - a plan is a list of
+    folders to move, and accepting one over the wire would let a caller name any path.
+    """
+    plan, problems = await _refile_plan(request, body)
+    if problems or plan["problems"]:
+        raise HTTPException(status_code=400, detail="; ".join(problems + plan["problems"]))
+    if plan["empty"]:
+        return {"plan": plan, "results": {"moved": [], "failed": [], "pictures_moved": [], "removed_folders": []}}
+
+    root = Config.LIBRARY_PATH or ""
+    results = await asyncio.to_thread(execute_artist_refile, plan, root)
+
+    #? every folder that moved is gone from where the cache has it, and has new tags where it
+    #? is now - as with a retag, both keys go, and each review row follows its album
+    store = _store(request)
+    for moved in results["moved"]:
+        forget_cached_album(str(Path(root) / moved["from"]))
+        forget_cached_album(str(Path(root) / moved["to"]))
+        if store is not None:
+            await store.mark_album_reviewed(moved["from"], moved["to"])
+    await _persist_cache(request)
+
+    logger.info(
+        f"moved {len(results['moved'])} album(s) of {body.artist} under {plan['to_folder']}",
+        extra={"frontend": True},
+    )
+    return {"plan": plan, "results": results}
 
 
 @router.post("/artist/search")

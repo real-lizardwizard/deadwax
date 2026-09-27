@@ -240,6 +240,8 @@ The track view now shows what a file carries: <strong>Pictures in this file</str
 <strong>Get CD art</strong> puts a proper picture of the disc in that slot, as <code>disc.jpg</code> beside the tracks — or <code>disc1.jpg</code>, <code>disc2.jpg</code> for each disc of a set, which is how Navidrome matches them to their disc. It comes from the Cover Art Archive's pictures of the disc for the <em>exact release</em> the album is tagged with, then from fanart.tv's disc art if you've given it a key. A <code>disc.*</code> file sits ahead of a download's <code>cd.jpg</code> in every player's order, so the scan stops being what shows without being deleted. There's a <strong>Get CD art · N</strong> in the library toolbar for everything in view, and it never replaces CD art that's already there.
 <br><br>
 If you'd rather songs always showed the album's cover in Navidrome, that's two of <em>its</em> settings: <code>ND_ENABLEMEDIAFILECOVERART=false</code> and <code>ND_DISCARTPRIORITY=cover.*, folder.*, front.*, embedded</code>.
+<br><br>
+An artist who changed their name can end up in two folders — <code>Kanye West/</code> for older albums, <code>Ye/</code> for newer ones. deadwax notices when both carry the same MusicBrainz artist, flags them in the metadata queue, and the artist page offers to move the old albums under the name MusicBrainz uses now. The album artist changes; each track's artist stays as the sleeve credited it.
 </details>
 
 ### Lyrics

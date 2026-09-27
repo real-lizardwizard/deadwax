@@ -105,6 +105,8 @@ src/
   artists.py       PURE. What an artist page shows, and where artist pictures come from -
                    which is nowhere near as obvious as album covers. Also renders artist
                    CREDITS, which is why a split album no longer reads as a list.
+  artist_refile.py an artist's albums moved under their current name. The EIGHTH writer, same
+                   split - see "One artist under two names".
   artist_art.py    artist images written into the artist's folder. The FIFTH writer, same
                    plan/execute split - see "The artist page".
   lyrics.py        lyrics as a .lrc beside each track. The SIXTH writer, same split, and the
@@ -125,7 +127,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             834 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             844 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -218,9 +220,10 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   scoped to what is on screen, so the facets compose with it, and it reports "no cover on the
   Archive" separately from "the request failed" — the first is a fact about the release and
   nothing can be done, the second is worth trying again.
-- **There are now SEVEN writers to the user's filesystem**, and all but the smallest use the same
+- **There are now EIGHT writers to the user's filesystem**, and all but the smallest use the same
   plan/execute split: `organizer.py` files downloads in, `retag.py` corrects albums already
-  there, `track_tags.py` writes tags edited by hand (v0.6.9), `artist_art.py` writes an artist's
+  there (and since v0.9.13 merges a disc folder into its release's), `artist_refile.py` moves an
+  artist's albums under their current name (v0.9.14), `track_tags.py` writes tags edited by hand (v0.6.9), `artist_art.py` writes an artist's
   pictures into their folder (v0.6.15), `lyrics.py` writes a `.lrc` beside each track (v0.7.0),
   `save_disc_art()` writes CD art (v0.7.2), and `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
   the write rather than trusting the plan, for the same reason the retag endpoint recomputes its
@@ -737,6 +740,39 @@ folder name, and `_resolve_target` never merged into an existing folder.
   the tree said "2 disc folders", both were flagged, applying to discs 1-3 renamed them to
   `In Rainbows (2007) [Discbox]`, and applying to disc 4 previewed "Merge ... moves disc 4 in
   beside discs 1, 2, 3" and left one folder of 28 tracks with no issues.
+
+### One artist under two names (v0.9.14)
+
+The last of the 1.0 fixes from "Next up": an artist who renamed ends up in two folders -
+`Kanye West/` for albums filed before v0.6.18 (or by another tool), `Ye/` since - and the tree
+showed two artists, which v0.6.18 left as "at least visible".
+
+- **Noticed by the scan, with no network**: it reads `musicbrainz_albumartistid` now
+  (`albumartist_mbids`, `SCAN_FORMAT` 7), and one id under two artist-folder names is the whole
+  of the problem - `_mark_artist_under_two_names` sets `artist_folders` and the queue raises
+  `artist_split` on every album involved. Which name is CURRENT can't be told without asking
+  MusicBrainz, so it doesn't guess. Single-artist albums only: a collaboration's folder is its own.
+  Albums without artist ids (anything filed before v0.6.15, older rips) can't be noticed this way.
+- **Fixed from the artist page**, which already asks MusicBrainz and shows "Now: Ye": a "Move
+  albums to Ye" button there, a previewed dialog, and `src/artist_refile.py` - the EIGHTH writer,
+  plan/execute like the rest, the route recomputing the plan on apply. It rewrites only the
+  ALBUM ARTIST tag (and writes the artist id where missing) - the same two fields a download
+  filed today carries; each track's artist is the sleeve's credit and stays. Each album folder
+  moves under the current name keeping its own name, never onto one already there (refused and
+  shown), and never an album tagged as a different artist or a collaboration. A tag that won't
+  write keeps that album where it is.
+- **The old folder follows only when it is truly empty of albums**: its artist pictures
+  (`artist.*`, `banner.*`... - `ARTIST_ART_STEMS`) move across where the new folder has none of
+  that name, then `rmdir` - so a stray file of the user's keeps it, and an album left behind keeps
+  the pictures with it too.
+- **`_resolve_artist_mbid` asks the scan first**: an album by this artist alone has its id in
+  `albumartist_mbids`, which answers without opening a file. It had read only the track-artist id,
+  which an album tagged by Picard or an older deadwax may not carry.
+- **Verified in the real page** against live MusicBrainz: `Kanye West/Donda` and `Ye/BULLY`, both
+  tagged with Ye's id, were both flagged; the Kanye West page offered "Move albums to Ye", the
+  dialog previewed `Kanye West/Donda (2021) → Ye/Donda (2021) · 2 tracks, 2 retagged`, and moving
+  left one Ye with two albums, `Kanye West/` gone, album artist "Ye" and track artist still
+  "Kanye West".
 
 ### Browsing a discography, and ordering results
 
@@ -1554,12 +1590,9 @@ most up-to-date name".
   another when corrected.
 - **Collaborations still get their own folder**, in current names: Watch the Throne files under
   `JAŸ‐Z & Ye/`. That was always so (it was `Jay‐Z & Kanye West/`); only the names changed.
-- **NOT built: finding albums already filed under an old name.** The scan never talks to
-  MusicBrainz, so it cannot know `Kanye West/` is out of date. It COULD spot two artist folders
-  whose albums share a `musicbrainz_albumartistid` - but only for albums tagged with artist ids,
-  which nothing filed before v0.6.15 is, and the scan does not read that tag yet (it would mean
-  bumping `SCAN_FORMAT`). Until then such an album moves when its release is picked in the
-  editor, and the tree shows the old name as a second artist, which is at least visible.
+- ~~NOT built: finding albums already filed under an old name~~ **Built in v0.9.14** - the scan
+  reads the album-artist ids and notices, and the artist page moves them. See "One artist under
+  two names".
 
 ### Searching Soulseek under every name (v0.6.19)
 
@@ -2472,7 +2505,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 834 tests
+.venv/bin/python -m pytest tests/ -q  # 844 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2516,7 +2549,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 834 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 844 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

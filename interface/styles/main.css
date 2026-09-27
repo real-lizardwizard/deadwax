@@ -6270,7 +6270,8 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 
 /* ---- choosing which picture goes where ---------------------------------- */
 
-#artist-images {
+#artist-images,
+#artist-refile {
     position: fixed;
     inset: 0;
     z-index: 700;
@@ -6280,6 +6281,12 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
     padding: var(--space-4);
     background-color: rgb(0 0 0 / 55%);
 }
+
+/* moving an artist's albums under their current name (v0.9.14) - the images dialog's frame */
+.artist-refile-frame { width: min(640px, 100%); }
+.artist-refile-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-xs); }
+.artist-refile-list > li { overflow-wrap: anywhere; }
+.artist-refile-button { margin-left: var(--space-2); }
 
 .artist-images-frame {
     display: flex;

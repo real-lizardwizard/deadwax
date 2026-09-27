@@ -259,3 +259,41 @@ export function applyArtistImages(
 export function searchArtists(query: string): Promise<ArtistSearchResult> {
   return post<ArtistSearchResult>('/library/artist/search', { query })
 }
+
+/** One album the re-filing would move (v0.9.14). */
+export interface ArtistRefileMove {
+  album: string
+  path: string
+  target_path: string
+  files: number
+  retag: { filename: string; changes: Record<string, { from: string; to: string }> }[]
+}
+
+export interface ArtistRefilePlan {
+  current_name: string
+  to_folder: string
+  artist_mbid: string | null
+  moves: ArtistRefileMove[]
+  refused: { album: string; path: string; reason: string }[]
+  problems: string[]
+  empty: boolean
+}
+
+export interface ArtistRefileResults {
+  moved: { from: string; to: string }[]
+  failed: { album: string; reason: string }[]
+  pictures_moved: string[]
+  removed_folders: string[]
+}
+
+/** Which of an artist's albums would move under the name MusicBrainz uses now. Writes nothing. */
+export function previewArtistRefile(artist: string, artistMbid: string | null): Promise<ArtistRefilePlan> {
+  return post<ArtistRefilePlan>('/library/artist/refile/preview', { artist, artist_mbid: artistMbid })
+}
+
+/** Move them. The server recomputes the plan rather than taking this one back. */
+export function applyArtistRefile(
+  artist: string, artistMbid: string | null,
+): Promise<{ plan: ArtistRefilePlan; results: ArtistRefileResults }> {
+  return post('/library/artist/refile/apply', { artist, artist_mbid: artistMbid })
+}

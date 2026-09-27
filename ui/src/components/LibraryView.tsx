@@ -994,6 +994,7 @@ export function LibraryView({ active, onNavigate }: Props) {
             /* the server dropped the folder from its scan cache when it wrote the cover, so a
                plain reload picks up the new art_mtime and the URL changes with it */
             onArtFetched={() => void reload(false)}
+            onArtistRefiled={() => void reload(false)}
             /* a new .lrc changes the folder's mtime, which is also what re-reads the track's lyrics */
             onLyricsFetched={() => void reload(false)}
             onDiscArtFetched={() => void reload(false)}
