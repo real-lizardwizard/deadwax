@@ -249,6 +249,11 @@ class Config:
     #? should see being made. "Try next peer" on a failed download works either way.
     AUTO_RETRY_PEER = _env("AUTO_RETRY_PEER", "off")
 
+    #? Seconds slskd listens for answers to a Soulseek search (v0.9.16). Peers answer over
+    #? several seconds, slow and firewalled ones last, so a longer search hears from more of
+    #? them and a shorter one gets you a list sooner. 8 is what it always was; 3 to 60.
+    SLSKD_SEARCH_TIMEOUT = _env("SLSKD_SEARCH_TIMEOUT", "8")
+
     #? Milliseconds to move synced lyrics EARLIER as they are written - negative moves them
     #? later. LRCLIB's timings are tapped along by people and land a moment after the line is
     #? sung, which on a fast song shows the line just sung. 0 writes LRCLIB's timings as they
@@ -301,6 +306,8 @@ class Config:
         "COUNTRY_IN_FOLDER": None,
         #? read by the poller as each download fails, so nothing to rebuild
         "AUTO_RETRY_PEER": None,
+        #? read per search, so nothing to rebuild
+        "SLSKD_SEARCH_TIMEOUT": None,
         #? read as each .lrc is written, so nothing to rebuild
         "LYRICS_LEAD_MS": None,
         #? read per lookup by the artist image client, so nothing to rebuild here either
@@ -551,3 +558,21 @@ class Config:
     @classmethod
     def organizing_enabled(cls) -> bool:
         return bool(cls.SLSKD_DOWNLOAD_PATH and cls.LIBRARY_PATH and cls.ORGANIZE_MODE != "off")
+
+
+SEARCH_TIMEOUT_RANGE = (3, 60)
+
+
+def parse_search_timeout(value) -> int | None:
+    """SLSKD_SEARCH_TIMEOUT as whole seconds within range, or None when it isn't one."""
+    try:
+        seconds = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    low, high = SEARCH_TIMEOUT_RANGE
+    return seconds if low <= seconds <= high else None
+
+
+def search_timeout_seconds() -> int:
+    """What a search waits for - the setting when it is valid, else the long-standing 8."""
+    return parse_search_timeout(Config.SLSKD_SEARCH_TIMEOUT) or 8

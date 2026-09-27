@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.api.slskd_endpoint import SlskdSearchRefused, build_search_query
 from src.artists import former_names
-from src.config import Config
+from src.config import Config, search_timeout_seconds
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
@@ -252,7 +252,10 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
             raise HTTPException(status_code=400, detail="Could not build a search query")
 
         async def search():
-            responses = await slskd_client.search_all(queries)
+            #? SLSKD_SEARCH_TIMEOUT (v0.9.16); max_wait covers slskd's own bookkeeping past it
+            timeout = search_timeout_seconds()
+            responses = await slskd_client.search_all(queries, search_timeout_ms=timeout * 1000,
+                                                      max_wait=timeout + 17)
 
             if lookup is not None:
                 #? Usually long finished - it had the whole first round to answer. A former
@@ -265,7 +268,8 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
                     if query.casefold() not in {q.casefold() for q in queries}
                 ]
                 if extra:
-                    responses += await slskd_client.search_all(extra)
+                    responses += await slskd_client.search_all(extra, search_timeout_ms=timeout * 1000,
+                                                                max_wait=timeout + 17)
                     queries.extend(extra)
 
             return responses

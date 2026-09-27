@@ -127,7 +127,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             844 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             846 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -1713,6 +1713,21 @@ metadata as well".
 
 ### The settings tab
 
+- **More settings in v0.9.16**, all on the Downloads tab: where the candidates panel's Quality
+  floors (bitrate, bit depth) and its sort START (`candidateMinBitrate`, `candidateMinBitDepth`,
+  `candidateSort` - browser preferences, validated against exactly the values the dropdowns
+  offer), and `SLSKD_SEARCH_TIMEOUT` (server, 3-60s, default 8 as it always was; a new
+  "Soulseek searches" group, `max_wait` = timeout + 17).
+- **Auto-grab had been wired to NOTHING - found while laying out the tabs.** "Auto-grab best
+  match" was a checkbox, stored and read (`getSettings().autoGrab` in main.js), and no code ever
+  acted on it; the reader then went with the vanilla candidates panel in v0.9.10. CLAUDE.md's
+  own rule is that every preference is genuinely wired to behaviour. It is now (`autoGrabPick`
+  in lib/candidates.ts): on a fresh FIND only, never a Re-search; the top of the list through the
+  default filters and sort; only at `AUTO_GRAB_MIN_SCORE` (75, the "good" band) or better, since
+  a weak best match is exactly when you want to choose; and the panel says it did it. The pick
+  goes through the same download path, runners-up and all. **Verified in the real page**: with
+  auto-grab on and a 24-bit default, a Find queued the 24/96 peer by itself - pending row in the
+  downloads panel, "Queued ✓", the note - with the Quality badge at 1 and the sort on quality.
 - **Tabs since v0.9.15** (asked for: "some tabs for settings organization instead of a long
   list"): Search, Downloads, Library, Connections, Interface, in a strip outside the scroller
   so it never scrolls away. Server groups are placed by `tabForGroup()` - `connections`,
@@ -2519,7 +2534,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 844 tests
+.venv/bin/python -m pytest tests/ -q  # 846 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2563,7 +2578,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 844 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 846 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

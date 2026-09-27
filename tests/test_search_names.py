@@ -160,8 +160,9 @@ class FakeSlskd:
     def __init__(self):
         self.rounds = []
 
-    async def search_all(self, queries):
+    async def search_all(self, queries, **kwargs):
         self.rounds.append(list(queries))
+        self.timeouts = getattr(self, "timeouts", []) + [kwargs.get("search_timeout_ms")]
         return []
 
 
@@ -245,3 +246,22 @@ def test_a_search_that_finds_nothing_says_so_rather_than_crashing():
     #? the warning for an empty result named a variable that no longer existed
     answer, _ = find({"artist": "Portishead", "album": "Dummy"})
     assert answer["candidates"] == [] and answer["queries"] == ["Portishead Dummy"]
+
+
+def test_the_search_listens_as_long_as_the_setting_says(monkeypatch):
+    """SLSKD_SEARCH_TIMEOUT (v0.9.16) - and an unusable value falls back to the long-standing 8s."""
+    from src.config import Config
+    monkeypatch.setattr(Config, "SLSKD_SEARCH_TIMEOUT", "20")
+    _, slskd = find({**BULLY, "query_override": "Ye BULLY"})
+    assert slskd.timeouts == [20_000]
+
+    monkeypatch.setattr(Config, "SLSKD_SEARCH_TIMEOUT", "forever")
+    _, slskd = find({**BULLY, "query_override": "Ye BULLY"})
+    assert slskd.timeouts == [8_000]
+
+
+def test_the_timeout_is_refused_outside_its_range():
+    from src.routes.settings import _validate
+    assert _validate("SLSKD_SEARCH_TIMEOUT", "15") is None
+    assert _validate("SLSKD_SEARCH_TIMEOUT", "2") is not None
+    assert _validate("SLSKD_SEARCH_TIMEOUT", "8.5") is not None

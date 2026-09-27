@@ -283,3 +283,19 @@ export const EDITION_TAG_COLORS: Readonly<Record<string, string>> = {
   LIMITED: 'main-secondary',
   'SPECIAL EDITION': 'white-tertiary',
 }
+
+/** The "good" band of the score colours - below it, auto-grab leaves the choice to you. */
+export const AUTO_GRAB_MIN_SCORE = 75
+
+/**
+ * What auto-grab would queue from a result (v0.9.16): the top of the list as the filters and
+ * sort show it, and only when that scores AUTO_GRAB_MIN_SCORE or better - a weak best match is
+ * exactly when you want to choose. Returns the pick and the shown list (its runners-up), or null.
+ */
+export function autoGrabPick(
+  candidates: readonly Candidate[], filters: CandidateFilters, sort: CandidateSort,
+): { pick: Candidate; list: Candidate[] } | null {
+  const list = sortCandidates(candidates.filter((c) => passesFilters(c, filters)), sort)
+  const pick = list[0]
+  return pick && Math.round(pick.score * 100) >= AUTO_GRAB_MIN_SCORE ? { pick, list } : null
+}

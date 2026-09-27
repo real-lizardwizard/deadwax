@@ -291,6 +291,11 @@ export interface Preferences {
   candidateFreeSlotOnly: boolean
   /** Start with "complete albums only" ticked. */
   candidateCompleteOnly: boolean
+  /** Where the Quality dropdown's floors start (v0.9.16). 0 is any. kbps, and bits. */
+  candidateMinBitrate: number
+  candidateMinBitDepth: number
+  /** How the candidates list starts ordered - one of SORT_LABELS in lib/candidates.ts. */
+  candidateSort: string
 
   /* --- interface --- */
   /** Open the log panel on load. Mirrors the existing deadwax-log-open key's job. */
@@ -306,6 +311,9 @@ export const PREFERENCE_FALLBACK: Preferences = {
   candidateMinScore: 0,
   candidateFreeSlotOnly: false,
   candidateCompleteOnly: false,
+  candidateMinBitrate: 0,
+  candidateMinBitDepth: 0,
+  candidateSort: 'score',
   logOpenOnStart: false,
   confirmCancel: true,
 }
@@ -348,6 +356,14 @@ export function readPreferences(): Preferences {
       stored.candidateCompleteOnly,
       PREFERENCE_FALLBACK.candidateCompleteOnly,
     ),
+    //? only the values the Quality dropdown offers - anything else would show a floor no select
+    //? can display
+    candidateMinBitrate: [0, 128, 192, 256, 320].includes(Number(stored.candidateMinBitrate))
+      ? Number(stored.candidateMinBitrate) : PREFERENCE_FALLBACK.candidateMinBitrate,
+    candidateMinBitDepth: [0, 16, 24].includes(Number(stored.candidateMinBitDepth))
+      ? Number(stored.candidateMinBitDepth) : PREFERENCE_FALLBACK.candidateMinBitDepth,
+    candidateSort: ['score', 'quality', 'size_desc', 'size_asc'].includes(String(stored.candidateSort))
+      ? String(stored.candidateSort) : PREFERENCE_FALLBACK.candidateSort,
     logOpenOnStart: bool(stored.logOpenOnStart, PREFERENCE_FALLBACK.logOpenOnStart),
     confirmCancel: bool(stored.confirmCancel, PREFERENCE_FALLBACK.confirmCancel),
   }

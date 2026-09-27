@@ -7,6 +7,7 @@ import {
 } from '../api/settings'
 import * as libraryApi from '../api/library'
 import type { FormatPreference } from '../api/types'
+import { SORT_LABELS } from '../lib/candidates'
 import { describeRetime, type RetimeTotals } from '../lib/lyrics'
 import { Loading, LoadingPanel } from './Loading'
 import {
@@ -32,7 +33,7 @@ const SETTINGS_TABS: readonly { id: SettingsTab; label: string; hint: string }[]
  */
 export function tabForGroup(groupId: string): SettingsTab {
   if (groupId === 'connections') return 'connections'
-  if (groupId === 'downloads') return 'downloads'
+  if (groupId === 'downloads' || groupId === 'soulseek') return 'downloads'
   return 'library'
 }
 
@@ -673,7 +674,7 @@ export function SettingsView({ active }: { active: boolean }) {
 
           <Row
             label="Auto-grab best match"
-            hint="Queue the top-ranked candidate immediately instead of opening the panel to choose"
+            hint="Queue the top candidate as soon as a Find answers, when it scores 75 or more through the filters below - under that, the panel opens for you to choose"
             htmlFor="pref-auto-grab"
             control={
               <Checkbox
@@ -749,6 +750,54 @@ export function SettingsView({ active }: { active: boolean }) {
                 checked={shownPrefs.candidateCompleteOnly}
                 onChange={(v) => editPref('candidateCompleteOnly', v)}
               />
+            }
+          />
+
+          <Row
+            label="Bitrate at least"
+            hint="Where the Quality filter's bitrate floor starts. Judged by a folder's worst file; lossless always passes"
+            htmlFor="pref-min-bitrate"
+            control={
+              <select
+                id="pref-min-bitrate"
+                class="settings-select"
+                value={shownPrefs.candidateMinBitrate}
+                onChange={(e) => editPref('candidateMinBitrate', Number((e.currentTarget as HTMLSelectElement).value))}
+              >
+                {[0, 128, 192, 256, 320].map((n) => <option key={n} value={n}>{n ? `${n} kbps` : 'any'}</option>)}
+              </select>
+            }
+          />
+
+          <Row
+            label="Bit depth at least"
+            hint="Where the bit-depth floor starts. Many clients don't report bit depth, and a folder that didn't say is left out"
+            htmlFor="pref-min-depth"
+            control={
+              <select
+                id="pref-min-depth"
+                class="settings-select"
+                value={shownPrefs.candidateMinBitDepth}
+                onChange={(e) => editPref('candidateMinBitDepth', Number((e.currentTarget as HTMLSelectElement).value))}
+              >
+                {[0, 16, 24].map((n) => <option key={n} value={n}>{n ? `${n}-bit` : 'any'}</option>)}
+              </select>
+            }
+          />
+
+          <Row
+            label="Order candidates by"
+            hint="How the list starts sorted. Best match is deadwax's ranking against the release you picked"
+            htmlFor="pref-candidate-sort"
+            control={
+              <select
+                id="pref-candidate-sort"
+                class="settings-select"
+                value={shownPrefs.candidateSort}
+                onChange={(e) => editPref('candidateSort', (e.currentTarget as HTMLSelectElement).value)}
+              >
+                {Object.entries(SORT_LABELS).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+              </select>
             }
           />
         </Section>

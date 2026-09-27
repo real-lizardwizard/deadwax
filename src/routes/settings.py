@@ -50,7 +50,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from src import __version__
-from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, Config, build_user_agent,
+from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, SEARCH_TIMEOUT_RANGE, Config,
+                        build_user_agent, parse_search_timeout,
                         describe_contact, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env)
 from src.logger import logger
@@ -332,6 +333,24 @@ def _auto_retry_row() -> dict:
     )
 
 
+def _search_timeout_row() -> dict:
+    """SLSKD_SEARCH_TIMEOUT, in seconds."""
+    value = Config.SLSKD_SEARCH_TIMEOUT
+    seconds = parse_search_timeout(value)
+    low, high = SEARCH_TIMEOUT_RANGE
+    return _setting(
+        "SLSKD_SEARCH_TIMEOUT",
+        value,
+        effect=(
+            f"Each Soulseek search listens for {seconds}s. Peers answer over several seconds, slow "
+            "and firewalled ones last - longer finds more, shorter answers sooner"
+            if seconds else f"unrecognised - searches use 8s"
+        ),
+        status="ok" if seconds else "error",
+        detail=None if seconds else f"expected whole seconds, {low} to {high}",
+    )
+
+
 def _lyrics_row() -> dict:
     """FETCH_LYRICS, as an on/off dropdown."""
     value = Config.FETCH_LYRICS
@@ -552,6 +571,13 @@ async def settings():
                 ],
             },
             {
+                "id": "soulseek",
+                "label": "Soulseek searches",
+                "note": "How long each search listens for answers. A search runs under every name "
+                        "the artist has recorded as, side by side, so this is the wait for all of them.",
+                "settings": [_search_timeout_row()],
+            },
+            {
                 "id": "downloads",
                 "label": "When a download fails",
                 "note": (
@@ -640,6 +666,10 @@ def _validate(key: str, value: str) -> str | None:
 
     if key == "COUNTRY_IN_FOLDER" and value not in COUNTRY_CHOICES:
         return f"expected one of {', '.join(COUNTRY_CHOICES)}"
+
+    if key == "SLSKD_SEARCH_TIMEOUT" and parse_search_timeout(value) is None:
+        low, high = SEARCH_TIMEOUT_RANGE
+        return f"expected whole seconds, {low} to {high} - 8 is the default"
 
     if key == "AUTO_RETRY_PEER" and value not in AUTO_RETRY_CHOICES:
         return f"expected one of {', '.join(AUTO_RETRY_CHOICES)}"

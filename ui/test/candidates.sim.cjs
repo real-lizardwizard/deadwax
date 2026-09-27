@@ -85,6 +85,18 @@ check('mixed folders as ranges', C.depthRateText(flac({ bit_depths: [16, 24], sa
 check('nothing reported, nothing said', C.depthRateText(flac()), '');
 check('VBR is said', C.bitrateText([245], true), ' VBR 245kbps');
 
+console.log('\nauto-grab (v0.9.16)');
+{
+  const strong = candidate({ username: 'strong', score: 0.9, has_free_slot: false });
+  const weak = candidate({ username: 'weak', score: 0.6 });
+  check('the top candidate, when it scores 75 or more', C.autoGrabPick([strong, weak], filters(), 'score').pick.username, 'strong');
+  check('...its runners-up are the rest of the shown list', C.autoGrabPick([strong, weak], filters(), 'score').list.map((c) => c.username), ['strong', 'weak']);
+  check('nothing when the best match is weak', C.autoGrabPick([weak], filters(), 'score'), null);
+  check('through the default filters - a filtered-out strong one is never grabbed',
+    C.autoGrabPick([strong, weak], filters({ freeSlotOnly: true }), 'score'), null);
+  check('nothing from an empty result', C.autoGrabPick([], filters(), 'score'), null);
+}
+
 console.log('\nre-search');
 check('an unedited box is not an override - it would drop every other name', C.queryOverride('Ye Donda', 'Ye Donda'), '');
 check('an edited one is, trimmed', C.queryOverride('  Ye Donda 2021 ', 'Ye Donda'), 'Ye Donda 2021');

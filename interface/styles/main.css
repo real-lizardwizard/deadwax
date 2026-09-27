@@ -3208,6 +3208,22 @@ span.red { color: var(--red-text); }
 /* lines the box up with the label's first line rather than the middle of a two-line hint */
 .settings-row:has(.settings-check) > .settings-row-control { padding-top: 4px; }
 
+/* a preference with a fixed set of answers (v0.9.16) - the server rows' dropdown look */
+.settings-select {
+    height: var(--control-md);
+    padding: 0 var(--space-2);
+    background-color: var(--background-color-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--white-text);
+    font-size: var(--text-xs);
+    cursor: pointer;
+}
+.settings-select:hover { border-color: var(--border-strong); }
+.settings-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+.candidates-autograb { margin: 0 0 var(--space-2); font-size: var(--text-xs); }
+
 .settings-number input {
     width: 5.5em;
     height: var(--control-md);

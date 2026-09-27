@@ -301,7 +301,7 @@ It's permanent, there's no undo, and it says so. It refuses anything that isn't 
 ### A settings tab that tells you why something isn't working
 <details>
 <summary style="font-style:italic">Your preferences, and a straight answer about the container's configuration</summary>
-Split into tabs — Search, Downloads, Library, Connections and Interface — and a tab says when it holds an unsaved change or a setting that needs attention, so neither can hide behind one you aren't looking at. One save button covers every tab.
+Split into tabs — Search, Downloads, Library, Connections and Interface — and a tab says when it holds an unsaved change or a setting that needs attention, so neither can hide behind one you aren't looking at. One save button covers every tab. The Downloads tab holds where the candidates panel starts — its score, slot and quality filters and its order — how long a Soulseek search listens for answers, and auto-grab, which queues the top candidate as soon as a Find answers when it scores 75 or more, and otherwise leaves the choice to you.
 <br><br>
 Two kinds of setting, deliberately kept apart. Some are <em>yours</em> - format preference, auto-grab, how a new search starts, where the Soulseek candidate filters begin - stored in your browser.
 <br><br>

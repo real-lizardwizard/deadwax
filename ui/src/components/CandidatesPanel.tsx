@@ -4,7 +4,7 @@ import * as api from '../api/download'
 import type { Candidate, FindCandidatesRequest, FindCandidatesResponse } from '../api/types'
 import { bridge } from '../bridge'
 import {
-  EDITION_TAG_COLORS, NO_QUALITY_FILTERS, PEER_SPEED_HINT, SIGNAL_LABELS, SORT_LABELS,
+  EDITION_TAG_COLORS, autoGrabPick, NO_QUALITY_FILTERS, PEER_SPEED_HINT, SIGNAL_LABELS, SORT_LABELS,
   activeQualityCount, activeSignalCount, bitrateText, candidateKey, depthRateText, measuredSpeed,
   noSignalMinimums, passesFilters, peerSpeedLabel, queryOverride, resultFormats, scoreClass,
   sortCandidates, trackSummary, type CandidateFilters, type CandidateSort, type QualityFilters,
@@ -60,15 +60,29 @@ export function CandidatesPanel() {
       minScore: preferences.candidateMinScore,
       formats: new Set(),
       minSignals: noSignalMinimums(),
-      quality: { ...NO_QUALITY_FILTERS },
+      //? the Quality floors' defaults, from Settings -> Downloads (v0.9.16)
+      quality: {
+        ...NO_QUALITY_FILTERS,
+        minBitrate: preferences.candidateMinBitrate,
+        minBitDepth: preferences.candidateMinBitDepth,
+      },
     }
   })
-  const [sort, setSort] = useState<CandidateSort>('score')
+  const [sort, setSort] = useState<CandidateSort>(() => readPreferences().candidateSort as CandidateSort)
+  //? which candidate auto-grab queued for the search on screen, if it did (v0.9.16)
+  const [autoGrabbed, setAutoGrabbed] = useState<string | null>(null)
 
-  const run = useCallback(async (release: FindCandidatesRequest, override: string) => {
+  //? read by a search that answers after renders the closure didn't see
+  const filtersRef = useRef(filters)
+  filtersRef.current = filters
+  const sortRef = useRef(sort)
+  sortRef.current = sort
+
+  const run = useCallback(async (release: FindCandidatesRequest, override: string, fromFind = false) => {
     const request = requests.begin()
     setSearch({ release, pending: true, result: null, error: null })
     setDownloads(new Map())
+    setAutoGrabbed(null)
     //? the format chips were the last result's formats; filtering this search by them would be
     //? filtering on a question nobody has answered yet
     setFilters((current) => (current.formats.size ? { ...current, formats: new Set() } : current))
@@ -83,6 +97,21 @@ export function CandidatesPanel() {
       setSearch({ release, pending: false, result, error: null })
       setQuery(result.query)
       setShownQuery(result.query)
+
+      /*
+       * Auto-grab (a setting since before the port, and wired to nothing until v0.9.16 - its
+       * reader went with the vanilla panel and nothing had ever acted on it). Only on a fresh
+       * Find, never a Re-search you are steering by hand; only the top of the list as your
+       * default filters and sort show it; and only when that scores AUTO_GRAB_MIN_SCORE or
+       * better, because a weak best match is exactly when you want to choose.
+       */
+      const grab = fromFind && readDownloadDefaults().autoGrab
+        ? autoGrabPick(result.candidates, filtersRef.current, sortRef.current)
+        : null
+      if (grab) {
+        setAutoGrabbed(candidateKey(grab.pick))
+        void startDownload(grab.pick, release, grab.list)
+      }
     } catch (caught) {
       if (!request.current() || isAbort(caught)) return
       setSearch({ release, pending: false, result: null, error: caught instanceof Error ? caught.message : 'search failed' })
@@ -105,7 +134,7 @@ export function CandidatesPanel() {
       setQuery('')
       setShownQuery('')
       setOpen(true)
-      void run(release, '')
+      void run(release, '', true)
     }
     return () => { delete shared.openCandidates }
   }, [run])
@@ -127,10 +156,12 @@ export function CandidatesPanel() {
     [search, filters, sort],
   )
 
-  const download = async (candidate: Candidate) => {
-    if (!search?.result) return
+  const download = (candidate: Candidate) => {
+    if (search?.result) void startDownload(candidate, search.release, visible)
+  }
+
+  async function startDownload(candidate: Candidate, release: FindCandidatesRequest, list: Candidate[]) {
     const key = candidateKey(candidate)
-    const release = search.release
     setDownloads((current) => new Map(current).set(key, 'queueing'))
 
     try {
@@ -142,7 +173,7 @@ export function CandidatesPanel() {
         release: { ...release },
         //? the rest of the list as you see it, in order, for "try next peer" (v0.9.12) - the
         //? filters you set are what you'd accept, so the next peer respects them too
-        alternatives: visible
+        alternatives: list
           .filter((c) => candidateKey(c) !== key)
           .slice(0, 10)
           .map((c) => ({ username: c.username, directory: c.directory, files: c.files, score: c.score })),
@@ -256,7 +287,7 @@ export function CandidatesPanel() {
           </div>
         </div>
         <div class="scrollable" id="candidates-scrollable">
-          <CandidatesBody search={search} visible={visible} downloads={downloads} onDownload={download} />
+          <CandidatesBody search={search} visible={visible} downloads={downloads} autoGrabbed={autoGrabbed} onDownload={download} />
         </div>
       </div>
     </div>
@@ -445,12 +476,13 @@ function QualityControl(
  * are THEN rather than as they were when the search began.
  */
 function CandidatesBody(
-  { search, visible, downloads, onDownload }:
+  { search, visible, downloads, autoGrabbed, onDownload }:
   {
     search: Search | null
     /** The result through the filters, in the chosen order - computed once, in the panel. */
     visible: Candidate[]
     downloads: ReadonlyMap<string, DownloadState>
+    autoGrabbed: string | null
     onDownload: (candidate: Candidate) => void
   },
 ) {
@@ -489,6 +521,12 @@ function CandidatesBody(
 
   return (
     <>
+      {autoGrabbed && (
+        <p class="text default-muted candidates-autograb">
+          Grabbed the best match for you - it's the one marked Queued. Auto-grab can be turned off
+          under Settings → Downloads.
+        </p>
+      )}
       {visible.map((candidate) => (
         <CandidateRow
           key={candidateKey(candidate)}
