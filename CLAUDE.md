@@ -488,8 +488,8 @@ preview on Dummy and The Slow Rush first, then built with the MOST COMMON trackl
   (vinyl sides and all) on a second click - the 711ms rule. The diffs behind the chips are
   computed once per release and kept in a Map, since the body re-renders on every filter change.
 - **Third-party text goes in with `textContent`**, never `innerHTML`: these are MusicBrainz's
-  titles. (The older full-tracklist rows still interpolate the recording title into innerHTML,
-  as they always have - not changed here.)
+  titles. (The older full-tracklist rows still build from a template string, and since v0.9.22
+  every MusicBrainz value in them goes through `esc()` - see "Page start-up, the log, and escaping".)
 - **The same clipping bug lived one level down**: `.release-tracks.expanded` was capped at
   `max-height: 5000px`, which a large box set's tracklist can exceed. `none` now, like the
   release list's own 1000px cap fixed in v0.8.1.
@@ -1678,7 +1678,8 @@ James: "make sure the same logic with ye works with the slskd search".
   several queries, and re-searching sent the box's contents as an override - so pressing it
   unchanged would have quietly searched one name of several. Hovering the box lists the others,
   and "no matches" says every name it tried. That message is built with `textContent`: the
-  queries are MusicBrainz's names, third-party text, and the vanilla half has no escaping helper.
+  queries are MusicBrainz's names, third-party text. (The vanilla half has `esc()` since v0.9.22
+  for what still goes in as markup; text is still the better way where it fits.)
 - **Verified** over real HTTP against a stub slskd holding one share of BULLY filed under
   `Kanye West/`, which matches the way Soulseek does, with the alias lookup going to LIVE
   MusicBrainz: before, "Ye BULLY" and nothing; after, MusicBrainz gave "Kanye West" as a former
@@ -2538,7 +2539,7 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
 - **`naming.validate_template` and `folder_pattern` are memoised.** The scan reads every
   album's edition back out of its folder name, and it rebuilt the regex each time.
 
-### Page start-up and the event log (v0.9.21, the audit)
+### Page start-up, the log, and escaping (v0.9.21-0.9.22, the audit)
 
 - **The pings wait for the log stream to OPEN, not for a fixed sleep.** The MusicBrainz ping
   writes "Connection successful" to the log, and the stream keeps no history, so a line logged
@@ -2561,6 +2562,17 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
 - **Removed as unused:** `/monitor_slskd/config`, which startup fetched only to log "Loaded
   server config" and whose answer nothing read (the settings tab has `/deadwax/settings`);
   `utils.js`; the connector-line element the pills made and the CSS then hid.
+- **Everything MusicBrainz sends is escaped on its way into markup (v0.9.22).** The search
+  view's cards and release grid were built from template strings holding titles, artist
+  names, labels, catalogue numbers and disambiguations straight from MusicBrainz, some of them
+  inside `title="..."` attributes, where a straight quote ends the attribute (MusicBrainz's own
+  format names carry one: `12" Vinyl`). `esc()` in main.js wraps every such value.
+  **Verified** by stubbing the search's fetch with a group whose every field held an `<img>`
+  and quotes: no element was created, every tooltip read in full, including the full-tracklist
+  rows. **A new `${...}` in main.js markup takes `esc()`** unless it is our own constant; the
+  Preact half has no raw HTML at all. The two "Specific releases" toggles, one for a card that
+  came with its releases and one for a card that fetched them, were the same code twice and
+  are one `mountReleases()` now.
 
 ## Frontend migration (in progress)
 

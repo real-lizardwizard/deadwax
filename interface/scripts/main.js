@@ -590,7 +590,7 @@ async function handleSearch() {
         // surface it in the results area - a silent console error looks like "no matches",
         // which sends people rewording a search that never actually ran
         document.getElementById('search-results-scrollable').innerHTML =
-            `<h4 class="text red candidates-status">${error.message}</h4>`;
+            `<h4 class="text red candidates-status">${esc(error.message)}</h4>`;
         updateResultsSummary();
     }
 }
@@ -813,7 +813,7 @@ async function loadDiscography(artistMbid, artistName) {
         console.error(`Discography error: ${error.message}`);
         discography = null;
         container.innerHTML =
-            `<h4 class="text red candidates-status">couldn't load that discography - ${error.message}</h4>`;
+            `<h4 class="text red candidates-status">couldn't load that discography - ${esc(error.message)}</h4>`;
         updateResultsSummary();
     }
 }
@@ -1786,63 +1786,63 @@ function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupConte
                 td.className = `releases-col-${id}`;
 
                 if (id === 'title') {
-                    td.innerHTML = `<h4 class="text white releaseGridTitle"><a href="https://musicbrainz.org/release/${releaseId}" target="_blank" rel="noopener noreferrer">${title}</a></h4>`;
+                    td.innerHTML = `<h4 class="text white releaseGridTitle"><a href="https://musicbrainz.org/release/${esc(releaseId)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a></h4>`;
                     if (chips && chipsIn === 'title') td.appendChild(chips);
                 }
 
                 else if (id === 'edition') {
                     //? no dash when there are chips beneath: "—" over "+1 track" reads as a blank
                     td.innerHTML = editionTags.length
-                        ? editionTags.map(tag => `<h4 class="text ${EDITION_TAG_COLORS[tag] || 'default'} edition-tag" title="${disambiguation}">${tag}</h4>`).join('')
+                        ? editionTags.map(tag => `<h4 class="text ${EDITION_TAG_COLORS[tag] || 'default'} edition-tag" title="${esc(disambiguation)}">${esc(tag)}</h4>`).join('')
                         : (chips ? '' : `<h4 class="text default-muted edition-blank">—</h4>`);
                     if (chips) td.appendChild(chips);
                 }
 
                 else if (id === 'format') {
-                    td.innerHTML = `<h4 class="text default">${format}</h4>`;
+                    td.innerHTML = `<h4 class="text default">${esc(format)}</h4>`;
                 }
 
                 else if (id === 'tracks') {
-                    td.innerHTML = `<h4 class="text default">${tracks}</h4>`;
+                    td.innerHTML = `<h4 class="text default">${esc(tracks)}</h4>`;
                 }
 
                 else if (id === 'status') {
-                    td.innerHTML = `<h4 class="text default-secondary">${status}</h4>`;
+                    td.innerHTML = `<h4 class="text default-secondary">${esc(status)}</h4>`;
                 }
 
                 else if (id === 'country') {
                     td.innerHTML = `
-                        ${countryCode ? `<img src="https://flagcdn.com/${countryCode}.svg">` : `<img src="https://upload.wikimedia.org/wikipedia/commons/b/b0/No_flag.svg">`}
-                        <h4 class="text white">${countryDisplay}</h4>
+                        ${countryCode ? `<img src="https://flagcdn.com/${esc(countryCode)}.svg">` : `<img src="https://upload.wikimedia.org/wikipedia/commons/b/b0/No_flag.svg">`}
+                        <h4 class="text white">${esc(countryDisplay)}</h4>
                     `;
                 }
 
                 else if (id === 'date') {
-                    td.innerHTML = `<h4 class="text white">${date}</h4>`;
+                    td.innerHTML = `<h4 class="text white">${esc(date)}</h4>`;
                 }
 
                 else if (id === 'label') {
-                    td.innerHTML = `<h4 class="text default">${label}</h4>`;
+                    td.innerHTML = `<h4 class="text default">${esc(label)}</h4>`;
                 }
 
                 else if (id === 'catalogNumber') {
-                    td.innerHTML = `<h4 class="text default-secondary">${catalogNumber}</h4>`;
+                    td.innerHTML = `<h4 class="text default-secondary">${esc(catalogNumber)}</h4>`;
                 }
 
                 else if (id === 'barcode') {
-                    td.innerHTML = `<h4 class="text default-secondary">${barcode}</h4>`;
+                    td.innerHTML = `<h4 class="text default-secondary">${esc(barcode)}</h4>`;
                 }
 
                 else if (id === 'quality') {
-                    td.innerHTML = `<h4 class="text default-secondary">${quality}</h4>`;
+                    td.innerHTML = `<h4 class="text default-secondary">${esc(quality)}</h4>`;
                 }
 
                 else if (id === 'language') {
-                    td.innerHTML = `<h4 class="text default-secondary">${language}</h4>`;
+                    td.innerHTML = `<h4 class="text default-secondary">${esc(language)}</h4>`;
                 }
 
                 else if (id === 'disambiguation') {
-                    td.innerHTML = `<h4 class="text default-muted">${disambiguation}</h4>`;
+                    td.innerHTML = `<h4 class="text default-muted">${esc(disambiguation)}</h4>`;
                 }
 
                 row.appendChild(td);
@@ -1944,8 +1944,8 @@ function buildFullTracklist(media) {
             const trackDiv = document.createElement('div');
             trackDiv.className = 'track';
             trackDiv.innerHTML = `
-                <h4 class="text default trackNumber">${track.number}.${track.position}</h4>
-                <h4 class="text white trackName"><a href="https://musicbrainz.org/recording/${recordingId}" target="_blank" rel="noopener noreferrer">${recordingTitle}</a></h4>
+                <h4 class="text default trackNumber">${esc(track.number)}.${esc(track.position)}</h4>
+                <h4 class="text white trackName"><a href="https://musicbrainz.org/recording/${esc(recordingId)}" target="_blank" rel="noopener noreferrer">${esc(recordingTitle)}</a></h4>
                 <h4 class="text white-tertiary trackLength">[${lengthStr}]</h4>
             `;
             frag.appendChild(trackDiv);
@@ -1953,6 +1953,18 @@ function buildFullTracklist(media) {
     }
     return frag;
 }
+
+/**
+ * Text made safe to put into markup (v0.9.22). MusicBrainz's titles, names and labels are typed
+ * by other people, and this file still builds much of the page from template strings.
+ * Unescaped, a straight quote ends an attribute early (MusicBrainz's own format names carry one:
+ * `12" Vinyl`), and markup in a title would run in the page. Everything third-party goes
+ * through this on its way into innerHTML; the port replaces it with JSX, which escapes by itself.
+ */
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
 /** A small element with text set safely - these are MusicBrainz's titles, third-party text. */
 function textElement(tag, className, text) {
@@ -2116,6 +2128,30 @@ function millisecondsToMinutesAndSeconds(ms) {
     }
 }
 
+/**
+ * A card's "Specific releases" toggle and the grid beneath it - whether the releases came with
+ * the card (the best match's, pre-fetched) or were fetched from it.
+ */
+function mountReleases(card, releases, releaseGroupId, artistId, releaseGroupContext) {
+    card.insertAdjacentHTML('beforeend', `
+        <hr>
+        <button class="releases-toggle-button" type="button">
+            <hr>
+            <h4 class="text white releaseName"></h4>
+        </button>
+        <div class="release-group-releases"></div>
+    `);
+    const container = card.querySelector('.release-group-releases');
+    const label = card.querySelector('.releases-toggle-button .releaseName');
+    const describe = (open) => `Specific releases ${open ? '▽' : '▷'} (${releases.length})`;
+
+    label.textContent = describe(false);
+    container.appendChild(buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupContext));
+    card.querySelector('.releases-toggle-button').addEventListener('click', () => {
+        label.textContent = describe(container.classList.toggle('expanded'));
+    });
+}
+
 function createReleaseGroupElement(releaseGroup, releases = null) {
     if (releases && releases.length) {
         releases = sortReleasesByDateDesc(releases);
@@ -2178,12 +2214,12 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
                       a click, and "everything this artist released, in order" is a question
                       the search can't answer at all - it spends its limit on relevance. The
                       external link is still one click away, on the ↗.
-                    --><button type="button" class="releaseGrpArtistButton" data-artist-mbid="${artistId || ''}" title="Browse ${artist}'s discography">${artist}</button><a class="releaseGrpArtistLink" href="https://musicbrainz.org/artist/${artistId}" target="_blank" rel="noopener noreferrer" title="${artist} on MusicBrainz">↗</a>&nbsp;-&nbsp;
+                    --><button type="button" class="releaseGrpArtistButton" data-artist-mbid="${esc(artistId)}" title="Browse ${esc(artist)}'s discography">${esc(artist)}</button><a class="releaseGrpArtistLink" href="https://musicbrainz.org/artist/${esc(artistId)}" target="_blank" rel="noopener noreferrer" title="${esc(artist)} on MusicBrainz">↗</a>&nbsp;-&nbsp;
                 </h3>
                 <h3 class="text white releaseGrpName">
-                    <a href="https://musicbrainz.org/release-group/${releaseGroupId}" target="_blank" rel="noopener noreferrer">${title} (${year})</a>
+                    <a href="https://musicbrainz.org/release-group/${esc(releaseGroupId)}" target="_blank" rel="noopener noreferrer">${esc(title)} (${esc(year)})</a>
                 </h3>
-                <h3 class="text white-tertiary releaseGrpType">&nbsp;[${typeDisplay}] &nbsp;</h3>
+                <h3 class="text white-tertiary releaseGrpType">&nbsp;[${esc(typeDisplay)}] &nbsp;</h3>
                 <span class="owned-chip-slot"></span>
             </div>
             <div class="non-shrinkable">
@@ -2193,23 +2229,13 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
         </div>
     `;
 
-    if (releases && releases.length) {
-        html +=
-        `
-            <hr>
-            <button class="releases-toggle-button" type="button">
-                <hr>
-                <h4 class="text white releaseName">Specific releases ▷ (${releases.length})</h4>
-            </button>
-            <div class="release-group-releases"></div>
-        `;
-    }
-
-    // `else`, not `else if (releases === null)`. An empty array matched neither arm, so a group
-    // whose releases came back empty rendered with no grid and no fetch button at all: a dead
-    // card you could not expand, and - because the filter facets are built from whatever grids
-    // are mounted - an entire search with no filters. Every path now leaves a way forward.
-    else {
+    // A fetch button whenever there are no releases to show, an EMPTY list included. It used to
+    // be `else if (releases === null)`, which an empty array failed as well as the first arm, so
+    // a group whose releases came back empty rendered with no grid and no fetch button at all: a
+    // dead card you could not expand, and - because the filter facets are built from whatever
+    // grids are mounted - an entire search with no filters. Every path now leaves a way forward.
+    // A card that came with its releases gets their toggle from mountReleases() below.
+    if (!releases?.length) {
         html +=
         `
             <hr>
@@ -2246,22 +2272,8 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
         );
     });
 
-    if (releases && releases.length) {
-        const releasesContainer = div.querySelector('.release-group-releases');
-        const toggleButton = div.querySelector('.releases-toggle-button');
-        releasesContainer.appendChild(buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupContext));
-
-        toggleButton.addEventListener('click', () => {
-            releasesContainer.classList.toggle('expanded');
-
-            if (releasesContainer.classList.contains('expanded')) {
-                toggleButton.innerHTML = `<h4 class="text white releaseName">Specific releases ▽ (${releases.length})</h4>`;
-            }
-            else {
-                toggleButton.innerHTML = `<h4 class="text white releaseName">Specific releases ▷ (${releases.length})</h4>`;
-            }
-
-        });
+    if (releases?.length) {
+        mountReleases(div, releases, releaseGroupId, artistId, releaseGroupContext);
     }
 
 
@@ -2292,36 +2304,9 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
                 //? facets and the results count - they are built from every MOUNTED grid.
                 if (!div.isConnected) return;
 
-                const fetchedReleases = sortReleasesByDateDesc(result.releases);
-
-                const newHtml =
-                `
-                    <hr>
-                    <button class="releases-toggle-button" type="button">
-                        <hr>
-                        <h4 class="text white releaseName">Specific releases ▷ (${fetchedReleases.length})</h4>
-                    </button>
-                    <div class="release-group-releases"></div>
-                `;
-
                 fetchButton.parentElement.querySelector('hr').remove();
                 fetchButton.remove();
-                div.insertAdjacentHTML('beforeend', newHtml);
-                const releasesContainer = div.querySelector('.release-group-releases');
-                const toggleButton = div.querySelector('.releases-toggle-button');
-                releasesContainer.appendChild(buildReleasesGrid(fetchedReleases, releaseGroupId, artistId, releaseGroupContext));
-
-                toggleButton.addEventListener('click', () => {
-                    releasesContainer.classList.toggle('expanded');
-
-                    if (releasesContainer.classList.contains('expanded')) {
-                        toggleButton.innerHTML = `<h4 class="text white releaseName">Specific releases ▽ (${fetchedReleases.length})</h4>`;
-                    }
-                    else {
-                        toggleButton.innerHTML = `<h4 class="text white releaseName">Specific releases ▷ (${fetchedReleases.length})</h4>`;
-                    }
-
-                });
+                mountReleases(div, sortReleasesByDateDesc(result.releases), releaseGroupId, artistId, releaseGroupContext);
 
                 /*
                  * The grid has just joined mountedReleaseGrids, and the filter facets are built
