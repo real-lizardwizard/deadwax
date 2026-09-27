@@ -147,6 +147,9 @@
 body {
     position: relative;
     height: 100vh;
+    /* the viewport as it is now: iOS Safari's 100vh is its height with the toolbar HIDDEN, so
+       the bottom of a 100vh page - the library's status bar - sat under the toolbar */
+    height: 100dvh;
     overflow:hidden;
 
     /*
@@ -396,7 +399,14 @@ body {
 .search-input-cursor-holder {
     width: fit-content;
     position: relative;
+    /* the two fields give way when the row is short of room - between 769 and ~940px wide (a
+       phone on its side, a narrow window) they held their natural 184px each and pushed Search
+       95px off the right edge */
+    flex: 0 1 auto;
+    min-width: 7em;
 }
+
+.search-input-cursor-holder > .search-input { width: 100%; }
 
 .search-input {
     height: var(--control-lg);
@@ -537,10 +547,11 @@ body {
     flex-shrink: 0;
 }
 .results-box-image img{
-    width: auto; 
+    width: auto;
+    /* the card's own height, measured when the cover loads (loadAllCoverImages) */
+    height: var(--card-height, auto);
     display:block;
     object-fit: cover;
-    
 }
 
 
@@ -1399,6 +1410,7 @@ h5.white-tertiary{
     width: 100%;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
 }
 
 
@@ -3329,6 +3341,9 @@ span.red { color: var(--red-text); }
 #library-toolbar {
     display: flex;
     flex-direction: row;
+    /* the bulk buttons come and go with what the library needs; at a tablet's 800px there were
+       enough of them to push Rescan 36px off the edge */
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
     flex-shrink: 0;
@@ -3625,9 +3640,24 @@ span.red { color: var(--red-text); }
     padding: 0 var(--space-1);
 }
 
-.tree-row .library-edition,
-.tree-row .library-new-chip,
-.tree-row .library-issues { flex-shrink: 0; }
+/*
+ * The shrink order, when a row is short of room: the chips give way, ellipsized, long before the
+ * album's name does (the weights are that order - issues first, then the edition count). They
+ * didn't shrink at all, so "Dummy" beside "2 editions" and "No cover art" was drawn as "D." on a
+ * 375px phone: the container queries below only start dropping chips at 360px of tree.
+ */
+.tree-row .library-new-chip { flex-shrink: 0; }
+/*
+ * Weighted in the thousands against the name's 1: flex takes a share of any shortfall from
+ * every item that can shrink, in proportion to size times weight, and at 20 and 40 "Dummy"
+ * still lost the two pixels that made it "Dum…". At these the name's share rounds to nothing
+ * until the chips are down to their minimum - then it takes the rest. (Not a fraction on the
+ * name instead: with the chips at their minimum it would be the only item left, and flex
+ * scales the space it takes back by the sum of the weights when that is under 1.)
+ */
+.tree-row .library-edition { flex-shrink: 10000; min-width: 3.5em; overflow: hidden; text-overflow: ellipsis; }
+.tree-row .library-issues { flex-shrink: 20000; min-width: 3.5em; overflow: hidden; }
+.tree-row .library-issue-chip { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* "Disc 2", inside an album that the files tag as a multi-disc set */
 .tree-disc {
@@ -4083,7 +4113,8 @@ span.red { color: var(--red-text); }
     box-shadow: var(--inset-well);
 }
 
-.track-table { width: 100%; font-size: var(--text-xs); }
+/* the minimum is the columns' own, set by the component as a property so a phone can drop it */
+.track-table { width: 100%; min-width: var(--track-min-width, 0); font-size: var(--text-xs); }
 
 .track-table-head,
 .track-table-row {
@@ -4514,6 +4545,9 @@ span.red { color: var(--red-text); }
 */
 .metadata-release-detail {
     flex-shrink: 1;
+    /* never the whole row: with a long enough detail ("2014 · 20th Anniversary Reissue 180gram
+       · 12" Vinyl ...") its own width is the flex basis, and the title beside it got none */
+    max-width: 60%;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -5401,6 +5435,13 @@ span.red { color: var(--red-text); }
  * scroll position can be anchored on the cursor, which is the whole point of zooming into the
  * corner of a sleeve. The stage keeps overflow: hidden and the transform is clipped by it.
  */
+/* the hint for the hand in use: a touchscreen has no wheel and taps rather than clicks */
+.hint-touch { display: none; }
+@media (hover: none) and (pointer: coarse) {
+    .hint-pointer { display: none; }
+    .hint-touch { display: inline; }
+}
+
 .art-viewer-stage.is-zoomed > img { cursor: grab; }
 .art-viewer-stage.is-panning > img { cursor: grabbing; }
 
@@ -5734,6 +5775,9 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 }
 
 .tags-field input {
+    /* not the shared input class's flex: 1 - a field beside one with a longer note is stretched
+       to the row, and its box grew with it (Disc beside Track, on a phone) */
+    flex: none;
     width: 100%;
     min-width: 0;
     height: var(--control-md);
@@ -5872,7 +5916,9 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
     margin-top: var(--space-2);
 }
 
-.artist-links > a { font-size: var(--text-xs); }
+/* nothing coloured these, so they were the browser's own link blue (0, 0, 238) on a dark page */
+.artist-links > a { font-size: var(--text-xs); color: var(--main-text); text-decoration: none; }
+.artist-links > a:hover { color: var(--accent-hover); text-decoration: underline; }
 
 .artist-members {
     margin: var(--space-2) 0 0;
@@ -6574,17 +6620,7 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
         padding: var(--space-2) var(--space-3);
     }
 
-    /*
-     * The release-group cover is ~195px wide on desktop, which on a 375px phone leaves the
-     * title about 130px and breaks it across four lines. A thumbnail is enough to recognise
-     * a sleeve you already know; the words are what you are reading.
-     */
-    .results-box-image,
-    .results-box-image img {
-        max-width: 72px;
-        width: 72px;
-        height: auto;
-    }
+    /* the cover: see "the phone pass" below - a 52px square tucked into the card's corner */
 
     /*
      * A two-column GRID, not a wrapping flex row.
@@ -6702,7 +6738,7 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 
     #metadata-window {
         width: calc(100vw - 12px);
-        height: calc(100vh - 12px);
+        height: calc(100dvh - 12px);
     }
 
     #delete-window { width: calc(100vw - 16px); }
@@ -6711,7 +6747,7 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
        it - two columns of a 363px dialog are each narrower than most song titles */
     #tags-window {
         width: calc(100vw - 12px);
-        height: calc(100vh - 12px);
+        height: calc(100dvh - 12px);
     }
 
     .tags-body {
@@ -6797,7 +6833,9 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
     .facet-option,
     .library-facet {
         min-height: 32px;
-        padding: 4px 0;
+        /* the side padding stays: .facet-option pulls itself 8px left to line its hover up, and
+           without it the checkbox sat 4px from the edge of the screen */
+        padding: 4px var(--space-2);
     }
 
     .download-cancel-button {
@@ -6821,6 +6859,326 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
         min-width: 0;
     }
     .candidate-quality-note { max-width: none; }
+
+    /* ======================================================================================
+     * ---- the phone pass (v0.9.31) ----
+     *
+     * Asked for: "mobile needs to be 1000% optimized and working well. no weird overflows or
+     * cutoffs". Found by driving every view at 375px with a script that flags anything past
+     * the screen edge, text clipped without an ellipsis, fixed panels running off screen and
+     * tap targets under 32px - then fixing what it and the screenshots showed.
+     * ====================================================================================== */
+
+    /* iOS zooms the page into any field whose text is under 16px, and doesn't zoom back out.
+       !important because every input here is sized by an id or class rule this can't outrank
+       any other way, and the zoom is worth more than their smaller type on a phone */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* a fingertip, not a pointer: boxes and radios big enough to hit, fields tall enough */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 20px;
+        height: 20px;
+    }
+
+    input[type="range"] { min-height: 32px; }
+
+    .releases-filter-input,
+    #library-filter-input,
+    #library-sort-select,
+    .settings-env-input,
+    #candidates-query-input,
+    #candidate-sort,
+    .candidate-quality-row select,
+    .candidate-quality-range input,
+    .settings-row-control select,
+    .settings-number input {
+        min-height: 40px;
+    }
+
+    /* a setting's label is the box's tap target too - a whole line of it, not 20px of it */
+    .settings-row:has(.settings-check) .settings-row-label {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .settings-env-revert { min-height: 36px; }
+
+    #downloads-toggle-button,
+    #log-toggle-button {
+        min-height: 36px;
+    }
+
+    #limit-decrease,
+    #limit-increase {
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+    /* the dropdowns' items: 25px rows are a mouse's size */
+    .columns-dropdown-item {
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+    }
+
+    /* every panel's close button - they were 14-18px glyphs */
+    #candidates-close-button,
+    #log-close-button,
+    #metadata-close-button,
+    .window-close {
+        min-width: 40px;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .artist-links { gap: 0 var(--space-1); }
+    .artist-links > a { padding: 8px 6px; }
+
+    .tags-tracks > summary {
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+    }
+
+    .signals-reset-button,
+    #downloads-clear-button,
+    .download-retry-button,
+    #library-clear-filters,
+    .tag-chip {
+        min-height: 36px;
+    }
+
+    /* ---- search: one scroller, so the form scrolls away and the results get the screen ----
+     *
+     * The results scrolled inside their own box under the form, the header and the tab bar,
+     * which between them never moved: 40% of a phone spent on a form you had already used.
+     */
+    #middle-content {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    #results-section,
+    #results-section > .scrollable {
+        flex: none;
+        overflow: visible;
+    }
+
+    /* the cover tucks into the card's top-left corner, beside the title, instead of taking a
+       72px column down the whole card - an expanded card is a long list of pressings, and
+       they get the full width. A card with no cover keeps its header where it was */
+    .results-box-image-container { position: relative; }
+    .results-box-image {
+        position: absolute;
+        top: 9px;
+        left: 13px;
+        z-index: 1;
+    }
+    .results-box-image,
+    .results-box-image img {
+        width: 52px;
+        max-width: 52px;
+        height: 52px;
+        object-fit: cover;
+    }
+    .results-box-image-container:has(> .results-box-image) .release-group-header {
+        padding-left: 62px;
+        min-height: 52px;
+    }
+
+    /* the " - " between artist and title, and the spaces around the type, are a desktop row's
+       punctuation; stacked, they dangle at line ends and indent "[Single]" */
+    .releaseGrpSep { display: none; }
+    .releaseGrpType { margin-left: 0; }
+    .releaseGrpArtistButton,
+    .releaseGrpArtistLink {
+        padding-block: 6px;
+    }
+    .releaseGrpArtistLink { padding-inline: 4px 8px; }
+
+    /* the summary on a line of its own, and Sort and Columns side by side under it - they
+       otherwise wrapped as summary + Sort, then Columns alone */
+    #results-toolbar { flex-wrap: wrap; row-gap: var(--space-2); }
+    #results-summary { flex: 1 1 100%; }
+
+    /* Sort now starts the line under the summary, so its menu hangs from its LEFT edge -
+       anchored right, as on a desktop, it began 2px off the screen */
+    #sort-dropdown { left: 0; right: auto; }
+
+    .tracklist-full-toggle { min-height: 36px; }
+
+    /* "100%" says it; " match" was a third of the width the title needed */
+    .matchScore-word { display: none; }
+
+    /* ---- the release grid: a block per pressing, not a row of a 1,700px table ----
+     *
+     * Line one is what you choose by (▷, the title, Find), line two the edition and what the
+     * tracklist changes, then each other column you've switched on as a small labelled value.
+     * Values MusicBrainz doesn't have are left out rather than listed as "N/A".
+     */
+    .releases-table-scroll { overflow-x: visible; }
+    .releases-table { min-width: 0; }
+    .releases-table,
+    .releases-table tbody { display: block; }
+    .releases-table colgroup,
+    .releases-table thead { display: none; }
+
+    .releases-table tr.release-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px var(--space-3);
+        padding: var(--space-2) var(--space-1);
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .releases-table tr.release-row > td {
+        display: block;
+        width: auto;
+        padding: 0;
+        border: 0;
+        order: 5;
+        white-space: nowrap;
+        font-size: var(--text-xs);
+        color: var(--white-secondary-text);
+    }
+
+    .releases-table tr.release-row > td[data-label]:not(.releases-col-title):not(.releases-col-edition)::before {
+        content: attr(data-label) " ";
+        color: var(--white-tertiary-text);
+        font-size: var(--text-2xs);
+    }
+
+    .releases-table tr.release-row > td.is-na { display: none; }
+    /* the values are <h4>s, blocks - inline, so a label and its value share a line */
+    .releases-table tr.release-row > td:not(.releases-col-action) > h4 { display: inline; }
+    .releases-table tr.release-row .releaseAddButton { display: flex; align-items: center; padding-inline: var(--space-3); }
+
+    .releases-table tr.release-row > td.releases-col-expand { order: 0; flex: 0 0 1.2em; }
+    .releases-table tr.release-row > td.releases-col-title {
+        order: 1;
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: var(--text-sm);
+    }
+    .releases-table tr.release-row > td.releases-col-action { order: 2; flex: 0 0 auto; }
+    .releases-table tr.release-row > td.releases-col-edition {
+        order: 3;
+        flex: 1 1 100%;
+        padding-left: calc(1.2em + var(--space-3));
+        white-space: normal;
+    }
+    /* nothing to say about the edition (a dash) - no line for it */
+    .releases-table tr.release-row > td.releases-col-edition:has(> .edition-blank:only-child) { display: none; }
+    /* a value longer than the screen (a barcode list, a long label) ellipsizes on its own line */
+    .releases-table tr.release-row > td { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+    .releases-table tr.release-tracks-row,
+    .releases-table tr.release-tracks-row > td { display: block; }
+    .release-tracks { padding-left: var(--space-3); }
+
+    /* ---- candidates: a full-height sheet, and rows that read ---- */
+    #candidates-window {
+        height: calc(100dvh - 12px);
+    }
+
+    /* the desktop floors (320-340px, for dragging a panel smaller) are wider than a small phone:
+       at 320px the metadata editor hung 10px off both sides */
+    #candidates-window,
+    #metadata-window,
+    #downloads-window,
+    #log-window {
+        min-width: 0;
+    }
+
+    /* score, folder and Download on the first line; every detail line full width below it.
+       The body's children join the row's grid, which is what lets the details span it */
+    .candidate-main {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 4px 10px;
+    }
+    .candidate-body { display: contents; }
+    .candidate-score { grid-column: 1; grid-row: 1; width: auto; }
+    .candidate-dir { grid-column: 2; grid-row: 1; }
+    .candidate-download-button { grid-column: 3; grid-row: 1; min-height: 40px; }
+    .candidate-meta,
+    .candidate-peer,
+    .candidate-tags,
+    .candidate-signals { grid-column: 1 / -1; }
+    /* wrap BETWEEN the details, never inside one: "busy-" / "peer" was the old way */
+    .candidate-meta { flex-wrap: wrap; row-gap: 0; }
+    .candidate-meta > span,
+    .candidate-peer > span { white-space: nowrap; }
+
+    /* ---- downloads and the log: the sheets' own buttons ---- */
+    #downloads-window,
+    #log-window { max-height: 70dvh; }
+    #log-window { height: 70dvh; }
+
+    /* ---- the library ---- */
+
+    /* two short lines rather than one that runs off the right edge */
+    #library-statusbar {
+        flex-wrap: wrap;
+        white-space: normal;
+        row-gap: 0;
+        column-gap: var(--space-3);
+    }
+    .statusbar-spacer { display: none; }
+
+    /* a long edition name ellipsizes rather than wrapping its own pill */
+    .details-edition-pill {
+        max-width: 100%;
+        min-height: 32px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* the track list as a phone's music app draws one: tick, number, title, length. The
+       fields you chose (and the Fields menu that chooses them) are a desktop table's; a
+       track's every tag is still one tap away, in the track's own view */
+    .track-table:not(.editions-table) { min-width: 0; }
+    .track-table:not(.editions-table) > .track-table-head,
+    .track-table:not(.editions-table) > .track-table-row {
+        grid-template-columns: 40px 3.2em minmax(0, 1fr) auto;
+    }
+    .track-table:not(.editions-table) > .track-table-row { min-height: 44px; }
+    .track-table:not(.editions-table) .track-cell[data-column] { display: none; }
+    .track-table:not(.editions-table) .track-cell.track-check { grid-column: 1; display: flex; justify-content: center; }
+    .track-table:not(.editions-table) .track-cell[data-column="number"] { display: block; grid-column: 2; }
+    .track-table:not(.editions-table) .track-cell[data-column="title"] { display: block; grid-column: 3; font-size: var(--text-sm); }
+    .track-table:not(.editions-table) .track-cell[data-column="length"] { display: block; grid-column: 4; }
+    /* the header can't be dragged or sized with a thumb; only its tick box does anything */
+    .track-head-cell { pointer-events: none; }
+    .track-col-grip { display: none; }
+    .commandbar-fields { display: none; }
+
+    /* the editions table: edition, year and tracks, and what needs doing on a line of its own */
+    .editions-table { min-width: 0; }
+    .editions-table > .track-table-head,
+    .editions-table > .track-table-row {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+    .editions-table > .track-table-row { min-height: 44px; }
+    .editions-table .track-cell:nth-child(n + 4) { display: none; }
+    .editions-table > .track-table-row > .track-cell:nth-child(7):not(:empty) {
+        display: block;
+        grid-column: 1 / -1;
+        padding-top: 0;
+    }
 }
 
 @media (max-width: 420px) {
@@ -6830,4 +7188,22 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
         font-size: 6px;
     }
 
+}
+
+/*
+ * A SHORT screen - a phone on its side is 390px tall and wider than the phone breakpoint, so it
+ * gets the desktop layout - scrolls the search column as one, as a phone in portrait does:
+ * otherwise the results were a 186px box under a form and a header that never moved.
+ */
+@media (max-height: 520px) {
+    #middle-content {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    #results-section,
+    #results-section > .scrollable {
+        flex: none;
+        overflow: visible;
+    }
 }

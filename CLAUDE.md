@@ -933,6 +933,81 @@ on one — the whole thing was the desktop layout with `flex-wrap` turned on.
   fixed-width window with nowhere to overflow to. Measured after: `scrollWidth === clientWidth`
   on every row, document scroll width 375, two lines per row.
 
+### The phone pass (v0.9.31)
+
+James: "mobile needs to be 1000% optimized and working well. no weird overflows or cutoffs,
+everything should work exceptionally well". Every view and state was driven at 320, 375 and
+390px, at 844x390 (a phone on its side) and at 800 and 1024px tablets, with an audit script run in
+each. It flags anything past the screen edge that isn't inside a sideways scroller, text clipped
+without an ellipsis, fixed panels running off screen, and tap targets under 32px. Everything it
+found was fixed, and it now reports nothing anywhere, apart from 20px checkboxes whose labels are
+the real targets. All the CSS is in one commented section at the end of the 768px block, "the
+phone pass". What it changed, and why:
+
+- **Every text field is 16px on a phone (`!important`).** Anything smaller makes iOS Safari zoom
+  the whole page when you tap into it, and it doesn't zoom back. Every input in the app was
+  12-14px.
+- **`100dvh`, not `100vh`, for the app's height**, with `100vh` first as a fallback. iOS Safari's
+  `100vh` is its height with the toolbar hidden, so the bottom of the page (the library's status
+  bar) sat under the toolbar while it showed.
+- **Search scrolls as ONE column on a phone** (`#middle-content` is the scroller; the results
+  section and its box grow instead). Before, the results scrolled in a box under the form, the
+  header and the tab bar, and those never moved: 40% of the screen on a form already used.
+  **A screen under 520px tall gets the same** (`@media (max-height: 520px)`), because a phone on
+  its side is wider than the breakpoint and so gets the desktop layout at 390px tall.
+- **A release in the grid is a BLOCK on a phone, not a row of a 1,700px table.** `main.js` gives
+  each cell a `data-label` and an `is-na` class (values MusicBrainz doesn't have); the phone CSS
+  lays the row out as ▷, title and Find; then the edition and tracklist chips; then each other
+  visible column as a small labelled value; with "N/A" left out and the header hidden. The values
+  are `<h4>`s and go inline so a label shares their line - but NOT the Find cell's, which is a
+  button that `min-height` must still reach.
+- **The card's cover tucks into its header corner** (52px, `:has()` gives the header room only
+  when a cover is there), so an expanded card's pressings use the full width. Its height now
+  comes from a `--card-height` property that `loadAllCoverImages` sets, rather than inline, so
+  the phone rule can square it. The " - " between artist and title, and the spaces around the
+  type, are `.releaseGrpSep` spans a phone hides; " match" after the score is too. An undated
+  group no longer shows "(N/A)" as its year, anywhere.
+- **The results summary counts albums as well as pressings**, with plurals: "2 albums · 20
+  releases listed". It said "1 releases" beside fifty cards, because it only ever counted the
+  pressings in expanded grids.
+- **Candidates**: a full-height sheet; each row a grid with the score, the folder and Download
+  on the first line and every detail line spanning under it (`.candidate-body` is
+  `display: contents` for this); details wrap BETWEEN items, never inside one ("busy-" / "peer"
+  was the old way). The desktop panels' `min-width` floors (280-340px) are dropped on a phone:
+  at 320px the metadata editor hung 10px off both sides.
+- **Saved panel sizes aren't applied at phone width** (resize.js `PHONE`), and a window
+  narrowed into it drops the inline geometry. A size saved at a desk is an inline style, beats
+  every phone rule, and there's no way to resize it back on a phone.
+- **The track list is a music app's on a phone**: tick, number, title, length, 44px rows, no
+  sideways scroll. Body cells now carry `data-column` so CSS can pick them; the header can't be
+  dragged or resized and the Fields button is hidden (the fields are a desktop table's). Its
+  minimum width moved from inline `min-width` to a `--track-min-width` property for the same
+  reason as the cover height; the resize drag writes the property too (checked with a real drag
+  at 1440px). The editions table shows edition, year and tracks, with any issue on its own line.
+- **Tree rows have a shrink order**: the issue chip and the edition count give way, ellipsized,
+  before the album's name does - "Dummy" was drawn as "D." on a 375px phone. The weights are in
+  the thousands, not a fraction on the name: when the chips reach their minimum the name is the
+  only item left to shrink, and flex takes back space in proportion to the weights' SUM when
+  that is under 1, so a 0.001 on the name left rows running off the screen.
+- **Pinch to zoom a cover** (ArtViewer): the image takes `touch-action: none` for its drag, so
+  the browser's own pinch never happened there. Each finger's listeners answer only their own
+  pointer (every finger's hear every finger's events, and lifting one ended the other's gesture),
+  the finger left after a pinch pans on without a jump, and a still finger lifted after a pinch
+  isn't a tap. The hint says "tap … pinch" on a touchscreen (`hover: none`).
+- **Also fixed at every size**, found by the same sweep:
+  - The search row pushed Search 95px off the edge between 769 and about 940px; the fields
+    now shrink, down to 7em.
+  - The library toolbar pushed Rescan off at 800px; it wraps now.
+  - The tag editor's Disc box grew to match the Track field beside it.
+  - The editor's release rows could lose their title to a long detail line.
+  - The artist page's links were the browser's default blue.
+  - The facet checkboxes sat 4px from the edge at 420px, because side padding was dropped
+    under a -8px margin.
+  - The sort menu started 2px off the screen.
+- **Verified in the real page** at every size above, with screenshots and the audit. On desktop,
+  checked unchanged: 184px search fields, the release table with its header, the separators, 10
+  track columns, and the Fields button.
+
 ### Measuring what a peer actually gave you
 
 Added in v0.6.4. `src/peer_speed.py` is pure and holds all of it; the poller feeds it and the
@@ -1397,9 +1472,10 @@ anything else I'd need for an artist page".
   dead one** - the only candidates are Commons photographs, all of them of kind `thumb`, so
   every other row reads "none found" and the square is the only thing selectable. Which is
   exactly how it was reported.
-- **Known gap:** on a phone the details pane is a sheet that opens for albums and tracks, and an
-  artist "just opens in place" (v0.6.5's decision). So the artist page is desktop and tablet
-  only. The phone rules for it are written and inert until that decision changes.
+- ~~Known gap: on a phone the artist page is unreachable~~ **Closed in v0.9.31**: tapping an
+  artist opens it in place, as before, and tapping it again, open, opens the sheet with its page
+  (`activate` in LibraryView: `row.kind !== 'artist' || row.open`). The phone rules written for
+  it apply now, and were checked at 375px.
 
 ### CD art and embedded pictures (v0.7.2)
 

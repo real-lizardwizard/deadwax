@@ -43,6 +43,13 @@ interface View {
 
 const FIT: View = { zoom: 1, x: 0, y: 0 }
 
+/** Two fingers' spread and the point between them. */
+function spread(fingers: Map<number, { x: number; y: number }>): { distance: number; x: number; y: number } {
+  const [a, b] = [...fingers.values()]
+  if (!a || !b) return { distance: 1, x: a?.x ?? 0, y: a?.y ?? 0 }
+  return { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+}
+
 interface Size {
   width: number
   height: number
@@ -104,7 +111,8 @@ export function ArtViewer({ images, onClose, action }: Props) {
 
         <div class="art-viewer-footer">
           <span class="text white-tertiary art-viewer-hint">
-            Click to zoom in where you point · scroll to zoom · drag to move.
+            <span class="hint-pointer">Click to zoom in where you point · scroll to zoom · drag to move.</span>
+            <span class="hint-touch">Tap to zoom in where you touch · pinch to zoom · drag to move.</span>
           </span>
           {action && (
             <button
@@ -218,6 +226,12 @@ function ArtPane(
     return () => window.removeEventListener('resize', onResize)
   }, [clamp])
 
+  //? the fingers on the image now, and the pinch they make when there are two - a phone has no
+  //? wheel, and the image takes touch-action: none, so the browser's own pinch never happens here
+  const fingers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ distance: number; x: number; y: number } | null>(null)
+  const pinched = useRef(false)
+
   /**
    * Drag to move the image; a press that never travels is a click, which zooms.
    *
@@ -238,7 +252,33 @@ function ArtPane(
 
     img.setPointerCapture(event.pointerId)
 
+    //? a second finger turns whatever the first was doing into a pinch (v0.9.31)
+    fingers.current.set(event.pointerId, { x: startX, y: startY })
+    if (fingers.current.size === 2) {
+      pinch.current = spread(fingers.current)
+      pinched.current = true
+    }
+
+    //? every finger's listeners hear every finger's events, so each answers only its own
     const move = (e: PointerEvent) => {
+      if (e.pointerId !== event.pointerId) return
+      fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      if (pinch.current && fingers.current.size >= 2) {
+        //? zoom about the point between the fingers, and follow it as they move together
+        const now = spread(fingers.current)
+        const dx = now.x - pinch.current.x
+        const dy = now.y - pinch.current.y
+        zoomAt(now.x, now.y, now.distance / pinch.current.distance)
+        setView((current) => clamp({ zoom: current.zoom, x: current.x + dx, y: current.y + dy }))
+        pinch.current = now
+        moved = true
+        //? so the finger left when the other lifts carries on panning from where it is
+        lastX = e.clientX
+        lastY = e.clientY
+        return
+      }
+
       if (!moved && Math.abs(e.clientX - startX) < 4 && Math.abs(e.clientY - startY) < 4) return
       if (!moved) {
         moved = true
@@ -253,11 +293,17 @@ function ArtPane(
     }
 
     const up = (e: PointerEvent) => {
+      if (e.pointerId !== event.pointerId) return
       img.removeEventListener('pointermove', move)
       img.removeEventListener('pointerup', up)
       img.removeEventListener('pointercancel', up)
+      fingers.current.delete(e.pointerId)
+      if (fingers.current.size < 2) pinch.current = null
+      //? a finger that never moved, lifted after a pinch, is not a tap
+      const afterPinch = pinched.current
+      if (fingers.current.size === 0) pinched.current = false
       setPanning(false)
-      if (moved) return
+      if (moved || afterPinch) return
 
       if (view.zoom > 1) {
         setView(FIT)

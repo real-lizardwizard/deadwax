@@ -336,6 +336,13 @@ On a 375px screen the original layout laid out 1131px wide, with the entire top 
 The header is one row rather than four — the wordmark is set as text on a phone instead of drawn as ASCII art, and the connection pills only appear when something is actually wrong. The search form puts its three small controls on one row. Result cards lead with the album title and fit five to a screen instead of one and a half. The columns stack, the filter list collapses behind a toggle, and the dropdowns become bottom sheets.
 
 Measured at 375px: the header went from 161px to 47px, the search form from 450px to 146px, and a result card from 280px to 99px.
+
+Then every view was gone through again at phone sizes (320, 375 and 390px wide, a phone on its side, and tablets), with a script flagging anything past the screen's edge, text cut off without an ellipsis, and anything too small for a finger:
+
+- **Search** scrolls as one page, so the form moves out of the way of the results. Each pressing in a release list is a small block — title and Find, the edition, then each detail labelled — instead of a table wider than four screens.
+- **Soulseek candidates** open as a full-screen sheet, one readable row per folder.
+- **The library's track list** looks like a music app's: number, title, length. Tap an open artist a second time to see their page. Pinch to zoom a cover.
+- **No accidental zooming**: text fields are 16px, below which an iPhone zooms the whole page when you tap one. Every button, checkbox and menu item is big enough to hit with a thumb.
 <br><br>
 
 ![deadwax on a phone](assets/images/mobile.png)

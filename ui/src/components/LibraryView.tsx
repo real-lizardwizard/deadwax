@@ -391,8 +391,9 @@ export function LibraryView({ active, onNavigate }: Props) {
       setOpen(row.id, true)
     }
     //? a phone opens the details as a sheet for anything with details worth a whole screen;
-    //? tapping an artist just opens it in place
-    if (row.kind !== 'artist') setSheetOpen(true)
+    //? tapping an artist just opens it in place - and tapping it again, open, shows its page
+    //? (v0.9.31: until then a phone had no way to reach an artist's page at all)
+    if (row.kind !== 'artist' || row.open) setSheetOpen(true)
   }, [setOpen])
 
   const selectFromKeyboard = useCallback((id: string) => {
@@ -870,7 +871,7 @@ export function LibraryView({ active, onNavigate }: Props) {
                 title="Show or hide the views"
                 onClick={() => setViewsCollapsed((on) => !on)}
               >
-                {viewsCollapsed ? '▾' : '▴'}
+                {viewsCollapsed ? 'Show ▾' : 'Hide ▴'}
               </button>
             </div>
 

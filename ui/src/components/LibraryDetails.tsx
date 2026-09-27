@@ -291,7 +291,7 @@ export function LibraryDetails(props: Props) {
           <div class="fields-control">
             <button
               type="button"
-              class="commandbar-button"
+              class="commandbar-button commandbar-fields"
               aria-expanded={menuOpen}
               aria-haspopup="menu"
               title="Choose which fields the track viewer shows"
@@ -716,7 +716,7 @@ function TrackTable(
       width = clampWidth(e.clientX + grab - left)
       const next = columnLayout(columns, { ...widths, [id]: width }, [CHECK_COLUMN])
       ;(table as HTMLElement).style.setProperty('--track-columns', next.template)
-      ;(table as HTMLElement).style.minWidth = next.minWidth
+      ;(table as HTMLElement).style.setProperty('--track-min-width', next.minWidth)
     }
 
     function stop() {
@@ -742,7 +742,7 @@ function TrackTable(
         role="grid"
         aria-label="Tracks"
         aria-multiselectable={true}
-        style={`--track-columns:${template};min-width:${minWidth}`}
+        style={`--track-columns:${template};--track-min-width:${minWidth}`}
       >
         <div
           class={`track-table-head${moving ? ' is-moving' : ''}`}
@@ -855,6 +855,7 @@ function TrackTable(
                       <span
                         key={id}
                         role="gridcell"
+                        data-column={id}
                         class={`track-cell track-title${track.has_title_tag ? '' : ' is-untitled'}`}
                         title={track.has_title_tag ? title : 'No title tag - this is the file name'}
                       >
@@ -885,6 +886,8 @@ function Cell({ field, row, pending }: { field: TrackField; row: TrackRow; pendi
   return (
     <span
       role="gridcell"
+      //? which field this is, so a phone can lay a track out as number, title and length
+      data-column={field.id}
       class={[
         'track-cell',
         field.mono ? 'is-mono' : '',
@@ -939,7 +942,7 @@ function GroupDetails(
         <div
           class="track-table editions-table"
           role="grid"
-          style="--track-columns:minmax(10em,2fr) 4em 4em 5em 5em 6em minmax(8em,1fr);min-width:44em"
+          style="--track-columns:minmax(10em,2fr) 4em 4em 5em 5em 6em minmax(8em,1fr);--track-min-width:44em"
         >
           <div class="track-table-head" role="row">
             {['Edition', 'Year', 'Tracks', 'Length', 'Size', 'Format', 'Needs'].map((label) => (

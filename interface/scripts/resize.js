@@ -57,6 +57,26 @@ const DRAG_HANDLES = {
 const ANCHORED = new Set(['log-window', 'downloads-window']);
 
 /*
+  A phone lays every one of these panels out itself (the max-width: 768px block in main.css):
+  sheets, full-width and full-height. A size or position saved at a desk arrives as an INLINE
+  style, which beats all of that, and nothing on a phone can resize it back - so at this width
+  nothing saved is applied, and a window narrowed into it drops what was applied before.
+*/
+const PHONE = window.matchMedia('(max-width: 768px)');
+const INLINE_GEOMETRY = ['width', 'height', 'max-width', 'max-height', 'left', 'top', 'right', 'bottom', 'transform'];
+
+PHONE.addEventListener('change', () => {
+    if (!PHONE.matches) return;
+    for (const id of PANELS) {
+        const panel = document.getElementById(id);
+        if (!panel) continue;
+        for (const property of INLINE_GEOMETRY) panel.style.removeProperty(property);
+        delete panel.dataset['resizeFrozen'];
+        delete panel.dataset['sizeApplied'];
+    }
+});
+
+/*
   What inside a title bar is NOT a handle.
 
   The controls, obviously - a drag must not start on a button you meant to press. Also the
@@ -264,6 +284,7 @@ function savePosition(id, left, top) {
  * and a panel wider than the screen is worse than one that forgot its size.
  */
 function applySavedSize(panel) {
+    if (PHONE.matches) return;
     const saved = readSizes()[panel.id];
     if (!saved) return;
 

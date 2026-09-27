@@ -33,7 +33,8 @@ function loadAllCoverImages(parentContainer) {
         tempImg.decode()
             .then(() => {
 
-                tempImg.style.height = `${initialHeight - 2}px`;
+                //? a property rather than style.height, so a phone's square thumbnail can win over it
+                tempImg.style.setProperty('--card-height', `${initialHeight - 2}px`);
                 const imageDiv = document.createElement('div');
                 imageDiv.className = 'results-box-image';
                 tempImg.decoding = "sync";
@@ -149,7 +150,8 @@ window.deadwax.closeOtherDropdowns = () => {
     toggle.addEventListener('click', () => {
         const collapsed = column.classList.toggle('collapsed');
         toggle.setAttribute('aria-expanded', String(!collapsed));
-        toggle.textContent = collapsed ? '▾' : '▴';
+        //? words, not just the arrow: on its own in a box it read as an empty control
+        toggle.textContent = collapsed ? 'Show ▾' : 'Hide ▴';
     });
 })();
 
@@ -1184,6 +1186,8 @@ const RELEASE_COLUMNS = [
     { id: 'disambiguation', label: 'Disambiguation', width: 170 },
 ];
 
+const COLUMN_LABELS = Object.fromEntries(RELEASE_COLUMNS.map((column) => [column.id, column.label]));
+
 const COLUMN_STATE_STORAGE_KEY = 'deadwax-release-columns';
 
 //? Bumped when the DEFAULT order changes in a way a saved layout should pick up. A layout is
@@ -1531,6 +1535,10 @@ function renderFacets() {
 // render the empty state on first load rather than leaving a blank column until a search
 renderFacets();
 
+function plural(count, word) {
+    return count === 1 ? word : `${word}s`;
+}
+
 function updateResultsSummary() {
     const summary = document.getElementById('results-summary');
     const total = allMountedReleases().length;
@@ -1583,9 +1591,13 @@ function updateResultsSummary() {
         return;
     }
 
+    const groups = document.querySelectorAll('.results-box.release-group-result').length;
     const visible = document.querySelectorAll('.releases-table tbody tr.release-row').length;
-    const counts = visible === total ? `${total} releases` : `${visible} of ${total} releases`;
-    summary.textContent = `${counts}${filterNote}`;
+    const releases = visible === total
+        ? `${total} ${plural(total, 'release')}`
+        : `${visible} of ${total} ${plural(total, 'release')}`;
+    //? the album count leads: "1 release" beside fifty cards read as a search that found one thing
+    summary.textContent = `${groups} ${plural(groups, 'album')} · ${releases} listed${filterNote}`;
 }
 
 
@@ -1783,6 +1795,10 @@ function buildReleasesGrid(releases, releaseGroupId, releaseGroupContext) {
             for (const id of visibleOrder) {
                 const td = document.createElement('td');
                 td.className = `releases-col-${id}`;
+                //? a phone lays each release out as a block rather than a row of a 1,700px table,
+                //? naming each value (there is no header above it) and leaving out what isn't known
+                td.dataset.label = COLUMN_LABELS[id] ?? '';
+                if (fieldValues[id] === 'N/A') td.classList.add('is-na');
 
                 if (id === 'title') {
                     td.innerHTML = `<h4 class="text white releaseGridTitle"><a href="https://musicbrainz.org/release/${esc(releaseId)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a></h4>`;
@@ -2182,7 +2198,7 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
      * question nobody asked. Omitted entirely rather than shown empty.
      */
     const scoreMarkup = typeof score === 'number'
-        ? `<h3 class="matchScore ${scoreBand}" title="MusicBrainz relevance score for this search">${score}<span class="matchScore-unit">% match</span></h3>`
+        ? `<h3 class="matchScore ${scoreBand}" title="MusicBrainz relevance score for this search">${score}<span class="matchScore-unit">%<span class="matchScore-word"> match</span></span></h3>`
         : '';
     const releaseGroupId = releaseGroup.id;
     const artistId = getArtistId(releaseGroup['artist-credit']);
@@ -2213,12 +2229,12 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
                       a click, and "everything this artist released, in order" is a question
                       the search can't answer at all - it spends its limit on relevance. The
                       external link is still one click away, on the ↗.
-                    --><button type="button" class="releaseGrpArtistButton" data-artist-mbid="${esc(artistId)}" title="Browse ${esc(artist)}'s discography">${esc(artist)}</button><a class="releaseGrpArtistLink" href="https://musicbrainz.org/artist/${esc(artistId)}" target="_blank" rel="noopener noreferrer" title="${esc(artist)} on MusicBrainz">↗</a>&nbsp;-&nbsp;
+                    --><button type="button" class="releaseGrpArtistButton" data-artist-mbid="${esc(artistId)}" title="Browse ${esc(artist)}'s discography">${esc(artist)}</button><a class="releaseGrpArtistLink" href="https://musicbrainz.org/artist/${esc(artistId)}" target="_blank" rel="noopener noreferrer" title="${esc(artist)} on MusicBrainz">↗</a><span class="releaseGrpSep">&nbsp;-&nbsp;</span>
                 </h3>
                 <h3 class="text white releaseGrpName">
-                    <a href="https://musicbrainz.org/release-group/${esc(releaseGroupId)}" target="_blank" rel="noopener noreferrer">${esc(title)} (${esc(year)})</a>
+                    <a href="https://musicbrainz.org/release-group/${esc(releaseGroupId)}" target="_blank" rel="noopener noreferrer">${esc(title)}${year === 'N/A' ? '' : ` (${esc(year)})`}</a>
                 </h3>
-                <h3 class="text white-tertiary releaseGrpType">&nbsp;[${esc(typeDisplay)}] &nbsp;</h3>
+                <h3 class="text white-tertiary releaseGrpType"><span class="releaseGrpSep">&nbsp;</span>[${esc(typeDisplay)}]<span class="releaseGrpSep"> &nbsp;</span></h3>
                 <span class="owned-chip-slot"></span>
             </div>
             <div class="non-shrinkable">
