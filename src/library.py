@@ -724,14 +724,6 @@ def drain_cache_changes() -> tuple[list[tuple[str, float, dict]], list[str]]:
     return upserts, removed
 
 
-def _relative_to(path: str, root: Path) -> str | None:
-    """The cache key as the scan's relative album path, or None if it isn't under this root."""
-    try:
-        return str(Path(path).relative_to(root))
-    except ValueError:
-        return None
-
-
 def _unreadable(library_root: str, problem: str) -> dict:
     return {"albums": [], "artists": [], "library_path": library_root, "problem": problem,
             "scanned_at": time.time(), "album_count": 0, "artist_count": 0,
@@ -827,25 +819,27 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
 
     albums = []
     reused = 0
+    #? every folder this walk found an album in - the cache keys, as they are
+    seen: set[str] = set()
 
     for current, subdirs, files in os.walk(root):
         subdirs.sort()
         if not any(file_extension(f) in AUDIO_EXTENSIONS for f in files):
             continue
 
-        directory = Path(current)
         try:
-            mtime = directory.stat().st_mtime
+            mtime = os.stat(current).st_mtime
         except OSError:
             continue
 
         cached = _album_cache.get(current)
         if cached and cached[0] == mtime:
             albums.append(dict(cached[1]))
+            seen.add(current)
             reused += 1
             continue
 
-        album = read_album_dir(directory, root)
+        album = read_album_dir(Path(current), root)
         if album is None:
             continue
 
@@ -853,12 +847,14 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
         _dirty.add(current)
         _removed.discard(current)
         albums.append(dict(album))
+        seen.add(current)
 
     #? drop cache entries for folders that no longer exist, so a long-running container
     #? doesn't hold a growing map of albums the user deleted months ago - and so a restart
-    #? doesn't load them back from the saved copy either
-    live = {a["path"] for a in albums}
-    for path in [p for p in _album_cache if _relative_to(p, root) not in live]:
+    #? doesn't load them back from the saved copy either. Compared as cache keys, not by
+    #? turning each back into a relative path (v0.9.20: that pathlib round trip was half of a
+    #? warm scan on a thousand albums).
+    for path in [p for p in _album_cache if p not in seen]:
         _album_cache.pop(path, None)
         _dirty.discard(path)
         _removed.add(path)
@@ -1288,3 +1284,44 @@ def read_album_details(directory: Path) -> list[dict]:
     ]
     files.sort(key=track_order)
     return files
+
+
+#? Per-track fields that nearly always repeat across an album's tracks. Sent once per album as
+#? `track_defaults` and left off every track that agrees - see compact_for_wire.
+TRACK_DEFAULT_FIELDS = ("artist", "album", "albumartist", "date", "originaldate", "release_mbid", "format")
+
+#? Per-track fields the interface never reads (the album carries its own), dropped on the wire.
+TRACK_SERVER_ONLY_FIELDS = ("release_group_mbid", "albumartist_mbids")
+
+
+def compact_for_wire(albums: list[dict]) -> list[dict]:
+    """
+    The albums as the interface is sent them - the same data, without saying things twice.
+
+    Measured on 1,060 albums: 4.3 MB, more than half of it per-track fields repeating the
+    album's own values eleven times over (artist, album, date, release id...) - on every visit
+    to the tab, twice (the snapshot, then the scan). Each album now carries the commonest value
+    of each of TRACK_DEFAULT_FIELDS once, as `track_defaults`, and a track carries only the ones
+    where it DIFFERS - which is exactly the mis-tagged file the track viewer exists to show.
+    `has_title_tag` is sent only when false. ui/src/api/library.ts puts every track back together
+    on arrival, so nothing past the fetch sees the difference.
+
+    New dicts throughout: the scan's albums are copies of the CACHED dicts, but their track lists
+    are the cache's own, and trimming those in place would strip the cache.
+    """
+    wire = []
+    for album in albums:
+        tracks = album.get("tracks") or []
+        defaults = {field: _commonest([t.get(field) or "" for t in tracks]) for field in TRACK_DEFAULT_FIELDS}
+        compact = []
+        for track in tracks:
+            entry = {k: v for k, v in track.items()
+                     if k not in TRACK_SERVER_ONLY_FIELDS and k not in TRACK_DEFAULT_FIELDS and k != "has_title_tag"}
+            for field in TRACK_DEFAULT_FIELDS:
+                if (track.get(field) or "") != defaults[field]:
+                    entry[field] = track.get(field) or ""
+            if not track.get("has_title_tag", True):
+                entry["has_title_tag"] = False
+            compact.append(entry)
+        wire.append({**album, "tracks": compact, "track_defaults": defaults})
+    return wire

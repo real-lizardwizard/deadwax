@@ -26,8 +26,14 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def request():
-    return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+def request(headers=None):
+    return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()), headers=headers or {})
+
+
+def body(response):
+    """/owned answers with an ETag'd Response (v0.9.20) - the JSON inside it."""
+    import json
+    return json.loads(response.body)
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +69,7 @@ def test_a_full_walk_catches_the_cache_up_and_anything_that_changes_the_library_
 def owned(monkeypatch, tmp_path):
     from src.routes import library as routes
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
-    return run(routes.owned(request()))
+    return body(run(routes.owned(request())))
 
 
 def test_owned_carries_only_what_says_which_album_and_edition(tmp_path, monkeypatch):
@@ -91,7 +97,6 @@ def test_owned_answers_from_the_saved_scan_when_nothing_has_changed(tmp_path, mo
     answer = owned(monkeypatch, tmp_path)
 
     assert walks == []
-    assert answer["stale"] is True
     assert [a["release_mbid"] for a in answer["albums"]] == ["rel-1"]
 
 
@@ -104,14 +109,13 @@ def test_an_album_the_poller_just_filed_is_found_by_the_next_search(tmp_path, mo
 
     answer = owned(monkeypatch, tmp_path)
 
-    assert answer["stale"] is False
     assert sorted(a["release_mbid"] for a in answer["albums"]) == ["dummy", "rel-1"]
 
 
 def test_no_library_is_said_rather_than_raised(monkeypatch):
     from src.routes import library as routes
     monkeypatch.setattr(Config, "LIBRARY_PATH", "")
-    assert run(routes.owned(request()))["problem"] == "LIBRARY_PATH is not set"
+    assert body(run(routes.owned(request())))["problem"] == "LIBRARY_PATH is not set"
 
 
 def test_filing_an_album_marks_the_library_changed(tmp_path, monkeypatch):
@@ -134,3 +138,17 @@ def test_filing_an_album_marks_the_library_changed(tmp_path, monkeypatch):
     run(poller._organize_if_enabled({"id": 1, "artist": "a", "album": "b"}, Store()))
 
     assert library_is_behind()
+
+
+def test_an_unchanged_answer_is_a_304_with_no_body(tmp_path, monkeypatch):
+    """The browser revalidates with If-None-Match; an unchanged library sends nothing back."""
+    from src.routes import library as routes
+    seed(tmp_path, musicbrainz_albumid="rel-1")
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
+    first = run(routes.owned(request()))
+    etag = first.headers["etag"]
+
+    again = run(routes.owned(request({"if-none-match": etag})))
+
+    assert (again.status_code, again.body) == (304, b"")
+    assert again.headers["etag"] == etag

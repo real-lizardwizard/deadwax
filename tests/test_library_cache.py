@@ -295,9 +295,10 @@ def test_asking_for_a_snapshot_with_nothing_cached_gets_a_real_scan(tmp_path, mo
     seed_album(tmp_path)
     client = make_client(tmp_path, monkeypatch)
 
-    body = client.get("/deadwax/library/albums", params={"snapshot": "true"}).json()
-    assert body["stale"] is False
-    assert body["album_count"] == 1
+    response = client.get("/deadwax/library/albums", params={"snapshot": "true"})
+    #? the fields that change on every scan travel as headers, so the body can be a 304 (v0.9.20)
+    assert response.headers["x-scan-stale"] == "0"
+    assert response.json()["album_count"] == 1
 
 
 def test_a_snapshot_is_the_last_scan_not_the_current_disk(tmp_path, monkeypatch, store):
@@ -307,11 +308,11 @@ def test_a_snapshot_is_the_last_scan_not_the_current_disk(tmp_path, monkeypatch,
 
     shutil.rmtree(directory)
 
-    snapshot = client.get("/deadwax/library/albums", params={"snapshot": "true"}).json()
-    assert snapshot["stale"] is True
-    assert snapshot["album_count"] == 1
+    response = client.get("/deadwax/library/albums", params={"snapshot": "true"})
+    assert response.headers["x-scan-stale"] == "1"
+    assert response.json()["album_count"] == 1
     #? says when that was, so the interface can say how old it is
-    assert snapshot["scanned_at"]
+    assert float(response.headers["x-scanned-at"]) > 0
 
     assert client.get("/deadwax/library/albums").json()["album_count"] == 0
 
@@ -325,11 +326,12 @@ def test_after_a_restart_the_snapshot_comes_from_the_database(tmp_path, monkeypa
     library.clear_scan_cache()
     route._cache_loaded_for = None  # the restart
 
-    body = make_client(tmp_path, monkeypatch, store).get(
+    response = make_client(tmp_path, monkeypatch, store).get(
         "/deadwax/library/albums", params={"snapshot": "true"}
-    ).json()
+    )
+    body = response.json()
 
-    assert body["stale"] is True
+    assert response.headers["x-scan-stale"] == "1"
     assert body["album_count"] == 1
     #? decorated like any other response - the queue is derived, never stored
     assert "no_art" in body["albums"][0]["issues"]
@@ -485,3 +487,30 @@ def test_the_download_request_keeps_the_disc_fields():
 
     kept = Track(position=3, title="Hey You", disc=2, disc_position=1).model_dump()
     assert kept["disc"] == 2 and kept["disc_position"] == 1
+
+
+def test_an_unchanged_library_is_a_304_whenever_it_was_scanned(tmp_path, monkeypatch, store):
+    """The scan's timing is in headers, so the body - and the ETag - change only with the library."""
+    import time
+    directory = seed_album(tmp_path)
+    client = make_client(tmp_path, monkeypatch, store)
+    #? the very first scan enrols the album, and its first_seen appears from the next answer on
+    client.get("/deadwax/library/albums")
+    first = client.get("/deadwax/library/albums")
+    time.sleep(0.01)
+
+    again = client.get("/deadwax/library/albums", headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304
+    #? the fresh timing rides on the 304, for the browser to lay over its stored copy
+    assert float(again.headers["x-scanned-at"]) >= float(first.headers["x-scanned-at"])
+
+    (directory / "03 - Track 3.flac").write_bytes((directory / "01 - Track 1.flac").read_bytes())
+    changed = client.get("/deadwax/library/albums", headers={"If-None-Match": first.headers["etag"]})
+    assert changed.status_code == 200 and changed.json()["albums"][0]["track_count"] == 3
+
+
+def test_tracks_travel_compact_and_say_only_where_they_differ(tmp_path, monkeypatch, store):
+    seed_album(tmp_path)
+    album = make_client(tmp_path, monkeypatch, store).get("/deadwax/library/albums").json()["albums"][0]
+    assert album["track_defaults"]["album"] == "The Slow Rush"
+    assert all("album" not in track and "has_title_tag" not in track for track in album["tracks"])

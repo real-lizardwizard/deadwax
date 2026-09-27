@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings
 from src.logger import logger, cleanup_logging
@@ -124,6 +125,32 @@ def start() -> FastAPI:
             await self.inner(scope, receive, send_with_policy)
 
     app.add_middleware(RevalidateInterfaceAssets)
+
+    class CompressText:
+        """
+        Gzip what compresses - JSON, the interface's scripts and CSS - and nothing that doesn't
+        (v0.9.20). Nothing was compressed before, and the library's album list is the largest
+        thing the page fetches; JSON like it shrinks to about a tenth.
+
+        Starlette's GZipMiddleware is plain ASGI (it wraps `send` and leaves `receive` alone, so
+        the disconnect detection below still works) and already leaves the log's event stream
+        uncompressed. It would gzip images too, which are compressed already - pure CPU for
+        nothing - so pictures, covers and fonts are passed straight through.
+        """
+
+        BINARY = ("/deadwax/library/art", "/deadwax/library/artist/art", "/deadwax/library/disc_art",
+                  "/deadwax/library/tracks/picture", "/styles/font/")
+
+        def __init__(self, inner):
+            self.inner = inner
+            self.gzip = GZipMiddleware(inner, minimum_size=1024, compresslevel=6)
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] == "http" and not scope.get("path", "").startswith(self.BINARY):
+                return await self.gzip(scope, receive, send)
+            return await self.inner(scope, receive, send)
+
+    app.add_middleware(CompressText)
 
     logger.info("adding routers")
     app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"])

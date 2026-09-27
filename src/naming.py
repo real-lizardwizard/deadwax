@@ -21,6 +21,7 @@ Pure: no config read, no filesystem. organizer.album_folder_template() is where 
 """
 
 import re
+from functools import lru_cache
 
 #? the default, and exactly the convention deadwax has always filed by
 DEFAULT_ALBUM_FOLDER = "{album} ({year}) [{edition}]"
@@ -42,6 +43,7 @@ _TOKEN = re.compile(r"\{(\w+)\}")
 _WRAPPED = re.compile(r"(\s*)([(\[{])\{(\w+)\}([)\]}])")
 
 
+@lru_cache(maxsize=32)
 def validate_template(template: str | None) -> str | None:
     """Why this can't be an album folder template, or None when it can."""
     text = (template or "").strip()
@@ -91,6 +93,7 @@ def render_album_folder(template: str, values: dict[str, str], discriminator: st
     return text
 
 
+@lru_cache(maxsize=32)
 def folder_pattern(template: str) -> re.Pattern:
     """
     A regex that reads a folder name back into its tokens, made from the same template.

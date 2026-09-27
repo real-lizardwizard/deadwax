@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -14,8 +16,8 @@ from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.config import COVER_ART_SIZES
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, plan_disc_art,
                           save_disc_art)
-from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, delete_album, drain_cache_changes,
-                         embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
+from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, compact_for_wire, delete_album,
+                         drain_cache_changes, embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
                          forget_cached_album, load_album_art, load_artist_art,
                          read_album_details, read_artist_mbid, scan_library, seed_cache,
                          snapshot_library, summarize_for_deletion)
@@ -170,6 +172,49 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
     return result
 
 
+def _json_with_etag(request: Request, payload: dict, headers: dict | None = None) -> Response:
+    """
+    JSON with an ETag, answered 304 when the browser already holds this exact body (v0.9.20).
+
+    For the library's big payloads, which are usually unchanged since the last visit: with
+    `no-cache` the browser revalidates every time and, on a 304, hands the page its cached copy -
+    no body crosses the network at all. The server still does the work (a warm scan is ~70ms on a
+    thousand albums); what is saved is the transfer, which on a phone over a LAN was the wait.
+
+    `headers` go on the 304 as well, and that is how anything that changes on every answer
+    reaches the page without changing the body: the browser freshens its stored copy's headers
+    from the 304 (RFC 9111 4.3.4). See _SCAN_HEADERS.
+    """
+    body = json.dumps(payload, separators=(",", ":"), default=str).encode()
+    etag = '"' + hashlib.blake2b(body, digest_size=12).hexdigest() + '"'
+    headers = {**(headers or {}), "ETag": etag, "Cache-Control": "no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/json", headers=headers)
+
+
+#? The parts of a scan that change on EVERY scan whatever the library holds - when it was read,
+#? how long it took, how much came from cache, whether it's the saved copy - sent as headers so
+#? the body only changes when the library does, and an unchanged library is a 304 (v0.9.20).
+#? ui/src/api/library.ts reads them back into the same fields.
+_SCAN_HEADERS = {"scanned_at": "X-Scanned-At", "scan_seconds": "X-Scan-Seconds",
+                 "cached": "X-Scan-Cached", "stale": "X-Scan-Stale"}
+
+
+def _library_response(request: Request, result: dict) -> Response:
+    """A scan as the interface is sent it: compact tracks, the volatile fields as headers."""
+    def header(key: str) -> str:
+        value = result.get(key)
+        if value is None:
+            return ""
+        return str(int(value)) if key == "stale" else str(value)
+
+    headers = {name: header(key) for key, name in _SCAN_HEADERS.items()}
+    body = {k: v for k, v in result.items() if k not in _SCAN_HEADERS}
+    body["albums"] = compact_for_wire(result["albums"])
+    return _json_with_etag(request, body, headers)
+
+
 @router.get("/albums")
 async def albums(request: Request, snapshot: bool = False):
     """
@@ -205,7 +250,7 @@ async def albums(request: Request, snapshot: bool = False):
                 extra={"frontend": True},
             )
 
-        return result
+        return _library_response(request, result)
 
     except Exception as e:
         logger.error(f"Exception in /albums endpoint: {e}")
@@ -234,7 +279,7 @@ async def owned(request: Request):
     """
     root = Config.LIBRARY_PATH or ""
     if not root:
-        return {"albums": [], "problem": "LIBRARY_PATH is not set", "stale": False}
+        return _json_with_etag(request, {"albums": [], "problem": "LIBRARY_PATH is not set"})
 
     await _ensure_cache_loaded(request)
 
@@ -243,11 +288,12 @@ async def owned(request: Request):
         result = await asyncio.to_thread(scan_library, root, False)
         await _persist_cache(request, result)
 
-    return {
+    return _json_with_etag(request, {
         "albums": [{field: album.get(field) for field in OWNED_FIELDS} for album in result["albums"]],
+        #? no `stale`: nothing reads it, and it differed between a scan and a snapshot of the
+        #? same albums, which made identical answers carry different ETags
         "problem": result.get("problem"),
-        "stale": bool(result.get("stale")),
-    }
+    })
 
 
 @router.post("/rescan")
@@ -260,7 +306,7 @@ async def rescan(request: Request):
     that, and for when you simply don't trust what you're looking at.
     """
     try:
-        return await _scan_with_queue(request, True)
+        return _library_response(request, await _scan_with_queue(request, True))
 
     except Exception as e:
         logger.error(f"Exception in /rescan endpoint: {e}")

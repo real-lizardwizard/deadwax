@@ -1,9 +1,10 @@
-import { get, post } from './http'
+import { get, post, requestWithHeaders } from './http'
 import type {
   ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
   DeletionSummary,
-  LibraryResponse, LyricsSummary, NewImportsResponse, RetagPlan, RetagRelease, RetagResponse, TagEditPlan,
-  TagEditResponse, TrackDetailsResponse, TrackLyrics, TrackTagEdit,
+  LibraryAlbum, LibraryResponse, LibraryTrack, LyricsSummary, NewImportsResponse, RetagPlan,
+  RetagRelease, RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackLyrics,
+  TrackTagEdit,
 } from './types'
 
 /**
@@ -16,8 +17,46 @@ import type {
  * `snapshot` answers from the saved scan without touching the disk, marked `stale`, and falls
  * through to a real scan when nothing has been saved yet. It is what makes the tab open at once.
  */
-export function listAlbums(options: { snapshot?: boolean } = {}): Promise<LibraryResponse> {
-  return get<LibraryResponse>(options.snapshot ? '/library/albums?snapshot=true' : '/library/albums')
+export async function listAlbums(options: { snapshot?: boolean } = {}): Promise<LibraryResponse> {
+  return fromWire(await requestWithHeaders<LibraryResponse>(options.snapshot ? '/library/albums?snapshot=true' : '/library/albums'))
+}
+
+/**
+ * A scan as it arrives: the fields that change on every scan come as headers (so an unchanged
+ * library's body is a 304 - see _SCAN_HEADERS in src/routes/library.py), and the tracks compact.
+ * Both are undone here, at the one place albums arrive.
+ */
+function fromWire({ body, headers }: { body: LibraryResponse; headers: Headers }): LibraryResponse {
+  const number = (name: string) => {
+    const value = headers.get(name)
+    return value === null || value === '' ? null : Number(value)
+  }
+  return expandTracks({
+    ...body,
+    scanned_at: number('X-Scanned-At'),
+    scan_seconds: number('X-Scan-Seconds') ?? 0,
+    cached: number('X-Scan-Cached') ?? 0,
+    stale: headers.get('X-Scan-Stale') === '1',
+  })
+}
+
+/**
+ * Put every track back together from the compact wire form (v0.9.20, src/library.py
+ * compact_for_wire): an album sends the values its tracks share once, as `track_defaults`, and a
+ * track carries only where it differs, plus `has_title_tag` only when false. Expanded here, at the
+ * one place albums arrive, so nothing past the fetch knows the difference.
+ */
+export function expandTracks(response: LibraryResponse): LibraryResponse {
+  for (const album of response.albums ?? []) {
+    const wire = album as LibraryAlbum & { track_defaults?: Partial<LibraryTrack> }
+    const defaults = wire.track_defaults
+    if (!defaults) continue
+    //? the wire track is partial - it is the defaults that make it whole
+    album.tracks = album.tracks.map((track) =>
+      ({ ...defaults, has_title_tag: true, ...(track as Partial<LibraryTrack>) }) as LibraryTrack)
+    delete wire.track_defaults
+  }
+  return response
 }
 
 /**
@@ -32,8 +71,8 @@ export function trackDetails(albumPath: string): Promise<TrackDetailsResponse> {
 }
 
 /** Drop the server's per-folder cache and read everything again. */
-export function rescan(): Promise<LibraryResponse> {
-  return post<LibraryResponse>('/library/rescan')
+export async function rescan(): Promise<LibraryResponse> {
+  return fromWire(await requestWithHeaders<LibraryResponse>('/library/rescan', { method: 'POST' }))
 }
 
 /**
