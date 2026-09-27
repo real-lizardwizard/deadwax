@@ -1093,6 +1093,37 @@ full-width album cards (`LibraryAlbumRow`, deleted), whose middle was mostly emp
 - **On a phone the details pane is a full-screen sheet**, opened by picking an album or a
   track (an artist just opens in place) and closed by the command bar's back button.
 
+### The tree draws only what is in view (v0.9.30)
+
+James: "build the tree windowing". A broad filter opens everything it touches, and the tree was
+drawn whole: 12,720 rows for a song search on a thousand albums.
+
+- **Rows are absolutely placed inside a tree as tall as all of them**; only those within
+  `OVERSCAN_PX` (600) of the view are drawn. `ui/src/lib/treeWindow.ts` is pure and does the
+  maths (offsets, the visible span, siblings), pinned in `tree.sim.cjs`; `LibraryTree.tsx` only
+  measures and scrolls.
+- **Heights are MEASURED, one per row kind** (`heightKey`), after every render. Labels never
+  wrap, so every row of a kind is one height; measured, not assumed, because the phone's rows are
+  36px and a narrow tree hides chips. Fractional, from `getBoundingClientRect` (nothing in the
+  tree is transformed): `offsetHeight` rounds, and half a pixel over 12,000 rows is 6,000px.
+  A width change re-measures. **So nothing in the tree may give a row a margin, or a height that
+  depends on its neighbours**: `.tree-heading:first-child` became `.is-first`, set by index,
+  because a positioned row's DOM neighbours aren't its list neighbours any more.
+- **The selected row, the tab stop and the focused row are always drawn**, wherever they are
+  (`rowsToDraw`'s `pinned`). That is what keeps keyboard focus alive when you scroll away, and
+  what lets the existing `scrollIntoView` calls (a keyboard move, a pick in the details pane) find
+  a row that was nowhere near the view.
+- **`aria-posinset` and `aria-setsize` on every item**, since assistive tech can no longer count
+  siblings that aren't in the page.
+- **Measured on the generated library**: opening the tab now has no main-thread stall over 30ms
+  (one of 300-400ms before); the 12,720-row "track" filter applies in 246ms, 200 of them the
+  settle, with a single 36ms stall (340ms warm and up to 3s cold before); scrolling the whole
+  result in 440 jumps never stalls; 61 rows are in the page at once.
+- **Verified in the real page** on the scratch library, fully expanded: all 151 rows at exactly
+  the positions and sizes the full render gave them (to 0.1px), the same tree height; every
+  arrangement laid out gap-free, headings included; End and Home jump to the ends with focus;
+  the focused row survives a scroll to the far end and the next ArrowDown carries on from it.
+
 ### The saved scan (v0.6.5)
 
 - **Opening the tab makes two requests, on purpose.** `?snapshot=true` answers from the cache
@@ -2615,12 +2646,9 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
     state). The view re-renders on every keystroke, and with 12,720 rows on screen each key
     diffed all of them: **65ms a key, now 5-7ms.** Preact skips a component whose element is
     the one it rendered last, so this needs no `preact/compat`.
-  - **Still slow: the first render of a HUGE result.** 12,720 rows is about 160ms of JS and 180ms
-    of layout once warm, more cold. The real fix is windowing the tree, which is a bigger
-    change (varying row heights, focus kept on rows scrolled out of the window, ARIA
-    positions) and hasn't been made. `content-visibility: auto` was tried: it cut layout but
-    added render time, a net 20%, and it brings paint containment and guessed heights. Not
-    kept. A real library meets this only with a very broad song search.
+  - ~~Still slow: the first render of a HUGE result~~ **Windowed in v0.9.30, asked for** -
+    see "The tree draws only what is in view". (`content-visibility: auto` had been tried first:
+    it cut layout but added render time, a net 20%, with paint containment and guessed heights.)
 - **A line logged from a worker thread never reached the page (fixed v0.9.26).** `SSEHandler`
   fell back on `asyncio.get_event_loop()` outside the loop, which from a worker thread raises or
   finds a loop that isn't running, and the handler swallowed that. Six page-bound lines run
@@ -2777,7 +2805,7 @@ node ui/test/speed.sim.cjs      # the derived download rate, simulated against a
 node ui/test/queue.sim.cjs      # the tab badge and the review queue agreeing on what's outstanding
 node ui/test/downloads.sim.cjs  # optimistic overlays incl. the wrong-prediction paths, and announcing filed albums
 node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and relevance-as-no-op
-node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices, compact tracks
+node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices, compact tracks, windowing
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
 node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
 node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes about it

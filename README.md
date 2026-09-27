@@ -192,7 +192,7 @@ Reads your library off disk with mutagen and shows it as a tree, the way Windows
 <br><br>
 Albums you hold more than one version of say so on their own row ("3 editions"), which was the entire point, and open to one row per edition. Identity comes from tags rather than folder names, so renaming a folder by hand doesn't split an album in two. Folders with no MusicBrainz id at all — i.e. anything that predates deadwax — are left as their own albums rather than being guessed at and merged.
 <br><br>
-The search box matches song titles as well as artists and albums: type a song and the tree opens its album to show you where it is.
+The search box matches song titles as well as artists and albums: type a song and the tree opens its album to show you where it is. It stays quick on a big library, because only the rows on screen are ever drawn: a search matching ten thousand songs scrolls like one matching ten.
 <br><br>
 You can arrange it by artist, album, release date or date added, either way round. By artist it's the tree above; the other three list albums directly under headings (a letter, a year, a month), like Windows 7's music library did. "Date added" goes by when deadwax first saw an album, or its folder's date if that's earlier, so a library that was there before deadwax still sorts sensibly.
 <br><br>

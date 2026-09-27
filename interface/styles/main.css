@@ -3501,7 +3501,13 @@ span.red { color: var(--red-text); }
 
 /* ---- the tree ---- */
 
-.library-tree { display: flex; flex-direction: column; }
+/*
+ * Only the rows in view are drawn (v0.9.30), each placed at its own top inside a tree as tall as
+ * all of them - see ui/src/lib/treeWindow.ts. So a row's place never depends on what else is in
+ * the page, and nothing here may either: no margins, no :first-child.
+ */
+.library-tree { position: relative; }
+.library-tree > * { position: absolute; left: 0; right: 0; }
 
 /*
  * One row of the tree. The indent is a custom property per row rather than nesting, because
@@ -5505,7 +5511,7 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
     user-select: none;
 }
 
-.tree-heading:first-child { padding-top: var(--space-1); }
+.tree-heading.is-first { padding-top: var(--space-1); }
 
 .tree-heading::after {
     content: "";

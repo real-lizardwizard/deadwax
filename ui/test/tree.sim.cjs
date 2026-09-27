@@ -17,6 +17,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-tree-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/libraryTree.ts', 'src/lib/trackFields.ts', 'src/lib/groupAlbums.ts', 'src/api/library.ts',
+  'src/lib/treeWindow.ts',
   '--outDir', OUT, '--module', 'commonjs',
   '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' });
@@ -26,6 +27,7 @@ const tree = require(path.join(OUT, 'lib/libraryTree.js'));
 const fields = require(path.join(OUT, 'lib/trackFields.js'));
 const grouping = require(path.join(OUT, 'lib/groupAlbums.js'));
 const libraryApi = require(path.join(OUT, 'api/library.js'));
+const windowing = require(path.join(OUT, 'lib/treeWindow.js'));
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -202,6 +204,33 @@ console.log('\ntracks arrive compact and are put back together (v0.9.20, filled 
   check('but its OWN value wins where it differs', album.tracks[1].artist, 'A Guest');
   check('has_title_tag is true unless the track said otherwise', album.tracks.map((t) => t.has_title_tag), [true, true, false]);
   check('the defaults are gone once used', 'track_defaults' in album, false);
+}
+
+console.log('\nonly the rows in view are drawn (v0.9.30)');
+{
+  const heading = (label) => ({ kind: 'heading', id: null, level: 1, parent: null, label });
+  const artist = (id) => ({ kind: 'artist', id, level: 1, parent: null, open: true, node: {} });
+  const track = (id, parent) => ({ kind: 'track', id, level: 2, parent, album: {}, track: {}, match: false });
+  const rows = [heading('A'), artist('a'), track('t1', 'a'), track('t2', 'a'), heading('B'), artist('b'), track('t3', 'b')];
+  const heights = { 'heading-first': 23.5, heading: 31.5, artist: 24, track: 24 };
+
+  const offsets = windowing.rowOffsets(rows, heights, 24);
+  check('every row starts where the one above it ends, the first heading its own height',
+    Array.from(offsets), [0, 23.5, 47.5, 71.5, 95.5, 127, 151, 175]);
+  check('a kind not measured yet takes the fallback', Array.from(windowing.rowOffsets([artist('x')], {}, 26)), [0, 26]);
+
+  check('the rows overlapping the view, and no more', windowing.visibleSpan(offsets, 50, 40, 0), [2, 4]);
+  check('a row straddling the bottom edge is in', windowing.visibleSpan(offsets, 0, 48, 0), [0, 3]);
+  check('the margin widens it both ways', windowing.visibleSpan(offsets, 60, 10, 30), [1, 5]);
+  check('scrolled past the end: nothing', windowing.visibleSpan(offsets, 1000, 100, 0), [7, 7]);
+  check('an empty tree draws nothing', windowing.visibleSpan(new Float64Array(1), 0, 500, 600), [0, 0]);
+
+  check('a pinned row far away is drawn too, in order', windowing.rowsToDraw([2, 4], [6, 3, -1, 99], 7), [2, 3, 6]);
+  check('with nothing pinned outside, just the span', windowing.rowsToDraw([1, 3], [2], 7), [1, 2]);
+
+  check('each item knows its place among its siblings',
+    windowing.siblingPositions(rows).map((p) => `${p.posinset}/${p.setsize}`),
+    ['0/0', '1/2', '1/2', '2/2', '0/0', '2/2', '1/1']);
 }
 
 console.log(failures ? `\n${failures} FAILED\n` : '\nall passed\n');
