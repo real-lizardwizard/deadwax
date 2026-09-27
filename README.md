@@ -39,6 +39,8 @@ Pick the release you actually want, and deadwax searches Soulseek, ranks what co
 
 _Please note; this is a silly and fun container i made for my own server, its probably kinda shitty, the code is a mess, and theres certainly better alternatives out there. buuut if you like it thats awesome :)_<3
 
+> **New here?** [The guide](docs/README.md) covers everything, step by step: [getting started](docs/getting-started.md), [every setting](docs/configuration.md), [finding music](docs/finding-music.md), [downloading](docs/downloading.md), [organizing](docs/organizing.md), [the library](docs/library.md), [how matching works](docs/matching.md) and [troubleshooting](docs/troubleshooting.md). This README is the tour.
+
 > **Heads up:** this is a fork of [LidBrainz](https://github.com/dual-shock/lidbrainz) that has diverged a long way. LidBrainz sends things to Lidarr; deadwax cut Lidarr out entirely and talks to slskd directly. If you want the Lidarr version, go use the original — it's good.
 
 ## Why not Lidarr?
@@ -52,6 +54,8 @@ deadwax already knows everything about the release you clicked: its MBID, full t
 A caveat worth setting expectations on: this won't magically always find the exact remaster. Soulseek folder names are typed by strangers and frequently omit edition text entirely. What it does is *rank* candidates against your real tracklist and show its reasoning, so you can pick with actual information instead of hoping. Edition matching is a weighted signal, never a hard filter — filtering on it would hide perfectly good results.
 
 ## Installation
+
+_The full walk-through, with the three folders explained, is in [Getting started](docs/getting-started.md), and every setting is in [Configuration](docs/configuration.md)._
 
 _Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** managing Docker, so the compose file below is the way to run it — see [below](#installation-openmediavault--komodo) for the parts worth getting right the first time. It's an ordinary compose stack, so anything else that runs one will do._
 

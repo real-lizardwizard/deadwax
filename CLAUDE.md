@@ -2846,6 +2846,13 @@ compile time.
   that changes behaviour and leaves it stale has made the docs wrong, not merely incomplete.
   If a commit genuinely changes nothing a user could notice (a comment, a test, a refactor),
   say so in the message rather than inventing a README edit for it.
+- **`docs/` is the user guide (v0.9.32), and it is kept current like the README.** One page per
+  part of the app (getting started, configuration, finding music, downloading, organizing, the
+  library, matching, troubleshooting), written for someone seeing deadwax for the first time
+  and checked against the code rather than memory: every setting, default, label and limit in
+  it was read from the source. A change a user would notice updates the page describing it in
+  the same commit. **A new setting goes in configuration.md**, and a new failure a user could
+  hit goes in troubleshooting.md with what to do about it.
 - **Bumping the patch version is not the same as tagging it, and the difference matters
   here.** `docker-publish.yml` builds and publishes an image for every pushed `v*` tag, and
   moves **`:latest`** for any version without a hyphen in it. So tagging every commit would
