@@ -13,7 +13,6 @@ one side a string, the other a one-item list - and the symptom is an album that 
 
 from pathlib import Path
 
-from src.artists import credit_ids, credit_name
 from src.organizer import tag_values, write_tags
 from src.retag import read_current_tags
 from tests.test_retag import write_flac
@@ -26,32 +25,6 @@ FEATURING = [
     {"name": "Jay-Z", "joinphrase": " feat. ", "artist": {"id": "id-jay", "name": "JAY-Z"}},
     {"name": "Linkin Park", "artist": {"id": "id-lp", "name": "Linkin Park"}},
 ]
-
-
-def test_a_credit_reads_the_way_musicbrainz_writes_it():
-    assert credit_name(SPLIT) == "Dance Gavin Dance / Tilian"
-    assert credit_name(FEATURING) == "Jay-Z feat. Linkin Park"
-
-
-def test_one_artist_is_just_their_name():
-    assert credit_name([{"name": "Portishead", "artist": {"id": "x"}}]) == "Portishead"
-    assert credit_name([]) == "" and credit_name(None) == ""
-
-
-def test_the_credited_name_wins_over_the_artists_own():
-    #? MusicBrainz credits "Jay-Z" on a record whose artist page is "JAY-Z", and the tag should
-    #? say what the sleeve says
-    assert credit_name(FEATURING).startswith("Jay-Z ")
-
-
-def test_every_id_in_the_credit_is_kept_in_order():
-    assert credit_ids(SPLIT) == ["id-dgd", "id-tilian"]
-    assert credit_ids([]) == [] and credit_ids(None) == []
-
-
-def test_the_same_artist_credited_twice_is_one_id():
-    doubled = [{"name": "A", "artist": {"id": "id-a"}}, {"name": "A again", "artist": {"id": "id-a"}}]
-    assert credit_ids(doubled) == ["id-a"]
 
 
 # ---------------------------------------------------------------- what gets written

@@ -29,11 +29,6 @@ export type JobStatus =
   | 'failed'
   | 'cancelled'
 
-/** src/store.py OPEN_STATUSES, plus organizing - see ACTIVE_STATUSES in ../lib/jobs.ts */
-export type ClearableStatus = Extract<
-  JobStatus,
-  'complete' | 'organized' | 'failed' | 'cancelled'
->
 
 export interface Track {
   /** The RUNNING number across every disc — what the matcher keys on and files are named after. */
@@ -129,7 +124,6 @@ export interface CandidateSignals {
   peer: number | null
 }
 
-export type SignalName = keyof CandidateSignals
 
 export interface CandidateFile {
   filename: string
@@ -270,18 +264,6 @@ export interface ClearJobsResponse {
 }
 
 /* ===== monitor_slskd ===== */
-
-export interface ServerConfig {
-  library_path: string
-  download_path: string
-  organizing_enabled: boolean
-  organize_mode: string
-  /** Reported back deliberately - a LAN address, not a secret. The API key never is. */
-  slskd_url: string
-  /** Human-readable explanation of why the URL is unusable, or null when it's fine. */
-  slskd_url_problem: string | null
-  slskd_apikey_set: boolean
-}
 
 export interface PingResponse {
   status: string
@@ -834,30 +816,6 @@ export interface DeleteResult extends DeletionSummary {
   deleted: boolean
   problem: string | null
 }
-
-/* ===== interface_logs ===== */
-
-export type LogSource = 'musicbrainz' | 'slskd' | 'deadwax' | (string & {})
-
-/** Python levelnames - src/logger.py sends record.levelname straight through. */
-export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL' | (string & {})
-
-/**
- * One SSE frame from GET /interface_logs/interface_logs.
- *
- * Note this differs from the table in docs/FRONTEND-MIGRATION.md, which was written from the
- * endpoint signature rather than the emitter: SSEHandler.emit() in src/logger.py also sends
- * `event_time`, and only attaches `src` when the log record carried one. Frames without a
- * `src` are real and must render.
- */
-export interface LogEvent {
-  /** Pre-formatted "HH:MM:SS" from the server. Not a parseable timestamp. */
-  event_time: string
-  event_type: LogLevel
-  event_content: string
-  src?: LogSource
-}
-
 
 /* ------------------------------------------------------------------ artists */
 

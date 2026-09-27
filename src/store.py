@@ -168,7 +168,6 @@ MAX_ALTERNATIVES = 10
 
 #? queued/downloading/complete are phase 2. organizing/organized land with the organizer.
 OPEN_STATUSES = ("queued", "downloading")
-TERMINAL_STATUSES = ("organized", "failed", "cancelled")
 #? what "clear finished" is allowed to delete - anything still moving is excluded
 CLEARABLE_STATUSES = ("complete", "organized", "failed", "cancelled")
 

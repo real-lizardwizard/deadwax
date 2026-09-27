@@ -40,7 +40,6 @@ TOKENS: dict[str, str] = {
 _TOKEN = re.compile(r"\{(\w+)\}")
 #? a token inside a bracket pair, and the whitespace before it - removed whole when it's empty
 _WRAPPED = re.compile(r"(\s*)([(\[{])\{(\w+)\}([)\]}])")
-_OPEN_CLOSE = {"(": ")", "[": "]", "{": "}"}
 
 
 def validate_template(template: str | None) -> str | None:

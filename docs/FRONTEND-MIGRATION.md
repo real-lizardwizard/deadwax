@@ -9,7 +9,7 @@ the how.
 | --- | --- |
 | Toolchain (`ui/`) | **done** — Vite 8, Preact 10, TS strict. `npm run typecheck` is clean. |
 | Typed API layer | **done** — every endpoint in the table below, in `ui/src/api/`. |
-| localStorage compatibility | **done** — `ui/src/state/persisted.ts`. Column-state reconciliation still owed, see there. |
+| localStorage compatibility | **done** for what the ported panels use — `ui/src/state/persisted.ts`. The release-column and log-open keys are still main.js's alone; their Preact readers were written ahead of the ports and removed unused in v0.9.19, so each port writes its own (see the notes below). |
 | Downloads panel | **ported**, verified against a running backend with seeded jobs. |
 | Tab shell | **done** — `Tabs.tsx`. Search/Library, built to take Settings as a third. |
 | Metadata editor | **done** — `MetadataEditor.tsx`, an overlay from the library reusing the candidates-window shape. Pick a release *or* type the fields directly; the release the album is already tagged with sorts first and is badged `current`. |
@@ -153,15 +153,16 @@ than from the current JS.
 Users have these set; don't orphan them.
 
 - `deadwax-download-defaults` — `{formatPreference, autoGrab}`, JSON, possibly partial
-- `deadwax-release-columns` — `{order, visible, widths}`, JSON
+- `deadwax-release-columns` — `{orderVersion, order, visible, widths}`, JSON. Read and written
+  by main.js only; the releases-grid port (#5) writes the Preact reader, and must keep the
+  vanilla loader's reconciliation - it checks the saved order against the current column set
+  and backfills anything new, which stops a version that adds a column from hiding it forever -
+  and `orderVersion` (see COLUMN_ORDER_VERSION in main.js).
 - `deadwax-log-open` — the literal string `'1'`/`'0'`, **not** JSON. Writing `true` here
-  reads back as closed on any un-ported page.
+  reads back as closed on any un-ported page. main.js's alone until the log is ported.
 
-All three are handled in `ui/src/state/persisted.ts`. One thing is deliberately still owed:
-the vanilla column-state loader reconciles the saved order against the current column set and
-backfills anything new — which is what stops a version that adds a column from hiding it
-forever. That needs the column definitions, so it lands with the releases grid (#5). Don't
-drop it.
+`deadwax-download-defaults` is handled in `ui/src/state/persisted.ts`. Readers for the other
+two were written there ahead of their ports and removed, unused, in v0.9.19.
 
 ## What to port, in order
 

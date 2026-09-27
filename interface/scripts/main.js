@@ -1,5 +1,4 @@
 import { init} from './init.js';
-import {sleep} from './utils.js';
 import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel } from './sort.mjs';
 import { getArtistIds, getArtistNames, getCurrentArtistNames } from './credits.mjs';
 import { chooseBase, diffTracklists, formatSeconds, releaseTracks, summarizeDiff } from './tracklistDiff.mjs';

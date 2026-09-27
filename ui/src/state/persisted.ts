@@ -12,8 +12,6 @@ import type { FormatPreference } from '../api/types'
  */
 export const STORAGE_KEYS = {
   downloadDefaults: 'deadwax-download-defaults',
-  releaseColumns: 'deadwax-release-columns',
-  logOpen: 'deadwax-log-open',
   /**
    * Preferences owned by the settings tab that aren't download defaults.
    *
@@ -121,60 +119,6 @@ export function useDownloadDefaults(): [
   }, [])
 
   return [value, update]
-}
-
-/* ===== deadwax-log-open ===== */
-
-/**
- * Stored as the literal string '1' or '0', NOT as JSON. The vanilla app compares
- * `getItem(...) === '1'`, so writing `true` here would read back as closed for anyone who
- * still lands on the un-ported page.
- */
-export function useLogOpen(): [boolean, (open: boolean) => void] {
-  const [open, setOpen] = useState(() => readRaw(STORAGE_KEYS.logOpen) === '1')
-
-  const update = useCallback((next: boolean) => {
-    writeRaw(STORAGE_KEYS.logOpen, next ? '1' : '0')
-    setOpen(next)
-  }, [])
-
-  return [open, update]
-}
-
-/* ===== deadwax-release-columns ===== */
-
-export interface ReleaseColumnState {
-  /** 2 since edition moved before title (v0.9.0) - see COLUMN_ORDER_VERSION in main.js */
-  orderVersion?: number
-  order: string[]
-  visible: Record<string, boolean>
-  widths: Record<string, number>
-}
-
-/**
- * Read the stored column layout, or null when there isn't a usable one.
- *
- * Deliberately returns the raw stored shape without reconciling it. The vanilla loader
- * filters the saved order against the current column set and backfills anything new, which
- * is what stops a version that adds a column from hiding it forever - but that needs the
- * column definitions, which land with the releases-grid port (step 5 in
- * docs/FRONTEND-MIGRATION.md). Do the reconciliation there; don't drop it.
- */
-export function readReleaseColumnState(): ReleaseColumnState | null {
-  const saved = readJson<Partial<ReleaseColumnState>>(STORAGE_KEYS.releaseColumns)
-
-  if (!saved || !Array.isArray(saved.order) || typeof saved.visible !== 'object') return null
-
-  return {
-    ...(typeof saved.orderVersion === 'number' ? { orderVersion: saved.orderVersion } : {}),
-    order: saved.order,
-    visible: saved.visible ?? {},
-    widths: saved.widths ?? {},
-  }
-}
-
-export function writeReleaseColumnState(state: ReleaseColumnState): void {
-  writeRaw(STORAGE_KEYS.releaseColumns, JSON.stringify(state))
 }
 
 /* ===== deadwax-library-fields ===== */

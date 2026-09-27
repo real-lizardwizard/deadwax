@@ -130,7 +130,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             868 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             862 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -481,8 +481,9 @@ preview on Dummy and The Slow Rush first, then built with the MOST COMMON trackl
   `COLUMN_ORDER_VERSION` (2) moves edition ahead of title ONCE, and only in a saved layout still
   holding the two in the old default's first places: one arranged by hand is left as arranged,
   and a deliberate "title first" saved afterwards is kept because the version has moved on.
-  `ReleaseColumnState` in persisted.ts carries `orderVersion` so the eventual port can't drop
-  it. **Verified** with all four cases seeded in localStorage.
+  The column state's shape (with `orderVersion`) lives only in main.js now - the unused
+  Preact reader went in the v0.9.19 audit; the grid's port has to carry `orderVersion` across.
+  **Verified** with all four cases seeded in localStorage.
 - **Still lazy**: a release's change list is built on first expand, and its own full tracklist
   (vinyl sides and all) on a second click - the 711ms rule. The diffs behind the chips are
   computed once per release and kept in a Map, since the body re-renders on every filter change.
@@ -1729,11 +1730,12 @@ metadata as well".
 - **A credit's JOIN PHRASES are its punctuation.** MusicBrainz says "A / B" for a split, "A & B"
   for a collaboration, "A feat. B" for a guest spot, and it says so in `joinphrase` between the
   names. Joining on ", " - which every part of this interface did - invents punctuation nobody
-  chose and flattens a duet into what reads as two separate acts. The rule now lives in THREE
-  places that must agree: `credit_name()` in `src/artists.py`, `creditName()` in
-  `ui/src/lib/release.ts`, and `getArtistNames()` in `interface/scripts/credits.mjs` (moved out
-  of main.js in v0.6.18 so a sim can reach it). One names a folder, another
-  writes the tag inside it.
+  chose and flattens a duet into what reads as two separate acts. The rule lives in TWO places
+  that must agree: `creditName()` in `ui/src/lib/release.ts` and `getArtistNames()` in
+  `interface/scripts/credits.mjs` (moved out of main.js in v0.6.18 so a sim can reach it). One
+  names a folder, the other writes the tag inside it - both in the browser, which sends the
+  server names already joined. (A third copy, `credit_name()` in `src/artists.py`, was called by
+  nothing but its own tests and went in the v0.9.19 audit.)
 - **A track keeps its OWN artist.** `tag_values` gave every track the release's artist, so
   applying a release to a compilation rewrote eighteen artists into one. The track's credit wins
   where it has one; `albumartist` stays the release's, which is what the two tags are for.
@@ -2570,7 +2572,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 868 tests
+.venv/bin/python -m pytest tests/ -q  # 862 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2614,7 +2616,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 868 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 862 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

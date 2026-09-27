@@ -30,11 +30,6 @@ import re
 
 #? Formats worth naming in a folder. CD is the unmarked default - writing "[CD]" on almost
 #? every album would be noise, and the point of the label is to tell editions APART.
-NOTABLE_FORMATS = {
-    "vinyl", "12\" vinyl", "7\" vinyl", "10\" vinyl", "lp",
-    "cassette", "sacd", "dvd-audio", "dvd", "blu-ray", "minidisc", "digital media",
-}
-
 #? Digital is only worth mentioning when it distinguishes something, and it usually doesn't -
 #? most of what people download is nominally "Digital Media".
 UNMARKED_FORMATS = {"cd", "digital media", "", None}
@@ -145,14 +140,3 @@ def edition_discriminator(release: dict) -> str:
         return mbid[:8]
 
     return ""
-
-
-def describe_edition(release: dict) -> str:
-    """
-    What to show a person for this edition, never empty.
-
-    The folder name uses resolve_edition_label() and omits the suffix entirely for ordinary
-    albums; the UI still needs something to put in an "edition" column, so it says "Standard"
-    where the folder says nothing.
-    """
-    return resolve_edition_label(release) or "Standard"

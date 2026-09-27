@@ -33,9 +33,6 @@ from src.api.coverart_endpoint import extension_for
 from src.organizer import (build_album_dirname, country_in_folder, filed_artist, is_within,
                            read_album_mbid, sanitize_filename, tag_values, write_tags)
 
-#? Same vocabulary as the organizer's ORGANIZE_MODES, minus the copy/move distinction which
-#? has no meaning here - a retag either happens or it doesn't.
-RETAG_MODES = ("dry_run", "apply")
 
 
 def read_current_tags(path: Path) -> dict:

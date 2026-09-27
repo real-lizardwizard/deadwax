@@ -292,13 +292,6 @@ class MusicBrainzClient:
         return ping_error_obj
         
 
-    async def get_release_groups(self, query: str, limit: int = 5) -> dict:
-        params = {
-            "query": query,
-            "fmt": "json",
-            "limit": limit
-        }
-        return await self.request_with_retries("release-group/", params)
       
      
     #? Everything needed to TELL releases apart: format, labels, country, disambiguation, and

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from src.editions import describe_edition, edition_discriminator, resolve_edition_label
+from src.editions import edition_discriminator, resolve_edition_label
 from src.organizer import build_album_dirname, build_target_path, resolve_album_dir
 
 
@@ -104,10 +104,6 @@ def test_explicit_label_overrides_everything():
 def test_label_is_length_capped():
     assert len(resolve_edition_label({**BASE, "disambiguation": "x" * 500})) == 60
 
-
-def test_describe_edition_never_returns_empty_for_display():
-    assert describe_edition(BASE) == "Standard"
-    assert describe_edition({**BASE, "disambiguation": "deluxe edition"}) == "Deluxe edition"
 
 
 def test_discriminator_prefers_catalogue_number_then_falls_back_to_mbid():

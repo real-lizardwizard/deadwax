@@ -160,42 +160,6 @@ def _candidate(kind: str, url: str, source: str, label: str, preview: str | None
     }
 
 
-def credit_name(credit: list[dict] | None) -> str:
-    """
-    An artist credit as MusicBrainz itself renders it.
-
-    The join phrases ARE the punctuation: a split release is "A / B", a collaboration "A & B",
-    a guest spot "A feat. B". Joining the names on ", " instead - which is what deadwax did
-    everywhere until now - invents punctuation MusicBrainz did not use and flattens a duet into
-    what reads as a list of two separate acts.
-    """
-    parts = []
-
-    for entry in credit or []:
-        name = entry.get("name") or (entry.get("artist") or {}).get("name") or ""
-        if name:
-            parts.append(f"{name}{entry.get('joinphrase') or ''}")
-
-    return "".join(parts).strip()
-
-
-def credit_ids(credit: list[dict] | None) -> list[str]:
-    """
-    Every MusicBrainz artist id in a credit, in the order credited.
-
-    A list rather than one id because a credit genuinely can be several artists, and the first
-    of them is not "the" artist - on a split release it is simply whoever is printed first.
-    """
-    ids: list[str] = []
-
-    for entry in credit or []:
-        mbid = (entry.get("artist") or {}).get("id")
-        if mbid and mbid not in ids:
-            ids.append(mbid)
-
-    return ids
-
-
 def wikidata_id(relations: list[dict] | None) -> str | None:
     """The artist's Wikidata id, from its `wikidata` relation."""
     for relation in relations or []:
