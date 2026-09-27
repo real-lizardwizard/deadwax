@@ -1,11 +1,10 @@
 services:
   deadwax:
-    # :experimental is built from the experimental/* branches - the slskd-direct version with
-    # no Lidarr, and ahead of the last release. As of 0.3.0 :latest is that same slskd-direct
-    # line, so swapping it in here is safe and holds still; use :0.3.0 to pin exactly.
-    # Only :0.2.1 and older are the original Lidarr-based version, and those will NOT
-    # understand the settings below.
-    image: ghcr.io/real-lizardwizard/deadwax:experimental
+    # :latest is the newest release (1.0.0 onward: slskd direct, no Lidarr), and moves only when
+    # one is tagged; use :1.0.0 to pin exactly. :experimental is rebuilt from the development
+    # branch on every push and moves under you. Only :0.2.1 and older are the original
+    # Lidarr-based version, and those will NOT understand the settings below.
+    image: ghcr.io/real-lizardwizard/deadwax:latest
     container_name: deadwax
     restart: unless-stopped
 

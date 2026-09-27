@@ -23,8 +23,8 @@ confidently wrong deployment advice. Don't bring them back.
 
 | branch | what |
 | --- | --- |
-| `main` | the old Lidarr-based line, v0.2.1. Untouched by the rewrite, and now behind it. |
-| `experimental/slskdn-no-lidarr` | **all the work below.** slskd-direct, no Lidarr. Releases are tagged from here — v0.3.0 onward. |
+| `main` | **the release line since 1.0.0** (2026-09-27, asked for), fast-forwarded to experimental. Until then it held the old Lidarr-based v0.2.1, which is still tag `v0.2.1`. |
+| `experimental/slskdn-no-lidarr` | **all the work below.** slskd-direct, no Lidarr. v0.3.0 to v0.9.2 were tagged from here, and `:experimental` is built from it. |
 
 ### The name (v0.6.21)
 
@@ -2893,14 +2893,14 @@ compile time.
   moves **`:latest`** for any version without a hyphen in it. So tagging every commit would
   move `:latest` on every commit, which is exactly what `:experimental` exists to prevent —
   see the image-tag note below. Bump the version as you go; tag when you mean to ship.
-- Versions: `v0.x` tags. **1.0.0 is reserved for when this is genuinely polished** — a
-  deliberate choice, don't jump to it.
+- Versions: `v0.x` tags until **1.0.0, released on 2026-09-27** when James called it polished,
+  as the first release on `main`. The patch bump per commit carries on from there.
 - Image tags: `:experimental` = this branch (rebuilt on every push); `:latest` = the newest
   real release. `:latest` only ever moves for a real release, never a branch or prerelease —
   the workflow enforces this by skipping `:latest` for any version containing a hyphen.
-  **As of v0.3.0 `:latest` is the slskd-direct line, not the Lidarr one.** It was tagged from
-  `experimental/slskdn-no-lidarr`, so `main` still holds v0.2.1 and anyone visiting the repo's
-  default branch sees the old Lidarr README. Merging this branch to `main` is still owed.
+  **As of v0.3.0 `:latest` is the slskd-direct line, not the Lidarr one**, and since 1.0.0 `main`
+  is too - the repo's default branch showed the old Lidarr README until then. The example
+  compose file points at `:latest` from 1.0.0, not `:experimental`.
 
 ## Local development
 
@@ -2979,8 +2979,8 @@ A green suite here means the logic is sound, not that it works against real infr
    organized for real - James reported them filing, just appearing late - so the search,
    enqueue, completion and filing path has run end to end at least once. Still unwatched: the
    derived download speed (byte deltas, not `job.speed`), queue position, and cancel.
-2. **Merge to `main`.** It still holds v0.2.1, so the repo's default branch shows the old
-   Lidarr README to anyone who visits, while `:latest` has been the slskd line since v0.3.0.
+2. ~~Merge to `main`~~ **Done for 1.0.0** - a fast-forward, since `main` had nothing the
+   experimental branch lacked.
 3. Continue the port in the order in [docs/FRONTEND-MIGRATION.md](docs/FRONTEND-MIGRATION.md):
    ~~candidates panel~~ (done, v0.9.10), filter column, releases grid, top bar.
 4. ~~A Settings tab~~ **Done in v0.5.** It landed exactly as this entry predicted — one
