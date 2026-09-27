@@ -21,7 +21,9 @@ never the threat and there is no login to protect yet.
 The comparison is on host and port, not scheme: behind a proxy that terminates TLS, the page is
 https://music.example but deadwax itself is spoken to over plain http. A proxy that REWRITES the
 Host header (nginx does by default) makes every write look foreign; X-Forwarded-Host is honoured
-when it is set, and TRUSTED_ORIGINS names any other origin to accept. That setting is read from
+when it is set, X-Forwarded-Port fills in a port the Host left out, and TRUSTED_ORIGINS names any
+other origin to accept. None of those headers can be set by a web page on a cross-origin request
+without a CORS preflight, which deadwax never grants, so trusting them costs nothing here. That setting is read from
 the environment only - it guards the settings tab's own save, so a bad value saved there could
 never be undone from there.
 
@@ -116,6 +118,9 @@ def refusal(method: str, headers: dict[str, str], trusted: list[tuple[str, int]]
     if origin is None:
         return f"its Origin ({stated[:100]}) isn't a web address"
 
+    #? nginx's $host drops the port, so a proxy on a non-default port (http://nas:8443) passes
+    #? "nas" on - which alone would only match 80 or 443. X-Forwarded-Port says which it was (1.0.2).
+    forwarded_port = (headers.get("x-forwarded-port") or "").split(",")[0].strip()
     candidates = []
     for name in ("host", "x-forwarded-host"):
         #? a proxy may list several hosts; the first is the one the browser used
@@ -123,6 +128,8 @@ def refusal(method: str, headers: dict[str, str], trusted: list[tuple[str, int]]
         host = _split_host(value)
         if host:
             candidates.append(host)
+            if host[1] is None and forwarded_port.isdigit():
+                candidates.append((host[0], int(forwarded_port)))
 
     if any(_matches(origin, host) for host in candidates):
         return None

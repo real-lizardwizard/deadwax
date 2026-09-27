@@ -115,8 +115,13 @@ const PLAIN_FORMATS = ['CD', 'Digital Media'];
  * could later tell it was already held. It now stands for a real pressing, chosen to be the
  * least surprising one: its tracklist is the group's most common (what a Soulseek folder most
  * likely holds, and what chooseBase shows), then an Official release over a promo or bootleg,
- * then a CD or digital release over vinyl or cassette, then the earliest. Null when no release
- * in the group lists any tracks.
+ * then a CD or digital release over vinyl or cassette, then one MusicBrainz needs no
+ * disambiguation for (a disambiguation becomes the folder's edition label), then the earliest.
+ * Null when no release in the group lists any tracks.
+ *
+ * Since 1.0.2: a date with only a year (or a month) sorts AFTER full dates in that year - as
+ * strings, "1994" came before "1994-08-22", so the pressing MusicBrainz knew least about won -
+ * and a tie falls to the release id, so the answer never depends on the order the list came in.
  */
 export function representativeRelease(releases) {
   const withTracks = releases.filter((release) => releaseTracks(release).length);
@@ -128,8 +133,15 @@ export function representativeRelease(releases) {
 
   const plain = (release) => (release.media || []).length > 0
     && release.media.every((medium) => PLAIN_FORMATS.includes(medium.format));
-  const date = (release) => release.date || release['release-events']?.[0]?.date || '9999';
-  const rank = (release) => [release.status === 'Official' ? 0 : 1, plain(release) ? 0 : 1, date(release)];
+  //? '~' sorts after every digit and '-': "1994~" after "1994-08-22", "~" alone after all dates
+  const date = (release) => `${release.date || release['release-events']?.[0]?.date || ''}~`;
+  const rank = (release) => [
+    release.status === 'Official' ? 0 : 1,
+    plain(release) ? 0 : 1,
+    release.disambiguation ? 1 : 0,
+    date(release),
+    release.id || '',
+  ];
 
   return pool.reduce((best, release) => {
     const [a, b] = [rank(release), rank(best)];

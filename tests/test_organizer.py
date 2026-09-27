@@ -607,7 +607,8 @@ def test_a_job_with_no_release_drops_the_sharers_release_id(tmp_path):
     from tests.test_library import write_flac
 
     path = write_flac(tmp_path / "01.flac", musicbrainz_albumid="the-sharers-pressing", title="x")
-    write_tags(path, {**RELEASE, "release_mbid": None, "release_group_mbid": "rg-1"}, RELEASE["tracks"][0])
+    write_tags(path, {**RELEASE, "release_mbid": None, "release_group_mbid": "rg-1"}, RELEASE["tracks"][0],
+               drop_stale_release_id=True)
 
     tags = FLAC(str(path))
     assert "musicbrainz_albumid" not in tags
@@ -622,3 +623,17 @@ def test_a_job_that_names_its_release_writes_that_id(tmp_path):
     path = write_flac(tmp_path / "01.flac", musicbrainz_albumid="the-sharers-pressing")
     write_tags(path, RELEASE, RELEASE["tracks"][0])
     assert FLAC(str(path))["musicbrainz_albumid"] == ["mb-1"]
+
+
+def test_the_editor_naming_no_release_leaves_the_files_id_alone(tmp_path):
+    """
+    The metadata editor shares write_tags. A retag naming no release previews no change to the
+    release id, so the write must not remove one either (v1.0.2).
+    """
+    from mutagen.flac import FLAC
+    from src.organizer import write_tags
+    from tests.test_library import write_flac
+
+    path = write_flac(tmp_path / "01.flac", musicbrainz_albumid="picard-wrote-this")
+    write_tags(path, {**RELEASE, "release_mbid": None}, RELEASE["tracks"][0])
+    assert FLAC(str(path))["musicbrainz_albumid"] == ["picard-wrote-this"]

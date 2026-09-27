@@ -68,6 +68,16 @@ def test_a_proxy_that_rewrites_host_is_matched_by_x_forwarded_host():
     assert refusal("PUT", headers, trusted=[]) is None
 
 
+def test_x_forwarded_port_fills_in_the_port_a_proxy_dropped():
+    """nginx's $host has no port, so a proxy on 8443 passes plain "nas" (v1.0.2)."""
+    headers = {"host": "nas", "x-forwarded-port": "8443", "origin": "https://nas:8443"}
+    assert refusal("POST", headers, trusted=[]) is None
+    assert refusal("POST", {**headers, "origin": "https://nas:9000"}, trusted=[]) is not None
+    assert refusal("POST", {**headers, "x-forwarded-port": "junk"}, trusted=[]) is not None
+    #? a Host that names its own port is taken at its word
+    assert refusal("POST", {**headers, "host": "nas:8090"}, trusted=[]) is not None
+
+
 def test_trusted_origins_names_the_rest():
     headers = {"host": "deadwax:8080", "origin": "https://music.example"}
     assert refusal("POST", headers, trusted=[]) is not None

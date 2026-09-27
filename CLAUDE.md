@@ -133,7 +133,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             924 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             934 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -167,8 +167,10 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   **Downloads never sent it until v1.0.2** - only the metadata editor did. Neither builder in
   main.js set `original_year`, so every download of a reissue was filed under the pressing's year
   and flagged "no original year". Found while verifying the disc-folder fix: the Experience
-  edition filed as `(2011)`. `albumYear()` gives both builders the group's first-release year (null,
-  not 'N/A', when MusicBrainz has none); verified in the real page, a row's Find filing
+  edition filed as `(2011)`. Both builders send the group's first-release year through
+  `realYear()` (null, not 'N/A', when MusicBrainz has none) - the version of this fix
+  player-spike made in its own review, kept over main's `albumYear()` when brought over in 1.0.4
+  because it also stops 'N/A' going out as `year`; verified in the real page, a row's Find filing
   `Wish You Were Here (1975) [Experience edition]` with date 2011 and originaldate 1975, a card's
   `(1975)`.
 - **The search type filter narrows the QUERY, not the results.** That distinction is the whole
@@ -879,8 +881,8 @@ the agent's memory), each affecting the single-user install as it stands. Shippe
   Host both the attacker's name) gets past it; logins will close that, since a session cookie
   is bound to deadwax's own host name. **Verified** in the real page: its own Rescan passed, and
   a page on another port POSTing to rescan and enqueue got 403 on both, logged.
-- **A second copy of a held release isn't filed beside the first** (`existing_track_keys`,
-  `_planned_track_key` in organizer.py). `resolve_album_dir` shares a folder holding the same
+- **A second copy of a held release isn't filed beside the first** (`existing_tracks`,
+  `_planned_track`, `find_duplicate` in organizer.py - renamed in 1.0.2, see below). `resolve_album_dir` shares a folder holding the same
   release, and `execute_plan` only refused an exact existing filename, so a FLAC and then an
   MP3 landed side by side (one album, each track twice in Navidrome); a grab without a
   tracklist keeps the sharer's filenames and did it even in one format. Now a planned track
@@ -915,6 +917,51 @@ the agent's memory), each affecting the single-user install as it stands. Shippe
   stopgap**: with the Navidrome connection (step 1), poll `getScanStatus` instead. **Verified** in
   the real page with a 6s wait: tags written, then the wait, then "re-filed Third rip as Third
   (2008) [...]".
+
+#### After review (1.0.2)
+
+A review of 1.0.1 found seven real problems in it, all fixed together:
+
+- **Another pressing is judged by TITLE, not number.** `resolve_album_dir` shares a folder with
+  an UNTAGGED one (a pre-deadwax rip) as well as one holding the same release, and numbers mean
+  nothing across pressings: the US *Dummy* inserts "It's a Fire" at 6, so by number it was a
+  "duplicate" of the UK CD's "Numb" and was left out, while US 11 "Glory Box" filed beside UK 10.
+  `find_duplicate` matches by (disc, track) only when the folder's `musicbrainz_albumid` IS this
+  job's release (`same_release`); otherwise by folded title (`matching.normalize`), same disc when
+  both sides know it. A title comes from tags or an `NN - Title` name only, never a bare stem:
+  "01" as a title made false duplicates, caught by the poller tests.
+- **An unfiled copy keeps its sidecars.** With any track a duplicate, no companion is planned:
+  the FLAC rip's log and cue would otherwise have filed beside the MP3s they don't describe,
+  and a cover-only "organized" count would hide an all-duplicate job. The poller's "already in
+  the store" message counts `duplicates`, not `skipped` (which a cover could pad).
+- **`write_tags(drop_stale_release_id=True)` only from the organizer.** 1.0.1 dropped a file's
+  `musicbrainz_albumid` whenever the release had none - including the editor's apply of a
+  hand-built release, which would silently un-tag an album. The retag path leaves it.
+- **The rename looks again after the pause.** Two copies of one release applied back to back
+  both planned a plain rename, and the second `shutil.move`d its folder INSIDE the first's.
+  `move_retagged` refuses a target that exists by then (the album keeps its new tags where it
+  is), and `_retag_apply` holds a per-album `asyncio.Lock` (`_apply_lock`) so one album can't
+  be applied twice at once.
+- **The pause covers albums with no release id.** Navidrome's album PID falls back to
+  albumartistid, album, version and date, so for a release without an MBID those tags are ids
+  too (`NO_MBID_ID_TAGS`); `changes_player_ids(plan, release)` takes the release to know.
+- **The saved scan is refreshed BEFORE the pause**, not after: a container stopped mid-pause
+  restarted onto a snapshot of the old tags at the old path, which matched on mtime.
+- **The editor followed a stale album after an apply.** `onApplied` set the editing album and
+  the queue's paths from whatever the closure held; both are functional updates keyed on the
+  OLD path now, so an apply landing after you stepped on can't pull the editor back.
+- **Downloads carry `original_year`** (main.js, both builders, through `realYear()` - `getYear()`
+  says 'N/A' for display, which the group fallback sent as a year: "Album (N/A)"). A card's Find
+  standing for a real pressing made it matter: Wish You Were Here's card picks a 1985 CD, which
+  without it files as `(1985)`. **Verified in the real page**: that card now sends year 1985,
+  original_year 1975.
+- **`representativeRelease` is deterministic**: a disambiguation ranks after none (it becomes
+  the folder's edition label), a year-only date sorts after full dates in that year (as
+  strings "1994" beat "1994-08-22"), and a full tie goes to the release id.
+- **The guard, twice more**: `X-Forwarded-Port` fills in a port the Host left out (nginx's
+  `$host` drops it; the docs now say `$http_host`), and the Vite dev proxy keeps the Host
+  (`changeOrigin: false`), since the string shorthand rewrote it and every harness write was
+  refused.
 
 ### Browsing a discography, and ordering results
 
@@ -3009,7 +3056,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 924 tests
+.venv/bin/python -m pytest tests/ -q  # 934 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3053,7 +3100,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 924 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 934 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

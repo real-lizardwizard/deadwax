@@ -6,8 +6,10 @@ the organizer only ever refused an EXACT existing filename. So a FLAC copy and t
 landed side by side - one album in Navidrome with every track twice - and a grab made without a
 tracklist, which keeps the sharer's own filenames, did it even in the same format.
 
-Now a track the folder already has (by disc and track number, from the files' own tags) is
-skipped, and a missing one still files, so a second download can fill gaps a partial one left.
+Now a track the folder already has is skipped, and a missing one still files, so a second
+download can fill gaps a partial one left. "Already has" is the same disc and track number when
+the folder holds this very release, and the same title otherwise (v1.0.2) - two pressings can
+number their tracks differently.
 """
 
 import asyncio
@@ -18,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import poller  # noqa: E402
 from src.config import Config  # noqa: E402
-from src.organizer import execute_plan, existing_track_keys, plan_organization  # noqa: E402
+from src.organizer import execute_plan, existing_tracks, plan_organization  # noqa: E402
 from tests.test_library import write_flac  # noqa: E402
 
 RELEASE = {
@@ -43,8 +45,9 @@ def job(files, release=None):
 def library_with(tmp_path, *tracks):
     """The album as deadwax filed it earlier, in FLAC, holding these track numbers."""
     names = {1: "01 - Wildlife Analysis.flac", 2: "02 - An Eagle in Your Mind.flac"}
+    titles = {1: "Wildlife Analysis", 2: "An Eagle in Your Mind"}
     for number in tracks:
-        write_flac(tmp_path / "music" / ALBUM / names[number], tracknumber=number,
+        write_flac(tmp_path / "music" / ALBUM / names[number], tracknumber=number, title=titles[number],
                    musicbrainz_albumid="mb-1", album="Music Has the Right to Children")
     return str(tmp_path / "music")
 
@@ -121,7 +124,7 @@ def test_the_other_disc_of_a_set_is_not_a_duplicate(tmp_path):
 
 
 def test_an_empty_or_new_folder_has_nothing_to_duplicate(tmp_path):
-    assert existing_track_keys(tmp_path / "nowhere") == {}
+    assert existing_tracks(tmp_path / "nowhere") == []
     names = ["01 Wildlife Analysis.flac", "02 An Eagle in Your Mind.flac"]
     downloads = downloads_with(tmp_path, names)
     plan = plan_organization(job(names), downloads, str(tmp_path / "music"))
@@ -159,3 +162,68 @@ def test_the_job_says_it_was_already_in_the_store(monkeypatch):
     asyncio.run(poller._organize_if_enabled({"id": 7, "artist": "a", "album": "b"}, store))
 
     assert store.statuses[-1] == ("complete", "already in the store: all 10 track(s) were already there, nothing was filed")
+
+
+# ----- after review (v1.0.2) -----
+
+DUMMY = "Portishead/Dummy (1994)"
+UK = ["Mysterons", "Sour Times", "Strangers", "It Could Be Sweet", "Wandering Star", "Numb", "Roads",
+      "Pedestal", "Biscuit", "Glory Box"]
+US = UK[:5] + ["It's a Fire"] + UK[5:]
+
+
+def test_another_pressing_in_an_untagged_folder_is_judged_by_title(tmp_path):
+    """
+    A pre-deadwax rip of the 10-track UK CD, untagged, shares its folder name with the 11-track US
+    CD. By number, 'It's a Fire' (US 6) would be a "duplicate" of 'Numb' (UK 6) and be left out,
+    while 'Glory Box' (US 11) filed beside UK 10. By title, only the missing song files.
+    """
+    for n, title in enumerate(UK, 1):
+        write_flac(tmp_path / "music" / DUMMY / f"{n:02d} - {title}.mp3.flac", tracknumber=n, title=title)
+    release = {"artist": "Portishead", "album": "Dummy", "year": "1994", "release_mbid": "us-cd",
+               "tracks": [{"position": n, "title": t} for n, t in enumerate(US, 1)]}
+    names = [f"{n:02d} {t}.flac" for n, t in enumerate(US, 1)]
+    downloads = downloads_with(tmp_path, names)
+
+    job_ = {**job(names, release), "artist": "Portishead", "album": "Dummy"}
+    plan = plan_organization(job_, downloads, str(tmp_path / "music"))
+    filed = [Path(op["target"]).name for op in plan["operations"] if not op.get("duplicate_of")]
+    assert filed == ["06 - It's a Fire.flac"]
+
+
+def test_the_same_release_is_judged_by_number_even_with_retitled_files(tmp_path):
+    """Holding the SAME release, the numbering is the release's - a retitled track is still that track."""
+    write_flac(tmp_path / "music" / ALBUM / "01 - Wildlife Analysis.flac",
+               tracknumber=1, title="Wildlife Analysis (retitled by hand)", musicbrainz_albumid="mb-1")
+    names = ["01 Wildlife Analysis.flac"]
+    plan = plan_organization(job(names), downloads_with(tmp_path, names), str(tmp_path / "music"))
+    assert plan["operations"][0].get("duplicate_of") == "01 - Wildlife Analysis.flac"
+
+
+def test_the_sidecars_of_an_unfiled_copy_stay_with_it(tmp_path):
+    """A log and cue describe the copy they came with, not the one already in the folder."""
+    library = library_with(tmp_path, 1, 2)
+    names = ["01 Wildlife Analysis.flac", "02 An Eagle in Your Mind.flac"]
+    downloads = downloads_with(tmp_path, names)
+    for extra in ("rip.log", "rip.cue"):
+        (Path(downloads) / "BoC" / extra).write_text("describes the FLAC rip")
+
+    plan = plan_organization(job(names), downloads, library)
+    assert plan["companion_count"] == 0
+    results = execute_plan(plan, RELEASE, "move")
+    assert results["organized"] == 0, "nothing arrived, so it mustn't read as organized"
+    assert "rip.log" in {p.name for p in (Path(downloads) / "BoC").iterdir()}
+
+
+def test_already_in_the_store_counts_the_tracks_not_a_skipped_cover(monkeypatch):
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", "/downloads")
+    monkeypatch.setattr(Config, "LIBRARY_PATH", "/music")
+    monkeypatch.setattr(Config, "ORGANIZE_MODE", "move")
+
+    async def organized(*args):
+        return {"organized": 0, "skipped": 11, "duplicates": 10, "failed": 0, "dry_run": False}
+
+    monkeypatch.setattr(poller, "organize_job", organized)
+    store = FakeStore()
+    asyncio.run(poller._organize_if_enabled({"id": 7, "artist": "a", "album": "b"}, store))
+    assert store.statuses[-1][1].startswith("already in the store: all 10 track(s)")

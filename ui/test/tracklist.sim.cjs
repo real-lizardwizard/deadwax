@@ -120,6 +120,16 @@ const SLOW_RUSH = [['One More Year', 322], ['Instant Destiny', 193], ['Borderlin
   check('the most common tracklist, Official, CD, earliest', T.representativeRelease(dummyGroup).id, 'uk-cd');
   check('an Official vinyl beats a CD promo when nothing plainer shares its tracklist',
     T.representativeRelease(dummyGroup.filter((r) => ['2017-vinyl', 'promo'].includes(r.id))).id, '2017-vinyl');
+  const tie = (extra) => dummyGroup.filter((r) => r.id === 'uk-cd').map((r) => ({ ...r, ...extra }));
+  check('a year-only date sorts after a full date in the same year',
+    T.representativeRelease([...tie({ id: 'year-only', date: '1994' }), ...tie({})]).id, 'uk-cd');
+  check('an undated pressing sorts after every dated one',
+    T.representativeRelease([...tie({ id: 'undated', date: undefined }), ...tie({ date: '2020-01-01' })]).id, 'uk-cd');
+  check('no disambiguation beats a disambiguated pressing, whatever the dates',
+    T.representativeRelease([...tie({ id: 'club', date: '1990-01-01', disambiguation: 'club edition' }), ...tie({})]).id, 'uk-cd');
+  const twins = [...tie({ id: 'b-twin' }), ...tie({ id: 'a-twin' })];
+  check('a full tie falls to the release id, in either order',
+    [T.representativeRelease(twins).id, T.representativeRelease([...twins].reverse()).id], ['a-twin', 'a-twin']);
   check('a lone pressing with tracks is chosen', T.representativeRelease([release('only', DUMMY_10)]).id, 'only');
   check('no tracks anywhere: nothing to stand for the album', T.representativeRelease([{ id: 'x', media: [] }, cd]), null);
   check('an empty group: nothing', T.representativeRelease([]), null);

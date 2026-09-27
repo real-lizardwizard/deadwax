@@ -40,8 +40,11 @@ export default defineConfig({
 
   server: {
     proxy: {
-      // dev against the real FastAPI backend, so no CORS handling is needed
-      '/deadwax': 'http://127.0.0.1:8080',
+      // dev against the real FastAPI backend, so no CORS handling is needed. Not the string
+      // shorthand: that sets changeOrigin, rewriting Host to 127.0.0.1:8080 while the browser's
+      // Origin still says localhost:5173 - and since 1.0.1 the backend refuses a write whose
+      // Origin names another host (src/api/same_origin.py). Keeping the Host keeps them agreeing.
+      '/deadwax': { target: 'http://127.0.0.1:8080', changeOrigin: false },
       // the dev harness reuses the real stylesheet and fonts rather than a copy that can
       // drift out of sync with what production actually serves
       '/styles': 'http://127.0.0.1:8080',

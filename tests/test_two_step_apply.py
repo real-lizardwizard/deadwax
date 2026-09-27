@@ -131,3 +131,58 @@ def test_the_setting_is_whole_seconds_from_0_to_300(monkeypatch):
     assert rename_wait_seconds() == 20, "unreadable falls back to the default"
     monkeypatch.setattr(Config, "RETAG_RENAME_WAIT", "0")
     assert rename_wait_seconds() == 0
+
+
+# ----- after review (v1.0.2) -----
+
+def test_a_target_that_appeared_during_the_pause_is_never_moved_into(tmp_path):
+    """
+    Two copies of one release applied back to back both planned a plain rename; the second
+    shutil.move'd its folder INSIDE the first's. The rename now looks again before it moves.
+    """
+    directory = seed(tmp_path)
+    plan = plan_retag(ALBUM, RELEASE, str(tmp_path))
+    results = execute_retag(plan, RELEASE, "apply", move=False)
+
+    (tmp_path / RENAMED).mkdir(parents=True)  # filed by something else during the pause
+    move_retagged(plan, results)
+
+    assert results["moved_to"] is None
+    assert "appeared while waiting" in results["problems"][-1]
+    assert directory.is_dir() and not any((tmp_path / RENAMED).iterdir())
+
+
+def test_an_album_with_no_release_id_pauses_for_its_name_too(tmp_path):
+    """With no release id, Navidrome keys the album on its name, artist and date instead."""
+    seed(tmp_path, folder="Slow Rush", album="Slow Rsh")
+    release = {**RELEASE, "release_mbid": None, "disambiguation": None}
+    plan = plan_retag("Tame Impala/Slow Rush", release, str(tmp_path))
+    assert plan["moves"]
+    assert set().union(*(e["changes"] for e in plan["files"])) & {"album"}
+    assert changes_player_ids(plan, release)
+    assert not changes_player_ids(plan, {**release, "release_mbid": "x"}), "with an id, the name isn't one"
+
+
+def test_the_saved_scan_is_refreshed_before_the_pause(monkeypatch, tmp_path):
+    """A container stopped mid-pause must not restart onto a saved scan of the old tags."""
+    seed(tmp_path)
+    order = []
+    monkeypatch.setattr(library, "forget_cached_album", lambda path: order.append(("forget", Path(path).name)))
+
+    async def persist(request, scan=None):
+        order.append(("persist",))
+
+    async def pause(seconds):
+        order.append(("pause",))
+
+    monkeypatch.setattr(library, "_persist_cache", persist)
+    monkeypatch.setattr(library.asyncio, "sleep", pause)
+    client(monkeypatch, tmp_path, "5").post("/deadwax/library/retag/apply", json={"album_path": ALBUM, "release": RELEASE})
+
+    assert order.index(("persist",)) < order.index(("pause",))
+    assert order[0] == ("forget", "The Slow Rush (2020)")
+
+
+def test_one_apply_per_album_at_a_time():
+    assert library._apply_lock("A/B") is library._apply_lock("A/B")
+    assert library._apply_lock("A/B") is not library._apply_lock("A/C")

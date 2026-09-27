@@ -33,10 +33,15 @@ Pink Floyd/Wish You Were Here (1975) [2011 remaster]/01 - Shine On You Crazy Dia
 - **Tracks** are named by their number and title from the release (`01 - Mysterons.flac`). A
   multi-disc set is numbered straight through, so it stays in order inside one folder; the disc
   numbers go in the tags. A file that couldn't be matched to a track keeps its own name.
-- **A second copy isn't filed beside the first.** If the folder already has a track (the same
-  disc and track number, whatever its format), the new file is left in slskd's folder. A
-  download of an album already there ends as *already in the store*. A track the folder is
-  missing still files, so a second download can finish an album a first one left partial.
+- **A second copy isn't filed beside the first.** If the folder already has a track, whatever
+  its format, the new file is left in slskd's folder. When the folder holds the same release,
+  "already has" means the same disc and track number; when it holds another pressing, or files
+  with no release id, it means the same title, since two pressings can number their tracks
+  differently (the US *Dummy* has an extra song at 6). A download of an album already there
+  ends as *already in the store*. A track the folder is missing still files, so a second
+  download can finish an album a first one left partial. When any track is left behind, so are
+  the download's cover and sidecars (log, cue and so on): they describe the copy they came with,
+  not the one already filed.
 
 ### Folder names
 

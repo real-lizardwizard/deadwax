@@ -25,7 +25,7 @@ from pathlib import Path
 from src.editions import edition_discriminator, resolve_edition_label
 from src.naming import DEFAULT_ALBUM_FOLDER, render_album_folder, validate_template
 from src.logger import logger
-from src.matching import (AUDIO_EXTENSIONS, file_extension, match_tracks_to_files,
+from src.matching import (AUDIO_EXTENSIONS, file_extension, match_tracks_to_files, normalize,
                           split_remote_path)
 
 
@@ -284,46 +284,83 @@ def _track_key(disc, number) -> tuple[int, int] | None:
 _NUMBERED_NAME = re.compile(r"^(\d{1,3}) - ")
 
 
-def _file_track_key(path: Path) -> tuple[int, int] | None:
-    """Where a file sits in its album, from its own disc and track tags."""
+def _read_track(path: Path) -> tuple[tuple[int, int] | None, str]:
+    """
+    Where a file sits in its album and what it's called: ((disc, track) or None, folded title).
+    From its own tags, with deadwax's "NN - Title.ext" name as the fallback for either.
+    """
     import mutagen
 
+    key, title = None, ""
     try:
         audio = mutagen.File(str(path), easy=True)
     except Exception:
         audio = None
     if audio is not None:
-        key = _track_key((audio.get("discnumber") or [None])[0], (audio.get("tracknumber") or [None])[0])
-        if key:
-            return key
-    match = _NUMBERED_NAME.match(path.name)
-    return (1, int(match.group(1))) if match else None
+        try:
+            key = _track_key((audio.get("discnumber") or [None])[0], (audio.get("tracknumber") or [None])[0])
+            title = str((audio.get("title") or [""])[0])
+        except Exception:
+            pass
+    named = _NUMBERED_NAME.match(path.name)
+    if key is None and named:
+        key = (1, int(named.group(1)))
+    #? only deadwax's own naming says what a track is called - "01.flac" or "Track 04.mp3" name
+    #? nothing, and two of them would otherwise "match" on a meaningless stem
+    if not title and named:
+        title = Path(path.name[named.end():]).stem
+    return key, normalize(title)
 
 
-def existing_track_keys(directory: Path) -> dict[tuple[int, int], str]:
-    """(disc, track) -> filename, for every audio file already in this folder."""
-    keys: dict[tuple[int, int], str] = {}
+def existing_tracks(directory: Path) -> list[dict]:
+    """Every audio file already in this folder: its place, folded title and filename."""
     if not directory.is_dir():
-        return keys
+        return []
+    found = []
     for entry in sorted(directory.iterdir()):
         if entry.is_file() and file_extension(entry.name) in AUDIO_EXTENSIONS:
-            key = _file_track_key(entry)
-            if key and key not in keys:
-                keys[key] = entry.name
-    return keys
+            key, title = _read_track(entry)
+            found.append({"key": key, "title": title, "name": entry.name})
+    return found
 
 
-def _planned_track_key(release: dict, track: dict | None, source: Path) -> tuple[int, int] | None:
+def _planned_track(release: dict, track: dict | None, source: Path) -> tuple[tuple[int, int] | None, str]:
     """
-    Where an incoming file will sit. A matched track says so itself, numbered exactly as
-    tag_values numbers it (per disc on a multi-disc release, running otherwise). An unmatched
-    file - every file of a grab made without a tracklist - is asked its own tags.
+    Where an incoming file will sit and what it's called. A matched track says so itself,
+    numbered exactly as tag_values numbers it (per disc on a multi-disc release, running
+    otherwise). An unmatched file - every file of a grab made without a tracklist - is asked its
+    own tags.
     """
     if track and track.get("position"):
         if _is_multi_disc(release) and track.get("disc") and track.get("disc_position"):
-            return (int(track["disc"]), int(track["disc_position"]))
-        return (1, int(track["position"]))
-    return _file_track_key(source)
+            key = (int(track["disc"]), int(track["disc_position"]))
+        else:
+            key = (1, int(track["position"]))
+        return key, normalize(track.get("title") or "")
+    return _read_track(source)
+
+
+def find_duplicate(existing: list[dict], key, title: str, same_release: bool) -> str | None:
+    """
+    The file already in the folder that this incoming track would duplicate, or None.
+
+    Holding the SAME release, the folder's numbering is the release's, so (disc, track) says
+    which song it is. Otherwise - an untagged folder resolve_album_dir chose to share, or a job
+    naming no release - numbers mean nothing across pressings (a 10-track and an 11-track CD
+    disagree from the bonus track on), so only the same title counts, on the same disc when both
+    are known. An unknown title is never a duplicate.
+    """
+    if same_release and key is not None:
+        for entry in existing:
+            if entry["key"] == key:
+                return entry["name"]
+        return None
+    if not title:
+        return None
+    for entry in existing:
+        if entry["title"] == title and (key is None or entry["key"] is None or entry["key"][0] == key[0]):
+            return entry["name"]
+    return None
 
 
 def resolve_album_dir(library_root: str, release: dict) -> tuple[Path, str]:
@@ -395,7 +432,9 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     #? a FLAC and an MP3 of every track side by side - one album, each track twice, for everyone
     #? who plays the library (v1.0.1). A track already present is skipped; a missing one still
     #? files, so a download can fill the gaps a partial one left.
-    already_here = existing_track_keys(album_target)
+    already_here = existing_tracks(album_target)
+    wanted_mbid = (release.get("release_mbid") or "").strip()
+    same_release = bool(already_here and wanted_mbid and read_album_mbid(album_target) == wanted_mbid)
 
     operations = []
     problems = []
@@ -434,9 +473,10 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
             "exists": target.exists(),
         }
         if already_here:
-            key = _planned_track_key(release, track, source)
-            if key in already_here:
-                operation["duplicate_of"] = already_here[key]
+            key, title = _planned_track(release, track, source)
+            duplicate = find_duplicate(already_here, key, title, same_release)
+            if duplicate:
+                operation["duplicate_of"] = duplicate
         operations.append(operation)
 
     album_dir = Path(operations[0]["target"]).parent if operations else None
@@ -448,7 +488,16 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     placed_names = {Path(op["source"]).name for op in operations}
     companions = []
 
-    if album_dir is not None:
+    #? A log, cue or scan beside a copy that isn't being filed describes THAT copy, not the one
+    #? already in the folder - so when the folder already had any of these tracks, the sidecars
+    #? stay in slskd's folder with the duplicates. Carrying them across also made an all-duplicate
+    #? job count as "organized", as if the album had arrived (v1.0.2).
+    if any(op.get("duplicate_of") for op in operations):
+        album_dir_for_companions = None
+    else:
+        album_dir_for_companions = album_dir
+
+    if album_dir_for_companions is not None:
         for source_dir in sorted(source_dirs):
             for companion in find_companion_files(source_dir, placed_names):
                 target = album_dir / sanitize_filename(companion.name, companion.name)
@@ -602,7 +651,7 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
     }
 
 
-def write_tags(path: Path, release: dict, track: dict | None) -> None:
+def write_tags(path: Path, release: dict, track: dict | None, drop_stale_release_id: bool = False) -> None:
     """
     Tag the file from the MusicBrainz release it came from.
 
@@ -638,10 +687,12 @@ def write_tags(path: Path, release: dict, track: dict | None) -> None:
             #? not every container supports every key (easy mp4 is picky); skip rather than abort
             continue
 
-    #? A job that names no release (an old group-level grab) must not keep the release id the
-    #? SHARER's tagger wrote (v1.0.1): tag_values skips an empty value, so it would survive and
-    #? claim a pressing nobody chose - and the scan and the "already held" checks trust that tag.
-    if not release.get("release_mbid"):
+    #? A DOWNLOAD that names no release (a group-level grab when MusicBrainz couldn't list the
+    #? pressings) must not keep the release id the SHARER's tagger wrote (v1.0.1): tag_values skips
+    #? an empty value, so it would survive and claim a pressing nobody chose - and the scan and the
+    #? "already held" checks trust that tag. Filing only: the metadata editor shares write_tags,
+    #? and a retag naming no release must leave the file's own id alone, as its preview says.
+    if drop_stale_release_id and not release.get("release_mbid"):
         try:
             if "musicbrainz_albumid" in audio:
                 del audio["musicbrainz_albumid"]
@@ -704,7 +755,7 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
                 shutil.copy2(str(source), str(target))
 
             if not operation.get("companion"):
-                write_tags(target, release, operation.get("track"))
+                write_tags(target, release, operation.get("track"), drop_stale_release_id=True)
 
             results["organized"] += 1
 

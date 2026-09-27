@@ -464,8 +464,12 @@ def _tidy_emptied_artist(artist_dir: Path, library_root: str | None) -> None:
 #? tracknumber,title` (deadwax never writes the release-track id, so its tracks use the second).
 PLAYER_ID_TAGS = frozenset({"musicbrainz_albumid", "title", "tracknumber", "discnumber"})
 
+#? With no release id, Navidrome's album id falls back to `albumartistid,album,albumversion,
+#? releasedate` - so for an apply naming no release, those tags are ids too (v1.0.2).
+NO_MBID_ID_TAGS = frozenset({"album", "albumartist", "musicbrainz_albumartistid", "date"})
 
-def changes_player_ids(plan: dict) -> bool:
+
+def changes_player_ids(plan: dict, release: dict | None = None) -> bool:
     """
     Whether applying this plan changes a tag a player keys its ids on AND moves the folder.
 
@@ -476,7 +480,8 @@ def changes_player_ids(plan: dict) -> bool:
     """
     if not (plan.get("moves") and plan.get("target")):
         return False
-    return any(PLAYER_ID_TAGS & set(entry.get("changes") or {}) for entry in plan.get("files") or [])
+    watched = PLAYER_ID_TAGS if (release or {}).get("release_mbid") else PLAYER_ID_TAGS | NO_MBID_ID_TAGS
+    return any(watched & set(entry.get("changes") or {}) for entry in plan.get("files") or [])
 
 
 def execute_retag(
@@ -588,6 +593,14 @@ def move_retagged(plan: dict, results: dict) -> dict:
 
         elif plan.get("merge"):
             _merge_into(source, target, plan, results)
+
+        elif target.exists():
+            #? It wasn't there when the plan was made - another apply or a download filed it during
+            #? the pause before the rename (v1.0.2). shutil.move would put this album INSIDE it.
+            results["problems"].append(
+                f"tags were written, but {target.name} appeared while waiting to rename, so the "
+                f"folder was left in place - open it in the editor again to merge or rename it"
+            )
 
         else:
             try:
