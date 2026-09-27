@@ -62,6 +62,12 @@ ISSUE_TYPES: dict[str, dict] = {
                 "usually means two albums are sharing a folder.",
         "severity": BLOCKING,
     },
+    "split_discs": {
+        "label": "Split across folders",
+        "hint": "this folder holds only some discs of a release whose other discs are in "
+                "another folder. Applying the release in the editor merges them into one.",
+        "severity": WRONG,
+    },
     "misfiled": {
         "label": "Folder off-convention",
         "hint": "the folder is not named the way these tags say it should be, so its name "
@@ -173,6 +179,10 @@ def inspect_album(album: dict) -> list[str]:
 
     if album.get("mixed_tags"):
         found.append("mixed_tags")
+
+    #? set by library._mark_multi_edition, which is the one place that sees the other folders
+    if album.get("split_discs"):
+        found.append("split_discs")
 
     if _is_misfiled(album):
         found.append("misfiled")

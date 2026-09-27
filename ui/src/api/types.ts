@@ -430,6 +430,15 @@ export interface LibraryAlbum {
   track_count: number
   /** Distinct disc numbers the files are TAGGED with — 0 when untagged, not a guessed 1. */
   disc_count: number
+  /** Which discs, by number (v0.9.13). Empty when untagged. */
+  discs?: number[]
+  /**
+   * This folder holds only some discs of a release whose other discs are in another folder
+   * (v0.9.13) - its `edition` then reads "Disc 2", and applying the release merges them.
+   */
+  split_discs?: boolean
+  /** "Disc 2" / "Discs 1, 2, 3" for such a folder, null otherwise. Display only - `edition` is left alone. */
+  disc_label?: string | null
   /**
    * Tracks with a `.lrc` beside them. Lyrics embedded in the files by another tool aren't
    * counted — the scan reads the folder listing for this, not the tags.
@@ -450,7 +459,10 @@ export interface LibraryAlbum {
   mixed_tags: boolean
   /** How many files carry no title tag. Non-zero raises the `untitled_tracks` issue. */
   untitled_tracks: number
-  /** How many versions of this (artist, album) are on disk. 1 is the ordinary case. */
+  /**
+   * How many versions of this (artist, album) are on disk. 1 is the ordinary case. A release
+   * split over several folders counts once (v0.9.13).
+   */
   edition_count: number
 
   /* ----- the metadata queue. Attached by src/metadata_health.py::attach_issues ----- */
@@ -724,6 +736,13 @@ export interface RetagPlan {
   target: string | null
   target_path: string | null
   moves: boolean
+  /**
+   * The move goes INTO an existing folder of the same release rather than renaming this one -
+   * a set stored one folder per disc (v0.9.13). Only when it's provably the same release and
+   * different discs; see _plan_merge in src/retag.py.
+   */
+  merge?: boolean
+  merge_detail?: { into: string; discs_here: number[]; discs_there: number[]; kept_back: string[] } | null
   edition_label: string
   files: RetagFileChange[]
   changed_file_count: number
@@ -743,6 +762,8 @@ export interface RetagResults {
   tagged: number
   failed: number
   moved_to: string | null
+  /** The folder's files joined an existing folder of the same release (v0.9.13). */
+  merged?: boolean
   /** The cover filename written, or null. */
   art_written: string | null
   problems: string[]

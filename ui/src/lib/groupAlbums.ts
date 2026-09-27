@@ -9,6 +9,37 @@ import { outstandingIssues } from './metadataQueue'
  * as a peer meant three separate "The Slow Rush" rows, which reads as three albums rather
  * than one album you happen to have three pressings of.
  */
+/**
+ * What an album's folders are, in words: "3 editions", or - when some are the discs of one
+ * release stored one folder per disc (v0.9.13) - "2 disc folders" / "2 editions · 1 split".
+ * The count of editions comes from the scan, which counts a split release once.
+ */
+export function folderSummary(editions: readonly { split_discs?: boolean; edition_count: number }[]): {
+  label: string
+  title: string
+} {
+  const folders = editions.length
+  const split = editions.filter((e) => e.split_discs).length
+  const releases = editions[0]?.edition_count ?? folders
+  if (!split) {
+    return { label: `${folders} editions`, title: `${folders} versions of this album are in your library` }
+  }
+  const title = `${split} of these folders hold different discs of one release - the metadata `
+    + 'editor merges them when you apply that release to each'
+  return releases <= 1
+    ? { label: `${folders} disc folders`, title }
+    : { label: `${releases} editions · split discs`, title }
+}
+
+/**
+ * What one folder is called among its album's others: its edition, or - for a disc of a release
+ * stored one folder per disc - which discs it holds (v0.9.13), after the edition when it has one.
+ */
+export function editionName(album: { edition: string; disc_label?: string | null }): string {
+  if (album.disc_label) return album.edition ? `${album.edition} · ${album.disc_label}` : album.disc_label
+  return album.edition || 'Standard'
+}
+
 export interface AlbumGroup {
   key: string
   artist: string

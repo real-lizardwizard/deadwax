@@ -225,10 +225,15 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
     }
 
     changes = []
+    #? the disc each file says it is on now - which disc a folder holds when the tracklist
+    #? couldn't match its files by name (a merge needs to know, see _plan_merge)
+    tagged_discs: set[int] = set()
     for path in audio_files:
         track = track_by_filename.get(path.name)
         #? read first: whether a stray disc number needs correcting depends on what is there
         current = read_current_tags(path)
+        if (disc := _disc_number(current.get("discnumber"))):
+            tagged_discs.add(disc)
         desired = tag_values(release, track, current)
 
         differing = {
@@ -267,11 +272,24 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
             f"check it's the right edition"
         )
 
-    target, move_problem = _resolve_target(root, source, release)
+    target, move_problem, existing = _resolve_target(root, source, release)
+    merge = None
+    if existing is not None:
+        #? the folder this release belongs in is already there - which, for one disc of a set
+        #? split across folders, is where the other discs are (v0.9.13)
+        merge = _plan_merge(existing, entries, audio_files, release, changes, tagged_discs)
+        if merge["ok"]:
+            target, move_problem = existing, ""
+            #? the count check above assumed this folder should hold the whole release
+            problems[:] = [p for p in problems if not p.startswith("this release has")]
+        else:
+            move_problem = merge["problem"]
     if move_problem:
         problems.append(move_problem)
 
     art = plan_art(entries, release, want_art)
+    if merge and merge["ok"] and merge["detail"]["has_cover"] and art["action"]:
+        art = {**art, "action": "", "reason": ""}
     if art["reason"]:
         problems.append(art["reason"])
 
@@ -284,6 +302,10 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
         "library_root": str(root),
         "target_path": str(target.relative_to(root)) if target else None,
         "moves": bool(target and target != source),
+        #? moving INTO an existing folder of the same release rather than renaming this one to
+        #? it - the discs of a set stored one folder per disc (v0.9.13). See _plan_merge.
+        "merge": bool(merge and merge["ok"]),
+        "merge_detail": merge["detail"] if merge and merge["ok"] else None,
         "edition_label": resolve_edition_label(release, with_country=country_in_folder()),
         "files": changes,
         "changed_file_count": sum(1 for c in changes if c["changes"]),
@@ -306,16 +328,18 @@ def _empty_plan(album_path: str, problem: str) -> dict:
     return {
         "album_path": album_path, "source": None, "target": None, "target_path": None,
         "library_root": None,
-        "moves": False, "edition_label": "", "files": [], "changed_file_count": 0,
+        "moves": False, "merge": False, "merge_detail": None,
+        "edition_label": "", "files": [], "changed_file_count": 0,
         "file_count": 0, "matched_tracks": 0, "expected_tracks": 0,
         "art": {"action": "", "reason": "", "existing": None},
         "problems": [problem], "empty": True,
     }
 
 
-def _resolve_target(root: Path, source: Path, release: dict) -> tuple[Path | None, str]:
+def _resolve_target(root: Path, source: Path, release: dict) -> tuple[Path | None, str, Path | None]:
     """
-    Where the album should live once it carries this release, and why it might not move.
+    Where the album should live once it carries this release, why it might not move, and - when
+    the reason is that the folder already exists - that folder, for _plan_merge to look at.
 
     Uses the organizer's own build_album_dirname, so an album corrected by hand ends up named
     exactly as one downloaded fresh would have been - the folder layout stays one convention
@@ -325,17 +349,87 @@ def _resolve_target(root: Path, source: Path, release: dict) -> tuple[Path | Non
     target = root / artist / build_album_dirname(release)
 
     if target == source:
-        return source, ""
+        return source, "", None
 
     if not is_within(target, root):
-        return None, "the new name would fall outside the library"
+        return None, "the new name would fall outside the library", None
 
     if target.exists():
-        #? never merge two albums together, even if they look like the same release. The
-        #? user can rename by hand if that's really what they want.
-        return None, f"'{target.name}' already exists, so the folder will be left where it is"
+        #? never merge two albums together, even if they look like the same release - except
+        #? for the one case _plan_merge can prove is safe. The user can rename by hand if
+        #? that's really what they want.
+        return None, f"'{target.name}' already exists, so the folder will be left where it is", target
 
-    return target, ""
+    return target, "", None
+
+
+def _disc_number(value) -> int | None:
+    text = str(value[0] if isinstance(value, list) else value or "").split("/")[0].strip()
+    return int(text) if text.isdigit() else None
+
+
+def _plan_merge(existing: Path, entries: list[Path], audio_files: list[Path], release: dict,
+                changes: list[dict], tagged_discs: set[int] | None = None) -> dict:
+    """
+    Whether this folder can be merged INTO `existing` - {ok, problem, detail}.
+
+    Albums stored one folder per disc (`Album (Disc 1)`, `Album (Disc 2)`) are one release in
+    two places, and applying it to the second used to be refused because the first had already
+    taken the folder name. Merging is what they want - one folder per release is the library's
+    convention - and it is only allowed when all three of these hold, because moving files into
+    an album that isn't this one would be far worse than leaving them where they are:
+
+    - every audio file already there is tagged with THIS release's id - it IS this release;
+    - the discs this folder holds (as matched to the tracklist) and the discs already there
+      don't overlap - it is another part of it, not a second copy;
+    - no audio file here has the same name as one there. Nothing is ever overwritten; a
+      same-named cover or .lrc is left behind instead, and said so.
+    """
+    release_id = (release.get("release_mbid") or "").strip()
+    refused = f"'{existing.name}' already exists, so the folder will be left where it is"
+
+    if not release_id or len({t.get("disc") for t in release.get("tracks") or [] if t.get("disc")}) < 2:
+        return {"ok": False, "problem": refused, "detail": None}
+
+    try:
+        there = sorted(p for p in existing.iterdir() if p.is_file())
+    except OSError as e:
+        return {"ok": False, "problem": f"could not read '{existing.name}': {e}", "detail": None}
+
+    there_audio = [p for p in there if file_extension(p.name) in AUDIO_EXTENSIONS]
+    there_tags = [read_current_tags(p) for p in there_audio]
+    if not there_audio or any(t.get("musicbrainz_albumid") != release_id for t in there_tags):
+        return {"ok": False, "problem": f"{refused} - it holds a different album or edition", "detail": None}
+
+    discs_there = {d for d in (_disc_number(t.get("discnumber")) for t in there_tags) if d}
+    #? the tracklist's word where it matched the files, the files' own disc tags where it didn't
+    discs_here = ({c["track_disc"] for c in changes if c.get("matched") and c.get("track_disc")}
+                  or set(tagged_discs or ()))
+    if not discs_here or not discs_there:
+        return {"ok": False, "problem": f"{refused} - which disc each folder holds can't be told",
+                "detail": None}
+    if discs_here & discs_there:
+        return {"ok": False, "problem": f"{refused} - it already holds the same disc", "detail": None}
+
+    names_there = {p.name for p in there}
+    clashes = [p.name for p in audio_files if p.name in names_there]
+    if clashes:
+        return {"ok": False,
+                "problem": f"{refused} - {len(clashes)} file name(s) here are already taken there "
+                           f"({', '.join(clashes[:3])})",
+                "detail": None}
+
+    kept_back = [p.name for p in entries if p not in audio_files and p.name in names_there]
+    return {"ok": True, "problem": "", "detail": {
+        "into": existing.name,
+        #? the album it joins already has its picture - fetching one here would only be left
+        #? behind by the merge (a cover.jpg of that name is already there)
+        "has_cover": bool(find_cover_file(there)),
+        "discs_here": sorted(discs_here),
+        "discs_there": sorted(discs_there),
+        #? a cover, .lrc or log that would collide - the one already there is kept
+        "kept_back": kept_back,
+    }}
 
 
 def _tidy_emptied_artist(artist_dir: Path, library_root: str | None) -> None:
@@ -462,6 +556,9 @@ def execute_retag(
             #? moving after a partial failure would scatter one album across two folders
             results["problems"].append("left the folder in place because some files failed")
 
+        elif plan.get("merge"):
+            _merge_into(source, target, plan, results)
+
         else:
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -477,3 +574,40 @@ def execute_retag(
                 results["problems"].append(f"tags were written but the folder could not be renamed: {e}")
 
     return results
+
+
+def _merge_into(source: Path, target: Path, plan: dict, results: dict) -> None:
+    """
+    Move this folder's files into the existing folder of the same release, then remove this one.
+
+    File by file, never overwriting - _plan_merge proved no audio collides, and anything else
+    that would (a second cover.jpg, say) stays behind, keeping this folder too, and is reported.
+    The folder is removed with rmdir, so it goes only once nothing is left in it.
+    """
+    left: list[str] = []
+    try:
+        for path in sorted(p for p in source.iterdir() if p.is_file()):
+            destination = target / path.name
+            if destination.exists():
+                left.append(path.name)
+                continue
+            shutil.move(str(path), str(destination))
+    except OSError as e:
+        logger.error(f"could not merge {source} into {target}: {e}")
+        results["problems"].append(f"tags were written but merging into {target.name} stopped part-way: {e}")
+        return
+
+    results["moved_to"] = str(target)
+    results["merged"] = True
+    logger.info(f"merged {source.name} into {target.name}", extra={"frontend": True})
+
+    if left:
+        results["problems"].append(
+            f"kept {', '.join(left)} in {source.name} - {target.name} already has a file of that name")
+        return
+
+    try:
+        source.rmdir()
+        _tidy_emptied_artist(source.parent, plan.get("library_root"))
+    except OSError:
+        results["problems"].append(f"merged, but {source.name} still holds something, so it stays")

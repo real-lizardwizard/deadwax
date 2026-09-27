@@ -86,7 +86,7 @@ def test_every_issue_code_is_described():
     """
     album = make_album(
         release_mbid="", year="", original_year="", art="", mixed_tags=True,
-        untitled_tracks=1, path="loose album",
+        untitled_tracks=1, path="loose album", split_discs=True,
         tracks=[{"filename": "a.flac", "title": "a", "position": None,
                  "has_title_tag": False, "artist": "", "albumartist": ""}],
     )

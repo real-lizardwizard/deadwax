@@ -41,7 +41,8 @@ from src.lyrics import has_lyrics_file, lyrics_filename
 #?   3  albums carry `lyrics_count`
 #?   4  albums carry `disc_art`
 #?   5  albums carry `release_group_mbid`
-SCAN_FORMAT = 5
+#?   6  albums carry `discs`, the disc numbers their files are tagged with
+SCAN_FORMAT = 6
 
 #? path -> (mtime, album dict). Reading tags costs milliseconds per file and a real library
 #? is thousands of files, so a rescan re-reads only the folders that actually changed. The
@@ -608,6 +609,9 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
         #? distinct disc numbers the files are TAGGED with, so 0 for an untagged album rather
         #? than a guessed 1. Above 1 is a multi-disc set, which the viewer splits by disc.
         "disc_count": len({t["disc"] for t in tracks if t["disc"]}),
+        #? WHICH discs - what tells "disc 2 of this release, in a folder of its own" from a
+        #? second copy of the same release (v0.9.13; see _mark_multi_edition)
+        "discs": sorted({t["disc"] for t in tracks if t["disc"]}),
         "lyrics_count": lyrics_count,
         #? disc images beside the tracks - what a player shows for a song with a disc number
         "disc_art": find_disc_art(entries),
@@ -843,6 +847,42 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
     return albums, reused
 
 
+def split_disc_folders(group: list[dict]) -> list[list[dict]]:
+    """
+    Folders that hold different DISCS of one release, clustered - e.g. `Album (Disc 1)` and
+    `Album (Disc 2)`, both tagged with the same release id.
+
+    The same release id alone is not enough: two copies of one release are two folders sharing
+    an id too. What makes them parts of one whole is that every folder's discs are tagged and no
+    disc turns up in two of them. An untagged folder is never counted - without disc tags nothing
+    says which part it is.
+    """
+    by_release: dict[str, list[dict]] = {}
+    for album in group:
+        if album.get("release_mbid") and album.get("discs"):
+            by_release.setdefault(album["release_mbid"], []).append(album)
+
+    clusters = []
+    for members in by_release.values():
+        if len(members) < 2:
+            continue
+        seen: set[int] = set()
+        disjoint = True
+        for album in members:
+            discs = set(album["discs"])
+            if discs & seen:
+                disjoint = False
+                break
+            seen |= discs
+        if disjoint:
+            clusters.append(members)
+    return clusters
+
+
+def _disc_label(discs: list[int]) -> str:
+    return f"Disc {discs[0]}" if len(discs) == 1 else f"Discs {', '.join(str(d) for d in discs)}"
+
+
 def _mark_multi_edition(albums: list[dict]) -> None:
     """
     Flag albums the user holds more than one version of.
@@ -850,17 +890,34 @@ def _mark_multi_edition(albums: list[dict]) -> None:
     The headline feature of this view. Grouping is on (artist, album) rather than MBID
     precisely because different editions have *different* MBIDs - that's what makes them
     different editions - so the id that separates them can't also be what gathers them.
+
+    Folders holding different discs of ONE release are not editions (v0.9.13): they are marked
+    `split_discs`, given a `disc_label` ("Disc 2") to be shown by, and count once. The metadata
+    queue flags them, and applying the release in the editor merges them (retag.plan_retag).
+    **`edition` is left alone** - it is what the editor seeds its edition field from, and a
+    display label there filed the merge as `Album (Year) [Disc 4]`. Caught in the real editor.
     """
     groups: dict[tuple[str, str], list[dict]] = {}
     for album in albums:
+        album["split_discs"] = False
+        album["disc_label"] = None
         groups.setdefault((album["artist"].lower(), album["album"].lower()), []).append(album)
 
     for group in groups.values():
+        clusters = split_disc_folders(group)
+        for cluster in clusters:
+            for album in cluster:
+                album["split_discs"] = True
+                album["disc_label"] = _disc_label(album["discs"])
+
+        #? a release split over three folders is one edition, not three
+        editions = len(group) - sum(len(cluster) - 1 for cluster in clusters)
         for album in group:
-            album["edition_count"] = len(group)
+            album["edition_count"] = editions
             #? an unlabelled folder sitting beside a labelled one is the standard press, and
-            #? saying so beats leaving a blank column next to "Deluxe edition"
-            if len(group) > 1 and not album["edition"]:
+            #? saying so beats leaving a blank column next to "Deluxe edition" - but only beside
+            #? another EDITION: the other discs of its own release are not one
+            if editions > 1 and not album["edition"]:
                 album["edition"] = "Standard"
 
 

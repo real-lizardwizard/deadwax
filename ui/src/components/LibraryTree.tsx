@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'preact/hooks'
 
 import type { MetadataIssueType } from '../api/types'
 import { trackTime } from '../lib/format'
+import { editionName, folderSummary } from '../lib/groupAlbums'
 import type { TreeRow } from '../lib/libraryTree'
 import { isNewImport, outstandingIssues } from '../lib/metadataQueue'
 import { AlbumArt, ArtistIcon, IssueChips } from './LibraryParts'
@@ -241,11 +242,8 @@ function RowContent({ row, issueTypes }: { row: NodeRow; issueTypes: Record<stri
           <span class="tree-year">{group.yearRange || group.year}</span>
           {/* the fact this library exists to show, on the row itself rather than behind it */}
           {multiple && (
-            <span
-              class="library-edition has-siblings"
-              title={`${group.editions.length} versions of this album are in your library`}
-            >
-              {group.editions.length} editions
+            <span class="library-edition has-siblings" title={folderSummary(group.editions).title}>
+              {folderSummary(group.editions).label}
             </span>
           )}
           {!multiple && only?.edition && <span class="library-edition">{only.edition}</span>}
@@ -259,7 +257,7 @@ function RowContent({ row, issueTypes }: { row: NodeRow; issueTypes: Record<stri
       const { album } = row
       return (
         <>
-          <span class="tree-label">{album.edition || 'Standard'}</span>
+          <span class="tree-label">{editionName(album)}</span>
           <span class="tree-year">{album.year}</span>
           <span class="tree-meta">
             {album.track_count} trk · {album.formats.join('/').toUpperCase()}

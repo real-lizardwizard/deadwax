@@ -594,7 +594,8 @@ export function MetadataEditor(
           [
             results.tagged ? `Retagged ${results.tagged} file(s)` : '',
             results.art_written ? `saved ${results.art_written}` : '',
-            results.moved_to ? 're-filed the folder' : '',
+            results.merged ? 'merged it in beside the other discs'
+              : results.moved_to ? 're-filed the folder' : '',
           ].filter(Boolean).join(', ').replace(/^./, (c) => c.toUpperCase()) + '.',
         )
         //? where the album lives now - the same path unless the folder was renamed
@@ -901,10 +902,21 @@ export function MetadataEditor(
 
                 {plan.moves && (
                   <div class="metadata-move">
-                    <span class="text default-secondary">Folder</span>
+                    <span class="text default-secondary">{plan.merge ? 'Merge' : 'Folder'}</span>
                     <span class="text white-tertiary">{plan.album_path}</span>
                     <span class="text default">→ {plan.target_path}</span>
                   </div>
+                )}
+
+                {/* the discs of one release stored one folder per disc (v0.9.13) */}
+                {plan.merge && plan.merge_detail && (
+                  <h5 class="text default metadata-status">
+                    {`Moves ${discWords(plan.merge_detail.discs_here)} in beside `
+                      + `${discWords(plan.merge_detail.discs_there)}, which ${plan.merge_detail.discs_there.length > 1 ? 'are' : 'is'} `
+                      + 'already there as the same release, and removes this folder once it is empty.'}
+                    {plan.merge_detail.kept_back.length > 0
+                      && ` ${plan.merge_detail.kept_back.join(', ')} stays behind - there's one of that name already.`}
+                  </h5>
                 )}
 
                 {plan.empty && (
@@ -937,7 +949,7 @@ export function MetadataEditor(
               {plan.changed_file_count} of {plan.file_count} file(s) would change
               {plan.art.action === 'download' ? ', cover art would be downloaded' : ''}
               {plan.art.action === 'replace' ? ', the cover art would be replaced' : ''}
-              {plan.moves ? ', and the folder would be renamed' : ''}
+              {plan.moves ? (plan.merge ? ', and the files would join the other disc' : ', and the folder would be renamed') : ''}
             </span>
           )}
 
@@ -1051,4 +1063,9 @@ export function MetadataEditor(
       })()}
     </div>
   )
+}
+
+/** "disc 2", "discs 1, 2, 3" */
+function discWords(discs: readonly number[]): string {
+  return `disc${discs.length > 1 ? 's' : ''} ${discs.join(', ')}`
 }

@@ -16,13 +16,14 @@ const UI = path.resolve(__dirname, '..');
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-tree-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/libraryTree.ts', 'src/lib/trackFields.ts', '--outDir', OUT, '--module', 'commonjs',
+  'src/lib/libraryTree.ts', 'src/lib/trackFields.ts', 'src/lib/groupAlbums.ts', '--outDir', OUT, '--module', 'commonjs',
   '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' });
 
 //? under lib/ because the type-only imports pull src/api into the program, which roots it at src/
 const tree = require(path.join(OUT, 'lib/libraryTree.js'));
 const fields = require(path.join(OUT, 'lib/trackFields.js'));
+const grouping = require(path.join(OUT, 'lib/groupAlbums.js'));
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -173,6 +174,16 @@ check('a field you turned off stays off',
 check('a field added since you chose takes its own default rather than staying hidden',
       fields.reconcileVisible({ visible: ['number'], seen: everyId.filter((id) => id !== 'bitrate') }),
       ['number', 'bitrate']);
+
+console.log('\nwhat an album\'s folders are called (v0.9.13)');
+{
+  const ed = (split, count) => ({ split_discs: split, edition_count: count });
+  check('ordinary editions', grouping.folderSummary([ed(false, 2), ed(false, 2)]).label, '2 editions');
+  check('the discs of one release are disc folders, not editions',
+    grouping.folderSummary([ed(true, 1), ed(true, 1)]).label, '2 disc folders');
+  check('a split release beside a real second edition',
+    grouping.folderSummary([ed(true, 2), ed(true, 2), ed(false, 2)]).label, '2 editions · split discs');
+}
 
 console.log(failures ? `\n${failures} FAILED\n` : '\nall passed\n');
 process.exit(failures ? 1 : 0);

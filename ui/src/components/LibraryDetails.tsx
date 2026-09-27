@@ -6,7 +6,7 @@ import type { LibraryAlbum, LibraryTrack, MetadataIssueType, TrackDetails, Track
 import type { TrackDetailsState } from '../hooks/useTrackDetails'
 import { useTrackFields, type TrackFieldsState } from '../hooks/useTrackFields'
 import { discArtUrl, formatAge, formatDuration, formatSize, trackPictureUrl, trackTime } from '../lib/format'
-import type { AlbumGroup } from '../lib/groupAlbums'
+import { editionName, folderSummary, type AlbumGroup } from '../lib/groupAlbums'
 import {
   editionNodeId, groupAddedAt, nodeIdForAlbum, trackNodeId, type Selected,
 } from '../lib/libraryTree'
@@ -447,7 +447,7 @@ function AlbumDetails(
           <div class="details-chips">
             {(multiple || album.edition) && (
               <span class={`library-edition${multiple ? ' has-siblings' : ''}`}>
-                {album.edition || 'Standard'}
+                {editionName(album)}
               </span>
             )}
             {isNewImport(album) && <span class="library-new-chip">New</span>}
@@ -463,7 +463,7 @@ function AlbumDetails(
                   class={`details-edition-pill${edition.path === album.path ? ' is-current' : ''}`}
                   onClick={() => onSelect(editionNodeId(edition))}
                 >
-                  {edition.edition || 'Standard'}
+                  {editionName(edition)}
                   <span class="text white-tertiary"> · {edition.track_count} trk</span>
                 </button>
               ))}
@@ -925,7 +925,7 @@ function GroupDetails(
             {group.artist}
           </button>
           <div class="details-facts text default-muted">
-            {[group.yearRange || group.year, `${group.editions.length} editions`,
+            {[group.yearRange || group.year, folderSummary(group.editions).label,
               formatSize(group.totalSize)].filter(Boolean).join(' · ')}
           </div>
         </div>
@@ -954,7 +954,7 @@ function GroupDetails(
                 onClick={() => onSelect(editionNodeId(album))}
                 onKeyDown={(event) => { if (event.key === 'Enter') onSelect(editionNodeId(album)) }}
               >
-                <span class="track-cell track-title">{album.edition || 'Standard'}</span>
+                <span class="track-cell track-title">{editionName(album)}</span>
                 <span class="track-cell is-mono">{album.year}</span>
                 <span class="track-cell is-mono is-right">{album.track_count}</span>
                 <span class="track-cell is-mono is-right">{formatDuration(album.duration)}</span>

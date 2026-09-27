@@ -125,7 +125,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             825 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             834 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -706,6 +706,37 @@ kept after enqueueing. They are now.
   the other two in the order shown; marked failed, "next peer" asked the offline one (refused),
   then the MP3 peer (accepted), and the row read "queued · mp3-peer · try 3"; failed again with
   nothing left, the button was gone.
+
+### Albums stored one folder per disc (v0.9.13)
+
+A 1.0 fix, from "Next up". `Album (Disc 1)` and `Album (Disc 2)` grouped as two editions of one
+album, and applying the release to the second was refused - the first had already taken the
+folder name, and `_resolve_target` never merged into an existing folder.
+
+- **Recognised in the scan** (`split_disc_folders`, library.py): folders tagged with the same
+  release id whose discs are ALL tagged and never overlap. The same id alone isn't enough - two
+  copies of a release share one too - and an untagged folder is never counted. They get
+  `split_discs` and a `disc_label` ("Disc 4", "Discs 1, 2, 3"), count ONCE in `edition_count`,
+  and raise a `split_discs` issue in the metadata queue. `SCAN_FORMAT` 6 carries `discs`.
+- **`edition` is NOT overwritten with the disc label.** The first cut did, and the editor - which
+  seeds its edition field from `album.edition` - previewed the merge as `In Rainbows (2007)
+  [Disc 4]`. Caught in the real editor, not by a test; the display goes through
+  `editionName()`/`folderSummary()` in groupAlbums.ts instead ("2 disc folders" on the tree row).
+  "Standard" is now given only beside another EDITION, not beside the other discs of a release.
+- **Applying the release merges** (`_plan_merge`, retag.py) - the first thing allowed into an
+  existing folder, and only when all three hold: every audio file there is tagged with THIS
+  release id; the discs here (the tracklist's match, else the files' own disc tags - titles
+  can't match `01.flac`) and the discs there don't overlap; and no audio file name collides.
+  Otherwise the old refusal stands, with the reason. `_merge_into` moves file by file, never
+  overwriting: a same-named cover or `.lrc` stays behind with its folder, and is reported. The
+  folder goes by `rmdir` once empty. No cover is fetched into a folder about to join one that
+  has one. The track-count warning is dropped for a merge - the folder SHOULD hold part of it.
+- **The real order is two applies**: the first disc folder to the release is renamed to the
+  proper folder, the second merges into it. **Verified in the real editor** on the test
+  library's four-disc In Rainbows discbox, split into `(2007)` holding discs 1-3 and `(Disc 4)`:
+  the tree said "2 disc folders", both were flagged, applying to discs 1-3 renamed them to
+  `In Rainbows (2007) [Discbox]`, and applying to disc 4 previewed "Merge ... moves disc 4 in
+  beside discs 1, 2, 3" and left one folder of 28 tracks with no issues.
 
 ### Browsing a discography, and ordering results
 
@@ -2441,7 +2472,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 825 tests
+.venv/bin/python -m pytest tests/ -q  # 834 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2485,7 +2516,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 825 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 834 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
@@ -2540,12 +2571,8 @@ A green suite here means the logic is sound, not that it works against real infr
    this panel again** — it needs no slskd and takes one `window.fetch` override.
 8. ~~Recapture `assets/images/library.png`~~ **Done in v0.6.21**, with the other four, for the
    rename. See "Capturing screenshots" for how the library was built.
-9. **An album stored one folder per disc shows as "editions".** The scan treats every folder
-   holding audio as an album, so `Album (Disc 1)` and `Album (Disc 2)` group as two editions of
-   one album - and applying the release to each tags them correctly (the title matcher finds
-   each disc's tracks) but then wants to re-file both into the same `Album (Year)` folder, and
-   the second is refused as "already exists". Now that the scan reads `discnumber`, folders
-   sharing a release MBID but holding different discs are detectable; nothing acts on it yet.
+9. ~~An album stored one folder per disc shows as "editions"~~ **Done in v0.9.13** - see
+   "Albums stored one folder per disc".
 10. **Upgrade the local Node to 22** so `npm run build` works again without the rolldown
     workaround in the tooling notes.
 
