@@ -16,7 +16,6 @@ docker-compose.yml
 /test/
 TODO.md
 
-.dockerignore
 .devdata/
 
 # dev scaffolding CLAUDE.md already describes as ignored, which it wasn't

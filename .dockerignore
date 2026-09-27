@@ -1,0 +1,16 @@
+# The image copies src/, interface/, requirements.txt and the entrypoint - nothing else from here
+# needs sending to the builder. ui/node_modules in particular must not be: the ui stage runs
+# `npm ci` for Linux, and `COPY ui/ ./` would lay a local (macOS) node_modules over it. .env stays
+# out so a builder never holds a copy of it.
+.git
+.github
+.claude
+.venv
+.devdata
+.env
+**/__pycache__
+ui/node_modules
+interface/dist
+tests
+assets
+docs

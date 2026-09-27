@@ -207,14 +207,10 @@ def test_the_rate_limiter_lets_a_short_burst_straight_through():
         for _ in range(limiter.max_requests):
             await limiter.wait()
 
-    started = asyncio.get_event_loop_policy().new_event_loop()
-    try:
-        import time
-        begin = time.monotonic()
-        started.run_until_complete(burst())
-        assert time.monotonic() - begin < 0.5
-    finally:
-        started.close()
+    import time
+    begin = time.monotonic()
+    asyncio.run(burst())
+    assert time.monotonic() - begin < 0.5
 
 
 # ---------------------------------------------------------------- what gets asked for

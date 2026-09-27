@@ -1,5 +1,6 @@
 """
-The event log's stream has to OPEN the moment the page asks for it.
+The event log's stream: it has to OPEN the moment the page asks for it, and every line meant for
+the page has to arrive on it, wherever it was logged from.
 
 The page waits for it to open before pinging, because the MusicBrainz ping writes a line to the
 log and the stream keeps no history - a line logged before the page is listening is gone.
@@ -11,8 +12,11 @@ Driven through the whole app, not the route alone, because the middleware is wha
 """
 
 import asyncio
+import json
+import logging
 
 from src.api.app import start
+from src.logger import SSEHandler, register_sse_client, unregister_sse_client
 
 
 def test_the_log_stream_opens_at_once_through_every_middleware():
@@ -54,3 +58,32 @@ def test_the_log_stream_opens_at_once_through_every_middleware():
     assert headers[b"content-type"].startswith(b"text/event-stream")
     assert b"content-encoding" not in headers, "an event stream must never be gzipped"
     assert sent[1]["body"] == b":\n\n"
+
+
+def test_a_line_logged_from_a_worker_thread_reaches_the_page():
+    """
+    Everything run through asyncio.to_thread logs from a thread with no event loop of its own -
+    the retag, the delete, the download cleanup that names what it removed. The handler used to
+    ask asyncio.get_event_loop() for one there, which raised or found one that wasn't running,
+    and the line was dropped without a word. It hands the line to the streams' own loop now.
+    """
+    log = logging.getLogger("deadwax-test-sse")
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    handler = SSEHandler()
+    log.addHandler(handler)
+
+    async def go():
+        queue = register_sse_client()
+        try:
+            log.info("from the loop", extra={"frontend": True})
+            await asyncio.to_thread(log.info, "from a worker thread", extra={"frontend": True})
+            await asyncio.sleep(0.05)
+            return [json.loads(queue.get_nowait())["event_content"] for _ in range(queue.qsize())]
+        finally:
+            unregister_sse_client(queue)
+
+    try:
+        assert asyncio.run(go()) == ["from the loop", "from a worker thread"]
+    finally:
+        log.removeHandler(handler)
