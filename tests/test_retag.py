@@ -6,9 +6,6 @@ organizer it operates on files the user already had rather than ones we just dow
 guards matter more than the happy path here, so most of these are about what it refuses.
 """
 
-import shutil
-from pathlib import Path
-
 import pytest
 from mutagen.flac import FLAC
 

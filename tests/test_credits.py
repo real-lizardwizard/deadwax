@@ -11,8 +11,6 @@ one side a string, the other a one-item list - and the symptom is an album that 
 "nothing to change" however many times you apply it.
 """
 
-from pathlib import Path
-
 from src.organizer import tag_values, write_tags
 from src.retag import read_current_tags
 from tests.test_retag import write_flac

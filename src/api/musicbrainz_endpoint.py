@@ -179,7 +179,7 @@ class MusicBrainzClient:
             logger.debug(f"MusicBrainz cache hit for {endpoint}")
             return cached
 
-        logger.info(f"requesting MusicBrainz")
+        logger.info("requesting MusicBrainz")
         attempt = 0
 
         ping_error_obj = {
@@ -228,7 +228,7 @@ class MusicBrainzClient:
                 status = exc.response.status_code
 
                 if status == 503:  
-                    logger.warning(f"MusicBrainz returned 503 (overloaded), retrying...")
+                    logger.warning("MusicBrainz returned 503 (overloaded), retrying...")
                     logger.warning(f"Response text: {exc.response.text[:200]}")
                     ping_error_obj["error"] =  "musicbrainz ping failed with 503 overloaded error, responded to ping but server currenty busy"
                     ping_error_obj["status"] =  "failed"
@@ -237,7 +237,7 @@ class MusicBrainzClient:
                     continue
 
                 if status == 403: 
-                    logger.error(f"MusicBrainz refused the request - usually the user agent. Check MUSICBRAINZ_EMAIL in the settings tab", extra={"frontend": True, "src":"musicbrainz"})
+                    logger.error("MusicBrainz refused the request - usually the user agent. Check MUSICBRAINZ_EMAIL in the settings tab", extra={"frontend": True, "src":"musicbrainz"})
                     logger.error(f"Response text: {exc.response.text}")
                     ping_error_obj["error"] =  "musicbrainz ping failed with 403 forbidden error, connection was made but user agent / ip not accepted"
                     ping_error_obj["status"] =  "failed"
@@ -245,7 +245,7 @@ class MusicBrainzClient:
                     break
                     
                 if status == 429:  
-                    logger.warning(f"Rate limited by server (429), waiting 10s...")
+                    logger.warning("Rate limited by server (429), waiting 10s...")
                     logger.warning(f"Response text: {exc.response.text[:200]}")
                     ping_error_obj["error"] =  "musicbrainz ping failed with 429 rate limit error, responded to ping but server is rate limiting"
                     ping_error_obj["status"] =  "failed"
@@ -276,14 +276,14 @@ class MusicBrainzClient:
 
                 logger.error(f"HTTP {status}: {exc.response.text[:200]}")
             
-            except ValueError as exc: 
+            except ValueError:
                 ping_error_obj["error"] =  "MUSICBRAINZ_EMAIL is not set - add your email in the settings tab"
                 ping_error_obj["status"] =  "failed"
                 ping_error_obj["code"] = "VALUE_ERROR"
                 break
             
-            except Exception as e:
-                ping_error_obj["error"] =  f"musicbrainz ping failed unexpectedly"
+            except Exception:
+                ping_error_obj["error"] =  "musicbrainz ping failed unexpectedly"
                 ping_error_obj["status"] =  "failed"
                 ping_error_obj["code"] = "UNKNOWN_ERROR"
 
@@ -584,7 +584,7 @@ class MusicBrainzClient:
         itself and then asks for the ones it actually wants, so the eager fetch was five round
         trips spent on a payload it dropped on the floor.
         """
-        logger.info(f"searching musicbrainz...", extra={"frontend": True, "src":"musicbrainz"})
+        logger.info("searching musicbrainz...", extra={"frontend": True, "src":"musicbrainz"})
         params = {
             "query": query,
             "fmt": "json",
@@ -610,7 +610,7 @@ class MusicBrainzClient:
             return {}
 
 
-        logger.info(f"release groups parsed", extra={"frontend": True, "src":"musicbrainz"})
+        logger.info("release groups parsed", extra={"frontend": True, "src":"musicbrainz"})
 
         if not include_releases:
             #? the key is still present, so callers reading it don't have to special-case this
@@ -632,12 +632,11 @@ class MusicBrainzClient:
                 logger.error(test_release.get("error"))
                 return test_release #? {"status":"failed"}
             else: 
-                logger.info(f"talking heads!")
-                logger.info(f"Connection successful", extra={"frontend": True, "src":"musicbrainz"})
+                logger.info("Connection successful", extra={"frontend": True, "src":"musicbrainz"})
                 return {"status": "ok"}
-        except Exception as e:
-            logger.error(f"musicbrainz ping failed unexpectedly")
-            return {"status": "failed", "error": f"musicbrainz ping failed unexpectedly", "code": "UNKNOWN_ERROR"}
+        except Exception:
+            logger.error("musicbrainz ping failed unexpectedly")
+            return {"status": "failed", "error": "musicbrainz ping failed unexpectedly", "code": "UNKNOWN_ERROR"}
 
 
 

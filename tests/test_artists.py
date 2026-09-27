@@ -18,7 +18,7 @@ import pytest
 from fastapi import HTTPException
 
 from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
-from src.artists import (ARTIST_ART_KINDS, ARTIST_ART_STEMS, answers_to, artist_facts,
+from src.artists import (ARTIST_ART_STEMS, answers_to, artist_facts,
                          artist_names, artist_query, best_per_kind, commons_file_url,
                          commons_title, from_relations, from_theaudiodb, from_fanarttv,
                          from_wikidata, safe_thumb_width, wikidata_id)
@@ -736,3 +736,20 @@ def test_two_artists_answering_to_one_name_is_still_refused(tmp_path, monkeypatc
 
     assert mbid is None and source is None
     assert len(matches) == 2, "and both are offered as a choice instead"
+
+
+def test_the_artist_id_is_read_from_the_tags(tmp_path):
+    """
+    Which artist a page is about comes from the tags first, and a name search only when they
+    carry no id. This reader called mutagen without importing it from v0.6.15 until v0.9.27, and
+    the NameError was swallowed as "no id on this file". Until v0.9.14, when the scan began
+    carrying album-artist ids, every artist page fell back to searching by name - the path that
+    can't tell three Nirvanas apart - and since then every album the scan can't answer for did:
+    a collaboration, or files carrying only a track-artist id.
+    """
+    from src.library import read_artist_mbid
+
+    album = tmp_path / "Portishead" / "Dummy (1994)"
+    write_flac(album / "01 - Mysterons.flac", title="Mysterons",
+               musicbrainz_albumartistid="8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11")
+    assert read_artist_mbid(album) == "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11"

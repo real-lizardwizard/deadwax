@@ -41,9 +41,16 @@ jobs:
       - name: Install
         run: |
           python -m pip install -r requirements.txt
-          # the only thing the tests need beyond the app itself; pinned to what they were
+          # the only things the checks need beyond the app itself; pinned to what they were
           # written against
-          python -m pip install pytest==9.1.1
+          python -m pip install pytest==9.1.1 pyflakes==4.0.0
+
+      # Before the tests, and on its own, because what it catches passes tests: an undefined
+      # name inside a try/except is swallowed as an ordinary failure. read_artist_mbid called
+      # mutagen without importing it from 0.6.15 to 0.9.27, so artist pages quietly fell back
+      # to a name search. Also unused imports and variables - no waste creeping back.
+      - name: pyflakes
+        run: python -m pyflakes src tests
 
       - name: pytest
         run: python -m pytest tests/ -q

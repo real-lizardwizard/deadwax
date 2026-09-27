@@ -379,7 +379,7 @@ def _search_timeout_row() -> dict:
         effect=(
             f"Each Soulseek search listens for {seconds}s. Peers answer over several seconds, slow "
             "and firewalled ones last - longer finds more, shorter answers sooner"
-            if seconds else f"unrecognised - searches use 8s"
+            if seconds else "unrecognised - searches use 8s"
         ),
         status="ok" if seconds else "error",
         detail=None if seconds else f"expected whole seconds, {low} to {high}",

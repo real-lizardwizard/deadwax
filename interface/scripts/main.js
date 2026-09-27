@@ -36,13 +36,12 @@ function loadAllCoverImages(parentContainer) {
                 tempImg.style.height = `${initialHeight - 2}px`;
                 const imageDiv = document.createElement('div');
                 imageDiv.className = 'results-box-image';
-                const img = document.createElement('img');
                 tempImg.decoding = "sync";
                 imageDiv.appendChild(tempImg);
                 imageWrapper.prepend(imageDiv);
             })
 
-            .catch((encodingError) => {
+            .catch(() => {
                 console.warn(`Cover missing or decode failed for ${mbid}`);
             });
     });
@@ -1591,7 +1590,7 @@ function updateResultsSummary() {
 
 
 
-function buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupContext) {
+function buildReleasesGrid(releases, releaseGroupId, releaseGroupContext) {
     const wrapper = document.createElement('div');
     wrapper.className = 'releases-grid-wrapper';
 
@@ -2132,7 +2131,7 @@ function millisecondsToMinutesAndSeconds(ms) {
  * A card's "Specific releases" toggle and the grid beneath it - whether the releases came with
  * the card (the best match's, pre-fetched) or were fetched from it.
  */
-function mountReleases(card, releases, releaseGroupId, artistId, releaseGroupContext) {
+function mountReleases(card, releases, releaseGroupId, releaseGroupContext) {
     card.insertAdjacentHTML('beforeend', `
         <hr>
         <button class="releases-toggle-button" type="button">
@@ -2146,7 +2145,7 @@ function mountReleases(card, releases, releaseGroupId, artistId, releaseGroupCon
     const describe = (open) => `Specific releases ${open ? '▽' : '▷'} (${releases.length})`;
 
     label.textContent = describe(false);
-    container.appendChild(buildReleasesGrid(releases, releaseGroupId, artistId, releaseGroupContext));
+    container.appendChild(buildReleasesGrid(releases, releaseGroupId, releaseGroupContext));
     card.querySelector('.releases-toggle-button').addEventListener('click', () => {
         label.textContent = describe(container.classList.toggle('expanded'));
     });
@@ -2273,7 +2272,7 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
     });
 
     if (releases?.length) {
-        mountReleases(div, releases, releaseGroupId, artistId, releaseGroupContext);
+        mountReleases(div, releases, releaseGroupId, releaseGroupContext);
     }
 
 
@@ -2306,7 +2305,7 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
 
                 fetchButton.parentElement.querySelector('hr').remove();
                 fetchButton.remove();
-                mountReleases(div, sortReleasesByDateDesc(result.releases), releaseGroupId, artistId, releaseGroupContext);
+                mountReleases(div, sortReleasesByDateDesc(result.releases), releaseGroupId, releaseGroupContext);
 
                 /*
                  * The grid has just joined mountedReleaseGrids, and the filter facets are built

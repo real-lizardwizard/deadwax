@@ -7,7 +7,6 @@ already taken the folder name. They are recognised now, flagged in the queue, an
 release merges them - but only when that is provably the same release and different discs.
 """
 
-import asyncio
 
 from src.library import clear_scan_cache, scan_library, split_disc_folders
 from src.metadata_health import inspect_album

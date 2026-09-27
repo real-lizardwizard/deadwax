@@ -1,5 +1,5 @@
-from src.api.musicbrainz_endpoint import MusicBrainzClient, MusicBrainzUnavailable
-from fastapi import APIRouter, HTTPException, Query, Request
+from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
+from fastapi import APIRouter, HTTPException, Request
 from src.logger import logger
 
 router = APIRouter()

@@ -6,7 +6,6 @@ only one with no undo - so nearly all of this is about what it refuses to do. Th
 path is one test; the rest are guards.
 """
 
-from pathlib import Path
 
 import pytest
 from mutagen.flac import FLAC

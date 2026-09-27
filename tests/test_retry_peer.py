@@ -12,7 +12,6 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-import src.poller as poller
 from src.config import Config
 from src.poller import poll_downloads_once, retry_next_peer, untried_alternatives
 from src.routes import download as routes

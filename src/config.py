@@ -523,7 +523,7 @@ class Config:
         if not cls.SLSKD_DOWNLOAD_PATH:
             logger.warning("SLSKD_DOWNLOAD_PATH not found in environment, organizing downloaded files will be disabled")
 
-        else: logger.info(f"SLSKD_DOWNLOAD_PATH found!")
+        else: logger.info("SLSKD_DOWNLOAD_PATH found!")
 
         if cls.SLSKD_INCOMPLETE_PATH:
             logger.info(
@@ -540,7 +540,7 @@ class Config:
         if not cls.LIBRARY_PATH:
             logger.warning("LIBRARY_PATH not found in environment, organizing downloaded files will be disabled")
 
-        else: logger.info(f"LIBRARY_PATH found!")
+        else: logger.info("LIBRARY_PATH found!")
 
         if cls.ORGANIZE_MODE not in ("off", "dry_run", "copy", "move"):
             logger.error(

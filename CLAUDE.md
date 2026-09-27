@@ -130,7 +130,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             868 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             869 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2642,6 +2642,21 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
   dockerignore", no reason given), so a local build sent `.git`, `.venv`, `.devdata` and `.env`
   to the builder, and `COPY ui/ ./` would lay a local macOS `node_modules` over the Linux one `npm
   ci` had just built. CI builds from a clean checkout and never had either problem.
+- **pyflakes found a bug the tests couldn't (v0.9.27).** `read_artist_mbid` called
+  `mutagen.File` without importing mutagen, from the day it was written (v0.6.15). The
+  NameError fell into its `except Exception: continue`, which reads as "no id on this file", so
+  it returned None for every album. Until v0.9.14, when the scan began carrying album-artist
+  ids, every artist page therefore resolved by a NAME SEARCH, the path the artist-page entry
+  warns can match the wrong band. Since then it mattered only where the scan can't answer: a
+  collaboration, or files tagged with a track-artist id alone. The import is added and
+  `test_the_artist_id_is_read_from_the_tags` pins it (it fails without it). The same run
+  cleared 31 f-strings with nothing to format, unused imports and `as e` bindings, and a
+  `logger.info("talking heads!")` on every MusicBrainz ping. **CI now runs `pyflakes src
+  tests` before pytest.** An undefined name inside a try/except passes every test that
+  doesn't reach it, and this one hid for twenty versions.
+  The vanilla scripts got the same treatment with `tsc --allowJs --checkJs --noUnusedLocals`,
+  keeping only its unused-name diagnostics (the type errors are noise on untyped code): an
+  `img` created and never used, and an `artistId` that `buildReleasesGrid` took and ignored.
 
 ## Frontend migration (in progress)
 
@@ -2718,7 +2733,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 868 tests
+.venv/bin/python -m pytest tests/ -q  # 869 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2762,7 +2777,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 868 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 869 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

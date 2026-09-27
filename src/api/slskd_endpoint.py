@@ -255,7 +255,7 @@ class SlskdClient:
                     api_key=Config.SLSKD_APIKEY
                 )
         except Exception as e:
-            logger.error(f"failed to create slskd client, traceback in logs", extra={"frontend": True, "src":"slskd"})
+            logger.error("failed to create slskd client, traceback in logs", extra={"frontend": True, "src":"slskd"})
             logger.error(traceback.format_exc())
             raise e
         
@@ -565,7 +565,7 @@ class SlskdClient:
                 return {"status": "failed", "error": connection["detail"], "code": connection["code"]}
 
             logger.info("slskd functionality enabled, auth correct, and connection successful")
-            logger.info(f"Connection successful", extra={"frontend": True, "src":"slskd"})
+            logger.info("Connection successful", extra={"frontend": True, "src":"slskd"})
             return {"status": "ok"}
 
 
@@ -586,14 +586,14 @@ class SlskdClient:
                 return {"status": "failed", "error": f"slskd uncaught HTTP error {status}, unknown", "code": "UNKNOWN_HTTP_ERROR"}
     
 
-        except ConnectionError as exc:
-            logger.error(f"slskd ping failed with connection error, functionality enabled, but couldnt connect to the url provided (no auth checked)")
-            return {"status": "failed", "error": f"slskd ping failed with connection error, functionality enabled, but couldnt connect to the url provided (no auth checked)", "code": "CONNECTION_ERROR"}
+        except ConnectionError:
+            logger.error("slskd ping failed with connection error, functionality enabled, but couldnt connect to the url provided (no auth checked)")
+            return {"status": "failed", "error": "slskd ping failed with connection error, functionality enabled, but couldnt connect to the url provided (no auth checked)", "code": "CONNECTION_ERROR"}
 
-        except Exception as e:
-            logger.error(f"slskd ping failed unexpectedly")
+        except Exception:
+            logger.error("slskd ping failed unexpectedly")
             logger.error(traceback.format_exc())
-            return {"status": "failed", "error": f"slskd ping failed unexpectedly", "code": "UNKNOWN_ERROR"}
+            return {"status": "failed", "error": "slskd ping failed unexpectedly", "code": "UNKNOWN_ERROR"}
 
 
 

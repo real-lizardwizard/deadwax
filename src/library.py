@@ -333,6 +333,8 @@ def read_artist_mbid(directory: Path) -> str | None:
     bands called Nirvana apart. Anything deadwax filed carries the id; a library that predates
     it may not, and then there is nothing here to find and the caller falls back to a search.
     """
+    import mutagen
+
     try:
         entries = sorted(p for p in directory.iterdir() if p.is_file())
     except OSError:
