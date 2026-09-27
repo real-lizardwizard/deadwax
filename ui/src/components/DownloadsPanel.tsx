@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { bridge } from '../bridge'
+import { useDismiss } from '../hooks/useDismiss'
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { PendingDownload } from '../lib/downloadOverlay'
 import { handleDownloadRequests } from '../lib/downloadRequests'
@@ -68,43 +69,8 @@ export function DownloadsPanel() {
     if (error) console.error(`Downloads refresh error: ${error}`)
   }, [error])
 
-  useEffect(() => {
-    if (!open) return
-
-    /*
-      Where the press BEGAN, not just where it ended. A press inside the panel released outside
-      it - a drag on the toolbar, a text selection run off the edge - fires its click on what
-      the two have in common, which is outside, and used to close the panel. It never came up
-      while the panel could be dragged, because the panel travelled with the pointer; now that
-      it stays anchored, the pointer leaves it. Cleared on every click so a keyboard click,
-      which has no press, is judged by its target alone.
-    */
-    let pressedInside = false
-
-    const onPointerDown = (event: PointerEvent) => {
-      pressedInside = rootRef.current?.contains(event.target as Node) ?? false
-    }
-
-    const onDocumentClick = (event: MouseEvent) => {
-      const root = rootRef.current
-      if (root && !pressedInside && !root.contains(event.target as Node)) setOpen(false)
-      pressedInside = false
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open])
+  //? a press that began inside and was released outside doesn't count - see useDismiss
+  useDismiss(rootRef, open, () => setOpen(false), { escape: true })
 
   const toggle = (event: MouseEvent) => {
     // without this the document listener above sees the same click and closes it again

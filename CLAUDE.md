@@ -407,8 +407,9 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
     released outside it fires its click on the common ancestor — outside — so a habitual
     title-bar drag, or a text selection run off the edge, closed the panel. It never showed
     while the panels moved, because the pointer stayed on them. Both close handlers
-    (`DownloadsPanel.tsx` and the log's in `main.js`) now also track where the press BEGAN,
-    and reset on every click so a keyboard click is judged by its target alone.
+    (Downloads' and the log's in `main.js`) now also track where the press BEGAN, and reset on
+    every click so a keyboard click is judged by its target alone. On the Preact side that rule
+    is `hooks/useDismiss.ts` since v0.9.23, shared with the candidate dropdowns.
   - **Verified** in the browser with real pointer drags, transitions disabled (the preview pane
     paints no frames while hidden, so the open animation sits at `scale(0.98)` and edges measure
     wrong): toolbar and title-bar drags leave both panels where they were and open; the left
@@ -2573,6 +2574,17 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
   Preact half has no raw HTML at all. The two "Specific releases" toggles, one for a card that
   came with its releases and one for a card that fetched them, were the same code twice and
   are one `mountReleases()` now.
+- **One outside-click rule on the Preact side: `useDismiss` (v0.9.23).** The candidates panel's
+  Signals and Quality dropdowns were the same shell written twice (open state, outside-click
+  effect, toggle, badge), and closed on a plain outside click, so a press on a label inside that
+  slipped off it closed the dropdown. That is the bug Downloads fixed in v0.6.8, and Downloads
+  now uses the same hook. They are one `FilterDropdown` now. `close` goes through a ref so a
+  re-render can't re-subscribe mid-press. **Verified with real pointer drags**: a press on the
+  "titles" label released outside the panel closed the old dropdown and leaves the new one
+  open; a plain click outside still closes it; Downloads still closes on Escape and on an
+  outside click. **A range slider's own drag was never affected**: Chrome keeps the pointer on
+  the slider, so its click lands on the slider. Measured by dragging one on the OLD build,
+  because the first draft of this change assumed otherwise.
 
 ## Frontend migration (in progress)
 

@@ -1,8 +1,10 @@
+import type { ComponentChildren } from 'preact'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import * as api from '../api/download'
 import type { Candidate, FindCandidatesRequest, FindCandidatesResponse } from '../api/types'
 import { bridge } from '../bridge'
+import { useDismiss } from '../hooks/useDismiss'
 import {
   EDITION_TAG_COLORS, autoGrabPick, NO_QUALITY_FILTERS, PEER_SPEED_HINT, SIGNAL_LABELS, SORT_LABELS,
   activeQualityCount, activeSignalCount, bitrateText, candidateKey, depthRateText, measuredSpeed,
@@ -294,6 +296,42 @@ export function CandidatesPanel() {
   )
 }
 
+/**
+ * The shell both filter dropdowns share: a toggle with a badge counting what's active - so a
+ * filter left on is never hidden state - and the options beneath it, closed by a click outside
+ * (see useDismiss). Clicks inside stop here, so they reach none of the vanilla half's own
+ * outside-click listeners either.
+ */
+function FilterDropdown(
+  { name, id, contentId, active, children }:
+  { name: string; id: string; contentId: string; active: number; children: ComponentChildren },
+) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  useDismiss(root, open, () => setOpen(false))
+
+  return (
+    <div
+      ref={root}
+      class={`releases-columns-control${open ? ' open' : ''}${active ? ' has-active' : ''}`}
+      id={`${id}-control`}
+    >
+      <button
+        type="button"
+        id={`${id}-button`}
+        class="columns-toggle-button"
+        onClick={(event) => { event.stopPropagation(); setOpen((o) => !o) }}
+      >
+        {name} ▾
+        {active > 0 && <span class="signals-badge">{active}</span>}
+      </button>
+      <div class="columns-dropdown" id={contentId} onClick={(event) => event.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 /*
  * Per-signal thresholds in a dropdown rather than inline: six always-visible sliders ate most
  * of the panel, and this is a tuning control you reach for occasionally. The badge keeps an
@@ -303,39 +341,12 @@ function SignalsControl(
   { filters, setFilters }:
   { filters: CandidateFilters; setFilters: (update: (current: CandidateFilters) => CandidateFilters) => void },
 ) {
-  const [open, setOpen] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  const active = activeSignalCount(filters)
-
-  useEffect(() => {
-    if (!open) return
-    const onClick = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
-  }, [open])
-
   const setMinimum = (signal: string, value: number) => setFilters((current) => ({
     ...current, minSignals: { ...current.minSignals, [signal]: value },
   }))
 
   return (
-    <div
-      ref={root}
-      class={`releases-columns-control${open ? ' open' : ''}${active ? ' has-active' : ''}`}
-      id="candidate-signals-control"
-    >
-      <button
-        type="button"
-        id="candidate-signals-button"
-        class="columns-toggle-button"
-        onClick={(event) => { event.stopPropagation(); setOpen((o) => !o) }}
-      >
-        Signals ▾
-        {active > 0 && <span id="candidate-signals-badge" class="signals-badge">{active}</span>}
-      </button>
-      <div class="columns-dropdown" id="candidate-signal-sliders">
+    <FilterDropdown name="Signals" id="candidate-signals" contentId="candidate-signal-sliders" active={activeSignalCount(filters)}>
         {Object.entries(SIGNAL_LABELS).map(([signal, name]) => {
           const value = filters.minSignals[signal] ?? 0
           return (
@@ -345,7 +356,6 @@ function SignalsControl(
                 type="range" min="0" max="100" step="5"
                 value={value}
                 onInput={(event) => setMinimum(signal, Number((event.target as HTMLInputElement).value))}
-                onClick={(event) => event.stopPropagation()}
               />
               <span class="text default candidate-signal-value">{value}</span>
             </label>
@@ -354,15 +364,11 @@ function SignalsControl(
         <button
           type="button"
           class="signals-reset-button"
-          onClick={(event) => {
-            event.stopPropagation()
-            setFilters((current) => ({ ...current, minSignals: noSignalMinimums() }))
-          }}
+          onClick={() => setFilters((current) => ({ ...current, minSignals: noSignalMinimums() }))}
         >
           Reset
         </button>
-      </div>
-    </div>
+    </FilterDropdown>
   )
 }
 
@@ -380,19 +386,6 @@ function QualityControl(
   { filters, setFilters }:
   { filters: CandidateFilters; setFilters: (update: (current: CandidateFilters) => CandidateFilters) => void },
 ) {
-  const [open, setOpen] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  const active = activeQualityCount(filters.quality)
-
-  useEffect(() => {
-    if (!open) return
-    const onClick = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
-  }, [open])
-
   const set = (field: keyof QualityFilters, value: number) => setFilters((current) => ({
     ...current, quality: { ...current.quality, [field]: Number.isFinite(value) && value > 0 ? value : 0 },
   }))
@@ -419,21 +412,7 @@ function QualityControl(
   )
 
   return (
-    <div
-      ref={root}
-      class={`releases-columns-control${open ? ' open' : ''}${active ? ' has-active' : ''}`}
-      id="candidate-quality-control"
-    >
-      <button
-        type="button"
-        id="candidate-quality-button"
-        class="columns-toggle-button"
-        onClick={(event) => { event.stopPropagation(); setOpen((o) => !o) }}
-      >
-        Quality ▾
-        {active > 0 && <span class="signals-badge">{active}</span>}
-      </button>
-      <div class="columns-dropdown" id="candidate-quality-options" onClick={(event) => event.stopPropagation()}>
+    <FilterDropdown name="Quality" id="candidate-quality" contentId="candidate-quality-options" active={activeQualityCount(filters.quality)}>
         <label class="candidate-quality-row">
           <span class="text default-secondary">Bitrate at least</span>
           {select('minBitrate', BITRATE_CHOICES, (n) => `${n} kbps`)}
@@ -465,8 +444,7 @@ function QualityControl(
         >
           Reset
         </button>
-      </div>
-    </div>
+    </FilterDropdown>
   )
 }
 
