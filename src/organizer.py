@@ -271,6 +271,61 @@ def read_album_mbid(directory: Path) -> str | None:
     return None
 
 
+def _track_key(disc, number) -> tuple[int, int] | None:
+    """A track's place as (disc, number), disc 1 when untagged. None when the number is unknown."""
+    track = _disc_number(number)  # same parsing: '3', '03' and '3/12' are all 3
+    if track is None:
+        return None
+    return (_disc_number(disc) or 1, track)
+
+
+#? "NN - Title.ext", the name deadwax gives a matched track - the fallback when a file's tags
+#? can't be read
+_NUMBERED_NAME = re.compile(r"^(\d{1,3}) - ")
+
+
+def _file_track_key(path: Path) -> tuple[int, int] | None:
+    """Where a file sits in its album, from its own disc and track tags."""
+    import mutagen
+
+    try:
+        audio = mutagen.File(str(path), easy=True)
+    except Exception:
+        audio = None
+    if audio is not None:
+        key = _track_key((audio.get("discnumber") or [None])[0], (audio.get("tracknumber") or [None])[0])
+        if key:
+            return key
+    match = _NUMBERED_NAME.match(path.name)
+    return (1, int(match.group(1))) if match else None
+
+
+def existing_track_keys(directory: Path) -> dict[tuple[int, int], str]:
+    """(disc, track) -> filename, for every audio file already in this folder."""
+    keys: dict[tuple[int, int], str] = {}
+    if not directory.is_dir():
+        return keys
+    for entry in sorted(directory.iterdir()):
+        if entry.is_file() and file_extension(entry.name) in AUDIO_EXTENSIONS:
+            key = _file_track_key(entry)
+            if key and key not in keys:
+                keys[key] = entry.name
+    return keys
+
+
+def _planned_track_key(release: dict, track: dict | None, source: Path) -> tuple[int, int] | None:
+    """
+    Where an incoming file will sit. A matched track says so itself, numbered exactly as
+    tag_values numbers it (per disc on a multi-disc release, running otherwise). An unmatched
+    file - every file of a grab made without a tracklist - is asked its own tags.
+    """
+    if track and track.get("position"):
+        if _is_multi_disc(release) and track.get("disc") and track.get("disc_position"):
+            return (int(track["disc"]), int(track["disc_position"]))
+        return (1, int(track["position"]))
+    return _file_track_key(source)
+
+
 def resolve_album_dir(library_root: str, release: dict) -> tuple[Path, str]:
     """
     Where this release's folder should be, avoiding a different release's folder.
@@ -333,7 +388,14 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
 
     #? decided once for the whole job, so every track lands in the same folder even if the
     #? escalation kicked in - resolving per file could split an album across two directories
-    _, discriminator = resolve_album_dir(library_root, release)
+    album_target, discriminator = resolve_album_dir(library_root, release)
+
+    #? What's already in that folder, by disc and track. resolve_album_dir shares a folder that
+    #? holds this same release (or an untagged one), and filing a second copy into it used to put
+    #? a FLAC and an MP3 of every track side by side - one album, each track twice, for everyone
+    #? who plays the library (v1.0.1). A track already present is skipped; a missing one still
+    #? files, so a download can fill the gaps a partial one left.
+    already_here = existing_track_keys(album_target)
 
     operations = []
     problems = []
@@ -365,12 +427,17 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
             continue
 
         used_targets.add(target)
-        operations.append({
+        operation = {
             "source": str(source),
             "target": str(target),
             "track": track,
             "exists": target.exists(),
-        })
+        }
+        if already_here:
+            key = _planned_track_key(release, track, source)
+            if key in already_here:
+                operation["duplicate_of"] = already_here[key]
+        operations.append(operation)
 
     album_dir = Path(operations[0]["target"]).parent if operations else None
 
@@ -571,6 +638,16 @@ def write_tags(path: Path, release: dict, track: dict | None) -> None:
             #? not every container supports every key (easy mp4 is picky); skip rather than abort
             continue
 
+    #? A job that names no release (an old group-level grab) must not keep the release id the
+    #? SHARER's tagger wrote (v1.0.1): tag_values skips an empty value, so it would survive and
+    #? claim a pressing nobody chose - and the scan and the "already held" checks trust that tag.
+    if not release.get("release_mbid"):
+        try:
+            if "musicbrainz_albumid" in audio:
+                del audio["musicbrainz_albumid"]
+        except Exception:
+            pass
+
     try:
         audio.save()
     except Exception as e:
@@ -584,7 +661,8 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
     if mode not in ORGANIZE_MODES:
         mode = "dry_run"
 
-    results = {"organized": 0, "skipped": 0, "failed": 0, "dry_run": mode == "dry_run", "mode": mode}
+    results = {"organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
+               "dry_run": mode == "dry_run", "mode": mode}
 
     if mode == "off":
         return results
@@ -592,6 +670,18 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
     for operation in plan["operations"]:
         source = Path(operation["source"])
         target = Path(operation["target"])
+
+        #? the album already has this track, perhaps in another format - a second copy beside it
+        #? would show every track twice. It stays in slskd's folder, and counts as skipped so the
+        #? move's clean-up keeps that folder rather than deleting unfiled music.
+        if operation.get("duplicate_of"):
+            logger.info(
+                f"{'[dry run] ' if mode == 'dry_run' else ''}already in the store as "
+                f"{operation['duplicate_of']}, not filing {source.name} beside it"
+            )
+            results["skipped"] += 1
+            results["duplicates"] += 1
+            continue
 
         if mode == "dry_run":
             logger.info(f"[dry run] would place {source.name} -> {target}")

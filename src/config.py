@@ -260,6 +260,13 @@ class Config:
     #? until a release is applied to them.
     ALBUM_FOLDER_TEMPLATE = _env("ALBUM_FOLDER_TEMPLATE", "")
 
+    #? Seconds to wait between writing an album's new tags and renaming its folder, when applying
+    #? a release changes both (v1.0.1). Navidrome keeps plays, ratings and favourites across a
+    #? retag OR a rename, but not both in one scan - which is what a one-step apply was. Waiting
+    #? lets its watcher (5s after a change) see the new tags at the old path first. 0 renames
+    #? straight away, as before; 0 to 300.
+    RETAG_RENAME_WAIT = _env("RETAG_RENAME_WAIT", "20")
+
     #? Milliseconds to move synced lyrics EARLIER as they are written - negative moves them
     #? later. LRCLIB's timings are tapped along by people and land a moment after the line is
     #? sung, which on a fast song shows the line just sung. 0 writes LRCLIB's timings as they
@@ -314,6 +321,8 @@ class Config:
         "AUTO_RETRY_PEER": None,
         #? read per search, so nothing to rebuild
         "SLSKD_SEARCH_TIMEOUT": None,
+        #? read by each apply as it runs
+        "RETAG_RENAME_WAIT": None,
         #? read each time a folder name is made or read, so nothing to rebuild
         "ALBUM_FOLDER_TEMPLATE": None,
         #? read as each .lrc is written, so nothing to rebuild
@@ -579,6 +588,25 @@ def parse_search_timeout(value) -> int | None:
         return None
     low, high = SEARCH_TIMEOUT_RANGE
     return seconds if low <= seconds <= high else None
+
+
+RENAME_WAIT_RANGE = (0, 300)
+
+
+def parse_rename_wait(value) -> int | None:
+    """RETAG_RENAME_WAIT as whole seconds within range, or None when it isn't one."""
+    try:
+        seconds = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    low, high = RENAME_WAIT_RANGE
+    return seconds if low <= seconds <= high else None
+
+
+def rename_wait_seconds() -> int:
+    """How long an apply waits before renaming - the setting when valid, else the default 20."""
+    seconds = parse_rename_wait(Config.RETAG_RENAME_WAIT)
+    return 20 if seconds is None else seconds
 
 
 def search_timeout_seconds() -> int:

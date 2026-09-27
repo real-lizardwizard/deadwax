@@ -128,6 +128,23 @@ A value saved in the settings tab **overrides** compose and `.env`, and the row 
 `SETTING=${SETTING}` in `environment:`, which quietly sets it to empty when compose has no such
 variable of its own; the log warns about this at start-up.
 
+## Saving or pressing a button says "Refused: it came from another website"
+
+deadwax only accepts changes from its own page, to stop another website you have open from
+deleting albums or starting downloads through your browser. It checks that each request comes
+from the address deadwax is being reached at. If you reach it through a reverse proxy that
+rewrites the `Host` header (nginx does unless you add `proxy_set_header Host $host;`), every
+change looks as if it came from somewhere else. Either pass the original `Host` through, or set
+`TRUSTED_ORIGINS` in the container's environment to the address you open deadwax at, such as
+`https://music.example.com`. The event log names the address it refused.
+
+## Applying a release pauses before the folder is renamed
+
+That's deliberate. When applying a release changes an album's tags **and** its folder, the
+editor writes the tags, waits (20 seconds by default), then renames, so Navidrome keeps the
+album's plays, ratings and favourites. Set `RETAG_RENAME_WAIT` to `0` in the settings tab
+(Library) to rename straight away.
+
 ## The page looks wrong after an update
 
 Reload it. The page is never cached without checking, but a tab left open across an upgrade

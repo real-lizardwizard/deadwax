@@ -13,7 +13,7 @@ from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, answers_to, artist_facts
                          best_per_kind)
 from src.api.artist_images_endpoint import ArtistImagesClient
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
-from src.config import COVER_ART_SIZES
+from src.config import COVER_ART_SIZES, rename_wait_seconds
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, plan_disc_art,
                           save_disc_art)
 from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, compact_for_wire, delete_album,
@@ -28,7 +28,8 @@ from src.organizer import is_within
 from src.api.coverart_endpoint import CoverArtClient
 from src.api.lrclib_endpoint import lrclib
 from src.lyrics import fetch_album_lyrics, read_track_lyrics
-from src.retag import execute_retag, plan_cover_art, plan_retag, save_cover_art
+from src.retag import (changes_player_ids, execute_retag, move_retagged, plan_cover_art, plan_retag,
+                       save_cover_art)
 from src.track_tags import execute_tag_edits, plan_tag_edits
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
@@ -446,6 +447,9 @@ async def retag_preview(body: RetagRequest):
         #? which size a cover would be fetched at, so the editor can say so. Laid on here rather
         #? than planned: plan_retag is the pure half, and this is configuration, not a decision.
         plan["art"]["size"] = Config.COVER_ART_SIZE
+        #? seconds the apply will pause between tags and rename, so the editor can say so up
+        #? front rather than leave Apply looking stuck (v1.0.1)
+        plan["rename_wait"] = rename_wait_seconds() if changes_player_ids(plan) else 0
         return plan
 
     except Exception as e:
@@ -483,7 +487,24 @@ async def retag_apply(request: Request, body: RetagRequest):
         if plan["art"]["action"]:
             art = await coverart_client.fetch_front(release.get("release_mbid") or "")
 
-        results = await asyncio.to_thread(execute_retag, plan, release, "apply", art)
+        #? Tags first, then a pause, then the rename, when this apply changes both an id tag and
+        #? the folder (v1.0.1). In one step Navidrome sees new tags at a new path in a single scan,
+        #? can't pair the album with what it had, and every user's plays, ratings and favourites
+        #? on it go missing. Given a moment between, its watcher sees the new tags where the
+        #? album already is, carries everything across, and then follows the rename as a move.
+        wait = rename_wait_seconds() if changes_player_ids(plan) else 0
+        results = await asyncio.to_thread(execute_retag, plan, release, "apply", art, wait == 0)
+        if wait:
+            if not results["failed"]:
+                logger.info(
+                    f"tags written in {Path(plan['source']).name}; waiting {wait}s for Navidrome "
+                    f"to see them before renaming the folder",
+                    extra={"frontend": True},
+                )
+                await asyncio.sleep(wait)
+            #? also on a failure: it is what records "left the folder in place"
+            await asyncio.to_thread(move_retagged, plan, results)
+        results["rename_wait"] = wait
 
         #? The cache keys on the folder's mtime, which a retag does not move - so without
         #? this the interface would keep showing the old tags and the edit would look like

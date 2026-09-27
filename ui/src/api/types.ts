@@ -744,6 +744,12 @@ export interface RetagPlan {
   problems: string[]
   /** Nothing to change. The album already carries this release. */
   empty: boolean
+  /**
+   * Seconds the apply pauses between writing the tags and renaming the folder, so Navidrome
+   * keeps the album's plays and favourites (v1.0.1). 0 when the apply doesn't change both.
+   * Laid on by the preview route from RETAG_RENAME_WAIT.
+   */
+  rename_wait?: number
 }
 
 export interface RetagResults {
@@ -757,6 +763,8 @@ export interface RetagResults {
   /** The cover filename written, or null. */
   art_written: string | null
   problems: string[]
+  /** Seconds it paused before renaming (v1.0.1). */
+  rename_wait?: number
 }
 
 export interface RetagResponse {

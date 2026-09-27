@@ -205,10 +205,14 @@ async def _organize_if_enabled(job: dict, store) -> None:
             #? "organized" below and report a green, finished job for an album that never
             #? arrived - the failure mode that made a second edition of an album look like it
             #? had been filed when it had not.
-            await store.update_status(
-                job["id"], "complete",
-                f"all {results['skipped']} file(s) already existed, nothing was filed",
-            )
+            if results.get("duplicates") == results["skipped"]:
+                #? every track was already in that album folder, perhaps in another format - the
+                #? organizer wouldn't file a second copy beside the first (v1.0.1)
+                message = (f"already in the store: all {results['skipped']} track(s) were already "
+                           f"there, nothing was filed")
+            else:
+                message = f"all {results['skipped']} file(s) already existed, nothing was filed"
+            await store.update_status(job["id"], "complete", message)
 
         else:
             await store.update_status(job["id"], "organized")

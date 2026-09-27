@@ -14,6 +14,7 @@ from src.store import JobStore
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
+from src.api.same_origin import SameOriginWrites
 from src.config import Config
 from src import __version__
 
@@ -151,6 +152,10 @@ def start() -> FastAPI:
             return await self.inner(scope, receive, send)
 
     app.add_middleware(CompressText)
+
+    #? Added last, so it is the OUTERMOST layer: a write another website asked for is refused
+    #? before anything else runs. See src/api/same_origin.py.
+    app.add_middleware(SameOriginWrites)
 
     logger.info("adding routers")
     app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"])

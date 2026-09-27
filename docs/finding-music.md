@@ -102,9 +102,10 @@ There are two **Find** buttons, and the difference matters:
 - **Find on a pressing's row** (recommended) searches Soulseek for that exact release, and ranks
   every folder found against **its real tracklist**: titles, count and lengths. When the
   download is filed, each track gets that release's title, number, disc and ids.
-- **Find on the album card** searches for the album without a particular release. It's quicker
-  when you don't mind which pressing, but there's no tracklist to compare against, so
-  candidates are ranked on what's left (format, edition words, the peer), and the files are
-  tagged with the album's details only.
+- **Find on the album card** is for when you don't mind which pressing. It picks one for you:
+  a pressing with the album's most common tracklist, preferring an official CD or digital
+  release, then the earliest. It then searches exactly as that pressing's own Find would. If the
+  card hasn't listed its pressings yet, the button shows a sweep while it asks MusicBrainz, and
+  if MusicBrainz can't answer, it falls back to searching for the album as a whole.
 
 Either opens the **candidates panel**; see [Downloading](downloading.md).

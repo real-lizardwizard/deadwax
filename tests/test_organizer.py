@@ -592,3 +592,33 @@ def test_the_download_request_does_not_drop_the_current_name():
 
     assert EnqueueRelease(**DONDA).model_dump()["album_artist"] == "Ye"
     assert EnqueueRelease(artist="Kanye West").model_dump()["album_artist"] is None
+
+
+# ---------------------------------------------------------------- a grab that names no release (v1.0.1)
+
+def test_a_job_with_no_release_drops_the_sharers_release_id(tmp_path):
+    """
+    tag_values skips empty values, so a job naming no release used to leave the SHARER's
+    musicbrainz_albumid in place - claiming a pressing nobody chose, which the scan and the
+    "already held" checks both trust.
+    """
+    from mutagen.flac import FLAC
+    from src.organizer import write_tags
+    from tests.test_library import write_flac
+
+    path = write_flac(tmp_path / "01.flac", musicbrainz_albumid="the-sharers-pressing", title="x")
+    write_tags(path, {**RELEASE, "release_mbid": None, "release_group_mbid": "rg-1"}, RELEASE["tracks"][0])
+
+    tags = FLAC(str(path))
+    assert "musicbrainz_albumid" not in tags
+    assert tags["musicbrainz_releasegroupid"] == ["rg-1"], "the group is known, so it is still written"
+
+
+def test_a_job_that_names_its_release_writes_that_id(tmp_path):
+    from mutagen.flac import FLAC
+    from src.organizer import write_tags
+    from tests.test_library import write_flac
+
+    path = write_flac(tmp_path / "01.flac", musicbrainz_albumid="the-sharers-pressing")
+    write_tags(path, RELEASE, RELEASE["tracks"][0])
+    assert FLAC(str(path))["musicbrainz_albumid"] == ["mb-1"]

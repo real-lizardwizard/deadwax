@@ -459,17 +459,40 @@ def _tidy_emptied_artist(artist_dir: Path, library_root: str | None) -> None:
         pass
 
 
+#? The tags Navidrome builds an album's and a track's id from, with its default persistent ids:
+#? `musicbrainz_albumid|albumartistid,album,...` and `musicbrainz_trackid|albumid,discnumber,
+#? tracknumber,title` (deadwax never writes the release-track id, so its tracks use the second).
+PLAYER_ID_TAGS = frozenset({"musicbrainz_albumid", "title", "tracknumber", "discnumber"})
+
+
+def changes_player_ids(plan: dict) -> bool:
+    """
+    Whether applying this plan changes a tag a player keys its ids on AND moves the folder.
+
+    Navidrome follows an album across a rename (same tags, new path) and across a retag (new
+    tags, same path), carrying every user's plays, ratings, favourites and playlist entries. Both
+    at once, in one scan, it can't pair up: the old ids go missing with everything on them. So
+    only this case needs the tags written, a pause for Navidrome to see them, and then the rename.
+    """
+    if not (plan.get("moves") and plan.get("target")):
+        return False
+    return any(PLAYER_ID_TAGS & set(entry.get("changes") or {}) for entry in plan.get("files") or [])
+
+
 def execute_retag(
     plan: dict,
     release: dict,
     mode: str = "dry_run",
     art: tuple[bytes, str] | None = None,
+    move: bool = True,
 ) -> dict:
     """
     Carry out a plan. `dry_run` reports what it would do and touches nothing.
 
     Tags are written before the folder moves, so a failure part-way leaves the album where
     the plan said it was rather than half-moved somewhere the interface isn't looking.
+    `move=False` stops there, for a caller that renames separately with move_retagged() once a
+    player has had time to see the new tags (see changes_player_ids).
 
     `art` is passed in already downloaded rather than fetched here, deliberately: this module
     writes to the user's filesystem and nothing else, and giving it a network dependency
@@ -543,7 +566,17 @@ def execute_retag(
     elif art_action and art is None and not results["dry_run"]:
         results["problems"].append("no cover art was available for that release")
 
-    if plan.get("moves") and plan.get("target"):
+    if move:
+        move_retagged(plan, results)
+
+    return results
+
+
+def move_retagged(plan: dict, results: dict) -> dict:
+    """The second half of an apply: rename or merge the folder the plan names. Updates `results`."""
+    source = Path(plan["source"]) if plan.get("source") else None
+
+    if source is not None and plan.get("moves") and plan.get("target"):
         target = Path(plan["target"])
 
         if results["dry_run"]:
