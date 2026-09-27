@@ -7,9 +7,7 @@ import { isAbort, latestOnly } from './latest.mjs';
 
 
 
-document.addEventListener('DOMContentLoaded', async () => {
-    init({refreshServerConfig})
-});
+document.addEventListener('DOMContentLoaded', init);
 
 
 
@@ -48,36 +46,6 @@ function loadAllCoverImages(parentContainer) {
                 console.warn(`Cover missing or decode failed for ${mbid}`);
             });
     });
-}
-
-
-
-async function fetchServerConfig() {
-    console.log("getting server config")
-    const response = await fetch(`/deadwax/monitor_slskd/config`);
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to fetch server config');
-    }
-
-    return response.json();
-}
-
-
-
-async function refreshServerConfig() {
-    console.log("refreshing server config")
-    try {
-        return await fetchServerConfig();
-    }
-
-    catch (error) {
-        //? Nothing to render from it here any more. The settings tab owns displaying server
-        //? configuration and fetches its own, richer view from /deadwax/settings; this is
-        //? still called because other code wants the returned object.
-        return null;
-    }
 }
 
 

@@ -1,210 +1,130 @@
-import {convertTime, sleep} from './utils.js';
+/*
+ * Page start-up: the event log's stream, and the two connection pills.
+ *
+ * The pings wait for the stream to OPEN, not for a fixed pause (v0.9.21). The MusicBrainz ping
+ * writes "Connection successful" to the log, and the stream has no history, so a line logged
+ * before this page is listening is gone. A 100ms sleep was a guess at that, too long on a LAN
+ * and too short on a slow link. The wait is capped so a stream that never opens can't hold the
+ * pills on "loading..." - they are drawn as pending first either way.
+ */
+const STREAM_OPEN_WAIT_MS = 2000;
 
-async function pingMusicbrainz() {
-    const response = await fetch(`/deadwax/search_musicbrainz/ping`);
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to connect to MusicBrainz');
-    }
-    return response.json();
-}
-async function checkMusicbrainzPing() {
+//? what a ping can answer, and the code a pill shows for it
+async function checkPing(name, url) {
     try {
-        addConnectionToInterface(
-            "musicbrainz",
-            "pending",
-            "loading..."
-        )
-        const musicbrainz_ping_response = await pingMusicbrainz();
-        if(musicbrainz_ping_response.status.toLowerCase() == "ok"){
-            console.log("musicbrainz configured and ping responded with OK")
-            musicbrainz_ping_response.code = "connected"
-            musicbrainz_ping_response.status = "ok"
-        }
-        else if(musicbrainz_ping_response.status.toLowerCase() == "failed"){
-            console.log("musicbrainz ping responded with FAILED")
-        }
-        else{
-            console.log("Unexpected musicbrainz ping response, consider it unconfigured:", musicbrainz_ping_response)
-            musicbrainz_ping_response.code = "UNEXPECTED"
-            musicbrainz_ping_response.status = "failed"
-        }
-        addConnectionToInterface(
-            "musicbrainz",
-            musicbrainz_ping_response.status,
-            musicbrainz_ping_response.code
-        )
-        return musicbrainz_ping_response
-    } catch (error) {
-        console.log("Musicbrainz ping error")
-        addConnectionToInterface(
-            "musicbrainz",
-            "failed",
-            "CONNECTION_ERROR"
-        )
-        return {"status": "failed", "error": "Musicbrainz ping error", "code": "CONNECTION_ERROR"}
+        const response = await fetch(url);
+        const answer = response.ok ? await response.json() : null;
+        const status = String(answer?.status || '').toLowerCase();
+
+        if (status === 'ok') setConnection(name, 'ok', 'connected');
+        else if (status === 'failed') setConnection(name, 'failed', answer.code);
+        else setConnection(name, 'failed', answer ? 'UNEXPECTED' : 'CONNECTION_ERROR');
     }
-
-}
-
-async function pingSlskd() {
-    const response = await fetch(`/deadwax/monitor_slskd/ping`);
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to connect to Slskd');
-    }
-    return response.json();
-}
-async function checkSlskdPing() {
-    try {
-        addConnectionToInterface(
-            "slskd",
-            "pending",
-            "loading..."
-        )
-        const slskd_ping_response = await pingSlskd();
-        if(slskd_ping_response.status.toLowerCase() == "ok"){
-            console.log("Slskd configured and ping responded with OK")
-            slskd_ping_response.code = "connected"
-            slskd_ping_response.status = "ok"
-        }
-        else if(slskd_ping_response.status.toLowerCase() == "failed"){
-            console.log("Slskd configured but ping responded with FAILED")
-        }
-        else{
-            console.log("Unexpected slskd ping response, consider it unconfigured:", slskd_ping_response)
-            slskd_ping_response.code = "UNEXPECTED"
-            slskd_ping_response.status = "failed"
-        }
-        addConnectionToInterface(
-            "slskd",
-            slskd_ping_response.status,
-            slskd_ping_response.code
-        )
-        return slskd_ping_response
-    } catch (error) {
-        console.log("Slskd ping didnt respond, slskd not configured")
-        addConnectionToInterface(
-            "slskd",
-            "failed",
-            "CONNECTION_ERROR"
-        )
-        return {"status": "failed", "error": "Slskd ping didnt respond, slskd not configured", "code": "CONNECTION_ERROR"}
+    catch {
+        setConnection(name, 'failed', 'CONNECTION_ERROR');
     }
 }
 
-function addConnectionToInterface(
-    connectionName, //slskd //musicbrainz
-    connectionStatus,
-    connectionStatusCode
-) {
-    let connectionElement = document.getElementById("general-connection-status")
+//? one pill per service, made on first use and updated in place after
+function setConnection(name, status, code) {
+    let pill = document.querySelector(`.connection-item[data-connection="${name}"]`);
 
-    if(document.querySelector(`.connection-item:has(.connection-info):has(.connection-info-name.${connectionName})`)) {
-        console.log(`Connection ${connectionName} already exists, updating status`)
-        const existingConnection = document.querySelector(`.connection-item:has(.connection-info):has(.connection-info-name.${connectionName})`);
-        existingConnection.querySelector('.connection-info').className = `connection-info ${connectionStatus}`;
-        existingConnection.querySelector('.connection-info-code').textContent = connectionStatusCode;
-        return;
+    if (!pill) {
+        pill = document.createElement('div');
+        pill.className = 'connection-item';
+        pill.dataset.connection = name;
+        //? the status dot is an empty span with a width; its class carries the brand colour
+        pill.innerHTML = `
+            <div class="connection-info">
+                <span class="connection-info-name ${name}" aria-hidden="true"></span>
+                <h4 class="connection-info-line text white">${name}</h4>
+                <h4 class="connection-info-code text"></h4>
+            </div>`;
+        document.getElementById('general-connection-status').appendChild(pill);
     }
 
-    let connectorLineElement = document.createElement("div");
-    connectorLineElement.className = "connection-connector-line";
-    connectorLineElement.innerHTML = `
-
-    `
-
-    let connectionItem = document.createElement('div');
-    connectionItem.className = "connection-item";
-    connectionItem.innerHTML = `
-
-        <div class="connection-info ${connectionStatus}">
-            <!--
-              The status dot. This used to be an <h4> holding a BRAILLE BLANK (U+2800) with a
-              background colour, because it needed to be a coloured box and a blank glyph was
-              a way to get one. It is an empty span with a width now. The class is unchanged
-              because the update path above finds an existing row by .connection-info-name.
-            --><span class="connection-info-name ${connectionName}" aria-hidden="true"></span>
-            <h4 class="connection-info-line text white">${connectionName}</h4>
-            <h4 class="connection-info-code text">${connectionStatusCode}</h4>
-        </div>
-    `
-    connectionElement.appendChild(connectionItem);
-    connectionElement.appendChild(connectorLineElement);
+    pill.querySelector('.connection-info').className = `connection-info ${status}`;
+    //? codes come from slskd's own state and are quoted back, so text, never markup
+    pill.querySelector('.connection-info-code').textContent = code || '';
 }
 
 
-function appendEvent(eventType, content, src) {
-    const eventLogElement = document.getElementById('logs-scrollable');
-    const eventItem = document.createElement('div');
-    eventItem.className = 'event-item';
-    const timeString = convertTime(new Date());
-    const srcMarkup = src
-        ? `<h5 class="text default-secondary event-src ${src.toLowerCase()}">${src}</h5>`
-        : '';
+/*
+ * One line of the event log. Built as TEXT (v0.9.21): the log quotes MusicBrainz titles, Soulseek
+ * queries and folder paths, all typed by other people, and this used to set them as innerHTML -
+ * an album called `<img onerror=...>` would have run in the page.
+ */
+function eventLine(eventType, content, src) {
+    const item = document.createElement('div');
+    item.className = 'event-item';
 
-    eventItem.innerHTML =
-    `
-        <div class="first-row">
-            <h5 class="text default event-type ${eventType}">${eventType}</h5>
-            <h5 class="text white event-time">[${timeString}]&nbsp;&nbsp;</h5>
-            ${srcMarkup}
-        </div>
-        <div class="second-row">
-            <h4 class="text event-content-indent">└─╲</h5>
-            <h5 class="text default-secondary event-content">${content}</h5>
-        </div>
-    `;
-    eventLogElement.prepend(eventItem);
-    return eventItem;
+    const first = document.createElement('div');
+    first.className = 'first-row';
+    first.append(
+        line('h5', `text default event-type ${eventType}`, eventType),
+        line('h5', 'text white event-time', `[${new Date().toTimeString().slice(0, 8)}]\u00a0\u00a0`),
+    );
+    if (src) first.append(line('h5', `text default-secondary event-src ${src.toLowerCase()}`, src));
+
+    const second = document.createElement('div');
+    second.className = 'second-row';
+    second.append(
+        line('h4', 'text event-content-indent', '└─╲'),
+        line('h5', 'text default-secondary event-content', content),
+    );
+
+    item.append(first, second);
+    return item;
 }
+
+function line(tag, className, text) {
+    const element = document.createElement(tag);
+    element.className = className;
+    element.textContent = text;
+    return element;
+}
+
+function logEvent(eventType, content, src) {
+    const item = eventLine(eventType, content, src);
+    document.getElementById('logs-scrollable').prepend(item);
+    return item;
+}
+
+const STREAM_LOST = 'Failed to connect to backend';
 
 
 let eventSource = null;
 
-async function initEventStream({ refreshServerConfig }) {
-    const eventLogElement = document.getElementById('logs-scrollable');
-
-    const serverConfig = await refreshServerConfig();
-
-    if (serverConfig === undefined) {
-        appendEvent('WARNING', 'Couldnt load server config');
-    }
-
-    else {
-        appendEvent('INFO', 'Loaded server config', 'slskd');
-    }
-
+function openEventStream() {
     eventSource = new EventSource('/deadwax/interface_logs/interface_logs');
-    eventSource.onerror = function(error){
-        const eventItem = appendEvent('ERROR', 'Failed to connect to backend');
 
-        // collapse repeats of the same message instead of flooding the log
-        if (eventLogElement.children[1] &&
-            eventLogElement.children[1].children[1].innerHTML == eventItem.children[1].innerHTML) {
-            console.log("next element same as last")
-            eventLogElement.removeChild(eventLogElement.children[1])
-        }
-    }
-
-    eventSource.onmessage = async function(event) {
+    eventSource.onerror = () => {
+        //? EventSource retries every few seconds while the server is down: one line, not a column
+        const previous = logEvent('ERROR', STREAM_LOST).nextElementSibling;
+        if (previous?.querySelector('.event-content')?.textContent === STREAM_LOST) previous.remove();
+    };
+    eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        appendEvent(data.event_type, data.event_content, data.src);
-    }
+        logEvent(data.event_type, data.event_content, data.src);
+    };
+
+    return new Promise((resolve) => {
+        eventSource.addEventListener('open', resolve, { once: true });
+        eventSource.addEventListener('error', resolve, { once: true });
+        setTimeout(resolve, STREAM_OPEN_WAIT_MS);
+    });
 }
 
-export async function init({ refreshServerConfig }) {
+export async function init() {
+    setConnection('musicbrainz', 'pending', 'loading...');
+    setConnection('slskd', 'pending', 'loading...');
 
-    await initEventStream({ refreshServerConfig })
+    await openEventStream();
 
-    await sleep(100)
-
-    const [musicbrainzPingResponse, slskdPingResponse] = await Promise.all([
-        checkMusicbrainzPing(), checkSlskdPing()]);
-
-    console.log(musicbrainzPingResponse, slskdPingResponse)
+    await Promise.all([
+        checkPing('musicbrainz', '/deadwax/search_musicbrainz/ping'),
+        checkPing('slskd', '/deadwax/monitor_slskd/ping'),
+    ]);
 }
 
 window.addEventListener('beforeunload', () => {

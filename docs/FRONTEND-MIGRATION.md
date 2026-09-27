@@ -129,13 +129,12 @@ the reference. All prefixed `/deadwax/`.
 | `search_musicbrainz/releases?release_group_mbid=` | GET | `{id, releases}` |
 | `search_musicbrainz/ping` | GET | `{status, code}` |
 | `monitor_slskd/ping` | GET | `{status, code}` |
-| `monitor_slskd/config` | GET | `{library_path, download_path, organizing_enabled, organize_mode, slskd_url, slskd_url_problem, slskd_apikey_set}` |
 | `download/find_candidates` | POST | body: `{artist, album, year, release_mbid, edition_tags, tracks[], format_preference, query_override}` → `{query, response_count, candidates[]}` |
 | `download/enqueue` | POST | body: `{username, files[], directory, release}` → `{status, queued, job_id}` |
 | `download/jobs` | GET | `{jobs[], tracking_enabled}`. `files_failed` is only present when slskd matched transfers — optional, not always-zero. |
 | `download/jobs/{id}/cancel` | POST | |
 | `download/jobs/clear` | POST | |
-| `library/albums` | GET | `{albums[], artists[], library_path, problem, ...}`. `problem` is a setup message (unset/missing LIBRARY_PATH), NOT an error — render it, don't throw. |
+| `library/albums` | GET | `{albums[], artists[], library_path, problem, ...}`. `problem` is a setup message (unset/missing LIBRARY_PATH), NOT an error — render it, don't throw. Since v0.9.20 tracks arrive compact (`track_defaults`) and the per-scan fields as `X-Scan-*` headers, with an ETag — read it through `listAlbums()`, which undoes both. |
 | `library/rescan` | POST | same shape; drops the server's per-folder mtime cache |
 | `library/retag/preview` | POST | `{album_path, release, fetch_art}` → a plan. Writes nothing and fetches nothing, deliberately a separate endpoint from apply rather than a flag. |
 | `library/retag/apply` | POST | same body; recomputes the plan server-side and executes it. Returns `{plan, results}`. |

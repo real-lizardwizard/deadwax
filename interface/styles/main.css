@@ -188,11 +188,6 @@ body {
     gap:5px;
     width: max-content;
 }
-    .connection-connector-line {
-        font-size:0.8em;
-        margin-bottom:-0.2em;
-        margin-left:0.80em;
-    }
     .connection-item{
         display:flex;
         flex-direction:row;
@@ -204,15 +199,6 @@ body {
             flex-direction:row;
             align-items: center;
             width:100%;
-        }
-        .connection-info.ok{
-
-        }
-        .connection-info.failed{
-             
-        }
-        .connection-info.pending{
-            
         }
 
 /*
@@ -308,13 +294,6 @@ body {
                 color: var(--red-text);
             }
 
-            /*
-              Was a spacer div between items. #general-connection-status is a flex row with a
-              gap now, so it has nothing left to do.
-            */
-            .connection-connector-line {
-                display: none;
-            }
 
         .event-item{
             display:flex;
@@ -384,10 +363,6 @@ body {
                 }
                 
                 .event-content{margin-left:10px;}
-                    .event-content > a {
-                        color: var(--main-text);
-                        text-decoration: underline;
-                    }
 
 
 /* ============================================================================
