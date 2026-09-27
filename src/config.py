@@ -254,6 +254,12 @@ class Config:
     #? them and a shorter one gets you a list sooner. 8 is what it always was; 3 to 60.
     SLSKD_SEARCH_TIMEOUT = _env("SLSKD_SEARCH_TIMEOUT", "8")
 
+    #? How an ALBUM folder is named (v0.9.17) - the artist folder above it is always the artist.
+    #? Tokens in src/naming.py; empty means the long-standing `{album} ({year}) [{edition}]`.
+    #? Changing it moves nothing already filed: those albums show as "folder off-convention"
+    #? until a release is applied to them.
+    ALBUM_FOLDER_TEMPLATE = _env("ALBUM_FOLDER_TEMPLATE", "")
+
     #? Milliseconds to move synced lyrics EARLIER as they are written - negative moves them
     #? later. LRCLIB's timings are tapped along by people and land a moment after the line is
     #? sung, which on a fast song shows the line just sung. 0 writes LRCLIB's timings as they
@@ -308,6 +314,8 @@ class Config:
         "AUTO_RETRY_PEER": None,
         #? read per search, so nothing to rebuild
         "SLSKD_SEARCH_TIMEOUT": None,
+        #? read each time a folder name is made or read, so nothing to rebuild
+        "ALBUM_FOLDER_TEMPLATE": None,
         #? read as each .lrc is written, so nothing to rebuild
         "LYRICS_LEAD_MS": None,
         #? read per lookup by the artist image client, so nothing to rebuild here either

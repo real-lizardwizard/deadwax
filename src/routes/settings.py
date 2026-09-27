@@ -333,6 +333,41 @@ def _auto_retry_row() -> dict:
     )
 
 
+#? what the album folder template's preview names - one album with an edition, one without
+TEMPLATE_EXAMPLES = (
+    {"album": "Wish You Were Here", "original_year": "1975", "year": "2011", "album_artist": "Pink Floyd",
+     "disambiguation": "2011 remaster", "media_format": "CD", "country": "GB", "catalog_number": "50999 028955 2 9"},
+    {"album": "Dummy", "original_year": "1994", "year": "1994", "album_artist": "Portishead",
+     "media_format": "CD", "country": "GB", "catalog_number": "828 553-2"},
+)
+
+
+def _album_folder_row() -> dict:
+    """ALBUM_FOLDER_TEMPLATE, previewed on two albums - one with an edition, one without."""
+    from src.naming import DEFAULT_ALBUM_FOLDER, TOKENS, validate_template
+    from src.organizer import build_album_dirname, sanitize_filename
+
+    value = (Config.ALBUM_FOLDER_TEMPLATE or "").strip()
+    problem = validate_template(value) if value else None
+    examples = " and ".join(
+        f"{sanitize_filename(example['album_artist'])}/{build_album_dirname(example)}"
+        for example in TEMPLATE_EXAMPLES
+    )
+    return _setting(
+        "ALBUM_FOLDER_TEMPLATE",
+        Config.ALBUM_FOLDER_TEMPLATE,
+        effect=(
+            f"Names album folders like {examples}. A token left empty takes its brackets with it. "
+            f"Tokens: {', '.join('{' + t + '}' for t in TOKENS)}. Albums already filed keep their "
+            f"folders until a release is applied to them"
+            if not problem else
+            f"unusable, so folders are named by the default, {DEFAULT_ALBUM_FOLDER}"
+        ),
+        status="error" if problem else "ok",
+        detail=problem,
+    )
+
+
 def _search_timeout_row() -> dict:
     """SLSKD_SEARCH_TIMEOUT, in seconds."""
     value = Config.SLSKD_SEARCH_TIMEOUT
@@ -568,6 +603,7 @@ async def settings():
                         choices={mode: mode for mode in ORGANIZE_MODES},
                     ),
                     _country_row(),
+                    _album_folder_row(),
                 ],
             },
             {
@@ -666,6 +702,12 @@ def _validate(key: str, value: str) -> str | None:
 
     if key == "COUNTRY_IN_FOLDER" and value not in COUNTRY_CHOICES:
         return f"expected one of {', '.join(COUNTRY_CHOICES)}"
+
+    if key == "ALBUM_FOLDER_TEMPLATE" and value.strip():
+        from src.naming import validate_template
+        problem = validate_template(value)
+        if problem:
+            return problem
 
     if key == "SLSKD_SEARCH_TIMEOUT" and parse_search_timeout(value) is None:
         low, high = SEARCH_TIMEOUT_RANGE

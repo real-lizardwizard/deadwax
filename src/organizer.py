@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 
 from src.editions import edition_discriminator, resolve_edition_label
+from src.naming import DEFAULT_ALBUM_FOLDER, render_album_folder, validate_template
 from src.logger import logger
 from src.matching import (AUDIO_EXTENSIONS, file_extension, match_tracks_to_files,
                           split_remote_path)
@@ -80,9 +81,23 @@ def country_in_folder() -> bool:
     return (Config.COUNTRY_IN_FOLDER or "off").strip().lower() == "on"
 
 
+def album_folder_template() -> str:
+    """
+    ALBUM_FOLDER_TEMPLATE (v0.9.17), or the long-standing convention when it's unset or can't be
+    used - read here, beside country_in_folder, at the one place folder names are made. An
+    invalid template never names a folder: the settings tab refuses one on save, and one set in
+    the environment is reported there and ignored here.
+    """
+    from src.config import Config
+
+    template = (Config.ALBUM_FOLDER_TEMPLATE or "").strip()
+    return template if template and validate_template(template) is None else DEFAULT_ALBUM_FOLDER
+
+
 def build_album_dirname(release: dict, discriminator: str = "") -> str:
     """
-    `Album (Year)`, plus ` [Edition]` when this release is a distinguishable edition.
+    `Album (Year)`, plus ` [Edition]` when this release is a distinguishable edition - or
+    whatever ALBUM_FOLDER_TEMPLATE says, which defaults to exactly that (src/naming.py).
 
     The suffix is omitted entirely for ordinary albums - most releases have exactly one
     edition and do not need decorating. It appears only when there is something real to say,
@@ -99,16 +114,25 @@ def build_album_dirname(release: dict, discriminator: str = "") -> str:
     #? "Wish You Were Here (1975) [2011 remaster]" - the year identifies the album and the
     #? edition identifies the pressing, so putting the reissue year in front files the same
     #? record under two different decades depending on which copy you happened to get.
-    #? MusicBrainz keeps this on the release GROUP as first-release-date.
+    #? MusicBrainz keeps this on the release GROUP as first-release-date. ({release_year} is
+    #? there for a template that wants the pressing's year anyway.)
     year = (release.get("original_year") or release.get("year") or "").strip()
-    name = f"{album} ({year})" if year else album
 
-    label = resolve_edition_label(release, with_country=country_in_folder())
-    parts = [part for part in (label, discriminator) if part]
-    if parts:
-        name = f"{name} [{' - '.join(parts)}]"
+    def clean(value) -> str:
+        text = str(value or "").strip()
+        return sanitize_filename(text, "") if text else ""
 
-    return sanitize_filename(name)
+    values = {
+        "album": album,
+        "year": clean(year),
+        "release_year": clean((release.get("year") or "")[:4]),
+        "edition": clean(resolve_edition_label(release, with_country=country_in_folder())),
+        "artist": clean(filed_artist(release)),
+        "format": clean(release.get("media_format")),
+        "country": clean(release.get("country")),
+        "catalog": clean(release.get("catalog_number")),
+    }
+    return sanitize_filename(render_album_folder(album_folder_template(), values, discriminator), album)
 
 
 def build_target_path(

@@ -181,6 +181,8 @@ The edition suffix is omitted for ordinary albums, and only appears when there's
 The year is the <em>album's</em> year, not the pressing's, so a 2011 remaster of a 1975 record files under <code>Wish You Were Here (1975) [Remastered]</code> rather than landing in a different decade from the original. The file still records which pressing it actually is.
 <br><br>
 The artist folder is the artist's <em>current</em> name, so one artist is one folder however many names their records came out under. Ye's albums are credited "Kanye West" up to 2024 and "Ye" after; they all file under <code>Ye/</code>, with the <code>albumartist</code> tag to match, so players that group on that tag show one artist too. The credit isn't thrown away — each track's <code>artist</code> tag still says what the sleeve says, and the Soulseek search still asks for "Kanye West", because that's what people named their folders. Albums you already have under an old name move when you pick their release in the metadata editor; nothing goes looking for them on its own yet.
+<br><br>
+The album folder's name can be changed in the settings tab with a template — <code>{year} - {album} [{edition}]</code>, say — from <code>{album}</code>, <code>{artist}</code>, <code>{year}</code>, <code>{release_year}</code>, <code>{edition}</code>, <code>{format}</code>, <code>{country}</code> and <code>{catalog}</code>. A token with nothing to say takes its brackets with it, so one template covers an album with an edition and one without, and the settings row previews it on two real albums. The artist folder above it is always the artist. Albums already filed keep their folders until a release is applied to them.
 </details>
 
 ### A library tab that knows what you've got

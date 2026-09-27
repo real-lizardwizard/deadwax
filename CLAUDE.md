@@ -87,6 +87,8 @@ src/
                    Also BUILDS the MusicBrainz user agent from MUSICBRAINZ_EMAIL and
                    __version__ - see "The MusicBrainz user agent" below.
   matching.py      PURE candidate scoring. No I/O. The heart of the project.
+  naming.py        PURE. The album folder's name from ALBUM_FOLDER_TEMPLATE, and the edition read
+                   back out of one - see "Naming album folders from a template".
   editions.py      PURE. Which edition a release is, in words. See below — it's why the
                    library can hold the deluxe and the standard press at the same time.
   metadata_health.py  PURE. What's WRONG with an album on disk, as issue codes. Backs the
@@ -127,7 +129,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             846 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             868 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -773,6 +775,40 @@ showed two artists, which v0.6.18 left as "at least visible".
   dialog previewed `Kanye West/Donda (2021) → Ye/Donda (2021) · 2 tracks, 2 retagged`, and moving
   left one Ye with two albums, `Kanye West/` gone, album artist "Ye" and track artist still
   "Kanye West".
+
+### Naming album folders from a template (v0.9.17)
+
+One of the 1.0 features. `ALBUM_FOLDER_TEMPLATE` (Library tab -> Organizing, server setting)
+names the ALBUM folder; `src/naming.py` is pure and holds all of it; `organizer.album_folder_
+template()` is the one reader of the setting, beside `country_in_folder()`.
+
+- **The default is byte-for-byte the old convention**, `{album} ({year}) [{edition}]`, and every
+  existing organizer/retag/editions test passes under it unchanged - that is the proof, not a
+  new test. Empty, unset or invalid all mean the default; an invalid one is refused on save and,
+  from the environment, reported on the row and ignored.
+- **The artist folder is not templated.** The artist page, `artist_refile`, the disc merge, the
+  misfiled check and `_tidy_emptied_artist` all rely on album folders sitting directly inside an
+  artist folder. A `/` in the template is refused with that reason.
+- **Both directions.** `render_album_folder` fills it in, and a token that comes out empty
+  takes its bracket pair (and the space before it) with it; a bare empty token leaves no doubled
+  space or dangling separator. `edition_from_folder` reads the edition back with a regex made
+  from the SAME template - bracketed tokens optional, a bracketed token unable to cross its own
+  closing bracket, full match. It has to: the scan shows `edition` from the folder, and
+  `metadata_health.expected_dirname` rebuilds the expected name from tags plus that edition, so a
+  reader that only knew the old trailing `[...]` would flag every album under a template that
+  moved it. Under the default it reads exactly as `edition_from_dirname` always did - including
+  `Album (1994) [A] [B]` giving `B`.
+- **A collision is always resolved**: the discriminator joins `{edition}` as it always did
+  (`[Deluxe - 5b6c1a2d]`) and is appended in brackets when the template has no `{edition}`.
+- **Tokens**: album, artist (current name), year (the album's - the long-standing rule),
+  release_year (the pressing's), edition, format, country, catalog. Values are sanitized
+  singly and the whole name again. No `{label}`: the release payload doesn't carry one.
+- **Changing it moves nothing.** Albums already filed show as "folder off-convention" until a
+  release is applied to them - said on the row.
+- **Verified in the real page**: the row previewed `Pink Floyd/Wish You Were Here (1975) [2011
+  remaster] and Portishead/Dummy (1994)`, then `1975 - Wish You Were Here [2011 remaster]` and
+  `1994 - Dummy` once `{year} - {album} [{edition}]` was saved; `{year}` alone was refused
+  ("it needs {album}"); reverting put the default back.
 
 ### Browsing a discography, and ordering results
 
@@ -2534,7 +2570,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 846 tests
+.venv/bin/python -m pytest tests/ -q  # 868 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2578,7 +2614,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 846 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 868 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

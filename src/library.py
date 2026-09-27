@@ -525,9 +525,13 @@ def edition_from_dirname(name: str) -> str:
     folder still matches its tags - `album["edition"]` is not a substitute, since the scan
     rewrites it to "Standard" further down.
     """
-    if name.endswith("]") and "[" in name:
-        return name[name.rindex("[") + 1:-1].strip()
-    return ""
+    #? read through the same template that named it (v0.9.17) - under the default this is the
+    #? trailing `[...]` it has always been, and under one that moved the edition, that's where
+    #? it is looked for instead
+    from src.naming import edition_from_folder
+    from src.organizer import album_folder_template
+
+    return edition_from_folder(album_folder_template(), name)
 
 
 def read_album_dir(directory: Path, library_root: Path) -> dict | None:

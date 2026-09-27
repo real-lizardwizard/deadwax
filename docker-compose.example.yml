@@ -80,6 +80,10 @@ services:
       # Off by default; different pressings still get their own folders, by catalogue number.
       #- COUNTRY_IN_FOLDER=off
       #
+      # how an album folder is named, e.g. "{year} - {album} [{edition}]". Unset is the default,
+      # "{album} ({year}) [{edition}]"; the artist folder above it is always the artist.
+      #- ALBUM_FOLDER_TEMPLATE={album} ({year}) [{edition}]
+      #
       # on | off - move a failed download to the next peer from the list you picked it from, by
       # itself. Off by default; "Try next peer" on the download works either way.
       #- AUTO_RETRY_PEER=off
