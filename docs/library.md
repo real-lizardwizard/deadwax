@@ -129,7 +129,9 @@ and album tags. You:
    folder, it writes the tags, pauses (20 seconds by default, `RETAG_RENAME_WAIT`), then
    renames. That pause lets Navidrome see the new tags first and keep the album's plays,
    ratings and favourites, which it loses when both change at once. The preview says so, and
-   the button counts it down.
+   the button counts it down. If a folder of the new name appears during the pause (another
+   copy of the same release applied just before), the rename is refused and the album stays
+   where it is, with its new tags.
 
 ![The metadata editor on an untagged rip of Third: its issues listed, the release picked, and the preview of the tags, the cover and the folder move](../assets/images/editor.png)
 

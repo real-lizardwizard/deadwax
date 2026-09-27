@@ -1127,7 +1127,16 @@ export function LibraryView({ active, onNavigate }: Props) {
             const oldPath = editing.path
             const fresh = await reload(false)
             recountBadge()
-            const updated = syncEditing(fresh, newPath)
+
+            /*
+             * An apply can land many seconds after the click - it pauses before a rename so
+             * Navidrome keeps the album's plays (v1.0.1) - and by then the user may have closed
+             * the editor or stepped on to another album. So the editor follows the album only if
+             * it is STILL showing it: re-pointing it unconditionally reopened a closed editor, or
+             * put the next album's chosen release in front of this album's folder (v1.0.2).
+             */
+            const updated = fresh.find((album) => album.path === newPath)
+            if (updated) setEditing((current) => (current && current.path === oldPath ? updated : current))
 
             //? the details pane follows the album to its new folder, rather than falling back
             //? to the overview because the path it was showing no longer exists
@@ -1136,11 +1145,12 @@ export function LibraryView({ active, onNavigate }: Props) {
               if (group) setSelectedId(nodeIdForAlbum(updated, group))
             }
 
-            //? the queue is holding paths and this album's has just changed under it
+            //? the queue is holding paths and this album's has just changed under it - found by
+            //? its old path, not by the current index, which may have moved on since the click
             if (review) {
               setReview((current) => current && {
                 ...current,
-                paths: current.paths.map((path, i) => (i === current.index ? newPath : path)),
+                paths: current.paths.map((path) => (path === oldPath ? newPath : path)),
               })
             }
           }}

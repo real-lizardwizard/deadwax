@@ -20,8 +20,9 @@ In order of likelihood:
    isn't mounted into the container looks perfectly correct from outside.
 4. **Permissions.** Files are written as `PUID`/`PGID`. If the library folder belongs to someone
    else, writing fails and the log says so.
-5. **The album was already there.** A track is never written over one of the same name, so a
-   second copy of an album is skipped, and the download says so.
+5. **The album was already there.** A track the album's folder already has (in any format) is
+   never filed again, so a second copy of an album is left in slskd's folder, and the download
+   reads *already in the store*. See [organizing](organizing.md).
 
 ## The slskd pill is red
 
@@ -125,8 +126,10 @@ variable of its own; the log warns about this at start-up.
 deadwax only accepts changes from its own page, to stop another website you have open from
 deleting albums or starting downloads through your browser. It checks that each request comes
 from the address deadwax is being reached at. If you reach it through a reverse proxy that
-rewrites the `Host` header (nginx does unless you add `proxy_set_header Host $host;`), every
-change looks as if it came from somewhere else. Either pass the original `Host` through, or set
+rewrites the `Host` header (nginx does by default), every change looks as if it came from
+somewhere else. Either pass the original `Host` through - in nginx,
+`proxy_set_header Host $http_host;`, which keeps the port (`$host` drops it, so a proxy on a port
+other than 80 or 443 also needs `proxy_set_header X-Forwarded-Port $server_port;`) - or set
 `TRUSTED_ORIGINS` in the container's environment to the address you open deadwax at, such as
 `https://music.example.com`. The event log names the address it refused.
 

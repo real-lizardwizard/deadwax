@@ -87,7 +87,7 @@ the tab's own overrides are stored, and `PUID`/`PGID` are used before the app st
 | setting | default | what it does |
 | --- | --- | --- |
 | `PUID` / `PGID` | `1000` / `1000` | the user and group the app runs as, and so the owner of every file it writes. Match them to slskd and your other media containers. |
-| `TRUSTED_ORIGINS` | | environment only. deadwax refuses changes that another website sends, by checking each request's `Origin` against the address it's being reached at. Behind a reverse proxy that rewrites the `Host` header (nginx does unless told `proxy_set_header Host $host`), every change looks foreign. List the address you open deadwax at here, comma-separated with the scheme, e.g. `https://music.example.com`. It can't be set in the settings tab, because it guards that tab's own save. |
+| `TRUSTED_ORIGINS` | | environment only. deadwax refuses changes that another website sends, by checking each request's `Origin` against the address it's being reached at. Behind a reverse proxy that rewrites the `Host` header (nginx does unless told `proxy_set_header Host $http_host`), every change looks foreign. List the address you open deadwax at here, comma-separated with the scheme, e.g. `https://music.example.com`. It can't be set in the settings tab, because it guards that tab's own save. |
 
 ## Preferences (per browser)
 

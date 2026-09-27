@@ -449,7 +449,7 @@ async def retag_preview(body: RetagRequest):
         plan["art"]["size"] = Config.COVER_ART_SIZE
         #? seconds the apply will pause between tags and rename, so the editor can say so up
         #? front rather than leave Apply looking stuck (v1.0.1)
-        plan["rename_wait"] = rename_wait_seconds() if changes_player_ids(plan) else 0
+        plan["rename_wait"] = rename_wait_seconds() if changes_player_ids(plan, body.release.model_dump()) else 0
         return plan
 
     except Exception as e:
@@ -470,6 +470,21 @@ async def retag_apply(request: Request, body: RetagRequest):
     if not Config.LIBRARY_PATH:
         raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
 
+    #? One apply per album at a time (v1.0.2). With the pause before a rename, a second apply of
+    #? the same folder could otherwise plan against it mid-way; queued behind the first, it plans
+    #? against what the first left - and is refused plainly if the folder has moved.
+    async with _apply_lock(body.album_path):
+        return await _retag_apply(request, body)
+
+
+_APPLY_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _apply_lock(album_path: str) -> asyncio.Lock:
+    return _APPLY_LOCKS.setdefault(album_path, asyncio.Lock())
+
+
+async def _retag_apply(request: Request, body: "RetagRequest"):
     release = body.release.model_dump()
 
     try:
@@ -492,9 +507,13 @@ async def retag_apply(request: Request, body: RetagRequest):
         #? can't pair the album with what it had, and every user's plays, ratings and favourites
         #? on it go missing. Given a moment between, its watcher sees the new tags where the
         #? album already is, carries everything across, and then follows the rename as a move.
-        wait = rename_wait_seconds() if changes_player_ids(plan) else 0
+        wait = rename_wait_seconds() if changes_player_ids(plan, release) else 0
         results = await asyncio.to_thread(execute_retag, plan, release, "apply", art, wait == 0)
         if wait:
+            #? the tags are on disk now: forget and save before the pause, so a container stopped
+            #? during it (Docker's grace is 10s) doesn't restart onto a saved scan of the OLD tags
+            forget_cached_album(plan["source"])
+            await _persist_cache(request)
             if not results["failed"]:
                 logger.info(
                     f"tags written in {Path(plan['source']).name}; waiting {wait}s for Navidrome "

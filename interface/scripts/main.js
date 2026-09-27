@@ -964,7 +964,12 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
         album_artist: getCurrentArtistNames(release['artist-credit']) || releaseGroupContext.albumArtist,
         artist_mbids: getArtistIds(release['artist-credit']),
         album: release.title || releaseGroupContext.album,
-        year: rawDate ? rawDate.substring(0, 4) : releaseGroupContext.year,
+        year: rawDate ? rawDate.substring(0, 4) : realYear(releaseGroupContext.year),
+        // the ALBUM's year, from the group's first release - what the folder is named after,
+        // so a 2014 vinyl of a 1994 album files under 1994 (see organizer.build_target_path).
+        // The editor has always sent it; downloads never did, which mattered little until a
+        // card's Find began standing for a real pressing in 1.0.1 - often a later one.
+        original_year: realYear(releaseGroupContext.year),
         release_mbid: release.id,
         edition_tags: getEditionTags(release),
         tracks,
@@ -1002,7 +1007,8 @@ function buildExpectedFromReleaseGroup(releaseGroupContext) {
         album_artist: releaseGroupContext.albumArtist,
         artist_mbids: releaseGroupContext.artistMbids,
         album: releaseGroupContext.album,
-        year: releaseGroupContext.year,
+        year: realYear(releaseGroupContext.year),
+        original_year: realYear(releaseGroupContext.year),
         release_mbid: null,
         release_group_mbid: releaseGroupContext.releaseGroupId || null,
         edition_tags: [],
@@ -1028,6 +1034,12 @@ function getArtistId(artistCredit){
 function getYear(dateStr) {
     if (!dateStr) return 'N/A';
     return dateStr.substring(0, 4);
+}
+
+//? getYear() is for DISPLAY and says 'N/A'; a payload wants a year or nothing, or an undated
+//? album files as "Album (N/A)".
+function realYear(year) {
+    return /^\d{4}$/.test(year || '') ? year : null;
 }
 
 
