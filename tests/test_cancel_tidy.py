@@ -35,7 +35,7 @@ class SlowCancellingSlskd:
                  for tid, state in self.states.items() if tid not in self.removed]
         return [{"username": "bob", "directories": [{"directory": "share/album", "files": files}]}]
 
-    async def get_downloads(self):
+    async def get_downloads(self, usernames=()):
         #? whatever was cancelled since the last look has now settled
         for tid in self.pending_cancel:
             self.states[tid] = "Completed, Cancelled"
@@ -95,7 +95,7 @@ def test_a_cancel_that_has_not_settled_is_asked_again_once_it_has():
 
 def test_the_tidy_gives_up_after_its_wait_and_leaves_the_rest_for_later(monkeypatch):
     class NeverSettles(SlowCancellingSlskd):
-        async def get_downloads(self):
+        async def get_downloads(self, usernames=()):
             return self._listing()
 
     slskd = NeverSettles({"01": "InProgress", "02": "InProgress"})
@@ -151,7 +151,7 @@ def test_on_start_with_nothing_cancelled_it_never_asks_slskd(tmp_path):
     seed(store, "organized")
 
     class Untouchable:
-        async def get_downloads(self):
+        async def get_downloads(self, usernames=()):
             raise AssertionError("asked slskd for nothing")
 
     assert asyncio.run(tidy_cancelled_on_start(Untouchable(), store)) == 0

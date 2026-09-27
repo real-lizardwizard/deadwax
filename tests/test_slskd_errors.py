@@ -16,6 +16,7 @@ the payloads here are slskd's own documented shapes, so a refusal can be rehears
 """
 
 import asyncio
+from types import SimpleNamespace
 import sys
 from pathlib import Path
 
@@ -281,3 +282,57 @@ def test_a_payload_that_is_not_an_object_is_not_a_disconnection():
     for payload in ([], "Disconnected", 0):
         assert describe_server_state(payload)["ok"] is True, payload
     assert describe_server_state({"server": "Disconnected"})["ok"] is True
+
+
+# ---------------------------------------------------------------- downloads, one peer at a time
+
+class FakeTransfersSession:
+    """slskd's per-user downloads endpoint behind slskd_api's session: raises on a non-2xx."""
+
+    def __init__(self, holding, fail_for=()):
+        self.holding, self.fail_for, self.asked = holding, set(fail_for), []
+
+    def get(self, url):
+        from urllib.parse import unquote
+        username = unquote(url.rsplit("/", 1)[1])
+        self.asked.append(url)
+        if username in self.fail_for:
+            raise HTTPError("500 Server Error", response=FakeResponse(500, text="boom"))
+        if username not in self.holding:
+            raise HTTPError("404 Client Error", response=FakeResponse(404))
+        return FakeResponse(200, body={"username": username, "directories": self.holding[username]})
+
+
+def downloads_for(usernames, holding, fail_for=()):
+    from src.api.slskd_endpoint import SlskdClient
+    session = FakeTransfersSession(holding, fail_for)
+    client = SlskdClient()
+    client.client = SimpleNamespace(transfers=SimpleNamespace(api_url="http://slskd/api/v0", session=session))
+    return asyncio.run(client.get_downloads(usernames)), session.asked
+
+
+def test_downloads_are_asked_for_only_the_peers_named():
+    """
+    v0.9.29: slskd's full list is every download it has kept, 2.3 MB a poll for 300 finished
+    albums - fetched twice a second with the panel open. Each caller names its jobs' peers.
+    """
+    got, asked = downloads_for(["bob", "ann", "bob", ""], {"ann": [{"files": []}], "bob": [], "cat": []})
+    assert sorted(u["username"] for u in got) == ["ann", "bob"]
+    assert len(asked) == 2, "each peer asked once, and a blank name not at all"
+
+
+def test_a_peer_slskd_holds_nothing_for_is_absent_not_a_failure():
+    """Its 404 means exactly what missing from the full list meant."""
+    got, _ = downloads_for(["ann", "gone"], {"ann": []})
+    assert [u["username"] for u in got] == ["ann"]
+
+
+def test_any_other_failure_answers_nothing_rather_than_a_partial_list():
+    """A job missing from a partial answer would look like its peer had vanished."""
+    got, _ = downloads_for(["ann", "bob"], {"ann": [], "bob": []}, fail_for={"bob"})
+    assert got == []
+
+
+def test_a_username_is_encoded_whole():
+    _, asked = downloads_for(["a/b c"], {"a/b c": []})
+    assert asked == ["http://slskd/api/v0/transfers/downloads/a%2Fb%20c"]

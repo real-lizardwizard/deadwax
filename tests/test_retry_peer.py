@@ -48,7 +48,7 @@ class Slskd:
         self.asked.append(username)
         return (False, f"slskd couldn't queue it: User {username} appears to be offline") if username in self.refuse else (True, "")
 
-    async def get_downloads(self):
+    async def get_downloads(self, usernames=()):
         return []
 
     async def cancel_download(self, *a, **k):
@@ -159,7 +159,7 @@ def test_the_poller_moves_a_failure_on_only_when_asked_to(tmp_path, monkeypatch,
     monkeypatch.setattr(Config, "AUTO_RETRY_PEER", setting)
 
     class Failing(Slskd):
-        async def get_downloads(self):
+        async def get_downloads(self, usernames=()):
             return failing_transfers()
 
     asyncio.run(poll_downloads_once(Failing(), store, {}))

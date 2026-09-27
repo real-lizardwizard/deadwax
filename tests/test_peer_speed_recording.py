@@ -32,7 +32,7 @@ class FakeSlskd:
     def __init__(self):
         self.downloads = []
 
-    async def get_downloads(self):
+    async def get_downloads(self, usernames=()):
         return self.downloads
 
 

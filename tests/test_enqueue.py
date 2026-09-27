@@ -102,10 +102,12 @@ def test_queue_positions_are_asked_side_by_side_and_land_on_the_right_jobs(tmp_p
         def __init__(self):
             self.in_flight = self.most = 0
 
-        async def get_downloads(self):
+        async def get_downloads(self, usernames=()):
+            #? only the users asked about - so a /jobs that forgot one would lose its position
+            wanted = set(usernames)
             return [{"username": u, "directories": [{"files": [
                 {"id": f"t-{u}", "filename": f"{u}.flac", "state": "Queued, Remotely",
-                 "percentComplete": 0, "size": 1}]}]} for u in ("ann", "bob", "cat")]
+                 "percentComplete": 0, "size": 1}]}]} for u in ("ann", "bob", "cat") if u in wanted]
 
         async def queue_position(self, username, transfer_id):
             self.in_flight += 1

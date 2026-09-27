@@ -55,7 +55,7 @@ async def poll_downloads_once(
             rate_samples.clear()
         return
 
-    downloads = await slskd_client.get_downloads()
+    downloads = await slskd_client.get_downloads(job["username"] for job in open_jobs)
     transfers_by_user = index_transfers_by_user(downloads)
 
     for job in open_jobs:
@@ -338,7 +338,7 @@ async def tidy_cancelled_transfers(slskd_client, jobs: list[dict]) -> tuple[int,
     completed transfer is a no-op cancel and a real remove. Removal is slskd's soft delete: the
     record stays in its database, it just leaves the list.
     """
-    downloads = await slskd_client.get_downloads()
+    downloads = await slskd_client.get_downloads(job["username"] for job in jobs)
     transfers_by_user = index_transfers_by_user(downloads)
 
     removed = waiting = 0

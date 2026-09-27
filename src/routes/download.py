@@ -453,7 +453,9 @@ async def jobs(request: Request):
 
         transfers_by_user = {}
         if any(j["status"] in OPEN_STATUSES for j in stored):
-            downloads = await request.app.state.slskd_client.get_downloads()
+            downloads = await request.app.state.slskd_client.get_downloads(
+                j["username"] for j in stored if j["status"] in OPEN_STATUSES
+            )
             transfers_by_user = index_transfers_by_user(downloads)
 
         summaries = [
@@ -505,18 +507,6 @@ async def jobs(request: Request):
         raise HTTPException(status_code=500, detail=f"Error fetching download jobs: {e}")
 
 
-@router.get("/downloads")
-async def downloads(request: Request):
-    """Raw slskd transfer list, untouched. Handy for debugging what the poller is seeing."""
-    try:
-        slskd_client = request.app.state.slskd_client
-        return {"downloads": await slskd_client.get_downloads()}
-
-    except Exception as e:
-        logger.error(f"Exception in /downloads endpoint: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching downloads: {e}")
-
-
 async def _first_queue_position(slskd_client, job: dict, transfers_by_user: dict) -> int | None:
     wanted = {f["filename"] for f in job["files"]}
 
@@ -547,7 +537,7 @@ async def cancel_job(request: Request, job_id: int):
             raise HTTPException(status_code=404, detail="No such download job")
 
         slskd_client = request.app.state.slskd_client
-        downloads = await slskd_client.get_downloads()
+        downloads = await slskd_client.get_downloads([job["username"]])
         transfers_by_user = index_transfers_by_user(downloads)
 
         wanted = {f["filename"] for f in job["files"]}

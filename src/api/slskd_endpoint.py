@@ -522,23 +522,48 @@ class SlskdClient:
             return None
 
 
-    async def get_downloads(self) -> list[dict]:
+    async def get_downloads(self, usernames) -> list[dict]:
         """
-        All current downloads, grouped by user then directory.
+        What slskd holds from these users, in the shape of its full list: [{username, directories}].
+
+        Asked user by user (v0.9.29). Every caller wants the transfers of a few jobs' peers, and
+        slskd's full list is every download it has kept - it only shrinks when somebody clears it -
+        fetched twice a second while the downloads panel is open. 300 finished albums there is
+        2.3 MB of JSON a poll; one peer's is a few KB. The asks go side by side.
 
         Never raises: this is read on every downloads-panel refresh and by the poller, and a
         misconfigured or briefly unreachable slskd should degrade to "no live progress"
         rather than breaking the whole panel. get_client() is inside the try for that reason
-        - it throws on missing config.
+        - it throws on missing config. As before, one failure answers nothing at all, not a
+        partial list: a job missing from a partial one would look like its peer had vanished.
         """
+        names = sorted({name for name in usernames if name})
+        if not names:
+            return []
+
         try:
             client = await self.get_client()
-            return await asyncio.to_thread(client.transfers.get_all_downloads, includeRemoved=False)
+            answers = await asyncio.gather(*(asyncio.to_thread(self._user_downloads, client, n) for n in names))
+            return [answer for answer in answers if answer]
 
         except Exception:
             logger.error("failed to fetch downloads from slskd", extra={"frontend": True, "src": "slskd"})
             logger.error(traceback.format_exc())
             return []
+
+    @staticmethod
+    def _user_downloads(client, username: str) -> dict | None:
+        """One user's downloads, or None when slskd holds none - its 404, and no failure."""
+        transfers = client.transfers
+        #? encoded whole, a "/" included - slskd_api's own quote() leaves that one as a path separator
+        url = transfers.api_url + f"/transfers/downloads/{quote(username, safe='')}"
+        try:
+            return transfers.session.get(url).json()
+        except HTTPError as exc:
+            #? slskd_api's session raises on a non-2xx (see enqueue)
+            if getattr(exc.response, "status_code", None) == 404:
+                return None
+            raise
 
 
     async def ping(self) -> dict:

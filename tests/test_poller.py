@@ -24,9 +24,11 @@ class FakeSlskd:
         self.downloads = downloads or []
         self.calls = 0
 
-    async def get_downloads(self):
+    async def get_downloads(self, usernames=()):
+        #? like slskd's per-user endpoint: only the users asked about
         self.calls += 1
-        return self.downloads
+        wanted = set(usernames)
+        return [user for user in self.downloads if user.get("username") in wanted]
 
 
 FILES = [{"filename": "share/album/01.flac", "size": 30000000},
