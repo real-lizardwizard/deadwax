@@ -40,6 +40,8 @@ Each row is one folder on one user's share:
 - **Edition words** found in the folder's name (REMASTER, DELUXE, …).
 - **Signal chips**, the score broken down: titles, count, lengths, edition, format, peer.
 
+![The candidates panel for Dummy: each folder's score, its user, format and size, the peer's speed and slot, and the six signal chips](../assets/images/candidates.png)
+
 ## Narrowing the list
 
 - **Free slot only** and **Complete albums only** hide busy peers and folders missing tracks.
@@ -87,6 +89,8 @@ files wanted, **queue #N** while waiting in the user's queue, and the live downl
 | cancelled | you cancelled it |
 
 When a download is filed, the library tab picks the new album up by itself.
+
+![The downloads panel: downloading, queued at #4, failed with the next peer offered, and organized](../assets/images/downloads.png)
 
 ### When a download fails
 

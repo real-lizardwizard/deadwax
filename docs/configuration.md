@@ -5,6 +5,8 @@ where your library is, how albums are filed. **Preferences** belong to your brow
 search results to ask for, which candidate filters start switched on. Both are edited in the
 **Settings** tab, which has five pages: Search, Downloads, Library, Connections and Interface.
 
+![The Connections page of the settings tab, saying where each setting came from](../assets/images/settings.png)
+
 ## Where a server setting comes from
 
 A server setting can be given in three places. The first one found wins:

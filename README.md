@@ -15,9 +15,9 @@ A one-page interface for finding music on MusicBrainz, pulling it down through s
 
 Pick the release you actually want, and deadwax searches Soulseek, ranks what comes back against that release's real tracklist, and shows you why each candidate scored what it did. One click queues it; when it finishes it gets tagged from the MusicBrainz data and filed into your library. Then the **library tab** shows you what you've actually got — including when you're holding three different pressings of the same record — and lets you correct anything that landed wrong.
 
-![deadwax — twenty pressings of one album, with the tracklist of the one you picked](assets/images/search.png)
+![deadwax — twenty pressings of one album, with the tracklist most of them share and what each one changes about it](assets/images/search.png)
 
-<sub>Twenty pressings of *Dummy* — vinyl, CD, cassette, SHM-CD, across seven countries — with the tracklist of the one you picked. The filter column builds itself from whatever is on screen.</sub>
+<sub>Twenty pressings of *Dummy* — vinyl, CD, cassette, SHM-CD, across seven countries — under the tracklist twelve of them share, each saying only what it changes: the 2017 vinyl drops "It's a Fire" and carries a shorter "Biscuit". The card knows two pressings of it are already in the library, and each one's row is marked. The filter column builds itself from whatever is on screen.</sub>
 
 <!--
   These are captured from the running app against the live MusicBrainz API, at 2x. The one
@@ -125,6 +125,10 @@ The speed on a candidate reads <code>peer avg</code> because that is what Soulse
 It searches under every name the artist has put records out under, because Soulseek needs every word of a search somewhere in a share's path — so a search for "Ye BULLY" can never find a share filed under <code>Kanye West/</code>. It tries the name on the release, the name the artist goes by now, and any name MusicBrainz marks as one they've stopped using, all at once rather than one after another. For an artist who never renamed, which is nearly everyone, that's one search as before, and it never waits on MusicBrainz to start. The query box shows the first name; hover it to see the others, and editing it (then Re-search, or Enter) searches exactly what you typed.
 <br><br>
 Once you've actually downloaded from someone, the row leads with <code>you got 780 KB/s</code> instead — what deadwax measured itself while bytes were moving, with queue time excluded. Nothing in the Soulseek protocol will tell you a transfer's speed before it starts, so this is the closest thing to an answer there is, and it's the one number on the row that was measured rather than claimed. It builds up as you use it: peers you've never downloaded from simply don't have it.
+<br><br>
+
+![Soulseek folders offering Dummy, each scored against the release's tracklist, with the six signals behind every score](assets/images/candidates.png)
+
 </details>
 
 ### An artist's discography, in order
@@ -173,6 +177,10 @@ The marks come from the saved scan, so they cost nothing and never hold a search
 deadwax keeps the link between a download and the MusicBrainz release that started it, in a small sqlite database. That's what makes tagging possible later, and it's why the downloads panel can tell you what an in-flight transfer actually is — with live progress, queue position, and a real transfer rate worked out from byte deltas rather than slskd's cumulative average, which only ever creeps upward.
 <br><br>
 Cancelling and clearing respond on the click rather than after the round-trip to slskd and back, so the buttons feel connected to something. The prediction is dropped the moment the server disagrees, and abandoned entirely if it never answers. A cancelled download also leaves slskd's own transfer list, once slskd has finished cancelling it, rather than sitting in its history for ever. A download that fails, or that you cancel, can move to the next peer from the list you picked it from — the list as you had it filtered and sorted — with one click on <em>↻ next peer</em>, skipping any peer already tried; turn on <code>AUTO_RETRY_PEER</code> in the settings tab and it happens by itself. A new download is in the panel the moment you press Download, reading <em>asking slskd…</em> while slskd connects to the peer (which can take a few seconds), and if slskd can't queue it, the row says why — usually that the peer is offline.
+<br><br>
+
+![The downloads panel: one album coming in, one waiting in a peer's queue, one refused with the next peer a click away, and one filed](assets/images/downloads.png)
+
 </details>
 
 ### Tagging and filing, with editions kept apart
@@ -236,6 +244,8 @@ A picker shows every candidate each source offered — TheAudioDB usually has fo
 
 Without a key you still get a photo where Commons has one, and the rest of the page is unaffected.
 
+![Portishead's artist page: the photograph from Wikimedia Commons, what MusicBrainz knows about them, the line-up and their albums in the library](assets/images/artist.png)
+
 ### CD art, and the pictures inside your files
 <details>
 <summary style="font-style:italic">Why a song can show a different picture from its album, and what to do about it</summary>
@@ -282,6 +292,10 @@ Multi-disc releases are tagged per disc, the way MusicBrainz and every player nu
 Covers are saved at 500 × 500 unless you choose otherwise: <strong>Cover art</strong> in the settings tab offers 250, 500, 1200 or <em>full size</em>, which is the original upload — often thousands of pixels and several megabytes. It applies to "Get cover", the bulk fetch and the editor alike, and the editor says which size it will save.
 <br><br>
 An album kept one folder per disc — <code>Album (Disc 1)</code>, <code>Album (Disc 2)</code> — shows as one album in two <em>disc folders</em> rather than as two editions, and the metadata queue flags it. Applying the release to each folder puts the discs back together in one: the second joins the first, but only once it's certain they're the same release and different discs, and nothing already there is ever overwritten.
+<br><br>
+
+![The metadata editor on a stranger's rip of Portishead's Third: no release id, the wrong folder, no original year. Picking the pressing previews every tag it writes, the cover it fetches, and the folder it moves to](assets/images/editor.png)
+
 </details>
 
 Tags now record **who** as well as what: `musicbrainz_albumartistid` and `musicbrainz_artistid` go in alongside the release ids, so a library deadwax filed says which artist it means rather than leaving the name to be matched later. A track credited to somebody else — a split, a compilation, a guest spot — keeps its own artist instead of being given the album's, and credits read the way MusicBrainz writes them: "A / B", "A & B", "A feat. B", rather than everything flattened to a comma.
@@ -318,7 +332,7 @@ It still reports, which is half the point. For every setting: the value this con
 It resolves the paths rather than trusting them, which is the point. <code>SLSKD_DOWNLOAD_PATH</code> pointing at a path that exists on the <em>host</em> but not inside the container is the most common first-run failure by a wide margin, and it is invisible from the value — the string looks perfectly correct. It also answers "why did nothing get filed" once, in a sentence, with every reason listed, rather than leaving you to infer it from four separate rows. The API key is never sent to the browser at all.
 <br><br>
 
-![The settings tab, reporting where each setting came from](assets/images/settings.png)
+![The settings tab's Connections page, saying where each setting came from and never showing a key](assets/images/settings.png)
 
 </details>
 
@@ -349,7 +363,11 @@ Then every view was gone through again at phone sizes (320, 375 and 390px wide, 
 - **No accidental zooming**: text fields are 16px, below which an iPhone zooms the whole page when you tap one. Every button, checkbox and menu item is big enough to hit with a thumb.
 <br><br>
 
-![deadwax on a phone](assets/images/mobile.png)
+<p>
+<img src="assets/images/mobile.png" width="300" alt="Searching on a phone: the album card, the shared tracklist, and a pressing laid out as a block">
+&nbsp;&nbsp;
+<img src="assets/images/mobile-library.png" width="300" alt="An album's tracks on a phone: number, title, length">
+</p>
 
 </details>
 

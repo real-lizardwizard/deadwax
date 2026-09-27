@@ -63,6 +63,12 @@ as a sheet over the tree. A few gestures are phone-specific:
 - The filter lists on the search and library views are collapsed behind a **Show** button to
   keep them out of the way.
 
+<p>
+<img src="../assets/images/mobile.png" width="280" alt="Searching on a phone">
+&nbsp;&nbsp;
+<img src="../assets/images/mobile-library.png" width="280" alt="An album's tracks on a phone">
+</p>
+
 ## For developers
 
 [CLAUDE.md](../CLAUDE.md) is the working notes: every design decision, and why. The

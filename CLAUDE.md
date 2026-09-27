@@ -2387,6 +2387,31 @@ suffix (`[GB]`, `[AU]`) - that WAS what deadwax named them until v0.8.3 made the
 (`COUNTRY_IN_FOLDER`), and the capture renamed them by hand for tidier pictures; and a wait on
 `.track-table-row` is what says the library pane has drawn.
 
+**v0.9.33 recaptured all six and added six (twelve in `assets/images/`, also embedded in `docs/`),
+the same way, on the same generated library.** What it took beyond the above:
+
+- **The candidates and downloads shots need a fuller fake slskd** than the one-endpoint stub: one
+  that answers EVERY search with the same handful of realistically named Dummy folders (exact
+  rips, a 24/96 remaster, a 320, one missing a track, one of bare `Track NN` names), sized from the
+  real track lengths so the scores and chips are the matcher's own; and that reports an enqueued
+  download's transfers as moving, with a head start so the bar is part-way.
+- **The panel's other rows are SEEDED**: a fresh database with an organized, a failed (with
+  runners-up, so "next peer" shows) and a queued job inserted straight into `jobs`, the queued
+  one's transfers handed to the fake as waiting at queue #4; plus one `import` review row (the
+  NEW chip and the tab badge) and one `peer_speed` row (the green "you got"). The live one is a
+  real Download click. Reseed before the final run - a second run adds a second Dummy job.
+- **The editor shot is STAGED and undone**: a copy of an album moved to the library root as a
+  stranger's rip, its MusicBrainz tags, original date and cover stripped, then the real folder
+  put back. Opened on an album deadwax filed itself, the editor has nothing honest to show - and
+  on a vinyl pressing it proposes a `[12_ Vinyl]` folder, which is real behaviour and reads as
+  a bug in a picture. Pick the release whose preview renames to the plain folder.
+- **The artist page's picture is a saved `artist.jpg`**, so the capture saves the Commons photo
+  through Artist images first; the page shows a placeholder until something has.
+- Driving it: a tab button's text includes its badge, so match it with `has_text`, not an exact
+  text; on a phone, tapping an album of several editions opens the sheet over the tree, so the
+  phone library shot opens a single-edition album; and `glob` reads `[FLAC]` in a folder name as
+  a character class (`glob.escape`).
+
 - **`--screenshot` and `--virtual-time-budget` cannot do this, and two attempts hung proving
   it.** The flag fires once load settles, which is before any driving has happened. Virtual
   time is the usual answer and it does not work here either: deadwax polls continuously, so
@@ -2969,7 +2994,7 @@ A green suite here means the logic is sound, not that it works against real infr
    re-search behave against a live search. **Stubbing the fetch is a cheap way to look at
    this panel again** — it needs no slskd and takes one `window.fetch` override.
 8. ~~Recapture `assets/images/library.png`~~ **Done in v0.6.21**, with the other four, for the
-   rename. See "Capturing screenshots" for how the library was built.
+   rename, and **all of them again in v0.9.33**, with six new ones. See "Capturing screenshots".
 9. ~~An album stored one folder per disc shows as "editions"~~ **Done in v0.9.13** - see
    "Albums stored one folder per disc".
 10. **Upgrade the local Node to 22** so `npm run build` works again without the rolldown

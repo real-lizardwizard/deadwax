@@ -395,6 +395,7 @@ function ArtistImagePicker(
         <div class="artist-images-search">
           <input
             type="search"
+            class="releases-filter-input"
             value={query}
             placeholder="Search MusicBrainz for an artist"
             aria-label="Search MusicBrainz for an artist"

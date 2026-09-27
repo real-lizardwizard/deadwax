@@ -34,6 +34,8 @@ opens to one row per edition first.
 
 It stays quick on a big library: only the rows in view are ever drawn.
 
+![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience edition in the details pane](../assets/images/library.png)
+
 ### Arranging
 
 **Arrange by**: **Artist** (the tree above), **Album**, **Release date** or **Date added**.
@@ -125,6 +127,8 @@ and album tags. You:
 5. **Apply** writes the tags, fetches the cover and moves the folder. There's no undo, which is
    why the preview shows everything first.
 
+![The metadata editor on an untagged rip of Third: its issues listed, the release picked, and the preview of the tags, the cover and the folder move](../assets/images/editor.png)
+
 ## Editing tags by hand
 
 Tick tracks in the track table (Shift-click for a range, Ctrl/Cmd-click for one at a time), then
@@ -156,6 +160,8 @@ album artist, track, disc, date, original date, genre and composer:
   the details in its tooltip). **Get lyrics · N** does every album in view that has no lyrics at
   all.
 
+![A track's synced lyrics, with the time beside each line](../assets/images/lyrics.png)
+
 **Why a song can show a different picture from its album:** some players (Navidrome, and so
 apps like Amperfy) show a picture *embedded in the file* over the album's cover, and a disc scan
 (`cd.jpg`) for songs with a disc number. An album's **Properties** and a track's view list the
@@ -176,6 +182,8 @@ Which artist this is comes from the files' MusicBrainz artist ids. When the file
 name search is used, but only when exactly one artist has that name. For a name several artists
 share (there are eight called Nirvana), the page asks you to choose.
 
+![Portishead's artist page](../assets/images/artist.png)
+
 **Artist images…** shows every picture found, from Wikimedia Commons, TheAudioDB (with a key)
 and fanart.tv (with a key), and saves your choices into the artist's folder:
 
@@ -186,6 +194,8 @@ and fanart.tv (with a key), and saves your choices into the artist's folder:
 
 The extension is the picture's own (`.jpg`, `.png`…). Any picture can go in any slot, and a
 folder that holds tracks is refused, since an `artist.jpg` there would mean something else.
+
+![The Artist images dialog: the pictures found for each slot, and the square image already on disk](../assets/images/artist-images.png)
 
 **An artist who has renamed.** When MusicBrainz knows the artist by another name now, the page
 says **Now: …**. If their albums are filed under two folder names, **Move albums to …** moves

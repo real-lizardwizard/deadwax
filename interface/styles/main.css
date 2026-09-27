@@ -6076,7 +6076,13 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
 }
 
 .artist-images-footer > .win-button:last-of-type { margin-left: 0; }
-.artist-images-footer > .settings-check { margin-right: auto; }
+/* a LABEL here, holding the box - in the settings tab .settings-check is the box itself */
+.artist-images-footer > .settings-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-right: auto;
+}
 
 /*
  * What the library already holds, on a search card and on each pressing (v0.9.1).

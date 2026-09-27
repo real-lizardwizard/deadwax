@@ -49,6 +49,8 @@ only** on to start with. **Back** returns to your search.
 A browse stops at 500 albums, and says so if it did, so an enormous catalogue ("Various
 Artists") isn't presented as complete.
 
+![Dance Gavin Dance's eleven studio albums, oldest first](../assets/images/discography.png)
+
 ## Every pressing of an album
 
 Under each card is a list of its **releases**: every pressing MusicBrainz knows of. The best
@@ -76,6 +78,8 @@ only what *it* changes:
 
 Click (or tap) a pressing to see its changes in full, and click **Show this release's full
 tracklist** for the whole thing, sides and discs included.
+
+![Dummy's twenty pressings under the tracklist twelve of them share, the 2017 vinyl opened to show what it changes](../assets/images/search.png)
 
 ### Pressings you already have
 
