@@ -30,7 +30,8 @@
  * player four times a second to move one bar would be waste. Whatever shows it subscribes with
  * usePosition() below, and only that re-renders. From a seek until the element says it has landed,
  * what it hears is the seek's target (reportedPosition() in lib/scrub), so the bar never goes back
- * to where the song was while the seek is on its way.
+ * to where the song was while the seek is on its way. ui/test/player.sim.cjs drives this file
+ * through a fake DOM - the seek wiring, the readout across song changes, a gapless handover.
  */
 
 import { useEffect, useMemo, useState } from 'preact/hooks'
@@ -103,6 +104,9 @@ function describeMediaError(error: MediaError | null): string {
 
 /** How long "Skipped ..." stands where the artist's name goes before the next song's own returns. */
 const SKIP_NOTICE_MS = 5000
+
+/** HTMLMediaElement.HAVE_METADATA: the element knows the song's length, and a seek moves it. */
+const HAVE_METADATA = 1
 
 /** Why the song before this one was passed over, named - the line is shown under the NEXT song. */
 function skipNotice(title: string, error: MediaError | null): string {
@@ -374,19 +378,30 @@ export function usePlayer(): Player {
     }
 
     /**
-     * The element playing to `seconds`, clamped to the song; what it went to, or null with nothing
-     * loaded. Until it says it has landed, the bar is told the target - see reportedPosition().
+     * The element playing to `seconds`, clamped to the song; null with nothing loaded. Says what it
+     * went to, and whether a 'seeked' will answer.
+     *
+     * Until it says it has landed, the bar is told the target (see reportedPosition()) - but only
+     * for a seek that MOVES the element, which one still loading can't: before it has the song's
+     * start (HAVE_NOTHING) the time is only kept as where to begin, and once it has, both engines
+     * seek there only if it is past 0 (WebKit's setReadyState, and Chromium's). "Previous", or a
+     * tap at the far left, on a song still loading would otherwise hold the bar at 0:00 for
+     * PENDING_MAX_MS while the song played. A seek to where it already is moves nothing either.
      */
-    function seek(seconds: number): number | null {
+    function seek(seconds: number): { target: number; answered: boolean } | null {
       const audio = live()
       if (!audio.src) return null
       const length = Number.isFinite(audio.duration) ? audio.duration : Infinity
       const target = Math.max(0, Math.min(seconds, length))
+      const loaded = audio.readyState >= HAVE_METADATA
+      const moves = loaded && target !== audio.currentTime
       audio.currentTime = target
       state.lastPosition = audio.currentTime
-      state.pendingSeek = { target, since: performance.now() }
+      state.pendingSeek = moves ? { target, since: performance.now() } : null
       report(target)
-      return target
+      //? a loaded element answers every seek with 'seeked', even to where it is; one still loading
+      //? answers only a start past 0, when it gets there
+      return { target, answered: loaded || target > 0 }
     }
 
     /** "Previous" early in a song: the song again from the top, heard - and counted - afresh. */
@@ -490,12 +505,14 @@ export function usePlayer(): Player {
      * where it fits (memoryPlan()). An element left holding only an ADDRESS may have its buffer
      * thrown away on a locked phone, since a paused element in a hidden page is marked purgeable
      * in WebKit; a copy in memory is there whatever iOS does, and costs no trip to the server when
-     * its turn comes. Anything that doesn't go into memory - too big, a transcode, a download that
-     * failed - hands the standby the address instead, to buffer as iOS allows. AirPlay beginning
-     * while it downloads lets the standby go altogether (standbyPlan()).
+     * its turn comes. Anything that doesn't go into memory - too big, a download that failed -
+     * hands the standby the address instead, to buffer as iOS allows; a transcode goes straight to
+     * the address, never fetched. AirPlay beginning while it downloads lets the standby go
+     * altogether (standbyPlan()).
      */
     async function download(standby: Standby, element: AirPlayAudio, track: QueueTrack) {
       const address = streamUrl(track, canPlay)
+      const raw = streamFormat(track, canPlay) === 'raw'
       const controller = new AbortController()
       state.download = controller
       //? after every wait: still the standby's song, and nothing got ready for AirPlay
@@ -513,6 +530,13 @@ export function usePlayer(): Player {
         element.load()
       }
       if (!wanted()) return
+      //? A transcode never goes into memory (memoryPlan()), and that is known before asking: fetched
+      //? only to be abandoned, it would start a transcode on Navidrome and throw it away, and the
+      //? standby's own request would start a second.
+      if (!raw) {
+        byAddress()
+        return
+      }
       try {
         const response = await fetch(address, { signal: controller.signal })
         if (!wanted()) return
@@ -522,7 +546,7 @@ export function usePlayer(): Player {
           ok: response.ok,
           contentType: response.headers.get('Content-Type'),
           contentLength,
-          raw: streamFormat(track, canPlay) === 'raw',
+          raw,
         })
         if (plan === 'stream') {
           controller.abort()
@@ -692,12 +716,16 @@ export function usePlayer(): Player {
       },
       //? the scrubber and the lock screen's: a seek the listener made, during a song change, ends
       //? its timing - the position it jumps to isn't the clock running - and is the one the readout
-      //? follows to its song's end, to say where it really landed
+      //? follows to its song's end, to say where it really landed. One no 'seeked' will answer - to
+      //? the top of a song still loading, where it starts anyway - is nothing to follow, but it does
+      //? take the place of any seek before it.
       seek(seconds: number) {
         state.change = null
-        const target = seek(seconds)
+        const sought = seek(seconds)
         const track = current(state.queue)
-        if (target !== null && track) readSeek({ kind: 'asked', asked: target, length: songLength(), track: track.id })
+        if (!sought || !track) return
+        if (sought.answered) readSeek({ kind: 'asked', asked: sought.target, length: songLength(), track: track.id })
+        else readSeek({ kind: 'other seek' })
       },
       showAirPlay() {
         live().webkitShowPlaybackTargetPicker?.()
@@ -787,6 +815,9 @@ export function usePlayer(): Player {
       //? an element with no source reports an error too, which is not one worth showing
       if (!audio.src) return
       const failed = current(state.queue)
+      //? a seek on its way never lands in a song that failed under it
+      state.pendingSeek = null
+      readSeek({ kind: 'failed' })
       const action = afterPlaybackFailure({
         queue: state.queue,
         code: audio.error?.code ?? 0,
@@ -876,12 +907,18 @@ export function usePlayer(): Player {
       }],
       ['playing', () => {
         setBuffering(false)
+        //? with no seek in flight, none is on its way - the second guard, as at 'loadedmetadata'
+        if (!live().seeking) state.pendingSeek = null
         beginListen()
         //? NOT the end of a timed song change: WebKit sends 'playing' from inside play() for an
         //? element with data, before any sound - the change ends on the clock (timeChange())
         preloadSoon()
       }],
       ['loadedmetadata', () => {
+        //? A second guard: with no seek in flight, none is on its way. seek() only waits on a seek
+        //? the element can answer and a failure lets go of it, so nothing should be left by now -
+        //? but one left over a new load would never land, and would hold the bar for PENDING_MAX_MS.
+        if (!live().seeking) state.pendingSeek = null
         //? a song asked for again after it failed part-way picks up where it stopped
         if (state.resumeAt > 0) {
           const at = state.resumeAt
@@ -916,6 +953,7 @@ export function usePlayer(): Player {
       }],
       ['ended', onEnded],
       ['error', onFailure],
+      //? from the element playing only - the standby's answer can be stale (see routeEvent())
       ['webkitplaybacktargetavailabilitychanged', (event) => {
         setAirplay((event as AvailabilityEvent).availability === 'available')
       }],

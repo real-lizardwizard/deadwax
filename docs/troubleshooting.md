@@ -318,7 +318,7 @@ for it again.
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
 The [Gapless switch](player.md#gapless-playback-experimental) is an experiment, and the readout
-under the player's controls says how each song change went. Compare it with the switch off on the
+between the cover and the song's title says how each song change went. Compare it with the switch off on the
 same phone and connection: the difference is what the switch saves.
 
 - **`download unfinished`**: the next song hadn't finished downloading when this one ended, so it
@@ -334,6 +334,11 @@ same phone and connection: the difference is what the switch saves.
   asked for again; the time includes that.
 - **`one element (refused)`**: iOS wouldn't start the second player, and the song went on the one
   that was playing.
+- **The AirPlay button disappears with the switch on**: the button follows only the player that
+  is playing, since the silent second one can be wrong about whether a speaker is there. If it
+  still goes, lock and unlock the phone, which (going by Safari's source) makes both ask again;
+  AirPlay in Control Center
+  works whatever the button does. Say so if it happens.
 - **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
   held in memory ahead of time, and hi-res albums come close to that. Turn the switch off.
 
@@ -357,8 +362,9 @@ In a song of steady loudness they landed within a third of a second. Safari's cl
 time you asked for, not the time you hear. Chrome, Edge and other Chromium browsers landed exactly
 where asked every time.
 
-**The readout tells you when it happened.** Under the controls the player shows *Last seek: asked
-2:10, the player said 2:10*. Safari says the time asked for either way, so that can't show it, but
+**The readout tells you when it happened.** Between the cover and the song's title the player
+shows *Last seek: asked 2:10, the player said 2:10* (*interrupted* instead, if Previous, Next or
+a failure came before the seek got there). Safari says the time asked for either way, so that can't show it, but
 the end of the song can: if the seek landed off, the song runs out before its clock reaches the
 end, or plays on after the clock has stopped at the end, by the same amount. When the song gets
 to its end with no other seek or pause in between, the line adds how far off it was, for example

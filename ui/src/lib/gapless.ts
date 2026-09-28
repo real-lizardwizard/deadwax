@@ -182,13 +182,18 @@ export type EventRoute = 'player' | 'standby' | 'ignore'
  * one element. From the standby, only an error means anything - that its song won't load, so the
  * song change goes the one-element way - and nothing it sends may touch what the player shows or
  * counts: its 'pause', 'durationchange' or 'timeupdate' would otherwise stop the lock screen,
- * shorten the song or count listening nobody did. The one exception is whether an AirPlay device
- * is on the network, which is a fact about the network, not about the element that said it.
+ * shorten the song or count listening nobody did.
+ *
+ * That includes whether an AirPlay device is on the network. It reads like a fact about the
+ * network, but WebKit keeps it per element (MediaElementSession::m_hasPlaybackTargets, false until
+ * a change is broadcast), and an element made after the page started watching for devices - the
+ * standby, the moment the switch goes on - is never told the current answer. Each element also
+ * repeats its own answer on every load. So the standby's 'not-available' hid the AirPlay button
+ * as the switch went on, and its loads made the button come and go from song to song.
  */
 export function routeEvent(name: string, fromActive: boolean): EventRoute {
   if (fromActive) return 'player'
   if (name === 'error') return 'standby'
-  if (name === 'webkitplaybacktargetavailabilitychanged') return 'player'
   return 'ignore'
 }
 

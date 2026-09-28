@@ -2374,7 +2374,10 @@ guide's section is `docs/player.md#gapless-playback-experimental`.
   few hi-res files) - a size not declared is counted as it arrives (`overMemoryMax`). Two are held at
   the peak, the song playing and the next. Anything else hands the standby the ADDRESS (stage
   'stream'), to buffer as iOS allows. A transcode is left out because its length is Navidrome's
-  estimate and it may end short. iOS reloads a page that uses too much memory, which stops the music.
+  estimate and it may end short - and, since the review, is never FETCHED ahead either:
+  `download()` sees `streamFormat()` isn't 'raw' before asking and goes straight to the address.
+  (It used to fetch, start a transcode on Navidrome, read the headers, abandon it, and have the
+  standby start a second.) iOS reloads a page that uses too much memory, which stops the music.
 - **Nothing is got ready while AirPlaying** (review): `standbyPlan(..., wireless)` answers `none` or
   `clear` then, so `preloadSoon`/`preloadNow` do nothing, `download()` lets the standby go if AirPlay
   began while it waited (`wanted()`, after every await), and `webkitcurrentplaybacktargetiswirelesschanged`
@@ -2402,15 +2405,21 @@ guide's section is `docs/player.md#gapless-playback-experimental`.
   a song whose copy on Navidrome plays. `reload()` always goes to Navidrome for an element holding a
   `blob:`. After that, retry-then-skip is exactly as before.
 - **Events** (`routeEvent`): everything from the element playing; from the standby only `error`
-  (marks it failed) and AirPlay availability (a fact about the network); the rest is dropped, so its
-  `pause`, `durationchange` or `timeupdate` can't stop the lock screen, shorten the song or count
-  listening nobody did. Every handler reads `live()`. The duration is set from the incoming element
+  (marks it failed); the rest is dropped, so its `pause`, `durationchange` or `timeupdate` can't
+  stop the lock screen, shorten the song or count listening nobody did. **AirPlay availability
+  too, since the review**: it was routed from the standby as "a fact about the network", but
+  WebKit keeps it PER ELEMENT (`MediaElementSession::m_hasPlaybackTargets`, false until a change
+  is broadcast; a session made after monitoring started is never seeded) and every element
+  repeats its own value on each load (`createMediaPlayer`, `EnqueueBehavior::Always`). So turning
+  the switch on hid the button (the new standby's first event said `not-available`), and the
+  standby's loads made it come and go between songs. Every handler reads `live()`. The duration is set from the incoming element
   at the handover, since its `durationchange` came while it was standing by.
 - **The standby lets go** when the queue moves to anything whose next song it doesn't hold
   (`fitStandby`, which also restarts the 3s wait from the new song's `playing`), when the switch goes
   off (whichever element is playing carries on alone: `activeAfter('switch off')`), and at a
   handover (the outgoing is emptied).
-- **The readout** (`describeGaps`, under the sheet's footer, hidden below 500px tall): each song
+- **The readout** (`describeGaps`, at the TOP of the sheet's body since the review - see "After
+  review" below - and hidden below 500px tall): each song
   change that happened by itself, with the switch on or off, the last `GAPS_KEPT` (5), and how it was
   made - including the incoming element's `readyState` at a handover of what it held, where below
   HAVE_FUTURE_DATA (3) reads "had to load" (pinned at 3 and 2 in the sim). **Timed on the incoming
@@ -2535,12 +2544,15 @@ one in the page, fixed; one in Safari's engine, which deadwax can't fix yet and 
   the bar's tap target with `pointer-events: none`, which keeps the track and clocks where the
   28px range had them. The sheet's drag-to-close is on the grip, a sibling, and doesn't move.
 - **The bar shows a seek's target until the element says it has landed** (`state.pendingSeek`,
-  `reportedPosition()`): set by every seek, cleared on a 'seeked' with `seeking` false and by a
-  new song, and ignored after `PENDING_MAX_MS` (20 s) in case one never lands. Both engines already
+  `reportedPosition()`): set by a seek that MOVES the element (readyState >= HAVE_METADATA and a
+  target other than `currentTime` - see "After review" below), cleared on a 'seeked' with
+  `seeking` false, by a new song and by a failure, and ignored after `PENDING_MAX_MS` (20 s) in
+  case one never lands. Both engines already
   answer `currentTime` with the target while seeking (Chromium measured; WebKit sets
   `m_lastSeekTime` synchronously in `seekWithTolerance`), so it changes nothing there today; it is
   the guarantee, and what the keys step from.
-- **The readout's "Last seek" line** (`seekStep()`, `describeSeek()`), under the gapless one:
+- **The readout's "Last seek" line** (`seekStep()`, `describeSeek()`), under the gapless one (both
+  at the top of the sheet's body since the review):
   asked, and what the element's clock said at 'seeked' - which in Safari is the time asked, so on
   its own it proves nothing. The END of the song is what can: WebKit clamps its clock to the
   duration (`MediaPlayerPrivateAVFoundationObjC::currentTime`, `std::min(..., m_cachedDuration)`),
@@ -2555,7 +2567,7 @@ one in the page, fixed; one in Safari's engine, which deadwax can't fix yet and 
   other seek, a pause other than the end's own (both engines send 'pause' just before 'ended'),
   or a song change stops the judging. The line is there from the start ("No seek yet"): appearing
   under the first tap, it moved the bar 16px up the screen, and a quick second tap landed below
-  it.
+  it. (That fixed only 0-to-1 lines; the review found the 1-to-3 - see below.)
 - **Verified in the real page** (Chromium, the pane displayed, real pointer events from the
   computer tool) at 800x600 and 390x844, against the seek stub at 150 KB/s: a tap at 60% seeked to
   179.74 and the bar held it through the 2.4 s seek; a tap at the bar's lower edge (18px below
@@ -2575,6 +2587,85 @@ one in the page, fixed; one in Safari's engine, which deadwax can't fix yet and 
 - **Not built**: sending FLAC to Safari in an MP4 (lossless, and it landed exactly) would mean a
   remux per song - ffmpeg in the image, and ranges over a remuxed copy. A CBR MP3 transcode lands
   exactly too, but Navidrome's transcodes carry no ranges, which is worse for seeking in Safari.
+
+#### After review (gapless and seeking, 1.1.0-player.2)
+
+An adversarial review of the two commits above confirmed seven findings, all fixed together:
+
+- **The readouts moved the bar under the finger (the major one).** The sheet's body is
+  `flex: none` against the bottom of a flex column (the grip takes the rest), so a change in the
+  height of anything in it moves everything ABOVE that thing and nothing below. The two readouts
+  were its last children and run 1-3 lines (a seek asked, then judged at its song's end; song
+  changes piling up; 4 at 320px in the worst case), so a tap after a judged line dropped the bar
+  and the transport 16-32px as the finger lifted, and a quick corrective tap landed above the
+  bar. The "No seek yet" placeholder had fixed only 0-to-1. **They are the FIRST children of the
+  body now** (`.pl-readouts`, above the title): nothing a finger goes to is above them, so their
+  height moves only the cover (by half of it upright, where the cover is width-limited; on a
+  320x568 phone, where it is height-limited, it shrinks instead - 197px to 116px in the 7-line
+  worst case). Chosen over a reserved fixed height with an ellipsis, which on a phone would cut
+  off the judgement ("...really landed at about 2:03") with no hover to read it; nothing is cut
+  short. **Measured in the real page** with a MutationObserver recording the geometry at every
+  real text change, and by setting every text variant directly (8 seek lines x 7 gapless lines,
+  the longest real forms): the bar's top was ONE value per size across all 56 - 642 at 390x844,
+  465 at 375x667, 366 at 320x568, 566 at 1024x768 - and so were the transport, the footer and the
+  title, with no overflow anywhere. The review's own sequence, for real: "ended on time" (2
+  lines) then a tap, "seeking…" then "said" (1 line), bar at 642.00 throughout. At 844x390
+  `.pl-readouts` is `display: none` and the bar stays 44px. **Anything added to the sheet's body
+  whose height can change goes above the title**, or reserves its height.
+- **A seek the listener didn't make filled in "the player said".** `seekStep`'s 'other seek' only
+  stopped the judging, so "previous" during a pending seek to 2:00 (which restarts: `currentTime`
+  answers the target while seeking) had its seek to 0 fill `said` - "asked 2:00, the player said
+  0:00". `SeekReading.closed` now: 'other seek', 'song change' and the new 'failed' close a
+  reading, and a closed reading takes no 'seeked'. The element answers only the newest seek, so a
+  later 'seeked' is never the closed one's.
+- **A seek that never landed said "seeking…" for good** (a song change or a failure first).
+  A closed reading with `said === null` reads "Last seek: asked 1:30, interrupted". `onFailure`
+  raises 'failed' (and clears `pendingSeek`): a seek on its way never lands in a song that failed.
+- **"previous", or a tap at 0:00, on a song still loading froze the bar at 0:00 for 20 s.** At
+  HAVE_NOTHING a `currentTime` write is only kept as the default start position, and both engines
+  seek there at the metadata only if it is past 0 - so neither 'seeking' nor 'seeked' ever came
+  and nothing cleared `pendingSeek`. `seek()` now sets it only for a seek that moves the element
+  (readyState >= HAVE_METADATA and a target other than `currentTime`; it clears a stale one
+  otherwise), and returns whether a 'seeked' will answer (loaded, or a start past 0). The
+  listener's seek that none will answer is `'other seek'` to the readout - it takes the place of
+  the one before, so Home after a tap at 0:30 during a load reads "asked 0:30, interrupted" - and
+  never 'asked'. `loadedmetadata` and `playing` also clear `pendingSeek` when no seek is in
+  flight: a SECOND guard, reached by no current path (a failure clears it first), so no sim can
+  make it matter - removing it alone passes everything, which is expected.
+- **A transcoded next song was fetched and thrown away** - see "What goes into memory".
+- **The standby's AirPlay availability drove the button** - see "Events". The button follows the
+  element playing. **Residual, from the same source reading**: the SECOND element's own session can
+  still be stale-false while it is the one playing, and a load of it while playing (previous, a
+  skip, next while paused, a retry) repeats that - so the button can still hide then, until the
+  first element is loaded while playing or the page is hidden and shown (which restarts
+  monitoring and broadcasts to both). Showing it when EITHER element says available would avoid
+  that at the cost of possibly showing it with no speaker; the orchestrating brief chose "live
+  element only". Not seen on a phone either way.
+- **No sim reached the wiring.** `ui/test/player.sim.cjs` drives the REAL `usePlayer.ts`,
+  compiled with the repo's TypeScript beside a small preact/hooks with a cursor (rendering calls
+  the hook again, so state is read through its own return value, not by slot index), through fake
+  audio elements on a virtual clock: loads, play() refused without a tap or the grace second,
+  seeks that take time, an optional clock that lags a seek and keeps sending updates, an engine
+  that answers every seek, WebKit's start-position rule, a clock held at the song's length while
+  a song that landed early plays on, failures in Chromium's order (error, then pause), blobs and a
+  Navidrome that answers late. 56 checks: what the bar hears through a seek with updates of the
+  old time and after it lands; a stray 'seeked' mid-seek; previous, next, a decode failure that
+  stops the queue and a dropped connection that resumes, all during a seek; the readout across an
+  on-time end and a 7 s early landing; the three load-time seeks; a gapless handover from memory
+  (AirPlay button untouched by the standby) and one of a transcode (nothing fetched ahead).
+  **Mutations**: dropping `state.pendingSeek = null` from 'seeked' fails 3 checks (the bar on the
+  target a second after landing, twice, and after a resume); the 'seeked' guard, each of fixes 2,
+  3, 4 (whole), 5 and 6, a failure not closing the reading, `load()` not closing it and `restart()`
+  not closing it each fail at least one.
+- **Also re-checked in the real page** (Chromium, 390x844 and 1024x768, the short-song stub): a
+  real tap at 75% landed at 27.06 s of 36 and a drag to 50% at 18.01, on the handed-over element;
+  at desktop size 14.43 and 9.00 (40% and 25% asked); arrows, Page Up/Down and Home stepped as
+  before, including across a song's end; the switch turned on by a real click, and Seven handed
+  over to Eight "from memory" at 97 ms, the first element muted and emptied; with the stub's
+  stream answers slowed to 3 s, "previous" on Long One still loading left the bar following the
+  clock (1.57 -> 1, 3.07 -> 3, 6.07 -> 6). NOT checked in a page: the AirPlay routing and the
+  transcode path (Chromium sends no AirPlay events and plays every file in the stub) - the sim
+  covers both; and nothing on an iPhone.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -3920,6 +4011,7 @@ node ui/test/candidates.sim.cjs # the candidates panel's filters, the edited-que
 node ui/test/playqueue.sim.cjs  # the phone player's queue - what previous does, shuffle's first song, what counts as a play
 node ui/test/gapless.sim.cjs    # the gapless switch - what the standby holds, hand over or not, which events count, memory
 node ui/test/scrub.sim.cjs      # the player's scrubber - a point on the bar, fingers and keys, a seek on its way, where it landed
+node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks on their way, the readout across song ends, a handover
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with

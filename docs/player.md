@@ -136,9 +136,11 @@ With it on:
 
 ### The readout
 
-Under the controls, the player shows how long the last few song changes took, newest first, and
-how the change was made. It's timed with the switch off as well, the same way, so you can compare
-the two.
+Between the cover and the song's title, the player shows how long the last few song changes took,
+newest first, and how the change was made. It's timed with the switch off as well, the same way,
+so you can compare the two. (It sits above the title, not under the controls, because it grows
+and shrinks as it fills in: under the controls, that moved the bar and the buttons at the moment
+you went to tap them. Up there, only the cover moves.)
 
 A change is timed from the moment one song ended to the moment the next one's **sound started**:
 when the player's clock for the new song is first seen moving. It isn't timed to the moment the
@@ -189,8 +191,9 @@ The parts that matter only an iPhone can answer. To try it:
 4. Try it in Safari as well as in the home-screen app.
 5. Play an album of big files (hi-res FLAC) for a while. If the app **reloads by itself**, that's
    iOS taking memory back; say so, and turn the switch off.
-6. Try **AirPlay** with the switch on (the readout should say `one element (airplay)`), and a
-   phone call or Siri during a song change (that change shouldn't be timed at all).
+6. Try **AirPlay** with the switch on (the readout should say `one element (airplay)`, and the
+   AirPlay button should stay put as songs change), and a phone call or Siri during a song change
+   (that change shouldn't be timed at all).
 
 Even when it works, it isn't sample-exact: the second player still has to start, so an album
 mixed straight through (a live album, a DJ mix) may keep a tiny gap. Closing that completely
@@ -219,10 +222,12 @@ and without one. Chrome and other Chromium browsers landed exactly where asked e
 without a table. The same FLAC audio in an MP4 file, or an MP3 at a constant bit rate, landed
 exactly in Safari's engine too; deadwax doesn't send either yet.
 
-**The readout shows it on your phone.** Under the controls, below the gapless readout, the player
-shows the last seek you made, with the bar or from the lock screen: *Last seek: asked 2:10, the
-player said 2:10*. Safari says the time asked for either way, so that half can't tell you, but the
-end of the song can: if the seek landed off, the song runs out before its clock reaches the end,
+**The readout shows it on your phone.** Between the cover and the song's title, below the gapless
+readout, the player shows the last seek you made, with the bar or from the lock screen: *Last
+seek: asked 2:10, seeking…* while it's on its way, then *Last seek: asked 2:10, the player said
+2:10*. If it never got there, because you pressed Previous or Next first or the song failed under
+it, the line says *Last seek: asked 2:10, interrupted*. Safari says the time asked for either way,
+so "the player said" can't tell you, but the end of the song can: if the seek landed off, the song runs out before its clock reaches the end,
 or plays on after its clock has stopped at the end, by the same amount. If the song plays to its
 end with no other seek or pause, the line adds what that showed:
 

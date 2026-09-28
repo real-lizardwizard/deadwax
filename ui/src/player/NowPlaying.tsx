@@ -114,9 +114,10 @@ function Scrubber({ player }: { player: Player }) {
 }
 
 /**
- * The gapless switch, iOS's shape, and what the last song changes took. The readout is timed with
- * the switch off as well, so the two can be compared on the phone: from one song's end to the next
- * one's sound starting, and how the next one was started - see clockStep() in lib/gapless.
+ * The gapless switch, iOS's shape. What the last song changes took is in the readouts at the top
+ * of the sheet's body, timed with the switch off as well, so the two can be compared on the phone:
+ * from one song's end to the next one's sound starting, and how the next one was started - see
+ * clockStep() in lib/gapless.
  */
 function Gapless({ player }: { player: Player }) {
   return (
@@ -214,6 +215,16 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
       </div>
 
       <div class="pl-sheet-body">
+        {/* The readouts come FIRST, above everything a finger goes to. The body sits against the
+            bottom of the sheet, so a line that grows or shrinks moves whatever is above it and
+            nothing below: under the bar, their one to three lines (a seek asked, then judged at
+            its song's end) moved the scrubber and the buttons up and down the screen at the
+            moment of a tap. Up here the most that moves is the cover. */}
+        <div class="pl-readouts">
+          <p class="pl-gapless-readout">{describeGaps(player.gaps)}</p>
+          <p class="pl-gapless-readout pl-seek-readout">{describeSeek(player.lastSeek)}</p>
+        </div>
+
         <div class="pl-sheet-titles">
           <h2 class="pl-sheet-title">{track.title}</h2>
           <p class="pl-sheet-artist">{track.artist}</p>
@@ -248,8 +259,6 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
             </button>
           )}
         </div>
-        <p class="pl-gapless-readout">{describeGaps(player.gaps)}</p>
-        <p class="pl-gapless-readout pl-seek-readout">{describeSeek(player.lastSeek)}</p>
       </div>
     </div>
   )

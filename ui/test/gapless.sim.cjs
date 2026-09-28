@@ -134,7 +134,11 @@ for (const name of ['play', 'pause', 'playing', 'timeupdate', 'ended', 'duration
                     'waiting', 'canplay', 'loadedmetadata']) {
   check(`the standby's ${name}: nobody's`, routeEvent(name, false), 'ignore');
 }
-check('an AirPlay device appearing: the player\'s, whichever says it', routeEvent('webkitplaybacktargetavailabilitychanged', false), 'player');
+check('whether an AirPlay device is on the network, from the element playing: the player\'s',
+  routeEvent('webkitplaybacktargetavailabilitychanged', true), 'player');
+//? WebKit keeps the answer per element, and the standby - made after the page began watching for
+//? devices - is never told it: its 'not-available' hid the button as the switch went on
+check('...from the standby: nobody\'s (its answer may be stale)', routeEvent('webkitplaybacktargetavailabilitychanged', false), 'ignore');
 
 /* ========================================================================== */
 console.log('\nwhich element is playing');

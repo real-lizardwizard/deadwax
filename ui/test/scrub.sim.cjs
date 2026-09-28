@@ -9,7 +9,8 @@
  * leaves the bar stuck, a drag carried over to the next song, the thumb going back to the old time
  * while a seek is on its way (or held there for good when one never lands), arrow keys stepping
  * from the old time instead of the one just asked for - and a readout that calls a seek landed
- * when its song's end says otherwise, or blames one the listener didn't make.
+ * when its song's end says otherwise, blames one the listener didn't make, fills in "the player
+ * said" from a seek that replaced it, or says "seeking…" for good about one that never landed.
  *
  * Run it with:  node ui/test/scrub.sim.cjs
  */
@@ -162,6 +163,24 @@ check('the song changed before its end: never judged', judged(seekStep(r, { kind
 check('...and the line says only what the clock said', describeSeek(seekStep(r, { kind: 'song change' })),
   'Last seek: asked 2:10, the player said 2:10');
 check('not landed yet when the song ended: nothing to judge', seekStep(asked(), { kind: 'ended', position: 300, at: 1, rate: 1 }).off, null);
+
+//? A seek that never landed: the element answers only the newest seek, and a new song or a failure
+//? aborts one on its way. A 'seeked' after that is somebody else's, and "seeking…" would be for good.
+const restarted = seekStep(seekStep(asked(120), { kind: 'other seek' }), { kind: 'seeked', position: 0 });
+check('"previous" during a seek to 2:00: the restart\'s 0:00 is not what the player said for it',
+  restarted.said, null);
+check('...it says the seek was interrupted', describeSeek(restarted), 'Last seek: asked 2:00, interrupted');
+const moved = seekStep(asked(90), { kind: 'song change' });
+check('the song changed before the seek landed: interrupted, not "seeking…" for good',
+  describeSeek(moved), 'Last seek: asked 1:30, interrupted');
+check('...and the next song\'s \'seeked\' doesn\'t fill it in', seekStep(moved, { kind: 'seeked', position: 12 }).said, null);
+check('the song failed under the seek: interrupted', describeSeek(seekStep(asked(90), { kind: 'failed' })),
+  'Last seek: asked 1:30, interrupted');
+check('...and its end is judged no more', seekStep(r, { kind: 'failed' }).judging, false);
+const pausedMidSeek = seekStep(seekStep(asked(90), { kind: 'paused' }), { kind: 'seeked', position: 90 });
+check('a pause doesn\'t stop a seek on its way: its \'seeked\' still counts', pausedMidSeek.said, 90);
+check('...but the end can no longer judge it', pausedMidSeek.judging, false);
+check('closing a closed reading changes nothing', seekStep(moved, { kind: 'song change' }) === moved, true);
 check('a new seek starts a new reading', seekStep(late, { kind: 'asked', asked: 60, length: 300, track: 's1' }).off, null);
 check('a seek with no length known can\'t be judged', asked(130, 0).judging, false);
 

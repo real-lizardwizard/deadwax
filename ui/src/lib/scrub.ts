@@ -143,6 +143,13 @@ export interface SeekReading {
   track: string
   /** the element's clock at 'seeked'; null until then */
   said: number | null
+  /**
+   * No later 'seeked' can be this seek's: another seek took its place, the song changed or failed.
+   * The element answers only the newest seek, so a 'seeked' after that is the other seek's - a
+   * restart's 0:00 read as "the player said 0:00" for a seek to 2:00 - and one that never landed
+   * says it was interrupted rather than "seeking…" for good.
+   */
+  closed: boolean
   /** still the latest seek in a song still playing, so its end can speak for it */
   judging: boolean
   /** when the clock first reached the song's end (performance ms), and what it read then */
@@ -154,9 +161,12 @@ export interface SeekReading {
 export type SeekEvent =
   | { kind: 'asked'; asked: number; length: number; track: string }
   | { kind: 'seeked'; position: number }
-  /** a seek the listener didn't make with the bar - "previous" restarting, a failed song resumed */
+  /** a seek the listener didn't make with the bar - "previous" restarting, a failed song resumed -
+   *  or one no 'seeked' will answer: either way it takes the place of the one before */
   | { kind: 'other seek' }
   | { kind: 'song change' }
+  /** the song failed: a seek on its way never lands, and the end is no longer this seek's */
+  | { kind: 'failed' }
   /** paused, other than by the song ending: the wall clock is no measure of the end after that */
   | { kind: 'paused' }
   | { kind: 'clock'; position: number; at: number }
@@ -175,14 +185,20 @@ export type SeekEvent =
  */
 export function seekStep(reading: SeekReading | null, event: SeekEvent): SeekReading | null {
   if (event.kind === 'asked') {
-    return { asked: event.asked, length: event.length, track: event.track, said: null, judging: event.length > 0, clockEnd: null, off: null }
+    return {
+      asked: event.asked, length: event.length, track: event.track,
+      said: null, closed: false, judging: event.length > 0, clockEnd: null, off: null,
+    }
   }
   if (!reading) return reading
   switch (event.kind) {
     case 'seeked':
-      return reading.said === null ? { ...reading, said: event.position } : reading
+      return reading.said === null && !reading.closed ? { ...reading, said: event.position } : reading
     case 'other seek':
     case 'song change':
+    case 'failed':
+      return reading.judging || !reading.closed ? { ...reading, judging: false, closed: true } : reading
+    //? a pause doesn't stop a seek on its way - its 'seeked' still comes - only the end's judging
     case 'paused':
       return reading.judging ? { ...reading, judging: false } : reading
     case 'clock':
@@ -203,13 +219,13 @@ export function seekStep(reading: SeekReading | null, event: SeekEvent): SeekRea
 }
 
 /**
- * The readout's line for the last seek. It is there before the first seek too, so the line doesn't
- * appear under the first one and move the controls up the screen under the finger.
+ * The readout's line for the last seek - "No seek yet" before the first. A seek that never landed
+ * (another seek took its place, the song changed or failed first) says it was interrupted.
  */
 export function describeSeek(reading: SeekReading | null): string {
   if (!reading) return 'No seek yet'
   const asked = `Last seek: asked ${clock(reading.asked)}`
-  if (reading.said === null) return `${asked}, seeking…`
+  if (reading.said === null) return reading.closed ? `${asked}, interrupted` : `${asked}, seeking…`
   const said = `${asked}, the player said ${clock(reading.said)}`
   if (reading.off === null) return said
   if (reading.off === 0) return `${said} · the song ended on time, so it landed there`
