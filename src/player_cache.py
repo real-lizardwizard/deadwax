@@ -367,9 +367,12 @@ def _base(configured: str | None) -> tuple[Path | None, str | None]:
 def _judge(folder: Path) -> str | None:
     """
     Why `folder` isn't one deadwax can keep its cache in, or None when it is: a real folder, not a
-    link, owned by the user deadwax runs as, and private to it (0700). Read with lstat, so a link
-    planted in its place is seen as a link. The owner rules out a folder somebody else made first
-    in a shared /tmp; the mode, one that anybody could have put files in.
+    link, owned by the user deadwax runs as, and private to it (no group or other permission bits).
+    Read with lstat, so a link planted in its place is seen as a link. The owner rules out a folder
+    somebody else made first in a shared /tmp; the mode, one that anybody could have put files in.
+    Only the PERMISSION bits count: OpenMediaVault sets setgid on every shared folder and Linux's
+    mkdir passes it on to a folder made inside, so the folder deadwax makes there is 02700 - which
+    gives nobody else anything. Judging the whole mode refused exactly that, on every song.
     """
     try:
         info = os.lstat(folder)
@@ -383,9 +386,9 @@ def _judge(folder: Path) -> str | None:
         return (f"{folder} belongs to another user (uid {info.st_uid}; deadwax runs as {os.getuid()}) - "
                 f"remove it, and deadwax makes its own")
     mode = stat.S_IMODE(info.st_mode)
-    if mode != 0o700:
-        return (f"{folder} is open to other users (mode {mode:o}, where deadwax makes it 700) - remove it, "
-                f"and deadwax makes it again")
+    if mode & 0o077:
+        return (f"{folder} is open to other users (mode {mode & 0o777:o}, where deadwax makes it 700) - "
+                f"remove it, and deadwax makes it again")
     if not os.access(folder, os.W_OK | os.X_OK):
         return f"{folder} can't be written to"
     return None
@@ -396,10 +399,24 @@ def _own(folder: Path) -> tuple[Path | None, str | None]:
     try:
         os.mkdir(folder, 0o700)
     except FileExistsError:
-        pass
+        made = False
     except OSError as e:
         return None, f"{folder} couldn't be made ({e.strerror or e})"
+    else:
+        made = True
+        #? what deadwax has just made is its own to set: this drops a setgid bit inherited from the
+        #? folder above (OpenMediaVault's shared folders have one), and a folder it didn't make is
+        #? never touched
+        try:
+            os.chmod(folder, 0o700)
+        except OSError:
+            pass
     problem = _judge(folder)
+    if problem and made and stat.S_IMODE(os.lstat(folder).st_mode) & 0o077:
+        #? made 0700 and chmodded, yet open: the filesystem keeps no modes of its own, and removing
+        #? the folder would only bring it back the same way
+        return None, (f"{folder} can't be made private: the disk it is on doesn't keep file permissions "
+                      f"(CIFS, NTFS or exFAT, say) - point PLAYER_CACHE_PATH at a Linux-formatted disk")
     return (None, problem) if problem else (folder, None)
 
 

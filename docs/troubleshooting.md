@@ -414,6 +414,9 @@ seeks can land off again, and deadwax's log says why:
     users*: deadwax only keeps its songs in a `deadwax-player` folder that it made itself and
     nobody else can use. Delete the folder the line names, and deadwax makes a new one on the
     next song.
+  - *… can't be made private: the disk it is on doesn't keep file permissions*: the disk
+    `PLAYER_CACHE_PATH` is on is CIFS, NTFS or exFAT, which make every folder open to everyone.
+    Point it at a Linux-formatted disk.
 
 A song whose MP4 was cleared out mid-song and can't be made again at once doesn't switch to the
 FLAC halfway through, since the two files' bytes differ: deadwax asks Safari to try again, and the

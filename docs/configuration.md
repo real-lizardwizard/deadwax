@@ -77,8 +77,11 @@ The folder has to be writable by `PUID`/`PGID`: unlike `/config`, deadwax doesn'
 owner. Leave it out of your backups. Settings → Library shows whether deadwax can write there,
 and what's wrong with its own `deadwax-player` folder inside it, if anything. It uses that folder
 only while it's a real folder (not a link), owned by the user deadwax runs as, and open to nobody
-else (mode 700), which is how deadwax makes it. One that isn't, say after `PUID` changed or when
-something else made it first, is left alone: delete it, and deadwax makes a new one. Until then,
+else (mode 700), which is how deadwax makes it. The setgid bit an OpenMediaVault shared folder
+passes on to folders made inside it doesn't matter. One that isn't, say after `PUID` changed or
+when something else made it first, is left alone: delete it, and deadwax makes a new one. A disk
+that doesn't keep file permissions (CIFS, NTFS or exFAT) can't hold the cache; use a
+Linux-formatted one. Until then,
 and whenever the cache can't be used at all, Safari is sent the FLAC, which plays but whose seeks
 can land seconds off.
 

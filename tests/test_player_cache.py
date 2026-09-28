@@ -696,6 +696,55 @@ def test_a_folder_belonging_to_someone_else_is_refused(upstream, client, tmp_pat
     assert said(caplog, "belongs to another user")
 
 
+def test_a_setgid_bit_is_no_bar(upstream, client, tmp_path, monkeypatch):
+    """
+    OpenMediaVault sets setgid on every shared folder, and Linux's mkdir passes it on: the folder
+    deadwax finds there is 02700, which gives nobody else anything. Judging the whole mode refused it
+    on every song, and removing it only brought it back the same.
+    """
+    state, _ = upstream
+    _, state["handler"] = navidrome_file()
+    shared = tmp_path / "omv-share"
+    (shared / FOLDER_NAME).mkdir(parents=True, mode=0o700)
+    (shared / FOLDER_NAME).chmod(0o2700)
+    monkeypatch.setattr(Config, "PLAYER_CACHE_PATH", str(shared))
+    monkeypatch.setattr(player_cache, "cache", Mp4Cache())
+
+    response = client.get(WRAPPED)
+
+    assert response.headers["content-type"] == "audio/mp4" and response.content == MP4
+    assert stat.S_IMODE((shared / FOLDER_NAME).stat().st_mode) == 0o2700, "not made by deadwax this time: left alone"
+
+
+def test_the_folder_deadwax_makes_under_a_setgid_folder_is_made_private(tmp_path, monkeypatch):
+    """Linux's mkdir inherits setgid (macOS's doesn't, so the test makes it happen): deadwax drops it."""
+    real_mkdir = os.mkdir
+
+    def linux_mkdir(path, mode=0o777):
+        real_mkdir(path, mode)
+        os.chmod(path, 0o2000 | mode)
+
+    monkeypatch.setattr(player_cache.os, "mkdir", linux_mkdir)
+    folder, problem = player_cache.open_folder(str(tmp_path))
+    assert problem is None and folder == tmp_path / FOLDER_NAME
+    assert stat.S_IMODE(folder.stat().st_mode) == 0o700
+
+
+def test_a_disk_that_keeps_no_permissions_says_so(tmp_path, monkeypatch):
+    """CIFS, NTFS or exFAT: every folder is 0777 whatever deadwax asks, and removing it never helps."""
+    real_mkdir, real_chmod = os.mkdir, os.chmod
+
+    def open_mkdir(path, mode=0o777):
+        real_mkdir(path, mode)
+        real_chmod(path, 0o777)
+
+    monkeypatch.setattr(player_cache.os, "mkdir", open_mkdir)
+    monkeypatch.setattr(player_cache.os, "chmod", lambda path, mode: None)
+    folder, problem = player_cache.open_folder(str(tmp_path))
+    assert folder is None
+    assert "doesn't keep file permissions" in problem and "Linux-formatted disk" in problem
+
+
 def test_a_shared_cache_path_gets_a_private_folder_of_deadwaxs_own(upstream, client, tmp_path, monkeypatch):
     """
     PLAYER_CACHE_PATH can be a folder other things use: deadwax makes deadwax-player inside it,

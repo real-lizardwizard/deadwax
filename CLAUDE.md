@@ -2977,8 +2977,15 @@ reproduced with review4's script before the fix and after it, and again after in
 - **The cache folder wasn't checked to be deadwax's own** (`plant.py` served a planted link's
   target as `206 audio/mp4 b'PRIVATE KEY MATERIAL'`). `_judge()` lstats `deadwax-player` before
   anything in it is listed, deleted or served: a real folder, not a link, owned by
-  `os.getuid()`, mode exactly 0700. Anything else is refused - FLAC, and one log line naming
-  what to remove. Clean-up and eviction never follow links, and cached files are opened with
+  `os.getuid()`, with no group or other permission bits. Anything else is refused - FLAC, and one
+  log line naming what to remove. **Only the permission bits count** (verification pass): the
+  first cut demanded the mode be exactly 0700, and OpenMediaVault sets setgid on every shared
+  folder (sharemgmt ORs in 02000), which Linux's mkdir passes on - so `deadwax-player` came out
+  02700 on James's platform and was refused on every song, with advice ("remove it") that could
+  only recreate it. macOS's mkdir doesn't inherit setgid, which is how the Mac tests missed it.
+  Now `_judge` refuses `mode & 0o077`, and `_own` chmods a folder it has JUST made to 0700
+  (never one it found). Made, chmodded and still open means a disk that keeps no permissions
+  (CIFS, NTFS, exFAT), which gets its own message pointing at a Linux-formatted disk. Clean-up and eviction never follow links, and cached files are opened with
   `O_NOFOLLOW`. Residual: if the folder `PLAYER_CACHE_PATH` names can be written by another
   user and isn't sticky, they could swap `deadwax-player` between the check and the file
   operations.
