@@ -334,11 +334,11 @@ same phone and connection: the difference is what the switch saves.
   asked for again; the time includes that.
 - **`one element (refused)`**: iOS wouldn't start the second player, and the song went on the one
   that was playing.
-- **The AirPlay button disappears with the switch on**: the button follows only the player that
-  is playing, since the silent second one can be wrong about whether a speaker is there. If it
-  still goes, lock and unlock the phone, which (going by Safari's source) makes both ask again;
-  AirPlay in Control Center
-  works whatever the button does. Say so if it happens.
+- **The AirPlay button disappears, or stays when the speaker has gone, with the switch on**:
+  Safari tells each of the two players separately whether a speaker is there, and a player it
+  hasn't told yet says "none". So the button shows while either says there is one. If it still
+  misbehaves, lock and unlock the phone, which (going by Safari's source) makes both ask again;
+  AirPlay in Control Center works whatever the button does. Say so if it happens.
 - **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
   held in memory ahead of time, and hi-res albums come close to that. Turn the switch off.
 

@@ -27,7 +27,7 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 ], { cwd: UI, stdio: 'inherit' });
 
 const {
-  standbyPlan, handoverDecision, memoryPlan, overMemoryMax, routeEvent, activeAfter, afterPlaybackFailure,
+  standbyPlan, handoverDecision, memoryPlan, overMemoryMax, routeEvent, airplayShown, activeAfter, afterPlaybackFailure,
   startChange, gapReading, clockStep, withReading, describeHow, describeGaps,
   MEMORY_MAX_BYTES, PRELOAD_DELAY_MS, GAPS_KEPT, CHANGE_MAX_MS,
 } = require(path.join(OUT, 'lib/gapless.js'));
@@ -134,11 +134,13 @@ for (const name of ['play', 'pause', 'playing', 'timeupdate', 'ended', 'duration
                     'waiting', 'canplay', 'loadedmetadata']) {
   check(`the standby's ${name}: nobody's`, routeEvent(name, false), 'ignore');
 }
-check('whether an AirPlay device is on the network, from the element playing: the player\'s',
-  routeEvent('webkitplaybacktargetavailabilitychanged', true), 'player');
-//? WebKit keeps the answer per element, and the standby - made after the page began watching for
-//? devices - is never told it: its 'not-available' hid the button as the switch went on
-check('...from the standby: nobody\'s (its answer may be stale)', routeEvent('webkitplaybacktargetavailabilitychanged', false), 'ignore');
+//? WebKit keeps the answer per element: each one's is kept, and either saying "available" shows the button
+check('whether an AirPlay device is on the network, from the element playing: kept per element',
+  routeEvent('webkitplaybacktargetavailabilitychanged', true), 'availability');
+check('...and from the standby too', routeEvent('webkitplaybacktargetavailabilitychanged', false), 'availability');
+check('"available" from either element shows the button (the other\'s "none" may be stale)', airplayShown([true, false]), true);
+check('"none" from both hides it', airplayShown([false, false]), false);
+check('no answer yet: hidden', airplayShown([]), false);
 
 /* ========================================================================== */
 console.log('\nwhich element is playing');

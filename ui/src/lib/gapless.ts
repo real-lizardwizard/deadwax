@@ -175,7 +175,7 @@ export function overMemoryMax(received: number, max: number = MEMORY_MAX_BYTES):
 }
 
 /** What an element's event is for: the player, the standby's own bookkeeping, or nobody. */
-export type EventRoute = 'player' | 'standby' | 'ignore'
+export type EventRoute = 'player' | 'standby' | 'availability' | 'ignore'
 
 /**
  * Which element's events count. Everything from the element PLAYING drives the player, as with
@@ -184,17 +184,29 @@ export type EventRoute = 'player' | 'standby' | 'ignore'
  * counts: its 'pause', 'durationchange' or 'timeupdate' would otherwise stop the lock screen,
  * shorten the song or count listening nobody did.
  *
- * That includes whether an AirPlay device is on the network. It reads like a fact about the
- * network, but WebKit keeps it per element (MediaElementSession::m_hasPlaybackTargets, false until
- * a change is broadcast), and an element made after the page started watching for devices - the
- * standby, the moment the switch goes on - is never told the current answer. Each element also
- * repeats its own answer on every load. So the standby's 'not-available' hid the AirPlay button
- * as the switch went on, and its loads made the button come and go from song to song.
+ * Whether an AirPlay device is on the network is the exception, from EITHER element: see
+ * airplayShown(). It reads like a fact about the network, but WebKit keeps it per element
+ * (MediaElementSession::m_hasPlaybackTargets, false until a change is broadcast), an element made
+ * after the page started watching for devices - the standby, the moment the switch goes on - is
+ * never told the current answer, and a broadcast only reaches an element whose answer changes.
+ * Taken from the element playing alone, the standby's stale 'not-available' hid the button once it
+ * took over; taken from it alone, a speaker leaving while the standby played was never heard.
  */
 export function routeEvent(name: string, fromActive: boolean): EventRoute {
+  if (name === 'webkitplaybacktargetavailabilitychanged') return 'availability'
   if (fromActive) return 'player'
   if (name === 'error') return 'standby'
   return 'ignore'
+}
+
+/**
+ * Whether to show the AirPlay button, from each element's last answer. An element's answer can
+ * only be stale one way - every session starts at "none" and every broadcast reaches every session
+ * whose answer it changes - so "available" from either is true, and "none" from both is true too.
+ */
+export function airplayShown(answers: Iterable<boolean>): boolean {
+  for (const answer of answers) if (answer) return true
+  return false
 }
 
 /** The two elements, by number: the first is made with the page, the second by the switch. */

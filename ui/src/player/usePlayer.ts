@@ -38,7 +38,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import {
   PRELOAD_DELAY_MS, activeAfter, afterPlaybackFailure, clockStep, handoverDecision, memoryPlan, overMemoryMax,
-  routeEvent, standbyPlan, startChange, withReading, type Change, type ClockUpdate, type ElementSlot, type GapReading,
+  airplayShown, routeEvent, standbyPlan, startChange, withReading, type Change, type ClockUpdate, type ElementSlot, type GapReading,
   type HandoverDecision, type Standby,
 } from '../lib/gapless'
 import {
@@ -953,10 +953,8 @@ export function usePlayer(): Player {
       }],
       ['ended', onEnded],
       ['error', onFailure],
-      //? from the element playing only - the standby's answer can be stale (see routeEvent())
-      ['webkitplaybacktargetavailabilitychanged', (event) => {
-        setAirplay((event as AvailabilityEvent).availability === 'available')
-      }],
+      //? from either element, each keeping its own answer - see routeEvent() and airplayShown()
+      ['webkitplaybacktargetavailabilitychanged', () => {}],
       //? AirPlay starting or stopping: a standby is let go of while it plays there, and the next
       //? song got ready again once it stops - see standbyPlan()
       ['webkitcurrentplaybacktargetiswirelesschanged', () => {
@@ -967,6 +965,8 @@ export function usePlayer(): Player {
 
     //? each element's listeners, each asking routeEvent() whether its event counts
     const attached = new Map<AirPlayAudio, [string, EventListener][]>()
+    //? each element's last word on whether an AirPlay device is there
+    const airplayAnswers = new Map<AirPlayAudio, boolean>()
     let mounted = false
 
     function attach(element: AirPlayAudio) {
@@ -975,6 +975,10 @@ export function usePlayer(): Player {
         const route = routeEvent(name, element === live())
         if (route === 'player') handler(event)
         else if (route === 'standby') onStandbyError(element)
+        else if (route === 'availability') {
+          airplayAnswers.set(element, (event as AvailabilityEvent).availability === 'available')
+          setAirplay(airplayShown(airplayAnswers.values()))
+        }
       }])
       routed.forEach(([name, listener]) => element.addEventListener(name, listener))
       attached.set(element, routed)

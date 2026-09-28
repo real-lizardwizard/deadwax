@@ -575,6 +575,37 @@ const near = (value, target, within = 0.6) => Math.abs(value - target) <= within
     await run(5_000)
     check('handed over, streamed', p.player.track.id === '2' && e1.playingNow && /handed over, streamed$/.test(p.gapLine()), true)
   }
+  {
+    //? WebKit's answers are per element and a broadcast reaches only an element whose answer changes:
+    //? the standby starts at "none" and is never told otherwise. After a handover it is the one
+    //? playing, and when the speaker leaves only the FIRST element (now the standby) says so.
+    const p = page({ gapless: true, durations: { 1: 8, 2: 8, 3: 8 } })
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    e0.dispatch('webkitplaybacktargetavailabilitychanged', { availability: 'available' })
+    e1.dispatch('webkitplaybacktargetavailabilitychanged', { availability: 'not-available' })
+    check('a speaker there: the button shows, whatever the standby\'s stale "none"', p.player.airplay, true)
+    await run(8_500)
+    check('handed over: the second element plays', p.player.track.id === '2' && e1.playingNow, true)
+    e0.dispatch('webkitplaybacktargetavailabilitychanged', { availability: 'not-available' })
+    check('the speaker leaves, heard only from the standby: the button goes', p.player.airplay, false)
+  }
+  {
+    //? "next" while a seek is on its way, taken by the standby: the reading closes there too
+    const p = page({ gapless: true, durations: { 1: 40, 2: 40 } })
+    const [, e1] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(3_500)
+    check('the standby holds song 2 in memory', e1.src.startsWith('blob:') && e1.readyState === 4, true)
+    net.seekDelay = 2_000
+    tap(() => p.player.seek(20))
+    await run(300)
+    tap(() => p.player.next())
+    await run(10_000)
+    check('"next" before the seek landed: song 2, handed over to the second element', p.player.track.id === '2' && e1.playingNow && !e1.muted, true)
+    check('the readout says the seek was interrupted, not "seeking…"', p.seekLine(), 'Last seek: asked 0:20, interrupted')
+    check('the bar hears the second element\'s clock, not the old target', near(p.lastHeard(), e1.currentTime, 0.3) && p.lastHeard() < 11, true)
+  }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')
   process.exit(failures ? 1 : 0)

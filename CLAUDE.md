@@ -2406,13 +2406,18 @@ guide's section is `docs/player.md#gapless-playback-experimental`.
   `blob:`. After that, retry-then-skip is exactly as before.
 - **Events** (`routeEvent`): everything from the element playing; from the standby only `error`
   (marks it failed); the rest is dropped, so its `pause`, `durationchange` or `timeupdate` can't
-  stop the lock screen, shorten the song or count listening nobody did. **AirPlay availability
-  too, since the review**: it was routed from the standby as "a fact about the network", but
-  WebKit keeps it PER ELEMENT (`MediaElementSession::m_hasPlaybackTargets`, false until a change
-  is broadcast; a session made after monitoring started is never seeded) and every element
-  repeats its own value on each load (`createMediaPlayer`, `EnqueueBehavior::Always`). So turning
-  the switch on hid the button (the new standby's first event said `not-available`), and the
-  standby's loads made it come and go between songs. Every handler reads `live()`. The duration is set from the incoming element
+  stop the lock screen, shorten the song or count listening nobody did. **AirPlay availability is
+  the exception, from EITHER element** (route `'availability'`, `airplayShown()`): WebKit keeps it
+  PER ELEMENT (`MediaElementSession::m_hasPlaybackTargets`, false until a change is broadcast; a
+  session made after monitoring started is never seeded; a broadcast reaches only a session whose
+  answer it changes) and every element repeats its own value on each load (`createMediaPlayer`,
+  `EnqueueBehavior::Always`). Each element's last answer is kept, and the button shows if EITHER
+  says available. An answer can only be stale one way - "none" - so that is right both ways. Two
+  wrong versions came first, each found by review: routing the standby's answer to the player hid
+  the button as the switch went on (the new standby's first event said `not-available`) and made
+  it come and go between songs; taking only the live element's then missed a speaker leaving
+  while the SECOND element played, since only the first (now the standby) was told.
+  `player.sim.cjs` models per-element sessions for both. Every other handler reads `live()`. The duration is set from the incoming element
   at the handover, since its `durationchange` came while it was standing by.
 - **The standby lets go** when the queue moves to anything whose next song it doesn't hold
   (`fitStandby`, which also restarts the 3s wait from the new song's `playing`), when the switch goes
@@ -2633,14 +2638,11 @@ An adversarial review of the two commits above confirmed seven findings, all fix
   flight: a SECOND guard, reached by no current path (a failure clears it first), so no sim can
   make it matter - removing it alone passes everything, which is expected.
 - **A transcoded next song was fetched and thrown away** - see "What goes into memory".
-- **The standby's AirPlay availability drove the button** - see "Events". The button follows the
-  element playing. **Residual, from the same source reading**: the SECOND element's own session can
-  still be stale-false while it is the one playing, and a load of it while playing (previous, a
-  skip, next while paused, a retry) repeats that - so the button can still hide then, until the
-  first element is loaded while playing or the page is hidden and shown (which restarts
-  monitoring and broadcasts to both). Showing it when EITHER element says available would avoid
-  that at the cost of possibly showing it with no speaker; the orchestrating brief chose "live
-  element only". Not seen on a phone either way.
+- **The standby's AirPlay availability drove the button** - see "Events". The first fix (the
+  element playing only) left the button up after a speaker left while the second element played,
+  and could still hide it when the second element reloaded; a verification pass found both. Each
+  element's own answer, shown if either says available, closes both - an answer is only ever
+  stale in the "none" direction. From WebKit's source; not seen on a phone either way.
 - **No sim reached the wiring.** `ui/test/player.sim.cjs` drives the REAL `usePlayer.ts`,
   compiled with the repo's TypeScript beside a small preact/hooks with a cursor (rendering calls
   the hook again, so state is read through its own return value, not by slot index), through fake
