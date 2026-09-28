@@ -29,6 +29,10 @@
     --pl-text-3: rgba(235, 235, 245, 0.3);
     --pl-scrub-done: rgba(255, 255, 255, 0.85);
     --pl-scrub-left: rgba(255, 255, 255, 0.22);
+    --pl-scrub-track: 7px;
+    --pl-scrub-track-held: 11px;
+    --pl-scrub-thumb: 12px;
+    --pl-scrub-thumb-held: 1.5;   /* the thumb grows by this while a finger holds the bar */
     --pl-error: var(--red-text);
     /* the brand purple one step lighter, to read as text on black */
     --pl-accent: var(--accent-hover);
@@ -627,38 +631,64 @@ img { display: block; }
 
 .pl-sheet-error { margin: 6px 0 0; color: var(--pl-error); font-size: var(--pl-text-footnote); }
 
-.pl-scrubber { margin-top: 22px; }
+/*
+  The scrubber is the whole bar, a full tap target tall with the track drawn across its middle: a
+  tap anywhere on it seeks there and a drag follows the finger (see Scrubber in NowPlaying.tsx).
+  It replaced an <input type=range>, which on an iPhone moves only when dragged by its thumb.
+  touch-action: none gives every touch on it to the scrubber - no scrolling, no double-tap zoom -
+  and the callout and selection that a long press would otherwise bring up are turned off. The
+  margins keep the track and the clocks where the old 28px range put them.
+*/
+.pl-scrubber { margin-top: 14px; }
 
-.pl-range {
-    width: 100%;
-    height: 28px;
-    margin: 0;
-    background: transparent;
-    -webkit-appearance: none;
-    appearance: none;
+.pl-scrub {
+    position: relative;
+    height: var(--pl-hit);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
 }
 
-.pl-range::-webkit-slider-runnable-track {
-    height: 7px;
-    border-radius: 4px;
+.pl-scrub[aria-disabled="true"] { cursor: default; }
+
+.pl-scrub-track {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: var(--pl-scrub-track);
+    border-radius: calc(var(--pl-scrub-track-held) / 2);
     background: linear-gradient(to right, var(--pl-scrub-done) var(--done, 0%), var(--pl-scrub-left) var(--done, 0%));
+    transform: translateY(-50%);
+    transition: height var(--duration-fast) var(--ease-out);
 }
 
-/* A large, mostly transparent thumb: on an iPhone a range can only be dragged BY its thumb, so a
-   small one is hard to catch. What shows is the dot in the middle of it. */
-.pl-range::-webkit-slider-thumb {
-    width: 28px;
-    height: 28px;
-    margin-top: -10.5px;
-    border: 0;
+.pl-scrub-thumb {
+    position: absolute;
+    top: 50%;
+    left: var(--done, 0%);
+    width: var(--pl-scrub-thumb);
+    height: var(--pl-scrub-thumb);
     border-radius: 50%;
-    background: radial-gradient(circle, var(--pl-text) 0 6px, transparent 7px);
-    -webkit-appearance: none;
-    appearance: none;
+    background: var(--pl-text);
+    transform: translate(-50%, -50%);
+    transition: transform var(--duration-fast) var(--ease-out);
 }
 
+.pl-scrub.is-held .pl-scrub-track { height: var(--pl-scrub-track-held); }
+.pl-scrub.is-held .pl-scrub-thumb { transform: translate(-50%, -50%) scale(var(--pl-scrub-thumb-held)); }
+.pl-scrub:focus-visible .pl-scrub-track { outline: 2px solid var(--pl-accent); outline-offset: 4px; }
+
+/* Drawn up over the bottom of the bar's tap target, and so left out of hit testing - a finger at
+   the bar's lower edge is on the bar, not on the clocks. */
 .pl-clocks {
     display: flex;
+    margin-top: -8px;
+    pointer-events: none;
     justify-content: space-between;
     color: var(--pl-text-2);
     font-size: var(--pl-text-caption);
@@ -750,7 +780,7 @@ img { display: block; }
     line-height: 1.35;
 }
 
-/* On its side the cover already has little room, and the readout gives its line back to it. (A
+/* On its side the cover already has little room, and the readouts give their lines back to it. (A
    media query can't read a custom property, so the height is written here.) */
 @media (max-height: 500px) {
     .pl-gapless-readout { display: none; }

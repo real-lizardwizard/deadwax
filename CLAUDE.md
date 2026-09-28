@@ -1905,6 +1905,7 @@ The user guide's page is `docs/player.md`.
   previous/next. Only play, pause, previoustrack, nexttrack and seekto are set.
 - **Position is not React state.** It changes several times a second; `usePosition()` subscribes
   only the scrubber and the mini player's hairline, so the album grid doesn't re-render at 4 Hz.
+  From a seek until 'seeked' it reports the seek's target - see "Seeking (1.1.0-player.2)".
 - **A play counts on LISTENING, not position** (`lib/playQueue.ts`, pinned by
   `playqueue.sim.cjs`): Last.fm's rule (>30s long, heard for half or 4 minutes), with seeks
   adding nothing - skipping to the last second is not a play. How a step of listening is judged
@@ -2479,6 +2480,101 @@ guide's section is `docs/player.md#gapless-playback-experimental`.
   and a decoded 5-minute track is ~110 MB; Gapless-5 tells iOS users to turn it off for background
   play. None of Feishin, Gapless-5, jellyfin-web, Navidrome's web UI or Plex web is gapless on a
   locked iPhone.
+
+#### Seeking (1.1.0-player.2)
+
+James, on `:player` before gapless: "the seek bar seems a bit messed up, but worse on mobile. it
+doesn't seem to always seek to where you put it." Two causes, measured before anything changed:
+one in the page, fixed; one in Safari's engine, which deadwax can't fix yet and now shows.
+
+- **How it was measured.** A test library (`scratchpad/seek/library`, served by
+  `scratchpad/seek/navidrome_stub_seek.py`, the gapless stub plus `/arm-rate?kbps=N` to pace every
+  audio answer) of FLACs whose audio SAYS what time it is: a sine at 300 + 5t Hz under noise
+  high-passed above 3-4 kHz. "Varied" (300 s: the pilot alone for a minute, loud noise to 180 s,
+  quiet after - frames 346 to 1956 bytes) and "Steady" (240 s), made with `flac -8`, each copy
+  with a table from `metaflac --add-seekpoint=10s` and without, and one with an ID3v2 tag in front.
+  In Chromium, Web Audio's analyser read the pilot 1.3 s after each seek; for Safari's engine,
+  `scratchpad/seek/avlab.swift` plays the same stream through AVPlayer and reads it with an
+  MTAudioProcessingTap. (swiftc needs `-sdk .../MacOSX26.5.sdk`: the CLT's 27.0 SDK is newer
+  than its compiler.)
+- **Chromium lands exactly, whatever the file.** Every seek, with and without a table, ID3 in front
+  or not, fast or at 150 KB/s: `currentTime` at 'seeked' was the target and the audio matched the
+  clock to 0.01 s. Without a table it bisects (its buffered ranges show the probes), costing 1-8 s
+  a seek at 150 KB/s, against 0.3-3.5 s with one.
+- **AVFoundation doesn't land, and says it did.** Seeking as WebKit's `currentTime` setter asks
+  (`seekWithTolerance(time, 0, 0)`, then `seekToTime:toleranceBefore:toleranceAfter:` - read in
+  `scratchpad/wk`): on Varied, up to 50 s early from a file, 32 s over HTTP through deadwax, 159 s
+  on a first seek at 150 KB/s and up to 40 s LATE on later ones; on a song-like swing (about 1.3x
+  in bit rate, quiet intro then verses and choruses) 2-8 s early; on Steady within 0.3 s.
+  `currentTime` read exactly the target throughout, and so did the tap's own source time range.
+  **A SEEKTABLE changed nothing** - runs with and without were identical error for error - so the
+  troubleshooting entry explains tables without offering one as the fix. The errors depend on what
+  it has read (the same target lands differently after other seeks), which fits estimating the
+  byte offset from the bit rate parsed so far and taking the frame there to be the target: 90 s
+  asked 0.5 s into the 15 KB/s intro landed at 64.4 s, where 90 x 15 KB/s falls in the file. The
+  same FLAC frames in MP4 (`ffmpeg -c:a copy -f mp4`) and a CBR MP3 landed exactly. This is the
+  Mac's AVFoundation; iOS shares CoreMedia, but no phone was measured.
+- **The page's half was iOS's native range.** The scrubber was `<input type=range>`, which on iOS
+  moves only when dragged BY ITS THUMB - the old CSS said so and made the thumb 28px to help - so a
+  tap on the bar, or a drag begun beside the thumb, did nothing. Chromium's range takes both, and
+  there the old scrubber measured right in everything asked of it: a tap, a drag, a drag while a
+  seek was in flight, a seek straight after a song change with gapless on and off, the lock
+  screen's `seekto` on the live element. The thumb never went back to the old time.
+- **The new scrubber** (`Scrubber` in NowPlaying.tsx; the rules are `lib/scrub.ts`, pinned by
+  `scrub.sim.cjs`, whose assertions fail under each of seven mutations tried): a `role="slider"` div,
+  the full width and `--pl-hit` (44px) tall, with the track drawn across its middle.
+  `touch-action: none`, no callout, no selection. `setPointerCapture` on pointerdown, so a drag
+  that wanders off the bar (onto the cover, say) still follows and seeks. A tap seeks where it
+  lands; a drag follows the finger and seeks ONLY on release. A cancel (pointercancel, or capture
+  lost without an up) seeks nowhere and lets go - the old range's `dragging` stayed set for good
+  if `change` never came. A second finger does nothing, and a drag begun on a song that has since
+  changed is dropped. The drag lives in a ref as well as state, so a release arriving before the
+  render after the last move seeks where that move put it. Arrows move 5 s, Page Up/Down 30,
+  Home/End to the ends - WebKit sends VoiceOver's swipe up and down as arrow keys, and each key
+  steps from what the bar SHOWS, so three quick presses go 15 s. `.pl-clocks` is drawn 8px up over
+  the bar's tap target with `pointer-events: none`, which keeps the track and clocks where the
+  28px range had them. The sheet's drag-to-close is on the grip, a sibling, and doesn't move.
+- **The bar shows a seek's target until the element says it has landed** (`state.pendingSeek`,
+  `reportedPosition()`): set by every seek, cleared on a 'seeked' with `seeking` false and by a
+  new song, and ignored after `PENDING_MAX_MS` (20 s) in case one never lands. Both engines already
+  answer `currentTime` with the target while seeking (Chromium measured; WebKit sets
+  `m_lastSeekTime` synchronously in `seekWithTolerance`), so it changes nothing there today; it is
+  the guarantee, and what the keys step from.
+- **The readout's "Last seek" line** (`seekStep()`, `describeSeek()`), under the gapless one:
+  asked, and what the element's clock said at 'seeked' - which in Safari is the time asked, so on
+  its own it proves nothing. The END of the song is what can: WebKit clamps its clock to the
+  duration (`MediaPlayerPrivateAVFoundationObjC::currentTime`, `std::min(..., m_cachedDuration)`),
+  so a seek that landed EARLY leaves the clock sitting at the end while the song plays on, until
+  AVFoundation's end-of-item brings 'ended'; one that landed LATE brings 'ended' with the clock
+  short of the length. (Its progress timer only schedules 'timeupdate'; 'ended' comes from
+  `mediaPlayerTimeChanged`, which the player calls at the end of the item - read in
+  `scratchpad/wk`, not seen on a phone.) So it notes when an update first sees the clock within
+  `END_SLACK_S` of the length, and at 'ended' works out `short - played on` (the wall clock
+  since, less what the clock still had to go), rounded to a tenth, "on time" within
+  `LANDED_WITHIN_S` (1.5 s). Only the listener's own seeks (bar, lock screen) are followed; any
+  other seek, a pause other than the end's own (both engines send 'pause' just before 'ended'),
+  or a song change stops the judging. The line is there from the start ("No seek yet"): appearing
+  under the first tap, it moved the bar 16px up the screen, and a quick second tap landed below
+  it.
+- **Verified in the real page** (Chromium, the pane displayed, real pointer events from the
+  computer tool) at 800x600 and 390x844, against the seek stub at 150 KB/s: a tap at 60% seeked to
+  179.74 and the bar held it through the 2.4 s seek; a tap at the bar's lower edge (18px below
+  the track) seeked; a drag begun away from the thumb followed it (70.5 mid-drag) and seeked on
+  release, one ending 130px above the bar included, with the sheet unmoved; a drag made while a
+  tap's seek was still in flight landed where the drag let go; ArrowRight x3 went 128.13 -> 143.13 in steps of 5,
+  then PageDown and Home; the lock screen's `seekto` (the handler, reached through Preact's hook
+  state) showed "seeking…" and landed; Next then an immediate tap seeked the new song, one element
+  (before its metadata, as a start position) and with gapless on (the handed-over element, from
+  memory); a seek to 4:54 read "ended on time" at the end, into a handover too; and with the
+  element's `currentTime` patched to act as WebKit's would after landing 7 s early or late, the
+  line read "played on 7 s ... at about 3:38" and "ran out 7 s ... at about 3:52". At 844x390 both
+  readouts hide, the bar stays 44px and the cover clears the title.
+- **Not verified - the phone's to answer**: a tap and a drag under a real finger (the tool's
+  pointers are a mouse's); where Safari on an iPhone lands (the readout is how James sees it);
+  whether WebKit sends VoiceOver's adjustments to a custom slider as arrow keys in this version.
+- **Not built**: sending FLAC to Safari in an MP4 (lossless, and it landed exactly) would mean a
+  remux per song - ffmpeg in the image, and ranges over a remuxed copy. A CBR MP3 transcode lands
+  exactly too, but Navidrome's transcodes carry no ranges, which is worse for seeking in Safari.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -3823,6 +3919,7 @@ node ui/test/latest.sim.cjs     # only the newest answer counts - both copies of
 node ui/test/candidates.sim.cjs # the candidates panel's filters, the edited-query rule, and what a row says
 node ui/test/playqueue.sim.cjs  # the phone player's queue - what previous does, shuffle's first song, what counts as a play
 node ui/test/gapless.sim.cjs    # the gapless switch - what the standby holds, hand over or not, which events count, memory
+node ui/test/scrub.sim.cjs      # the player's scrubber - a point on the bar, fingers and keys, a seek on its way, where it landed
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -3912,7 +4009,8 @@ A green suite here means the logic is sound, not that it works against real infr
     takes a transcode (an estimated length and no ranges: play an Ogg file and seek in it),
     landscape insets, `timeupdate` while locked, which Ogg codecs it says it plays, whether a
     failed song's 1.5s retry fires on a locked phone (and whether WebKit sends `pause` after
-    `error`, as Chromium does), and how long the scan wait really takes against a real Navidrome. **The week gates step 2 of the multi-user
+    `error`, as Chromium does), how long the scan wait really takes against a real Navidrome, and
+    where seeks land in Safari on the phone (the readout's "Last seek" line). **The week gates step 2 of the multi-user
     plan.** If the next song won't start with the screen locked, that is the answer to "can a web
     app do this", and native is back on the table.
 

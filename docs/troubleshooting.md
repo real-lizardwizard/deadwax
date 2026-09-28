@@ -337,6 +337,52 @@ same phone and connection: the difference is what the switch saves.
 - **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
   held in memory ahead of time, and hi-res albums come close to that. Turn the switch off.
 
+## A song seeks to the wrong place
+
+You move the player's bar to 2:10 and the music comes in somewhere else: a few seconds out, or a
+lot further in a song that goes from quiet to loud. The bar and the clock say 2:10 all the same.
+
+**The bar itself** takes a tap anywhere along it, or a drag from anywhere on it, and seeks where
+you let go. (Before 1.1.0-player.2 it was the browser's own slider, which on an iPhone moves only
+when you drag its small round thumb: a tap on the bar, or a drag started beside the thumb, did
+nothing.) If a tap or a drag still doesn't move the bar at all, that's a bug worth reporting.
+
+**Where the music lands is Safari's doing**, on an iPhone and on a Mac. To seek, a player has to
+work out where in the file a moment is. In a FLAC, where a second of quiet takes far fewer bytes
+than a second of loud, Safari estimates it from the bytes it has already read, and in a song whose
+loudness changes, that estimate is off. Measured on a Mac with the engine Safari uses: in a test
+song with a quiet first minute, seeks landed up to 50 seconds early, and up to 159 seconds out
+over a slow connection; in one whose loudness moved the way a song's does, 2 to 8 seconds early.
+In a song of steady loudness they landed within a third of a second. Safari's clock then says the
+time you asked for, not the time you hear. Chrome, Edge and other Chromium browsers landed exactly
+where asked every time.
+
+**The readout tells you when it happened.** Under the controls the player shows *Last seek: asked
+2:10, the player said 2:10*. Safari says the time asked for either way, so that can't show it, but
+the end of the song can: if the seek landed off, the song runs out before its clock reaches the
+end, or plays on after the clock has stopped at the end, by the same amount. When the song gets
+to its end with no other seek or pause in between, the line adds how far off it was, for example
+*the song played on 7 s after its clock ended, so it really landed at about 2:03*. *The song ended
+on time* means that seek landed where you put it.
+
+**Seek tables.** A FLAC can carry a table of where each moment is in the file, so that a player
+doesn't have to estimate. Plenty of files have none: about one in five, in one library sampled
+(ffmpeg, for one, doesn't write a table). To see whether a file has one, and to add one, with the `flac` tools:
+
+```sh
+metaflac --list --block-type=SEEKTABLE "01 - Song.flac"   # nothing listed: no table
+metaflac --add-seekpoint=10s "01 - Song.flac"            # a point every 10 seconds
+```
+
+`metaflac` writes into the file itself, so back it up first; the audio and tags are left as they
+are, and Navidrome picks the change up like any other. **But in the measurements above, a seek
+table made no difference to where Safari landed**: the same song landed in the same wrong places
+with and without one. A table helps players that read one, and Chromium lands exactly either
+way, so there's no need to add tables to your library for this. What does land exactly in
+Safari's engine is the same FLAC audio in an MP4 file, or an MP3 at a constant bit rate; deadwax
+doesn't send either yet. Meanwhile a seek near where the song is playing lands closer than one
+far from it, and a seek to the start is always right.
+
 ## The log says a transcode "ended at … of the … bytes Navidrome estimated"
 
 That line, followed by `ASGI callable returned without completing response` from the web

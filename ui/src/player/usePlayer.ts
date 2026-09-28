@@ -28,7 +28,9 @@
  *
  * The position changes several times a second, so it is not React state - rendering the whole
  * player four times a second to move one bar would be waste. Whatever shows it subscribes with
- * usePosition() below, and only that re-renders.
+ * usePosition() below, and only that re-renders. From a seek until the element says it has landed,
+ * what it hears is the seek's target (reportedPosition() in lib/scrub), so the bar never goes back
+ * to where the song was while the seek is on its way.
  */
 
 import { useEffect, useMemo, useState } from 'preact/hooks'
@@ -42,6 +44,7 @@ import {
   EMPTY_QUEUE, LOAD_RETRY_DELAY_MS, MEDIA_ERR_DECODE, NEW_LISTEN, current, listenHeard, listenStarted,
   listenedStep, nextIndex, previousAction, startQueue, type PlayQueue, type QueueTrack,
 } from '../lib/playQueue'
+import { reportedPosition, seekStep, type PendingSeek, type SeekEvent, type SeekReading } from '../lib/scrub'
 import { readPlayerGapless, writePlayerGapless } from '../state/persisted'
 import { coverUrl, scrobble, streamFormat, streamUrl } from './api'
 
@@ -59,6 +62,8 @@ export interface Player {
   gapless: boolean
   /** the last few song changes, timed from one song's end to the next one's clock running, newest first */
   gaps: GapReading[]
+  /** the last seek the listener made, and where its song's end says it landed - see SeekReading */
+  lastSeek: SeekReading | null
   /** `start` null with shuffle: no song in particular - see startQueue() */
   playTracks(tracks: QueueTrack[], start: number | null, shuffle?: boolean): void
   toggle(): void
@@ -126,6 +131,7 @@ export function usePlayer(): Player {
   const [airplay, setAirplay] = useState(false)
   const [gapless, setGaplessShown] = useState(readPlayerGapless)
   const [gaps, setGaps] = useState<GapReading[]>([])
+  const [lastSeek, setLastSeek] = useState<SeekReading | null>(null)
 
   //? Everything the element's events and the lock screen's handlers read. They are set up once,
   //? so they read these rather than closing over a render's state.
@@ -170,6 +176,10 @@ export function usePlayer(): Player {
       //? means the music stopped - a pause, asked for or not, a refused play(), a failure that
       //? stops the queue - and anything the listener does, drops it.
       change: null as Change | null,
+      //? a seek on its way: what the bar is told until the element says it has landed
+      pendingSeek: null as PendingSeek | null,
+      //? the last seek the listener made, for the readout - see seekStep() in lib/scrub
+      seekReading: null as SeekReading | null,
     }
 
     /** The element playing - or paused, or about to play. Everything the player does goes to it. */
@@ -218,6 +228,20 @@ export function usePlayer(): Player {
         album: track.album,
         artwork: art ? [{ src: new URL(art, location.href).href, sizes: '512x512' }] : [],
       })
+    }
+
+    /** Tell whatever shows the position where the song is - or where a seek on its way is going. */
+    function report(position: number) {
+      const shown = reportedPosition(state.pendingSeek, position, performance.now())
+      listeners.forEach((listener) => listener(shown))
+    }
+
+    /** The last seek's reading after `event`, and the readout told when it changed. */
+    function readSeek(event: SeekEvent) {
+      const next = seekStep(state.seekReading, event)
+      if (next === state.seekReading) return
+      state.seekReading = next
+      setLastSeek(next)
     }
 
     /** A new hearing of the song: from a load, or a restart of the song already loaded. */
@@ -274,7 +298,9 @@ export function usePlayer(): Player {
       setQueue(next)
       setDuration(track.duration)
       setError(null)
-      listeners.forEach((listener) => listener(0))
+      state.pendingSeek = null
+      readSeek({ kind: 'song change' })
+      report(0)
       showOnLockScreen(track)
 
       setSource(live(), streamUrl(track, canPlay))
@@ -347,19 +373,27 @@ export function usePlayer(): Player {
       if (media) media.playbackState = 'paused'
     }
 
-    function seek(seconds: number) {
+    /**
+     * The element playing to `seconds`, clamped to the song; what it went to, or null with nothing
+     * loaded. Until it says it has landed, the bar is told the target - see reportedPosition().
+     */
+    function seek(seconds: number): number | null {
       const audio = live()
-      if (!audio.src) return
+      if (!audio.src) return null
       const length = Number.isFinite(audio.duration) ? audio.duration : Infinity
-      audio.currentTime = Math.max(0, Math.min(seconds, length))
+      const target = Math.max(0, Math.min(seconds, length))
+      audio.currentTime = target
       state.lastPosition = audio.currentTime
-      listeners.forEach((listener) => listener(audio.currentTime))
+      state.pendingSeek = { target, since: performance.now() }
+      report(target)
+      return target
     }
 
     /** "Previous" early in a song: the song again from the top, heard - and counted - afresh. */
     function restart() {
       newListen()
       state.resumeAt = 0
+      readSeek({ kind: 'other seek' })
       seek(0)
       //? no 'playing' follows a seek to a start that is already buffered, so a restart while
       //? playing begins its listen here
@@ -573,7 +607,9 @@ export function usePlayer(): Player {
       setQueue(next)
       setDuration(songLength())
       setError(null)
-      listeners.forEach((listener) => listener(0))
+      state.pendingSeek = null
+      readSeek({ kind: 'song change' })
+      report(0)
       showOnLockScreen(track)
 
       play(() => refusedHandover(next))
@@ -655,10 +691,13 @@ export function usePlayer(): Player {
         else load({ ...state.queue, index: action.index }, state.intendsToPlay)
       },
       //? the scrubber and the lock screen's: a seek the listener made, during a song change, ends
-      //? its timing - the position it jumps to isn't the clock running
+      //? its timing - the position it jumps to isn't the clock running - and is the one the readout
+      //? follows to its song's end, to say where it really landed
       seek(seconds: number) {
         state.change = null
-        seek(seconds)
+        const target = seek(seconds)
+        const track = current(state.queue)
+        if (target !== null && track) readSeek({ kind: 'asked', asked: target, length: songLength(), track: track.id })
       },
       showAirPlay() {
         live().webkitShowPlaybackTargetPicker?.()
@@ -701,7 +740,8 @@ export function usePlayer(): Player {
       state.lastPosition = position
       state.lastAt = at
       state.seeked = false
-      listeners.forEach((listener) => listener(position))
+      report(position)
+      readSeek({ kind: 'clock', position, at })
 
       const { listen, submit } = listenHeard(state.listen, step, songLength())
       state.listen = listen
@@ -710,6 +750,9 @@ export function usePlayer(): Player {
     }
 
     function onEnded() {
+      //? before anything moves on: where the clock was when the audio ran out judges the last seek
+      const ended = live()
+      readSeek({ kind: 'ended', position: ended.currentTime, at: performance.now(), rate: ended.playbackRate })
       const index = nextIndex(state.queue)
       if (index === null) {
         state.change = null
@@ -823,6 +866,9 @@ export function usePlayer(): Player {
           //? and a song change it interrupted - a call arriving at the change - isn't a gap
           state.change = null
         }
+        //? any pause but the song's end (which sends one before 'ended') stops the wall clock
+        //? being a measure of how long the song played on past its clock
+        if (!audio.ended) readSeek({ kind: 'paused' })
         setPlaying(false)
         const media = session()
         if (media && !state.intendsToPlay) media.playbackState = 'paused'
@@ -840,6 +886,7 @@ export function usePlayer(): Player {
         if (state.resumeAt > 0) {
           const at = state.resumeAt
           state.resumeAt = 0
+          readSeek({ kind: 'other seek' })
           seek(at)
         }
       }],
@@ -856,7 +903,17 @@ export function usePlayer(): Player {
       ['seeking', () => {
         state.seeked = true
       }],
-      ['seeked', updatePositionState],
+      //? Landed. The bar goes back to the element's own clock - unless another seek has gone out
+      //? since, which is still on its way. That clock is what the readout calls "the player said":
+      //? Safari's says the time asked for even when it lands elsewhere (see lib/scrub).
+      ['seeked', () => {
+        const audio = live()
+        if (audio.seeking) return
+        state.pendingSeek = null
+        readSeek({ kind: 'seeked', position: audio.currentTime })
+        report(audio.currentTime)
+        updatePositionState()
+      }],
       ['ended', onEnded],
       ['error', onFailure],
       ['webkitplaybacktargetavailabilitychanged', (event) => {
@@ -952,6 +1009,7 @@ export function usePlayer(): Player {
     airplay,
     gapless,
     gaps,
+    lastSeek,
     ...engine.actions,
   }
 }

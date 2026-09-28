@@ -81,6 +81,11 @@ can't be reached. See [`RETAG_RENAME_WAIT`](configuration.md#organizing).
 - **Now playing**: a large cover (a grey square for an album without one), a scrubber, previous,
   play/pause and next, and an **AirPlay** button when there's a speaker on the network to send
   to. Drag it down, or tap the arrow at its top, to close it.
+- **The scrubber** is the whole bar: tap anywhere along it to jump there, or drag from anywhere on
+  it and it follows your finger, seeking when you let go. It works from the keyboard too (arrows
+  move 5 seconds, Page Up and Page Down 30, Home and End to the ends), and VoiceOver's swipe up
+  and down move it. [Seeking](#seeking-and-where-safari-lands) says why a seek in Safari can land
+  somewhere other than where you put it.
 - **Previous** restarts the song if you're more than three seconds in, and goes back a song if
   you're not, as Apple Music does.
 - **A song that won't play doesn't stop the album.** The player asks for it once more a moment
@@ -191,6 +196,47 @@ Even when it works, it isn't sample-exact: the second player still has to start,
 mixed straight through (a live album, a DJ mix) may keep a tiny gap. Closing that completely
 would take a different kind of player.
 
+## Seeking, and where Safari lands
+
+The scrubber seeks where you let go, and shows that time until the player has got there, however
+long that takes over a slow connection. Where the music then comes in is up to the browser, and
+Safari (on an iPhone or a Mac) doesn't always come in where it was asked to.
+
+To seek in a FLAC a player has to find the moment in the file, and a second of a quiet passage
+takes far fewer bytes than a second of a loud one. Safari's engine estimates from the part of the
+file it has already read, and in a song whose loudness changes, it lands off, while its clock
+says the time you asked for. Measured on a Mac with that engine (the same one iOS Safari uses,
+though not measured on a phone):
+
+| test song | where seeks landed |
+| --- | --- |
+| steady loudness | within a third of a second |
+| loudness moving like a song's (quiet intro, verses and choruses) | 2 to 8 seconds early |
+| a quiet first minute, then loud | up to 50 seconds out, and up to 159 over a slow connection |
+
+A **seek table** in the file made no difference: the same songs landed in the same places with
+and without one. Chrome and other Chromium browsers landed exactly where asked every time, with or
+without a table. The same FLAC audio in an MP4 file, or an MP3 at a constant bit rate, landed
+exactly in Safari's engine too; deadwax doesn't send either yet.
+
+**The readout shows it on your phone.** Under the controls, below the gapless readout, the player
+shows the last seek you made, with the bar or from the lock screen: *Last seek: asked 2:10, the
+player said 2:10*. Safari says the time asked for either way, so that half can't tell you, but the
+end of the song can: if the seek landed off, the song runs out before its clock reaches the end,
+or plays on after its clock has stopped at the end, by the same amount. If the song plays to its
+end with no other seek or pause, the line adds what that showed:
+
+| it adds | meaning |
+| --- | --- |
+| `the song ended on time, so it landed there` | the seek landed where you put it (to within about a second and a half) |
+| `the song ran out 7 s before its clock did, so it really landed at about 2:17` | it landed 7 seconds later in the song than asked |
+| `the song played on 7 s after its clock ended, so it really landed at about 2:03` | it landed 7 seconds earlier |
+
+It's hidden with the phone on its side, like the gapless readout. To try it on the iPhone, pick a
+song with a quiet opening and a loud middle, seek well into the loud part near the end, and let it
+finish. [Troubleshooting](troubleshooting.md#a-song-seeks-to-the-wrong-place) says more, including
+how to see whether a file has a seek table and how to add one.
+
 ## How plays are counted
 
 The player reports plays to Navidrome the way any Subsonic app does, so play counts, "Recently
@@ -281,4 +327,7 @@ question the whole player existed to answer. Still to find out:
 - how Safari handles a **transcoded** song, and which Ogg files it says it can play;
 - whether a song that won't load is **asked for again with the phone locked**: the second try
   comes a moment later, with nothing playing meanwhile, which is exactly when iOS may be holding
-  the page back.
+  the page back;
+- **where seeks land in Safari on the phone**: measured on a Mac's Safari engine only (see
+  [Seeking](#seeking-and-where-safari-lands)), and whether the scrubber takes a tap and a drag
+  under a real finger, which a desktop browser can only stand in for.

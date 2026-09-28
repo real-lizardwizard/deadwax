@@ -1,15 +1,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { describeGaps } from '../lib/gapless'
+import { clock, describeSeek, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
 import { Cover } from './Library'
 import { AirPlayIcon, ChevronDownIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
 import { usePosition, type Player } from './usePlayer'
-
-/** "3:07" - and "0:00" for nothing, which a clock should say where a track list says nothing. */
-function clock(seconds: number): string {
-  const whole = Math.max(0, Math.floor(seconds || 0))
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
-}
 
 /** How far a drag down has to go before letting go closes the sheet. */
 const DISMISS_PX = 110
@@ -21,34 +16,95 @@ const DISMISS_PX = 110
 const DRAG_START_PX = 6
 
 /**
- * The bar and the two clocks. While a finger is on the bar it shows where the finger is, not
- * where the song is - otherwise the thumb jumps back under it on every position update.
+ * The bar and the two clocks. The whole bar is the target, 44px tall: a tap seeks to where it
+ * lands, and a drag follows the finger and seeks where it lets go - never on the way, so a drag
+ * across the song doesn't ask for every part of it. It is not an <input type=range>, which on an
+ * iPhone moves only when dragged by its thumb: a tap on the bar, or a drag begun beside the thumb,
+ * did nothing there. While a finger is on the bar it shows where the finger is, not where the song
+ * is; once let go, the player shows the seek's target until the element has landed (see
+ * reportedPosition() in lib/scrub), so the thumb never goes back to the old time meanwhile.
+ *
+ * A slider to the keyboard and to VoiceOver (whose swipe up and down WebKit sends as arrow keys):
+ * arrows move 5 seconds, Page Up and Down 30, Home and End to the ends.
  */
 function Scrubber({ player }: { player: Player }) {
   const position = usePosition(player)
-  const [dragging, setDragging] = useState<number | null>(null)
+  const bar = useRef<HTMLDivElement>(null)
+  //? The drag in a ref as well as in state: a move and the release can both arrive before the
+  //? render between them, and the release must seek to where the LAST move put it.
+  const held = useRef<Drag | null>(null)
+  const [drag, setDragShown] = useState<Drag | null>(null)
+  const setDrag = (next: Drag | null) => {
+    held.current = next
+    setDragShown(next)
+  }
   const length = player.duration || 0
-  const shown = Math.min(dragging ?? position, length || Infinity)
+  const track = player.track?.id ?? ''
+  const shown = shownTime(dragFor(drag, track), position, length)
   const done = length ? (shown / length) * 100 : 0
+
+  //? the song changed under the finger: the drag was for the song before, and seeks nowhere
+  useEffect(() => {
+    if (held.current && !dragFor(held.current, track)) setDrag(null)
+  }, [track])
+
+  const timeFor = (event: PointerEvent) => {
+    //? The bar's place on screen. Its rect is right here, where the art viewer needs offsetWidth:
+    //? nothing scales the bar, and the sheet only ever moves on its y axis (closing, opening).
+    const rect = bar.current!.getBoundingClientRect()
+    return timeAt(event.clientX, rect.left, rect.width, length)
+  }
+
+  const onPointerDown = (event: PointerEvent) => {
+    if (!length || !event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return
+    //? every move and the release come here wherever the finger goes, off the bar included
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+    setDrag(dragStart(event.pointerId, track, timeFor(event)))
+  }
+  const onPointerMove = (event: PointerEvent) => {
+    if (!held.current) return
+    const next = dragMove(held.current, event.pointerId, timeFor(event))
+    if (next !== held.current) setDrag(next)
+  }
+  const onRelease = (how: 'up' | 'cancel') => (event: PointerEvent) => {
+    const { drag: next, seek } = dragEnd(held.current, event.pointerId, how)
+    if (next === held.current) return
+    setDrag(next)
+    if (seek !== null) player.seek(seek)
+  }
+  const onKeyDown = (event: KeyboardEvent) => {
+    const target = keyTarget(event.key, shown, length)
+    if (target === null) return
+    event.preventDefault()
+    player.seek(target)
+  }
 
   return (
     <div class="pl-scrubber">
-      <input
-        type="range"
-        class="pl-range"
-        min={0}
-        max={length || 1}
-        step="any"
-        value={shown}
-        disabled={!length}
+      <div
+        ref={bar}
+        class={`pl-scrub${drag ? ' is-held' : ''}`}
+        role="slider"
+        tabIndex={length ? 0 : -1}
         aria-label="Position in the song"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(length)}
+        aria-valuenow={Math.round(shown)}
+        aria-valuetext={`${clock(shown)} of ${clock(length)}`}
+        aria-disabled={!length}
         style={{ '--done': `${done}%` }}
-        onInput={(event) => setDragging(Number(event.currentTarget.value))}
-        onChange={(event) => {
-          player.seek(Number(event.currentTarget.value))
-          setDragging(null)
-        }}
-      />
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onRelease('up')}
+        onPointerCancel={onRelease('cancel')}
+        //? capture lost without an up - the element taken away mid-drag - is a cancel too; after
+        //? an up the drag is already gone and this changes nothing
+        onLostPointerCapture={onRelease('cancel')}
+        onKeyDown={onKeyDown}
+      >
+        <span class="pl-scrub-track" />
+        <span class="pl-scrub-thumb" />
+      </div>
       <div class="pl-clocks">
         <span>{clock(shown)}</span>
         <span>-{clock(length - shown)}</span>
@@ -193,6 +249,7 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
           )}
         </div>
         <p class="pl-gapless-readout">{describeGaps(player.gaps)}</p>
+        <p class="pl-gapless-readout pl-seek-readout">{describeSeek(player.lastSeek)}</p>
       </div>
     </div>
   )
