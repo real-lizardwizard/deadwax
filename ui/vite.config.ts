@@ -6,11 +6,14 @@ import preact from '@preact/preset-vite'
  *
  * This is deliberately NOT an HTML build. While the port is in progress the vanilla
  * `interface/index.html` is still the page users get, and it loads the bundle produced here
- * as one extra module script. So the build input is `src/main.tsx`, not `index.html`, and
- * `index.html` in this directory exists only as a dev harness (see the file itself).
+ * as one extra module script. So the build inputs are `src/main.tsx` - and, for the player's
+ * own page at /player/, `src/player/main.tsx` - not `index.html`, and `index.html` in this
+ * directory exists only as a dev harness for the main interface (see the file itself). The
+ * player has no harness; it is checked through the real app on 8080 after a build.
  *
- * When the migration finishes and Vite owns the page, drop `rollupOptions.input` and let it
- * build `index.html` normally. See docs/FRONTEND-MIGRATION.md.
+ * When the migration finishes and Vite owns the main page, let it build `index.html` normally -
+ * but keep the player's entry beside it: dropping `rollupOptions.input` outright would drop the
+ * player. See docs/FRONTEND-MIGRATION.md.
  */
 export default defineConfig({
   plugins: [preact()],
@@ -21,15 +24,21 @@ export default defineConfig({
     sourcemap: true,
 
     rollupOptions: {
-      input: 'src/main.tsx',
+      // Two pages, two entries: the main interface, and the player at /player/. Named so each
+      // lands at a fixed filename its hand-written page can name; code they share (preact, the
+      // HTTP helpers) is split into a hashed chunk both load.
+      input: {
+        'deadwax-ui': 'src/main.tsx',
+        'deadwax-player': 'src/player/main.tsx',
+      },
       output: {
-        // The entry filename is stable and unhashed because a static, hand-written
-        // `interface/index.html` has to reference it by name. That makes it a mutable URL,
-        // which is exactly why `revalidate_interface_assets` in src/api/app.py has to send
-        // `no-cache` for it - otherwise upgrading the container leaves people on the old
-        // bundle, which is the "I upgraded and nothing changed" bug that middleware exists
-        // to prevent.
-        entryFileNames: 'deadwax-ui.js',
+        // The entry filenames are stable and unhashed because static, hand-written pages
+        // (`interface/index.html`, `interface/player/index.html`) have to reference them by
+        // name. That makes them mutable URLs, which is exactly why `RevalidateInterfaceAssets`
+        // in src/api/app.py has to send `no-cache` for them - otherwise upgrading the container
+        // leaves people on the old bundle, which is the "I upgraded and nothing changed" bug
+        // that middleware exists to prevent.
+        entryFileNames: '[name].js',
         // Split chunks and assets keep their hashes and are served immutable. Same file
         // contents always mean the same URL, so caching them hard is safe.
         chunkFileNames: 'assets/[name]-[hash].js',

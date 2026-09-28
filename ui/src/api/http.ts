@@ -61,8 +61,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export function get<T>(path: string): Promise<T> {
-  return request<T>(path)
+export function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  //? lib/latest.ts aborts a request that has been superseded - see there
+  return request<T>(path, signal ? { signal } : undefined)
 }
 
 /**

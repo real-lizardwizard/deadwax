@@ -126,12 +126,27 @@ and album tags. You:
    Archive, and compare it with the one you have (**Compare full size**) before replacing it.
 5. **Apply** writes the tags, fetches the cover and moves the folder. There's no undo, which is
    why the preview shows everything first. When the apply changes both the album's tags and its
-   folder, it writes the tags, pauses (20 seconds by default, `RETAG_RENAME_WAIT`), then
-   renames. That pause lets Navidrome see the new tags first and keep the album's plays,
-   ratings and favourites, which it loses when both change at once. The preview says so, and
-   the button counts it down. If a folder of the new name appears during the pause (another
-   copy of the same release applied just before), the rename is refused and the album stays
-   where it is, with its new tags.
+   folder, it writes the tags, pauses, then renames. That pause lets Navidrome see the new tags
+   first and keep the album's plays, ratings and favourites, which it loses when both change at
+   once. With Navidrome set up (the [phone player's](player.md) settings), deadwax asks it, and
+   renames as soon as Navidrome has finished a scan that began after the tags were written,
+   usually a few seconds; the button reads *Applying, waiting for Navidrome*. Without, it's a
+   fixed pause (20 seconds by default, `RETAG_RENAME_WAIT`), and the button names it
+   (*Applying, renaming in 20s*). The preview says which, up front. If Navidrome finishes no
+   scan within 90 seconds, or can't be reached at all, the folder is left where it is and the
+   editor says so. Apply the same release again once Navidrome has scanned: deadwax checks with
+   Navidrome first and renames straight away if it has, or waits for a scan again if it hasn't.
+   deadwax forgets a held-back rename when it restarts, and after that the next apply renames
+   without asking
+   ([troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)).
+   If a folder of the new name appears during the pause (another copy of the same release
+   applied just before), the rename is refused and the album stays where it is, with its new
+   tags.
+
+   Navidrome can only say that a scan finished, not which folders it read. With one library
+   that's enough, because a scan after a change is the one the change caused, or covers
+   everything. With a second library in Navidrome, or an admin scanning some other folder at
+   that moment, the rename can come before this album has been scanned.
 
 ![The metadata editor on an untagged rip of Third: its issues listed, the release picked, and the preview of the tags, the cover and the folder move](../assets/images/editor.png)
 

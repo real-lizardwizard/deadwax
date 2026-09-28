@@ -39,7 +39,7 @@ Pick the release you actually want, and deadwax searches Soulseek, ranks what co
 
 _Please note; this is a silly and fun container i made for my own server, its probably kinda shitty, the code is a mess, and theres certainly better alternatives out there. buuut if you like it thats awesome :)_<3
 
-> **New here?** [The guide](docs/README.md) covers everything, step by step: [getting started](docs/getting-started.md), [every setting](docs/configuration.md), [finding music](docs/finding-music.md), [downloading](docs/downloading.md), [organizing](docs/organizing.md), [the library](docs/library.md), [how matching works](docs/matching.md) and [troubleshooting](docs/troubleshooting.md). This README is the tour.
+> **New here?** [The guide](docs/README.md) covers everything, step by step: [getting started](docs/getting-started.md), [every setting](docs/configuration.md), [finding music](docs/finding-music.md), [downloading](docs/downloading.md), [organizing](docs/organizing.md), [the library](docs/library.md), [the phone player](docs/player.md), [how matching works](docs/matching.md) and [troubleshooting](docs/troubleshooting.md). This README is the tour.
 
 > **Heads up:** this is a fork of [LidBrainz](https://github.com/dual-shock/lidbrainz) that has diverged a long way. LidBrainz sends things to Lidarr; deadwax cut Lidarr out entirely and talks to slskd directly. If you want the Lidarr version, go use the original — it's good.
 
@@ -63,6 +63,7 @@ _Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** manag
 1. a running [slskd](https://slskd.org) instance reachable from this container, with an API key
 2. an email address to give MusicBrainz as a contact (deadwax builds the rest of its user agent itself)
 3. docker
+4. optionally, [Navidrome](https://www.navidrome.org) and an account on it of your own (not an admin one), for the [phone player](docs/player.md)
 
 ### Environment:
 1. either clone the repo: ```git clone https://github.com/real-lizardwizard/deadwax.git``` <br> or just grab the ```docker-compose.example.yml``` file
@@ -86,7 +87,7 @@ _Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** manag
 It's the same app under a new name, and 0.7.0 is the first release under it. Point your compose file or Komodo stack at **`ghcr.io/real-lizardwizard/deadwax`** instead of `…/jimbrainz` — nothing redirects the old image name, and it stops getting updates at 0.6.20. Nothing else needs changing:
 
 - **Your database is found where it is.** A `DB_PATH=/config/jimbrainz.db` line keeps working as it is, and if you never set `DB_PATH`, the old `/config/jimbrainz.db` keeps being used until a `deadwax.db` exists. Don't rename the file by hand to "match" — leave it.
-- **Your browser keeps its layouts and preferences** — column widths, panel sizes, the library's fields and sort. They're carried over to the new name the first time the page loads.
+- **Your browser's layouts and preferences start from the defaults again** — column widths, panel sizes, the library's fields and sort were saved under the old name, and the step that carried them across has since been retired. Nothing on the server is affected.
 - If you had the page open during the upgrade, reload it.
 
 ### Which image tag?
@@ -285,7 +286,7 @@ Picard-shaped, but small. Open the editor on any album and it searches MusicBrai
 <br><br>
 Pick a release and it fills in the fields, or type them yourself — artist, album, year, original year, and the edition name that names the folder. So if MusicBrainz says "remixed by john" and you'd rather the folder just said <code>[REMIX]</code>, type that.
 <br><br>
-Nothing is written until you press apply, and the preview showing what would change is produced by the same code that does the writing — so it can't drift into lying about it. When an apply changes both the tags and the folder, it writes the tags, pauses 20 seconds, then renames, because Navidrome loses an album's plays, ratings and favourites when both change at once; <code>RETAG_RENAME_WAIT</code> sets the pause, and 0 turns it off. It can also pull the release's cover into the folder, with the incoming art shown next to the one you already have. Click either cover to compare the two <em>at full size</em>, side by side, with their real pixel dimensions and the larger one marked. Each zooms and moves on its own, so you can go and look at the same corner of both. Two sleeves that look identical as thumbnails usually differ in exactly that, and you can keep the new one from right there.
+Nothing is written until you press apply, and the preview showing what would change is produced by the same code that does the writing — so it can't drift into lying about it. When an apply changes both the tags and the folder, it writes the tags first and renames afterwards, because Navidrome loses an album's plays, ratings and favourites when both change at once. With Navidrome connected (the phone player's settings), it asks Navidrome, and renames as soon as Navidrome has scanned the new tags — usually a few seconds. If no scan comes within 90 seconds, or Navidrome can't be reached at all (it may be restarting, and would scan both changes at once when it's back), it leaves the folder where it is and says so, rather than renaming blind. Apply again once Navidrome has caught up: deadwax checks with it first, and renames straight away if it has scanned since, or waits for it again if it hasn't. Without Navidrome it pauses a fixed 20 seconds; <code>RETAG_RENAME_WAIT</code> sets that, and 0 turns the pause off either way. It can also pull the release's cover into the folder, with the incoming art shown next to the one you already have. Click either cover to compare the two <em>at full size</em>, side by side, with their real pixel dimensions and the larger one marked. Each zooms and moves on its own, so you can go and look at the same corner of both. Two sleeves that look identical as thumbnails usually differ in exactly that, and you can keep the new one from right there.
 <br><br>
 Multi-disc releases are tagged per disc, the way MusicBrainz and every player number them: disc 2 starts at track 1 of disc 2 rather than carrying on from disc 1. Single-disc albums aren't given a disc number at all, so an album that's already right still reads "nothing to change" — but a track claiming to be on some <em>other</em> disc is put back on disc 1, so re-applying the right release fixes a stray disc number instead of leaving it where it was.
 <br><br>
@@ -329,7 +330,7 @@ The bottom is the container's configuration, and most of it is <strong>editable<
 <br><br>
 It still reports, which is half the point. For every setting: the value this container <em>actually received</em>, <strong>which file supplied it</strong> (your compose <code>environment:</code> block or <code>.env</code> — indistinguishable from the value alone, and always the first question when something's wrong), and what is broken about it if anything.
 <br><br>
-It resolves the paths rather than trusting them, which is the point. <code>SLSKD_DOWNLOAD_PATH</code> pointing at a path that exists on the <em>host</em> but not inside the container is the most common first-run failure by a wide margin, and it is invisible from the value — the string looks perfectly correct. It also answers "why did nothing get filed" once, in a sentence, with every reason listed, rather than leaving you to infer it from four separate rows. The API key is never sent to the browser at all.
+It resolves the paths rather than trusting them, which is the point. <code>SLSKD_DOWNLOAD_PATH</code> pointing at a path that exists on the <em>host</em> but not inside the container is the most common first-run failure by a wide margin, and it is invisible from the value — the string looks perfectly correct. It also answers "why did nothing get filed" once, in a sentence, with every reason listed, rather than leaving you to infer it from four separate rows. API keys and the Navidrome password are never sent to the browser at all.
 <br><br>
 
 ![The settings tab's Connections page, saying where each setting came from and never showing a key](assets/images/settings.png)
@@ -369,6 +370,20 @@ Then every view was gone through again at phone sizes (320, 375 and 390px wide, 
 <img src="assets/images/mobile-library.png" width="300" alt="An album's tracks on a phone: number, title, length">
 </p>
 
+</details>
+
+### A player for your phone (early)
+<details>
+<summary style="font-style:italic">Your library from Navidrome, on your home screen, without the App Store</summary>
+Open <code>/player/</code> on your iPhone in Safari, tap Share, then <strong>Add to Home Screen</strong>, and deadwax opens full screen like an app: your albums in a grid (recently added, recently played, by artist or by title), an album page with Play and Shuffle, a mini player along the bottom, and a full now-playing screen you drag down to close. It's built to keep playing in the background, with the song, its cover, previous/next and a scrubber on the lock screen and in Control Center, and an AirPlay button when there's a speaker to send to. A song that won't load is asked for once more and then skipped, with a note saying so, so one bad file or a dropped connection doesn't stop an album playing in your pocket.
+<br><br>
+It plays from <strong>Navidrome</strong>, so it needs one: set <code>NAVIDROME_URL</code>, <code>NAVIDROME_USER</code> and <code>NAVIDROME_PASSWORD</code> in the settings tab (Connections), or in compose or <code>.env</code>. Use an account of your own; it doesn't need to be an admin. The login stays in deadwax, which passes the player's requests on, so the phone never sees your Navidrome password and only ever needs to reach deadwax. It's a short, fixed list of requests (albums, covers, audio, and "played") rather than a pass-through, so reaching deadwax never means reaching the rest of Navidrome. Plays are reported to Navidrome the way any Subsonic app reports them, so play counts and Last.fm or ListenBrainz scrobbling carry on working.
+<br><br>
+Files are sent as they are whenever the phone can play them, and only the ones it can't (mostly Ogg and WMA on an iPhone) are transcoded to MP3 — which can't be skipped through the first time it plays. Navidrome lists the player under <strong>Players</strong> as <code>deadwax</code>. Leave that player's transcoding and max bit rate unset: it's one entry for every device on every network, so it can't mean "smaller over mobile data", and a transcoding set there replaces the MP3 the player asks for with a format the phone may not play.
+<br><br>
+<strong>What it can't do</strong>, because it's a web page and not an App Store app: there's a short gap between tracks (no gapless playback yet), no CarPlay, no offline downloads, and no Siri. There's no search yet either, and the queue is gone if iOS closes the app. And the lock screen side is so far only tested in a desktop browser. Moving to the next song with the phone locked is exactly what iOS has historically been fussy about for web apps, and it hasn't yet been tried on a locked iPhone, which is the whole question.
+<br><br>
+To use it away from home, reach deadwax over a VPN such as WireGuard or Tailscale rather than an open port, since deadwax has no login (see below). Everything else — setting it up, what counts as a play, what's still unverified — is in <a href="docs/player.md">the phone player guide</a>.
 </details>
 
 ## (more importantly) Non-features (and how they dont work)
@@ -411,12 +426,13 @@ This is how deadwax actually runs: OpenMediaVault for the box, Komodo managing D
 
 Komodo deploys compose stacks, so there's nothing deadwax-specific to learn — point a stack at this repo, or paste `docker-compose.example.yml` into one, and put the settings in the stack's environment (or in a `.env` beside it; which wins is described above).
 
-Four things are worth getting right the first time:
+Four things are worth getting right the first time, and a fifth if you use the phone player:
 
 1. **`PUID`/`PGID` should match whoever owns the media on your OMV share**, and should be the same pair slskd runs as. If the two disagree, deadwax files albums away as a user slskd can't write — or the other way round. OMV's shared folders commonly sit in the `users` group.
 2. **`SLSKD_URL` has to be reachable from inside this container.** If slskd is another stack on the same host, put both on one docker network and use its service name and internal port (`http://slskd:5030`) rather than the host address you type into your browser.
 3. **`SLSKD_DOWNLOAD_PATH` and the `/downloads` mount have to point at the same files slskd writes**, as this container sees them. It's the most likely first-run problem by a mile, and it fails quietly: organizing simply finds nothing.
 4. **Mount your library** where `LIBRARY_PATH` points, or the library tab has nothing to read.
+5. *Optional, for the phone player:* **`NAVIDROME_URL` has to be reachable from inside this container** too. With Navidrome on the same docker network, that's `http://navidrome:4533` (plus its base path, if it has one). Give it a Navidrome account of your own that isn't an admin, and keep its password in `.env` or the settings tab, like the slskd key.
 
 Leave `ORGANIZE_MODE` on `dry_run` until the event log shows it finding your files, then switch it to `copy` or `move`.
 
@@ -440,4 +456,6 @@ basically anyone who wants more functionality than whats mentioned above. if you
 - **MusicBrainz is just down sometimes:** it happens a lot. deadwax tells you thats what happened rather than showing you an empty result and letting you blame your search terms.
 - **slskd's incomplete folder fills with empty folders:** that's slskd - it writes each download under a folder per level of the sharer's path, and when the download finishes it only removes the last of them. Set `SLSKD_INCOMPLETE_PATH` to that folder and deadwax clears the empty ones every ten minutes. It only ever removes empty folders; a half-finished download, which slskd can resume, is left alone.
 - **The library tab is empty:** check `LIBRARY_PATH` is set and points at the same music the container can see. It says which of those is wrong.
+- **The phone player can't reach Navidrome:** the player says why on its own screen, in place of your albums; [troubleshooting](docs/troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome) goes through each message, and through songs that won't start.
+- **Plays from the phone player don't show up in Navidrome:** nothing on the phone says so - a play that can't be reported never interrupts the music. [Troubleshooting](docs/troubleshooting.md#plays-dont-show-up-in-navidrome) covers what counts as a play, and the usual reasons they go missing.
 - the ui has many problems, i just wanted it to look pretty cause i like pretty things

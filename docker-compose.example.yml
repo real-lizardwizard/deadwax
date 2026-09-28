@@ -90,6 +90,29 @@ services:
       # seconds each Soulseek search listens for answers (3-60): longer finds more peers
       #- SLSKD_SEARCH_TIMEOUT=8
       #
+      # seconds between writing an album's new tags and renaming its folder, when applying a
+      # release changes both, so Navidrome keeps its plays and favourites. With Navidrome set up
+      # below, deadwax asks it when it has scanned instead, and this only has to be more than 0.
+      # 0 renames straight away.
+      #- RETAG_RENAME_WAIT=20
+      #
+      # Optional - the player at /player/, which plays your library from Navidrome. deadwax
+      # keeps this login and passes the player's requests on, so a phone only ever needs to
+      # reach deadwax. The URL is Navidrome's address FROM THIS CONTAINER, like slskd's, plus
+      # Navidrome's base path if it has one (ND_BASEPATH): http://navidrome:4533/music. A
+      # non-admin account of your own is enough. The password is better kept in .env, like the
+      # slskd key.
+      #- NAVIDROME_URL=http://navidrome:4533
+      #- NAVIDROME_USER=your-navidrome-user
+      #- NAVIDROME_PASSWORD=your-navidrome-password
+      #
+      # Only behind a reverse proxy that rewrites the Host header: the address you open deadwax
+      # at, with the scheme (comma-separated for several). Changes another website sends are
+      # refused, and behind such a proxy deadwax's own page - and the player's plays - look like
+      # another website. Environment only: the settings tab can't set it, since it guards that
+      # tab's own save.
+      #- TRUSTED_ORIGINS=https://music.example.com
+      #
       # off | dry_run | copy | move. Starts at dry_run on purpose - organizing is the only
       # thing here that writes to your filesystem, so check the event log looks right before
       # switching to copy or move.

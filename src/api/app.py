@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 
-from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings
+from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome
 from src.logger import logger, cleanup_logging
 from src.poller import run_download_poller
 from src.store import JobStore
@@ -15,8 +15,24 @@ from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
 from src.api.same_origin import SameOriginWrites
+from src.api.navidrome_endpoint import navidrome as navidrome_client
 from src.config import Config
 from src import __version__
+
+#? The routes that answer with a picture or with audio - bytes deadwax didn't make. The library's
+#? are matched EXACTLY, since each takes its album as a query parameter: as a prefix,
+#? "/deadwax/library/art" also caught every /deadwax/library/artist route, all of them JSON.
+MEDIA_PATHS = frozenset({
+    "/deadwax/library/art", "/deadwax/library/artist/art", "/deadwax/library/disc_art",
+    "/deadwax/library/tracks/picture",
+})
+#? The player's, whose ids are in the path.
+MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/")
+
+
+def serves_media(path: str) -> bool:
+    return path in MEDIA_PATHS or path.startswith(MEDIA_PREFIXES)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +52,7 @@ async def lifespan(app: FastAPI):
     #? Here rather than in Config.check(), which runs before the overrides exist - an email set
     #? in the settings tab would otherwise be reported missing on every single restart.
     Config.report_musicbrainz()
+    Config.report_navidrome()
 
     poller_task = asyncio.create_task(
         run_download_poller(app.state.slskd_client, app.state.store)
@@ -57,6 +74,7 @@ async def lifespan(app: FastAPI):
     await library.coverart_client.close_client()
     await library.artist_images_client.close_client()
     await lrclib.close_client()
+    await navidrome_client.close_client()
 
     cleanup_logging()
 
@@ -77,7 +95,9 @@ def start() -> FastAPI:
     #? Everything whose URL stays the same while its contents change: the hand-written
     #? interface files, and the Vite entry bundle - deliberately unhashed so the static
     #? index.html can name it (see ui/vite.config.ts), which is exactly what makes it mutable.
-    REVALIDATE_PREFIXES = ("/scripts/", "/styles/", "/assets/", "/dist/")
+    #? The player's page and manifest belong here for the same reason: an installed web app
+    #? revalidates on launch like any page, and a cached page is an old app.
+    REVALIDATE_PREFIXES = ("/scripts/", "/styles/", "/assets/", "/dist/", "/player/")
 
     class RevalidateInterfaceAssets:
         """
@@ -135,23 +155,71 @@ def start() -> FastAPI:
 
         Starlette's GZipMiddleware is plain ASGI (it wraps `send` and leaves `receive` alone, so
         the disconnect detection below still works) and already leaves the log's event stream
-        uncompressed. It would gzip images too, which are compressed already - pure CPU for
-        nothing - so pictures, covers and fonts are passed straight through.
+        uncompressed. Pictures, fonts and the player's icons are passed straight through, since
+        they are compressed already and gzipping them is CPU for nothing.
+
+        The player's audio and covers are passed through for CORRECTNESS, not just to save CPU.
+        GZipMiddleware compresses any body that is streamed, whatever its size or type, and drops
+        its Content-Length to do it - so Safari's two-byte probe came back as a gzipped 206 with
+        no length, and a seek as a gzipped body under a Content-Range counting uncompressed bytes.
+        Byte ranges have to reach Safari exactly as Navidrome sent them, or it won't play.
         """
 
-        BINARY = ("/deadwax/library/art", "/deadwax/library/artist/art", "/deadwax/library/disc_art",
-                  "/deadwax/library/tracks/picture", "/styles/font/")
+        #? skipped as well as everything serves_media() names - `icon-` so that it catches the PNG
+        #? icons and not icon.svg, which is text and still worth gzipping
+        BINARY = ("/styles/font/", "/player/icon-")
 
         def __init__(self, inner):
             self.inner = inner
             self.gzip = GZipMiddleware(inner, minimum_size=1024, compresslevel=6)
 
         async def __call__(self, scope, receive, send):
-            if scope["type"] == "http" and not scope.get("path", "").startswith(self.BINARY):
-                return await self.gzip(scope, receive, send)
+            if scope["type"] == "http":
+                path = scope.get("path", "")
+                if not serves_media(path) and not path.startswith(self.BINARY):
+                    return await self.gzip(scope, receive, send)
             return await self.inner(scope, receive, send)
 
     app.add_middleware(CompressText)
+
+    class GuardMedia:
+        """
+        Pictures and audio are only ever shown to deadwax's own pages, and never as pages.
+
+        Their bytes come from strangers - an embedded picture in a file a Soulseek peer shared,
+        passed on by the library routes or by Navidrome - and each route decides which types it
+        will serve them as. This is the rest of that: `nosniff` stops a browser guessing a type
+        from the bytes, a sandbox with nothing allowed means a response opened as a page can run
+        nothing even if a type slips through, and `same-origin` stops any other website
+        embedding the covers and audio. The player and the library tab are same-origin, so their
+        <img> and <audio> - and the lock screen's artwork - are unaffected.
+
+        Plain ASGI, touching only the response's headers, like the layers around it.
+        """
+
+        HEADERS = [
+            (b"x-content-type-options", b"nosniff"),
+            (b"content-security-policy", b"default-src 'none'; sandbox"),
+            (b"cross-origin-resource-policy", b"same-origin"),
+        ]
+        NAMES = {name for name, _ in HEADERS}
+
+        def __init__(self, inner):
+            self.inner = inner
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http" or not serves_media(scope.get("path", "")):
+                return await self.inner(scope, receive, send)
+
+            async def send_guarded(message):
+                if message["type"] == "http.response.start":
+                    headers = [(k, v) for k, v in message.get("headers", []) if k.lower() not in self.NAMES]
+                    message = {**message, "headers": headers + self.HEADERS}
+                await send(message)
+
+            await self.inner(scope, receive, send_guarded)
+
+    app.add_middleware(GuardMedia)
 
     #? Added last, so it is the OUTERMOST layer: a write another website asked for is refused
     #? before anything else runs. See src/api/same_origin.py.
@@ -164,6 +232,7 @@ def start() -> FastAPI:
     app.include_router(download.router, prefix="/deadwax/download", tags=["download"])
     app.include_router(library.router, prefix="/deadwax/library", tags=["library"])
     app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"])
+    app.include_router(navidrome.router, prefix="/deadwax/navidrome", tags=["navidrome"])
 
     @app.get("/deadwax/health")
     async def health():

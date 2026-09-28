@@ -1,0 +1,699 @@
+/*
+  The player at /player/ - a phone app's look, not the desktop interface's.
+
+  It borrows the brand from theme.css (the purple, the motion curves, the reduced-motion switch)
+  and nothing else: the desktop's type scale is set for fitting a release grid on a monitor at
+  13px, and an iPhone's is set for a thumb at 17. So the player has its own scale and spacing
+  here, on the same rule as theme.css - every value is a token at the top, and a raw value in a
+  rule below is a bug. The face is the phone's own (San Francisco on an iPhone), because a player
+  pretending to be a native one should not be the only thing on the phone set in Noto.
+
+  Dark only, like the rest of deadwax.
+*/
+
+@import url('../styles/theme.css');
+
+:root {
+    --pl-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Helvetica Neue', sans-serif;
+    --pl-font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+
+    /* iOS's own dark palette, so the player sits among the phone's other apps */
+    --pl-bg: #000;
+    --pl-sheet-bg: #0b0a10;
+    --pl-bar: rgba(24, 22, 30, 0.78);
+    --pl-fill: rgba(118, 118, 128, 0.24);
+    --pl-fill-strong: rgba(118, 118, 128, 0.4);
+    --pl-separator: rgba(84, 84, 88, 0.55);
+    --pl-text: #fff;
+    --pl-text-2: rgba(235, 235, 245, 0.6);
+    --pl-text-3: rgba(235, 235, 245, 0.3);
+    --pl-scrub-done: rgba(255, 255, 255, 0.85);
+    --pl-scrub-left: rgba(255, 255, 255, 0.22);
+    --pl-error: var(--red-text);
+    /* the brand purple one step lighter, to read as text on black */
+    --pl-accent: var(--accent-hover);
+
+    /* iOS's text styles, in points = CSS px */
+    --pl-text-large-title: 34px;
+    --pl-text-title: 22px;
+    --pl-text-title-2: 20px;
+    --pl-text-body: 17px;
+    --pl-text-subhead: 15px;
+    --pl-text-footnote: 13px;
+    --pl-text-caption: 12px;
+    --pl-weight-regular: 400;
+    --pl-weight-medium: 500;
+    --pl-weight-semibold: 600;
+    --pl-weight-bold: 700;
+
+    --pl-gutter: 20px;
+    --pl-gap: 16px;
+    --pl-gap-sm: 8px;
+    --pl-gap-xs: 4px;
+    --pl-hit: 44px;            /* Apple's minimum tap target */
+    --pl-row: 50px;
+    --pl-pill-height: 48px;
+    --pl-mini-height: 64px;
+    --pl-mini-cover: 44px;
+    --pl-mini-inset: 8px;
+    --pl-content-max: 640px;
+    --pl-hero-cover: min(70vw, 300px);
+    --pl-sheet-cover: min(100%, 420px, 50vh);
+
+    --pl-radius-cover: 8px;
+    --pl-radius-small-cover: 6px;
+    --pl-radius-hero: 10px;
+    --pl-radius-sheet-cover: 12px;
+    --pl-radius-control: 12px;
+    --pl-radius-mini: 16px;
+
+    --pl-shadow-cover: 0 8px 28px rgba(0, 0, 0, 0.45);
+    --pl-shadow-small: 0 2px 8px rgba(0, 0, 0, 0.35);
+    --pl-shadow-mini: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --pl-shadow-sheet-cover: 0 22px 50px rgba(0, 0, 0, 0.55);
+    --pl-blur-bar: saturate(180%) blur(24px);
+    --pl-blur-backdrop: blur(60px) saturate(1.6) brightness(0.5);
+
+    --pl-safe-top: env(safe-area-inset-top, 0px);
+    --pl-safe-bottom: env(safe-area-inset-bottom, 0px);
+    /* on their side, the sensor housing and the rounded corners take the left or right edge, and
+       viewport-fit=cover leaves keeping out of them to the page */
+    --pl-safe-left: env(safe-area-inset-left, 0px);
+    --pl-safe-right: env(safe-area-inset-right, 0px);
+    /* a screen's side padding: the gutter, or the inset where that is wider */
+    --pl-edge-left: max(var(--pl-gutter), var(--pl-safe-left));
+    --pl-edge-right: max(var(--pl-gutter), var(--pl-safe-right));
+
+    /* the curve and pace of an iOS sheet; the cover's settle on pause overshoots a little */
+    --pl-sheet-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --pl-sheet-duration: 420ms;
+    --pl-settle-duration: 520ms;
+    --pl-paused-scale: 0.82;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --pl-sheet-duration: 1ms;
+        --pl-settle-duration: 1ms;
+    }
+}
+
+/* ===== foundation ===== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+    background: var(--pl-bg);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* the page behind the full player must not scroll under a finger on it */
+html.pl-sheet-open { overflow: hidden; }
+
+body {
+    margin: 0;
+    background: var(--pl-bg);
+    color: var(--pl-text);
+    font-family: var(--pl-font);
+    font-size: var(--pl-text-body);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+button:disabled { opacity: 0.4; cursor: default; }
+img { display: block; }
+[hidden] { display: none !important; }
+
+.pl-app { min-height: 100dvh; padding-bottom: calc(var(--pl-safe-bottom) + var(--pl-gutter)); }
+.pl-app.has-mini {
+    padding-bottom: calc(var(--pl-safe-bottom) + var(--pl-mini-height) + var(--pl-mini-inset) + var(--pl-gutter));
+}
+
+.pl-large-title {
+    margin: 0;
+    font-family: var(--pl-font-display);
+    font-size: var(--pl-text-large-title);
+    font-weight: var(--pl-weight-bold);
+    line-height: 1.2;
+}
+
+.pl-notice {
+    padding: var(--pl-gutter) var(--pl-edge-right) var(--pl-gutter) var(--pl-edge-left);
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-subhead);
+    text-align: center;
+}
+
+.pl-notice p { margin: 0; }
+
+.pl-text-button {
+    margin-top: var(--pl-gap-sm);
+    color: var(--pl-accent);
+    font-size: var(--pl-text-subhead);
+}
+
+.pl-spinner {
+    width: 28px;
+    height: 28px;
+    margin: var(--pl-gutter) auto;
+    border: 3px solid var(--pl-fill);
+    border-top-color: var(--pl-text-2);
+    border-radius: 50%;
+    animation: pl-spin 0.8s linear infinite;
+}
+
+.pl-spinner.is-page { margin-top: 40vh; }
+
+@keyframes pl-spin { to { transform: rotate(360deg); } }
+
+.pl-sentinel { height: 1px; }
+
+/* ===== library ===== */
+
+.pl-large-header {
+    padding: calc(var(--pl-safe-top) + 12px) var(--pl-edge-right) var(--pl-gap-xs) var(--pl-edge-left);
+}
+
+.pl-orders {
+    display: flex;
+    gap: var(--pl-gap-sm);
+    overflow-x: auto;
+    padding: var(--pl-gap-sm) var(--pl-edge-right) 14px var(--pl-edge-left);
+    scrollbar-width: none;
+}
+
+.pl-orders::-webkit-scrollbar { display: none; }
+
+.pl-order {
+    flex: none;
+    padding: 7px 14px;
+    border-radius: var(--radius-full);
+    background: var(--pl-fill);
+    font-size: var(--pl-text-subhead);
+    font-weight: var(--pl-weight-medium);
+}
+
+.pl-order.is-active { background: var(--pl-text); color: var(--pl-bg); }
+
+.pl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--pl-gutter) var(--pl-gap);
+    padding: var(--pl-gap-xs) var(--pl-edge-right) var(--pl-gap-xs) var(--pl-edge-left);
+}
+
+.pl-album {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    text-align: left;
+}
+
+.pl-album-cover {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--pl-radius-cover);
+    background: var(--pl-fill);
+    transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.pl-album:active .pl-album-cover { opacity: 0.7; }
+
+.pl-album-title,
+.pl-album-artist {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--pl-text-footnote);
+    line-height: 1.35;
+}
+
+.pl-album-title { margin-top: 6px; font-weight: var(--pl-weight-medium); }
+.pl-album-artist { color: var(--pl-text-2); }
+
+/* ===== one album ===== */
+
+.pl-nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: calc(var(--pl-safe-top) + 4px) max(var(--pl-gap-sm), var(--pl-safe-right)) 4px
+        max(var(--pl-gap-sm), var(--pl-safe-left));
+    background: var(--pl-bar);
+    -webkit-backdrop-filter: var(--pl-blur-bar);
+    backdrop-filter: var(--pl-blur-bar);
+}
+
+.pl-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--pl-hit);
+    padding: 0 var(--pl-gap-sm) 0 0;
+    color: var(--pl-accent);
+    font-size: var(--pl-text-body);
+}
+
+.pl-back-icon { width: 26px; height: 26px; }
+
+.pl-album-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--pl-gap) var(--pl-edge-right) var(--pl-gap-sm) var(--pl-edge-left);
+    text-align: center;
+}
+
+.pl-hero-cover {
+    width: var(--pl-hero-cover);
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--pl-radius-hero);
+    background: var(--pl-fill);
+    box-shadow: var(--pl-shadow-cover);
+}
+
+.pl-hero-title {
+    margin: 18px 0 2px;
+    font-size: var(--pl-text-title);
+    font-weight: var(--pl-weight-bold);
+    line-height: 1.2;
+}
+
+.pl-hero-artist {
+    margin: 0;
+    color: var(--pl-accent);
+    font-size: var(--pl-text-title-2);
+    line-height: 1.25;
+}
+
+.pl-hero-meta {
+    min-height: 1em;
+    margin: 6px 0 0;
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-caption);
+    font-weight: var(--pl-weight-semibold);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+}
+
+.pl-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--pl-gap);
+    width: 100%;
+    max-width: 420px;
+    margin-top: 18px;
+}
+
+.pl-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--pl-pill-height);
+    padding: 0 var(--pl-gutter);
+    border-radius: var(--pl-radius-control);
+    background: var(--pl-fill);
+    color: var(--pl-accent);
+    font-size: var(--pl-text-body);
+    font-weight: var(--pl-weight-semibold);
+    transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.pl-pill:active:not(:disabled) { background: var(--pl-fill-strong); }
+.pl-pill-icon { width: 20px; height: 20px; }
+
+.pl-tracks {
+    margin: var(--pl-gap) 0 0;
+    padding: 0 0 0 var(--pl-edge-left);
+    list-style: none;
+}
+
+.pl-disc {
+    padding: 18px var(--pl-edge-right) 6px 0;
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-footnote);
+    font-weight: var(--pl-weight-semibold);
+    text-transform: uppercase;
+}
+
+.pl-track {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--pl-row);
+    padding: 6px var(--pl-edge-right) 6px 0;
+    border-bottom: 0.5px solid var(--pl-separator);
+    text-align: left;
+}
+
+.pl-track:active { background: var(--pl-fill); }
+
+.pl-track-number,
+.pl-track-time {
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-subhead);
+    font-variant-numeric: tabular-nums;
+}
+
+.pl-track-text { display: flex; flex-direction: column; min-width: 0; }
+
+.pl-track-title,
+.pl-track-artist {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pl-track-title { font-size: var(--pl-text-body); }
+.pl-track-artist { color: var(--pl-text-2); font-size: var(--pl-text-footnote); }
+
+.pl-album-footer {
+    margin: 0;
+    padding: 14px var(--pl-edge-right) 14px var(--pl-edge-left);
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-footnote);
+}
+
+/* the "playing" mark: three bars that rise and fall, and hold still while paused */
+.pl-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+
+.pl-bars i {
+    width: 3px;
+    height: 100%;
+    border-radius: 1px;
+    background: var(--pl-accent);
+    transform-origin: bottom;
+    animation: pl-bar 0.9s ease-in-out infinite alternate;
+}
+
+.pl-bars i:nth-child(2) { animation-delay: -0.35s; }
+.pl-bars i:nth-child(3) { animation-delay: -0.7s; }
+.pl-bars.is-paused i { animation-play-state: paused; }
+
+@keyframes pl-bar {
+    from { transform: scaleY(0.3); }
+    to { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pl-bars i { animation: none; transform: scaleY(0.7); }
+}
+
+/* ===== the mini player ===== */
+
+.pl-mini {
+    position: fixed;
+    left: calc(var(--pl-mini-inset) + var(--pl-safe-left));
+    right: calc(var(--pl-mini-inset) + var(--pl-safe-right));
+    bottom: calc(var(--pl-safe-bottom) + var(--pl-mini-inset));
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: var(--pl-gap-xs);
+    max-width: var(--pl-content-max);
+    height: var(--pl-mini-height);
+    margin: 0 auto;
+    padding: 0 var(--pl-gap-xs) 0 10px;
+    overflow: hidden;
+    border-radius: var(--pl-radius-mini);
+    background: var(--pl-bar);
+    -webkit-backdrop-filter: var(--pl-blur-bar);
+    backdrop-filter: var(--pl-blur-bar);
+    box-shadow: var(--pl-shadow-mini);
+}
+
+.pl-mini-open {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    height: 100%;
+    text-align: left;
+}
+
+.pl-mini-cover {
+    flex: none;
+    width: var(--pl-mini-cover);
+    height: var(--pl-mini-cover);
+    object-fit: cover;
+    border-radius: var(--pl-radius-small-cover);
+    background: var(--pl-fill);
+    box-shadow: var(--pl-shadow-small);
+}
+
+.pl-mini-text { display: flex; flex-direction: column; min-width: 0; }
+
+.pl-mini-title,
+.pl-mini-artist {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pl-mini-title { font-size: var(--pl-text-subhead); font-weight: var(--pl-weight-medium); }
+.pl-mini-artist { color: var(--pl-text-2); font-size: var(--pl-text-footnote); }
+
+.pl-mini-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: var(--pl-accent);
+    transform: scaleX(0);
+    transform-origin: left;
+}
+
+.pl-icon-button {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    border-radius: 50%;
+}
+
+.pl-icon-button:active { background: var(--pl-fill); }
+.pl-icon { width: 24px; height: 24px; }
+.is-busy { opacity: 0.55; }
+
+/* ===== now playing ===== */
+
+.pl-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    padding: var(--pl-safe-top) var(--pl-safe-right) var(--pl-safe-bottom) var(--pl-safe-left);
+    overflow: hidden;
+    background: var(--pl-sheet-bg);
+    touch-action: none;
+    visibility: hidden;
+    transform: translateY(100%);
+    /* visibility waits for the slide down to finish before hiding it */
+    transition:
+        transform var(--pl-sheet-duration) var(--pl-sheet-ease),
+        visibility 0s linear var(--pl-sheet-duration);
+}
+
+.pl-sheet.is-open {
+    visibility: visible;
+    transform: translateY(0);
+    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.pl-sheet.is-dragging { transition: none; }
+
+/* the cover itself, blurred to a wash of its colours - what the real one does */
+.pl-sheet-backdrop {
+    position: absolute;
+    inset: -20%;
+    z-index: -1;
+    width: 140%;
+    height: 140%;
+    object-fit: cover;
+    filter: var(--pl-blur-backdrop);
+}
+
+.pl-sheet-grip {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    min-height: 0;
+    padding: 0 28px;
+}
+
+.pl-sheet-close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    color: var(--pl-text-2);
+}
+
+/*
+  The cover is limited by the room the grip has in BOTH directions. Upright, the width is what
+  limits it, as it always was. On its side the controls below take most of the screen's height:
+  a cover sized by its width alone ran down over the title and the scrubber, and while paused (a
+  transform, which paints it above them) took the scrubber's touches. So the art box may shrink
+  in height (min-height: 0 - aspect-ratio would otherwise hold it at its width), and the cover
+  inside is as tall as the box and exactly as wide as it is tall. The close button keeps its
+  full tap target (flex: none) instead of being squeezed to fit.
+*/
+.pl-sheet-art {
+    width: var(--pl-sheet-cover);
+    min-height: 0;
+    aspect-ratio: 1;
+    margin: auto 0;
+    transition: transform var(--pl-settle-duration) var(--ease-spring);
+}
+
+.pl-sheet-art.is-paused { transform: scale(var(--pl-paused-scale)); }
+
+.pl-sheet-cover {
+    display: block;
+    height: 100%;
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 0 auto;
+    object-fit: cover;
+    border-radius: var(--pl-radius-sheet-cover);
+    background: var(--pl-fill);
+    box-shadow: var(--pl-shadow-sheet-cover);
+}
+
+.pl-sheet-body {
+    flex: none;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: var(--pl-gap) 28px var(--pl-gap-sm);
+}
+
+.pl-sheet-title,
+.pl-sheet-artist,
+.pl-sheet-album {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pl-sheet-title {
+    margin: 0;
+    font-size: var(--pl-text-title);
+    font-weight: var(--pl-weight-bold);
+    line-height: 1.25;
+}
+
+.pl-sheet-artist {
+    margin: 2px 0 0;
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-title-2);
+    line-height: 1.25;
+}
+
+.pl-sheet-error { margin: 6px 0 0; color: var(--pl-error); font-size: var(--pl-text-footnote); }
+
+.pl-scrubber { margin-top: 22px; }
+
+.pl-range {
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.pl-range::-webkit-slider-runnable-track {
+    height: 7px;
+    border-radius: 4px;
+    background: linear-gradient(to right, var(--pl-scrub-done) var(--done, 0%), var(--pl-scrub-left) var(--done, 0%));
+}
+
+/* A large, mostly transparent thumb: on an iPhone a range can only be dragged BY its thumb, so a
+   small one is hard to catch. What shows is the dot in the middle of it. */
+.pl-range::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+    margin-top: -10.5px;
+    border: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--pl-text) 0 6px, transparent 7px);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.pl-clocks {
+    display: flex;
+    justify-content: space-between;
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-caption);
+    font-weight: var(--pl-weight-medium);
+    font-variant-numeric: tabular-nums;
+}
+
+.pl-transport {
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    margin: 18px 0 10px;
+}
+
+.pl-transport-button {
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.pl-transport-button:active { background: var(--pl-fill); transform: scale(0.92); }
+.pl-transport-icon { width: 36px; height: 36px; }
+.pl-transport-button.is-main .pl-transport-icon { width: 48px; height: 48px; }
+
+.pl-sheet-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: var(--pl-hit);
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-footnote);
+}
+
+/* ===== before there is anything to play ===== */
+
+.pl-setup {
+    max-width: var(--pl-content-max);
+    margin: 0 auto;
+    padding: calc(var(--pl-safe-top) + 48px) var(--pl-edge-right) var(--pl-gutter) var(--pl-edge-left);
+}
+
+.pl-setup p { color: var(--pl-text-2); font-size: var(--pl-text-subhead); line-height: 1.45; }
+.pl-setup a { color: var(--pl-accent); }
+.pl-setup .pl-pill { width: 100%; margin-top: var(--pl-gap); }

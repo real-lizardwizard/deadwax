@@ -2,6 +2,17 @@ import asyncio
 import json
 import logging
 
+#? httpx writes every request it makes to its own logger at INFO, with the whole URL, query
+#? string and all - and the root logger below sends INFO to the container log that Komodo shows.
+#? Two of those query strings hold a secret. Every Navidrome call carries the login as `t` and
+#? `s`, a token and its salt, and Navidrome takes the same pair again for as long as the password
+#? stands (it keeps no record of salts used), so one logged line is the account. fanart.tv takes
+#? its `api_key` in the query too. Warnings and errors still come through. Set here at module
+#? level rather than in setup_logging(), which is skipped when something has already given the
+#? root logger a handler.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 #? one queue per open event-log stream (routes/interface_logs.py)
 sse_clients = set()
 

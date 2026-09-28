@@ -1,5 +1,6 @@
 import os
 import re
+from urllib.parse import urlsplit
 from dotenv import dotenv_values, load_dotenv
 from src import __version__
 from src.logger import logger
@@ -79,6 +80,57 @@ def describe_slskd_url(url: str | None) -> str | None:
 
     if not rest.strip("/"):
         return "has a scheme but no host"
+
+    return None
+
+
+def describe_navidrome_url(url: str | None) -> str | None:
+    """
+    Why this can't be NAVIDROME_URL, or None if it can. Everything describe_slskd_url() refuses,
+    and more, because this address is sent a login on every request (1.0.3 audit):
+
+      - a user name or password in it (`http://me:pw@host`) would ride along as basic auth and
+        be quoted back in every error message the player shows;
+      - a `?` or `#` would let whatever follows swallow the path deadwax appends, so a call
+        meant for /rest/getCoverArt fetched any page on that host and relayed it as a cover.
+
+    A PATH is allowed, since Navidrome behind a proxy or with ND_BASEPATH lives under one.
+
+    Nothing here quotes the value back (1.0.3 review): this is logged at start-up, shown on the
+    settings row and in the player, and a value typed with a password in it - `me:pw@navidrome`,
+    with no scheme - would otherwise be repeated wherever it goes. describe_slskd_url()'s "use
+    http://<the value>" does exactly that, which is why the scheme is judged here.
+    """
+    if not url:
+        return "not set"
+
+    if "://" not in url:
+        return "missing the scheme - it starts with http:// or https://, as in http://navidrome:4533"
+
+    scheme, _, rest = url.partition("://")
+    if scheme not in ("http", "https"):
+        return "has a scheme other than http:// or https://"
+
+    if not rest.strip("/"):
+        return "has a scheme but no host"
+
+    if "?" in url or "#" in url:
+        return "has a ? or # in it - give Navidrome's address alone, with its base path if it has one"
+
+    if any(c.isspace() for c in url):
+        return "has a space in it"
+
+    parts = urlsplit(url)
+    if "@" in parts.netloc:
+        return "has a user name or password in it - those go in NAVIDROME_USER and NAVIDROME_PASSWORD"
+
+    if not parts.hostname:
+        return "has a scheme but no host"
+
+    try:
+        parts.port
+    except ValueError:
+        return "has a port that isn't a number"
 
     return None
 
@@ -263,8 +315,9 @@ class Config:
     #? Seconds to wait between writing an album's new tags and renaming its folder, when applying
     #? a release changes both (v1.0.1). Navidrome keeps plays, ratings and favourites across a
     #? retag OR a rename, but not both in one scan - which is what a one-step apply was. Waiting
-    #? lets its watcher (5s after a change) see the new tags at the old path first. 0 renames
-    #? straight away, as before; 0 to 300.
+    #? lets its watcher (5s after a change) see the new tags at the old path first. With Navidrome
+    #? set up below, deadwax asks it when it has scanned instead of counting (v1.0.3), and this
+    #? only has to be more than 0. 0 renames straight away either way, as before; 0 to 300.
     RETAG_RENAME_WAIT = _env("RETAG_RENAME_WAIT", "20")
 
     #? Milliseconds to move synced lyrics EARLIER as they are written - negative moves them
@@ -286,6 +339,15 @@ class Config:
     FANARTTV_KEY = _env("FANARTTV_KEY")
     FANARTTV_PERSONAL_KEY = _env("FANARTTV_PERSONAL_KEY")
 
+    #? Optional, and the player at /player/ is off without them. Navidrome is what plays the
+    #? library; deadwax holds its login and passes on a short, fixed list of read-only requests,
+    #? so the password never reaches a phone's browser. See src/api/navidrome_endpoint.py. With
+    #? them, applying a release also asks Navidrome when it has scanned before renaming a folder.
+    #? None of it needs an admin account, and a non-admin one of your own is the one to give it.
+    NAVIDROME_URL = _env("NAVIDROME_URL")
+    NAVIDROME_USER = _env("NAVIDROME_USER")
+    NAVIDROME_PASSWORD = _env("NAVIDROME_PASSWORD")
+
     #? ===== which settings the settings tab may write ==========================
     #?
     #? Editability is a property of the setting, not a policy choice, and the split is real:
@@ -298,8 +360,9 @@ class Config:
     #?   before Python starts. Nothing this process writes can change who it is running as.
     #?
     #? Everything else is genuinely changeable at runtime, because Config is read as a class
-    #? attribute at the point of use rather than captured at import. The two cached clients
-    #? are the exception, and `invalidates` names the one to rebuild - see the settings route.
+    #? attribute at the point of use rather than captured at import. The cached clients (slskd,
+    #? MusicBrainz, Navidrome) and the library's scan cache are the exception, and the value here
+    #? names the one to rebuild - see the settings route.
     EDITABLE = {
         "SLSKD_URL": "slskd",
         "SLSKD_APIKEY": "slskd",
@@ -331,6 +394,11 @@ class Config:
         "THEAUDIODB_KEY": None,
         "FANARTTV_KEY": None,
         "FANARTTV_PERSONAL_KEY": None,
+        #? the Navidrome client caches its base URL, so a change drops it for a rebuild
+        "NAVIDROME_URL": "navidrome",
+        #? signed into each request's token, so nothing to rebuild
+        "NAVIDROME_USER": None,
+        "NAVIDROME_PASSWORD": None,
     }
 
     #? Why each of these cannot be edited here, in words the settings tab renders verbatim.
@@ -479,6 +547,62 @@ class Config:
                 extra={"frontend": True},
             )
 
+    #? the three the player needs, all or none
+    NAVIDROME_SETTINGS = ("NAVIDROME_URL", "NAVIDROME_USER", "NAVIDROME_PASSWORD")
+
+    @classmethod
+    def report_navidrome(cls) -> None:
+        """
+        Say whether the player at /player/ can ask Navidrome anything, and if not, what's missing.
+
+        Called once the settings tab's overrides are in, beside report_musicbrainz() and for the
+        same reason: from check(), a Navidrome set up in the tab was logged as "not configured" on
+        every restart while the player worked (1.0.3 audit). Never logs the password, or anything
+        made from it - only which settings are set, and where the address came from.
+        """
+        given = [name for name in cls.NAVIDROME_SETTINGS if getattr(cls, name, None)]
+
+        if not given:
+            logger.info(
+                "Navidrome isn't set up (NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD), so the "
+                "player at /player/ is off, and applying a release waits a fixed RETAG_RENAME_WAIT "
+                "before renaming"
+            )
+            return
+
+        missing = [name for name in cls.NAVIDROME_SETTINGS if name not in given]
+        if missing:
+            logger.error(
+                f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so the player "
+                f"at /player/ is off - it needs all three NAVIDROME_ settings, and only "
+                f"{' and '.join(given)} {'is' if len(given) == 1 else 'are'} there. Set the rest in the "
+                f"settings tab (Connections), or in your compose file.",
+                extra={"frontend": True},
+            )
+            return
+
+        problem = describe_navidrome_url(cls.NAVIDROME_URL)
+        if problem:
+            #? true to the letter: the client refuses the address (get_client), so nothing is sent
+            #? to it, and the apply waits the fixed time rather than asking (navidrome_usable)
+            logger.error(
+                f"NAVIDROME_URL is unusable ({problem}), so the player at /player/ can't reach "
+                f"Navidrome, and applying a release waits a fixed RETAG_RENAME_WAIT before renaming. "
+                f"It is Navidrome's address as seen from inside this container - "
+                f"http://navidrome:4533 on a shared docker network.",
+                extra={"frontend": True},
+            )
+            return
+
+        source = (
+            "the settings tab" if "NAVIDROME_URL" in cls.OVERRIDDEN
+            else setting_source("NAVIDROME_URL") or "the environment"
+        )
+        logger.info(
+            f"the player at /player/ plays from Navidrome at {cls.NAVIDROME_URL} (from {source}), "
+            f"as {cls.NAVIDROME_USER}"
+        )
+
     @classmethod
     def exists(cls, env_var: str):
         value = os.getenv(env_var)
@@ -490,8 +614,9 @@ class Config:
 
     @classmethod
     def check(cls):
-        #? MusicBrainz is reported separately, by report_musicbrainz(), once the settings tab's
-        #? overrides are in - see its docstring for why it can't happen here.
+        #? MusicBrainz and Navidrome are reported separately, by report_musicbrainz() and
+        #? report_navidrome(), once the settings tab's overrides are in - see their docstrings
+        #? for why it can't happen here.
 
         if cls.DB_PATH == LEGACY_DB_PATH and not _env("DB_PATH"):
             logger.info(
@@ -571,6 +696,20 @@ class Config:
             logger.info(f"organizing enabled in '{cls.ORGANIZE_MODE}' mode")
 
         else: logger.info("organizing disabled (needs SLSKD_DOWNLOAD_PATH + LIBRARY_PATH, and ORGANIZE_MODE not 'off')")
+
+    @classmethod
+    def navidrome_configured(cls) -> bool:
+        """All three NAVIDROME_ settings are there - whether the address is usable or not."""
+        return bool(cls.NAVIDROME_URL and cls.NAVIDROME_USER and cls.NAVIDROME_PASSWORD)
+
+    @classmethod
+    def navidrome_usable(cls) -> bool:
+        """
+        Navidrome can be asked: all three set AND an address describe_navidrome_url() accepts. The
+        client refuses any other (1.0.3 review), so an apply that relied on asking it would only
+        ever fall back - better to say from the start that it waits a fixed time.
+        """
+        return cls.navidrome_configured() and describe_navidrome_url(cls.NAVIDROME_URL) is None
 
     @classmethod
     def organizing_enabled(cls) -> bool:

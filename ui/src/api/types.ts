@@ -739,12 +739,21 @@ export interface RetagPlan {
   /** Nothing to change. The album already carries this release. */
   empty: boolean
   /**
-   * Seconds the apply pauses between writing the tags and renaming the folder, so Navidrome
-   * keeps the album's plays and favourites (v1.0.1). 0 when the apply doesn't change both.
-   * Laid on by the preview route from RETAG_RENAME_WAIT.
+   * Seconds the apply may pause between writing the tags and renaming the folder, so Navidrome
+   * keeps the album's plays and favourites (v1.0.1). 0 when the apply doesn't change both, or
+   * RETAG_RENAME_WAIT is 0. With `rename_by` 'navidrome' it is the most the wait can take (the
+   * cap, 90), not a countdown. Laid on by the preview route.
    */
   rename_wait?: number
+  /**
+   * How the pause ends (v1.0.3): 'navidrome' - deadwax asks Navidrome until it has scanned the new
+   * tags, usually a few seconds; 'timer' - a fixed RETAG_RENAME_WAIT, when Navidrome isn't set up;
+   * null when there is no pause.
+   */
+  rename_by?: RenameBy | null
 }
+
+export type RenameBy = 'navidrome' | 'timer'
 
 export interface RetagResults {
   mode: string
@@ -757,8 +766,19 @@ export interface RetagResults {
   /** The cover filename written, or null. */
   art_written: string | null
   problems: string[]
-  /** Seconds it paused before renaming (v1.0.1). */
+  /** Seconds it paused before renaming (v1.0.1) - or, waiting on Navidrome, the cap. */
   rename_wait?: number
+  /**
+   * How it paused in the end (v1.0.3): 'timer' also when Navidrome was set up but couldn't be
+   * asked, and it fell back to the fixed wait. null when it didn't pause.
+   */
+  rename_by?: RenameBy | null
+  /**
+   * Navidrome finished no scan within the cap, or couldn't be reached, so the folder was left
+   * where it is and `problems` says so (v1.0.3). deadwax remembers the hold: the next apply of
+   * this album asks Navidrome first and renames only once it has scanned (a restart forgets it).
+   */
+  rename_held?: boolean
 }
 
 export interface RetagResponse {

@@ -25,8 +25,9 @@ hiding them: DB_PATH (it is the database the overrides live in) and PUID/PGID (c
 docker-entrypoint.sh, which has already dropped privileges before Python starts).
 
 Editing applies LIVE, without a restart, because Config is read as a class attribute at the
-point of use rather than captured at import. The two cached clients are the exception, so a
-change to their settings drops the cached client and the next call rebuilds it.
+point of use rather than captured at import. The cached clients (slskd, MusicBrainz, Navidrome)
+are the exception, so a change to their settings drops the cached client and the next call
+rebuilds it.
 
 Diagnosis is still half the job. For every setting the tab answers:
 
@@ -52,8 +53,9 @@ from pydantic import BaseModel
 from src import __version__
 from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config,
                         build_user_agent, parse_rename_wait, parse_search_timeout,
-                        describe_contact, describe_slskd_url, parse_lyrics_lead,
+                        describe_contact, describe_navidrome_url, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env)
+from src.scan_wait import SCAN_WAIT_CAP_SECONDS
 from src.logger import logger
 
 router = APIRouter()
@@ -168,7 +170,7 @@ def _setting(
     `choices` is value -> label for a setting that only takes certain values, which the tab
     draws as a dropdown rather than a text box that would accept anything and fail on save.
     """
-    #? The API key is the only secret here and it never leaves the process. The tab shows
+    #? Secrets (API keys, the Navidrome password) never leave the process. The tab shows
     #? whether one arrived and nothing else - enough to diagnose "downloads don't work",
     #? without putting a credential in a screenshot somebody pastes into an issue.
     reported = ("set" if value else None) if secret else (value or None)
@@ -209,6 +211,56 @@ def _setting(
         ),
         "choices": choices,
     }
+
+
+def _navidrome_rows() -> list[dict]:
+    """
+    Where the player at /player/ plays from. All three or none: the player needs a login to ask
+    anything, so a URL alone is reported as incomplete rather than as fine.
+    """
+    url = Config.NAVIDROME_URL
+    url_problem = describe_navidrome_url(url) if url else None
+    partial = bool(url or Config.NAVIDROME_USER or Config.NAVIDROME_PASSWORD) and not (
+        Config.navidrome_configured()
+    )
+    missing = "all three NAVIDROME_ settings are needed before the player can ask Navidrome anything"
+
+    return [
+        _setting(
+            "NAVIDROME_URL",
+            url,
+            effect=(
+                "The Navidrome the player at /player/ plays from. deadwax passes the player's "
+                "requests on to it, so this is Navidrome's address as seen from inside THIS "
+                "container, with its base path if it has one - and the phone only ever needs to "
+                "reach deadwax. Changing it takes the password again, typed with it"
+            ),
+            status="error" if url_problem or (partial and not url) else None,
+            detail=f"unusable: {url_problem}" if url_problem else (missing if partial and not url else None),
+        ),
+        _setting(
+            "NAVIDROME_USER",
+            Config.NAVIDROME_USER,
+            effect=(
+                "The Navidrome account the player plays as. Its play counts (and Last.fm or "
+                "ListenBrainz scrobbles, if that account has them) are recorded there. It doesn't "
+                "need to be an admin - a non-admin account of your own is the one to use"
+            ),
+            status="error" if partial and not Config.NAVIDROME_USER else None,
+            detail=missing if partial and not Config.NAVIDROME_USER else None,
+        ),
+        _setting(
+            "NAVIDROME_PASSWORD",
+            Config.NAVIDROME_PASSWORD,
+            secret=True,
+            effect=(
+                "That account's password. It stays in deadwax: the phone is never sent it, or "
+                "anything made from it"
+            ),
+            status="error" if partial and not Config.NAVIDROME_PASSWORD else None,
+            detail=missing if partial and not Config.NAVIDROME_PASSWORD else None,
+        ),
+    ]
 
 
 def _musicbrainz_rows() -> list[dict]:
@@ -373,15 +425,27 @@ def _rename_wait_row() -> dict:
     value = Config.RETAG_RENAME_WAIT
     seconds = parse_rename_wait(value)
     low, high = RENAME_WAIT_RANGE
-    if seconds is None:
-        effect = "unrecognised - applying a release waits 20s before renaming"
-    elif seconds == 0:
+    #? an unreadable value is read as the default 20, which is not 0 - so it pauses like any other
+    pause = 20 if seconds is None else seconds
+    if pause == 0:
         effect = ("Applying a release renames the folder straight away. Navidrome loses the album's "
                   "plays, ratings and favourites when its tags and folder change together")
+    elif Config.navidrome_usable():
+        #? v1.0.3: with the connection there, the number only has to say "don't rename at once".
+        #? Usable, not merely filled in: an address the client refuses means the fixed wait below.
+        effect = ("Applying a release that changes an album's tags AND its folder writes the tags, "
+                  "asks Navidrome until it has scanned them (usually a few seconds), then renames - "
+                  "so Navidrome keeps the album's plays, ratings and favourites. If no scan finishes "
+                  f"within {SCAN_WAIT_CAP_SECONDS}s, or Navidrome can't be reached, the folder is left "
+                  "in place and the editor says so. With Navidrome set up this only has to be more "
+                  "than 0; 0 renames straight away")
     else:
         effect = (f"Applying a release that changes an album's tags AND its folder writes the tags, "
-                  f"waits {seconds}s for Navidrome to see them, then renames - so Navidrome keeps "
-                  f"the album's plays, ratings and favourites. 0 renames straight away")
+                  f"waits {pause}s for Navidrome to see them, then renames - so Navidrome keeps "
+                  f"the album's plays, ratings and favourites. Set up Navidrome on the Connections "
+                  f"tab and deadwax asks it instead of waiting a fixed time. 0 renames straight away")
+    if seconds is None:
+        effect = f"unrecognised, so read as 20. {effect}"
     return _setting(
         "RETAG_RENAME_WAIT",
         value,
@@ -501,7 +565,7 @@ async def settings():
             {
                 "id": "connections",
                 "label": "Connections",
-                "note": "Where deadwax fetches metadata and downloads from.",
+                "note": "Where deadwax fetches metadata and downloads from, and where the player plays from.",
                 "settings": [
                     _setting(
                         "SLSKD_URL",
@@ -556,6 +620,7 @@ async def settings():
                         ),
                     ),
                     *_musicbrainz_rows(),
+                    *_navidrome_rows(),
                 ],
             },
             {
@@ -721,6 +786,13 @@ def _validate(key: str, value: str) -> str | None:
         if problem:
             return problem
 
+    #? Optional, so only a URL that is there can be wrong - and more makes it wrong than a slskd
+    #? one, since every request to it carries the login. See describe_navidrome_url.
+    if key == "NAVIDROME_URL" and value:
+        problem = describe_navidrome_url(value)
+        if problem:
+            return problem
+
     if key == "COVER_ART_SIZE" and value not in COVER_ART_SIZES:
         return f"expected one of {', '.join(COVER_ART_SIZES)}"
 
@@ -752,6 +824,35 @@ def _validate(key: str, value: str) -> str | None:
                 f"either way - 300, say, or -200 to move them later")
 
     return None
+
+
+def _navidrome_moved_without_password(updates: list[SettingUpdate]) -> str | None:
+    """
+    Why this batch may not point Navidrome somewhere new, or None if it may.
+
+    Every request to NAVIDROME_URL carries a token made from the saved password - and Navidrome
+    accepts the same token and salt again for as long as the password stands. So re-pointing
+    the URL alone would send the saved password's token to whatever address was typed, which
+    anyone who can reach deadwax could do (the 1.0.3 audit did it with curl). A new address
+    therefore takes the password again, in the same save.
+
+    Not a change, and so allowed: saving the address it already is, clearing it (nothing is
+    sent anywhere), and reverting it (that address is the environment's, which is the admin's).
+    Nor when no password is set yet, from here or the environment - there is nothing to send.
+    """
+    wanted = {update.key: update.value for update in updates}
+    url = (wanted.get("NAVIDROME_URL") or "").strip()
+
+    if not url or url == (Config.NAVIDROME_URL or "").strip() or not Config.NAVIDROME_PASSWORD:
+        return None
+
+    if (wanted.get("NAVIDROME_PASSWORD") or "").strip():
+        return None
+
+    return (
+        "type the Navidrome password again with the new address - deadwax won't send the saved "
+        "one to an address it wasn't entered for"
+    )
 
 
 @router.put("")
@@ -788,6 +889,10 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
             if problem:
                 problems[update.key] = problem
 
+    moved = _navidrome_moved_without_password(updates)
+    if moved and "NAVIDROME_URL" not in problems:
+        problems["NAVIDROME_URL"] = moved
+
     if problems:
         raise HTTPException(
             status_code=400,
@@ -815,9 +920,9 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
     #? in a state the database wouldn't reproduce is a lie that only shows up on restart.
     Config.apply_overrides(store.stored_settings())
 
-    #? Config is read at the point of use, so most settings are already live. These two are
-    #? the exception: their clients are built once and cached, so drop them and let the next
-    #? call rebuild against the new values.
+    #? Config is read at the point of use, so most settings are already live. The cached
+    #? clients are the exception: they are built once, so drop them and let the next call
+    #? rebuild against the new values.
     if "slskd" in invalidate:
         await request.app.state.slskd_client.close_client()
         logger.info("slskd client dropped, it will rebuild with the new settings")
@@ -830,6 +935,12 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
             f"MusicBrainz user agent is now: {Config.musicbrainz_user_agent() or 'not set'}",
             extra={"frontend": True},
         )
+
+    if "navidrome" in invalidate:
+        from src.api.navidrome_endpoint import navidrome
+
+        await navidrome.close_client()
+        logger.info("Navidrome client dropped, it will rebuild with the new address")
 
     if "library" in invalidate:
         #? The scan cache keys on folder mtime under the OLD root, so it is meaningless now.

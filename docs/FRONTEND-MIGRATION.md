@@ -57,6 +57,7 @@ ui/
   index.html             # DEV HARNESS ONLY - not built, not served. See below.
   src/
     main.tsx             # mount table: element id -> component
+    player/              # the phone player at /player/ - its own entry, main.tsx (1.0.3)
     bridge.ts            # window.deadwax - the seam with the vanilla app
     api/                 # types.ts + one wrapper module per backend module
     components/
@@ -67,17 +68,28 @@ ui/
   vite.config.ts
   package.json
 interface/               # existing vanilla app — stays until fully replaced
+  player/                # the player's hand-written page, manifest, icons and stylesheet
   dist/                  # build output, gitignored
 ```
 
-**The build input is `src/main.tsx`, not `index.html`.** While the port is incremental the
-page users get is still the hand-written `interface/index.html`, which loads the bundle as one
-extra module script. So the build emits JS, not a page, and the entry filename is pinned
-unhashed (`deadwax-ui.js`) because a static HTML file has to name it. Split chunks keep
-their hashes.
+**The build inputs are two TypeScript entries, not `index.html`.** While the port is
+incremental the page users get is still the hand-written `interface/index.html`, which loads the
+bundle as one extra module script. So the build emits JS, not a page. Since 1.0.3 there are two
+entries, one per hand-written page:
 
-When the migration finishes and Vite owns the page, delete `rollupOptions.input` and let it
-build `index.html` normally.
+| entry | source | loaded by |
+| --- | --- | --- |
+| `deadwax-ui` | `src/main.tsx` | `interface/index.html`, the main page (as `/dist/deadwax-ui.js`) |
+| `deadwax-player` | `src/player/main.tsx` | `interface/player/index.html`, the phone player at `/player/` (as `/dist/deadwax-player.js`) |
+
+Both entry filenames are pinned unhashed (`entryFileNames: '[name].js'`) because a static HTML
+file has to name them. Code they share (Preact, the HTTP helpers) goes into a hashed chunk under
+`dist/assets/` that both import, and split chunks keep their hashes.
+
+When the migration finishes and Vite owns the main page, let it build `index.html` normally, but
+**keep the player's entry** (or give the player its own HTML input): deleting
+`rollupOptions.input` outright would drop the player, and `/player/` would load a script that
+isn't there - a blank page with nothing on screen to say why.
 
 Two consequences worth knowing:
 
@@ -114,9 +126,11 @@ so a stale `interface/dist` left by a local build is overwritten rather than shi
 
 `src/api/app.py` was updated at the same time, as this section warned it must be:
 `/dist/assets/` (hashed, content-addressed) is served `immutable, max-age=31536000`, while
-`/dist/` (the unhashed entry bundle) joins `/scripts/`, `/styles/`, `/assets/` on `no-cache`.
+`/dist/` (the unhashed entry bundles) joins `/scripts/`, `/styles/`, `/assets/` on `no-cache`.
 Leaving the middleware alone would have reintroduced "I upgraded and nothing changed" for
-precisely the ported half of the interface.
+precisely the ported half of the interface. Since 1.0.3 `/player/` is on `no-cache` too - the
+player's page, manifest and icons - since an app on a phone's home screen is exactly the tab
+that never gets reloaded.
 
 ## API surface to type — done
 

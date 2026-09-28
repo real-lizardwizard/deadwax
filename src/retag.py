@@ -619,6 +619,39 @@ def move_retagged(plan: dict, results: dict) -> dict:
     return results
 
 
+#? Why a folder was left where it was when Navidrome never got round to scanning its new tags.
+RENAME_HELD = (
+    "tags were written, but Navidrome hasn't finished a scan since, so the folder was left in "
+    "place - renaming it now would have Navidrome see new tags and a new name at once and drop "
+    "every user's plays and favourites on it. Apply it again once Navidrome has scanned: deadwax "
+    "checks with Navidrome first, and renames it then"
+)
+
+#? ...and when Navidrome couldn't be reached at all. A Navidrome that isn't answering may be
+#? restarting, and the scan it starts with would see a rename made now together with the tags.
+RENAME_UNREACHABLE = (
+    "tags were written, but Navidrome couldn't be reached, so the folder was left in place - "
+    "renaming it now would have Navidrome's next scan see new tags and a new name at once and drop "
+    "every user's plays and favourites on it. Apply it again once Navidrome is back and has "
+    "scanned: deadwax checks with Navidrome first, and renames it then"
+)
+
+
+def hold_back_rename(results: dict, unreachable: bool = False) -> dict:
+    """
+    The second half of an apply, declined: the folder stays where it is and `results` say why.
+
+    For when the route asked Navidrome and no scan finished within the cap, or Navidrome couldn't
+    be reached (v1.0.3). Renaming anyway would be the one-step apply the two steps exist to avoid;
+    leaving it costs a second click once Navidrome has caught up. That apply writes no id tags -
+    they match already - but the route remembers the hold and asks Navidrome again before it
+    renames, rather than taking the matching tags as a sign Navidrome has seen them.
+    """
+    results["problems"].append(RENAME_UNREACHABLE if unreachable else RENAME_HELD)
+    results["rename_held"] = True
+    return results
+
+
 def _merge_into(source: Path, target: Path, plan: dict, results: dict) -> None:
     """
     Move this folder's files into the existing folder of the same release, then remove this one.

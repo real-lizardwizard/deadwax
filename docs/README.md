@@ -18,6 +18,7 @@ Everything deadwax does, explained for someone opening it for the first time. Th
 | [Downloading](downloading.md) | the Soulseek candidates panel, what the scores mean, quality filters, the downloads panel, cancelling, and trying the next peer |
 | [Organizing](organizing.md) | what happens when a download finishes: dry run, copy or move, folder names and templates, editions, tags, covers, lyrics, and clean-up |
 | [The library](library.md) | the library tab, the review queue, the metadata editor, editing tags by hand, covers, CD art, lyrics, artist pages, deleting |
+| [The phone player](player.md) | playing your library on an iPhone from Navidrome, through deadwax: setting it up, adding it to the home screen, how plays are counted, and what it can't do yet |
 | [How matching works](matching.md) | the six signals a candidate is scored on, and why edition is never a filter |
 | [Troubleshooting](troubleshooting.md) | what to do when something doesn't work, by symptom |
 
@@ -62,6 +63,9 @@ as a sheet over the tree. A few gestures are phone-specific:
 - **Pinch** to zoom a cover in the cover viewer, and drag to move around it.
 - The filter lists on the search and library views are collapsed behind a **Show** button to
   keep them out of the way.
+
+For listening, there's also [the phone player](player.md) at `/player/`: a separate page that
+plays your library from Navidrome, made to be added to an iPhone's home screen.
 
 <p>
 <img src="../assets/images/mobile.png" width="280" alt="Searching on a phone">

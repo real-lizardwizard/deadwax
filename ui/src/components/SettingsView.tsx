@@ -23,7 +23,7 @@ const SETTINGS_TABS: readonly { id: SettingsTab; label: string; hint: string }[]
   { id: 'search', label: 'Search', hint: 'Where a new MusicBrainz search starts' },
   { id: 'downloads', label: 'Downloads', hint: 'Choosing and fetching from Soulseek' },
   { id: 'library', label: 'Library', hint: 'Paths, organizing, covers and lyrics' },
-  { id: 'connections', label: 'Connections', hint: 'slskd, MusicBrainz and the picture sources' },
+  { id: 'connections', label: 'Connections', hint: 'slskd, MusicBrainz, Navidrome and the picture sources' },
   { id: 'interface', label: 'Interface', hint: 'This browser' },
 ]
 
@@ -76,6 +76,28 @@ export function tabMarks(
 
 function isTab(value: string | null): value is SettingsTab {
   return SETTINGS_TABS.some((entry) => entry.id === value)
+}
+
+/**
+ * What the password row says while NAVIDROME_URL has an unsaved new address and no password has
+ * been typed to go with it (v1.0.3). The server refuses that save - every request to the address
+ * carries a token made from the password, so it is never sent somewhere it wasn't typed for - and
+ * saying so beside the field beats a refusal in the save bar. The rule itself is the server's:
+ * _navidrome_moved_without_password in src/routes/settings.py.
+ */
+export function navidromePasswordNote(
+  server: ServerSettings | null,
+  draftEnv: Record<string, string | null>,
+): string | null {
+  const settings = (server?.groups ?? []).flatMap((group) => group.settings)
+  const current = settings.find((setting) => setting.key === 'NAVIDROME_URL')?.value ?? ''
+  const password = settings.find((setting) => setting.key === 'NAVIDROME_PASSWORD')
+  const url = draftEnv['NAVIDROME_URL']
+
+  if (typeof url !== 'string' || !url.trim() || url.trim() === current.trim()) return null
+  if (!password?.value) return null
+  if ((draftEnv['NAVIDROME_PASSWORD'] ?? '').trim()) return null
+  return "Type the password again to go with the new address - deadwax won't send the saved one to an address it wasn't entered for."
 }
 
 /**
@@ -186,12 +208,15 @@ function SettingRow({
   draft,
   onEdit,
   onRevert,
+  note,
 }: {
   setting: ServerSetting
   /** The pending edit: a string, `null` for "revert", or undefined when untouched. */
   draft: string | null | undefined
   onEdit: (key: string, value: string) => void
   onRevert: (key: string) => void
+  /** Something another row's edit asks of this one, said before the save refuses it. */
+  note?: string | null
 }) {
   const edited = draft !== undefined
   const reverting = draft === null
@@ -277,6 +302,8 @@ function SettingRow({
       ) : null}
 
       {reverting ? <div class="settings-env-effect">Will revert to the environment on save.</div> : null}
+
+      {note ? <div class="settings-env-detail">{note}</div> : null}
 
       {setting.detail && !edited ? <div class="settings-env-detail">{setting.detail}</div> : null}
     </div>
@@ -545,6 +572,7 @@ export function SettingsView({ active }: { active: boolean }) {
             draft={draftEnv[setting.key]}
             onEdit={editEnv}
             onRevert={revertEnv}
+            note={setting.key === 'NAVIDROME_PASSWORD' ? navidromePasswordNote(server, draftEnv) : null}
           />
         ))}
       </div>

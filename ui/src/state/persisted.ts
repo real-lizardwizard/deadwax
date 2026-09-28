@@ -32,6 +32,8 @@ export const STORAGE_KEYS = {
   librarySort: 'deadwax-library-sort',
   /** Which settings tab was open last (v0.9.15). The literal tab id, not JSON. */
   settingsTab: 'deadwax-settings-tab',
+  /** Which order the player's album grid is in - a Subsonic album list type. */
+  playerOrder: 'deadwax-player-order',
 } as const
 
 /*
@@ -201,6 +203,17 @@ export function readSettingsTab(): string | null {
 
 export function writeSettingsTab(tab: string): void {
   writeRaw(STORAGE_KEYS.settingsTab, tab)
+}
+
+/* ===== deadwax-player-order ===== */
+
+/** A plain string, validated by the player against the orders it offers today. */
+export function readPlayerOrder(): string | null {
+  return readRaw(STORAGE_KEYS.playerOrder)
+}
+
+export function writePlayerOrder(order: string): void {
+  writeRaw(STORAGE_KEYS.playerOrder, order)
 }
 
 /* ===== deadwax-preferences ===== */

@@ -1,6 +1,8 @@
 import asyncio
 import hashlib
 import json
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -28,8 +30,12 @@ from src.organizer import is_within
 from src.api.coverart_endpoint import CoverArtClient
 from src.api.lrclib_endpoint import lrclib
 from src.lyrics import fetch_album_lyrics, read_track_lyrics
-from src.retag import (changes_player_ids, execute_retag, move_retagged, plan_cover_art, plan_retag,
-                       save_cover_art)
+from src.retag import (changes_player_ids, execute_retag, hold_back_rename, move_retagged, plan_cover_art,
+                       plan_retag, save_cover_art)
+from src.api.navidrome_endpoint import NavidromeError, navidrome
+from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_SECONDS,
+                           SCAN_WAIT_CAP_SECONDS, ScanStatus, WaitState, begin, read_status,
+                           scanned_since_hold, step)
 from src.track_tags import execute_tag_edits, plan_tag_edits
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
@@ -314,6 +320,46 @@ async def rescan(request: Request):
         raise HTTPException(status_code=500, detail=f"Error rescanning library: {e}")
 
 
+#? The picture types these routes will name. A picture embedded in an audio file carries its own
+#? MIME type, typed by whoever made the file - a stranger on Soulseek, for a download - and
+#? handing that string to the browser as the Content-Type let a FLAC whose picture said
+#? `text/html` serve a page, script and all, from deadwax's own address (found in the 1.0.3
+#? audit). SVG is left out on purpose: it is a document that can carry script too.
+SERVED_IMAGE_TYPES = frozenset({"image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"})
+
+#? what files commonly say instead of the registered name
+_IMAGE_TYPE_ALIASES = {"image/jpg": "image/jpeg", "image/pjpeg": "image/jpeg", "image/x-png": "image/png",
+                       "image/x-ms-bmp": "image/bmp", "image/x-bmp": "image/bmp"}
+
+
+def served_image_type(declared: str | None, data: bytes) -> str:
+    """
+    The Content-Type to serve an image's bytes with: the declared type when it is one of
+    SERVED_IMAGE_TYPES, else whatever the bytes' own signature says, else
+    application/octet-stream - which no browser renders as a page.
+
+    The signature is the fallback rather than the rule, so a picture labelled correctly is served
+    exactly as before, and one labelled oddly ("PNG", "image/x-png") still shows.
+    """
+    kind = (declared or "").split(";", 1)[0].strip().lower()
+    kind = _IMAGE_TYPE_ALIASES.get(kind, kind)
+    if kind in SERVED_IMAGE_TYPES:
+        return kind
+
+    head = bytes(data[:12])
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    if head.startswith(b"BM"):
+        return "image/bmp"
+    return "application/octet-stream"
+
+
 @router.get("/art")
 async def art(album: str):
     """
@@ -354,7 +400,8 @@ async def art(album: str):
 
     return Response(
         content=data,
-        media_type=mime,
+        #? a picture from inside the audio carries its own type, written by whoever made the file
+        media_type=served_image_type(mime, data),
         #? Art changes rarely but not never - replacing cover.jpg should show up without a
         #? hard refresh. Five minutes keeps scrolling a large library cheap while still
         #? letting an edit appear on its own.
@@ -447,9 +494,12 @@ async def retag_preview(body: RetagRequest):
         #? which size a cover would be fetched at, so the editor can say so. Laid on here rather
         #? than planned: plan_retag is the pure half, and this is configuration, not a decision.
         plan["art"]["size"] = Config.COVER_ART_SIZE
-        #? seconds the apply will pause between tags and rename, so the editor can say so up
-        #? front rather than leave Apply looking stuck (v1.0.1)
-        plan["rename_wait"] = rename_wait_seconds() if changes_player_ids(plan, body.release.model_dump()) else 0
+        #? whether and how the apply will pause between tags and rename, so the editor can say so
+        #? up front rather than leave Apply looking stuck (v1.0.1): a fixed number of seconds, or
+        #? until Navidrome has scanned, with the cap as the number (v1.0.3)
+        seconds, by = _rename_pause(plan, body.release.model_dump())
+        plan["rename_wait"] = _reported_wait(seconds, by)
+        plan["rename_by"] = by
         return plan
 
     except Exception as e:
@@ -507,23 +557,40 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
         #? can't pair the album with what it had, and every user's plays, ratings and favourites
         #? on it go missing. Given a moment between, its watcher sees the new tags where the
         #? album already is, carries everything across, and then follows the rename as a move.
-        wait = rename_wait_seconds() if changes_player_ids(plan, release) else 0
-        results = await asyncio.to_thread(execute_retag, plan, release, "apply", art, wait == 0)
-        if wait:
+        #? With Navidrome set up, the pause lasts until it has actually scanned (v1.0.3), and a
+        #? rename it held back stays held until it has (see HeldRename).
+        key = _held_key(plan)
+        held = _HELD_RENAMES.get(key)
+        seconds, by = _rename_pause(plan, release)
+        results = await asyncio.to_thread(execute_retag, plan, release, "apply", art, seconds == 0)
+        if seconds:
+            #? What a later apply measures against if this one is held back too: when these id
+            #? tags were written - or, when this apply wrote none because it is following up a
+            #? hold, when the earlier one wrote them. Taken with the tags on disk.
+            writes_ids = changes_player_ids(plan, release)
+            written = datetime.now(timezone.utc) if writes_ids or held is None else held.written
             #? the tags are on disk now: forget and save before the pause, so a container stopped
             #? during it (Docker's grace is 10s) doesn't restart onto a saved scan of the OLD tags
             forget_cached_album(plan["source"])
             await _persist_cache(request)
+            pause = _Pause(by, rename=True)
             if not results["failed"]:
-                logger.info(
-                    f"tags written in {Path(plan['source']).name}; waiting {wait}s for Navidrome "
-                    f"to see them before renaming the folder",
-                    extra={"frontend": True},
-                )
-                await asyncio.sleep(wait)
-            #? also on a failure: it is what records "left the folder in place"
-            await asyncio.to_thread(move_retagged, plan, results)
-        results["rename_wait"] = wait
+                #? a hold is carried on from only when these are the tags it held - new id tags
+                #? written now need a scan of their own, whatever Navidrome did since
+                pause = await _pause_before_rename(
+                    Path(plan["source"]).name, seconds, by, None if writes_ids else held)
+            by = pause.by
+            if pause.rename:
+                #? also on a failure: it is what records "left the folder in place"
+                await asyncio.to_thread(move_retagged, plan, results)
+            else:
+                hold_back_rename(results, unreachable=pause.unreachable)
+                _HELD_RENAMES[key] = HeldRename(state=pause.state, written=written)
+        #? a hold ends when the folder is renamed, or when applying the album no longer moves it
+        if results.get("moved_to") or not plan.get("moves"):
+            _HELD_RENAMES.pop(key, None)
+        results["rename_wait"] = _reported_wait(seconds, by)
+        results["rename_by"] = by
 
         #? The cache keys on the folder's mtime, which a retag does not move - so without
         #? this the interface would keep showing the old tags and the edit would look like
@@ -559,6 +626,226 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
     except Exception as e:
         logger.error(f"Exception in /retag/apply endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error applying the retag: {e}")
+
+
+@dataclass(frozen=True)
+class HeldRename:
+    """
+    A rename held back for Navidrome, remembered so the next apply of the album asks Navidrome
+    again rather than renaming at once (1.0.3 review). By then the id tags on disk match, so
+    changes_player_ids() is false and nothing else would stop a one-step rename - a second click
+    straight away, or an apply that was queued on the album's lock during the wait, would rename
+    before Navidrome had scanned anything.
+    """
+    #? the wait's state when it gave up; None when Navidrome couldn't be read at all
+    state: WaitState | None
+    #? when the id tags were written, in UTC - the bar when there is no state
+    written: datetime
+
+
+#? Held renames, keyed on the album's folder relative to LIBRARY_PATH - the folder left in place.
+#? In memory only, so a restart forgets them: an album held back before one and applied again
+#? after renames in one step, as every apply did before 1.0.3. A hold lasts until Navidrome's
+#? next scan, which is seconds or minutes, not the lifetime of a container.
+_HELD_RENAMES: dict[str, HeldRename] = {}
+
+
+def _held_key(plan: dict) -> str:
+    """The album's folder as the holds are keyed: its path in the library, spelled one way."""
+    return Path(plan.get("album_path") or "").as_posix()
+
+
+def _rename_pause(plan: dict, release: dict) -> tuple[int, str | None]:
+    """
+    Whether this apply pauses between its tags and its rename, and how.
+
+    (RETAG_RENAME_WAIT, "navidrome") when Navidrome can be asked, (RETAG_RENAME_WAIT, "timer")
+    when it can't, and (0, None) for an apply done in one step - one that doesn't change both, or
+    RETAG_RENAME_WAIT at 0, which still means "rename at once" whatever Navidrome says.
+
+    An album whose rename was held back asks Navidrome again even though its tags match now
+    (1.0.3 review). Without Navidrome to ask any more it renames in one step, as it would have
+    before there was anything to ask.
+    """
+    seconds = rename_wait_seconds()
+    if not seconds:
+        return 0, None
+    if changes_player_ids(plan, release):
+        return seconds, "navidrome" if Config.navidrome_usable() else "timer"
+    if plan.get("moves") and plan.get("target") and Config.navidrome_usable() and _held_key(plan) in _HELD_RENAMES:
+        return seconds, "navidrome"
+    return 0, None
+
+
+def _reported_wait(seconds: int, by: str | None) -> int:
+    """The number the editor is given: the fixed pause, or the most a wait on Navidrome can take."""
+    return SCAN_WAIT_CAP_SECONDS if by == "navidrome" else seconds
+
+
+@dataclass(frozen=True)
+class _Pause:
+    """How the pause before a rename ended."""
+    #? how it waited in the end: "navidrome", or "timer" when it fell back on the fixed wait
+    by: str
+    #? whether to rename now
+    rename: bool
+    #? on a hold, the wait's state, for the next apply to carry on from (see HeldRename)
+    state: WaitState | None = None
+    #? the hold was Navidrome not being there at all, rather than answering and not scanning
+    unreachable: bool = False
+
+
+async def _pause_before_rename(name: str, seconds: int, by: str, since: HeldRename | None = None) -> _Pause:
+    """
+    Wait until the folder can be renamed without Navidrome losing the album's plays.
+
+    It renames once Navidrome has scanned the new tags; when Navidrome isn't set up, after the
+    fixed wait; and when Navidrome answered but not in a way that could be read (a refused login,
+    a lastScan that isn't a time), after the fixed wait or as it would have. It holds the rename
+    back in two cases. Navidrome answered throughout and finished no scan within the cap: renaming
+    then would be the one-step apply this exists to avoid, and a scan that never came is better
+    said than hidden behind a rename. Or Navidrome couldn't be reached at all - refused, no such
+    host, no answer in time (1.0.3 review): one that isn't answering may be restarting, and the
+    scan it starts with (Navidrome scans on start-up by default) would see the rename and the new
+    tags together.
+
+    `since` is a hold from an earlier apply of this album, whose tags are on disk already: the
+    wait carries on from it, and a scan finished since the hold lets the rename go at once.
+    """
+    if by == "navidrome":
+        logger.info(
+            (f"tags written in {name}; waiting for Navidrome to scan them before renaming the folder"
+             if since is None else
+             f"the rename of {name} was held back for Navidrome; asking it whether it has scanned "
+             f"the new tags since"),
+            extra={"frontend": True},
+        )
+        outcome, detail, state = await _wait_for_navidrome_scan(since)
+
+        if outcome == "scanned":
+            logger.info(
+                f"Navidrome has scanned the new tags in {name}{f' ({detail})' if detail else ''} - renaming",
+                extra={"frontend": True},
+            )
+            return _Pause("navidrome", rename=True)
+
+        if outcome == "held":
+            logger.warning(
+                f"Navidrome finished no scan in the {SCAN_WAIT_CAP_SECONDS}s deadwax waited after the "
+                f"new tags in {name}, so the folder was left in place",
+                extra={"frontend": True},
+            )
+            return _Pause("navidrome", rename=False, state=state)
+
+        if outcome == "unreachable":
+            logger.warning(
+                f"couldn't ask Navidrome whether it has scanned {name} ({detail}), and it may be "
+                f"restarting, so the folder was left in place - apply it again once Navidrome is back "
+                f"and has scanned",
+                extra={"frontend": True},
+            )
+            return _Pause("navidrome", rename=False, state=state, unreachable=True)
+
+        if outcome == "unanswered":
+            #? Navidrome answered every poll after the baseline, but never in a way that could be
+            #? read - no evidence either way, which is where the fixed wait always stood
+            logger.warning(
+                f"Navidrome stopped answering usably while deadwax waited for it to scan {name} ({detail}), "
+                f"so the folder is renamed now, as a fixed wait would have",
+                extra={"frontend": True},
+            )
+            return _Pause("navidrome", rename=True)
+
+        #? no baseline, so nothing Navidrome said later could be judged against one
+        logger.warning(
+            f"couldn't ask Navidrome whether it has scanned {name} ({detail}), so waiting "
+            f"{seconds}s instead before renaming",
+            extra={"frontend": True},
+        )
+    else:
+        logger.info(
+            f"tags written in {name}; waiting {seconds}s for Navidrome to see them before renaming the folder",
+            extra={"frontend": True},
+        )
+
+    await asyncio.sleep(seconds)
+    return _Pause("timer", rename=True)
+
+
+async def _navidrome_scan_status() -> tuple[ScanStatus | None, str | None, bool]:
+    """
+    One getScanStatus answer - or None, why not, and whether that was Navidrome not being there
+    at all (refused, no such host, no answer in time) rather than an answer that couldn't be used.
+    Bounded, and never raises: the tags are on disk by the time this is asked, and nothing
+    Navidrome does may turn that into a failed apply.
+
+    Through the client's plain call() - getScanStatus is for the rename, not the player, so it is
+    not one of the player's routes and must never become one.
+    """
+    try:
+        body = await asyncio.wait_for(navidrome.call("getScanStatus"), SCAN_CALL_TIMEOUT_SECONDS)
+    except TimeoutError:
+        return None, f"no answer within {SCAN_CALL_TIMEOUT_SECONDS}s", True
+    except NavidromeError as e:
+        return None, str(e) or type(e).__name__, e.unreachable
+    except Exception as e:
+        return None, str(e) or type(e).__name__, False
+
+    status = read_status(body)
+    if status is None:
+        return None, "its answer carried no scan status deadwax could read", False
+    return status, None, False
+
+
+async def _wait_for_navidrome_scan(since: HeldRename | None = None) -> tuple[str, str | None, WaitState | None]:
+    """
+    Ask Navidrome until a scan that began after the tags were written has finished.
+
+    Returns (outcome, detail, state). The outcome is "scanned", with the scan's type; "held" when
+    Navidrome answered but finished no such scan within the cap; "unreachable" when it couldn't be
+    reached at all - at the baseline, or at any poll after it when none was answered; "unanswered"
+    when every poll after the baseline got an answer that couldn't be used; and "unreadable" when
+    the baseline couldn't be read for that reason. Each failure carries Navidrome's reason. The
+    state is what a hold records, for the next apply to carry on from; with no baseline, a hold
+    carried over keeps its own. The rules for what an answer proves are src/scan_wait.py's.
+    """
+    first, problem, unreachable = await _navidrome_scan_status()
+    second = None
+    if first is not None:
+        second, problem, unreachable = await _navidrome_scan_status()
+
+    state = begin(first, second)
+    if state is None:
+        return ("unreachable" if unreachable else "unreadable"), problem, since.state if since else None
+
+    #? following up a hold: a scan finished since then is the proof, whatever is running now
+    if since is not None and scanned_since_hold(since.state, since.written, second):
+        return "scanned", second.scan_type, None
+
+    #? stopped by the clock or by the number of polls, whichever comes first - the clock is what
+    #? matters live, the count is what lets a test that makes sleeping instant still finish
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + SCAN_WAIT_CAP_SECONDS
+    answered = False
+    went_away = False
+
+    for _ in range(SCAN_MAX_POLLS):
+        await asyncio.sleep(SCAN_POLL_SECONDS)
+        status, problem, unreachable = await _navidrome_scan_status()
+        answered = answered or status is not None
+        went_away = went_away or unreachable
+
+        state, confirmed = step(state, status)
+        if confirmed:
+            return "scanned", status.scan_type, None
+        if loop.time() >= deadline:
+            break
+
+    if answered:
+        return "held", None, state
+    #? Navidrome went away at some point and never came back with an answer: it may be
+    #? restarting, so the rename waits for the scan it starts with, like any other
+    return ("unreachable" if went_away else "unanswered"), problem, state
 
 
 class CoverArtRequest(BaseModel):
@@ -726,7 +1013,7 @@ async def track_picture(album: str, file: str, index: int = 0):
         raise HTTPException(status_code=404, detail="no such picture")
 
     picture = pictures[index]
-    return Response(content=picture["data"], media_type=picture["mime"],
+    return Response(content=picture["data"], media_type=served_image_type(picture["mime"], picture["data"]),
                     headers={"Cache-Control": "private, max-age=300"})
 
 

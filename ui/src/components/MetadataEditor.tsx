@@ -239,6 +239,10 @@ export function MetadataEditor(
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
   const [applied, setApplied] = useState<string | null>(null)
+  //? What the apply had to say that its preview didn't - a rename held back for Navidrome
+  //? (v1.0.3), a folder that appeared during the pause, a cover that couldn't be saved. The
+  //? preview is recomputed as soon as the album reloads, so these would vanish with it.
+  const [appliedProblems, setAppliedProblems] = useState<string[]>([])
   const [ignoring, setIgnoring] = useState(false)
   //? the art-only action, which is a different thing from the `fetchArt` checkbox below - that
   //? one rides along with an apply, this one writes the cover and nothing else
@@ -288,6 +292,7 @@ export function MetadataEditor(
     //? the message describes a write that has already happened; the moment you change
     //? anything it stops describing what the apply button would now do
     setApplied(null)
+    setAppliedProblems([])
     setFields((current) => ({ ...current, [key]: value }))
   }
 
@@ -498,6 +503,7 @@ export function MetadataEditor(
   /** Picking a release replaces the fields with its values, which you can then still edit. */
   const chooseRelease = (release: Release) => {
     setApplied(null)
+    setAppliedProblems([])
     void loadRelease(release, true)
   }
 
@@ -581,9 +587,12 @@ export function MetadataEditor(
   const apply = async () => {
     setApplying(true)
     setApplyError(null)
+    setAppliedProblems([])
 
     try {
       const { results } = await libraryApi.applyRetag(album.path, payload, fetchArt)
+      //? results.problems starts as a copy of the plan's, which are on screen already
+      setAppliedProblems(results.problems.filter((problem) => !plan?.problems.includes(problem)))
 
       if (results.failed) {
         setApplyError(`${results.failed} file(s) could not be written`)
@@ -894,6 +903,11 @@ export function MetadataEditor(
               </h5>
             )}
 
+            {/* what the last apply reported, kept on screen while the preview is redone under it */}
+            {appliedProblems.map((problem) => (
+              <h5 class="text yellow metadata-problem" key={`applied:${problem}`}>{problem}</h5>
+            ))}
+
             {!planning && plan && (
               <>
                 {plan.problems.map((problem) => (
@@ -908,11 +922,21 @@ export function MetadataEditor(
                   </div>
                 )}
 
-                {/* said before the click, so a paused Apply doesn't read as stuck (v1.0.1) */}
+                {/* said before the click, so a paused Apply doesn't read as stuck (v1.0.1). Asking
+                    Navidrome (v1.0.3) has no fixed length, so it gets no number: the cap is a
+                    ceiling, and quoting it would make a few seconds' wait sound like ninety */}
                 {plan.moves && Boolean(plan.rename_wait) && (
                   <h5 class="text white-tertiary metadata-status">
-                    {`Writes the tags first and renames ${plan.rename_wait}s later, so Navidrome keeps `
-                      + `this album's plays, ratings and favourites.`}
+                    {plan.rename_by === 'navidrome'
+                      ? (plan.changed_file_count === 0
+                        //? a rename held back earlier: the tags are on disk already, and it still
+                        //? waits for Navidrome to have scanned them (1.0.3 review)
+                        ? 'The tags were written by an earlier apply. Renames the folder once Navidrome '
+                          + "has scanned them, so Navidrome keeps this album's plays, ratings and favourites."
+                        : 'Writes the tags first and renames the folder once Navidrome has scanned them '
+                          + "(usually a few seconds), so Navidrome keeps this album's plays, ratings and favourites.")
+                      : `Writes the tags first and renames ${plan.rename_wait}s later, so Navidrome keeps `
+                        + `this album's plays, ratings and favourites.`}
                   </h5>
                 )}
 
@@ -1023,7 +1047,7 @@ export function MetadataEditor(
               onClick={() => void apply()}
             >
               {applying
-                ? <Loading label={plan?.rename_wait ? `Applying, renaming in ${plan.rename_wait}s` : 'Applying'} />
+                ? <Loading label={applyingLabel(plan)} />
                 : 'Apply'}
             </button>
           )}
@@ -1078,4 +1102,16 @@ export function MetadataEditor(
 /** "disc 2", "discs 1, 2, 3" */
 function discWords(discs: readonly number[]): string {
   return `disc${discs.length > 1 ? 's' : ''} ${discs.join(', ')}`
+}
+
+/**
+ * What the Apply button says while it works. A pause before the rename is named, so a button
+ * busy for a while doesn't read as stuck: the seconds when it is a fixed wait, and no number when
+ * it is waiting for Navidrome, which ends when Navidrome has scanned rather than on a clock.
+ */
+function applyingLabel(plan: RetagPlan | null): string {
+  if (!plan?.rename_wait) return 'Applying'
+  return plan.rename_by === 'navidrome'
+    ? 'Applying, waiting for Navidrome'
+    : `Applying, renaming in ${plan.rename_wait}s`
 }

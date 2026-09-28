@@ -14,6 +14,8 @@ spent getting three folder paths to agree.
   limit the ones that don't send it.
 - **A folder for your music library.** An empty one is fine, and so is an existing library:
   the library tab reads whatever is there.
+- **Optionally, [Navidrome](https://www.navidrome.org)** and an account on it of your own (not
+  an admin one), for [the phone player](player.md). Nothing else needs it.
 
 ## The three folders
 
@@ -126,6 +128,10 @@ Every setting is described in [Configuration](configuration.md).
   deadwax unhealthy, because restarting deadwax wouldn't fix them.
 - **There is no login.** Anyone who can reach the port can use it, so keep it on your own
   network or put it behind something that asks for a password.
+- **On your phone**, the main page works as it is, and `/player/` is a separate player for
+  your library, played from Navidrome, that you can add to an iPhone's home screen. To use either
+  away from home, reach deadwax over a VPN such as WireGuard or Tailscale rather than an open
+  port. See [the phone player](player.md).
 
 ## Coming from jimbrainz
 

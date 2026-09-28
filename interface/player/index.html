@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- viewport-fit=cover lets the page draw under the notch and the home bar; player.css keeps
+         anything you touch out of them with the safe-area insets -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>deadwax</title>
+    <meta name="theme-color" content="#000000">
+    <!-- Added to an iPhone's home screen, this opens full screen like an app. The manifest says so
+         for iOS 16.4 and later; the apple- meta tags say it for anything older. -->
+    <link rel="manifest" href="/player/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="deadwax">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- iOS takes the home screen icon from here, not the manifest, and it has to be a PNG -->
+    <link rel="apple-touch-icon" href="/player/icon-180.png">
+    <link rel="icon" href="/player/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/player/player.css">
+</head>
+<body>
+    <div id="player-root"></div>
+    <!-- built from ui/src/player/ by `npm run build` - see ui/vite.config.ts -->
+    <script type="module" src="/dist/deadwax-player.js"></script>
+</body>
+</html>
