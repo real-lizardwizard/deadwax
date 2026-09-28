@@ -25,6 +25,7 @@ Pure: bytes in, bytes out, no I/O.
 """
 
 import struct
+from bisect import bisect_left
 from dataclasses import dataclass
 
 
@@ -47,15 +48,17 @@ MAX_INPUT_BYTES = 1 << 30
 #? Sync codes that turn out not to start a frame are about one per 90 KB of real FLAC (measured on
 #? CD and 24/96 files). A file with far more - by accident or by design - would have every one
 #? checked, so past one per 256 bytes (and a floor for small files) it is refused instead. A
-#? header repeating the number just used counts as one: one of the two starts no frame.
+#? header carrying a number already used counts as one: one of the two starts no frame.
 FALSE_SYNC_BUDGET = (4096, 256)
 
 #? A bound on the checksumming, the one part of this done a byte at a time in Python (~15 MB/s).
-#? Each stretch is summed once and remembered, so a real file sums its last frame and any tag
-#? after it, and a frame or two more in the rare file with a false header - a sliver of this. A
-#? file built to be checksummed over and over (a frame full of copies of a header) is refused
-#? past it instead of holding a worker thread for minutes: a floor, plus twice the file.
-CHECKSUM_BUDGET = (1 << 20, 2)
+#? A sum runs no further than a frame can reach (`_reach`) - bar the check of a header repeating
+#? the number just used, which spans two frames in a file as it should be - and each stretch is
+#? summed once and remembered, so a real file sums its last frame and any tag after it within
+#? reach - kilobytes; 2 MB for the largest frame FLAC can hold - and a frame or two more in the
+#? rare file with a false header. A file built to be checksummed over and over is refused past
+#? this instead of holding a worker thread: about a quarter of a second here, whatever its size.
+CHECKSUM_BUDGET = 4 << 20
 
 #? How much audio goes in one MP4 chunk (a run of samples stored back to back, found through one
 #? entry of the chunk offset table). A player finds a sample by taking its chunk's offset and
@@ -116,15 +119,16 @@ class _Checksums:
     """The CRC-16s one split asks for, each stretch of the file summed once, within CHECKSUM_BUDGET.
 
     `upto(origin, end)` is the CRC-16 of data[origin:end]. The questions asked of one origin come
-    in order along the file - the frame before a repeated number, then the frame up to each copy
+    in order along the file - where its frame was taken to end, then up to each copy of a header
     - so the sum is carried on from where the last answer stopped rather than begun again, and
-    every answer is kept, so asking twice costs nothing. A new origin starts afresh; origins only
-    move forward, so no byte is summed more than twice this way.
+    every answer is kept, so asking twice costs nothing. A later origin where the sum so far is
+    zero - the start of a frame that checked out - carries on too, since a sum that has come back
+    to zero goes on exactly as one begun there. Any other origin starts afresh.
     """
 
     def __init__(self, data: bytes):
         self.data = data
-        self.left = CHECKSUM_BUDGET[0] + CHECKSUM_BUDGET[1] * len(data)
+        self.left = CHECKSUM_BUDGET
         self.origin = -1
         self.answers: dict[int, int] = {}
         self.at = self.crc = 0
@@ -132,11 +136,11 @@ class _Checksums:
     def _sum(self, start: int, end: int, crc: int) -> int:
         self.left -= end - start
         if self.left < 0:
-            raise Unsupported("far too much checksumming for a file this size")
+            raise Unsupported("far too much checksumming")
         return _crc16(self.data[start:end], crc)
 
     def upto(self, origin: int, end: int) -> int:
-        if origin != self.origin:
+        if origin != self.origin and not (self.origin < origin and self.answers.get(origin) == 0):
             self.origin, self.answers, self.at, self.crc = origin, {origin: 0}, origin, 0
         if end not in self.answers:
             if end < self.at:
@@ -170,6 +174,7 @@ class StreamInfo:
     channels: int
     bits_per_sample: int
     total_samples: int          # 0 when the encoder didn't know
+    max_framesize: int = 0      # the largest frame's size in bytes; 0 when the encoder didn't know
 
 
 @dataclass(frozen=True)
@@ -239,6 +244,7 @@ def _parse_streaminfo(raw: bytes) -> StreamInfo:
         channels=((packed >> 41) & 0x7) + 1,
         bits_per_sample=((packed >> 36) & 0x1F) + 1,
         total_samples=packed & 0xFFFFFFFFF,
+        max_framesize=int.from_bytes(raw[7:10], "big"),
     )
     if info.sample_rate == 0:
         raise Unsupported("STREAMINFO gives no sample rate")
@@ -249,30 +255,43 @@ def _parse_streaminfo(raw: bytes) -> StreamInfo:
     return info
 
 
-def _coded_number(n: int) -> bytes:
-    """A frame or sample number as a frame header codes it (UTF-8's scheme, stretched to 36 bits).
+def _reach(info: StreamInfo) -> int:
+    """The most bytes one frame of this stream can take up.
 
-    Only the shortest coding is ever written by an encoder, and comparing against it is both the
-    fastest check and the strictest: an over-long coding that happened to carry the right value
-    is not accepted.
+    STREAMINFO's largest frame, when the encoder wrote one: libFLAC and ffmpeg write the true
+    figure (ffmpeg an upper bound when it can't go back for it, libFLAC 0), and none of the 217
+    real files this was checked against has a frame past it. Otherwise, a frame of the largest
+    block with every sample stored as it is - a stereo side channel's extra bit included - which
+    no encoder goes past, since storing the samples verbatim is always one of the ways it can
+    write a frame (ffmpeg's ff_flac_get_max_frame_size is the same sum).
     """
-    if n < 0x80:
-        return bytes((n,))
-    for extra, limit in ((1, 1 << 11), (2, 1 << 16), (3, 1 << 21), (4, 1 << 26), (5, 1 << 31), (6, 1 << 36)):
-        if n < limit:
-            lead = (0xFF << (7 - extra)) & 0xFF
-            tail = [0x80 | ((n >> (6 * i)) & 0x3F) for i in range(extra - 1, -1, -1)]
-            return bytes([lead | (n >> (6 * extra))] + tail)
-    raise Unsupported("a sample number past 36 bits")
+    if info.max_framesize:
+        return info.max_framesize
+    bits = info.max_block * info.channels * info.bits_per_sample
+    if info.channels == 2:
+        bits += info.max_block
+    #? a header of 16 bytes at most, a subframe header per channel with room for its count of
+    #? wasted bits, the samples, and the CRC-16
+    return 16 + info.channels * ((info.bits_per_sample + 14) // 8) + (bits + 7) // 8 + 2
 
 
-def _frame_header(data: bytes, pos: int, info: StreamInfo, numbers: tuple[bytes, ...]):
-    """(which of `numbers` it carries, its block size, its length) for a frame header at `pos`.
+#? a coded number's first byte -> how many bytes follow it (UTF-8's scheme, stretched to 36 bits:
+#? 110xxxxx one, 1110xxxx two ... 11111110 six); 0 for a byte that can't begin one (10xxxxxx,
+#? 0xFF) - the one-byte numbers, below 0x80, are read before this is looked at
+_NUMBER_TAILS = tuple(8 - (lead ^ 0xFF).bit_length() - 1 if 0xC0 <= lead < 0xFF else 0 for lead in range(256))
+#? the least number each length may carry: anything less has a shorter coding, and only the
+#? shortest is ever written by an encoder
+_SHORTEST = (0, 1 << 7, 1 << 11, 1 << 16, 1 << 21, 1 << 26, 1 << 31)
+
+
+def _frame_header(data: bytes, pos: int, info: StreamInfo):
+    """(the frame or sample number it carries, its block size, its length) for a frame header at
+    `pos`.
 
     None unless EVERYTHING about it is right: every fixed field agrees with STREAMINFO, the
-    reserved bits are clear, the frame (or sample) number is exactly one of those given, coded
-    the shortest way, and the header's own CRC-8 checks out. The caller has already matched the
-    sync code and blocking-strategy bit.
+    reserved bits are clear, the number is coded the shortest way, and the header's own CRC-8
+    checks out. Which number it ought to carry is the caller's to judge. The caller has already
+    matched the sync code and blocking-strategy bit.
     """
     end = len(data)
     if pos + 6 > end:
@@ -290,12 +309,22 @@ def _frame_header(data: bytes, pos: int, info: StreamInfo, numbers: tuple[bytes,
     if 0 < rate_code < 12 and _RATES[rate_code] != info.sample_rate:
         return None
     p = pos + 4
-    for which, coded in enumerate(numbers):
-        if data.startswith(coded, p):
-            p += len(coded)
-            break
+    lead = data[p]
+    if lead < 0x80:
+        number = lead
+        p += 1
     else:
-        return None
+        tail = _NUMBER_TAILS[lead]
+        if not tail or p + tail >= end:
+            return None
+        number = lead & (0x3F >> tail)
+        for byte in data[p + 1:p + 1 + tail]:
+            if byte & 0xC0 != 0x80:
+                return None
+            number = (number << 6) | (byte & 0x3F)
+        if number < _SHORTEST[tail]:
+            return None
+        p += 1 + tail
     if block_code == 6:
         if p + 1 > end:
             return None
@@ -326,7 +355,7 @@ def _frame_header(data: bytes, pos: int, info: StreamInfo, numbers: tuple[bytes,
             return None
     if p >= end or _crc8(data[pos:p]) != data[p]:
         return None
-    return which, block_size, p + 1 - pos
+    return number, block_size, p + 1 - pos
 
 
 def _audio_ends(data: bytes, start: int) -> list[int]:
@@ -351,33 +380,49 @@ def _audio_ends(data: bytes, start: int) -> list[int]:
     return ends
 
 
-def _last_frame_end(data: bytes, start: int, sync: bytes, checks: _Checksums) -> int | None:
+#? both sync codes: the fixed-block one and the variable-block one
+_SYNCS = (b"\xff\xf8", b"\xff\xf9")
+
+
+def _last_frame_end(data: bytes, start: int, reach: int, checks: _Checksums) -> int | None:
     """Where the frame at `start` ends if it is the last one; None if it can't be.
 
     Nothing after the last frame says where it ends, so its CRC-16 does: summed from its start,
-    it has to come to zero at exactly one of the places it could end (`_audio_ends`).
+    it has to come to zero at exactly one of the places it could end (`_audio_ends`). A place
+    further from the start than any frame of the stream can reach (`_reach`) is not one, and is
+    ruled out before anything is summed - so a file with megabytes appended costs nothing to
+    refuse, and nothing past a frame's reach is ever summed.
 
     Coming to zero there is not the whole test, though, because the sum carries on unchanged
     through anything appended that sums to zero from scratch - and whatever is let in goes into
     the last MP4 sample, where AVFoundation stops with an error seconds before the end of a song
     it plays through as FLAC. So:
+    - The reach is the first guard: with STREAMINFO's largest frame to go by, a last sample
+      larger than it is refused whatever it sums to.
     - The sum coming to zero at two of those places - a tag whose own CRC-16 is zero, one in
       65,536 - leaves which of them the audio ends at unknown, and the file is refused.
-    - Whole frames each sum to zero. The same pass sums to every sync code in the frame as well,
-      and one where the sum is zero is a frame's end with another after it: refused.
+    - Whole frames each sum to zero. The same pass sums to every sync code in the frame as well -
+      of EITHER blocking strategy, since a frame written with the other one sums to zero just the
+      same - and one where the sum is zero is a frame's end with another after it: refused.
     - Zero bytes sum to zero (the CRC starts at zero and nothing is XORed at the end). Stripping
       them can't be right - a real frame's CRC-16 ends in a zero byte in one file of 256, and
       that can't be told from a zero appended - but a real frame ends in THREE only when its
       CRC-16 is 0x0000 and the byte before it is zero too, so three are refused. One or two
       appended stay in the last sample, which AVFoundation played through.
-    Anything else appended whose CRC-16 happens to be zero - one in 65,536 - still gets in.
+    Anything else appended that sums to zero and doesn't start with a sync code still gets in,
+    as long as the last sample stays within the reach: one in 65,536 by chance, every time by
+    design.
     """
-    ends = _audio_ends(data, start)
+    ends = [end for end in _audio_ends(data, start) if end - start <= reach]
+    if not ends:
+        return None
+    furthest = max(ends)
     syncs = []
-    at = data.find(sync, start + 1, ends[0])
-    while at >= 0:
-        syncs.append(at)
-        at = data.find(sync, at + 1, ends[0])
+    for sync in _SYNCS:
+        at = data.find(sync, start + 1, furthest)
+        while at >= 0:
+            syncs.append(at)
+            at = data.find(sync, at + 1, furthest)
     zero = checks.zeros(start, sorted(set(ends + syncs)))
     ends = [end for end in ends if end in zero]
     if not ends:
@@ -405,13 +450,26 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
 
     That is not left to chance either. Were a false header ever taken as frame k, the real frame
     k's header would still come after it, before frame k+1's - and it would carry a number already
-    used. So a header carrying the number just used is watched for, and when one appears the
-    frame's own CRC-16 settles which of the two is real: the frame before them has to checksum
-    to zero from its start to the real one. Exactly one of them must: neither means the stream
-    isn't what it claims, and both - a chance of 1 in 65,536 on top of the false header, unless
-    the file was built that way - leave two readings of it. Either is refused. Every such header
-    is charged to FALSE_SYNC_BUDGET, and the sums are carried on and remembered (`_Checksums`),
-    so a frame full of copies of a header costs one pass over it, not one per copy.
+    used - and so would the real headers after it, were false ones taken for frames k+1 and on as
+    well, one after another inside frame k-1's audio. So a header carrying ANY number already
+    given to a frame is watched for, not just the last, and when one appears the frame's own
+    CRC-16 settles which of the two is real: the frame before them has to checksum to zero from
+    its start to the real one (and whatever was taken after a false one was inside that frame).
+    Exactly one of them must: neither means the stream isn't what it claims, and both - a chance
+    of 1 in 65,536 on top of the false header, unless the file was built that way - leave two
+    readings of it. Either is refused. Every such header is charged to FALSE_SYNC_BUDGET, and the
+    sums are carried on and remembered (`_Checksums`), so a frame full of copies of a header costs
+    one pass over it, not one per copy.
+
+    What bounds that is a frame's reach (`_reach`): no frame is taken that would make the one
+    before it longer than any frame of the stream can be, so a header whose number was given
+    further back than that can't be the real one - the frame before it would have to be longer
+    still - and is passed over without a sum. A real file meets a header carrying some earlier
+    number by chance about once in 2^34 bytes (its number only has to be one of the frames
+    already found, not the next), which is why it isn't refused; within a frame's reach it is
+    checked. The number just given is checked whatever the distance, as it always was: in a file
+    as it should be that spans two frames at most.
+
     (Checksumming every frame would be certain without any of this, but it is a byte-at-a-time
     loop in Python - seconds for an album track - where this is milliseconds.)
 
@@ -423,8 +481,9 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
         raise Unsupported("no audio frame where the metadata ends")
     sync = data[first:first + 2]
     fixed = sync == b"\xff\xf8"
-    got = _frame_header(data, first, info, (_coded_number(0),))
-    if got is None:
+    reach = _reach(info)
+    got = _frame_header(data, first, info)
+    if got is None or got[0] != 0:
         raise Unsupported("the first audio frame's header isn't valid")
     _, block_size, header_length = got
     starts, blocks, numbers = [first], [block_size], [0]
@@ -432,55 +491,65 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
     budget = FALSE_SYNC_BUDGET[0] + len(data) // FALSE_SYNC_BUDGET[1]
     checks = _Checksums(data)
     while True:
-        #? the number the frame just found carried, and the one the next frame must carry
-        last = numbers[-1]
-        wanted = last + 1 if fixed else last + blocks[-1]
-        coded = (_coded_number(wanted), _coded_number(last))
-        while True:
-            at = data.find(sync, search)
-            if at < 0:
-                break
-            got = _frame_header(data, at, info, coded)
-            if got is not None:
-                break
-            search = at + 1
-            budget -= 1
-            if budget < 0:
-                raise Unsupported("far too many sync codes that start no frame")
+        at = data.find(sync, search)
         if at < 0:
             break
-        which, block_size, header_length = got
-        if which == 0:
+        got = _frame_header(data, at, info)
+        #? the number the next frame must carry
+        wanted = numbers[-1] + (1 if fixed else blocks[-1])
+        if got is not None and got[0] == wanted:
+            if at - starts[-1] > reach:
+                raise Unsupported(f"a frame would be {at - starts[-1]} bytes, larger than any frame of "
+                                  f"this stream can be ({reach})")
+            number, block_size, header_length = got
             starts.append(at)
             blocks.append(block_size)
-            numbers.append(wanted)
+            numbers.append(number)
             search = at + header_length
             continue
-        #? a second header carrying the number already given to the frame at starts[-1]
+        search = at + 1
         budget -= 1
         if budget < 0:
             raise Unsupported("far too many sync codes that start no frame")
-        if len(starts) == 1:
-            #? the first frame is where the metadata ends, so this one is inside its audio
-            search = at + 1
+        if got is None:
             continue
-        before = starts[-2]
-        kept = checks.upto(before, starts[-1]) == 0
+        number, block_size, header_length = got
+        #? a header carrying a number already given to the frame at starts[slot]?
+        slot = bisect_left(numbers, number)
+        if slot == len(numbers) or numbers[slot] != number or slot == 0:
+            #? no - or the first frame's, which is where the metadata ends, so this is audio
+            continue
+        before = starts[slot - 1]
+        if slot < len(starts) - 1 and at - before > reach:
+            #? too far on for the frame before that one to end here
+            continue
+        #? the frame before it ends where the frame given that number was taken to begin - or at
+        #? this header instead, and everything taken since then was inside it
+        kept = checks.upto(before, starts[slot]) == 0
         moved = checks.upto(before, at) == 0
         if kept and moved:
-            raise Unsupported(f"two frames claim to be number {last}, and both check out")
-        if kept:
-            search = at + 1
-        elif moved:
-            starts[-1], blocks[-1] = at, block_size
+            raise Unsupported(f"two frames claim to be number {number}, and both check out")
+        if moved:
+            if at - before > reach:
+                raise Unsupported(f"a frame would be {at - before} bytes, larger than any frame of "
+                                  f"this stream can be ({reach})")
+            del starts[slot:], blocks[slot:], numbers[slot:]
+            starts.append(at)
+            blocks.append(block_size)
+            numbers.append(number)
             search = at + header_length
-        else:
-            raise Unsupported(f"two frames claim to be number {last}, and neither checks out")
-    end = _last_frame_end(data, starts[-1], sync, checks)
+        elif not kept:
+            raise Unsupported(f"two frames claim to be number {number}, and neither checks out")
+    shortest = min(_audio_ends(data, starts[-1])) - starts[-1]
+    if shortest > reach:
+        raise Unsupported(f"the last frame would be {shortest} bytes, larger than any frame of this "
+                          f"stream can be ({reach}) - something is appended to the audio, or a "
+                          "frame's header is damaged")
+    end = _last_frame_end(data, starts[-1], reach, checks)
     if end is None and len(starts) > 1:
         #? the last header found may have been audio data in the real last frame, numbered as
         #? if a frame followed it: then the frame before it checks out to the end of the file
-        end = _last_frame_end(data, starts[-2], sync, checks)
+        end = _last_frame_end(data, starts[-2], reach, checks)
         if end is not None:
             del starts[-1], blocks[-1], numbers[-1]
     if end is None:

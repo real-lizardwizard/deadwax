@@ -88,11 +88,13 @@ def frame_header(number, block, *, rate, channels, bps, variable, rate_style):
 
 
 def encode(*, rate=44100, channels=2, bps=16, blocks=(4096,) * 4 + (1000,), variable=False,
-           rate_style="table", seed=1, plant=None, total=None, id3=b"", trailer=b""):
+           rate_style="table", seed=1, plant=None, total=None, id3=b"", trailer=b"", max_framesize=None):
     """A FLAC file, and the frames in it as (offset, bytes, block size).
 
     `plant` maps a frame index to (byte offset into its first channel's samples, bytes) - or to a
     function of the list of every frame's header that returns them, to copy a real header in.
+    `max_framesize` is what STREAMINFO says the largest frame is: the truth unless it is given,
+    and 0 for "not known", as an encoder writing to a pipe leaves it.
     """
     rng = random.Random(seed)
     width = bps // 8
@@ -128,7 +130,8 @@ def encode(*, rate=44100, channels=2, bps=16, blocks=(4096,) * 4 + (1000,), vari
     sizes = [len(f) for f in frames]
     min_block = min(blocks[:-1]) if len(blocks) > 1 else blocks[0]
     streaminfo = struct.pack(">HH", min_block, max(blocks))
-    streaminfo += min(sizes).to_bytes(3, "big") + max(sizes).to_bytes(3, "big")
+    largest = max(sizes) if max_framesize is None else max_framesize
+    streaminfo += min(sizes).to_bytes(3, "big") + largest.to_bytes(3, "big")
     total = sum(blocks) if total is None else total
     streaminfo += ((rate << 44) | ((channels - 1) << 41) | ((bps - 1) << 36) | total).to_bytes(8, "big")
     streaminfo += hashlib.md5(pcm).digest()
@@ -356,16 +359,24 @@ CD = flac_mp4.StreamInfo(raw=bytes(34), min_block=4096, max_block=4096, sample_r
 GOOD = [0xFF, 0xF8, 0xC9, 0x88, 5]
 
 
-def header_check(head, numbers=(5,), fix_crc=True):
+def header_check(head, fix_crc=True):
     """What `_frame_header` makes of `head` (with its CRC-8 made right unless told otherwise)."""
     data = bytes(head) + (bytes([crc8(bytes(head))]) if fix_crc else b"") + bytes(20)
-    return flac_mp4._frame_header(data, 0, CD, tuple(coded(n) for n in numbers))
+    return flac_mp4._frame_header(data, 0, CD)
 
 
 def test_a_good_header_is_read():
-    assert header_check(GOOD) == (0, 4096, 6)
-    assert header_check(GOOD, numbers=(6, 5)) == (1, 4096, 6)
-    assert header_check([0xFF, 0xF8, 0x79, 0x88, 5, 0x0F, 0xFF]) == (0, 4096, 8)   # a 16-bit tail
+    assert header_check(GOOD) == (5, 4096, 6)
+    assert header_check([0xFF, 0xF8, 0x79, 0x88, 5, 0x0F, 0xFF]) == (5, 4096, 8)   # a 16-bit tail
+    #? which number it ought to carry is for the caller to say
+    assert header_check(GOOD[:4] + [6]) == (6, 4096, 6)
+
+
+@pytest.mark.parametrize("number", [0, 127, 128, 2047, 2048, (1 << 16) - 1, 1 << 16, (1 << 21) - 1, 1 << 21,
+                                    (1 << 26) - 1, 1 << 26, (1 << 31) - 1, 1 << 31, (1 << 36) - 1])
+def test_a_number_of_every_length_is_read(number):
+    """Frame numbers take up to six bytes to write and sample numbers seven."""
+    assert header_check(GOOD[:4] + list(coded(number))) == (number, 4096, 5 + len(coded(number)))
 
 
 @pytest.mark.parametrize("head, why", [
@@ -379,8 +390,11 @@ def test_a_good_header_is_read():
     ([0xFF, 0xF8, 0xCF, 0x88, 5], "the invalid rate code"),
     ([0xFF, 0xF8, 0x09, 0x88, 5], "the reserved block size"),
     ([0xFF, 0xF8, 0xD9, 0x88, 5], "8192 samples, past STREAMINFO's largest"),
-    ([0xFF, 0xF8, 0xC9, 0x88, 6], "the wrong frame number"),
-    ([0xFF, 0xF8, 0xC9, 0x88, 0xC0, 0x85], "the right number, written the long way"),
+    ([0xFF, 0xF8, 0xC9, 0x88, 0xC0, 0x85], "number 5, written the long way"),
+    ([0xFF, 0xF8, 0xC9, 0x88, 0xE0, 0x9F, 0xBF], "number 2047, written the long way"),
+    ([0xFF, 0xF8, 0xC9, 0x88, 0x85], "a number starting with a continuation byte"),
+    ([0xFF, 0xF8, 0xC9, 0x88, 0xC2, 0x05], "a number whose second byte isn't a continuation"),
+    ([0xFF, 0xF8, 0xC9, 0x88, 0xFF, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80], "0xFF, which starts no number"),
 ])
 def test_a_header_wrong_in_any_one_field_is_not_a_frame(head, why):
     assert header_check(head) is None, why
@@ -388,13 +402,24 @@ def test_a_header_wrong_in_any_one_field_is_not_a_frame(head, why):
 
 def test_a_header_with_a_bad_crc_is_not_a_frame():
     good = bytes(GOOD) + bytes([crc8(bytes(GOOD))])
-    assert header_check(list(good), fix_crc=False) == (0, 4096, 6)
+    assert header_check(list(good), fix_crc=False) == (5, 4096, 6)
     assert header_check(list(good[:-1]) + [good[-1] ^ 1], fix_crc=False) is None
 
 
-def test_a_header_cut_off_by_the_end_of_the_file_is_not_a_frame():
-    head = bytes([0xFF, 0xF8, 0x79, 0x88, 5, 0x0F])
-    assert flac_mp4._frame_header(head, 0, CD, (coded(5),)) is None
+@pytest.mark.parametrize("head", [[0xFF, 0xF8, 0x79, 0x88, 5, 0x0F], [0xFF, 0xF8, 0xC9, 0x88, 0xE1, 0x80]],
+                         ids=["in its block size", "in its number"])
+def test_a_header_cut_off_by_the_end_of_the_file_is_not_a_frame(head):
+    assert flac_mp4._frame_header(bytes(head), 0, CD) is None
+
+
+def test_a_first_frame_that_isnt_number_0_is_refused():
+    flac, frames = encode()
+    at = frames[0][0]
+    header = bytearray(flac[at:at + 6])
+    header[4] = 1
+    header[5] = crc8(bytes(header[:5]))
+    with pytest.raises(Unsupported, match="first audio frame"):
+        flac_to_mp4(flac[:at] + bytes(header) + flac[at + 6:])
 
 
 def test_a_file_full_of_sync_codes_is_refused_rather_than_searched_for_ever():
@@ -409,10 +434,117 @@ def test_a_file_full_of_sync_codes_is_refused_rather_than_searched_for_ever():
     assert_same_frames(flac_to_mp4(flac), flac, frames)
 
 
-def test_two_false_headers_in_a_row_are_refused_rather_than_guessed():
-    """Copies of frames 4 AND 5 inside frame 3: no reading of it checks out, so no MP4 at all."""
-    flac, _ = encode(blocks=(4096,) * 8, plant={3: (1000, lambda h: h[4] + bytes(40) + h[5])})
-    with pytest.raises(Unsupported):
+def test_two_false_headers_in_a_row_are_found_out_by_the_frame_before_them():
+    """Copies of frames 4 AND 5 inside frame 3 are both taken for frames; the real frame 4's header
+    then carries a number given two frames back, and frame 3 checks out to it and not to the copy."""
+    flac, frames = encode(blocks=(4096,) * 8, plant={3: (1000, lambda h: h[4] + bytes(40) + h[5])})
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+
+
+def chained_copies(copies=2, solve=None):
+    """A valid FLAC with copies of the headers of frames 2, 3 ... (as many as `copies`) inside frame
+    1, one after another, each just after two bytes that can be set. `solve` sets a pair so that a
+    checksum comes to zero at a copy: "first" makes frame 1 check out ending at the first copy, and
+    "between" makes the stretch from the first copy to the second check out as a frame. Returns the
+    file, its frames, and where the copies are."""
+    blocks, at, gap = (4096,) * 6 + (1000,), 2000, 40
+
+    def build(fixes):
+        run = lambda h: b"".join(bytes(gap if n else 0) + fix + h[2 + n] for n, fix in enumerate(fixes))
+        return encode(blocks=blocks, seed=7, plant={1: (at, run)})
+
+    fixes = [bytes(2)] * copies
+    flac, frames = build(fixes)
+    start = frames[1][0]
+    places = [start + 6 + 1 + at + 2 + n * (2 + gap + 6) for n in range(copies)]
+    if solve == "first":
+        fixes[0] = struct.pack(">H", crc16(flac[start:places[0] - 2]))
+    elif solve == "between":
+        fixes[1] = struct.pack(">H", crc16(flac[places[0]:places[1] - 2]))
+    flac, frames = build(fixes)
+    for n, place in enumerate(places):
+        assert flac[place:place + 6] == frames[2 + n][1][:6]
+    return flac, frames, places
+
+
+@pytest.mark.parametrize("copies", [2, 3])
+def test_a_chain_of_header_copies_is_found_out_by_the_frame_before_it(copies):
+    flac, frames, _ = chained_copies(copies)
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+
+
+def test_a_chain_whose_copies_check_out_as_a_frame_is_still_found_out():
+    """The second copy used to be all the next check looked for, so a copy of frame 2's header and
+    then of frame 3's, the stretch between them made to check out, was kept: the real frame 2's
+    header carried a number no longer looked for and was passed over. It is looked for now, and
+    frame 1 doesn't check out to the first copy."""
+    flac, frames, (first, second) = chained_copies(solve="between")
+    assert crc16(flac[first:second]) == 0 and crc16(flac[frames[1][0]:first]) != 0
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+
+
+@pytest.mark.parametrize("copies", [2, 3])
+def test_a_chain_where_the_frame_before_checks_out_to_the_first_copy_is_refused(copies):
+    """Frame 1 checks out ending at the first copy AND at the real frame 2: two readings. The first
+    used to be kept, splitting a valid FLAC in the wrong place."""
+    flac, frames, (first, *_) = chained_copies(copies, solve="first")
+    assert crc16(flac[frames[1][0]:first]) == 0
+    with pytest.raises(Unsupported, match="number 2, and both check out"):
+        flac_to_mp4(flac)
+
+
+def test_a_header_numbered_further_back_than_a_frame_can_reach_is_passed_over_unsummed(monkeypatch):
+    """A copy of frame 2's header inside frame 5: frame 1 would have to run on into frame 5 for it
+    to be the real one, far past STREAMINFO's largest frame - so it isn't, and nothing is summed to
+    say so. A real file carries a header like it about once in 2^34 bytes."""
+    flac, frames = encode(blocks=(4096,) * 8, plant={5: (100, lambda h: h[2])})
+    summed, crc16_of = [], flac_mp4._crc16
+    monkeypatch.setattr(flac_mp4, "_crc16", lambda data, crc=0: summed.append(len(data)) or crc16_of(data, crc))
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+    assert sum(summed) == len(frames[-1][1])
+
+
+def test_a_header_numbered_back_but_within_reach_is_checked_and_passed_over(monkeypatch):
+    """With small frames and room for large ones, the copy of frame 2's header in frame 4 could be
+    the real one as far as sizes go, so frames 1 to 3 are summed: they check out where they were
+    taken to end, and frame 1 doesn't to the copy."""
+    flac, frames = encode(blocks=(256,) * 8, max_framesize=20000, plant={4: (100, lambda h: h[2])})
+    summed, crc16_of = [], flac_mp4._crc16
+    monkeypatch.setattr(flac_mp4, "_crc16", lambda data, crc=0: summed.append(len(data)) or crc16_of(data, crc))
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+    assert sum(summed) > sum(len(f) for _, f, _ in frames[1:4])
+
+
+def test_a_frame_too_large_with_a_copy_of_the_next_header_halfway_is_refused_not_split_there():
+    """STREAMINFO says frames reach 12000 bytes; frame 2 is 16 KB with a copy of frame 3's header
+    halfway. Each half fits the reach, so the copy is taken - and the real frame 3's header, a
+    frame's reach and more from frame 2's start, carries the number just given. That one is checked
+    whatever the distance: frame 2 checks out to it and not to the copy, which makes frame 2 larger
+    than STREAMINFO allows."""
+    blocks = (1152, 1152, 4096, 100, 1152)
+    flac, frames = encode(blocks=blocks, variable=True, max_framesize=12000, plant={2: (7000, lambda h: h[3])})
+    assert frames[3][0] - frames[2][0] > 12000
+    with pytest.raises(Unsupported, match="larger than any frame of this stream can be"):
+        flac_to_mp4(flac)
+
+
+def test_a_copy_of_the_next_header_in_a_frame_whose_checksum_is_wrong_is_refused():
+    """Frame 1 checks out neither at the copy nor at the real frame 2: the file isn't what it says."""
+    flac, frames = encode(blocks=(4096,) * 6, plant={1: (1000, next_header(1))})
+    footer = frames[2][0] - 1
+    damaged = flac[:footer] + bytes([flac[footer] ^ 0x5A]) + flac[footer + 1:]
+    with pytest.raises(Unsupported, match="number 2, and neither checks out"):
+        flac_to_mp4(damaged)
+
+
+@pytest.mark.parametrize("where", [1, 3, 4], ids=["the second frame", "a middle frame", "the last frame"])
+def test_a_frame_larger_than_streaminfo_says_any_can_be_is_refused(where):
+    """A frame past STREAMINFO's largest means STREAMINFO is wrong, and the reach that decides what
+    can be a frame with it - so nothing it decided is trusted."""
+    blocks = [1152] * 5
+    blocks[where] = 4096
+    flac, frames = encode(blocks=tuple(blocks), variable=True, max_framesize=len(encode(blocks=(1152,))[1][0][1]) + 20)
+    with pytest.raises(Unsupported, match="larger than any frame of this stream can be"):
         flac_to_mp4(flac)
 
 
@@ -465,15 +597,74 @@ def test_a_frame_full_of_copies_of_a_header_is_checksummed_once_not_once_a_copy(
     assert sum(summed) <= len(frames[0][1]) + 7 + 6 * 999 + len(frames[-1][1])
 
 
-def test_checksumming_is_bounded_and_refused_past_the_bound(monkeypatch):
-    """A file as it should be sums its last frame and nothing else, which the bound's floor covers
-    many times over."""
-    flac, frames = encode()
-    monkeypatch.setattr(flac_mp4, "CHECKSUM_BUDGET", (len(frames[-1][1]), 0))
+def test_copies_frame_after_frame_are_summed_in_one_pass(monkeypatch):
+    """Copies of frame 1's header in frame 1, then of frame 2's in frame 2: the second lot's sums
+    start from frame 1's, which had come back to zero at frame 2 - so frame 1 isn't summed twice."""
+    flac, frames = encode(blocks=(4096,) * 5, plant={1: (0, lambda h: h[1] * 500), 2: (0, lambda h: h[2] * 500)})
+    summed = counting_sums(monkeypatch)
     assert_same_frames(flac_to_mp4(flac), flac, frames)
-    monkeypatch.setattr(flac_mp4, "CHECKSUM_BUDGET", (len(frames[-1][1]) - 1, 0))
+    assert sum(summed) <= len(frames[0][1]) + len(frames[1][1]) + 7 + 6 * 499 + len(frames[-1][1])
+
+
+def test_a_large_tag_after_the_audio_is_left_out_without_summing_it(monkeypatch):
+    """An APEv2 tag with a cover in it runs to hundreds of KB. Ending the last frame after it would
+    make that frame larger than any can be, so the tag is never summed."""
+    items = bytes(1 << 20)
+    flac, frames = encode(trailer=items + b"APETAGEX" + struct.pack("<IIII8x", 2000, len(items) + 32, 1, 0))
+    summed = counting_sums(monkeypatch)
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+    assert sum(summed) == len(frames[-1][1])
+
+
+def test_a_tag_that_checks_out_as_audio_beyond_a_frames_reach_is_left_out():
+    """The last frame checks out both before an ID3v1 tag and after it, but it is already as large
+    as STREAMINFO's largest, so running on through the tag would make it larger than any frame can
+    be: there is only one reading, and the tag is left out."""
+    body = b"TAG" + bytes(123)
+    flac, frames = encode(blocks=(4096,) * 5, trailer=body + struct.pack(">H", crc16(body)))
+    assert crc16(flac[frames[-1][0]:]) == 0
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+
+
+def test_checksumming_is_bounded_and_refused_past_the_bound(monkeypatch):
+    """A file as it should be sums its last frame and nothing else, which the bound covers many
+    times over."""
+    flac, frames = encode()
+    assert flac_mp4.CHECKSUM_BUDGET > 100 * len(frames[-1][1])
+    monkeypatch.setattr(flac_mp4, "CHECKSUM_BUDGET", len(frames[-1][1]))
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+    monkeypatch.setattr(flac_mp4, "CHECKSUM_BUDGET", len(frames[-1][1]) - 1)
     with pytest.raises(Unsupported, match="checksumming"):
         flac_to_mp4(flac)
+
+
+def counting_sums(monkeypatch):
+    summed, crc16_of = [], flac_mp4._crc16
+    monkeypatch.setattr(flac_mp4, "_crc16", lambda data, crc=0: summed.append(len(data)) or crc16_of(data, crc))
+    return summed
+
+
+def test_megabytes_after_the_audio_are_refused_without_summing_a_byte(monkeypatch):
+    """The last frame's checksum used to run to the end of the file and the one before it again:
+    64 MiB appended took nine seconds to refuse, and every other Safari song waited on it. An end
+    further from the last frame's start than any frame can reach is no end at all."""
+    flac, _ = encode(blocks=(4096, 1000))
+    summed = counting_sums(monkeypatch)
+    with pytest.raises(Unsupported, match="larger than any frame of this stream can be"):
+        flac_to_mp4(flac + b"\x01" * (16 << 20))
+    assert sum(summed) == 0
+
+
+def test_a_stream_claiming_huge_frames_is_summed_no_further_than_the_bound(monkeypatch):
+    """STREAMINFO can claim frames of up to 16 MiB, which puts megabytes appended within reach:
+    then the bound - the same whatever the file's size - is what stops the summing. Sync codes
+    through the tail make the sum go stretch by stretch rather than ask for it all at once."""
+    flac, _ = encode(blocks=(4096, 1000), max_framesize=(1 << 24) - 1)
+    tail = (b"\x01" * 65534 + b"\xff\xf8") * 160
+    summed = counting_sums(monkeypatch)
+    with pytest.raises(Unsupported, match="far too much checksumming"):
+        flac_to_mp4(flac + tail)
+    assert flac_mp4.CHECKSUM_BUDGET - 65536 < sum(summed) <= flac_mp4.CHECKSUM_BUDGET
 
 
 @pytest.mark.parametrize("cut", ["in the last frame", "in a middle frame", "after the metadata", "in the metadata"])
@@ -655,19 +846,87 @@ def test_a_tag_that_checks_out_as_audio_as_well_is_refused():
         flac_to_mp4(flac)
 
 
-@pytest.mark.parametrize("what", ["its first three frames again", "a frame of another stream", "its last frame again"])
-def test_whole_frames_after_the_last_are_refused(what):
+@pytest.mark.parametrize("what, largest_known, refusal", [
+    ("its first three frames again", True, "larger than any frame"),
+    ("its first three frames again", False, "larger than any frame"),
+    ("a frame of another stream", True, "larger than any frame"),
+    ("a frame of another stream", False, "more frames"),
+    ("a short frame of another stream", True, "more frames"),
+    ("its last frame again", True, "number 4, and both check out"),
+], ids=["3 frames", "3 frames, largest unknown", "another's", "another's, largest unknown", "another's short one",
+        "its last again"])
+def test_whole_frames_after_the_last_are_refused(what, largest_known, refusal):
     """Each checks out on its own, so the last frame's checksum comes to zero at the end of the
-    file as well, and the MP4's last sample would have held them all."""
-    flac, frames = encode()
+    file as well, and the MP4's last sample would have held them all. What catches them: the last
+    sample coming out larger than any frame of the stream can be - STREAMINFO's largest frame when
+    it gives one, a frame of verbatim samples when not - or else the checksum coming to zero at a
+    sync code before the end."""
+    flac, frames = encode(blocks=(4096,) * 4 + (100,), max_framesize=None if largest_known else 0)
     extra = {
         "its first three frames again": lambda: b"".join(f for _, f, _ in frames[:3]),
         "a frame of another stream": lambda: encode(rate=48000, seed=5)[1][1][1],
+        "a short frame of another stream": lambda: encode(rate=48000, seed=5, blocks=(4096, 100))[1][1][1],
         "its last frame again": lambda: frames[-1][1],
     }[what]()
-    #? the last frame again carries the last number again: two readings, both checking out
-    with pytest.raises(Unsupported, match="both check out" if what == "its last frame again" else "more frames"):
+    with pytest.raises(Unsupported, match=refusal):
         flac_to_mp4(flac + extra)
+
+
+def other_strategy(frame, header_length):
+    """`frame` with its blocking-strategy bit flipped and both checksums made right again: a whole
+    frame that sums to zero, beginning with the OTHER sync code."""
+    body = bytearray(frame[:-2])
+    body[1] ^= 0x01
+    body[header_length - 1] = crc8(bytes(body[:header_length - 1]))
+    body = bytes(body)
+    flipped = body + struct.pack(">H", crc16(body))
+    assert crc16(flipped) == 0 and flipped[:2] == (b"\xff\xf8" if frame[1] == 0xF9 else b"\xff\xf9")
+    return flipped
+
+
+@pytest.mark.parametrize("variable", [False, True], ids=["0xFFF9 after a fixed stream", "0xFFF8 after a variable one"])
+@pytest.mark.parametrize("which, largest_known, refusal", [
+    ("its first frame", True, "larger than any frame"),
+    ("its first frame", False, "more frames"),
+    ("its last frame", True, "more frames"),
+], ids=["first, largest known", "first, largest unknown", "last"])
+def test_a_whole_frame_of_the_other_blocking_strategy_after_the_last_is_refused(variable, which, largest_known, refusal):
+    """Only the stream's own sync code used to be looked for in the last frame, so a frame written
+    with the other one went into the last sample every time: a 60 s flac -8 file with its first
+    frame appended that way stopped in AVFoundation at 57.8 s as an MP4."""
+    blocks = (4096,) * 4 + (100,)
+    flac, frames = encode(blocks=blocks, variable=variable, max_framesize=None if largest_known else 0)
+    index = 0 if which == "its first frame" else len(blocks) - 1
+    number = sum(blocks[:index]) if variable else index
+    header = frame_header(number, blocks[index], rate=44100, channels=2, bps=16, variable=variable, rate_style="table")
+    assert frames[index][1].startswith(header)
+    with pytest.raises(Unsupported, match=refusal):
+        flac_to_mp4(flac + other_strategy(frames[index][1], len(header)))
+
+
+@pytest.mark.parametrize("args, expected", [
+    (dict(channels=2, bits_per_sample=16, max_block=4096), 16 + 2 * 3 + (33 * 4096 + 7) // 8 + 2),
+    (dict(channels=1, bits_per_sample=8, max_block=16), 16 + 2 + 16 + 2),
+    (dict(channels=6, bits_per_sample=24, max_block=4608), 16 + 6 * 4 + 6 * 24 * 4608 // 8 + 2),
+    (dict(channels=8, bits_per_sample=32, max_block=65535), 16 + 8 * 5 + 8 * 32 * 65535 // 8 + 2),
+    (dict(channels=2, bits_per_sample=16, max_block=4096, max_framesize=12345), 12345),
+], ids=["cd", "8-bit mono", "5.1 24-bit", "the largest FLAC allows", "streaminfo's"])
+def test_a_frames_reach_is_streaminfos_largest_or_else_its_samples_stored_verbatim(args, expected):
+    info = flac_mp4.StreamInfo(raw=bytes(34), min_block=16, sample_rate=44100, total_samples=0, **args)
+    assert flac_mp4._reach(info) == expected
+
+
+@pytest.mark.parametrize("case", [
+    dict(), dict(rate=96000, bps=24, blocks=(4608,) * 3 + (7,)), dict(channels=1, bps=8, rate=8000, blocks=(16,) * 300),
+    dict(channels=8, bps=24, rate=48000, blocks=(1152,) * 4), dict(bps=32, blocks=(4096,) * 3 + (5,)),
+    dict(blocks=(1152, 4608, 576, 16, 4608), variable=True),
+], ids=["cd", "96k 24-bit", "8-bit mono", "8 channels", "32-bit", "variable blocks"])
+def test_with_no_largest_frame_given_every_verbatim_frame_is_within_reach(case):
+    """An encoder writing to a pipe leaves STREAMINFO's largest frame 0. The test encoder writes
+    nothing but verbatim frames - the largest a frame is ever written - so all of these must
+    still wrap, their last frame summed and nothing else refused."""
+    flac, frames = encode(**case, max_framesize=0)
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
 
 
 def test_streaminfo_must_come_first():
@@ -803,6 +1062,31 @@ def test_libflacs_own_output_repackages_losslessly(tmp_path):
     check_decodes_the_same(tmp_path, source.read_bytes())
 
 
+@needs_ffmpeg
+@pytest.mark.skipif(not FLAC, reason="the flac tool isn't installed")
+def test_libflacs_output_with_its_first_frame_appended_the_other_way_is_refused(tmp_path):
+    """The review's case, from a real encoder: flac -8's own file, then its frame 0 again with the
+    blocking-strategy bit flipped. It wraps as it is; with the frame appended the last sample would
+    run well past the largest frame STREAMINFO says the file has."""
+    wav, source = tmp_path / "in.wav", tmp_path / "flac.flac"
+    subprocess.run([FFMPEG, "-v", "error", "-f", "lavfi", "-i", "anoisesrc=d=5:a=0.5:c=pink",
+                    "-ar", "44100", "-ac", "2", "-sample_fmt", "s16", str(wav)], check=True)
+    subprocess.run([FLAC, "-s", "-8", "-o", str(source), str(wav)], check=True)
+    data = source.read_bytes()
+    frames = flac_mp4.find_frames(data)
+    flac_to_mp4(data)
+    first = data[frames.starts[0]:frames.starts[1]]
+    header_length = flac_mp4._frame_header(data, frames.starts[0], frames.info)[2]
+    with pytest.raises(Unsupported, match="larger than any frame|more frames"):
+        flac_to_mp4(data + other_strategy(first, header_length))
+
+
+@needs_ffmpeg
+def test_a_chain_found_out_decodes_to_the_same_pcm(tmp_path):
+    flac, _, _ = chained_copies(solve="between")
+    check_decodes_the_same(tmp_path, flac)
+
+
 @pytest.mark.skipif(not FLAC, reason="the flac tool isn't installed")
 def test_libflac_accepts_what_the_test_encoder_writes(tmp_path):
     """flac -t checks every frame's CRCs and the STREAMINFO MD5: the fixtures here are valid FLAC,
@@ -810,8 +1094,9 @@ def test_libflac_accepts_what_the_test_encoder_writes(tmp_path):
     not that it is broken."""
     cases = [dict(), dict(variable=True, blocks=(1152, 4608, 576, 333)), dict(rate=96000, bps=24),
              dict(blocks=(4096,) * 8, plant={3: (1000, next_header(3))})]
-    for data in [encode(**case)[0] for case in cases] + [two_readings()[0], copies_of_its_own_header(1000)[0],
-                                                          ending_in(0x0000, b"\x00")[0]]:
+    crafted = [two_readings()[0], copies_of_its_own_header(1000)[0], ending_in(0x0000, b"\x00")[0],
+               chained_copies(3)[0], chained_copies(solve="first")[0], chained_copies(solve="between")[0]]
+    for data in [encode(**case)[0] for case in cases] + crafted:
         path = tmp_path / "t.flac"
         path.write_bytes(data)
         subprocess.run([FLAC, "-s", "-t", str(path)], check=True)

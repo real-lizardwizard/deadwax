@@ -2755,20 +2755,25 @@ frames; Chromium, Arc included, keeps the file as it is. The guide's section is
   so the same file always makes the same bytes. `mp4_layout()` returns the head and where the
   audio is in the input, so the cache writes head + a slice of the FLAC it already holds rather
   than a second copy. Decoded PCM through ffmpeg was byte-identical for six real files; 57 ms for
-  a 40 MB CD FLAC.
+  a 40 MB CD FLAC as first built, 51 ms since 1.1.0-player.5.
 - **Splitting frames safely is the whole risk**, since FLAC has no frame index and the sync code
   turns up inside audio every ~90 KB. A candidate is taken as the next frame only if its header
   is right in every particular: every field agrees with STREAMINFO, reserved bits clear, CRC-8
   right, and exactly the NEXT frame (or sample) number, coded the shortest way - by chance once in
   2^40 bytes at worst, 2^48 past frame 127. And not left to chance: a false header taken for frame
-  k leaves the real frame k's header before k+1's, carrying a number already used - that duplicate
-  is watched for and the CRC-16 of the frame before decides which is real; neither or both
-  checking out refuses the file. The LAST frame is always CRC-16 checked (how an ID3v1/APEv2 trailer is left
-  out and a truncated file refused), block sizes must sum to STREAMINFO's total, a fixed-block
-  stream's frames must all be one size, and past one false sync per 256 bytes the file is refused
-  (bounded work). Anything off raises `CannotRepackage` and the FLAC is sent as it is: a wrong MP4
-  would be worse than none. 103 tests (`tests/test_flac_mp4.py`) with a verbatim FLAC encoder, no
-  binary fixtures, planted false headers; see "After review (the muxer)" below.
+  k leaves the real frame k's header before k+1's, carrying a number already used (and the real
+  headers after it too, when several false ones were taken in a row) - so a header carrying ANY
+  number already given to a frame is watched for, and the CRC-16 of the frame before that one
+  decides which is real; neither or both checking out refuses the file. Only within a frame's
+  reach of that frame, since 1.1.0-player.5: one numbered further back can't be real and is
+  passed over. Every frame, the last included, must fit that reach - STREAMINFO's largest frame,
+  or a frame of verbatim samples when it gives none. The LAST frame is always CRC-16 checked (how
+  an ID3v1/APEv2 trailer is left out and a truncated file refused), block sizes must sum to
+  STREAMINFO's total, a fixed-block stream's frames must all be one size, past one false sync per
+  256 bytes the file is refused, and past 4 MiB of checksumming too (bounded work). Anything off
+  raises `CannotRepackage` and the FLAC is sent as it is: a wrong MP4 would be worse than none.
+  161 tests (`tests/test_flac_mp4.py`) with a verbatim FLAC encoder, no binary fixtures, planted
+  false headers; see "After review (the muxer)" below.
 - **The route: `wrap=mp4` on the EXISTING stream route**, honoured only with `format=raw` - no new
   route, `test_there_is_no_general_proxy` still pins the list. `player_cache.Mp4Cache.answer()`:
   1. **Which version** (`_version`): a `bytes=0-3` range of the file from Navidrome. Its type must
@@ -2883,8 +2888,9 @@ An adversarial review confirmed three findings in `src/flac_mp4.py`, all fixed t
   frame's CRC-16 ends in a zero byte in one file of 256 and that can't be told from one
   appended zero; a real frame ends in three only when its CRC-16 is 0x0000 and the byte
   before it is zero too. One or two appended zeros stay in the last sample, and AVPlayer
-  played those MP4s to the end (measured). Still let in: any other trailer whose CRC-16
-  happens to be zero, 1 in 65,536.
+  played those MP4s to the end (measured). ~~Still let in: any other trailer whose CRC-16
+  happens to be zero, 1 in 65,536~~ - not so: a whole frame of the OTHER blocking strategy got
+  in every time, and anything built to sum to zero still can; see the second review below.
 - **Each header repeating the number just used cost a whole-frame checksum, uncharged.**
   review4's `m/dup_dos.py` (a valid 397 KB FLAC, frame 1 full of copies of its own header):
   200 copies 1.8 s, 1,000 copies 8.8 s, packed with 21,800 copies 196 s - and through the app
@@ -2894,13 +2900,16 @@ An adversarial review confirmed three findings in `src/flac_mp4.py`, all fixed t
   answer, so a frame is summed once, not once a copy; and CHECKSUM_BUDGET (1 MiB plus twice
   the file) bounds all checksumming, refusing past it. After: 0.01 s, 0.01 s, and refused in
   0.02 s; gate_demo's songs answer at once. A real file sums its last frame and any tag and
-  nothing else - a test pins it with the budget set to exactly that. The worst case is now
-  linear, about twice the file at ~15 MB/s of pure-Python CRC.
+  nothing else - a test pins it with the budget set to exactly that. ~~The worst case is now
+  linear, about twice the file at ~15 MB/s of pure-Python CRC~~ - and linear was the problem:
+  one file with a long tail still held the gate for seconds. The budget is 4 MiB whatever the
+  file since the second review, below.
 - **A repeated number where BOTH readings check out kept the first**, splitting a valid FLAC
   in the wrong place with no error (`m/wrongsplit.py`: a start at 18580 where frame 2 really
   is at 32965; AVAssetReader failed on the MP4 with -50). Both checking out is refused now,
   as neither always was: in a real file it takes a false header (2^-40) AND a 1-in-65,536
-  checksum.
+  checksum. That held for one planted copy only: two in a row got past it (see the second
+  review).
 - **Measured**: the 40 MB CD FLAC maps in 55.2 ms against 55.0 before (median of 15). 112 of
   121 FLACs to hand (the review battery, the seek and gapless libraries, the big and hi-res
   files) give byte-identical MP4s; the nine that changed are six zero trailers, the two
@@ -2914,6 +2923,101 @@ An adversarial review confirmed three findings in `src/flac_mp4.py`, all fixed t
   change for any file it still wraps, but a cache kept since 1.1.0-player.3 holds MP4s of the
   files it now refuses, which AVFoundation stops in before the end; the new key means they are
   never served again, at the cost of one re-make of each song cached.
+
+A second review, of those fixes, confirmed three more crafted files that got through, all fixed
+in 1.1.0-player.5. Each was reproduced with its script in the scratchpad's `verify5` before the
+fix and after it.
+
+- **Two header copies in a row still split a valid FLAC in the wrong place.** Only a header
+  repeating the number JUST used was watched for. So copies of frame 2's and frame 3's headers
+  inside frame 1 were both taken, and the real frame 2's header, carrying a number no longer
+  looked for, was passed over as a false sync. `verify5/twoplant.py` built two such files: A
+  split at [.., 16571, 18580, 20580, 65753] and B at [.., 16571, 18580, 49359], where the real
+  starts are [.., 16571, 32965, 49359, 65753]. `flac -t` passes both, and AVAssetReader failed on
+  both MP4s (-11800 / -50).
+  - `_frame_header` now reads the number, whatever it is, and the split watches for a header
+    carrying ANY number already given to a frame. The rule is the old one at any slot: the frame
+    before that one checks out either where the next was taken to begin or at this header, and
+    everything taken in between was inside it.
+  - A now wraps, split where it should be: AVAssetReader and ffmpeg both decode its MP4 to
+    libFLAC's PCM exactly. (ffmpeg's own FLAC demuxer misreads the FLAC itself.)
+  - B, where frame 1 checks out at the first copy as well, is refused as two readings. The old
+    test of two copies in a row ("refused rather than guessed") now wraps correctly, for the same
+    reason as A.
+  - **Only within a frame's reach.** A real file carries a valid header with SOME earlier number
+    far more often than one with the next number: past frame 127 its number byte has 128 chances
+    instead of one. On random bytes for a CD stream 3,000 frames in, that was once in 2^33.6
+    bytes (one per 13 GiB), roughly one 40 MB track in 300. Refusing those would cost real
+    songs, and so would summing back to their frame (the whole file, for number 3 turning up in
+    frame 3,000). So a header further from the start of that frame than any frame can reach is
+    passed over unsummed: the frame couldn't be that long. The last number given is checked
+    whatever the distance, as before.
+- **A frame's reach** (`_reach`) is what makes that sound, and bounds everything below.
+  - It is STREAMINFO's max_framesize when the encoder wrote one (libFLAC and ffmpeg write the
+    true figure). Otherwise it is a frame of the largest block stored verbatim, the sum in
+    ffmpeg's `ff_flac_get_max_frame_size`, which no encoder goes past.
+  - No frame is taken that makes the one before it larger than that, and no last frame may be.
+    A frame past it means the reach is wrong for this file, and so is everything it decided.
+  - Of the 217 FLACs to hand (1.37 GB, 1.9 million frames), none has a frame past its reach.
+    Two, in review4's battery, leave max_framesize 0.
+  - **Residual**: the reach is only as honest as the file. A crafted file with a frame larger
+    than its own STREAMINFO allows can still be split wrong. With no max_framesize given, the
+    same goes for a frame larger than verbatim (legal FLAC that no encoder writes). Either needs
+    two or more planted copies with checksum bytes solved as well, and costs one song in Safari.
+    Middle frames are still never checksummed, so a whole frame slipped in between two others is
+    caught only when its number was given within a frame's reach of it, or it makes a frame
+    larger than the reach.
+- **A whole frame of the OTHER blocking strategy after the last went into the last sample
+  every time.** The last frame was searched for the stream's own sync code only, and such a
+  frame sums to zero on its own. `verify5/s60_plus_fff9.flac` is a 60 s `flac -8` file plus its
+  own frame 0 re-coded with 0xFFF9: its last sample was 2575 bytes where STREAMINFO says 1298,
+  and AVPlayer stopped at 57.8 s (-11800 / -50) on a song it plays to the end as FLAC.
+  - Both sync codes are looked for now.
+  - A last sample larger than the reach is refused before anything is summed, which alone
+    refuses this file: "the last frame would be 2575 bytes, larger than any frame of this stream
+    can be (1298)".
+  - One or two appended zero bytes still fit s60's reach and stay in. Sixteen don't.
+  - **Still let in**: something appended that sums to zero and starts with no sync code, while
+    the last sample stays within the reach. That happens one time in 65,536 by chance, and every
+    time if built so. With no max_framesize the room is the verbatim bound's slack over the last
+    frame.
+- **The checksumming was still about twice the file.** `verify5/bigtail.py` (a valid FLAC and 64
+  MiB appended with no sync code in it) took 9.2 s to refuse, 134 MB summed. Through the app an
+  ordinary song asked for 0.5 s later got its first byte at 9.3 s, behind the cache's one gate.
+  At WRAP_MAX_BYTES that is over a minute here.
+  - An end further from the last frame's start than a frame can reach is ruled out before
+    anything is summed. Tails of 16, 64 and 512 MiB are refused with nothing summed, in 0.0,
+    0.0 and 0.3 s (the last is the search for sync codes through 512 MB).
+  - `CHECKSUM_BUDGET` is 4 MiB whatever the file, about a quarter of a second here. Only a
+    stream claiming frames megabytes long can reach it, since the reach bounds every sum.
+  - Through the app (verify6's copy of gate_demo, 64 MiB tail) the ordinary song answers at
+    0.5 s, when it is asked.
+  - A real file's tag gets the same treatment: a 1 MiB APEv2 tag (a cover) after the audio used
+    to be summed and now isn't.
+- **Measured**: all 217 FLACs to hand (the seek, step1 and review4 libraries and the big files)
+  against 1.1.0-player.4's muxer. 209 give byte-identical MP4s. The other 8, the review's zero
+  and junk trailers, are refused by both, 6 of them now by the reach before anything is summed.
+  The 40 MB CD file maps in 50.8 ms against 55.1 (median of 15, twice over).
+- **Tests**: `tests/test_flac_mp4.py` has 161 now, 58 more, with the header and appended-frame
+  tests rewritten. They cover:
+  - chained copies resolved, and refused where both readings check out;
+  - old numbers within and beyond reach;
+  - frames larger than STREAMINFO allows, at the second, a middle and the last frame, and one
+    with a copy halfway;
+  - the other strategy's frame both ways, with the largest frame known and unknown, and
+    `flac -8`'s own file with its frame 0 appended re-coded;
+  - 16 MiB appended refused with nothing summed, a stream claiming 16 MiB frames stopped at the
+    budget, a big tag left out unsummed, and verbatim frames of every shape within reach when
+    STREAMINFO gives none.
+
+  Sixteen mutations, each undoing one rule, are all caught. The first pass missed three. The
+  reach on tag candidates and carrying a sum on from an earlier frame got tests. The third,
+  checking every frame taken since the slot rather than only the one before it, turned out to
+  add nothing, and was dropped.
+- **`FORMAT_VERSION` is not bumped** here (it is player_cache.py's). Every real file's MP4 is
+  unchanged. A 1.1.0-player.4 cache can hold a wrong MP4 only of a crafted file (twoplant A or
+  B, a frame of the other strategy appended), and serves it until it is evicted. Bumping would
+  clear those at the cost of re-making every cached song.
 
 #### After review (the cache, 1.1.0-player.4)
 
