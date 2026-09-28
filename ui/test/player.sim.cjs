@@ -107,6 +107,8 @@ const NET = { fetchDelay: 50, seekDelay: 300, staleClockWhileSeeking: false, ans
   sentAsFlac: new Set() }
 const net = { ...NET }
 const fetched = []
+//? what the page let go of before its answer came - the same labels as `fetched`
+const abandoned = []
 const blobs = new Map()
 let blobCount = 0
 URL.createObjectURL = (blob) => { const address = `blob:deadwax.test/${++blobCount}`; blobs.set(address, blob.songId); return address }
@@ -125,10 +127,11 @@ define('fetch', (address, init = {}) => {
   const [, id, format] = /\/stream\/([^?]+)\?format=(\w+)/.exec(address)
   const wrap = /[?&]wrap=mp4(&|$)/.test(address)
   const range = init.headers?.Range
-  fetched.push(`${decodeURIComponent(id)}?${format}${wrap ? '+mp4' : ''}${range ? ` ${range}` : ''}`)
+  const label = `${decodeURIComponent(id)}?${format}${wrap ? '+mp4' : ''}${range ? ` ${range}` : ''}`
+  fetched.push(label)
   return new Promise((resolve, reject) => {
     let aborted = false
-    init.signal?.addEventListener('abort', () => { aborted = true; reject(new DOMException('aborted', 'AbortError')) })
+    init.signal?.addEventListener('abort', () => { aborted = true; abandoned.push(label); reject(new DOMException('aborted', 'AbortError')) })
     later(net.fetchDelay, () => {
       if (aborted) return
       const mp4 = wrap && !net.sentAsFlac.has(decodeURIComponent(id))
@@ -351,6 +354,7 @@ function page({ gapless = false, durations = {}, userAgent, maxTouchPoints } = {
   tasks = []
   elements.length = 0
   fetched.length = 0
+  abandoned.length = 0
   blobs.clear()
   storage.clear()
   graceUntil = -1
@@ -677,6 +681,8 @@ const near = (value, target, within = 0.6) => Math.abs(value - target) <= within
     tap(() => p.player.playTracks(tracks(['1', '2']), 0))
     await run(100)
     tap(() => p.player.next())
+    //? deadwax stops making an MP4 nobody waits for, so a probe left running would keep song 1's going
+    check('"next" let go of song 1\'s two bytes', abandoned, ['1?raw+mp4 bytes=0-1'])
     net.sentAsFlac.add('2')
     await run(450)
     check('song 1\'s answer came after "next": song 2 still only asked for', p.seekLine(), 'No seek yet · asked for FLAC in MP4')

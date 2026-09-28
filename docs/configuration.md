@@ -60,6 +60,27 @@ renaming a folder (see `RETAG_RENAME_WAIT` below).
 | `SLSKD_INCOMPLETE_PATH` | | optional: slskd's **incomplete** folder inside this container. Setting it turns on two clean-ups: a cancelled download's half-finished file is deleted, and the empty folders slskd leaves in there are cleared every ten minutes. Leave it unset to keep slskd's own behaviour, which keeps partial files so a retry can resume. |
 | `LIBRARY_PATH` | | your music library inside this container, usually `/music`. Organized albums are filed here, and the library tab reads it. Everything else works without it. |
 | `DB_PATH` | `/config/deadwax.db` | deadwax's database. An install from before the rename keeps using `/config/jimbrainz.db` if that's where its data is. |
+| `PLAYER_CACHE_PATH` | *(the container's temporary space)* | where [the phone player](player.md#seeking-and-where-safari-lands) keeps the FLAC songs it repackages as MP4s for Safari and iPhones, whose seeks only land where you asked in an MP4. deadwax makes a folder of its own inside it, `deadwax-player`, private to the user it runs as, and touches nothing else there, so it can be a folder other things use too. **It's only a cache**: nothing in it needs backing up, deleting it is always safe, and a song that isn't in it is made again from Navidrome the next time Safari plays it, which only makes that first play start a moment later. Left empty, it's the container's temporary space, which starts empty whenever the container is recreated. Best on a fast disk (an SSD); see below. A change applies to the next song, with no restart. |
+| `PLAYER_CACHE_MB` | `1024` | the most that cache holds, in MB, from 64 to 1048576. A CD-quality song is 20 to 60 MB, so the default is a few albums. The songs played longest ago are cleared first. While a song is being made its download sits beside it until it's done, so the folder can briefly hold one song more than this, and a single song bigger than the whole setting is still made, and kept on its own. deadwax also leaves the disk 128 MB spare and needs room for two copies of the song being made: when there isn't, older songs are cleared to make room, and if there still isn't enough, Safari is sent the FLAC instead. |
+
+**Putting the player's cache on a fast disk.** Mount a folder into the container and point
+`PLAYER_CACHE_PATH` at it, as `docker-compose.example.yml` shows:
+
+```yaml
+    environment:
+      - PLAYER_CACHE_PATH=/cache
+    volumes:
+      - /path/to/fast/disk/deadwax-cache:/cache
+```
+
+The folder has to be writable by `PUID`/`PGID`: unlike `/config`, deadwax doesn't change its
+owner. Leave it out of your backups. Settings → Library shows whether deadwax can write there,
+and what's wrong with its own `deadwax-player` folder inside it, if anything. It uses that folder
+only while it's a real folder (not a link), owned by the user deadwax runs as, and open to nobody
+else (mode 700), which is how deadwax makes it. One that isn't, say after `PUID` changed or when
+something else made it first, is left alone: delete it, and deadwax makes a new one. Until then,
+and whenever the cache can't be used at all, Safari is sent the FLAC, which plays but whose seeks
+can land seconds off.
 
 ### Organizing
 

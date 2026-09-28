@@ -955,7 +955,12 @@ def test_navidrome_dropping_the_download_sends_the_flac(upstream, client, mp4_ca
     assert (response.content, response.headers["content-type"]) == (FLAC, "audio/flac")
     assert any("stopped sending" in r.getMessage() for r in caplog.records)
     assert not any(mp4_cache.directory.iterdir()), "the part file was cleared away"
-    assert client.get(WRAPPED).content == MP4, "not remembered as a refusal: the next request wraps it"
+    #? the rest of that play stays on the FLAC it was sent - one URL, one file
+    assert client.get(WRAPPED, headers={"Range": "bytes=2-100"}).content == FLAC[2:101]
+    assert client.get(WRAPPED).content == FLAC, "a fresh start within VERSION_SECONDS stays FLAC too"
+    later = mp4_cache.clock() + player_cache.VERSION_SECONDS + 1
+    mp4_cache.clock = lambda: later
+    assert client.get(WRAPPED).content == MP4, "not remembered as a refusal: a later play wraps it"
 
 
 def test_a_download_that_ends_short_is_not_taken_for_the_file(upstream, client, mp4_cache):
@@ -977,13 +982,16 @@ def test_a_download_that_ends_short_is_not_taken_for_the_file(upstream, client, 
     state["handler"] = handler
 
     assert client.get(WRAPPED).headers["content-type"] == "audio/flac"
-    assert client.get(WRAPPED).content == MP4, "the next request fetched it again, whole, and wrapped it"
+    later = mp4_cache.clock() + player_cache.VERSION_SECONDS + 1
+    mp4_cache.clock = lambda: later
+    assert client.get(WRAPPED).content == MP4, "a later play fetched it again, whole, and wrapped it"
 
 
-def test_a_look_at_the_file_that_breaks_off_isnt_remembered(upstream, client):
+def test_a_look_at_the_file_that_breaks_off_isnt_remembered(upstream, client, mp4_cache):
     """
-    The four bytes that say which version is there, cut off: that request gets the FLAC, and
-    the next one looks again - rather than taking FLAC for VERSION_SECONDS.
+    The four bytes that say which version is there, cut off: that request gets the FLAC, and so
+    does the rest of that play (one URL, one file) - but no version is remembered, so the next
+    play looks again rather than believing a look that never finished.
     """
     state, _ = upstream
     fake, file_handler = navidrome_file()
@@ -1001,6 +1009,10 @@ def test_a_look_at_the_file_that_breaks_off_isnt_remembered(upstream, client):
     state["handler"] = handler
 
     assert client.get(WRAPPED).headers["content-type"] == "audio/flac"
+    assert client.get(WRAPPED, headers={"Range": "bytes=1000-"}).content == FLAC[1000:]
+    assert len(looks) == 1, "the rest of the play asked nothing - it is FLAC, as it began"
+    later = mp4_cache.clock() + player_cache.VERSION_SECONDS + 1
+    mp4_cache.clock = lambda: later
     assert client.get(WRAPPED).content == MP4
     assert len(looks) == 2
 

@@ -209,6 +209,23 @@ COVER_ART_SIZES = ("250", "500", "1200", "full")
 LYRICS_LEAD_LIMIT_MS = 5000
 
 
+#? PLAYER_CACHE_MB's default and bounds. 64 MB still holds a CD-quality song while it is made
+#? (two copies of it, briefly); a terabyte is past any disk this cache would sensibly be given.
+DEFAULT_PLAYER_CACHE_MB = 1024
+PLAYER_CACHE_MB_RANGE = (64, 1 << 20)
+
+
+def parse_player_cache_mb(value: str | None) -> int | None:
+    """PLAYER_CACHE_MB as a whole number of MB within range, or None when it isn't one."""
+    text = (value or "").strip().removesuffix("MB").removesuffix("mb").strip()
+    #? ASCII digits only: int() also takes '٣' and '1_024', which nobody means as a size
+    if not re.fullmatch(r"[0-9]+", text):
+        return None
+    low, high = PLAYER_CACHE_MB_RANGE
+    megabytes = int(text)
+    return megabytes if low <= megabytes <= high else None
+
+
 def parse_lyrics_lead(value: str | None) -> int | None:
     """A lyrics lead in milliseconds, or None if `value` isn't one - a whole number within the limit."""
     text = (value or "").strip().removesuffix("ms").strip()
@@ -388,6 +405,17 @@ class Config:
     NAVIDROME_USER = _env("NAVIDROME_USER")
     NAVIDROME_PASSWORD = _env("NAVIDROME_PASSWORD")
 
+    #? Where the player keeps the MP4s it makes of FLAC songs for Safari, whose seeks land only in
+    #? an MP4 (1.1.0, src/player_cache.py). Empty is the container's temporary space. deadwax makes
+    #? a folder of its own inside it, deadwax-player, private to it, and touches nothing else there
+    #? - so this can be a folder other things use too. Asked for so the cache can go on an SSD. Only
+    #? ever a cache: anything in it is made again from Navidrome when it is next played.
+    PLAYER_CACHE_PATH = _env("PLAYER_CACHE_PATH")
+
+    #? How much that cache may hold, in MB (MiB): the songs played longest ago go first past it.
+    #? 1024 is the gigabyte it always had, several albums of CD-quality FLAC. 64 to 1048576.
+    PLAYER_CACHE_MB = _env("PLAYER_CACHE_MB", str(DEFAULT_PLAYER_CACHE_MB))
+
     #? ===== which settings the settings tab may write ==========================
     #?
     #? Editability is a property of the setting, not a policy choice, and the split is real:
@@ -439,6 +467,9 @@ class Config:
         #? signed into each request's token, so nothing to rebuild
         "NAVIDROME_USER": None,
         "NAVIDROME_PASSWORD": None,
+        #? read by the player's cache at every request it answers, so nothing to rebuild
+        "PLAYER_CACHE_PATH": None,
+        "PLAYER_CACHE_MB": None,
     }
 
     #? Why each of these cannot be edited here, in words the settings tab renders verbatim.
@@ -791,3 +822,8 @@ def rename_wait_seconds() -> int:
 def search_timeout_seconds() -> int:
     """What a search waits for - the setting when it is valid, else the long-standing 8."""
     return parse_search_timeout(Config.SLSKD_SEARCH_TIMEOUT) or 8
+
+
+def player_cache_bytes() -> int:
+    """The player cache's cap in bytes - the setting when it is valid, else the gigabyte it always was."""
+    return (parse_player_cache_mb(Config.PLAYER_CACHE_MB) or DEFAULT_PLAYER_CACHE_MB) << 20

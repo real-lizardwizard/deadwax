@@ -19,22 +19,46 @@ How a request is answered (`Mp4Cache.answer()`):
      round trip for nothing.
   2. The MP4 made for that version, if the cache has it.
   3. If not, the file is fetched whole, repackaged in a worker thread, written under a temporary
-     name and renamed into place, so a half-written file is never served. One repackage per
-     version at a time however many requests want it (single flight), and one at a time
-     altogether, since the whole file is in memory while it is repackaged.
+     name and renamed into place, so a half-written file is never served. One make per version
+     however many requests want it (single flight), and it is STOPPED - its download from
+     Navidrome included - when the last request waiting for it goes: skipping through five songs
+     must not leave the fifth waiting on four nobody is listening to. The repackage itself runs
+     one at a time, since the whole file is in memory while it does; the downloads don't wait on
+     each other.
   4. Served from the cache with byte ranges, which Safari won't play without.
 
-Anything that goes wrong answers None, and the route relays the FLAC exactly as it did before this
-existed: a type that isn't FLAC, a file too big to hold in memory, a stream the muxer won't vouch
-for, Navidrome dropping the download, a full disk. A song that plays and seeks badly in Safari
-beats a song that doesn't play.
+ONE URL, ONE FILE. The element reads each range against what it was sent before, so a URL is
+never answered as the FLAC on one request and the MP4 on the next: their bytes and lengths differ,
+and a splice of the two is a decode error. So what each song was last answered as is remembered
+(`_answered`). A request carrying on from bytes the phone already has - anything but a fresh start,
+which is Safari's two-byte probe or the whole file - gets that same container: a song sent as FLAC
+stays FLAC, and a song sent as an MP4 is made again and waited for when its MP4 has gone, or
+answered 503 when it can't be had, never with FLAC bytes. A fresh start after a FLAC answer stays
+FLAC for VERSION_SECONDS too, so the page's readout and the element can't be told different things.
 
-The cache is in the container's TEMPORARY space, not the config volume. It is rebuilt on demand
-from Navidrome, so there is nothing in it worth keeping; the config volume is what people back up,
-and a gigabyte of repackaged audio in their backups would be a cost for nothing; and a new image
-starts it empty, so an MP4 made by an older muxer can't outlive the upgrade that changed it
-(FORMAT_VERSION covers a restart without one). It has no setting: it only ever has to hold the
-songs being listened to now, and CACHE_MAX_BYTES holds a few albums of them.
+Anything else that goes wrong sends the FLAC, exactly as before this existed: a type that isn't
+FLAC, a file too big to hold in memory, a stream the muxer won't vouch for, Navidrome dropping the
+download, a disk short of space, a cache folder that can't be used. A song that plays and seeks
+badly in Safari beats a song that doesn't play.
+
+WHERE: PLAYER_CACHE_PATH (asked for, so the cache can live on an SSD), or the container's
+temporary space when that is empty - never the config volume, which is what people back up. Either way deadwax keeps to a folder of its own inside it, `deadwax-player`,
+which it makes private (0700) and checks is still its own (a real folder, not a link, its owner,
+that mode) before anything in it is listed, deleted or served. So the setting can point at a
+folder other things share, and a /tmp shared with other users on a machine running from source
+can't hand it a folder somebody else planted. Nothing is resolved at import: a read-only root
+filesystem with no temporary space means no cache - FLAC for Safari, said once - not a deadwax
+that won't start.
+
+HOW MUCH: PLAYER_CACHE_MB of MP4s, a gigabyte by default, least recently served going first. Room
+for a song is made BEFORE it is fetched, counting the songs being made as well as those made, so
+the MP4s never add up to more than the cap. While a song is made there is a second copy of it on
+disk too (the download, beside the MP4 being written), so the folder's peak is the cap plus that
+copy. Nor does the cache take the last of the disk: a make needs room for both copies and
+DISK_SPARE_BYTES besides, older songs are cleared to find it, and a disk that is short even then is
+a FLAC answer, not a full disk. If the disk fills anyway (something else writing), older songs are
+cleared for twice the song and it is tried once more. It is only ever a cache: deleting it is safe,
+and costs the next play of each song the wait for its MP4 to be made again.
 
 A retag rewrites a file in place under the same Navidrome id, so the cache is keyed on the
 version, never the id alone. Worth knowing when reading that: the MP4 carries only STREAMINFO and
@@ -43,11 +67,14 @@ a wrong one. It is a file whose AUDIO was replaced that the key has to catch.
 """
 
 import asyncio
+import errno
 import hashlib
 import json
 import os
 import re
 import secrets
+import shutil
+import stat
 import tempfile
 import time
 from dataclasses import dataclass
@@ -60,16 +87,13 @@ from fastapi.responses import Response, StreamingResponse
 from starlette.background import BackgroundTask
 
 from src.api.navidrome_endpoint import NavidromeError, navidrome
+from src.config import Config, player_cache_bytes
 from src.flac_mp4 import CannotRepackage, mp4_layout
 from src.logger import logger
 
-#? The container's temporary space - see the module's docstring for why not /config.
-CACHE_DIR = Path(tempfile.gettempdir()) / "deadwax-player"
-
-#? The whole cache, least recently used going first past it. A CD-quality FLAC song is 20-60 MB,
-#? so this holds several albums: the song playing, the next one (the gapless switch fetches it
-#? early), and anything played again soon. It is only ever written for Safari.
-CACHE_MAX_BYTES = 1 << 30
+#? The cache's own folder, inside PLAYER_CACHE_PATH or the temporary space. deadwax makes it, and
+#? uses nothing else there.
+FOLDER_NAME = "deadwax-player"
 
 #? The largest file repackaged. The whole file is held in memory while it is - one at a time, for
 #? a second or two - so this bounds what that costs a NAS. It covers every CD-quality song and most
@@ -78,18 +102,21 @@ WRAP_MAX_BYTES = 512 << 20
 
 #? How long what Navidrome said about a song's file is believed without asking again, in seconds.
 #? A retag within that time is served from the MP4 of the version before it for at most this long.
+#? Also how long a fresh start after a FLAC answer stays FLAC - see the module's docstring.
 VERSION_SECONDS = 30
 
 #? Part of every cache key. Bump it whenever src/flac_mp4.py's output changes, so an MP4 made by
-#? the old muxer is never served under a new one's name.
-FORMAT_VERSION = 1
+#? the old muxer is never served under a new one's name. 2 (1.1.0-player.4): the muxer now refuses
+#? files 1 wrapped wrongly - zeros or frames after the audio, a wrong split - and their MP4s,
+#? which AVFoundation stops in before the end, mustn't be served from a cache kept since.
+FORMAT_VERSION = 2
 
 #? What Navidrome calls a FLAC file (resources/mime_types.yaml), and what an older setup might.
 FLAC_TYPES = frozenset({"audio/flac", "audio/x-flac"})
 MP4_TYPE = "audio/mp4"
 
 #? A file this old in the cache folder that isn't a finished MP4 is left over from a process that
-#? stopped part-way, and is cleared the first time the cache is used.
+#? stopped part-way, and is cleared the first time the folder is used.
 LEFTOVER_SECONDS = 600
 
 #? What the download writes in one go, and what a range is read from disk in.
@@ -99,6 +126,26 @@ READ_CHUNK = 64 * 1024
 #? Versions whose file can't be repackaged, remembered so Safari's next request for the same file
 #? doesn't fetch it all again only to fail again. Bounded; the oldest are forgotten first.
 REFUSALS_KEPT = 256
+
+#? How many songs' last answer is remembered, to keep each URL on one container. Bounded; the
+#? song answered longest ago is forgotten first.
+ANSWERS_KEPT = 1024
+
+#? What a make needs on disk while it runs, as a multiple of the song: the file downloaded (.part)
+#? and the MP4 written beside it (.tmp, renamed into place). The .part goes once the MP4 is there,
+#? so only one of the two counts against the cap - see _make_room().
+MAKE_ROOM_FACTOR = 2
+
+#? What the cache leaves free on its disk, whatever its cap. The temporary space is usually the
+#? Docker root's filesystem, where other containers' layers and logs live, and filling it to the
+#? last byte would be somebody else's failure.
+DISK_SPARE_BYTES = 128 << 20
+
+#? How long a phone that can't be sent its MP4 just now is asked to wait before asking again.
+RETRY_AFTER_SECONDS = 2
+
+#? What a song was last answered as.
+MP4, FLAC = "mp4", "flac"
 
 
 @dataclass(frozen=True)
@@ -175,6 +222,27 @@ def byte_range(header: str | None, size: int) -> tuple[int, int] | None:
     return start, end
 
 
+def continues(header: str | None) -> bool:
+    """
+    Whether a request carries on from bytes of this URL the phone already has, rather than starting
+    it afresh. Safari starts every song with its first two bytes (`bytes=0-1`), and no Range at all
+    is the whole file (the gapless switch's download); anything else - the rest after the probe, a
+    seek - is read against what came before, so it has to come from the same file. A Range the
+    route would ignore (another unit, several ranges) is answered whole, so it is a start too.
+    """
+    if not header:
+        return False
+    unit, _, spec = header.partition("=")
+    if unit.strip().lower() != "bytes" or "," in spec:
+        return False
+    return spec.replace(" ", "") != "0-1"
+
+
+def _open_cached(path: Path):
+    """A cached MP4, opened for reading - never through a link, which nothing of deadwax's makes."""
+    return os.fdopen(os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)), "rb")
+
+
 async def ranged_file(path: Path, request: Request, etag: str) -> Response:
     """
     A file from the cache, whole or as the byte range asked for, as audio/mp4.
@@ -184,20 +252,20 @@ async def ranged_file(path: Path, request: Request, etag: str) -> Response:
     the file, and it stats the file only once it is sending - by which time the cache may have
     evicted it, which would surface as a 500. Here the file is opened first, so an eviction after
     that can't touch what is being sent (an open file outlives its name), and FileNotFoundError
-    reaches the caller while it can still send the FLAC instead.
+    reaches the caller while it can still make it again.
 
     If-Range is honoured against the ETag (strongly - a weak tag never matches) and the
     Last-Modified: a range asked for against any other version gets the whole file, which is how a
     seek never splices two versions of a song together.
     """
-    handle = await asyncio.to_thread(open, path, "rb")
+    handle = await asyncio.to_thread(_open_cached, path)
     try:
-        stat = os.fstat(handle.fileno())
+        info = os.fstat(handle.fileno())
     except OSError:
         handle.close()
         raise
-    size = stat.st_size
-    last_modified = formatdate(stat.st_mtime, usegmt=True)
+    size = info.st_size
+    last_modified = formatdate(info.st_mtime, usegmt=True)
     headers = {
         "accept-ranges": "bytes",
         "etag": etag,
@@ -262,30 +330,170 @@ def _repackage(part: Path, target: Path) -> int:
     return len(head) + end - start
 
 
+async def _to_the_end(work):
+    """
+    A worker thread's result, waited for to its end even when whatever awaits it is cancelled
+    meanwhile - and then the cancellation carried on. A thread can't be stopped, and the gate it
+    runs under has to stay held until it is done, or a second song could be held in memory beside
+    it.
+    """
+    job = asyncio.ensure_future(work)
+    try:
+        return await asyncio.shield(job)
+    except asyncio.CancelledError:
+        while not job.done():
+            try:
+                await asyncio.wait({job})
+            except asyncio.CancelledError:
+                pass
+        raise
+
+
+# ---------------------------------------------------------------- the cache's own folder
+
+def _base(configured: str | None) -> tuple[Path | None, str | None]:
+    """The folder the cache's own goes inside - PLAYER_CACHE_PATH, else the temporary space - or why none."""
+    configured = (configured or "").strip()
+    if configured:
+        return Path(configured), None
+    try:
+        #? raises when no candidate is writable: a read-only root filesystem with no tmpfs
+        return Path(tempfile.gettempdir()), None
+    except OSError:
+        return None, ("this container has no writable temporary space (a read-only root filesystem?), "
+                      "and PLAYER_CACHE_PATH isn't set - set it to a folder deadwax can write to")
+
+
+def _judge(folder: Path) -> str | None:
+    """
+    Why `folder` isn't one deadwax can keep its cache in, or None when it is: a real folder, not a
+    link, owned by the user deadwax runs as, and private to it (0700). Read with lstat, so a link
+    planted in its place is seen as a link. The owner rules out a folder somebody else made first
+    in a shared /tmp; the mode, one that anybody could have put files in.
+    """
+    try:
+        info = os.lstat(folder)
+    except OSError as e:
+        return f"{folder} can't be looked at ({e.strerror or e})"
+    if stat.S_ISLNK(info.st_mode):
+        return f"{folder} is a link, not a folder deadwax made"
+    if not stat.S_ISDIR(info.st_mode):
+        return f"{folder} is a file, not a folder"
+    if info.st_uid != os.getuid():
+        return (f"{folder} belongs to another user (uid {info.st_uid}; deadwax runs as {os.getuid()}) - "
+                f"remove it, and deadwax makes its own")
+    mode = stat.S_IMODE(info.st_mode)
+    if mode != 0o700:
+        return (f"{folder} is open to other users (mode {mode:o}, where deadwax makes it 700) - remove it, "
+                f"and deadwax makes it again")
+    if not os.access(folder, os.W_OK | os.X_OK):
+        return f"{folder} can't be written to"
+    return None
+
+
+def _own(folder: Path) -> tuple[Path | None, str | None]:
+    """`folder`, made private if it isn't there, once it has been checked - or None and why not."""
+    try:
+        os.mkdir(folder, 0o700)
+    except FileExistsError:
+        pass
+    except OSError as e:
+        return None, f"{folder} couldn't be made ({e.strerror or e})"
+    problem = _judge(folder)
+    return (None, problem) if problem else (folder, None)
+
+
+def open_folder(configured: str | None) -> tuple[Path | None, str | None]:
+    """The cache's own folder under this PLAYER_CACHE_PATH, made and checked - or None and why not."""
+    base, problem = _base(configured)
+    if base is None:
+        return None, problem
+    if (configured or "").strip() and not base.is_dir():
+        return None, f"PLAYER_CACHE_PATH, {base}, isn't a folder this container can see"
+    return _own(base / FOLDER_NAME)
+
+
+def folder_problem(configured: str | None) -> str | None:
+    """
+    For the settings tab: why the cache couldn't use its folder under this PLAYER_CACHE_PATH, or
+    None when it can - without making anything. A folder not there yet is made on first use.
+    Whether a configured folder exists and can be written to is the Paths row's own check.
+    """
+    base, problem = _base(configured)
+    if base is None:
+        return problem
+    folder = base / FOLDER_NAME
+    if not os.path.lexists(folder):
+        if not (configured or "").strip() and not os.access(base, os.W_OK | os.X_OK):
+            return f"the temporary space, {base}, can't be written to"
+        return None
+    return _judge(folder)
+
+
+def _is_cached(path: Path) -> bool:
+    """A finished MP4 is there under this name - a file, never a link."""
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except OSError:
+        return False
+
+
+# ---------------------------------------------------------------- the cache
+
+class _Make:
+    """A make under way, and how many requests are waiting for it."""
+
+    def __init__(self, task: asyncio.Task):
+        self.task = task
+        self.waiters = 0
+
+
 class Mp4Cache:
     """The repackaged songs on disk, and what is known about the versions they were made from."""
 
-    def __init__(self, directory: Path = CACHE_DIR, max_bytes: int = CACHE_MAX_BYTES,
+    def __init__(self, directory: Path | None = None, max_bytes: int | None = None,
                  wrap_max_bytes: int = WRAP_MAX_BYTES):
-        self.directory = Path(directory)
-        self.max_bytes = max_bytes
+        #? A folder given here is used exactly (tests); otherwise it is PLAYER_CACHE_PATH's, read at
+        #? every request, and the cap PLAYER_CACHE_MB's - so the settings tab changes both live
+        self._fixed = Path(directory) if directory is not None else None
+        self._max_bytes = max_bytes
         self.wrap_max_bytes = wrap_max_bytes
         #? song id -> (believed until, on the monotonic clock; its version, or None: not one to wrap)
         self._versions: dict[str, tuple[float, Version | None]] = {}
-        #? cache key -> the repackage under way for it
-        self._working: dict[str, asyncio.Task] = {}
+        #? cache key -> the make under way for it
+        self._working: dict[str, _Make] = {}
         #? cache key -> why it can't be repackaged, oldest first
         self._refused: dict[str, str] = {}
+        #? song id -> (MP4 or FLAC, when, on the monotonic clock) - what it was last answered as,
+        #? the song answered longest ago first
+        self._answered: dict[str, tuple[str, float]] = {}
         #? file name -> when it was last served (time.time()). A file not here - one made before a
         #? restart - counts as used when it was made. Kept apart from the file's own times, because
         #? its mtime is its Last-Modified: touching it would change the validator under a seek.
         self._used: dict[str, float] = {}
-        self._prepared = False
+        #? bytes of the cap the makes under way have claimed - the MP4 each will add
+        self._reserved = 0
+        #? folders whose leftovers have been cleared; the folder last used; the problem last said
+        self._prepared: set[Path] = set()
+        self._using: Path | None = None
+        self._said: str | None = None
         #? what VERSION_SECONDS is measured on - a test moves it on rather than waiting
         self.clock = time.monotonic
         #? one repackage at a time, made for the event loop that uses it
         self._gate_loop: asyncio.AbstractEventLoop | None = None
         self._gate_lock: asyncio.Lock | None = None
+
+    @property
+    def directory(self) -> Path | None:
+        """The folder the cache uses under the settings as they are now - made and checked only when used."""
+        if self._fixed is not None:
+            return self._fixed
+        base, _ = _base(Config.PLAYER_CACHE_PATH)
+        return base / FOLDER_NAME if base is not None else None
+
+    @property
+    def max_bytes(self) -> int:
+        return self._max_bytes if self._max_bytes is not None else player_cache_bytes()
 
     def _gate(self) -> asyncio.Lock:
         loop = asyncio.get_running_loop()
@@ -303,34 +511,101 @@ class Mp4Cache:
     async def answer(self, song_id: str, request: Request) -> Response | None:
         """
         The song as an MP4, with the request's byte range - or None, and the caller sends the FLAC
-        as it is. NavidromeError is raised as it would be for the FLAC: a song Navidrome doesn't
-        have, a login it refuses, a Navidrome that isn't there.
+        as it is - or a 503, for a request carrying on from an MP4 that can't be had just now (see
+        the module's docstring). NavidromeError is raised as it would be for the FLAC: a song
+        Navidrome doesn't have, a login it refuses, a Navidrome that isn't there.
+
+        Cancelling it (the route does when the phone hangs up) takes this request off the make it
+        waits for, and a make nobody waits for any more stops.
         """
-        version = await self._version(song_id)
-        if version is None:
-            return None
-        path = await self._mp4(version)
-        if path is None:
-            return None
+        carrying_on = continues(request.headers.get("range"))
+        last = self._answered.get(song_id)
+        if last is not None and last[0] == FLAC and (carrying_on or self.clock() - last[1] < VERSION_SECONDS):
+            return self._as_flac(song_id)
+
+        folder = await self._folder()
+        if folder is None:
+            return self._instead(song_id, carrying_on, "the player's cache has nowhere to go")
         try:
-            return await ranged_file(path, request, self.etag_for(version))
-        except FileNotFoundError:
-            #? evicted between being found and being opened - the next request makes it again
+            version = await self._version(song_id)
+        except httpx.TransportError:
+            return self._instead(song_id, carrying_on, "Navidrome broke off saying which file it has")
+        if version is None:
+            return self._as_flac(song_id)
+
+        for _ in range(2):
+            path = await self._mp4(version, folder)
+            if path is None:
+                break
+            try:
+                response = await ranged_file(path, request, self.etag_for(version))
+            except FileNotFoundError:
+                #? cleared out between being found and being opened: made again, and waited for
+                continue
+            except OSError as e:
+                logger.warning(f"player: the MP4 of song {song_id} couldn't be opened ({e})")
+                break
+            self._mark(song_id, MP4)
+            return response
+        return self._instead(song_id, carrying_on, "its MP4 couldn't be made again just now")
+
+    def _mark(self, song_id: str, container: str) -> None:
+        self._answered.pop(song_id, None)
+        self._answered[song_id] = (container, self.clock())
+        while len(self._answered) > ANSWERS_KEPT:
+            del self._answered[next(iter(self._answered))]
+
+    def _as_flac(self, song_id: str) -> None:
+        self._mark(song_id, FLAC)
+        return None
+
+    def _instead(self, song_id: str, carrying_on: bool, why: str) -> Response | None:
+        """
+        What a request gets when its MP4 can't be had: the FLAC - unless it carries on from an MP4
+        this URL was answered with, where FLAC bytes under another length would be spliced into what
+        the phone already has. That gets a 503, and the page's own retry starts the song afresh.
+        """
+        last = self._answered.get(song_id)
+        if carrying_on and last is not None and last[0] == MP4:
+            logger.warning(f"player: song {song_id} was being played as an MP4, and {why}; Safari is "
+                           f"asked to try again rather than sent the FLAC, whose bytes aren't the MP4's")
+            return Response(status_code=503, headers={"retry-after": str(RETRY_AFTER_SECONDS),
+                                                      "cache-control": "no-store"})
+        return self._as_flac(song_id)
+
+    async def _folder(self) -> Path | None:
+        """The folder to keep MP4s in now, made and checked, or None - said once - when there is none."""
+        if self._fixed is not None:
+            folder, problem = await asyncio.to_thread(_own, self._fixed)
+        else:
+            folder, problem = await asyncio.to_thread(open_folder, Config.PLAYER_CACHE_PATH)
+        if folder is None:
+            if problem != self._said:
+                self._said = problem
+                logger.warning(f"player: Safari is sent FLAC, not MP4s, because the player's cache can't be "
+                               f"kept - {problem}. Its seeks can land seconds off until that is fixed")
             return None
+        self._said = None
+        if folder != self._using:
+            if self._using is not None:
+                #? the names in it are the old folder's
+                self._used.clear()
+            self._using = folder
+            logger.info(f"player: the MP4s made for Safari are kept in {folder}, "
+                        f"{self.max_bytes >> 20} MB at most")
+        return folder
 
     async def _version(self, song_id: str) -> Version | None:
-        """What Navidrome has for this song now, or None when it isn't a FLAC this can wrap."""
+        """
+        What Navidrome has for this song now, or None when it isn't a FLAC this can wrap. Four bytes
+        that Navidrome breaks off raise httpx.TransportError, and nothing is remembered.
+        """
         now = self.clock()
         remembered = self._versions.get(song_id)
         if remembered and remembered[0] > now:
             return remembered[1]
 
-        try:
-            version = await self._look(song_id)
-        except httpx.TransportError:
-            #? Navidrome dropped the four bytes: this request gets the FLAC, and nothing is
-            #? remembered, so the next one asks again rather than taking FLAC for VERSION_SECONDS
-            return None
+        version = await self._look(song_id)
         #? the expired go whenever anything is added, so this never grows past what was asked lately
         self._versions = {key: value for key, value in self._versions.items() if value[0] > now}
         self._versions[song_id] = (now + VERSION_SECONDS, version)
@@ -384,66 +659,102 @@ class Mp4Cache:
         say(f"player: song {version.song_id} is sent to Safari as FLAC, not in an MP4 - {reason}. "
             f"It plays, but Safari's seeks in it can land seconds off")
 
-    async def _mp4(self, version: Version) -> Path | None:
+    async def _mp4(self, version: Version, folder: Path) -> Path | None:
         """The cached MP4 for this version, made if it isn't there. None when it can't be."""
-        path = self.path_for(version)
-        if await asyncio.to_thread(path.is_file):
+        path = folder / f"{version.key[:40]}.mp4"
+        if await asyncio.to_thread(_is_cached, path):
             self._used[path.name] = time.time()
             return path
         if version.key in self._refused:
             return None
 
-        task = self._working.get(version.key)
-        if task is None:
-            task = asyncio.ensure_future(self._make(version))
-            self._working[version.key] = task
+        make = self._working.get(version.key)
+        if make is None:
+            make = _Make(asyncio.ensure_future(self._make(version, path)))
+            self._working[version.key] = make
 
-            def finished(done: asyncio.Task, key: str = version.key) -> None:
-                if self._working.get(key) is done:
+            def finished(done: asyncio.Task, key: str = version.key, this: _Make = make) -> None:
+                if self._working.get(key) is this:
                     del self._working[key]
+                if not done.cancelled():
+                    done.exception()  # retrieved, so an abandoned make's error is never "never retrieved"
 
-            task.add_done_callback(finished)
-        #? shielded: a phone that hangs up mustn't cancel a repackage another request is waiting on
-        return await asyncio.shield(task)
+            make.task.add_done_callback(finished)
 
-    async def _make(self, version: Version) -> Path | None:
-        """
-        Fetch, repackage, store. Never raises: every way it can fail is logged here, and answers
-        None so the FLAC is sent instead.
-        """
+        make.waiters += 1
         try:
-            async with self._gate():
-                path = self.path_for(version)
-                if await asyncio.to_thread(path.is_file):
-                    return path
-                await asyncio.to_thread(self._prepare)
-                part = self.directory / f"{path.stem}.{secrets.token_hex(4)}.part"
+            #? shielded: one request hanging up mustn't cancel a make another is waiting on
+            return await asyncio.shield(make.task)
+        finally:
+            make.waiters -= 1
+            if make.waiters == 0 and not make.task.done():
+                #? Nobody waits for it any more - Safari skipped on, or the gapless download was let
+                #? go - so it stops, download and all. A request for it after this starts afresh.
+                if self._working.get(version.key) is make:
+                    del self._working[version.key]
+                make.task.cancel()
+
+    async def _make(self, version: Version, path: Path) -> Path | None:
+        """
+        Fetch, repackage, store. Never raises but for being cancelled: every way it can fail is
+        logged here, and answers None so the FLAC is sent instead.
+        """
+        folder = path.parent
+        what = f"song {version.song_id}"
+        part = folder / f"{path.stem}.{secrets.token_hex(4)}.part"
+        self._reserved += version.size
+        try:
+            await asyncio.to_thread(self._prepare, folder)
+            if await asyncio.to_thread(_is_cached, path):
+                return path
+            if not await asyncio.to_thread(self._make_room, folder, version.size):
+                logger.warning(f"player: {what} isn't put in an MP4 for Safari - the disk holding the cache "
+                               f"({folder}) is short of space even with older songs cleared out of it, or the "
+                               f"cache is full of songs being made; it is sent as FLAC")
+                return None
+
+            fetched = False
+            for attempt in (1, 2):
                 try:
-                    if not await self._download(version, part):
-                        return None
+                    if not fetched:
+                        if not await self._download(version, part):
+                            return None
+                        fetched = True
                     began = time.monotonic()
-                    try:
-                        size = await asyncio.to_thread(_repackage, part, path)
-                    except CannotRepackage as e:
-                        self._refuse(version, f"its FLAC stream couldn't be repackaged with certainty ({e})")
-                        return None
-                    took = (time.monotonic() - began) * 1000
-                    logger.info(f"player: song {version.song_id} put in an MP4 for Safari "
-                                f"({size >> 10} KiB, repackaged in {took:.0f} ms)")
-                    self._used[path.name] = time.time()
-                    await asyncio.to_thread(self._evict, path.name)
-                    return path
-                finally:
-                    await asyncio.to_thread(part.unlink, missing_ok=True)
+                    async with self._gate():
+                        size = await _to_the_end(asyncio.to_thread(_repackage, part, path))
+                    break
+                except OSError as e:
+                    if e.errno != errno.ENOSPC or attempt == 2:
+                        raise
+                    #? something else filled the disk since room was made: older songs go, and once more
+                    freed = await asyncio.to_thread(self._clear, folder, MAKE_ROOM_FACTOR * version.size,
+                                                    path.name)
+                    logger.info(f"player: the disk holding the cache filled up while {what} was being put in "
+                                f"an MP4; {freed >> 20} MiB of songs played longest ago were cleared, and it "
+                                f"is tried once more")
+
+            took = (time.monotonic() - began) * 1000
+            logger.info(f"player: {what} put in an MP4 for Safari ({size >> 10} KiB, repackaged in {took:.0f} ms)")
+            self._used[path.name] = time.time()
+            await asyncio.to_thread(self._evict, folder, path.name)
+            return path
+        except CannotRepackage as e:
+            self._refuse(version, f"its FLAC stream couldn't be repackaged with certainty ({e})")
+            return None
+        except asyncio.CancelledError:
+            logger.info(f"player: putting {what} in an MP4 was stopped - nobody was waiting for it any more")
+            raise
         except OSError as e:
             #? the disk: full, unwritable, the folder gone - the FLAC still plays
-            logger.warning(f"player: song {version.song_id} couldn't be put in an MP4 for Safari "
-                           f"({e}); it is sent as FLAC")
+            logger.warning(f"player: {what} couldn't be put in an MP4 for Safari ({e}); it is sent as FLAC")
             return None
         except Exception:
-            logger.exception(f"player: putting song {version.song_id} in an MP4 for Safari failed; "
-                             f"it is sent as FLAC")
+            logger.exception(f"player: putting {what} in an MP4 for Safari failed; it is sent as FLAC")
             return None
+        finally:
+            self._reserved -= version.size
+            await asyncio.to_thread(part.unlink, missing_ok=True)
 
     async def _download(self, version: Version, part: Path) -> bool:
         """The whole file into `part`, exactly the version looked at. False, and said, otherwise."""
@@ -492,48 +803,106 @@ class Mp4Cache:
                 await asyncio.to_thread(out.close)
             await upstream.aclose()
 
-    def _prepare(self) -> None:
-        """The folder, made on first use; and what a process that stopped part-way left in it."""
-        self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if self._prepared:
+    def _prepare(self, folder: Path) -> None:
+        """What a process that stopped part-way left in the folder, cleared the first time it is used."""
+        if folder in self._prepared:
             return
-        self._prepared = True
+        self._prepared.add(folder)
         stale = time.time() - LEFTOVER_SECONDS
-        for entry in os.scandir(self.directory):
-            try:
-                if not entry.name.endswith(".mp4") and entry.is_file() and entry.stat().st_mtime < stale:
-                    os.unlink(entry.path)
-            except OSError:
-                pass
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                try:
+                    if (not entry.name.endswith(".mp4") and entry.is_file(follow_symlinks=False)
+                            and entry.stat(follow_symlinks=False).st_mtime < stale):
+                        os.unlink(entry.path)
+                except OSError:
+                    pass
 
-    def _evict(self, keep: str) -> None:
+    def _entries(self, folder: Path) -> list[tuple[float, str, int]]:
+        """The finished MP4s in the folder as (last served, name, size), played longest ago first."""
+        found = []
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                if not entry.name.endswith(".mp4"):
+                    continue
+                try:
+                    info = entry.stat(follow_symlinks=False)
+                except OSError:
+                    continue
+                if stat.S_ISREG(info.st_mode):
+                    found.append((self._used.get(entry.name, info.st_mtime), entry.name, info.st_size))
+        return sorted(found)
+
+    def _drop(self, folder: Path, name: str) -> bool:
+        """One MP4 out of the cache. A file being served is unaffected: an open file outlives its name."""
+        try:
+            os.unlink(folder / name)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return False
+        self._used.pop(name, None)
+        return True
+
+    def _make_room(self, folder: Path, size: int) -> bool:
+        """
+        Room for a song of `size` bytes about to be made, by clearing the songs played longest ago:
+        its MP4 within the cap beside those made and those being made, and both its copies on the
+        disk with DISK_SPARE_BYTES to spare. False when the disk can't give it that even with every
+        song cleared - or the songs being made fill the cap by themselves, the one way past the cap
+        this refuses: a song too big for what is left of it goes past by that one song at most.
+        """
+        entries = self._entries(folder)
+        held = sum(size for _, _, size in entries)
+        others = self._reserved - size
+        cap = self.max_bytes
+        need = MAKE_ROOM_FACTOR * size
+        try:
+            free = shutil.disk_usage(folder).free
+        except OSError:
+            free = None
+
+        def fits() -> bool:
+            on_disk = free is None or free >= need + DISK_SPARE_BYTES
+            return on_disk and held + others + size <= cap
+
+        #? not `size`: fits() reads that, the song's own, and a loop rebinding it judged every song
+        #? against the one about to be cleared instead
+        for _, name, cleared in entries:
+            if fits():
+                break
+            if self._drop(folder, name):
+                held -= cleared
+                if free is not None:
+                    free += cleared
+        if free is not None and free < need + DISK_SPARE_BYTES:
+            return False
+        return held + others <= cap or others <= 0
+
+    def _clear(self, folder: Path, need: int, keep: str) -> int:
+        """The songs played longest ago cleared until `need` bytes are freed, never `keep`. What was freed."""
+        freed = 0
+        for _, name, size in self._entries(folder):
+            if freed >= need:
+                break
+            if name != keep and self._drop(folder, name):
+                freed += size
+        return freed
+
+    def _evict(self, folder: Path, keep: str) -> None:
         """
         Least recently served first, until the cache is under its limit again - never `keep`, the
-        file just made, which is the one about to be served. A file being served when it goes is
-        unaffected: it was opened before, and an open file outlives its name.
+        file just made, which is the one about to be served.
         """
-        entries = []
-        for entry in os.scandir(self.directory):
-            if not entry.name.endswith(".mp4"):
-                continue
-            try:
-                stat = entry.stat()
-            except OSError:
-                continue
-            entries.append((self._used.get(entry.name, stat.st_mtime), entry.name, stat.st_size))
+        entries = self._entries(folder)
         total = sum(size for _, _, size in entries)
-        for _, name, size in sorted(entries):
+        for _, name, size in entries:
             if total <= self.max_bytes:
                 break
-            if name == keep:
-                continue
-            try:
-                os.unlink(self.directory / name)
-            except OSError:
-                continue
-            total -= size
-            self._used.pop(name, None)
+            if name != keep and self._drop(folder, name):
+                total -= size
 
 
-#? One for the process, like the Navidrome client it fetches with.
+#? One for the process, like the Navidrome client it fetches with. Nothing about where it keeps its
+#? files is decided until a song is asked for.
 cache = Mp4Cache()

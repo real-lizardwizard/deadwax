@@ -178,6 +178,9 @@ export function usePlayer(): Player {
       standby: null as Standby | null,
       preloadTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       download: null as AbortController | null,
+      //? checkWrapped()'s two bytes, let go of at the next song: deadwax stops making an MP4 once
+      //? nobody is waiting for it, and this would otherwise wait for every song skipped past
+      wrapCheck: null as AbortController | null,
       //? the blob: address each element holds a song in memory by, handed back when it lets go
       memory: new Map<HTMLAudioElement, string>(),
       //? The song change being timed, from 'ended' until the next song's clock runs (clockStep()).
@@ -252,15 +255,22 @@ export function usePlayer(): Player {
      * Whether the song now playing came inside an MP4, for the readout: an audio element never says
      * what type it was sent, and deadwax sends the FLAC as it is when it won't repackage a file. So
      * it is asked with two bytes, as Safari itself asks first - deadwax makes the MP4 once for both.
+     *
+     * The ask before is let go of first. deadwax keeps making an MP4 only while a request waits for
+     * it, so skipping through songs stops the ones skipped past - but only if their asks go too.
      */
     function checkWrapped(track: QueueTrack) {
+      state.wrapCheck?.abort()
+      state.wrapCheck = null
       if (!asksForMp4(track, streamFormat(track, canPlay), pageWraps)) {
         setWrapped(null)
         return
       }
       const id = track.id
+      const controller = new AbortController()
+      state.wrapCheck = controller
       setWrapped({ id, got: null })
-      fetch(addressOf(track), { headers: { Range: 'bytes=0-1' } })
+      fetch(addressOf(track), { headers: { Range: 'bytes=0-1' }, signal: controller.signal })
         .then((response) => {
           response.body?.cancel().catch(() => {})
           if (!response.ok) return
@@ -268,7 +278,11 @@ export function usePlayer(): Player {
           setWrapped((shown) => (shown?.id === id ? { id, got } : shown))
         })
         .catch(() => {
-          //? the readout goes on saying it was asked for; the song itself is the element's business
+          //? let go of (the song changed), or failed - the readout goes on saying it was asked
+          //? for; the song itself is the element's business
+        })
+        .finally(() => {
+          if (state.wrapCheck === controller) state.wrapCheck = null
         })
     }
 
@@ -1031,6 +1045,8 @@ export function usePlayer(): Player {
       return () => {
         attached.forEach((routed, element) => routed.forEach(([name, listener]) => element.removeEventListener(name, listener)))
         attached.clear()
+        state.wrapCheck?.abort()
+        state.wrapCheck = null
         mounted = false
       }
     }

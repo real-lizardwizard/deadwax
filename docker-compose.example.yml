@@ -42,6 +42,17 @@ services:
       # RESUME from them rather than starting over, so one is only junk for a transfer you
       # meant to abandon.
       #- SLSKD_INCOMPLETE_PATH=/incomplete
+      #
+      # Optional. Where the player keeps the FLAC songs it repackages as MP4s for Safari and
+      # iPhones, whose seeks only land where you asked in an MP4. Left out, it is the container's
+      # temporary space, which starts empty with every new container. Mount a folder below and
+      # point this at it to keep the cache there - on a fast disk (an SSD) if you have one.
+      # deadwax makes a private folder of its own inside it, deadwax-player, and touches nothing
+      # else there. It is only a cache: nothing in it needs backing up, and deleting it is always
+      # safe. PLAYER_CACHE_MB is the most it holds (64 to 1048576; 1024 is a few albums), the songs
+      # played longest ago going first. A disk short of space just means Safari gets the FLAC.
+      #- PLAYER_CACHE_PATH=/cache
+      #- PLAYER_CACHE_MB=1024
 
       # ----- uncomment to configure deadwax here instead of in .env -----
       #
@@ -134,6 +145,9 @@ services:
       - /path/to/music:/music
       # holds the database that remembers which download belongs to which release
       - /path/to/deadwax/config:/config
+      # only needed if you set PLAYER_CACHE_PATH above - put it on a fast disk (an SSD), writable
+      # by PUID/PGID. It is only a cache: leave it out of your backups, and delete it when you like
+      #- /path/to/fast/disk/deadwax-cache:/cache
 
     ports:
       - "8080:8080"

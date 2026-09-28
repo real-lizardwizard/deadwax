@@ -50,9 +50,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from src import __version__
-from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config,
-                        build_user_agent, parse_rename_wait, parse_search_timeout,
+from src import __version__, player_cache
+from src.config import (COVER_ART_SIZES, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS, PLAYER_CACHE_MB_RANGE,
+                        RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config,
+                        build_user_agent, parse_player_cache_mb, parse_rename_wait, parse_search_timeout,
                         describe_contact, describe_navidrome_url, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env, without_login)
 from src.scan_wait import SCAN_WAIT_CAP_SECONDS
@@ -110,7 +111,8 @@ COVER_ART_SIZE_NOTES = {
 }
 
 
-def _describe_path(value: str | None, *, needs_write: bool) -> tuple[str, str | None]:
+def _describe_path(value: str | None, *, needs_write: bool,
+                   unwritable: str = "organizing will fail when it tries to file something") -> tuple[str, str | None]:
     """
     Whether a configured path is actually usable from inside this container.
 
@@ -141,8 +143,8 @@ def _describe_path(value: str | None, *, needs_write: bool) -> tuple[str, str | 
 
         if needs_write and not os.access(path, os.W_OK):
             return "error", (
-                f"{value} is readable but NOT writable, so organizing will fail when it "
-                f"tries to file something. Check PUID/PGID against the folder's owner."
+                f"{value} is readable but NOT writable, so {unwritable}. Check PUID/PGID against "
+                f"the folder's owner."
             )
 
     except OSError as e:
@@ -274,6 +276,77 @@ def _navidrome_rows() -> list[dict]:
             ),
             status="error" if partial and not Config.NAVIDROME_PASSWORD else None,
             detail=missing if partial and not Config.NAVIDROME_PASSWORD else None,
+        ),
+    ]
+
+
+#? What the player's cache is, for both of its rows.
+PLAYER_CACHE_IS = (
+    "Only a cache: safe to delete at any time, and a song that isn't in it is made again from "
+    "Navidrome the next time Safari plays it, which only makes that first play start a moment later"
+)
+
+
+def _player_cache_rows() -> list[dict]:
+    """
+    Where the player keeps the MP4s it makes for Safari, and how much. The folder is checked the way
+    the cache itself will check it - the configured path usable, and deadwax's own folder inside it
+    a private folder of its own - without making anything.
+    """
+    configured = Config.PLAYER_CACHE_PATH
+    status, detail = _describe_path(
+        configured, needs_write=True,
+        unwritable="the player can't keep its MP4s there and Safari is sent FLAC",
+    )
+    if status != "error":
+        problem = player_cache.folder_problem(configured)
+        if problem:
+            status, detail = "error", (
+                f"{problem}. Until then Safari is sent FLAC, and its seeks can land seconds off"
+            )
+    folder = player_cache.cache.directory
+    where = f" ({folder})" if folder is not None else ""
+    if configured:
+        path_effect = (
+            f"Where the player keeps FLAC songs repackaged as MP4s for Safari and iPhones, whose "
+            f"seeks land only in an MP4 - in a folder of its own inside this one{where}, which "
+            f"deadwax makes private and touches nothing else beside. Best on a fast disk (an SSD). "
+            f"{PLAYER_CACHE_IS}"
+        )
+    else:
+        path_effect = (
+            f"Unset: the player keeps FLAC songs repackaged as MP4s for Safari and iPhones in the "
+            f"container's temporary space{where}, which starts empty with every new container. Set "
+            f"it to a folder mounted from a fast disk (an SSD) to keep them there; deadwax makes a "
+            f"private folder of its own inside it. {PLAYER_CACHE_IS}"
+        )
+
+    megabytes = parse_player_cache_mb(Config.PLAYER_CACHE_MB)
+    low, high = PLAYER_CACHE_MB_RANGE
+    used = megabytes or DEFAULT_PLAYER_CACHE_MB
+    size_effect = (
+        f"The player's cache holds at most {used} MB of songs, the ones played longest ago cleared "
+        f"first (a CD-quality song is 20-60 MB). A song being made has a second copy of itself on "
+        f"disk until it is done. When the disk runs short, older songs are cleared to make room, and "
+        f"if there still isn't enough Safari is sent the FLAC instead"
+    )
+    if megabytes is None:
+        size_effect = f"unrecognised, so {DEFAULT_PLAYER_CACHE_MB} is used. {size_effect}"
+
+    return [
+        _setting(
+            "PLAYER_CACHE_PATH",
+            configured,
+            effect=path_effect,
+            status=status,
+            detail=detail,
+        ),
+        _setting(
+            "PLAYER_CACHE_MB",
+            Config.PLAYER_CACHE_MB,
+            effect=size_effect,
+            status="ok" if megabytes is not None else "error",
+            detail=None if megabytes is not None else f"expected a whole number of MB, {low} to {high}",
         ),
     ]
 
@@ -686,6 +759,7 @@ async def settings():
                             "to be on a persistent volume or you lose it on every restart"
                         ),
                     ),
+                    *_player_cache_rows(),
                 ],
             },
             {
@@ -840,6 +914,11 @@ def _validate(key: str, value: str) -> str | None:
 
     if key == "FETCH_LYRICS" and value not in LYRICS_CHOICES:
         return f"expected one of {', '.join(LYRICS_CHOICES)}"
+
+    if key == "PLAYER_CACHE_MB" and parse_player_cache_mb(value) is None:
+        low, high = PLAYER_CACHE_MB_RANGE
+        return (f"expected a whole number of MB, {low} to {high} - {DEFAULT_PLAYER_CACHE_MB} is the "
+                f"default")
 
     if key == "LYRICS_LEAD_MS" and parse_lyrics_lead(value) is None:
         return (f"expected a whole number of milliseconds, at most {LYRICS_LEAD_LIMIT_MS} "

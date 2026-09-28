@@ -140,8 +140,9 @@ src/
                    tags were written, so the folder can be renamed - see "The scan wait".
   flac_mp4.py      PURE. A FLAC file as an MP4 of the very same frames, no ffmpeg - what makes
                    Safari's seeks land. See "FLAC in an MP4, for Safari".
-  player_cache.py  those MP4s made from Navidrome's file and kept on disk (temp space, 1 GiB),
-                   served with byte ranges; the stream route's `wrap=mp4`.
+  player_cache.py  those MP4s made from Navidrome's file and kept on disk (PLAYER_CACHE_PATH or
+                   temp space, PLAYER_CACHE_MB), served with byte ranges; the stream route's
+                   `wrap=mp4`. One URL stays one container - see "After review (the cache)".
   track_tags.py    tags edited BY HAND, on one track or a selection at once. The fourth
                    writer, and the same plan/execute split again - see "Editing tags by hand".
   artists.py       PURE. What an artist page shows, and where artist pictures come from -
@@ -174,7 +175,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one.
-tests/             1259 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1326 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2761,13 +2762,13 @@ frames; Chromium, Arc included, keeps the file as it is. The guide's section is
   right, and exactly the NEXT frame (or sample) number, coded the shortest way - by chance once in
   2^40 bytes at worst, 2^48 past frame 127. And not left to chance: a false header taken for frame
   k leaves the real frame k's header before k+1's, carrying a number already used - that duplicate
-  is watched for and the CRC-16 of the frame before decides which is real; neither checking out
-  refuses the file. The LAST frame is always CRC-16 checked (how an ID3v1/APEv2 trailer is left
+  is watched for and the CRC-16 of the frame before decides which is real; neither or both
+  checking out refuses the file. The LAST frame is always CRC-16 checked (how an ID3v1/APEv2 trailer is left
   out and a truncated file refused), block sizes must sum to STREAMINFO's total, a fixed-block
   stream's frames must all be one size, and past one false sync per 256 bytes the file is refused
   (bounded work). Anything off raises `CannotRepackage` and the FLAC is sent as it is: a wrong MP4
-  would be worse than none. 84 tests (`tests/test_flac_mp4.py`) with a verbatim FLAC encoder, no
-  binary fixtures, planted false headers, 17 mutations of which 16 caught.
+  would be worse than none. 103 tests (`tests/test_flac_mp4.py`) with a verbatim FLAC encoder, no
+  binary fixtures, planted false headers; see "After review (the muxer)" below.
 - **The route: `wrap=mp4` on the EXISTING stream route**, honoured only with `format=raw` - no new
   route, `test_there_is_no_general_proxy` still pins the list. `player_cache.Mp4Cache.answer()`:
   1. **Which version** (`_version`): a `bytes=0-3` range of the file from Navidrome. Its type must
@@ -2796,12 +2797,13 @@ frames; Chromium, Arc included, keeps the file as it is. The guide's section is
      altogether (`_gate`, an asyncio.Lock made per event loop - TestClient runs each request on its
      own loop), which bounds memory; inside it the file is checked for again. **Verified**: ten
      requests at once on a cold song, one abandoned after 20 ms, made one MP4 and every range
-     matched.
+     matched. (Since 1.1.0-player.4 the gate covers the repackage only, and a make nobody waits
+     for any more is stopped - see "After review (the cache)".)
   5. **Refusals** (`CannotRepackage`, too big) are remembered per key (`REFUSALS_KEPT`, 256) and
      logged ONCE: `player: song X is sent to Safari as FLAC, not in an MP4 - <reason>`. Transient
      failures (Navidrome dropping the download, the disk) are logged each time and not remembered.
-     Every failure answers None and the route relays the FLAC exactly as before - never a broken
-     song.
+     ~~Every failure answers None and the route relays the FLAC~~ - not a request carrying on from
+     an MP4, which the review found spliced two files; see "After review (the cache)".
 - **Served by `ranged_file`, not Starlette's FileResponse**, which was read (0.50) and fails three
   ways: its 416 says `Content-Range: */N` without the unit, it refuses a suffix range longer than
   the file (RFC 9110 says the whole file, as a 206), and it stats the file only as it sends, so an
@@ -2813,11 +2815,12 @@ frames; Chromium, Arc included, keeps the file as it is. The guide's section is
   touching the file: that would change the validator under a seek). `audio/mp4`,
   `Cache-Control: no-cache`, Accept-Ranges, exact Content-Length; GuardMedia and the gzip
   exemption apply by path already (`/deadwax/navidrome/stream/`), and a test checks both.
-- **The cache: `tempfile.gettempdir()/deadwax-player`, `CACHE_MAX_BYTES` 1 GiB, least recently
-  served first**, never the file just made. Temp space, not /config: it is rebuilt on demand, the
-  config volume is what gets backed up, and a new image starts it empty. Leftover `.part`/`.tmp`
-  files older than 10 minutes are cleared on first use. **No setting**, decided: it only has to
-  hold what is being listened to now, and 1 GiB is several albums.
+- **The cache: `tempfile.gettempdir()/deadwax-player`, 1 GiB, least recently served first**, never
+  the file just made. Temp space, not /config: it is rebuilt on demand, the config volume is what
+  gets backed up, and a new image starts it empty. Leftover `.part`/`.tmp` files older than 10
+  minutes are cleared on first use. ~~No setting, decided~~ **Two settings since 1.1.0-player.4,
+  asked for** (`PLAYER_CACHE_PATH`, so it can live on an SSD, and `PLAYER_CACHE_MB`) - see "After
+  review (the cache)". Still never /config by default.
 - **The page** (`lib/streamWrap.ts`, pinned by `wrap.sim.cjs`): `wrapsFlac()` once per page -
   WebKit that isn't Chromium (any iPhone/iPad UA, CriOS and FxiOS included; a "Macintosh" UA with
   touch points is an iPad in desktop mode, even one claiming Chrome; otherwise `AppleWebKit/`
@@ -2861,6 +2864,158 @@ frames; Chromium, Arc included, keeps the file as it is. The guide's section is
   over WireGuard from the NAS; that the gapless `blob:` of an MP4 plays on the phone (it plays in
   Chromium); memory on the NAS with hi-res files; and Safari's own request pattern against the
   cache (only curl, AVPlayer and Chromium have asked it).
+
+#### After review (the muxer, 1.1.0-player.4)
+
+An adversarial review confirmed three findings in `src/flac_mp4.py`, all fixed together:
+
+- **Anything appended that checksums to zero went into the last MP4 sample.** FLAC's CRC-16
+  starts at zero with nothing XORed at the end, so once a frame sums to zero, appended zero
+  bytes keep it there, and so does a run of whole frames, each summing to zero. The end check
+  took the end of the file on that alone: 16 zeros after a 60 s `flac -8` file made the last
+  sample 1302 bytes instead of 1286, and AVPlayer (`avend`, from 50 s) posted
+  FailedToPlayToEndTime at 57.7 s (-11800 / OSStatus -50) on a song it plays to 60.0 as FLAC -
+  the same with 64 to 4096 zeros. `_last_frame_end` now refuses (the FLAC is served) when:
+  the last frame checks out at more than one candidate end (a tag whose own CRC-16 is zero, 1
+  in 65,536 - the longer was taken, tag and all); the sum, carried in the same pass to every
+  sync code in the last frame, is zero at one (a frame's end with another after it); or three
+  or more zero bytes come before the chosen end. **Don't strip zeros instead**: a real
+  frame's CRC-16 ends in a zero byte in one file of 256 and that can't be told from one
+  appended zero; a real frame ends in three only when its CRC-16 is 0x0000 and the byte
+  before it is zero too. One or two appended zeros stay in the last sample, and AVPlayer
+  played those MP4s to the end (measured). Still let in: any other trailer whose CRC-16
+  happens to be zero, 1 in 65,536.
+- **Each header repeating the number just used cost a whole-frame checksum, uncharged.**
+  review4's `m/dup_dos.py` (a valid 397 KB FLAC, frame 1 full of copies of its own header):
+  200 copies 1.8 s, 1,000 copies 8.8 s, packed with 21,800 copies 196 s - and through the app
+  every other Safari song waited behind it on the cache's one gate (`m/gate_demo.py`: an
+  ordinary song's first byte at 8.8 s). Now every such header is charged to
+  FALSE_SYNC_BUDGET; `_Checksums` carries one running CRC-16 per origin and remembers every
+  answer, so a frame is summed once, not once a copy; and CHECKSUM_BUDGET (1 MiB plus twice
+  the file) bounds all checksumming, refusing past it. After: 0.01 s, 0.01 s, and refused in
+  0.02 s; gate_demo's songs answer at once. A real file sums its last frame and any tag and
+  nothing else - a test pins it with the budget set to exactly that. The worst case is now
+  linear, about twice the file at ~15 MB/s of pure-Python CRC.
+- **A repeated number where BOTH readings check out kept the first**, splitting a valid FLAC
+  in the wrong place with no error (`m/wrongsplit.py`: a start at 18580 where frame 2 really
+  is at 32965; AVAssetReader failed on the MP4 with -50). Both checking out is refused now,
+  as neither always was: in a real file it takes a false header (2^-40) AND a 1-in-65,536
+  checksum.
+- **Measured**: the 40 MB CD FLAC maps in 55.2 ms against 55.0 before (median of 15). 112 of
+  121 FLACs to hand (the review battery, the seek and gapless libraries, the big and hi-res
+  files) give byte-identical MP4s; the nine that changed are six zero trailers, the two
+  crafted wrong splits and the packed-copies file, all now refused. Through the real app
+  s60 + 16 zeros answers `audio/flac`, and s60 itself `audio/mp4`, playing to 60.0 s in
+  AVPlayer.
+- **Tests**: 19 new in `tests/test_flac_mp4.py` (103 now); 14 fail on the old muxer, and the
+  other 5 pin what must still be accepted (one or two appended zeros, a last frame whose own
+  CRC-16 ends in one or two zeros). All 8 mutations of the new rules tried were caught.
+- **`FORMAT_VERSION` is 2** (player_cache.py), bumped at integration. The muxer's output didn't
+  change for any file it still wraps, but a cache kept since 1.1.0-player.3 holds MP4s of the
+  files it now refuses, which AVFoundation stops in before the end; the new key means they are
+  never served again, at the cost of one re-make of each song cached.
+
+#### After review (the cache, 1.1.0-player.4)
+
+The same review confirmed five findings in `src/player_cache.py` and the page, and one in the
+docs; fixed together with two settings James asked for so the cache can live on an SSD. Each was
+reproduced with review4's script before the fix and after it, and again after integration.
+
+- **Skipping songs in Safari made the song landed on wait for every one skipped (major).** Each
+  make was a shielded task nothing cancelled, one lock covered the download from Navidrome as
+  well as the repackage, and `checkWrapped()`'s `bytes=0-1` was never aborted - so four Nexts on
+  uncached songs downloaded and repackaged all four, in turn, before the fifth started.
+  - `_Make` counts the requests waiting on a make, and the last to leave cancels it, its
+    Navidrome download closed with it. A later request for that song starts afresh.
+  - The route wraps `answer()` in `unless_abandoned()`, since uvicorn never cancels a handler
+    whose phone has gone; a hang-up answers 204 into the closed connection.
+  - `_gate` covers `_repackage` only, so downloads no longer queue behind each other.
+    `_to_the_end` keeps it held until the worker thread finishes even when the make is cancelled:
+    a thread can't be stopped, and a second song mustn't be held in memory beside it.
+  - `checkWrapped()` has an AbortController, aborted at the next song and on unmount.
+  - `review4/skip.py` at 100 MB/s, song 5's first byte: 2880-2897 ms before, 531-559 ms after
+    (one song alone 546-630 ms), MP4s made 6 before and 2 after; uncapped 316-473 ms before,
+    171-286 after. Live under uvicorn, the stub at 5 MB/s, four skips 150 ms apart: song 5 in
+    5539 ms against 5513 ms for one song alone, four "was stopped" lines, and the stub saw each
+    skipped download hang up part-way.
+- **One URL could be answered as FLAC and then as MP4** (`test_splice.py`: a cut first download
+  gave `bytes 0-1/200917` as FLAC, then `bytes 2-100/201415` from the MP4; the other way round
+  after an eviction). The element splices the two into a decode error.
+  - `_answered` remembers what each SONG was last answered as, and `continues()` tells a fresh
+    start (Safari's `bytes=0-1` probe, or no Range) from a continuation (anything else).
+  - A continuation of a FLAC answer stays FLAC, however long after. A fresh start stays FLAC for
+    `VERSION_SECONDS` after one, so the readout's probe and the element are told the same.
+  - A continuation of an MP4 answer re-makes the MP4 and waits for it, also when the file
+    vanishes between being found and opened. If it still can't be had, it is a **503** with
+    `Retry-After: 2` and `Cache-Control: no-store`, never FLAC bytes. The page's retry then
+    starts afresh, and a fresh probe may get FLAC.
+  - After: (a) both FLAC, the second body `FLAC[2:101]`; (b) MP4, then 503.
+  - Costs, stated: a transient failure keeps that song on FLAC for its play; the memory is per
+    song, not per phone (deadwax can't tell clients apart), so two clients on one song around a
+    failure can still see a flip; and whether Safari always starts a song with exactly
+    `bytes=0-1` is unverified on a phone - if it didn't, a retry after a failure would get a 503
+    rather than the FLAC.
+- **A disk short of space filled up and was never given back** (`enospc.py`: songs 3-6 sent as
+  FLAC, 76 MiB held for good). `_make_room()` runs BEFORE the download now: the MP4s played
+  longest ago are cleared until the new song fits under the cap, counting the songs being made
+  (`_reserved`), and the disk has `MAKE_ROOM_FACTOR` (2) copies of it plus `DISK_SPARE_BYTES`
+  (128 MiB) free. Short even then is FLAC, with nothing fetched. ENOSPC anyway (something else
+  writing) clears twice the song and tries once more. After: all six wrapped.
+  - The cap bounds the finished MP4s. The folder's peak is the cap plus one `.part` per song
+    being made, and a song bigger than the whole cap is still made - kept on its own, the one way
+    past the cap. The docs say both.
+  - **Found at integration**: `_make_room()`'s loop variable was `size`, rebinding the song's own
+    size that `fits()` reads, so the room was judged by whichever song was about to be cleared. A
+    big song after small ones cleared nothing: a 50 MB song beside ten 9 MB ones under a 100 MB
+    cap went 40 MB past it until `_evict` trimmed it after the make.
+    `test_room_is_made_for_the_song_coming_not_the_size_of_the_songs_cleared` fails without the
+    fix.
+- **A read-only root filesystem stopped deadwax starting** (`ro_import.py`, `ro_app.py`): the
+  cache folder was `tempfile.gettempdir()` at import, which raises when nothing is writable.
+  Nothing is resolved at import now, and no usable folder means FLAC, logged once per distinct
+  problem (`_said`).
+- **The cache folder wasn't checked to be deadwax's own** (`plant.py` served a planted link's
+  target as `206 audio/mp4 b'PRIVATE KEY MATERIAL'`). `_judge()` lstats `deadwax-player` before
+  anything in it is listed, deleted or served: a real folder, not a link, owned by
+  `os.getuid()`, mode exactly 0700. Anything else is refused - FLAC, and one log line naming
+  what to remove. Clean-up and eviction never follow links, and cached files are opened with
+  `O_NOFOLLOW`. Residual: if the folder `PLAYER_CACHE_PATH` names can be written by another
+  user and isn't sticky, they could swap `deadwax-player` between the check and the file
+  operations.
+- **The settings.**
+  - `PLAYER_CACHE_PATH` (the Paths group, Settings → Library). Empty is
+    `gettempdir()/deadwax-player`. Set, deadwax makes its OWN `<path>/deadwax-player` (0700),
+    never chmods or chowns the folder named, and touches nothing else there - so it can name a
+    shared folder. Read on every request (`Mp4Cache.directory`, `_folder()`), so a change needs
+    no restart; a new folder clears `_used`. Not validated on save, like the other paths: the
+    row adds `folder_problem()` (the same `_judge`, making nothing) to `_describe_path`'s
+    exists-and-writable check.
+  - `PLAYER_CACHE_MB` (after `DB_PATH`). Default 1024. `parse_player_cache_mb()` takes ASCII
+    digits only, 64 to 1048576, and a trailing "MB"; anything else is refused on save. Read at
+    every use (`player_cache_bytes()`). An unreadable environment value is an error row saying
+    1024 is used.
+  - Both are commented into `docker-compose.example.yml` (with a `/cache` volume line) and
+    `.env.example`, and documented under Paths in docs/configuration.md.
+  - **Verified in the real page** (Chromium with an iPhone user agent, the seek stub, 8081): the
+    element played `&wrap=mp4` and the readout said "FLAC in MP4"; three real taps landed (the
+    pilot read 210.51, 60.32 and 271.07 against clocks of 210.79, 60.79 and 271.56, the
+    analyser's usual lag); the MP4s went into the configured folder's `deadwax-player` (mode
+    700, "256 MB at most" logged); changing `PLAYER_CACHE_PATH` in the tab moved the next MP4 to
+    the new folder with no restart.
+- **The docs' MP3 claim was wrong.** player.md and troubleshooting.md said an MP3 is sent as it
+  is because "Safari seeks those properly already", which holds for a CONSTANT-bit-rate MP3
+  only. avlab2 on review4's `varied-vbr.mp3` (LAME V2 with a Xing header) landed -0.29, -2.29,
+  +41.31, +8.31, -0.19 and +33.31 s off at 90, 250, 30, 150, 200 and 60 s, where the CBR
+  `varied-320.mp3` landed +0.01 on every seek. WebKit's `createAVAssetForURL` doesn't set
+  `AVURLAssetPreferPreciseDurationAndTimingKey`, so avlab stands for Safari. The docs now say a
+  VBR MP3 can land seconds off in Safari and isn't repackaged, and that AAC and ALAC in `.m4a`
+  are MP4s already. The test song swings its bit rate far more than music does, so how far off
+  a real V0 album lands is unknown. Repackaging MP3 is not built.
+- **Tests**: `tests/test_player_cache.py` is new (32 functions, 48 cases); three tests in
+  test_navidrome.py changed, because they pinned the flip (the request after a cut download
+  stays FLAC now, and wraps once `VERSION_SECONDS` have passed); `player.sim.cjs` checks that
+  Next lets go of song 1's probe. Fifteen mutations, each undoing one fix, were all caught, and
+  so is the make-room one.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -4179,7 +4334,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1259 tests
+.venv/bin/python -m pytest tests/ -q  # 1326 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -4228,7 +4383,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1259 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1326 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

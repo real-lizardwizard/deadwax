@@ -46,8 +46,16 @@ MAX_INPUT_BYTES = 1 << 30
 
 #? Sync codes that turn out not to start a frame are about one per 90 KB of real FLAC (measured on
 #? CD and 24/96 files). A file with far more - by accident or by design - would have every one
-#? checked, so past one per 256 bytes (and a floor for small files) it is refused instead.
+#? checked, so past one per 256 bytes (and a floor for small files) it is refused instead. A
+#? header repeating the number just used counts as one: one of the two starts no frame.
 FALSE_SYNC_BUDGET = (4096, 256)
+
+#? A bound on the checksumming, the one part of this done a byte at a time in Python (~15 MB/s).
+#? Each stretch is summed once and remembered, so a real file sums its last frame and any tag
+#? after it, and a frame or two more in the rare file with a false header - a sliver of this. A
+#? file built to be checksummed over and over (a frame full of copies of a header) is refused
+#? past it instead of holding a worker thread for minutes: a floor, plus twice the file.
+CHECKSUM_BUDGET = (1 << 20, 2)
 
 #? How much audio goes in one MP4 chunk (a run of samples stored back to back, found through one
 #? entry of the chunk offset table). A player finds a sample by taking its chunk's offset and
@@ -97,11 +105,58 @@ def _crc8(data: bytes) -> int:
     return crc
 
 
-def _crc16(data: bytes) -> int:
-    crc = 0
+def _crc16(data: bytes, crc: int = 0) -> int:
+    """The CRC-16 of `data`, or carried on over it from `crc`, the sum of whatever came before."""
     for byte in data:
         crc = ((crc << 8) & 0xFFFF) ^ _CRC16[(crc >> 8) ^ byte]
     return crc
+
+
+class _Checksums:
+    """The CRC-16s one split asks for, each stretch of the file summed once, within CHECKSUM_BUDGET.
+
+    `upto(origin, end)` is the CRC-16 of data[origin:end]. The questions asked of one origin come
+    in order along the file - the frame before a repeated number, then the frame up to each copy
+    - so the sum is carried on from where the last answer stopped rather than begun again, and
+    every answer is kept, so asking twice costs nothing. A new origin starts afresh; origins only
+    move forward, so no byte is summed more than twice this way.
+    """
+
+    def __init__(self, data: bytes):
+        self.data = data
+        self.left = CHECKSUM_BUDGET[0] + CHECKSUM_BUDGET[1] * len(data)
+        self.origin = -1
+        self.answers: dict[int, int] = {}
+        self.at = self.crc = 0
+
+    def _sum(self, start: int, end: int, crc: int) -> int:
+        self.left -= end - start
+        if self.left < 0:
+            raise Unsupported("far too much checksumming for a file this size")
+        return _crc16(self.data[start:end], crc)
+
+    def upto(self, origin: int, end: int) -> int:
+        if origin != self.origin:
+            self.origin, self.answers, self.at, self.crc = origin, {origin: 0}, origin, 0
+        if end not in self.answers:
+            if end < self.at:
+                #? not asked in order: begin again rather than answer wrongly
+                self.at, self.crc = origin, 0
+            self.crc = self._sum(self.at, end, self.crc)
+            self.at = end
+            self.answers[end] = self.crc
+        return self.answers[end]
+
+    def zeros(self, start: int, marks: list[int]) -> set[int]:
+        """Which of `marks` (places after `start`, in order) data[start:mark] checksums to zero at,
+        in one pass."""
+        found, at, crc = set(), start, 0
+        for mark in marks:
+            crc = self._sum(at, mark, crc)
+            at = mark
+            if not crc:
+                found.add(mark)
+        return found
 
 
 @dataclass(frozen=True)
@@ -278,8 +333,8 @@ def _audio_ends(data: bytes, start: int) -> list[int]:
     """Where the last frame could end: the end of the file, or before a tag appended to it.
 
     ID3v1 (and its "TAG+" extension) and APEv2 are the tags that turn up at the end of FLAC
-    files. Each is only a candidate - the last frame's CRC-16 decides - so a frame whose last
-    bytes happen to spell "TAG" is not cut short by it.
+    files. Each is only a candidate - the last frame's CRC-16 decides (`_last_frame_end`) - so a
+    frame whose last bytes happen to spell "TAG" is not cut short by it.
     """
     ends = [len(data)]
     end = len(data)
@@ -294,6 +349,47 @@ def _audio_ends(data: bytes, start: int) -> list[int]:
         if end - ape > start:
             ends.append(end - ape)
     return ends
+
+
+def _last_frame_end(data: bytes, start: int, sync: bytes, checks: _Checksums) -> int | None:
+    """Where the frame at `start` ends if it is the last one; None if it can't be.
+
+    Nothing after the last frame says where it ends, so its CRC-16 does: summed from its start,
+    it has to come to zero at exactly one of the places it could end (`_audio_ends`).
+
+    Coming to zero there is not the whole test, though, because the sum carries on unchanged
+    through anything appended that sums to zero from scratch - and whatever is let in goes into
+    the last MP4 sample, where AVFoundation stops with an error seconds before the end of a song
+    it plays through as FLAC. So:
+    - The sum coming to zero at two of those places - a tag whose own CRC-16 is zero, one in
+      65,536 - leaves which of them the audio ends at unknown, and the file is refused.
+    - Whole frames each sum to zero. The same pass sums to every sync code in the frame as well,
+      and one where the sum is zero is a frame's end with another after it: refused.
+    - Zero bytes sum to zero (the CRC starts at zero and nothing is XORed at the end). Stripping
+      them can't be right - a real frame's CRC-16 ends in a zero byte in one file of 256, and
+      that can't be told from a zero appended - but a real frame ends in THREE only when its
+      CRC-16 is 0x0000 and the byte before it is zero too, so three are refused. One or two
+      appended stay in the last sample, which AVFoundation played through.
+    Anything else appended whose CRC-16 happens to be zero - one in 65,536 - still gets in.
+    """
+    ends = _audio_ends(data, start)
+    syncs = []
+    at = data.find(sync, start + 1, ends[0])
+    while at >= 0:
+        syncs.append(at)
+        at = data.find(sync, at + 1, ends[0])
+    zero = checks.zeros(start, sorted(set(ends + syncs)))
+    ends = [end for end in ends if end in zero]
+    if not ends:
+        return None
+    if len(ends) > 1:
+        raise Unsupported("the last frame checks out both with the tag after it and without")
+    end, = ends
+    if any(at in zero and at < end for at in syncs):
+        raise Unsupported("what comes after the last frame checks out as more frames")
+    if data[end - 3:end] == bytes(3):
+        raise Unsupported("the audio ends in zero bytes that may not belong to it")
+    return end
 
 
 def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
@@ -311,13 +407,17 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
     k's header would still come after it, before frame k+1's - and it would carry a number already
     used. So a header carrying the number just used is watched for, and when one appears the
     frame's own CRC-16 settles which of the two is real: the frame before them has to checksum
-    to zero from its start to the real one. Neither doing so means the stream isn't what it
-    claims, and it is refused. (Checksumming every frame would be certain without any of this,
-    but it is a byte-at-a-time loop in Python - seconds for an album track - where this is
-    milliseconds.)
+    to zero from its start to the real one. Exactly one of them must: neither means the stream
+    isn't what it claims, and both - a chance of 1 in 65,536 on top of the false header, unless
+    the file was built that way - leave two readings of it. Either is refused. Every such header
+    is charged to FALSE_SYNC_BUDGET, and the sums are carried on and remembered (`_Checksums`),
+    so a frame full of copies of a header costs one pass over it, not one per copy.
+    (Checksumming every frame would be certain without any of this, but it is a byte-at-a-time
+    loop in Python - seconds for an album track - where this is milliseconds.)
 
     The LAST frame is always checksummed, since nothing after it says where it ends: that is how
-    a tag appended to the file is left out, and how a file cut short is refused.
+    a tag appended to the file is left out, and how a file cut short, or with something else
+    appended, is refused (`_last_frame_end`).
     """
     if data[first:first + 1] != b"\xff" or data[first + 1:first + 2] not in (b"\xf8", b"\xf9"):
         raise Unsupported("no audio frame where the metadata ends")
@@ -330,6 +430,7 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
     starts, blocks, numbers = [first], [block_size], [0]
     search = first + header_length
     budget = FALSE_SYNC_BUDGET[0] + len(data) // FALSE_SYNC_BUDGET[1]
+    checks = _Checksums(data)
     while True:
         #? the number the frame just found carried, and the one the next frame must carry
         last = numbers[-1]
@@ -356,28 +457,34 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
             search = at + header_length
             continue
         #? a second header carrying the number already given to the frame at starts[-1]
+        budget -= 1
+        if budget < 0:
+            raise Unsupported("far too many sync codes that start no frame")
         if len(starts) == 1:
             #? the first frame is where the metadata ends, so this one is inside its audio
             search = at + 1
             continue
         before = starts[-2]
-        if _crc16(data[before:starts[-1]]) == 0:
+        kept = checks.upto(before, starts[-1]) == 0
+        moved = checks.upto(before, at) == 0
+        if kept and moved:
+            raise Unsupported(f"two frames claim to be number {last}, and both check out")
+        if kept:
             search = at + 1
-        elif _crc16(data[before:at]) == 0:
+        elif moved:
             starts[-1], blocks[-1] = at, block_size
             search = at + header_length
         else:
             raise Unsupported(f"two frames claim to be number {last}, and neither checks out")
-    ends = [end for end in _audio_ends(data, starts[-1]) if _crc16(data[starts[-1]:end]) == 0]
-    if not ends and len(starts) > 1:
+    end = _last_frame_end(data, starts[-1], sync, checks)
+    if end is None and len(starts) > 1:
         #? the last header found may have been audio data in the real last frame, numbered as
         #? if a frame followed it: then the frame before it checks out to the end of the file
-        ends = [end for end in _audio_ends(data, starts[-2]) if _crc16(data[starts[-2]:end]) == 0]
-        if ends:
+        end = _last_frame_end(data, starts[-2], sync, checks)
+        if end is not None:
             del starts[-1], blocks[-1], numbers[-1]
-    if not ends:
+    if end is None:
         raise Unsupported("the last frame's checksum is wrong - the file may be cut short")
-    end = ends[0]
     total = sum(blocks)
     if info.total_samples and total != info.total_samples:
         raise Unsupported(f"the frames hold {total} samples where STREAMINFO says {info.total_samples}")

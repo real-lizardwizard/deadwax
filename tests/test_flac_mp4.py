@@ -47,8 +47,7 @@ def crc8(data):
 CRC16_TABLE = [crc_bitwise(bytes([b]), 0x8005, 16) for b in range(256)]
 
 
-def crc16(data):
-    crc = 0
+def crc16(data, crc=0):
     for byte in data:
         crc = ((crc << 8) & 0xFFFF) ^ CRC16_TABLE[(crc >> 8) ^ byte]
     return crc
@@ -417,6 +416,66 @@ def test_two_false_headers_in_a_row_are_refused_rather_than_guessed():
         flac_to_mp4(flac)
 
 
+def two_readings():
+    """A valid FLAC with a copy of frame 2's header inside frame 1, just after two bytes that make
+    frame 1's checksum come to zero there - so frame 1 checks out ending at the copy AND at the
+    real frame 2. Returns the file, its frames, and where the copy is."""
+    blocks, at = (4096,) * 6 + (1000,), 2000
+    flac, frames = encode(blocks=blocks, plant={1: (at, lambda h: bytes(2) + h[2])})
+    start = frames[1][0]
+    copy = start + 6 + 1 + at + 2          # frame 1's header, its first subframe's, the two bytes
+    crc = struct.pack(">H", crc16(flac[start:copy - 2]))
+    flac, frames = encode(blocks=blocks, plant={1: (at, lambda h: crc + h[2])})
+    return flac, frames, copy
+
+
+def test_a_copy_of_the_next_header_where_both_readings_check_out_is_refused():
+    """The first one found used to be kept, splitting frame 1 in two with no error: an MP4
+    AVFoundation couldn't decode, of a file that plays as FLAC."""
+    flac, frames, copy = two_readings()
+    assert crc16(flac[frames[1][0]:copy]) == 0 and flac[copy:copy + 6] == frames[2][1][:6]
+    with pytest.raises(Unsupported, match="both check out"):
+        flac_to_mp4(flac)
+
+
+def copies_of_its_own_header(copies, frame=1):
+    """Frame `frame`'s audio starting with `copies` copies of its own header: each one a header
+    carrying the number just used - and still a valid FLAC."""
+    return encode(blocks=(4096,) * 4, plant={frame: (0, lambda h: h[frame] * copies)})
+
+
+@pytest.mark.parametrize("frame", [0, 1])
+def test_headers_repeating_the_number_just_used_are_charged_as_false_syncs(monkeypatch, frame):
+    flac, frames = copies_of_its_own_header(1000, frame)
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+    monkeypatch.setattr(flac_mp4, "FALSE_SYNC_BUDGET", (500, 1 << 40))
+    with pytest.raises(Unsupported, match="sync codes"):
+        flac_to_mp4(flac)
+
+
+def test_a_frame_full_of_copies_of_a_header_is_checksummed_once_not_once_a_copy(monkeypatch):
+    """Each copy used to sum the whole frame before it again: a thousand copies of one header in a
+    32768-sample frame took nine seconds, and a frame packed with them over three minutes."""
+    flac, frames = copies_of_its_own_header(1000)
+    summed, crc16_of = [], flac_mp4._crc16
+    monkeypatch.setattr(flac_mp4, "_crc16", lambda data, crc=0: summed.append(len(data)) or crc16_of(data, crc))
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+    #? frame 0 once, frame 1 up to its last copy (its header, its subframe's, 999 copies more), then
+    #? the last frame - where the old way summed frame 0 a thousand times, 16 MB
+    assert sum(summed) <= len(frames[0][1]) + 7 + 6 * 999 + len(frames[-1][1])
+
+
+def test_checksumming_is_bounded_and_refused_past_the_bound(monkeypatch):
+    """A file as it should be sums its last frame and nothing else, which the bound's floor covers
+    many times over."""
+    flac, frames = encode()
+    monkeypatch.setattr(flac_mp4, "CHECKSUM_BUDGET", (len(frames[-1][1]), 0))
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+    monkeypatch.setattr(flac_mp4, "CHECKSUM_BUDGET", (len(frames[-1][1]) - 1, 0))
+    with pytest.raises(Unsupported, match="checksumming"):
+        flac_to_mp4(flac)
+
+
 @pytest.mark.parametrize("cut", ["in the last frame", "in a middle frame", "after the metadata", "in the metadata"])
 def test_a_truncated_file_is_refused(cut):
     flac, frames = encode(blocks=(4096,) * 6 + (500,))
@@ -532,6 +591,85 @@ def test_audio_that_happens_to_spell_tag_is_not_cut_off():
     assert_same_frames(flac_to_mp4(flac), flac, frames)
 
 
+@pytest.mark.parametrize("zeros", [1, 2])
+def test_one_or_two_zero_bytes_after_the_audio_stay_in_the_last_sample(zeros):
+    """A frame's checksum starts at zero and ends with nothing XORed in, so it comes to zero again
+    after every zero byte appended. One or two can't be told from a last frame whose own CRC-16
+    ends in zero, which one file in 256 has, so they are kept - AVFoundation played such an MP4
+    to its end."""
+    flac, frames = encode()
+    assert flac[-1] != 0
+    got = read_mp4(flac_to_mp4(flac + bytes(zeros)))
+    assert got["samples"][:-1] == [f for _, f, _ in frames[:-1]]
+    assert got["samples"][-1] == frames[-1][1] + bytes(zeros)
+
+
+@pytest.mark.parametrize("trailer", [bytes(3), bytes(16), bytes(4096), bytes(16) + b"TAG" + bytes(125)],
+                         ids=["3", "16", "4096", "16 before an id3v1 tag"])
+def test_three_or_more_zero_bytes_after_the_audio_are_refused(trailer):
+    """In the last MP4 sample, 16 zeros made AVFoundation stop with an error over two seconds
+    before the end of a song it plays to the end as FLAC. A real frame ends in three zeros only
+    when its CRC-16 is 0x0000 and the byte before it is zero too."""
+    flac, _ = encode()
+    with pytest.raises(Unsupported, match="zero bytes"):
+        flac_to_mp4(flac + trailer)
+
+
+def ending_in(footer, after=b""):
+    """A FLAC whose last frame ends in `after` and then the CRC-16 `footer`, and its frames.
+
+    The two sample bytes before `after` are solved for: CRC-16 is linear, so exactly one pair
+    gives any footer.
+    """
+    kw = dict(rate=8000, channels=1, bps=8, blocks=(16,) * 3 + (8,))
+    at = 8 - 2 - len(after)
+    flac, frames = encode(**kw, plant={3: (at, bytes(2) + after)})
+    frame = frames[-1][1]
+    before = crc16(frame[:len(frame) - 4 - len(after)])
+    pair = next(bytes((p, q)) for p in range(256) for q in range(256)
+                if crc16(bytes((p, q)) + after, before) == footer)
+    flac, frames = encode(**kw, plant={3: (at, pair + after)})
+    assert flac.endswith(after + struct.pack(">H", footer))
+    return flac, frames
+
+
+@pytest.mark.parametrize("footer, after", [(0x1200, b""), (0x0000, b"\x01")], ids=["one zero", "two zeros"])
+def test_a_last_frame_whose_own_checksum_ends_in_zeros_is_kept_whole(footer, after):
+    flac, frames = ending_in(footer, after)
+    assert_same_frames(flac_to_mp4(flac), flac, frames)
+
+
+def test_the_price_a_last_frame_ending_in_three_zeros_of_its_own_is_sent_as_flac():
+    flac, _ = ending_in(0x0000, b"\x00")
+    with pytest.raises(Unsupported, match="zero bytes"):
+        flac_to_mp4(flac)
+
+
+def test_a_tag_that_checks_out_as_audio_as_well_is_refused():
+    """An ID3v1 tag whose own CRC-16 is zero (one in 65,536) leaves the last frame checking out
+    both before it and at the end of the file. The longer used to be taken, tag and all."""
+    body = b"TAG" + bytes(123)
+    flac, frames = encode(trailer=body + struct.pack(">H", crc16(body)))
+    assert crc16(flac[frames[-1][0]:]) == 0
+    with pytest.raises(Unsupported, match="with the tag after it and without"):
+        flac_to_mp4(flac)
+
+
+@pytest.mark.parametrize("what", ["its first three frames again", "a frame of another stream", "its last frame again"])
+def test_whole_frames_after_the_last_are_refused(what):
+    """Each checks out on its own, so the last frame's checksum comes to zero at the end of the
+    file as well, and the MP4's last sample would have held them all."""
+    flac, frames = encode()
+    extra = {
+        "its first three frames again": lambda: b"".join(f for _, f, _ in frames[:3]),
+        "a frame of another stream": lambda: encode(rate=48000, seed=5)[1][1][1],
+        "its last frame again": lambda: frames[-1][1],
+    }[what]()
+    #? the last frame again carries the last number again: two readings, both checking out
+    with pytest.raises(Unsupported, match="both check out" if what == "its last frame again" else "more frames"):
+        flac_to_mp4(flac + extra)
+
+
 def test_streaminfo_must_come_first():
     flac, _ = encode()
     moved = flac[:4] + bytes([4]) + flac[5:]        # call the first block a VORBIS_COMMENT
@@ -615,7 +753,9 @@ def check_decodes_the_same(tmp_path, flac):
     dict(blocks=(1152, 4608, 576, 4096, 192, 2000, 4608, 333), variable=True),
     dict(blocks=(4096,) * 8, plant={3: (1000, next_header(3))}),
     dict(id3=id3v2(), trailer=b"TAG" + bytes(125)),
-], ids=["cd", "96k 24-bit", "192k mono", "6 channels", "variable blocks", "false sync", "tags around it"])
+    dict(trailer=bytes(2)),
+], ids=["cd", "96k 24-bit", "192k mono", "6 channels", "variable blocks", "false sync", "tags around it",
+        "two zeros after"])
 def test_the_mp4_decodes_to_the_same_pcm_as_the_flac(tmp_path, case):
     flac, frames = encode(**case)
     info = check_decodes_the_same(tmp_path, flac)
@@ -665,9 +805,13 @@ def test_libflacs_own_output_repackages_losslessly(tmp_path):
 
 @pytest.mark.skipif(not FLAC, reason="the flac tool isn't installed")
 def test_libflac_accepts_what_the_test_encoder_writes(tmp_path):
-    """flac -t checks every frame's CRCs and the STREAMINFO MD5: the fixtures here are valid FLAC."""
-    for case in [dict(), dict(variable=True, blocks=(1152, 4608, 576, 333)), dict(rate=96000, bps=24),
-                 dict(blocks=(4096,) * 8, plant={3: (1000, next_header(3))})]:
+    """flac -t checks every frame's CRCs and the STREAMINFO MD5: the fixtures here are valid FLAC,
+    the ones this refuses among them - a refusal says a file can't be repackaged with certainty,
+    not that it is broken."""
+    cases = [dict(), dict(variable=True, blocks=(1152, 4608, 576, 333)), dict(rate=96000, bps=24),
+             dict(blocks=(4096,) * 8, plant={3: (1000, next_header(3))})]
+    for data in [encode(**case)[0] for case in cases] + [two_readings()[0], copies_of_its_own_header(1000)[0],
+                                                          ending_in(0x0000, b"\x00")[0]]:
         path = tmp_path / "t.flac"
-        path.write_bytes(encode(**case)[0])
+        path.write_bytes(data)
         subprocess.run([FLAC, "-s", "-t", str(path)], check=True)

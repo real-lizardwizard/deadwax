@@ -379,14 +379,45 @@ ends with how the song playing was sent.
   was one play: the next one tries again.
 - **`· asked for FLAC in MP4`** that never changes: the player couldn't find out what came. The
   song itself may still have come as an MP4.
-- **nothing at the end**: the song isn't a FLAC (an MP3, AAC or ALAC file is sent as it is, and
-  seeks properly already), or the browser isn't Safari, or it's a Safari too old to play FLAC in an
-  MP4.
+- **nothing at the end**: the song isn't a FLAC, or the browser isn't Safari, or it's a Safari too
+  old to play FLAC in an MP4. Anything but a FLAC is sent as it is. AAC and ALAC (`.m4a`) already
+  come in an MP4 and seek exactly, and so does an MP3 at a **constant** bit rate, but a
+  **variable-bit-rate MP3** (LAME's V0 or V2, the most common kind) can land seconds off in Safari
+  just as a FLAC did, and deadwax doesn't repackage it: on a test song, a V2 MP3 landed up to 41
+  seconds out where a constant 320 kbps copy landed exactly.
 
 **The first play of a song waits a moment** in Safari while deadwax repackages it (under a quarter
-of a second for a CD-quality song where it was measured), then it's kept, up to 1 GB of songs, in
-the container's temporary space. If that space is short, the repackaging fails and the song is sent as
-FLAC; it never stops a song playing.
+of a second for a CD-quality song where it was measured). Then it's kept, up to
+[`PLAYER_CACHE_MB`](configuration.md#paths) of songs (1 GB unless you set it), in the container's
+temporary space or in [`PLAYER_CACHE_PATH`](configuration.md#paths) if you've set one. Skipping
+past songs before they start doesn't make the next one wait: deadwax stops making the ones you
+skipped.
+
+**When the cache can't be used, Safari gets the FLAC.** It never stops a song playing, but its
+seeks can land off again, and deadwax's log says why:
+
+- **`… the disk holding the cache (…) is short of space even with older songs cleared out of it`**:
+  a song needs room for two copies of itself while it's made, and deadwax leaves 128 MB free for
+  everything else on that disk, clearing the songs played longest ago to find it. If the log says
+  this, that disk is nearly full with other things. Free some space, or point `PLAYER_CACHE_PATH`
+  at a folder on a disk with room. In a container, the temporary space is usually on the same
+  disk as Docker itself, which on a NAS is often a small system drive.
+- **`Safari is sent FLAC, not MP4s, because the player's cache can't be kept - …`**, said once
+  until the problem changes. The rest of the line names it:
+  - *this container has no writable temporary space (a read-only root filesystem?), and
+    PLAYER_CACHE_PATH isn't set*: a container run with a read-only root filesystem, and no
+    `tmpfs` on `/tmp`. Set `PLAYER_CACHE_PATH` to a folder you've mounted that deadwax can write.
+  - *… isn't a folder this container can see*, *… couldn't be made* or *… can't be written to*:
+    the folder `PLAYER_CACHE_PATH` names isn't mounted, or isn't writable by `PUID`/`PGID`.
+    Settings → Library says the same on that row.
+  - *… is a link, not a folder deadwax made*, *… belongs to another user*, or *… is open to other
+    users*: deadwax only keeps its songs in a `deadwax-player` folder that it made itself and
+    nobody else can use. Delete the folder the line names, and deadwax makes a new one on the
+    next song.
+
+A song whose MP4 was cleared out mid-song and can't be made again at once doesn't switch to the
+FLAC halfway through, since the two files' bytes differ: deadwax asks Safari to try again, and the
+player's own retry asks for the song afresh, from where it stopped.
 
 **The readout tells you when a seek landed off**, whichever way the song came. The line shows
 *Last seek: asked 2:10, the player said 2:10* (*interrupted* instead, if Previous, Next or a

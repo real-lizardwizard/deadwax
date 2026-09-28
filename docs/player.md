@@ -232,14 +232,33 @@ out. Other browsers get the FLAC as it is, as before.
   from Navidrome and repackage it before it can send the first byte: under a quarter of a second
   for a four-minute CD-quality song where it was measured, and probably a little longer on a NAS.
   After that the song is kept, so playing it again and seeking in it don't wait.
-- **Where it's kept**: in the container's temporary space, up to 1 GB, the songs played longest ago
-  making room for new ones. Nothing goes in your config folder, and nothing needs setting up. It's
-  emptied when the container is recreated, which only means the next first play waits that moment
-  again.
+- **Skipping doesn't wait.** Skip past songs before they start and deadwax stops making the ones
+  you skipped, and stops fetching them from Navidrome, so the song you land on starts as soon as it
+  would have on its own.
+- **Where it's kept**: in a folder of deadwax's own, `deadwax-player`. Nothing needs setting up:
+  by default it's in the container's temporary space, which is emptied when the container is
+  recreated, and that only means the next first play of each song waits that moment again. To keep
+  it, or to put it on a fast disk (an SSD), set
+  [`PLAYER_CACHE_PATH`](configuration.md#paths) to a folder you've mounted. Nothing goes in your
+  config folder. It holds up to [`PLAYER_CACHE_MB`](configuration.md#paths) of songs, 1 GB unless
+  you set it, the songs played longest ago making room for new ones; while a song is being made,
+  its download sits beside it, so the folder briefly holds one song more than that. It's only a
+  cache, and deleting it is always safe.
+- **When the disk runs short**, older songs are cleared to make room, and deadwax leaves some space
+  free for everything else on that disk. If there still isn't room, or the folder can't be used at
+  all (say the container can't write anywhere), the song is sent as FLAC. It plays exactly as
+  before; only its seeks can land off. deadwax's log says why.
 - **Some FLACs are sent as they are**: a file over 512 MB (an hour-long album ripped as one file,
-  or long hi-res), or one deadwax can't repackage with certainty. It plays exactly as before, and
-  seeks in Safari can land off. deadwax's log says which song and why.
-- **Only FLAC.** An MP3, AAC or ALAC file is sent as it is: Safari seeks those properly already.
+  or long hi-res), or one deadwax can't repackage with certainty (cut short, say, or with something
+  after the audio it can't account for). It plays exactly as before, and seeks in Safari can land
+  off. deadwax's log says which song and why.
+- **Only FLAC.** Anything else is sent as it is. AAC and ALAC, in an `.m4a` file, already come in an
+  MP4 with its table, so Safari seeks them exactly. **An MP3 lands exactly only if it's constant
+  bit rate.** A variable-bit-rate MP3 (LAME's V0 or V2, which is most MP3s in most libraries) can
+  land seconds off in Safari, just as a FLAC did, and deadwax doesn't repackage it. Measured on a
+  Mac with Safari's engine, on a test song whose loudness swings far more than most music's: a
+  constant 320 kbps MP3 landed within a hundredth of a second on every seek, and a V2 copy of the
+  same song from a fraction of a second to 41 seconds out.
 
 **The readout shows it on your phone.** Between the cover and the song's title, below the gapless
 readout, the player shows the last seek you made, with the bar or from the lock screen: *Last
@@ -254,8 +273,9 @@ in Safari:
 | `· sent as FLAC, not in an MP4` | deadwax sent the FLAC as it is (see above); seeks may land off |
 | `· asked for FLAC in MP4` | for a moment, while the player checks what came |
 
-In other browsers it ends with nothing, since they get every file as it is. The line shows it
-before any seek too: *No seek yet · FLAC in MP4*.
+In other browsers it ends with nothing, since they get every file as it is, and so it does in
+Safari for a song that isn't a FLAC (an MP3's seeks can still land off; see above). The line
+shows it before any seek too: *No seek yet · FLAC in MP4*.
 
 Safari says the time asked for wherever it lands, so "the player said" can't tell you where a seek
 really went, but the end of the song can: if the seek landed off, the song runs out before its

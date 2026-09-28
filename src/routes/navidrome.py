@@ -10,13 +10,14 @@ from typing import Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from starlette.background import BackgroundTask
 
 from src import player_cache
 from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, navidrome
 from src.config import Config
 from src.logger import logger
+from src.routes.download import ClientGone, unless_abandoned
 
 router = APIRouter()
 
@@ -255,6 +256,8 @@ async def stream(
     src/player_cache.py, and src/flac_mp4.py for why). The page asks for it only from WebKit, and
     only for a FLAC. It is made once per version of the file and served from a cache, with byte
     ranges; anything that isn't a FLAC it can repackage is sent exactly as it would be without it.
+    One URL stays on one container: a range carrying on from an MP4 that can't be had just now is
+    a 503, never the FLAC's bytes under another length.
 
     `format=raw` is the file as it is, which is the only kind Navidrome can answer a byte range
     for, and the player asks for it for every file the phone can play. It is asked for by name
@@ -268,7 +271,12 @@ async def stream(
     """
     if wrap == "mp4" and format == "raw":
         try:
-            wrapped = await player_cache.cache.answer(song_id, request)
+            #? uvicorn never cancels a handler whose phone has gone, so this looks every half second
+            #? and cancels the answer itself - which takes the request off the MP4 it waits for, and a
+            #? make nobody waits for stops, its download from Navidrome included
+            wrapped = await unless_abandoned(request, player_cache.cache.answer(song_id, request))
+        except ClientGone:
+            return Response(status_code=204)
         except NavidromeError as e:
             raise _fail(e)
         if wrapped is not None:
