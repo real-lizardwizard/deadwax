@@ -101,6 +101,12 @@ When a download is filed, the library tab picks the new album up by itself.
 The reason is shown on the row: the user refused the transfer, stopped responding, the transfer
 errored, or slskd never reported the transfers at all (after about two minutes of looking).
 
+**↻ retry** asks the same user again. Only the files that didn't arrive are asked for, and
+slskd can pick a partly downloaded file up where it stopped (unless a cancel deleted it; see
+below). It's the one to try when a user was briefly offline or a transfer timed out. If slskd
+is still stopping the last attempt, the row says to try again in a moment, and a refusal shows
+the reason, as with any download.
+
 **↻ next peer** moves the download to the next user from the list you picked it from,
 skipping any user already tried. It asks up to three in turn until one accepts, and the row
 then reads **try 2**, **try 3** and so on. The old attempt's transfers are cleared out of

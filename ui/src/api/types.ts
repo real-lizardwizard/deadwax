@@ -253,6 +253,15 @@ export interface RetryResponse {
   problem: string | null
 }
 
+/** Asking the same peer again (v1.0.7). */
+export interface RetrySameResponse {
+  retried: boolean
+  username: string | null
+  /** How many files were asked for - those that hadn't arrived. */
+  files: number
+  problem: string | null
+}
+
 export interface EnqueueResponse {
   status: string
   queued: number

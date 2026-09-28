@@ -2363,12 +2363,17 @@ span.red { color: var(--red-text); }
 
 .download-job-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
+    gap: 4px 10px;
 }
 
+/* takes what's left, but keeps a few characters: past that the retry buttons wrap to a line of
+   their own instead (v1.0.7), which a 280px panel with two of them needs */
 .download-job-title {
+    flex: 1 1 0;
+    min-width: 5em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2397,6 +2402,14 @@ span.red { color: var(--red-text); }
     cursor: pointer;
 }
 .download-retry-button:hover { color: var(--white-text); border-color: var(--accent-ring); }
+/* "retry" and "next peer" (v1.0.7): one group at the right, wrapping as one */
+.download-job-retries {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.download-job-retries > .download-retry-button { margin-left: 0; }
 
 .download-job-status.good { color: var(--green-text); }
 .download-job-status.mid { color: var(--yellow-text); }

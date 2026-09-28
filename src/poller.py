@@ -421,6 +421,52 @@ async def retry_next_peer(slskd_client, store, job: dict) -> dict:
             "left": len(untried_alternatives({**job, "tried": tried})), "problem": problem}
 
 
+async def retry_same_peer(slskd_client, store, job: dict) -> dict:
+    """
+    Ask the same peer for a failed or cancelled job again (v1.0.7, asked for: "a button next to
+    the next peer button to retry the same peer").
+
+    Returns {"retried", "username", "files", "problem"}. Only the files that didn't arrive are
+    asked for: a file slskd lists as succeeded is left alone, since asking again would fetch it a
+    second time. slskd supersedes each old record itself (DownloadService.EnqueueAsync marks the
+    previous one removed), and nothing here deletes a partial file - slskd resumes from it when
+    `retry.partial` is Resume, which is the point of asking the same peer.
+
+    A transfer slskd hasn't finished stopping - a cancel still settling - would be refused as
+    "Already in progress" inside a 201 that says nothing about it, so the job is left as it was
+    and the problem says to try again in a moment. When slskd's list can't be read at all,
+    every file is asked for, which at worst fetches one again.
+    """
+    username = job["username"]
+    files = job.get("files") or []
+
+    downloads = await slskd_client.get_downloads([username])
+    by_file = {t.get("filename"): t.get("state") or "" for t in index_transfers_by_user(downloads).get(username, [])}
+
+    unsettled = [f for f in files if f["filename"] in by_file and "Completed" not in by_file[f["filename"]]]
+    if unsettled:
+        return {"retried": False, "username": username, "files": 0,
+                "problem": "slskd is still stopping the last attempt - try again in a moment"}
+
+    wanted = [f for f in files if "Succeeded" not in by_file.get(f["filename"], "")]
+    if wanted:
+        ok, reason = await slskd_client.enqueue(username, wanted)
+        if not ok:
+            return {"retried": False, "username": username, "files": 0,
+                    "problem": reason or f"{username} refused"}
+
+    #? the same peer, folder and files, back to queued with the error cleared - move_to_peer
+    #? with nothing moved. `tried` is unchanged: this is no new peer.
+    await store.move_to_peer(job["id"], username, job.get("directory") or "", files,
+                             list(job.get("tried") or [{"username": username, "directory": job.get("directory")}]))
+    logger.info(
+        f"asking {username} again for {job.get('artist')} - {job.get('album')} "
+        f"({len(wanted)} of {len(files)} file(s))",
+        extra={"frontend": True, "src": "slskd"},
+    )
+    return {"retried": True, "username": username, "files": len(wanted), "problem": None}
+
+
 async def _auto_retry(slskd_client, store, job: dict) -> None:
     """After a failure, when AUTO_RETRY_PEER is on and there is a runner-up to try."""
     if (Config.AUTO_RETRY_PEER or "off").strip().lower() != "on" or not untried_alternatives(job):

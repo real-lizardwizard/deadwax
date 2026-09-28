@@ -59,12 +59,17 @@ export interface DownloadJobsState {
   cancelling: ReadonlySet<number>
   /** Downloads asked for that slskd hasn't answered yet, or refused. See PendingDownload. */
   pending: PendingDownload[]
-  /** Failed or cancelled jobs moving to their next peer, until a poll shows them moving. */
+  /** Failed or cancelled jobs being started again, until a poll shows them moving. */
   retrying: ReadonlySet<number>
-  /** Why the last "try next peer" didn't move a job, by job id - every peer refused, say. */
+  /** Which of `retrying` are asking the SAME peer again rather than moving to the next. */
+  retryingSame: ReadonlySet<number>
+  /** Why the last retry didn't start a job, by job id - every peer refused, say. */
   retryProblems: ReadonlyMap<number, string>
-  /** Move a failed or cancelled job to the next peer from the list it was picked from. */
-  retry: (jobId: number) => Promise<void>
+  /**
+   * Start a failed or cancelled job again: by default on the next peer from the list it was
+   * picked from, or with `samePeer` from the same peer, for the files that didn't arrive (v1.0.7).
+   */
+  retry: (jobId: number, samePeer?: boolean) => Promise<void>
   refresh: () => void
   /**
    * Queue a download, with a row in the panel from the click rather than from slskd's answer.
@@ -216,8 +221,11 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
   const pendingKey = useRef(0)
   const [retryProblems, setRetryProblems] = useState<ReadonlyMap<number, string>>(() => new Map())
 
-  const retry = useCallback(async (jobId: number) => {
+  const [retryingSame, setRetryingSame] = useState<ReadonlySet<number>>(() => new Set())
+
+  const retry = useCallback(async (jobId: number, samePeer = false) => {
     setOverlays((current) => ({ ...current, retrying: withAdded(current.retrying, [jobId]) }))
+    setRetryingSame((current) => samePeer ? withAdded(current, [jobId]) : withRemoved(current, [jobId]))
     setRetryProblems((current) => {
       if (!current.has(jobId)) return current
       const next = new Map(current)
@@ -231,9 +239,15 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
     }
 
     try {
-      const outcome = await api.retryJob(jobId)
-      if (outcome.moved) refresh()
-      else giveUp(outcome.problem ?? 'no other peer would take it')
+      if (samePeer) {
+        const outcome = await api.retryJobSamePeer(jobId)
+        if (outcome.retried) refresh()
+        else giveUp(outcome.problem ?? 'the peer refused')
+      } else {
+        const outcome = await api.retryJob(jobId)
+        if (outcome.moved) refresh()
+        else giveUp(outcome.problem ?? 'no other peer would take it')
+      }
     } catch (caught) {
       giveUp(caught instanceof Error ? caught.message : 'the retry failed')
     }
@@ -306,6 +320,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
     cancelling: overlays.cancelling,
     pending,
     retrying: overlays.retrying,
+    retryingSame,
     retryProblems,
     retry,
     refresh,

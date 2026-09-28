@@ -8,6 +8,7 @@ import type {
   FindCandidatesResponse,
   JobsResponse,
   RetryResponse,
+  RetrySameResponse,
 } from './types'
 
 /**
@@ -32,6 +33,11 @@ export function listJobs(): Promise<JobsResponse> {
 /** Move a failed or cancelled job to the next peer from the list it was picked from. */
 export function retryJob(jobId: number): Promise<RetryResponse> {
   return post<RetryResponse>(`/download/jobs/${jobId}/retry`)
+}
+
+/** Ask the same peer for a failed or cancelled job again, for the files that didn't arrive. */
+export function retryJobSamePeer(jobId: number): Promise<RetrySameResponse> {
+  return post<RetrySameResponse>(`/download/jobs/${jobId}/retry_same`)
 }
 
 export function cancelJob(jobId: number): Promise<CancelJobResponse> {
