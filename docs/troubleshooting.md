@@ -352,42 +352,61 @@ you let go. (Before 1.1.0-player.2 it was the browser's own slider, which on an 
 when you drag its small round thumb: a tap on the bar, or a drag started beside the thumb, did
 nothing.) If a tap or a drag still doesn't move the bar at all, that's a bug worth reporting.
 
-**Where the music lands is Safari's doing**, on an iPhone and on a Mac. To seek, a player has to
-work out where in the file a moment is. In a FLAC, where a second of quiet takes far fewer bytes
-than a second of loud, Safari estimates it from the bytes it has already read, and in a song whose
-loudness changes, that estimate is off. Measured on a Mac with the engine Safari uses: in a test
-song with a quiet first minute, seeks landed up to 50 seconds early, and up to 159 seconds out
-over a slow connection; in one whose loudness moved the way a song's does, 2 to 8 seconds early.
-In a song of steady loudness they landed within a third of a second. Safari's clock then says the
-time you asked for, not the time you hear. Chrome, Edge and other Chromium browsers landed exactly
-where asked every time.
+**Where the music lands in a FLAC is Safari's doing**, on an iPhone and on a Mac. To seek, a player
+has to work out where in the file a moment is. In a FLAC, where a second of quiet takes far fewer
+bytes than a second of loud, Safari estimates it from the bytes it has already read, and in a song
+whose loudness changes, that estimate is off: 3 and 8 seconds out on an iPhone, up to 14 in a
+song-like test file on a Mac, and up to 50 in one with a quiet first minute. Safari's clock then
+says the time you asked for, not the time you hear. Chrome, Arc, Edge and other Chromium browsers
+land exactly where asked every time.
 
-**The readout tells you when it happened.** Between the cover and the song's title the player
-shows *Last seek: asked 2:10, the player said 2:10* (*interrupted* instead, if Previous, Next or
-a failure came before the seek got there). Safari says the time asked for either way, so that can't show it, but
-the end of the song can: if the seek landed off, the song runs out before its clock reaches the
-end, or plays on after the clock has stopped at the end, by the same amount. When the song gets
-to its end with no other seek or pause in between, the line adds how far off it was, for example
-*the song played on 7 s after its clock ended, so it really landed at about 2:03*. *The song ended
-on time* means that seek landed where you put it.
+**Since 1.1.0-player.3 Safari gets FLAC inside an MP4**, the same audio bit for bit in a container
+that carries a table of where everything is, and its seeks land there exactly
+([the phone player](player.md#seeking-and-where-safari-lands) says more). So a song that still
+seeks to the wrong place in Safari, or on the iPhone, but not in Chrome, is one that didn't come
+that way. **The readout says which**: the *Last seek* line, between the cover and the song's title,
+ends with how the song playing was sent.
 
-**Seek tables.** A FLAC can carry a table of where each moment is in the file, so that a player
-doesn't have to estimate. Plenty of files have none: about one in five, in one library sampled
-(ffmpeg, for one, doesn't write a table). To see whether a file has one, and to add one, with the `flac` tools:
+- **`· FLAC in MP4`**: it came inside an MP4. A seek that still lands off is worth reporting,
+  with the song.
+- **`· sent as FLAC, not in an MP4`**: deadwax sent the FLAC as it is. It does that for a file
+  over 512 MB, and for one it can't repackage with certainty (a file cut short, say, or with
+  something after the audio it doesn't recognise); the song plays as before, and seeks may land
+  off. deadwax's log names the song and the reason, in a line starting `player: song … is sent to
+  Safari as FLAC, not in an MP4`. If the log says instead that Navidrome stopped sending the song,
+  or that the song couldn't be put in an MP4 because of the disk (full, or not writable), that
+  was one play: the next one tries again.
+- **`· asked for FLAC in MP4`** that never changes: the player couldn't find out what came. The
+  song itself may still have come as an MP4.
+- **nothing at the end**: the song isn't a FLAC (an MP3, AAC or ALAC file is sent as it is, and
+  seeks properly already), or the browser isn't Safari, or it's a Safari too old to play FLAC in an
+  MP4.
+
+**The first play of a song waits a moment** in Safari while deadwax repackages it (under a quarter
+of a second for a CD-quality song where it was measured), then it's kept, up to 1 GB of songs, in
+the container's temporary space. If that space is short, the repackaging fails and the song is sent as
+FLAC; it never stops a song playing.
+
+**The readout tells you when a seek landed off**, whichever way the song came. The line shows
+*Last seek: asked 2:10, the player said 2:10* (*interrupted* instead, if Previous, Next or a
+failure came before the seek got there). Safari says the time asked for either way, so that can't
+show it, but the end of the song can: if the seek landed off, the song runs out before its clock
+reaches the end, or plays on after the clock has stopped at the end, by the same amount. When the
+song gets to its end with no other seek or pause in between, the line adds how far off it was, for
+example *the song played on 7 s after its clock ended, so it really landed at about 2:03*. *The
+song ended on time* means that seek landed where you put it.
+
+**Seek tables don't help.** A FLAC can carry a table of where each moment is in the file, so that a
+player doesn't have to estimate, and plenty of files have none (ffmpeg, for one, doesn't write
+one). But in the measurements above a seek table made no difference to where Safari landed: the
+same song landed in the same wrong places with and without one. Chromium lands exactly either way,
+and Safari now gets the MP4, so there's no need to add tables to your library for this. If you
+want to look anyway, with the `flac` tools:
 
 ```sh
 metaflac --list --block-type=SEEKTABLE "01 - Song.flac"   # nothing listed: no table
-metaflac --add-seekpoint=10s "01 - Song.flac"            # a point every 10 seconds
+metaflac --add-seekpoint=10s "01 - Song.flac"            # a point every 10 seconds (writes the file: back it up)
 ```
-
-`metaflac` writes into the file itself, so back it up first; the audio and tags are left as they
-are, and Navidrome picks the change up like any other. **But in the measurements above, a seek
-table made no difference to where Safari landed**: the same song landed in the same wrong places
-with and without one. A table helps players that read one, and Chromium lands exactly either
-way, so there's no need to add tables to your library for this. What does land exactly in
-Safari's engine is the same FLAC audio in an MP4 file, or an MP3 at a constant bit rate; deadwax
-doesn't send either yet. Meanwhile a seek near where the song is playing lands closer than one
-far from it, and a seek to the start is always right.
 
 ## The log says a transcode "ended at … of the … bytes Navidrome estimated"
 

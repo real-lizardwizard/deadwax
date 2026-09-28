@@ -46,6 +46,7 @@ import {
   listenedStep, nextIndex, previousAction, startQueue, type PlayQueue, type QueueTrack,
 } from '../lib/playQueue'
 import { reportedPosition, seekStep, type PendingSeek, type SeekEvent, type SeekReading } from '../lib/scrub'
+import { asksForMp4, wrappedAs, wrapsFlac, type Wrapped } from '../lib/streamWrap'
 import { readPlayerGapless, writePlayerGapless } from '../state/persisted'
 import { coverUrl, scrobble, streamFormat, streamUrl } from './api'
 
@@ -65,6 +66,9 @@ export interface Player {
   gaps: GapReading[]
   /** the last seek the listener made, and where its song's end says it landed - see SeekReading */
   lastSeek: SeekReading | null
+  /** how the song playing came when it was asked for as FLAC in an MP4, for the readout; null when
+   *  it wasn't (every song, outside Safari) - see lib/streamWrap */
+  wrapped: Wrapped | null
   /** `start` null with shuffle: no song in particular - see startQueue() */
   playTracks(tracks: QueueTrack[], start: number | null, shuffle?: boolean): void
   toggle(): void
@@ -136,6 +140,7 @@ export function usePlayer(): Player {
   const [gapless, setGaplessShown] = useState(readPlayerGapless)
   const [gaps, setGaps] = useState<GapReading[]>([])
   const [lastSeek, setLastSeek] = useState<SeekReading | null>(null)
+  const [wrapped, setWrapped] = useState<Wrapped | null>(null)
 
   //? Everything the element's events and the lock screen's handlers read. They are set up once,
   //? so they read these rather than closing over a render's state.
@@ -193,6 +198,15 @@ export function usePlayer(): Player {
 
     const canPlay = (type: string) => live().canPlayType(type) !== ''
     const isWireless = () => live().webkitCurrentPlaybackTargetIsWireless === true
+    //? Safari, and every browser on an iPhone: FLAC songs are asked for inside an MP4, which is how
+    //? its engine lands a seek where it was asked to - see lib/streamWrap. Decided once, for the page.
+    const pageWraps = wrapsFlac({
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent ?? '' : '',
+      maxTouchPoints: typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0,
+      canPlayType: (type) => elements[0]!.canPlayType(type),
+    })
+    /** Where a song's audio is, for this page - see streamUrl(). */
+    const addressOf = (track: QueueTrack) => streamUrl(track, canPlay, pageWraps)
 
     /**
      * The song's length in seconds: the element's once it knows a real one, the tags' until then,
@@ -232,6 +246,30 @@ export function usePlayer(): Player {
         album: track.album,
         artwork: art ? [{ src: new URL(art, location.href).href, sizes: '512x512' }] : [],
       })
+    }
+
+    /**
+     * Whether the song now playing came inside an MP4, for the readout: an audio element never says
+     * what type it was sent, and deadwax sends the FLAC as it is when it won't repackage a file. So
+     * it is asked with two bytes, as Safari itself asks first - deadwax makes the MP4 once for both.
+     */
+    function checkWrapped(track: QueueTrack) {
+      if (!asksForMp4(track, streamFormat(track, canPlay), pageWraps)) {
+        setWrapped(null)
+        return
+      }
+      const id = track.id
+      setWrapped({ id, got: null })
+      fetch(addressOf(track), { headers: { Range: 'bytes=0-1' } })
+        .then((response) => {
+          response.body?.cancel().catch(() => {})
+          if (!response.ok) return
+          const got = wrappedAs(response.headers.get('Content-Type'))
+          setWrapped((shown) => (shown?.id === id ? { id, got } : shown))
+        })
+        .catch(() => {
+          //? the readout goes on saying it was asked for; the song itself is the element's business
+        })
     }
 
     /** Tell whatever shows the position where the song is - or where a seek on its way is going. */
@@ -307,8 +345,10 @@ export function usePlayer(): Player {
       report(0)
       showOnLockScreen(track)
 
-      setSource(live(), streamUrl(track, canPlay))
+      setSource(live(), addressOf(track))
       if (autoplay) play()
+      //? after the element's own request is on its way - the song comes first, the readout second
+      checkWrapped(track)
       fitStandby()
     }
 
@@ -321,7 +361,7 @@ export function usePlayer(): Player {
       setError(null)
       const audio = live()
       const track = current(state.queue)
-      if (state.memory.has(audio) && track) setSource(audio, streamUrl(track, canPlay))
+      if (state.memory.has(audio) && track) setSource(audio, addressOf(track))
       else audio.load()
     }
 
@@ -511,7 +551,7 @@ export function usePlayer(): Player {
      * altogether (standbyPlan()).
      */
     async function download(standby: Standby, element: AirPlayAudio, track: QueueTrack) {
-      const address = streamUrl(track, canPlay)
+      const address = addressOf(track)
       const raw = streamFormat(track, canPlay) === 'raw'
       const controller = new AbortController()
       state.download = controller
@@ -613,7 +653,7 @@ export function usePlayer(): Player {
       cancelRetry()
       //? aborts a download still under way - 'unfinished' plays the song from its address instead
       cancelPreload()
-      if (decision.source === 'unfinished') setSource(incoming, streamUrl(track, canPlay))
+      if (decision.source === 'unfinished') setSource(incoming, addressOf(track))
       //? what it held, when it held something: whether iOS kept it - see describeHow()
       const readyState = decision.source === 'unfinished' ? null : incoming.readyState
       const from = incoming.currentTime || 0
@@ -637,6 +677,7 @@ export function usePlayer(): Player {
       showOnLockScreen(track)
 
       play(() => refusedHandover(next))
+      checkWrapped(track)
       //? the element that finished lets go of its song, and becomes the next song's standby
       empty(outgoing)
       return { decision, readyState, from }
@@ -1052,6 +1093,7 @@ export function usePlayer(): Player {
     gapless,
     gaps,
     lastSeek,
+    wrapped,
     ...engine.actions,
   }
 }

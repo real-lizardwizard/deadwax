@@ -8,6 +8,7 @@
 
 import { get, post, url } from '../api/http'
 import type { QueueTrack } from '../lib/playQueue'
+import { asksForMp4 } from '../lib/streamWrap'
 
 export interface NavidromeStatus {
   configured: boolean
@@ -109,9 +110,14 @@ export function playableType(track: Pick<QueueTrack, 'contentType' | 'suffix'>):
  * has cached it (core/stream/media_streamer.go answers Accept-Ranges: none) and, from a bit rate
  * alone, in Opus. A file nobody named a type for is sent as it is too: asking for MP3 would be a
  * guess.
+ *
+ * `pageWraps` - Safari and every iPhone browser (wrapsFlac() in lib/streamWrap) - asks for a FLAC
+ * inside an MP4 of the same frames, which is the form of it whose seeks Safari lands exactly.
  */
-export function streamUrl(track: QueueTrack, canPlay: (type: string) => boolean): string {
-  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${streamFormat(track, canPlay)}`)
+export function streamUrl(track: QueueTrack, canPlay: (type: string) => boolean, pageWraps = false): string {
+  const format = streamFormat(track, canPlay)
+  const wrap = asksForMp4(track, format, pageWraps) ? '&wrap=mp4' : ''
+  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${format}${wrap}`)
 }
 
 /** Which of the two streamUrl() asks for: the file as it is, or a transcode to MP3. */

@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
+from src import player_cache
 from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, navidrome
 from src.config import Config
 from src.logger import logger
@@ -244,9 +245,16 @@ async def stream(
     request: Request,
     format: str | None = Query(None, pattern=r"^[a-z0-9]{1,10}$"),
     max_bitrate: int | None = Query(None, ge=0, le=3200),
+    wrap: Literal["mp4"] | None = None,
 ):
     """
     A song's audio, with the page's byte range and conditions passed through.
+
+    `wrap=mp4`, with `format=raw`, asks for a FLAC song inside an MP4 of the very same frames -
+    lossless, and the one form of it whose seeks Safari lands where they were asked (see
+    src/player_cache.py, and src/flac_mp4.py for why). The page asks for it only from WebKit, and
+    only for a FLAC. It is made once per version of the file and served from a cache, with byte
+    ranges; anything that isn't a FLAC it can repackage is sent exactly as it would be without it.
 
     `format=raw` is the file as it is, which is the only kind Navidrome can answer a byte range
     for, and the player asks for it for every file the phone can play. It is asked for by name
@@ -258,6 +266,14 @@ async def stream(
 
     Never cached without asking: a retag rewrites a file in place under the same URL.
     """
+    if wrap == "mp4" and format == "raw":
+        try:
+            wrapped = await player_cache.cache.answer(song_id, request)
+        except NavidromeError as e:
+            raise _fail(e)
+        if wrapped is not None:
+            return wrapped
+
     params = {"id": song_id, "format": format, "maxBitRate": max_bitrate}
     #? For anything but the file as it is, have Navidrome send a Content-Length - its estimate,
     #? from the duration and bit rate. It reads this only for a transcode, which otherwise goes

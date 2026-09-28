@@ -138,6 +138,10 @@ src/
                    already on disk. Same plan/execute split, for the same reasons.
   scan_wait.py     PURE. Whether Navidrome has finished a scan that began after an apply's
                    tags were written, so the folder can be renamed - see "The scan wait".
+  flac_mp4.py      PURE. A FLAC file as an MP4 of the very same frames, no ffmpeg - what makes
+                   Safari's seeks land. See "FLAC in an MP4, for Safari".
+  player_cache.py  those MP4s made from Navidrome's file and kept on disk (temp space, 1 GiB),
+                   served with byte ranges; the stream route's `wrap=mp4`.
   track_tags.py    tags edited BY HAND, on one track or a selection at once. The fourth
                    writer, and the same plan/execute split again - see "Editing tags by hand".
   artists.py       PURE. What an artist page shows, and where artist pictures come from -
@@ -170,7 +174,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one.
-tests/             1137 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1253 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2479,6 +2483,9 @@ guide's section is `docs/player.md#gapless-playback-experimental`.
   skipped, and a Flaky one failing three times was retried and played; switching off mid-album,
   whichever element was playing (the first, and in another run the second) played the rest alone,
   Broken and Flaky behaving as before.
+- **Seen on the phone (1.1.0-player.2, James):** song changes on the iPhone read 96 ms and 94 ms;
+  on his Mac, in Arc, "Last song change 236 ms, handed over, from memory · before: 581, 511, 2867,
+  218 ms". Whether the phone's were locked, and how they were made, he didn't say.
 - **NOT verified - the phone's to answer**, and the guide lists them for James: that `load()` in a tap
   unlocks the second element as read; whether a download or a buffer survives while locked (the
   readout's "had to load" and big numbers say no); the lock screen during a swap; AirPlay with the
@@ -2589,9 +2596,12 @@ one in the page, fixed; one in Safari's engine, which deadwax can't fix yet and 
 - **Not verified - the phone's to answer**: a tap and a drag under a real finger (the tool's
   pointers are a mouse's); where Safari on an iPhone lands (the readout is how James sees it);
   whether WebKit sends VoiceOver's adjustments to a custom slider as arrow keys in this version.
-- **Not built**: sending FLAC to Safari in an MP4 (lossless, and it landed exactly) would mean a
-  remux per song - ffmpeg in the image, and ranges over a remuxed copy. A CBR MP3 transcode lands
-  exactly too, but Navidrome's transcodes carry no ranges, which is worse for seeking in Safari.
+- ~~Not built: sending FLAC to Safari in an MP4~~ **Built in 1.1.0-player.3**, without ffmpeg -
+  see "FLAC in an MP4, for Safari". (A CBR MP3 transcode lands exactly too, but Navidrome's
+  transcodes carry no ranges and aren't lossless, so it was never the fix.)
+- **Seen on the iPhone (1.1.0-player.2, James):** FLAC seeks landed 3 s and 8 s off by the
+  readout's end-of-song judgement ("the song ended 8 seconds early the first time and 3 seconds
+  early the second time") - the Mac's AVFoundation measurements, confirmed on the phone.
 
 #### After review (gapless and seeking, 1.1.0-player.2)
 
@@ -2668,6 +2678,140 @@ An adversarial review of the two commits above confirmed seven findings, all fix
   clock (1.57 -> 1, 3.07 -> 3, 6.07 -> 6). NOT checked in a page: the AirPlay routing and the
   transcode path (Chromium sends no AirPlay events and plays every file in the stub) - the sim
   covers both; and nothing on an iPhone.
+
+#### FLAC in an MP4, for Safari (1.1.0-player.3)
+
+James: "go ahead and build the MP4 repackaging", after his iPhone confirmed FLAC seeks 3 and 8 s
+off. Safari (and every iPhone browser) now gets each FLAC song as an MP4 holding the SAME FLAC
+frames; Chromium, Arc included, keeps the file as it is. The guide's section is
+`docs/player.md#seeking-and-where-safari-lands`.
+
+- **Why an MP4 fixes it.** AVFoundation seeks a FLAC by estimating a byte offset from the bit rate
+  it has parsed so far (see "Seeking"); an MP4 has a sample table (`stsz`/`stts`/`stco`) giving
+  every frame's size and duration, so a seek is arithmetic. Measured with `avlab2` (AVFoundation,
+  pilot-tone read) THROUGH deadwax on 8081 against the seek stub, same song, same targets:
+  | file | FLAC as it is (`format=raw`) | FLAC in MP4 (`&wrap=mp4`) |
+  | --- | --- | --- |
+  | Varied (quiet minute, then loud) | -25.6, -22.9, +39.9, +17.9, +25.3, +38.1, +31.0; 275 s ran off the end | +0.01 on all 8 |
+  | Song-like (a song's swing) | -11.8, -14.0, +3.0, -2.5, +1.7, +1.2, +1.9, +4.8 | +0.01 on all 8 |
+  In Chromium the wrapped URL, set by hand on an `<audio>` with a Web Audio analyser, read the
+  pilot at a constant -0.34 s from the clock on all 8 seeks - the analyser window's half, the
+  same figure the raw FLAC gives - so Chromium plays and seeks the MP4 exactly too.
+- **The muxer, `src/flac_mp4.py`, pure, no ffmpeg** (the image is python-slim and stays so).
+  xiph's isoflac.txt layout: ftyp (`isom`, `iso2`, `mp41`), then `moov` BEFORE `mdat` (a player
+  fetching by range seeks without reading to the end), one MP4 sample per FLAC frame, frames
+  byte for byte, STREAMINFO in `dfLa` in an `fLaC` sample entry, sample rate as timescale, no
+  `stss` (every frame is a sync sample), chunks of about a second. Deterministic (no timestamps),
+  so the same file always makes the same bytes. `mp4_layout()` returns the head and where the
+  audio is in the input, so the cache writes head + a slice of the FLAC it already holds rather
+  than a second copy. Decoded PCM through ffmpeg was byte-identical for six real files; 57 ms for
+  a 40 MB CD FLAC.
+- **Splitting frames safely is the whole risk**, since FLAC has no frame index and the sync code
+  turns up inside audio every ~90 KB. A candidate is taken as the next frame only if its header
+  is right in every particular: every field agrees with STREAMINFO, reserved bits clear, CRC-8
+  right, and exactly the NEXT frame (or sample) number, coded the shortest way - by chance once in
+  2^40 bytes at worst, 2^48 past frame 127. And not left to chance: a false header taken for frame
+  k leaves the real frame k's header before k+1's, carrying a number already used - that duplicate
+  is watched for and the CRC-16 of the frame before decides which is real; neither checking out
+  refuses the file. The LAST frame is always CRC-16 checked (how an ID3v1/APEv2 trailer is left
+  out and a truncated file refused), block sizes must sum to STREAMINFO's total, a fixed-block
+  stream's frames must all be one size, and past one false sync per 256 bytes the file is refused
+  (bounded work). Anything off raises `CannotRepackage` and the FLAC is sent as it is: a wrong MP4
+  would be worse than none. 84 tests (`tests/test_flac_mp4.py`) with a verbatim FLAC encoder, no
+  binary fixtures, planted false headers, 17 mutations of which 16 caught.
+- **The route: `wrap=mp4` on the EXISTING stream route**, honoured only with `format=raw` - no new
+  route, `test_there_is_no_general_proxy` still pins the list. `player_cache.Mp4Cache.answer()`:
+  1. **Which version** (`_version`): a `bytes=0-3` range of the file from Navidrome. Its type must
+     be `audio/flac` or `audio/x-flac` (Navidrome's mime_types.yaml says `audio/flac`) AND its
+     first bytes `fLaC` or `ID3`; the Content-Range gives the size, and Last-Modified plus any
+     ETag the stamp. Remembered `VERSION_SECONDS` (30), since Safari asks two bytes, then the rest,
+     then a range per seek. A 416 (an empty file) is a "no", not Safari's 416. Four bytes that
+     Navidrome breaks off are NOT remembered: that request gets the FLAC, the next looks again.
+  2. **The key is `sha256([FORMAT_VERSION, id, size, stamp])`**, and the file is named by it, never
+     by the id (caller input). Navidrome's Last-Modified for a raw stream is its database's
+     `UpdatedAt` (core/stream/media_streamer.go: `ModTime()` is `mf.UpdatedAt`), which moves once
+     its scan has seen a change; the size is ServeContent's real one. **The MP4 carries no tags**
+     - only STREAMINFO and the frames - so a retag makes the same MP4 again: a wasted repackage,
+     never a wrong one. What the key must catch is a file whose AUDIO was replaced, and a
+     same-size replacement is caught by the stamp (pinned). Bump `FORMAT_VERSION` whenever the
+     muxer's output changes.
+  3. **Miss**: the whole file (no Range) streamed to a `.part` file in 1 MiB writes, its bytes
+     counted against the version's size (a length that disagrees, or too many or too few bytes,
+     means it changed or broke: this request gets the FLAC, the next looks again - NOT remembered
+     as a refusal, which would keep a good song out for good), then `_repackage` in a worker
+     thread: read, `mp4_layout`, write `<key>.<token>.tmp`, `os.replace` into place, so a
+     half-written MP4 is never served. The input is held once in memory (`WRAP_MAX_BYTES`, 512 MiB;
+     bigger is refused from the probe's size, logged at info, nothing fetched).
+  4. **Single flight**: one task per key in `_working`, awaited through `asyncio.shield` so a
+     phone hanging up can't cancel what another request waits on; and one repackage at a time
+     altogether (`_gate`, an asyncio.Lock made per event loop - TestClient runs each request on its
+     own loop), which bounds memory; inside it the file is checked for again. **Verified**: ten
+     requests at once on a cold song, one abandoned after 20 ms, made one MP4 and every range
+     matched.
+  5. **Refusals** (`CannotRepackage`, too big) are remembered per key (`REFUSALS_KEPT`, 256) and
+     logged ONCE: `player: song X is sent to Safari as FLAC, not in an MP4 - <reason>`. Transient
+     failures (Navidrome dropping the download, the disk) are logged each time and not remembered.
+     Every failure answers None and the route relays the FLAC exactly as before - never a broken
+     song.
+- **Served by `ranged_file`, not Starlette's FileResponse**, which was read (0.50) and fails three
+  ways: its 416 says `Content-Range: */N` without the unit, it refuses a suffix range longer than
+  the file (RFC 9110 says the whole file, as a 206), and it stats the file only as it sends, so an
+  eviction in between is a 500. `ranged_file` opens the file FIRST (an open file outlives its
+  name; FileNotFoundError reaches the caller while it can still send the FLAC), answers one range
+  (several, another unit or a malformed one get the whole file with a 200, which the RFC allows),
+  and honours If-Range strongly against the ETag (the key) or exactly against Last-Modified (the
+  MP4 file's own mtime - which is why LRU recency is kept in memory, `_used`, and never by
+  touching the file: that would change the validator under a seek). `audio/mp4`,
+  `Cache-Control: no-cache`, Accept-Ranges, exact Content-Length; GuardMedia and the gzip
+  exemption apply by path already (`/deadwax/navidrome/stream/`), and a test checks both.
+- **The cache: `tempfile.gettempdir()/deadwax-player`, `CACHE_MAX_BYTES` 1 GiB, least recently
+  served first**, never the file just made. Temp space, not /config: it is rebuilt on demand, the
+  config volume is what gets backed up, and a new image starts it empty. Leftover `.part`/`.tmp`
+  files older than 10 minutes are cleared on first use. **No setting**, decided: it only has to
+  hold what is being listened to now, and 1 GiB is several albums.
+- **The page** (`lib/streamWrap.ts`, pinned by `wrap.sim.cjs`): `wrapsFlac()` once per page -
+  WebKit that isn't Chromium (any iPhone/iPad UA, CriOS and FxiOS included; a "Macintosh" UA with
+  touch points is an iPad in desktop mode, even one claiming Chrome; otherwise `AppleWebKit/`
+  without `Chrome/`, which HeadlessChrome, Edge, Opera, Samsung and Arc all carry) AND
+  `canPlayType('audio/mp4; codecs="flac"') !== ''`. Per song, `asksForMp4()`: a FLAC by suffix or
+  type, and `format=raw` (a transcode has no FLAC in it). `streamUrl(track, canPlay, pageWraps)`;
+  usePlayer's `addressOf()` is used for the element, the reload, the gapless download and the
+  unfinished handover alike, so all four ask for the same URL and the server's cache serves them
+  all. `memoryPlan` already took any `audio/*`, so the gapless download holds the MP4 unchanged.
+- **The readout says how the song came**, since an element never shows what type it was sent and
+  deadwax may have sent the FLAC: `checkWrapped()` asks the same URL for `bytes=0-1` at every song
+  (`load` and `handOver`), reads the Content-Type, and drops an answer for a song no longer
+  playing. The "Last seek" line ends ` · FLAC in MP4`, ` · sent as FLAC, not in an MP4`, or
+  ` · asked for FLAC in MP4` until the answer lands; nothing in Chromium. It describes the song
+  PLAYING, so after a song change it sits beside a seek judged on the song before.
+- **First-request delay** (a cold `bytes=0-1` through deadwax on this Mac, the stub on
+  localhost): 131-225 ms for a 4-minute CD-quality FLAC (29 MB, ~970 kbps; the repackage itself
+  77-87 ms of it, the rest fetching from the Python stub), 91 ms for Varied (19 MB); a cached
+  answer 1.2 ms, against 2.3 ms for the raw FLAC relayed. A NAS will be slower; a real Navidrome
+  serves the file faster than the stub.
+- **Verified in the real page** (Chromium, 8081, the seek stub): the page as it is - element on
+  `format=raw`, the gapless download `?format=raw`, a handover "from memory" at 226 ms, the seek
+  line with no suffix. Then with `navigator.userAgent`/`maxTouchPoints` overridden to an iPhone's
+  and the player module re-imported: the element on `&wrap=mp4`, the next song downloaded as
+  `&wrap=mp4` and played from its `blob:` after a handover "from memory", the line reading "No
+  seek yet · FLAC in MP4" and, after a real tap at 50%, "Last seek: asked 2:30, the player said
+  2:30 · FLAC in MP4", then "... the song ended on time ..." at the end; at 375x667 the line wraps
+  above the title with nothing clipped. Every served byte and range (0-1, 1000-, a suffix, a
+  middle, past the end, If-Range stale and current) compared equal to `flac_to_mp4()` of the file
+  for Varied, the ID3-fronted Varied and the CD file.
+- **Tests**: 32 through the real app in `tests/test_navidrome.py` (a fake Navidrome serving a
+  FLAC from the muxer tests' encoder), and `wrap.sim.cjs` plus a Safari/Chromium section in
+  `player.sim.cjs`. Mutations: 14 of the cache's (If-Range ignored, the suffix clamp, refusal
+  memory, the stamp in the key, the LRU touch, LRU order, the cap, version memory, the bytes check,
+  the size cap, the byte count, the 416's unit, the part file left, a weak ETag taken) and 8 of the
+  page's (the answer-for-this-song guard, the download's URL, the handover's check, the iOS and
+  iPad rules, the Chrome exclusion, the raw-only rule, the canPlayType ask) all caught - after
+  the stamp, the byte count and the two iOS rules first went uncaught and tests were added.
+- **NOT verified - the phone's to answer**: that the iPhone's AVFoundation lands in the MP4 as the
+  Mac's does (the readout's end-of-song line is how James sees it); how long a first play waits
+  over WireGuard from the NAS; that the gapless `blob:` of an MP4 plays on the phone (it plays in
+  Chromium); memory on the NAS with hi-res files; and Safari's own request pattern against the
+  cache (only curl, AVPlayer and Chromium have asked it).
 
 ### Artists who have renamed (v0.6.18)
 
@@ -3986,7 +4130,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1137 tests
+.venv/bin/python -m pytest tests/ -q  # 1253 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -4014,6 +4158,7 @@ node ui/test/playqueue.sim.cjs  # the phone player's queue - what previous does,
 node ui/test/gapless.sim.cjs    # the gapless switch - what the standby holds, hand over or not, which events count, memory
 node ui/test/scrub.sim.cjs      # the player's scrubber - a point on the bar, fingers and keys, a seek on its way, where it landed
 node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks on their way, the readout across song ends, a handover
+node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (WebKit, not Chromium), which songs, what the readout says
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -4034,7 +4179,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1137 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1253 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { describeGaps } from '../lib/gapless'
 import { clock, describeSeek, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
+import { describeWrap } from '../lib/streamWrap'
 import { Cover } from './Library'
 import { AirPlayIcon, ChevronDownIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
 import { usePosition, type Player } from './usePlayer'
@@ -222,7 +223,10 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
             moment of a tap. Up here the most that moves is the cover. */}
         <div class="pl-readouts">
           <p class="pl-gapless-readout">{describeGaps(player.gaps)}</p>
-          <p class="pl-gapless-readout pl-seek-readout">{describeSeek(player.lastSeek)}</p>
+          {/* ending "· FLAC in MP4" when the song was sent that way - how the phone shows it */}
+          <p class="pl-gapless-readout pl-seek-readout">
+            {describeSeek(player.lastSeek) + describeWrap(player.wrapped, track.id)}
+          </p>
         </div>
 
         <div class="pl-sheet-titles">

@@ -12,7 +12,9 @@
  * it included), a 'seeked' that comes while another seek is still out, "previous" and "next" during
  * a seek, the readout across a song's end (on time, and landed early as Safari's engine does), a
  * seek on a song still loading, and a gapless handover - from memory, and for a transcode, never
- * fetched ahead - with the AirPlay button left alone by the standby.
+ * fetched ahead - with the AirPlay button left alone by the standby. And, per browser, which
+ * addresses it asks for: FLAC inside an MP4 from Safari (lib/streamWrap), taken into memory by the
+ * gapless switch like any file, and said in the readout; the file as it is from Chromium.
  *
  * A script for the same reason as the other sims: there is no JS test runner here. It compiles
  * usePlayer.ts and what it imports with the repo's TypeScript into a temporary folder, beside a
@@ -100,7 +102,9 @@ function tap(fn) {
 /* ===== Navidrome, through deadwax ===== */
 
 const songs = {}
-const NET = { fetchDelay: 50, seekDelay: 300, staleClockWhileSeeking: false, answerEverySeek: false, landingError: 0, cannotPlay: /$^/ }
+const NET = { fetchDelay: 50, seekDelay: 300, staleClockWhileSeeking: false, answerEverySeek: false, landingError: 0, cannotPlay: /$^/,
+  //? songs deadwax sends as FLAC even when asked for an MP4 - a file it won't repackage
+  sentAsFlac: new Set() }
 const net = { ...NET }
 const fetched = []
 const blobs = new Map()
@@ -119,13 +123,16 @@ define('fetch', (address, init = {}) => {
   address = String(address)
   if (address.includes('/scrobble/')) return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
   const [, id, format] = /\/stream\/([^?]+)\?format=(\w+)/.exec(address)
-  fetched.push(`${decodeURIComponent(id)}?${format}`)
+  const wrap = /[?&]wrap=mp4(&|$)/.test(address)
+  const range = init.headers?.Range
+  fetched.push(`${decodeURIComponent(id)}?${format}${wrap ? '+mp4' : ''}${range ? ` ${range}` : ''}`)
   return new Promise((resolve, reject) => {
     let aborted = false
     init.signal?.addEventListener('abort', () => { aborted = true; reject(new DOMException('aborted', 'AbortError')) })
     later(net.fetchDelay, () => {
       if (aborted) return
-      const headers = { 'content-type': 'audio/flac', 'content-length': '1000' }
+      const mp4 = wrap && !net.sentAsFlac.has(decodeURIComponent(id))
+      const headers = { 'content-type': mp4 ? 'audio/mp4' : 'audio/flac', 'content-length': range ? '2' : '1000' }
       resolve({
         ok: true, status: 200, body: null,
         headers: { get: (name) => headers[name.toLowerCase()] ?? null },
@@ -322,7 +329,11 @@ const storage = new Map()
 define('localStorage', { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)) })
 define('document', { createElement: () => new FakeAudio(), body: { appendChild() {} } })
 const media = { metadata: null, playbackState: 'none', handlers: {}, setActionHandler(action, handler) { this.handlers[action] = handler }, setPositionState() {} }
-define('navigator', { mediaSession: media })
+const browser = { mediaSession: media }
+define('navigator', browser)
+//? what the real browsers send - see ui/test/wrap.sim.cjs for the rest
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1'
+const ARC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
 define('MediaMetadata', class { constructor(fields) { Object.assign(this, fields) } })
 define('location', { href: 'http://deadwax.test/player/' })
 
@@ -330,16 +341,20 @@ const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { usePlayer } = require(path.join(OUT, 'player/usePlayer.js'))
 const { describeSeek, PENDING_MAX_MS } = require(path.join(OUT, 'lib/scrub.js'))
 const { describeGaps } = require(path.join(OUT, 'lib/gapless.js'))
+const { describeWrap } = require(path.join(OUT, 'lib/streamWrap.js'))
 
 /** A fresh page: no elements, nothing queued, the storage empty - and a player, and what its bar hears. */
-function page({ gapless = false, durations = {} } = {}) {
+function page({ gapless = false, durations = {}, userAgent, maxTouchPoints } = {}) {
+  //? before the player is made: it decides once, for the page, whether FLAC comes in an MP4
+  browser.userAgent = userAgent
+  browser.maxTouchPoints = maxTouchPoints
   tasks = []
   elements.length = 0
   fetched.length = 0
   blobs.clear()
   storage.clear()
   graceUntil = -1
-  Object.assign(net, NET)
+  Object.assign(net, NET, { sentAsFlac: new Set() })
   for (const id of Object.keys(songs)) delete songs[id]
   for (const [id, duration] of Object.entries(durations)) songs[id] = { duration }
   if (gapless) storage.set('deadwax-player-gapless', 'on')
@@ -350,7 +365,7 @@ function page({ gapless = false, durations = {} } = {}) {
     get player() { return render() },
     heard,
     lastHeard: () => heard[heard.length - 1].s,
-    seekLine: () => describeSeek(render().lastSeek),
+    seekLine: () => describeSeek(render().lastSeek) + describeWrap(render().wrapped, render().track?.id ?? null),
     gapLine: () => describeGaps(render().gaps),
   }
 }
@@ -605,6 +620,68 @@ const near = (value, target, within = 0.6) => Math.abs(value - target) <= within
     check('"next" before the seek landed: song 2, handed over to the second element', p.player.track.id === '2' && e1.playingNow && !e1.muted, true)
     check('the readout says the seek was interrupted, not "seeking…"', p.seekLine(), 'Last seek: asked 0:20, interrupted')
     check('the bar hears the second element\'s clock, not the old target', near(p.lastHeard(), e1.currentTime, 0.3) && p.lastHeard() < 11, true)
+  }
+
+  /* ======================================================================== */
+  console.log('\nFLAC inside an MP4, for Safari only')
+  {
+    //? Arc on a Mac - Chromium - seeks FLAC exactly: the file as it is, and nothing asked about it
+    const p = page({ gapless: true, durations: { 1: 8, 2: 8 }, userAgent: ARC, maxTouchPoints: 0 })
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    check('Chromium: the song asked for as it is', /\/stream\/1\?format=raw$/.test(e0.src), true)
+    await run(3_500)
+    check('...the next one downloaded as it is, and nothing else asked', fetched, ['2?raw'])
+    check('...the readout says nothing about MP4s', p.seekLine(), 'No seek yet')
+    check('...and nothing is recorded about one', p.player.wrapped, null)
+    await run(5_000)
+    check('...handed over from memory as before', /handed over, from memory$/.test(p.gapLine()) && e1.playingNow, true)
+  }
+  {
+    //? an iPhone: every FLAC asked for in an MP4 - the element, the check, and the gapless download
+    const p = page({ gapless: true, durations: { 1: 8, 2: 8, 3: 8 }, userAgent: IPHONE, maxTouchPoints: 5 })
+    net.cannotPlay = /opus/
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3'], { 3: 'opus' }), 0))
+    check('Safari: the song asked for in an MP4', /\/stream\/1\?format=raw&wrap=mp4$/.test(e0.src), true)
+    check('...said as asked for until the answer is in', p.seekLine(), 'No seek yet · asked for FLAC in MP4')
+    await run(100)
+    check('...two bytes of it asked for, to see what came', fetched, ['1?raw+mp4 bytes=0-1'])
+    check('...an MP4 came, and the readout says so', p.seekLine(), 'No seek yet · FLAC in MP4')
+    await run(3_500)
+    check('the next song downloaded in an MP4 too', fetched.slice(1), ['2?raw+mp4'])
+    check('...and taken into memory, audio/mp4 like any audio', e1.src.startsWith('blob:') && e1.readyState === 4, true)
+    await run(5_000)
+    check('handed over from memory', p.player.track.id === '2' && e1.playingNow && /handed over, from memory$/.test(p.gapLine()), true)
+    check('...asked what came for the new song, and said', [fetched[2], p.seekLine()], ['2?raw+mp4 bytes=0-1', 'No seek yet · FLAC in MP4'])
+    tap(() => p.player.seek(4))
+    await run(400)
+    check('a seek: the line ends with how the song came', p.seekLine(), 'Last seek: asked 0:04, the player said 0:04 · FLAC in MP4')
+    await run(4_000)
+    const playing = elements.find((element) => element.playingNow)
+    check('an Opus song, transcoded: no MP4 asked for, nothing said',
+          [p.player.track.id, /\/stream\/3\?format=mp3$/.test(playing?.src ?? ''), p.player.wrapped], ['3', true, null])
+  }
+  {
+    //? a FLAC deadwax won't repackage comes as FLAC, and the phone can see it did
+    const p = page({ durations: { 1: 8 }, userAgent: IPHONE, maxTouchPoints: 5 })
+    net.sentAsFlac.add('1')
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(100)
+    check('sent as FLAC: the readout says so', p.seekLine(), 'No seek yet · sent as FLAC, not in an MP4')
+  }
+  {
+    //? an answer for the song before, arriving after the change, says nothing about this one
+    const p = page({ durations: { 1: 30, 2: 30 }, userAgent: IPHONE, maxTouchPoints: 5 })
+    net.fetchDelay = 500
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(100)
+    tap(() => p.player.next())
+    net.sentAsFlac.add('2')
+    await run(450)
+    check('song 1\'s answer came after "next": song 2 still only asked for', p.seekLine(), 'No seek yet · asked for FLAC in MP4')
+    await run(200)
+    check('...and then song 2\'s own answer', p.seekLine(), 'No seek yet · sent as FLAC, not in an MP4')
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

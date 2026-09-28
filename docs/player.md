@@ -175,7 +175,8 @@ In a desktop browser (Chromium) it works. Timed on the clock as above, a song ch
 stand in for a VPN; with the switch on it took about 98 ms either way. Much of those 98 ms is the
 browser starting its sound output at all, which every device does at its own speed, so what to
 look at on the phone is the difference between the switch on and off, not either number alone.
-The parts that matter only an iPhone can answer. To try it:
+On an iPhone, song changes have read 94 and 96 ms. The parts that matter only an iPhone can
+answer. To try it:
 
 1. Turn **Gapless** off, play an album from a tap, and let a few songs change with the screen on,
    to see what the ordinary way takes on your phone and connection. Then turn it on and let a
@@ -202,34 +203,64 @@ would take a different kind of player.
 ## Seeking, and where Safari lands
 
 The scrubber seeks where you let go, and shows that time until the player has got there, however
-long that takes over a slow connection. Where the music then comes in is up to the browser, and
-Safari (on an iPhone or a Mac) doesn't always come in where it was asked to.
+long that takes over a slow connection. Where the music then comes in is up to the browser.
 
-To seek in a FLAC a player has to find the moment in the file, and a second of a quiet passage
-takes far fewer bytes than a second of a loud one. Safari's engine estimates from the part of the
-file it has already read, and in a song whose loudness changes, it lands off, while its clock
-says the time you asked for. Measured on a Mac with that engine (the same one iOS Safari uses,
-though not measured on a phone):
+**In a FLAC file, Safari doesn't land where it was asked to.** To seek in a FLAC a player has to
+find the moment in the file, and a second of a quiet passage takes far fewer bytes than a second
+of a loud one. Safari's engine (on a Mac, and every browser on an iPhone or iPad, which all use it)
+estimates from the part of the file it has already read, and in a song whose loudness changes it
+lands off, while its clock says the time you asked for. Measured on a Mac with that engine:
 
 | test song | where seeks landed |
 | --- | --- |
 | steady loudness | within a third of a second |
-| loudness moving like a song's (quiet intro, verses and choruses) | 2 to 8 seconds early |
+| loudness moving like a song's (quiet intro, verses and choruses) | 1 to 14 seconds out |
 | a quiet first minute, then loud | up to 50 seconds out, and up to 159 over a slow connection |
 
-A **seek table** in the file made no difference: the same songs landed in the same places with
-and without one. Chrome and other Chromium browsers landed exactly where asked every time, with or
-without a table. The same FLAC audio in an MP4 file, or an MP3 at a constant bit rate, landed
-exactly in Safari's engine too; deadwax doesn't send either yet.
+On an iPhone it landed 3 and 8 seconds out. A **seek table** in the file made no difference. Chrome
+and other Chromium browsers (Arc and Edge included) land exactly where asked every time.
+
+**So Safari gets FLAC songs inside an MP4.** An MP4 file carries a table of where every piece of
+the audio is, and Safari's engine seeks by that table exactly. When the player is running in
+Safari, it asks deadwax for each FLAC song inside an MP4, and deadwax repackages it: **the very same
+FLAC audio, bit for bit, in a different container**. Nothing is transcoded and nothing is lost, and
+the files in your library aren't touched. Measured the same way, through deadwax: every seek into
+the MP4 landed within a hundredth of a second, where the same song as FLAC landed up to 40 seconds
+out. Other browsers get the FLAC as it is, as before.
+
+- **The first time a song plays, it starts a moment later.** deadwax has to fetch the whole file
+  from Navidrome and repackage it before it can send the first byte: under a quarter of a second
+  for a four-minute CD-quality song where it was measured, and probably a little longer on a NAS.
+  After that the song is kept, so playing it again and seeking in it don't wait.
+- **Where it's kept**: in the container's temporary space, up to 1 GB, the songs played longest ago
+  making room for new ones. Nothing goes in your config folder, and nothing needs setting up. It's
+  emptied when the container is recreated, which only means the next first play waits that moment
+  again.
+- **Some FLACs are sent as they are**: a file over 512 MB (an hour-long album ripped as one file,
+  or long hi-res), or one deadwax can't repackage with certainty. It plays exactly as before, and
+  seeks in Safari can land off. deadwax's log says which song and why.
+- **Only FLAC.** An MP3, AAC or ALAC file is sent as it is: Safari seeks those properly already.
 
 **The readout shows it on your phone.** Between the cover and the song's title, below the gapless
 readout, the player shows the last seek you made, with the bar or from the lock screen: *Last
 seek: asked 2:10, seeking…* while it's on its way, then *Last seek: asked 2:10, the player said
 2:10*. If it never got there, because you pressed Previous or Next first or the song failed under
-it, the line says *Last seek: asked 2:10, interrupted*. Safari says the time asked for either way,
-so "the player said" can't tell you, but the end of the song can: if the seek landed off, the song runs out before its clock reaches the end,
-or plays on after its clock has stopped at the end, by the same amount. If the song plays to its
-end with no other seek or pause, the line adds what that showed:
+it, the line says *Last seek: asked 2:10, interrupted*. It ends with how the song playing was sent,
+in Safari:
+
+| it ends | meaning |
+| --- | --- |
+| `· FLAC in MP4` | the song came inside an MP4: seeks should land where you put them |
+| `· sent as FLAC, not in an MP4` | deadwax sent the FLAC as it is (see above); seeks may land off |
+| `· asked for FLAC in MP4` | for a moment, while the player checks what came |
+
+In other browsers it ends with nothing, since they get every file as it is. The line shows it
+before any seek too: *No seek yet · FLAC in MP4*.
+
+Safari says the time asked for wherever it lands, so "the player said" can't tell you where a seek
+really went, but the end of the song can: if the seek landed off, the song runs out before its
+clock reaches the end, or plays on after its clock has stopped at the end, by the same amount. If
+the song plays to its end with no other seek or pause, the line adds what that showed:
 
 | it adds | meaning |
 | --- | --- |
@@ -237,10 +268,10 @@ end with no other seek or pause, the line adds what that showed:
 | `the song ran out 7 s before its clock did, so it really landed at about 2:17` | it landed 7 seconds later in the song than asked |
 | `the song played on 7 s after its clock ended, so it really landed at about 2:03` | it landed 7 seconds earlier |
 
-It's hidden with the phone on its side, like the gapless readout. To try it on the iPhone, pick a
-song with a quiet opening and a loud middle, seek well into the loud part near the end, and let it
-finish. [Troubleshooting](troubleshooting.md#a-song-seeks-to-the-wrong-place) says more, including
-how to see whether a file has a seek table and how to add one.
+It's hidden with the phone on its side, like the gapless readout. To try it on the iPhone, play a
+FLAC and check the line ends `· FLAC in MP4`; then pick a song with a quiet opening and a loud
+middle, seek well into the loud part near the end, and let it finish. It should say `the song ended
+on time`. [Troubleshooting](troubleshooting.md#a-song-seeks-to-the-wrong-place) says more.
 
 ## How plays are counted
 
@@ -266,7 +297,9 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
 
 **Files are sent as they are** whenever the phone says it can play them, which on an iPhone
 should cover FLAC, MP3, AAC and ALAC. That's the only kind of file Navidrome can send in pieces (byte ranges), which is
-what Safari needs to start a song quickly and to skip around in it.
+what Safari needs to start a song quickly and to skip around in it. The one change is that Safari
+gets a FLAC inside an MP4 of the same audio, so that its seeks land
+([Seeking](#seeking-and-where-safari-lands)); that's sent in pieces too.
 
 **A file the phone can't play is transcoded to MP3** by Navidrome as it plays. On an iPhone
 that's mostly Ogg (Vorbis or Opus) and WMA. A transcode is made as it goes, so the first time
@@ -333,6 +366,8 @@ question the whole player existed to answer. Still to find out:
 - whether a song that won't load is **asked for again with the phone locked**: the second try
   comes a moment later, with nothing playing meanwhile, which is exactly when iOS may be holding
   the page back;
-- **where seeks land in Safari on the phone**: measured on a Mac's Safari engine only (see
-  [Seeking](#seeking-and-where-safari-lands)), and whether the scrubber takes a tap and a drag
-  under a real finger, which a desktop browser can only stand in for.
+- **whether seeks land in the MP4s on the phone**: FLAC was seen landing 3 and 8 seconds out on an
+  iPhone, and the MP4s landing exactly was measured on a Mac's Safari engine only (see
+  [Seeking](#seeking-and-where-safari-lands)); and how long a song's first play waits there;
+- whether the scrubber takes a tap and a drag under a real finger, which a desktop browser can only
+  stand in for.
