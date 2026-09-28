@@ -958,6 +958,7 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
         artist_mbids: getArtistIds(release['artist-credit']),
         album: release.title || releaseGroupContext.album,
         year: rawDate ? rawDate.substring(0, 4) : releaseGroupContext.year,
+        original_year: albumYear(releaseGroupContext),
         release_mbid: release.id,
         edition_tags: getEditionTags(release),
         tracks,
@@ -980,6 +981,16 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
 
 
 
+// The ALBUM's year - its release group's first release - which the organizer names the folder
+// after and writes as the originaldate tag, so a 2011 remaster files under (1975) as the metadata
+// editor would file it. Neither builder had ever sent it (found in v1.0.2), so every download of
+// a reissue was filed under the pressing's year and flagged "no original year". Null rather than
+// getYear()'s 'N/A' for a group MusicBrainz has no date for.
+function albumYear(releaseGroupContext) {
+    return /^\d{4}$/.test(releaseGroupContext.year || '') ? releaseGroupContext.year : null;
+}
+
+
 function buildExpectedFromReleaseGroup(releaseGroupContext) {
     // No specific release picked, so there's no tracklist to match against. The matcher
     // drops the tracklist-dependent signals rather than scoring these as failures.
@@ -994,6 +1005,7 @@ function buildExpectedFromReleaseGroup(releaseGroupContext) {
         artist_mbids: releaseGroupContext.artistMbids,
         album: releaseGroupContext.album,
         year: releaseGroupContext.year,
+        original_year: albumYear(releaseGroupContext),
         release_mbid: null,
         edition_tags: [],
         tracks: [],

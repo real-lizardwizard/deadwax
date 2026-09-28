@@ -161,6 +161,13 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   MusicBrainz's release-GROUP `first-release-date` (`original_year` on the payload, written
   to the `originaldate` tag); the `date` tag still records this pressing's own year. Absent
   `original_year` the behaviour is exactly as before, so nothing already filed moves.
+  **Downloads never sent it until v1.0.2** - only the metadata editor did. Neither builder in
+  main.js set `original_year`, so every download of a reissue was filed under the pressing's year
+  and flagged "no original year". Found while verifying the disc-folder fix: the Experience
+  edition filed as `(2011)`. `albumYear()` gives both builders the group's first-release year (null,
+  not 'N/A', when MusicBrainz has none); verified in the real page, a row's Find filing
+  `Wish You Were Here (1975) [Experience edition]` with date 2011 and originaldate 1975, a card's
+  `(1975)`.
 - **The search type filter narrows the QUERY, not the results.** That distinction is the whole
   point: MusicBrainz spends the `limit` on whatever matches, so for a prolific artist it goes
   almost entirely on things nobody wanted. Measured — `releasegroup:"Metallica" AND

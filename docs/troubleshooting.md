@@ -87,6 +87,14 @@ Their folder names don't match what the template makes from their tags: albums f
 another tool, or filed before you changed `ALBUM_FOLDER_TEMPLATE`. Changing the template never
 moves anything. Applying the album's release in the metadata editor re-files it.
 
+## A downloaded reissue is filed under its reissue's year
+
+Before 1.0.2, a download was filed under the year of the pressing you picked, and with no
+original-year tag: a 2011 remaster of a 1975 album went to `Wish You Were Here (2011) [...]`
+instead of `(1975)`. The library flags these as **No original year**. Open one in the metadata
+editor and apply its release: that writes the original year and moves the folder. Downloads
+since 1.0.2 are filed under the album's year.
+
 ## No cover, or "No cover on the Archive"
 
 The Cover Art Archive has no front cover for that release. It's a fact about the release, not
