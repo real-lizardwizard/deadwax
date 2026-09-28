@@ -258,3 +258,20 @@ def test_the_poller_sweeps_only_where_it_has_been_told_to(tmp_path, monkeypatch)
     monkeypatch.setattr(Config, "SLSKD_INCOMPLETE_PATH", str(tmp_path))
     assert asyncio.run(sweep_empty_incomplete_dirs()) == 2
     assert not (tmp_path / "bob").exists()
+
+
+def test_a_set_shared_one_folder_per_disc_is_found_disc_by_disc(tmp_path):
+    """
+    A joined set's job directory is the album folder, but slskd keeps each partial under its own
+    disc folder. Judged by the job's directory, no partial of it would ever match; each file's
+    own folder finds it - and only it, since both discs hold a "01 - Intro.flac".
+    """
+    seed(tmp_path, "bob", "Album/CD 1", "01 - Intro.flac")
+    seed(tmp_path, "bob", "Album/CD 2", "01 - Intro.flac")
+    files = [{"filename": "@@abc\\Music\\Album\\CD 1\\01 - Intro.flac"},
+             {"filename": "@@abc\\Music\\Album\\CD 2\\01 - Intro.flac"}]
+
+    result = remove_incomplete_downloads(str(tmp_path), files, "@@abc\\Music\\Album")
+
+    assert sorted(Path(p).parent.name for p in result["removed"]) == ["CD 1", "CD 2"]
+    assert not list(tmp_path.rglob("*.flac"))

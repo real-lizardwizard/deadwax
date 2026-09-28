@@ -130,7 +130,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             880 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             891 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -714,6 +714,41 @@ kept after enqueueing. They are now.
   the other two in the order shown; marked failed, "next peer" asked the offline one (refused),
   then the MP3 peer (accepted), and the row read "queued · mp3-peer · try 3"; failed again with
   nothing left, the button was gone.
+
+### A set shared one folder per disc (v1.0.1)
+
+James, on the Experience edition of Wish You Were Here: a peer had every track, in `CD 1` and
+`CD 2` folders "like it should be", and the panel showed two results from that peer that "both
+look wrong" - 5 tracks called "CD 1" and the rest called "CD 2". A candidate was one (user,
+folder), so each disc was scored alone against the whole two-disc release.
+
+- **`join_disc_folders` (matching.py, pure) makes the set one candidate**: the same peer's
+  folders, named as discs (`disc_folder()`: "CD 1", "cd2", "Disc 02", "Disc One", "[CD2]"; or
+  "Album CD1" / "Album CD2" side by side), in the same folder, and each a different disc. It
+  takes the album folder's name (or, for siblings, the name they share) and carries
+  `disc_folders`, which the row shows as "2 disc folders". Left alone when unsure: two folders
+  that are the same disc, or an album folder with tracks of its own beside its disc folders.
+- **Joined unless the picked release is known to be ONE disc** (`is_single_disc`). A peer's
+  "CD 1" of a two-disc deluxe can be exactly the standard album that was picked, and joined to
+  its "CD 2" it would rank below itself. A card-level Find (no tracklist) is offered the set.
+  A disc folder left alone is named with the album folder above it: "Wish You Were Here / CD 2".
+- **A track pairs only with files from its own disc's folder** (`file_disc` in
+  `match_tracks_to_files`), when some folder names that disc. Discs repeat titles, and a
+  containment match took whichever came first: disc 1's "Have a Cigar" took disc 2's
+  "Have a Cigar (alternative version)" with disc 2 listed first. That was a bug for the
+  organizer even before joining, since it pairs the same way. A test fails without it.
+- **The organizer finds each file by ITS folder, not the job's.** A joined job's directory is
+  the album folder, but slskd names a download's folder after the file's own remote folder (its
+  default `{source_directory}` pattern, read in slskd's `DownloadService.DeriveDestination`) or
+  after the whole remote path. `find_local_file` now prefers the match agreeing on the most
+  folders counted up from the file; `remove_incomplete_downloads` checks each file's own folder.
+  Both discs can hold a file of the same name (`Pink Floyd - Wish You Were Here.flac`).
+- **Verified end to end in the real page**, against live MusicBrainz and a fake slskd sharing
+  the Experience edition three ways: `CD 1`/`CD 2` with no track numbers in the names and disc 2
+  listed first; "... CD1"/"... CD2" siblings; and a lone `CD 2`. The first two scored 100 and 99
+  as "11/11 tracks · 2 disc folders", the lone disc 61 as "Wish You Were Here / CD 2". Downloaded
+  and filed in copy mode, all eleven tracks landed on the right disc and number, both "Wish You
+  Were Here"s (335s on disc 1, 374s on disc 2) and both "Have a Cigar"s included.
 
 ### Albums stored one folder per disc (v0.9.13)
 
@@ -2906,7 +2941,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 880 tests
+.venv/bin/python -m pytest tests/ -q  # 891 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -2950,7 +2985,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 880 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 891 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

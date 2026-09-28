@@ -65,6 +65,17 @@ WEIGHTS = {
 TITLE_MATCH_THRESHOLD = 0.60
 DURATION_TOLERANCE_SEC = 8
 
+#? One disc of a set, as sharers name it: "CD 1", "CD1", "cd.2", "Disc 02", "Disk 3", "Disc One".
+_DISC_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+               "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+_DISC_MARKER = r"(?:cd|disc|disk)\s*[-_.#]?\s*(\d{1,2}|" + "|".join(_DISC_WORDS) + r")(?![0-9a-z])"
+#? the whole name, or its start: "CD 1", "[CD2]", "Disc 1 - Wish You Were Here"
+_DISC_AT_START = re.compile(r"^[\[(]?\s*" + _DISC_MARKER, re.IGNORECASE)
+#? or its end, after the album: "Wish You Were Here CD2", "Wish You Were Here (Disc 2)". The marker
+#? has to follow a separator or a bracket, so "ABCD1" is not disc 1 of "AB".
+_DISC_AT_END = re.compile(r"^(.*?[^\s\-_.,\[(])(?:[\s\-_.,]+[\[(]?|[\[(])\s*" + _DISC_MARKER
+                          + r"\s*[\])]?\s*$", re.IGNORECASE)
+
 
 def normalize(text: str) -> str:
     """Lowercase, drop punctuation, collapse whitespace. For comparing messy filenames."""
@@ -105,6 +116,49 @@ def filename_stem(filename: str) -> str:
 
 def is_audio(filename: str) -> bool:
     return file_extension(filename) in AUDIO_EXTENSIONS
+
+
+def disc_folder(name: str) -> tuple[str, int] | None:
+    """
+    Is this folder one disc of a set? Its album part and disc number, or None.
+
+    The album part is "" when the name leads with the disc ("CD 1", "Disc 2 - Live at Wembley"),
+    since those sit inside the album's own folder and it is the parent that names the set; it is
+    the rest of the name when the disc comes last ("Wish You Were Here CD2"), where the discs sit
+    side by side in the artist's folder and only the shared name says they belong together.
+    """
+    name = name.strip()
+    match = _DISC_AT_START.match(name)
+    if match:
+        return "", _disc_number(match.group(1))
+    match = _DISC_AT_END.match(name)
+    if match:
+        return match.group(1), _disc_number(match.group(2))
+    return None
+
+
+def _disc_number(text: str) -> int:
+    return _DISC_WORDS.get(text.lower()) or int(text)
+
+
+def file_disc(remote_filename: str) -> int | None:
+    """The disc a file's own folder says it is on, or None when the folder says nothing."""
+    directory, _ = split_remote_path(remote_filename)
+    found = disc_folder(directory.rpartition("/")[2]) if directory else None
+    return found[1] if found else None
+
+
+def folder_label(directory: str) -> str:
+    """
+    What to call a candidate's folder on screen: its own name - or, for a folder that is only a
+    disc ("CD 1"), the album folder above it too, since "CD 1" on its own says nothing about
+    which album the peer is offering.
+    """
+    parent, _, name = directory.rpartition("/")
+    found = disc_folder(name)
+    if found and not found[0] and parent:
+        return f"{parent.rpartition('/')[2]} / {name}"
+    return name or directory
 
 
 def detect_edition_tags(text: str) -> set[str]:
@@ -162,7 +216,16 @@ def match_tracks_to_files(expected_tracks: list[dict], files: list[dict]) -> dic
         if stem:  #? a file with no name to compare can never score above 0
             #? the stem is the matcher's second sequence, as in title_similarity - difflib indexes
             #? that one, so it is done once per file here rather than once per pair
-            remaining.append((candidate_file, stem, SequenceMatcher(None, "", stem)))
+            remaining.append((candidate_file, stem, SequenceMatcher(None, "", stem),
+                              file_disc(candidate_file.get("filename", ""))))
+
+    #? A set shared one folder per disc says which disc each file is on, and a track pairs only
+    #? with files of its own disc. Discs repeat titles - The Experience edition's second disc is
+    #? "Shine On You Crazy Diamond (live at Wembley 1974)" and "Wish You Were Here (with Stéphane
+    #? Grappelli)" - and both CONTAIN the first disc's titles, so otherwise disc 1's tracks could
+    #? claim disc 2's files, whichever came first in the list. A disc no folder is named for (a
+    #? peer's lone "CD 1" holding everything) leaves its tracks free to pair with anything.
+    folder_discs = {entry[3] for entry in remaining if entry[3] is not None}
 
     mapping: dict[int, dict] = {}
 
@@ -170,9 +233,12 @@ def match_tracks_to_files(expected_tracks: list[dict], files: list[dict]) -> dic
         title = normalize(track.get("title", ""))
         best = None
         best_score = 0.0
+        disc = track.get("disc") if track.get("disc") in folder_discs else None
 
         for entry in remaining if title else ():
-            _, stem, matcher = entry
+            if disc is not None and entry[3] != disc:
+                continue
+            _, stem, matcher, _ = entry
             if title in stem:
                 score = 1.0
             else:
@@ -329,7 +395,7 @@ def group_files_by_directory(responses: list[dict]) -> list[dict]:
                 candidates[key] = {
                     "username": username,
                     "directory": directory,
-                    "directory_name": directory.replace("\\", "/").rpartition("/")[2] or directory,
+                    "directory_name": folder_label(directory),
                     "files": [],
                     "response": response,
                 }
@@ -337,6 +403,71 @@ def group_files_by_directory(responses: list[dict]) -> list[dict]:
             candidates[key]["files"].append(file_entry)
 
     return list(candidates.values())
+
+
+def join_disc_folders(candidates: list[dict]) -> list[dict]:
+    """
+    One candidate for a set a peer shares one folder per disc.
+
+    `Album/CD 1` and `Album/CD 2` are two folders, so they were two candidates, and each was
+    scored against the whole release: a 5-track "CD 1" and a 9-track "CD 2", both missing most of
+    a 14-track album, both ranked as poor - while the peer had every track. Reported on the
+    Experience edition of Wish You Were Here.
+
+    Folders join when they are the same peer's, are named as discs ("CD 1", "Disc 2"; or
+    "Album CD1", "Album CD2" side by side), sit in the same folder, and are different discs.
+    The joined candidate takes the album folder's name (or the name the discs share) and lists
+    its disc folders. Anything less certain is left as it was: two folders both called "CD 1",
+    or an album folder holding tracks of its own beside its disc folders.
+    """
+    sets: dict[tuple[str, str, str], list[tuple[int, str, dict]]] = {}
+    for candidate in candidates:
+        parent, _, name = candidate["directory"].rpartition("/")
+        found = disc_folder(name) if parent else None
+        if found:
+            album, number = found
+            sets.setdefault((candidate["username"], parent, normalize(album)), []).append((number, album, candidate))
+
+    own_folders = {(c["username"], c["directory"]) for c in candidates}
+    joined_ids: set[int] = set()
+    joined: dict[int, dict] = {}
+
+    for (username, parent, _), members in sets.items():
+        numbers = [number for number, _, _ in members]
+        if len(members) < 2 or len(set(numbers)) != len(numbers):
+            continue
+
+        members.sort(key=lambda member: member[0])
+        album = members[0][1]
+        #? a set named inside its album folder IS that folder; one named beside its siblings has
+        #? no folder of its own, so it is named for what the discs share
+        directory = f"{parent}/{album}" if album else parent
+        #? that folder is a candidate itself - it holds tracks of its own - so which files are
+        #? the album is no longer certain
+        if (username, directory) in own_folders:
+            continue
+
+        first = members[0][2]
+        for _, _, member in members:
+            joined_ids.add(id(member))
+        joined[id(first)] = {
+            "username": username,
+            "directory": directory,
+            "directory_name": directory.rpartition("/")[2],
+            "files": [f for _, _, member in members for f in member["files"]],
+            "response": first["response"],
+            "disc_folders": [member["directory"].rpartition("/")[2] for _, _, member in members],
+        }
+
+    #? in place of the first of its discs, so the list keeps the order it came in
+    return [joined[id(c)] if id(c) in joined else c
+            for c in candidates if id(c) in joined or id(c) not in joined_ids]
+
+
+def is_single_disc(expected: dict) -> bool:
+    """True only when the release's tracklist is known and every track of it is on one disc."""
+    tracks = expected.get("tracks") or []
+    return bool(tracks) and len({t.get("disc") or 1 for t in tracks}) == 1
 
 
 def score_candidate(candidate: dict, expected: dict, format_preference: str = "prefer_lossless") -> dict:
@@ -375,6 +506,8 @@ def score_candidate(candidate: dict, expected: dict, format_preference: str = "p
         "audio_file_count": len(files),
         "track_mapping": mapping,
         "detected_edition_tags": sorted(detect_edition_tags(candidate["directory"])),
+        #? the peer's own folder per disc, for a set joined from them (join_disc_folders)
+        "disc_folders": candidate.get("disc_folders", []),
         "formats": sorted({file_extension(split_remote_path(f.get("filename", ""))[1]) for f in files}),
         #? Peer stats, surfaced so the UI can show and filter on them.
         #?
@@ -414,6 +547,14 @@ def rank_candidates(
 ) -> list[dict]:
     """Full pipeline: raw slskd responses in, ranked scored candidates out."""
     candidates = group_files_by_directory(responses)
+
+    #? A release known to be ONE disc keeps disc folders apart: a peer's "CD 1" of a two-disc
+    #? deluxe may be exactly the standard album that was picked, and joined to its "CD 2" it
+    #? would score as a worse match than it is. Anything else - two discs, or no tracklist to
+    #? say - is offered the set as the peer laid it out.
+    if not is_single_disc(expected):
+        candidates = join_disc_folders(candidates)
+
     scored = [score_candidate(c, expected, format_preference) for c in candidates]
 
     if format_preference == "lossless_only":

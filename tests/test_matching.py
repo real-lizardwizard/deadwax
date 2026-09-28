@@ -15,7 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.matching import (  # noqa: E402
     detect_edition_tags,
+    disc_folder,
     group_files_by_directory,
+    join_disc_folders,
     match_tracks_to_files,
     normalize,
     rank_candidates,
@@ -418,3 +420,129 @@ def test_the_fast_matcher_pairs_exactly_as_title_similarity_would():
         tracks = [{"position": n, "title": t} for n, t in enumerate(rng.sample(titles, rng.randint(1, len(titles))), 1)]
         files = [{"filename": f"@@peer\\share\\Album\\{name}"} for name in rng.sample(names, rng.randint(0, len(names)))]
         assert match_tracks_to_files(tracks, files) == plainly(tracks, files), (tracks, files)
+
+
+# ------------------------------------------------------------ a set shared one folder per disc
+#
+# Reported on the Experience edition of Wish You Were Here: a peer had every track, in "CD 1" and
+# "CD 2" folders as it should be, and the panel showed two poor half-albums instead of one good
+# candidate - each folder scored alone against the whole two-disc release.
+
+#? The Experience edition, as MusicBrainz lists it: two discs, and disc 2 repeats disc 1's titles
+#? with something added, so every one of them CONTAINS a disc 1 title.
+EXPERIENCE_TRACKS = [
+    {"position": 1, "disc": 1, "title": "Shine On You Crazy Diamond (Parts I-V)", "length_ms": 813_000},
+    {"position": 2, "disc": 1, "title": "Welcome to the Machine", "length_ms": 452_000},
+    {"position": 3, "disc": 1, "title": "Have a Cigar", "length_ms": 308_000},
+    {"position": 4, "disc": 1, "title": "Wish You Were Here", "length_ms": 335_000},
+    {"position": 5, "disc": 1, "title": "Shine On You Crazy Diamond (Parts VI-IX)", "length_ms": 750_000},
+    {"position": 6, "disc": 2, "title": "Shine On You Crazy Diamond (live at Wembley 1974)", "length_ms": 1_223_000},
+    {"position": 7, "disc": 2, "title": "Raving and Drooling (live at Wembley 1974)", "length_ms": 755_000},
+    {"position": 8, "disc": 2, "title": "You've Got to Be Crazy (live at Wembley 1974)", "length_ms": 1_093_000},
+    {"position": 9, "disc": 2, "title": "Wine Glasses (from 'Household Objects' project)", "length_ms": 137_000},
+    {"position": 10, "disc": 2, "title": "Have a Cigar (alternative version)", "length_ms": 432_000},
+    {"position": 11, "disc": 2, "title": "Wish You Were Here (with Stéphane Grappelli)", "length_ms": 374_000},
+]
+EXPERIENCE = {"artist": "Pink Floyd", "album": "Wish You Were Here", "year": "2011",
+              "tracks": EXPERIENCE_TRACKS, "edition_tags": []}
+SET_FOLDER = "@@share\\Music\\Pink Floyd - Wish You Were Here (Experience Edition)"
+
+
+def disc_files(folder, tracks):
+    numbered = {}
+    files = []
+    for t in tracks:
+        numbered[t["disc"]] = numbered.get(t["disc"], 0) + 1
+        files.append(make_file(f"{folder}\\{numbered[t['disc']]:02d} - {t['title']}.flac",
+                               length=t["length_ms"] // 1000))
+    return files
+
+
+def experience_set(folder=SET_FOLDER, cd1="CD 1", cd2="CD 2"):
+    return (disc_files(f"{folder}\\{cd1}", EXPERIENCE_TRACKS[:5])
+            + disc_files(f"{folder}\\{cd2}", EXPERIENCE_TRACKS[5:]))
+
+
+def test_disc_folders_are_recognised_by_the_names_sharers_give_them():
+    for name, number in [("CD 1", 1), ("cd2", 2), ("CD01", 1), ("cd.2", 2), ("Disc 2", 2), ("Disk 3", 3),
+                         ("Disc One", 1), ("[CD2]", 2), ("(Disc 1)", 1), ("Disc 1 - Wish You Were Here", 1)]:
+        assert disc_folder(name) == ("", number), name
+    assert disc_folder("Wish You Were Here CD2") == ("Wish You Were Here", 2)
+    assert disc_folder("Wish You Were Here (Disc 2)") == ("Wish You Were Here", 2)
+    #? a disc marker needs a separator in front of it, and a number of its own
+    for name in ["ABCD1", "ACDC 2", "Discography", "Disco Inferno 2", "CD", "CD 2011 Remaster",
+                 "1994 - Dummy", "Metallica - S&M2 (2020)"]:
+        assert disc_folder(name) is None, name
+
+
+def test_a_set_shared_one_folder_per_disc_is_one_candidate():
+    ranked = rank_candidates([make_response("glassbeads", experience_set())], EXPERIENCE)
+
+    assert len(ranked) == 1, "the two disc folders are one album, not two poor halves of it"
+    best = ranked[0]
+    assert best["directory_name"] == "Pink Floyd - Wish You Were Here (Experience Edition)"
+    assert best["disc_folders"] == ["CD 1", "CD 2"]
+    assert best["matched_tracks"] == 11 and best["audio_file_count"] == 11
+    assert best["signals"]["track_count"] == 1.0 and best["signals"]["duration_match"] == 1.0
+    assert best["score"] > 0.9
+
+
+def test_each_track_pairs_with_a_file_from_its_own_disc():
+    """
+    Disc 2's "Wish You Were Here (with Stéphane Grappelli)" CONTAINS disc 1's "Wish You Were
+    Here", so a matcher that takes the first containing name gives disc 1's track the disc 2
+    file whenever disc 2 is listed first - and the organizer names and tags the file from that.
+    """
+    files = list(reversed(experience_set()))
+    mapping = match_tracks_to_files(EXPERIENCE_TRACKS, files)
+
+    for position, entry in mapping.items():
+        disc = EXPERIENCE_TRACKS[position - 1]["disc"]
+        assert f"\\CD {disc}\\" in entry["file"]["filename"], (position, entry["file"]["filename"])
+    assert len(mapping) == 11
+
+
+def test_a_single_disc_release_keeps_the_disc_folders_apart():
+    """A peer's "CD 1" of the two-disc set can be exactly the one-disc album that was picked."""
+    standard = {**EXPERIENCE, "year": "1975",
+                "tracks": [{**t, "disc": 1} for t in EXPERIENCE_TRACKS[:5]]}
+    ranked = rank_candidates([make_response("glassbeads", experience_set())], standard)
+
+    assert len(ranked) == 2
+    assert ranked[0]["directory_name"] == "Pink Floyd - Wish You Were Here (Experience Edition) / CD 1", \
+        "a disc folder is named with its album, since CD 1 alone says nothing"
+    assert ranked[0]["matched_tracks"] == 5 and ranked[0]["audio_file_count"] == 5
+    assert ranked[0]["disc_folders"] == []
+
+
+def test_a_release_with_no_tracklist_is_offered_the_whole_set():
+    ranked = rank_candidates([make_response("glassbeads", experience_set())], {**EXPERIENCE, "tracks": []})
+    assert [c["disc_folders"] for c in ranked] == [["CD 1", "CD 2"]]
+
+
+def test_discs_named_beside_each_other_join_on_the_name_they_share():
+    folder = "@@share\\Music\\Pink Floyd"
+    files = (disc_files(f"{folder}\\Wish You Were Here (Experience Edition) CD1", EXPERIENCE_TRACKS[:5])
+             + disc_files(f"{folder}\\Wish You Were Here (Experience Edition) CD2", EXPERIENCE_TRACKS[5:]))
+    ranked = rank_candidates([make_response("glassbeads", files)], EXPERIENCE)
+
+    assert len(ranked) == 1
+    assert ranked[0]["directory_name"] == "Wish You Were Here (Experience Edition)"
+    assert ranked[0]["matched_tracks"] == 11
+
+
+def test_disc_folders_are_joined_only_when_it_is_certain():
+    groups = group_files_by_directory([
+        #? two of the same disc: which is the album?
+        make_response("a", experience_set(cd1="CD 1", cd2="CD1")),
+        #? an album folder with tracks of its own beside its disc folders
+        make_response("b", experience_set() + [make_file(f"{SET_FOLDER}\\Bonus.flac")]),
+    ])
+    joined = join_disc_folders(groups)
+    assert all(not c.get("disc_folders") for c in joined)
+    assert len(joined) == len(groups)
+
+
+def test_two_peers_disc_folders_are_never_joined_together():
+    responses = [make_response("a", experience_set()[:5]), make_response("b", experience_set()[5:])]
+    assert all(not c.get("disc_folders") for c in rank_candidates(responses, EXPERIENCE))

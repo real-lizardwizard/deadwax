@@ -20,7 +20,9 @@ like its title. A name that contains the title outright ("03 - Strangers (remast
 contains "Strangers") is a perfect match; otherwise it's a fuzzy comparison, and anything below
 60% similar doesn't count. Each file is used once. The signal is the share of tracks that found
 a file. The same pairing is what later names and tags each file when the download is filed, so
-a folder of `Track 04.mp3`s still gets proper titles.
+a folder of `Track 04.mp3`s still gets proper titles. In a set shared one folder per disc, a
+track only pairs with a file from its own disc's folder, because discs often repeat titles: a
+second disc's "Wish You Were Here" is a different recording from the first's.
 
 **Count.** An exact match scores full marks. Each track more or fewer takes off a share: one
 missing track out of twelve is a small penalty, and half the album missing is a large one.
