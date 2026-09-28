@@ -25,7 +25,7 @@ confidently wrong deployment advice. Don't bring them back.
 | --- | --- |
 | `main` | **the release line since 1.0.0** (2026-09-27, asked for), fast-forwarded to experimental. Until then it held the old Lidarr-based v0.2.1, which is still tag `v0.2.1`. |
 | `experimental/slskdn-no-lidarr` | **all the work below.** slskd-direct, no Lidarr. v0.3.0 to v0.9.2 were tagged from here, and `:experimental` is built from it. |
-| `player-spike` | **the multi-user and phone-player work, from 1.0.0** (moved there on 2026-09-27, asked for). 1.0.1 is its first commit, and 1.0.3 is step 1 of the multi-user plan: the phone player, ported onto 1.0.2. Local only: nothing builds an image from it. |
+| `player-spike` | **the multi-user and phone-player work, from 1.0.0** (moved there on 2026-09-27, asked for). 1.0.1 is its first commit, and 1.0.3 is step 1 of the multi-user plan: the phone player, ported onto 1.0.2. Pushed from 1.0.4, and every push builds `:player` (asked for, for the iPhone week). |
 | `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2). **Ported onto 1.0.2 as 1.0.3** on `player-spike` (see "The phone player"), so it is kept only for reference now. Everything after it on that branch shipped on experimental. |
 
 ### The name (v0.6.21)
@@ -3505,6 +3505,10 @@ compile time.
   **As of v0.3.0 `:latest` is the slskd-direct line, not the Lidarr one**, and since 1.0.0 `main`
   is too - the repo's default branch showed the old Lidarr README until then. The example
   compose file points at `:latest` from 1.0.0, not `:experimental`.
+  **`:player` = the `player-spike` branch (1.0.4, asked for)**, the phone player's trial build:
+  its own explicit case in docker-publish.yml (the generic branch fallback would have named it
+  `:player-spike`), tested through the workflow call like experimental, so tests.yml's own push
+  trigger ignores that branch too. It moves neither `:latest` nor `:experimental`.
 
 ## Local development
 

@@ -6,6 +6,9 @@ on:
       - 'v*'
     branches:
       - 'experimental/**'
+      # the phone player's trial build (1.0.3+), for a week on James's iPhone before the
+      # multi-user work goes on top of it - its own tag, so neither :latest nor :experimental moves
+      - 'player-spike'
   workflow_dispatch:
 
 env:
@@ -55,6 +58,9 @@ jobs:
 
           elif [[ "${GITHUB_REF}" == refs/heads/experimental/* ]]; then
             tags="${image}:experimental"
+
+          elif [[ "${GITHUB_REF}" == refs/heads/player-spike ]]; then
+            tags="${image}:player"
 
           else
             tags="${image}:$(echo "${GITHUB_REF_NAME}" | tr '/' '-')"
