@@ -492,6 +492,22 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   both edges and stretches the panel instead of moving it.
 - **`thaw()` only deletes the frozen flag.** It used to wipe the inline geometry, which would
   now undo a move the instant the panel closed.
+- **A gesture its panel didn't survive is dropped, not saved (v1.0.8).** Escape closes the
+  Downloads panel (and the candidates dialog) in the middle of a drag, and `onPointerUp` then
+  saved what a hidden panel measures: 0 x 0, so the panel opened at its 280 x 160 minimum for
+  ever after - found in the preview pane's storage, reproduced with real input in headless Brave
+  (press on the left edge, drag, Escape, release). A move abandoned the same way saved an
+  off-screen spot (-550, 0). `endGesture()` saves only while `isShown()`, `saveSize` refuses a
+  non-positive size, the observer ends a drag whose panel it sees hidden, and `applySavedSize`
+  ignores a saved size of 0 or below the panel's CSS minimum, so a stored 0 x 0 recovers by itself.
+- **"Hidden" is `isShown()`, never `offsetParent` (v1.0.8).** offsetParent is null for anything
+  `position: fixed` - both dialogs - whether showing or not, so the observer took them for hidden
+  every time and never ran `applySavedSize` on them: the candidates dialog opened at its default
+  (70, 90) with a position saved, contradicting the note above. The dialogs also hide by
+  `visibility: hidden` (kept laid out to fade), which has boxes, so `isShown()` checks visibility
+  as well as boxes. **Verified in headless Brave**: a saved (1300, 820) now restores at exactly
+  (836, 536) in 900 x 600, the 64px clamp above. **Not verified**: the metadata editor, which
+  mounts only when opened and has no library in the scratch setup.
 
 ### One tracklist per release group (v0.8.2)
 

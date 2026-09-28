@@ -269,7 +269,20 @@ function writeEntry(id, patch) {
 }
 
 function saveSize(id, width, height) {
+    //? a panel that isn't drawn measures 0 x 0, and a saved 0 opens it at its minimum for ever
+    if (!(width > 0 && height > 0)) return;
     writeEntry(id, { width: Math.round(width), height: Math.round(height) });
+}
+
+/*
+  Whether the panel is showing. The two kinds hide differently: the dropdowns by display: none,
+  which leaves no boxes (offsetWidth, offsetHeight and the rect all zeros - nothing worth saving),
+  and the dialogs by visibility: hidden, kept laid out so they can fade. offsetParent answered
+  this before, and it is null for anything position: fixed - both dialogs - showing or not, so
+  their remembered size and position were never put back (v1.0.8).
+*/
+function isShown(panel) {
+    return panel.isConnected && panel.getClientRects().length > 0 && getComputedStyle(panel).visibility !== 'hidden';
 }
 
 function savePosition(id, left, top) {
@@ -290,7 +303,17 @@ function applySavedSize(panel) {
 
     const anchored = ANCHORED.has(panel.id);
 
-    if (typeof saved.width === 'number' && typeof saved.height === 'number') {
+    /*
+      A size below the panel's own minimum was never one a drag could make - a drag stops at
+      min-width and min-height - so it is left out rather than applied. It is how a 0 x 0,
+      saved before v1.0.8 by a resize the panel closed in the middle of, stops pinning the
+      panel at its minimum without anyone clearing storage.
+    */
+    const style = getComputedStyle(panel);
+    const plausible = (value, minimum) => typeof value === 'number' && value > 0 && value >= minimum;
+
+    if (plausible(saved.width, parseFloat(style.minWidth) || 0)
+        && plausible(saved.height, parseFloat(style.minHeight) || 0)) {
         /*
           A dropdown grows left and down from its button, so the room it has is from its
           anchored right edge to the left of the window, and from its top to the bottom - not
@@ -527,25 +550,36 @@ function clampToViewport(panel, left, top) {
     };
 }
 
-function onPointerUp() {
+/*
+  End a move or resize. Only saved when the panel is still showing: Escape closes a panel in the
+  middle of a drag, and a release that never reached the page (let go outside the window)
+  arrives with the next click, maybe long after it closed. A hidden panel measures 0 x 0 and its
+  rect sits at 0,0 - which is how a downloads panel came to be saved as 0 x 0 and open at its
+  minimum ever after (v1.0.8). A gesture its panel didn't survive is dropped, not remembered.
+*/
+function endGesture({ save = true } = {}) {
     if (move) {
-        const box = move.panel.getBoundingClientRect();
-        savePosition(move.panel.id, box.left, box.top);
-
+        if (save && isShown(move.panel)) {
+            const box = move.panel.getBoundingClientRect();
+            savePosition(move.panel.id, box.left, box.top);
+        }
         move = null;
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-        return;
     }
 
-    if (!drag) return;
+    if (drag) {
+        if (save && isShown(drag.panel)) {
+            saveSize(drag.panel.id, drag.panel.offsetWidth, drag.panel.offsetHeight);
+        }
+        drag.panel.style.cursor = '';
+        drag = null;
+    }
 
-    saveSize(drag.panel.id, drag.panel.offsetWidth, drag.panel.offsetHeight);
-
-    drag.panel.style.cursor = '';
-    drag = null;
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
+}
+
+function onPointerUp() {
+    if (move || drag) endGesture();
 }
 
 document.addEventListener('pointerdown', onPointerDown, true);
@@ -565,9 +599,11 @@ const visibility = new MutationObserver(() => {
         const panel = document.getElementById(id);
         if (!panel) continue;
 
-        const hidden = panel.offsetParent === null;
+        const hidden = !isShown(panel);
 
         if (hidden) {
+            //? closed in the middle of a drag - by Escape, say - so the drag ends here, unsaved
+            if (move?.panel === panel || drag?.panel === panel) endGesture({ save: false });
             if (panel.dataset['resizeFrozen']) thaw(panel);
             //? Cleared so the next open re-applies and re-clamps against whatever the
             //? viewport is by then.
@@ -592,7 +628,7 @@ visibility.observe(document.body, {
 //? Preact mounts later, and anything opened for the first time after load.
 for (const id of PANELS) {
     const panel = document.getElementById(id);
-    if (panel && panel.offsetParent !== null) {
+    if (panel && isShown(panel)) {
         panel.dataset['sizeApplied'] = '1';
         applySavedSize(panel);
     }
