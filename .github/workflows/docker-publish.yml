@@ -1,13 +1,16 @@
 name: Publish Docker image
 
+# main is the one line that ships (since 1.0.5): every push to it is built as :experimental, and a
+# v* tag on it is a release. player-spike builds its own :player; other branches build nothing
+# unless run by hand (workflow_dispatch).
 on:
   push:
     tags:
       - 'v*'
     branches:
-      - 'experimental/**'
-      # the phone player's trial build (1.0.3+), for a week on James's iPhone before the
-      # multi-user work goes on top of it - its own tag, so neither :latest nor :experimental moves
+      - 'main'
+      # the phone player's trial build, for a week on James's iPhone before the multi-user work
+      # goes on top of it - its own tag, so neither :latest nor :experimental moves
       - 'player-spike'
   workflow_dispatch:
 
@@ -56,7 +59,9 @@ jobs:
               tags="${tags}"$'\n'"${image}:latest"
             fi
 
-          elif [[ "${GITHUB_REF}" == refs/heads/experimental/* ]]; then
+          #? still called :experimental - it was the experimental branch's until 1.0.5, and a stack
+          #? pointed at it keeps getting the newest code without being edited
+          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
             tags="${image}:experimental"
 
           elif [[ "${GITHUB_REF}" == refs/heads/player-spike ]]; then

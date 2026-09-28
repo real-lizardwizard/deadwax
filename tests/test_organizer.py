@@ -98,6 +98,36 @@ def test_find_local_file_prefers_the_matching_folder_when_ambiguous(tmp_path):
     assert found.parent.name == "MHTRTC"
 
 
+def test_find_local_file_finds_each_disc_by_its_own_folder(tmp_path):
+    """
+    A set shared one folder per disc is one job whose directory is the album folder, while slskd
+    files each track under ITS folder - "CD 1", "CD 2" - and both discs can hold the same name.
+    The job's directory would pick neither; the file's own folder picks the right one.
+    """
+    root = tmp_path / "downloads"
+    (root / "CD 1").mkdir(parents=True)
+    (root / "CD 2").mkdir(parents=True)
+    (root / "CD 1" / "01 - Intro.flac").write_bytes(b"disc one")
+    (root / "CD 2" / "01 - Intro.flac").write_bytes(b"disc two")
+
+    album = r"share\Pink Floyd - Wish You Were Here (Experience Edition)"
+    assert find_local_file(str(root), album + r"\CD 1\01 - Intro.flac", album).read_bytes() == b"disc one"
+    assert find_local_file(str(root), album + r"\CD 2\01 - Intro.flac", album).read_bytes() == b"disc two"
+
+
+def test_find_local_file_prefers_the_deepest_agreement_under_a_full_path_layout(tmp_path):
+    """slskd can be set to keep the whole remote path, where two albums' "CD 1"s sit side by side."""
+    root = tmp_path / "downloads"
+    for album in ("Wish You Were Here", "Animals"):
+        (root / "share" / album / "CD 1").mkdir(parents=True)
+        (root / "share" / album / "CD 1" / "01 - Intro.flac").write_bytes(album.encode())
+
+    found = find_local_file(str(root), r"share\Wish You Were Here\CD 1\01 - Intro.flac")
+    assert found.read_bytes() == b"Wish You Were Here"
+    found = find_local_file(str(root), r"share\Animals\CD 1\01 - Intro.flac")
+    assert found.read_bytes() == b"Animals"
+
+
 def test_find_local_file_returns_none_when_absent(tmp_path):
     root = seed_downloads(tmp_path, ["other.flac"])
     assert find_local_file(str(root), r"share\x\missing.flac") is None

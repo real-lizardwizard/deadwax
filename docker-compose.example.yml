@@ -1,9 +1,9 @@
 services:
   deadwax:
     # :latest is the newest release (1.0.0 onward: slskd direct, no Lidarr), and moves only when
-    # one is tagged; use :1.0.0 to pin exactly. :experimental is rebuilt from the development
-    # branch on every push and moves under you. Only :0.2.1 and older are the original
-    # Lidarr-based version, and those will NOT understand the settings below.
+    # one is tagged; use :1.0.4 to pin exactly. :experimental is rebuilt from main on every push
+    # and moves under you. Only :0.2.1 and older are the original Lidarr-based version, and
+    # those will NOT understand the settings below.
     image: ghcr.io/real-lizardwizard/deadwax:latest
     container_name: deadwax
     restart: unless-stopped

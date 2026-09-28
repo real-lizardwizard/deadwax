@@ -24,7 +24,11 @@ well: only the newest search's answer is ever shown.
 
 ## Reading a candidate
 
-Each row is one folder on one user's share:
+Each row is one folder on one user's share, or one set of folders: an album shared one folder
+per disc (`CD 1`, `CD 2`) is one row, marked **2 disc folders**, and downloads as one album.
+It stays split only when the release you picked is a single disc, since one disc of a bigger
+set can be exactly that album. A disc folder on its own is named with the album folder above
+it (**Wish You Were Here / CD 2**).
 
 - **The score**, 0 to 100, is how well the folder matches the release you picked. Green is
   good, yellow is middling, red is poor. How it's worked out is in

@@ -23,10 +23,32 @@ confidently wrong deployment advice. Don't bring them back.
 
 | branch | what |
 | --- | --- |
-| `main` | **the release line since 1.0.0** (2026-09-27, asked for), fast-forwarded to experimental. Until then it held the old Lidarr-based v0.2.1, which is still tag `v0.2.1`. |
-| `experimental/slskdn-no-lidarr` | **all the work below.** slskd-direct, no Lidarr. v0.3.0 to v0.9.2 were tagged from here, and `:experimental` is built from it. |
-| `player-spike` | **the multi-user and phone-player work, from 1.0.0** (moved there on 2026-09-27, asked for). 1.0.1 is its first commit, and 1.0.3 is step 1 of the multi-user plan: the phone player, ported onto 1.0.2. Pushed from 1.0.4, and every push builds `:player` (asked for, for the iPhone week). |
-| `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2). **Ported onto 1.0.2 as 1.0.3** on `player-spike` (see "The phone player"), so it is kept only for reference now. Everything after it on that branch shipped on experimental. |
+| `main` | **the one line that ships.** Every change that ships lands here, and since 1.0.5 only main takes version numbers. Each push is built as `:experimental`; a `v*` tag on it is a release. Until 1.0.0 it held the old Lidarr-based v0.2.1, still tag `v0.2.1`. |
+| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for); step 1 of the multi-user plan, the phone player, is on it, and every push builds `:player` (asked for, for the iPhone week). It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code here than on main - its 1.0.1 and 1.0.2 went to main as 1.0.3 and 1.0.4, and sections below dated 1.0.1-1.0.5 use its own numbering. main was merged in after main's 1.0.5, and from then it is `1.1.0-player.N`. |
+| `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2). **Ported onto player-spike's 1.0.2 as its 1.0.3** (see "The phone player"), so it is kept only for reference now. Everything after it on that branch shipped on experimental. |
+| ~~`experimental/slskdn-no-lidarr`~~ | **deleted after 1.0.4.** Where all the 0.x work happened: v0.3.0 to v0.9.2 were tagged from it, and every commit of it is in main's history. |
+
+#### Branches and versions (v1.0.5, asked for)
+
+James: "how can I set this up to work cleaner in the future so I don't have to go back and forth
+between versions like this?" After 1.0.0, two lines numbered their own commits: player-spike took
+1.0.1-1.0.5 while main took 1.0.1-1.0.4 - the same numbers for different code - and two fixes made
+on the spike that main needed had to be cherry-picked across.
+
+- **main is the one line that ships.** Don't start a second line that releases too.
+- **Only main takes version numbers.** A commit on any other branch leaves `__version__` alone.
+  A branch that publishes its own image needs a version to show, and takes a PRE-RELEASE of the
+  next minor - `1.1.0-player.1`, `1.1.0-player.2` - never a plain number. The publish workflow
+  never moves `:latest` for a version with a hyphen, so it can't pass for a release, and a plain
+  number always means one commit on main.
+- **A bug main has too is fixed ON MAIN first**, in its own commit with its own patch bump, and
+  main is then merged into the branch. Fixing it only on the branch is what stranded 1.0.1 and
+  1.0.2 on player-spike.
+- **Merge main into a long-running branch often** (`git merge main`; the app's sync does it for a
+  worktree session), so the merge back is small. When a branch merges into main, main gives it
+  the next plain version then.
+- **A release is a tag on main.** A push to main publishes `:experimental`; a `v*` tag publishes
+  `:<version>` and moves `:latest`.
 
 ### The name (v0.6.21)
 
@@ -139,7 +161,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one.
-tests/             1126 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1137 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -170,6 +192,15 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   MusicBrainz's release-GROUP `first-release-date` (`original_year` on the payload, written
   to the `originaldate` tag); the `date` tag still records this pressing's own year. Absent
   `original_year` the behaviour is exactly as before, so nothing already filed moves.
+  **Downloads never sent it until v1.0.2** - only the metadata editor did. Neither builder in
+  main.js set `original_year`, so every download of a reissue was filed under the pressing's year
+  and flagged "no original year". Found while verifying the disc-folder fix: the Experience
+  edition filed as `(2011)`. Both builders send the group's first-release year through
+  `realYear()` (null, not 'N/A', when MusicBrainz has none) - the version of this fix
+  player-spike made in its own review, kept over main's `albumYear()` when brought over in 1.0.4
+  because it also stops 'N/A' going out as `year`; verified in the real page, a row's Find filing
+  `Wish You Were Here (1975) [Experience edition]` with date 2011 and originaldate 1975, a card's
+  `(1975)`.
 - **The search type filter narrows the QUERY, not the results.** That distinction is the whole
   point: MusicBrainz spends the `limit` on whatever matches, so for a prolific artist it goes
   almost entirely on things nobody wanted. Measured — `releasegroup:"Metallica" AND
@@ -723,6 +754,43 @@ kept after enqueueing. They are now.
   the other two in the order shown; marked failed, "next peer" asked the offline one (refused),
   then the MP3 peer (accepted), and the row read "queued · mp3-peer · try 3"; failed again with
   nothing left, the button was gone.
+
+### A set shared one folder per disc (v1.0.1)
+
+James, on the Experience edition of Wish You Were Here: a peer had every track, in `CD 1` and
+`CD 2` folders "like it should be", and the panel showed two results from that peer that "both
+look wrong" - 5 tracks called "CD 1" and the rest called "CD 2". A candidate was one (user,
+folder), so each disc was scored alone against the whole two-disc release.
+
+- **`join_disc_folders` (matching.py, pure) makes the set one candidate**: the same peer's
+  folders, named as discs (`disc_folder()`: "CD 1", "cd2", "Disc 02", "Disc One", "[CD2]"; or
+  "Album CD1" / "Album CD2" side by side), in the same folder, and each a different disc. It
+  takes the album folder's name (or, for siblings, the name they share) and carries
+  `disc_folders`, which the row shows as "2 disc folders". Left alone when unsure: two folders
+  that are the same disc, or an album folder with tracks of its own beside its disc folders.
+- **Joined unless the picked release is known to be ONE disc** (`is_single_disc`). A peer's
+  "CD 1" of a two-disc deluxe can be exactly the standard album that was picked, and joined to
+  its "CD 2" it would rank below itself. Only a Find with no tracklist at all is offered the set
+  regardless: since v1.0.3 a card's Find stands for a real pressing, so that is the fallback for
+  when MusicBrainz can't say which pressings the album has.
+  A disc folder left alone is named with the album folder above it: "Wish You Were Here / CD 2".
+- **A track pairs only with files from its own disc's folder** (`file_disc` in
+  `match_tracks_to_files`), when some folder names that disc. Discs repeat titles, and a
+  containment match took whichever came first: disc 1's "Have a Cigar" took disc 2's
+  "Have a Cigar (alternative version)" with disc 2 listed first. That was a bug for the
+  organizer even before joining, since it pairs the same way. A test fails without it.
+- **The organizer finds each file by ITS folder, not the job's.** A joined job's directory is
+  the album folder, but slskd names a download's folder after the file's own remote folder (its
+  default `{source_directory}` pattern, read in slskd's `DownloadService.DeriveDestination`) or
+  after the whole remote path. `find_local_file` now prefers the match agreeing on the most
+  folders counted up from the file; `remove_incomplete_downloads` checks each file's own folder.
+  Both discs can hold a file of the same name (`Pink Floyd - Wish You Were Here.flac`).
+- **Verified end to end in the real page**, against live MusicBrainz and a fake slskd sharing
+  the Experience edition three ways: `CD 1`/`CD 2` with no track numbers in the names and disc 2
+  listed first; "... CD1"/"... CD2" siblings; and a lone `CD 2`. The first two scored 100 and 99
+  as "11/11 tracks · 2 disc folders", the lone disc 61 as "Wish You Were Here / CD 2". Downloaded
+  and filed in copy mode, all eleven tracks landed on the right disc and number, both "Wish You
+  Were Here"s (335s on disc 1, 374s on disc 2) and both "Have a Cigar"s included.
 
 ### Albums stored one folder per disc (v0.9.13)
 
@@ -3512,7 +3580,8 @@ compile time.
 - **Commits must set the author explicitly**, git defaults to a local placeholder here:
   `GIT_AUTHOR_NAME="James Barnett" GIT_AUTHOR_EMAIL="jamesambarnett@gmail.com" git commit …`
 - Commit messages explain *why*, and name what was verified vs assumed.
-- **Every commit bumps the patch version and leaves the README current.** Both in the same
+- **Every commit on main bumps the patch version and leaves the README current** (a commit on
+  any other branch doesn't - see "Branches and versions"). Both in the same
   commit as the change itself, not swept up afterwards — the point is that the history reads
   as a clean progression rather than as a pile of work with a version bolted on at the end.
   The README is the only description of this project most people will ever read, so a commit
@@ -3533,8 +3602,8 @@ compile time.
   see the image-tag note below. Bump the version as you go; tag when you mean to ship.
 - Versions: `v0.x` tags until **1.0.0, released on 2026-09-27** when James called it polished,
   as the first release on `main`. The patch bump per commit carries on from there.
-- Image tags: `:experimental` = this branch (rebuilt on every push); `:latest` = the newest
-  real release. `:latest` only ever moves for a real release, never a branch or prerelease —
+- Image tags: `:experimental` = main, rebuilt on every push (the experimental branch's until
+  1.0.5); `:latest` = the newest real release. `:latest` only ever moves for a real release, never a branch or prerelease —
   the workflow enforces this by skipping `:latest` for any version containing a hyphen.
   **As of v0.3.0 `:latest` is the slskd-direct line, not the Lidarr one**, and since 1.0.0 `main`
   is too - the repo's default branch showed the old Lidarr README until then. The example
@@ -3548,7 +3617,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1126 tests
+.venv/bin/python -m pytest tests/ -q  # 1137 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3586,14 +3655,14 @@ and 3.14 (what the image ships), `npm run build` on Node 22 (typecheck included,
 does it) and every `ui/test/*.sim.cjs`, each on its own so a failure names itself.
 **`docker-publish.yml` calls it and its build `needs:` it**, so a tag whose tests fail publishes
 no image and moves no `:latest`. To keep one push from being tested twice, `tests.yml`'s own push
-trigger ignores `experimental/**` - those, and `v*` tags, are tested through the publish
+trigger ignores `main` - pushes to it, and `v*` tags, are tested through the publish
 workflow's call instead. **A new sim is picked up by the glob; a new Python test dependency has
 to be added to the workflow's install step** - `requirements.txt` is the image's, and pytest is
 deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1126 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1137 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

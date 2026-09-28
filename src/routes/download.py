@@ -388,6 +388,7 @@ def _serialize_candidate(candidate: dict) -> dict:
         "expected_tracks": candidate["expected_tracks"],
         "audio_file_count": candidate["audio_file_count"],
         "detected_edition_tags": candidate["detected_edition_tags"],
+        "disc_folders": candidate.get("disc_folders", []),
         "formats": candidate["formats"],
         "upload_speed": candidate["upload_speed"],
         "queue_length": candidate["queue_length"],

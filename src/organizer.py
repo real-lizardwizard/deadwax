@@ -164,30 +164,42 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
 
     slskd's on-disk layout isn't something we control or can rely on staying put (it has
     changed between versions, and sanitizes remote directory names), so rather than
-    reconstructing the path we search for the basename under the download root and prefer a
-    hit whose parent folder matches the remote folder. Slower, but it survives slskd
-    reorganizing its own downloads directory.
+    reconstructing the path we search for the basename under the download root and prefer the
+    hit whose folders match the remote ones. Slower, but it survives slskd reorganizing its own
+    downloads directory.
+
+    The folders are the FILE's own, not the job's: slskd names a download's folder after the
+    folder the file sat in on the peer's share (its `{source_directory}` pattern, the default)
+    or after the whole remote path. For a set shared one folder per disc (v1.0.1) the job's
+    directory is the album folder while each file sits in its "CD 1" or "CD 2", and both discs
+    can hold an `01 - Wish You Were Here.flac`. The hit agreeing on the most folders, counted up
+    from the file, wins; that is one folder under the default pattern and more under the full one.
     """
     root = Path(download_root)
     if not root.is_dir():
         return None
 
-    _, basename = split_remote_path(remote_filename)
+    own_directory, basename = split_remote_path(remote_filename)
     if not basename:
         return None
 
     matches = [p for p in root.rglob(basename) if p.is_file()]
 
-    if not matches:
-        return None
+    if len(matches) < 2:
+        return matches[0] if matches else None
 
-    if len(matches) > 1 and remote_directory:
-        wanted_dir = remote_directory.replace("\\", "/").rstrip("/").rpartition("/")[2]
-        preferred = [p for p in matches if p.parent.name == wanted_dir]
-        if preferred:
-            return preferred[0]
+    remote_folders = [f for f in (own_directory or remote_directory).replace("\\", "/").split("/") if f]
 
-    return matches[0]
+    def agreement(path: Path) -> int:
+        count = 0
+        for local, remote in zip(reversed(path.parent.relative_to(root).parts), reversed(remote_folders)):
+            if local != remote:
+                break
+            count += 1
+        return count
+
+    #? max() keeps the first of equals, which is what this always returned with nothing to go on
+    return max(matches, key=agreement)
 
 
 def is_within(child: Path, parent: Path) -> bool:
@@ -927,16 +939,18 @@ def remove_incomplete_downloads(
         results["problem"] = f"the incomplete folder isn't there: {incomplete_root}"
         return results
 
-    #? the last component of the remote folder, which is the directory name slskd nests the
-    #? partial under - same derivation find_local_file uses to prefer the right match
-    wanted_dir = remote_directory.replace("\\", "/").rstrip("/").rpartition("/")[2] if remote_directory else ""
-
     for entry in files:
         remote_filename = entry.get("filename", "")
-        _, basename = split_remote_path(remote_filename)
+        own_directory, basename = split_remote_path(remote_filename)
 
         if not basename:
             continue
+
+        #? the last component of the FILE's own remote folder, which is the directory name slskd
+        #? nests the partial under - its disc folder, for a set shared one folder per disc (see
+        #? find_local_file). The job's directory is only the fallback for a bare filename.
+        folder = own_directory or remote_directory.replace("\\", "/")
+        wanted_dir = folder.rstrip("/").rpartition("/")[2]
 
         matches = [p for p in root.rglob(basename) if p.is_file()]
 

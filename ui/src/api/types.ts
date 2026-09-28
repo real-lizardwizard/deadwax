@@ -141,6 +141,12 @@ export interface Candidate {
   expected_tracks: number
   audio_file_count: number
   detected_edition_tags: string[]
+  /**
+   * The peer's folder for each disc, when the candidate is a set they share one folder per disc
+   * ("CD 1", "CD 2") joined into one (src/matching.py join_disc_folders). Absent or empty for
+   * an ordinary folder.
+   */
+  disc_folders?: string[]
   formats: string[]
   /**
    * The peer's average upload speed over their whole history, in BYTES/sec.

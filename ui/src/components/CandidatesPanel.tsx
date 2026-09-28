@@ -535,6 +535,14 @@ function CandidateRow(
             <span class="text default-secondary">{candidate.username}</span>
             <span class="text default-muted">·</span>
             <span class="text default-secondary">{trackSummary(candidate)}</span>
+            {(candidate.disc_folders?.length ?? 0) > 1 && (
+              <>
+                <span class="text default-muted">·</span>
+                <span class="text default-secondary" title={candidate.disc_folders!.join(', ')}>
+                  {candidate.disc_folders!.length} disc folders
+                </span>
+              </>
+            )}
             <span class="text default-muted">·</span>
             <span class="text default-secondary">
               {(candidate.formats.join(', ') || 'unknown') + depthRateText(candidate)
