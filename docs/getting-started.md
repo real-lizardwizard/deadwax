@@ -87,7 +87,7 @@ A few things to know:
   environment, and when that's empty it still counts as set, so it quietly overrides your
   `.env`. The log warns about this at start-up if it happens.
 - **Which image tag.** `:latest` is the current release. `:experimental` is rebuilt on every push
-  to the development branch and moves under you. `:0.2.1` and older are the original
+  to `main`, so it runs ahead of `:latest` and moves under you. `:0.2.1` and older are the original
   Lidarr-based app, which doesn't understand any of these settings.
 
 Every setting is described in [Configuration](configuration.md).

@@ -8,12 +8,12 @@ name: Tests
 #   - a pull request, anywhere;
 #   - a push to any branch the image workflow does NOT build - it calls this itself, through
 #     workflow_call, so that a failing test stops an image from being published at all;
-#   - that call, for experimental/** pushes and v* tags.
+#   - that call, for pushes to main and v* tags.
 on:
   pull_request:
   push:
     branches-ignore:
-      - 'experimental/**'
+      - 'main'
   workflow_call:
   workflow_dispatch:
 

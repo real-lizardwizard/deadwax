@@ -1,11 +1,13 @@
 name: Publish Docker image
 
+# main is the one line that ships (since 1.0.5): every push to it is built as :experimental, and a
+# v* tag on it is a release. Other branches build nothing unless run by hand (workflow_dispatch).
 on:
   push:
     tags:
       - 'v*'
     branches:
-      - 'experimental/**'
+      - 'main'
   workflow_dispatch:
 
 env:
@@ -53,7 +55,9 @@ jobs:
               tags="${tags}"$'\n'"${image}:latest"
             fi
 
-          elif [[ "${GITHUB_REF}" == refs/heads/experimental/* ]]; then
+          #? still called :experimental - it was the experimental branch's until 1.0.5, and a stack
+          #? pointed at it keeps getting the newest code without being edited
+          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
             tags="${image}:experimental"
 
           else

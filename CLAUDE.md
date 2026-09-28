@@ -23,10 +23,32 @@ confidently wrong deployment advice. Don't bring them back.
 
 | branch | what |
 | --- | --- |
-| `main` | **the release line since 1.0.0** (2026-09-27, asked for), fast-forwarded to experimental. Until then it held the old Lidarr-based v0.2.1, which is still tag `v0.2.1`. |
-| `experimental/slskdn-no-lidarr` | **all the work below.** slskd-direct, no Lidarr. v0.3.0 to v0.9.2 were tagged from here, and `:experimental` is built from it. |
-| `player-spike` | **the multi-user and phone-player work, from 1.0.0** (moved there on 2026-09-27, asked for). 1.0.1 is its first commit. Local only: nothing builds an image from it. |
+| `main` | **the one line that ships.** Every change that ships lands here, and since 1.0.5 only main takes version numbers. Each push is built as `:experimental`; a `v*` tag on it is a release. Until 1.0.0 it held the old Lidarr-based v0.2.1, still tag `v0.2.1`. |
+| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for), which builds its own `:player` image. It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code there than on main; its two fix commits came to main as 1.0.3 and 1.0.4. From here it follows the rules. |
 | `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2), kept for step 1's port. Everything after it on that branch shipped on experimental. |
+| ~~`experimental/slskdn-no-lidarr`~~ | **deleted after 1.0.4.** Where all the 0.x work happened: v0.3.0 to v0.9.2 were tagged from it, and every commit of it is in main's history. |
+
+#### Branches and versions (v1.0.5, asked for)
+
+James: "how can I set this up to work cleaner in the future so I don't have to go back and forth
+between versions like this?" After 1.0.0, two lines numbered their own commits: player-spike took
+1.0.1-1.0.5 while main took 1.0.1-1.0.4 - the same numbers for different code - and two fixes made
+on the spike that main needed had to be cherry-picked across.
+
+- **main is the one line that ships.** Don't start a second line that releases too.
+- **Only main takes version numbers.** A commit on any other branch leaves `__version__` alone.
+  A branch that publishes its own image needs a version to show, and takes a PRE-RELEASE of the
+  next minor - `1.1.0-player.1`, `1.1.0-player.2` - never a plain number. The publish workflow
+  never moves `:latest` for a version with a hyphen, so it can't pass for a release, and a plain
+  number always means one commit on main.
+- **A bug main has too is fixed ON MAIN first**, in its own commit with its own patch bump, and
+  main is then merged into the branch. Fixing it only on the branch is what stranded 1.0.1 and
+  1.0.2 on player-spike.
+- **Merge main into a long-running branch often** (`git merge main`; the app's sync does it for a
+  worktree session), so the merge back is small. When a branch merges into main, main gives it
+  the next plain version then.
+- **A release is a tag on main.** A push to main publishes `:experimental`; a `v*` tag publishes
+  `:<version>` and moves `:latest`.
 
 ### The name (v0.6.21)
 
@@ -3024,7 +3046,8 @@ compile time.
 - **Commits must set the author explicitly**, git defaults to a local placeholder here:
   `GIT_AUTHOR_NAME="James Barnett" GIT_AUTHOR_EMAIL="jamesambarnett@gmail.com" git commit …`
 - Commit messages explain *why*, and name what was verified vs assumed.
-- **Every commit bumps the patch version and leaves the README current.** Both in the same
+- **Every commit on main bumps the patch version and leaves the README current** (a commit on
+  any other branch doesn't - see "Branches and versions"). Both in the same
   commit as the change itself, not swept up afterwards — the point is that the history reads
   as a clean progression rather than as a pile of work with a version bolted on at the end.
   The README is the only description of this project most people will ever read, so a commit
@@ -3045,8 +3068,8 @@ compile time.
   see the image-tag note below. Bump the version as you go; tag when you mean to ship.
 - Versions: `v0.x` tags until **1.0.0, released on 2026-09-27** when James called it polished,
   as the first release on `main`. The patch bump per commit carries on from there.
-- Image tags: `:experimental` = this branch (rebuilt on every push); `:latest` = the newest
-  real release. `:latest` only ever moves for a real release, never a branch or prerelease —
+- Image tags: `:experimental` = main, rebuilt on every push (the experimental branch's until
+  1.0.5); `:latest` = the newest real release. `:latest` only ever moves for a real release, never a branch or prerelease —
   the workflow enforces this by skipping `:latest` for any version containing a hyphen.
   **As of v0.3.0 `:latest` is the slskd-direct line, not the Lidarr one**, and since 1.0.0 `main`
   is too - the repo's default branch showed the old Lidarr README until then. The example
@@ -3093,7 +3116,7 @@ and 3.14 (what the image ships), `npm run build` on Node 22 (typecheck included,
 does it) and every `ui/test/*.sim.cjs`, each on its own so a failure names itself.
 **`docker-publish.yml` calls it and its build `needs:` it**, so a tag whose tests fail publishes
 no image and moves no `:latest`. To keep one push from being tested twice, `tests.yml`'s own push
-trigger ignores `experimental/**` - those, and `v*` tags, are tested through the publish
+trigger ignores `main` - pushes to it, and `v*` tags, are tested through the publish
 workflow's call instead. **A new sim is picked up by the glob; a new Python test dependency has
 to be added to the workflow's install step** - `requirements.txt` is the image's, and pytest is
 deliberately not in it.
