@@ -54,7 +54,7 @@ from src import __version__
 from src.config import (COVER_ART_SIZES, LYRICS_LEAD_LIMIT_MS, RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config,
                         build_user_agent, parse_rename_wait, parse_search_timeout,
                         describe_contact, describe_navidrome_url, describe_slskd_url, parse_lyrics_lead,
-                        setting_source, shadowed_by_empty_env)
+                        setting_source, shadowed_by_empty_env, without_login)
 from src.scan_wait import SCAN_WAIT_CAP_SECONDS
 from src.logger import logger
 
@@ -153,6 +153,13 @@ def _describe_path(value: str | None, *, needs_write: bool) -> tuple[str, str | 
     return "ok", None
 
 
+#? What stands in for a login typed into an address (1.0.5). Saving refuses one and the clients
+#? won't use one, so it only reaches the payload from compose or .env - and it is still a
+#? password. Marked rather than dropped: the row says the address has a login in it, and a field
+#? showing none would leave you looking for it.
+LOGIN_MARK = "•••@"
+
+
 def _setting(
     key: str,
     value: str | None,
@@ -163,17 +170,24 @@ def _setting(
     status: str | None = None,
     detail: str | None = None,
     choices: dict[str, str] | None = None,
+    address: bool = False,
 ) -> dict:
     """
     One row in the settings tab.
 
     `choices` is value -> label for a setting that only takes certain values, which the tab
     draws as a dropdown rather than a text box that would accept anything and fail on save.
+
+    `address` marks a URL that a secret is sent to (SLSKD_URL, NAVIDROME_URL): any login typed
+    into it is shown as LOGIN_MARK, here and in env_value.
     """
     #? Secrets (API keys, the Navidrome password) never leave the process. The tab shows
     #? whether one arrived and nothing else - enough to diagnose "downloads don't work",
     #? without putting a credential in a screenshot somebody pastes into an issue.
-    reported = ("set" if value else None) if secret else (value or None)
+    def shown(v: str | None) -> str | None:
+        return without_login(v, LOGIN_MARK) if address and v else v
+
+    reported = ("set" if value else None) if secret else (shown(value) or None)
 
     if status is None:
         status = "ok" if value else ("error" if required else "unset")
@@ -207,7 +221,7 @@ def _setting(
         "overridden": key in Config.OVERRIDDEN,
         #? What reverting would restore. Never sent for secrets.
         "env_value": (
-            None if secret else (Config.ENV_VALUES.get(key) if key in Config.OVERRIDDEN else None)
+            None if secret else (shown(Config.ENV_VALUES.get(key)) if key in Config.OVERRIDDEN else None)
         ),
         "choices": choices,
     }
@@ -237,6 +251,7 @@ def _navidrome_rows() -> list[dict]:
             ),
             status="error" if url_problem or (partial and not url) else None,
             detail=f"unusable: {url_problem}" if url_problem else (missing if partial and not url else None),
+            address=True,
         ),
         _setting(
             "NAVIDROME_USER",
@@ -571,7 +586,11 @@ async def settings():
                         "SLSKD_URL",
                         Config.SLSKD_URL,
                         required=True,
-                        effect="The slskd instance searches and downloads go through",
+                        effect=(
+                            "The slskd instance searches and downloads go through. Every request "
+                            "to it carries the API key, so changing it takes the key again, "
+                            "typed with it"
+                        ),
                         status="error" if url_problem else "ok",
                         detail=(
                             f"unusable: {url_problem}. It has to be reachable from inside "
@@ -581,6 +600,7 @@ async def settings():
                             if url_problem
                             else None
                         ),
+                        address=True,
                     ),
                     _setting(
                         "SLSKD_APIKEY",
@@ -773,6 +793,8 @@ def _validate(key: str, value: str) -> str | None:
     if key == "ORGANIZE_MODE" and value not in ORGANIZE_MODES:
         return f"expected one of {', '.join(ORGANIZE_MODES)}"
 
+    #? Required, so an empty one is wrong too - and since 1.0.5 held to what NAVIDROME_URL is: no
+    #? login, no ? or #. Every request to it carries the API key. See describe_slskd_url.
     if key == "SLSKD_URL":
         problem = describe_slskd_url(value)
         if problem:
@@ -826,33 +848,50 @@ def _validate(key: str, value: str) -> str | None:
     return None
 
 
-def _navidrome_moved_without_password(updates: list[SettingUpdate]) -> str | None:
+#? An address that is sent a secret with every request -> that secret, and what a save moving the
+#? address without it is told. Navidrome since 1.0.3, slskd since 1.0.5.
+SECRET_FOR_ADDRESS = {
+    "NAVIDROME_URL": (
+        "NAVIDROME_PASSWORD",
+        "type the Navidrome password again with the new address - deadwax won't send the saved "
+        "one to an address it wasn't entered for",
+    ),
+    "SLSKD_URL": (
+        "SLSKD_APIKEY",
+        "type the slskd API key again with the new address - deadwax won't send the saved one "
+        "to an address it wasn't entered for",
+    ),
+}
+
+
+def _moved_without_secret(updates: list[SettingUpdate]) -> dict[str, str]:
     """
-    Why this batch may not point Navidrome somewhere new, or None if it may.
+    Each address this batch may not point somewhere new, with why. Empty when it may.
 
-    Every request to NAVIDROME_URL carries a token made from the saved password - and Navidrome
-    accepts the same token and salt again for as long as the password stands. So re-pointing
-    the URL alone would send the saved password's token to whatever address was typed, which
-    anyone who can reach deadwax could do (the 1.0.3 audit did it with curl). A new address
-    therefore takes the password again, in the same save.
+    Every request to NAVIDROME_URL carries a token made from the saved password, and Navidrome
+    accepts the same token and salt again for as long as the password stands; every request to
+    SLSKD_URL carries the API key itself, which is full control of slskd. deadwax has no login, so
+    anyone who can reach it could re-point either address with curl and collect the secret on the
+    next ping (the 1.0.3 audit did it to Navidrome). A new address therefore takes its secret
+    again, in the same save.
 
-    Not a change, and so allowed: saving the address it already is, clearing it (nothing is
-    sent anywhere), and reverting it (that address is the environment's, which is the admin's).
-    Nor when no password is set yet, from here or the environment - there is nothing to send.
+    Not a change, and so allowed: saving the address it already is, clearing it (nothing is sent
+    anywhere - an empty SLSKD_URL is refused anyway, as not set), and reverting it (that address
+    is the environment's, which is the admin's). Nor when no secret is set yet, from here or the
+    environment - there is nothing to send. Reverting or blanking the secret is not typing it.
     """
     wanted = {update.key: update.value for update in updates}
-    url = (wanted.get("NAVIDROME_URL") or "").strip()
+    refused = {}
 
-    if not url or url == (Config.NAVIDROME_URL or "").strip() or not Config.NAVIDROME_PASSWORD:
-        return None
+    for address, (secret, reason) in SECRET_FOR_ADDRESS.items():
+        url = (wanted.get(address) or "").strip()
+        if not url or url == (getattr(Config, address) or "").strip() or not getattr(Config, secret):
+            continue
+        if (wanted.get(secret) or "").strip():
+            continue
+        refused[address] = reason
 
-    if (wanted.get("NAVIDROME_PASSWORD") or "").strip():
-        return None
-
-    return (
-        "type the Navidrome password again with the new address - deadwax won't send the saved "
-        "one to an address it wasn't entered for"
-    )
+    return refused
 
 
 @router.put("")
@@ -889,9 +928,9 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
             if problem:
                 problems[update.key] = problem
 
-    moved = _navidrome_moved_without_password(updates)
-    if moved and "NAVIDROME_URL" not in problems:
-        problems["NAVIDROME_URL"] = moved
+    #? After validation, so an address that is unusable anyway is told that rather than this
+    for key, reason in _moved_without_secret(updates).items():
+        problems.setdefault(key, reason)
 
     if problems:
         raise HTTPException(

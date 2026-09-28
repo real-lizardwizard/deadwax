@@ -19,12 +19,13 @@ deadwax the means to create users or delete playlists on Navidrome.
 
 import hashlib
 import secrets
-from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
 from src import __version__
-from src.config import Config, describe_navidrome_url
+#? without_login lives in config.py since 1.0.5, shared with the settings payload; it is
+#? imported here under the name the rest of this module (and its tests) use
+from src.config import Config, describe_navidrome_url, without_login
 
 #? The Subsonic API version deadwax speaks: the last one Subsonic itself published, which is
 #? what Navidrome reports, and the one carrying the album-based (ID3) calls used here.
@@ -80,22 +81,6 @@ class NavidromeError(Exception):
         self.status = status
         self.headers = headers
         self.unreachable = unreachable
-
-
-def without_login(url: str | None) -> str:
-    """
-    The address as it may be shown: any user name or password in it taken out. The client refuses
-    such an address (see get_client), so this is the second line - an error message quoting it
-    lands in the log, the page's event log and the player's screen.
-    """
-    url = url or ""
-    try:
-        parts = urlsplit(url)
-    except ValueError:
-        return url.rpartition("@")[2] if "@" in url else url
-    if "@" not in parts.netloc:
-        return url
-    return urlunsplit(parts._replace(netloc=parts.netloc.rpartition("@")[2]))
 
 
 def unusable_url(problem: str) -> str:

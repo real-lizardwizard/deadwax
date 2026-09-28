@@ -79,25 +79,41 @@ function isTab(value: string | null): value is SettingsTab {
 }
 
 /**
- * What the password row says while NAVIDROME_URL has an unsaved new address and no password has
- * been typed to go with it (v1.0.3). The server refuses that save - every request to the address
- * carries a token made from the password, so it is never sent somewhere it wasn't typed for - and
- * saying so beside the field beats a refusal in the save bar. The rule itself is the server's:
- * _navidrome_moved_without_password in src/routes/settings.py.
+ * A secret that is sent to an address with every request, and what its row says while that
+ * address has an unsaved new value and the secret hasn't been typed to go with it. The server
+ * refuses that save - the saved secret is never sent somewhere it wasn't typed for - and saying so
+ * beside the field beats a refusal in the save bar. The rule itself is the server's:
+ * SECRET_FOR_ADDRESS and _moved_without_secret in src/routes/settings.py. Navidrome since v1.0.3,
+ * slskd since v1.0.5.
  */
-export function navidromePasswordNote(
+const RETYPE_WITH_ADDRESS: Record<string, { address: string; note: string }> = {
+  NAVIDROME_PASSWORD: {
+    address: 'NAVIDROME_URL',
+    note: "Type the password again to go with the new address - deadwax won't send the saved one to an address it wasn't entered for.",
+  },
+  SLSKD_APIKEY: {
+    address: 'SLSKD_URL',
+    note: "Type the API key again to go with the new address - deadwax won't send the saved one to an address it wasn't entered for.",
+  },
+}
+
+export function retypeSecretNote(
+  key: string,
   server: ServerSettings | null,
   draftEnv: Record<string, string | null>,
 ): string | null {
+  const rule = RETYPE_WITH_ADDRESS[key]
+  if (!rule) return null
+
   const settings = (server?.groups ?? []).flatMap((group) => group.settings)
-  const current = settings.find((setting) => setting.key === 'NAVIDROME_URL')?.value ?? ''
-  const password = settings.find((setting) => setting.key === 'NAVIDROME_PASSWORD')
-  const url = draftEnv['NAVIDROME_URL']
+  const current = settings.find((setting) => setting.key === rule.address)?.value ?? ''
+  const secret = settings.find((setting) => setting.key === key)
+  const url = draftEnv[rule.address]
 
   if (typeof url !== 'string' || !url.trim() || url.trim() === current.trim()) return null
-  if (!password?.value) return null
-  if ((draftEnv['NAVIDROME_PASSWORD'] ?? '').trim()) return null
-  return "Type the password again to go with the new address - deadwax won't send the saved one to an address it wasn't entered for."
+  if (!secret?.value) return null
+  if ((draftEnv[key] ?? '').trim()) return null
+  return rule.note
 }
 
 /**
@@ -572,7 +588,7 @@ export function SettingsView({ active }: { active: boolean }) {
             draft={draftEnv[setting.key]}
             onEdit={editEnv}
             onRevert={revertEnv}
-            note={setting.key === 'NAVIDROME_PASSWORD' ? navidromePasswordNote(server, draftEnv) : null}
+            note={retypeSecretNote(setting.key, server, draftEnv)}
           />
         ))}
       </div>

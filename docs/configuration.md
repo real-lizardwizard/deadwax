@@ -31,8 +31,8 @@ the tab's own overrides are stored, and `PUID`/`PGID` are used before the app st
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `SLSKD_URL` | *(required)* | slskd's address **as seen from inside this container**, with the scheme: `http://slskd:5030` for a container on the same Docker network. The settings tab explains exactly what's wrong with an address it can't use. |
-| `SLSKD_APIKEY` | *(required)* | an API key from slskd's configuration. Never shown in the page, only whether it's set. |
+| `SLSKD_URL` | *(required)* | slskd's address **as seen from inside this container**, with the scheme: `http://slskd:5030` for a container on the same Docker network. If slskd has a URL base, include it, as in `http://slskd:5030/slskd`. It can't hold a user name or password, a `?` or `#`, or a space, and the settings tab explains exactly what's wrong with an address it can't use. One set in compose or `.env` that fails the same check is refused as well: deadwax sends slskd nothing at it, and the **Log** and the container's log say why. **Changing it takes the API key again**, typed in the same save, so the saved key is never sent to an address it wasn't entered for. Reverting it doesn't. |
+| `SLSKD_APIKEY` | *(required)* | an API key from slskd's configuration. Never shown in the page, only whether it's set. Every request to `SLSKD_URL` carries it, and it gives full control of slskd. |
 | `MUSICBRAINZ_EMAIL` | *(recommended)* | your contact address for MusicBrainz. The app builds its identifying user agent around it, as `deadwax/<version> ( you@example.com )`, so the version it sends is always the one running. Without a contact, MusicBrainz may refuse or throttle requests. |
 | `MUSICBRAINZ_USERAGENT` | | the old way: a whole user agent written by hand. Still read, and its contact is used if `MUSICBRAINZ_EMAIL` isn't set. |
 | `THEAUDIODB_KEY` | | optional. [TheAudioDB](https://www.theaudiodb.com) is a source of artist banners, logos and backgrounds for artist pages. Without it (or a fanart.tv key), an artist page shows a photograph where Wikimedia Commons has one. |

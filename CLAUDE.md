@@ -139,7 +139,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one.
-tests/             1095 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1126 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -1901,6 +1901,8 @@ the spike's tests because they never went through the real app. What changed, an
   address that fails it (a 503 from `unusable_url()` naming the reason; nothing is sent), and
   `navidrome_usable()` - all three set AND that check passing - is what the apply and the
   `RETAG_RENAME_WAIT` row go by. Error text quoting the address goes through `without_login()`.
+  (Since 1.0.5 the slskd and Navidrome checks are one, `_describe_address()`, and `without_login()`
+  lives in config.py.)
 - **A new NAVIDROME_URL takes the password again, in the same save**
   (`_navidrome_moved_without_password`, settings.py). The audit re-pointed `NAVIDROME_URL` with
   curl - a write with no Origin passes SameOriginWrites by design - and the next status call sent
@@ -1909,8 +1911,8 @@ the spike's tests because they never went through the real app. What changed, an
   relayed the body as a cover. So: refused unless the batch carries a non-empty
   `NAVIDROME_PASSWORD`; saving the same address, clearing, reverting (the environment's address
   is the admin's) and "no password set yet" are allowed. The password row shows the reason in red
-  while the URL holds an unsaved new address. **`SLSKD_URL` has the same shape and is NOT
-  fixed**: re-pointing it sends the saved slskd API key to the new address.
+  while the URL holds an unsaved new address. ~~`SLSKD_URL` has the same shape and is NOT
+  fixed~~ **Fixed in 1.0.5** - see "slskd's address takes the key again" under "The settings tab".
 - **Audio and covers are never gzipped** (`serves_media()` in app.py, shared by CompressText and
   GuardMedia, plus `CompressText.BINARY` = fonts and `/player/icon-`). GZipMiddleware compresses
   any STREAMED body whatever `minimum_size` says and drops its Content-Length, so Safari's 2-byte
@@ -2521,6 +2523,38 @@ metadata as well".
   (v0.6.15) is declared `secret` for the same reason and is masked the same way. This payload
   renders on a page people screenshot into bug reports. A test asserts the key's value does
   not appear anywhere in the payload.
+- **slskd's address takes the key again, and holds no login (1.0.5)** - the rule 1.0.3 made for
+  Navidrome, asked for. Anyone who can reach deadwax can PUT a new `SLSKD_URL` (a write with no
+  Origin passes SameOriginWrites by design), and the next ping or search would have carried the
+  saved `SLSKD_APIKEY` - full control of slskd - to it.
+  - `SECRET_FOR_ADDRESS` (settings.py) pairs each address with its secret and the sentence a
+    refusal gives; `_moved_without_secret()` refuses a batch that changes either address from its
+    current value (stripped) without a non-empty secret beside it. The exceptions are
+    Navidrome's: the same value, reverting (the environment's address is the admin's), and no
+    secret set yet. Clearing is too, though an empty `SLSKD_URL` is refused anyway, as required.
+    Reverting or blanking the secret is not typing it. An address that fails validation is told
+    that, not this.
+  - **One URL check for both**, `_describe_address()` in config.py, each caller passing its own
+    words: no login, no `?`/`#`, no space, a numeric port, a host; a PATH is allowed (slskd's URL
+    base survives slskd_api's urljoin - measured). That urljoin quietly DROPS a `?` or `#`, so for
+    slskd they are refused for reading as something they aren't, not for swallowing a path as
+    they do in httpx. **Nothing quotes the value back** - slskd's old "use http://<value>" did.
+    `get_client` already ran `describe_slskd_url()`, so an environment value is refused by the
+    client with no change there (the pill reads `UNKNOWN_ERROR`, the Log says why).
+  - **The cost:** a reverse proxy in front of slskd with a login in the URL no longer works
+    (requests sent it as basic auth, beside the key). Point deadwax at slskd directly.
+  - **The payload masks a login in an address** (`_setting(address=True)`: `LOGIN_MARK`, `•••@`,
+    in `value` and `env_value`, for SLSKD_URL and NAVIDROME_URL). One can only come from compose
+    or .env now, and it is still a password. Marked rather than dropped, so the row's "has a user
+    name or password in it" has something to point at. `without_login()` moved to config.py and
+    reads the authority by hand: urlsplit finds no host in a scheme-less `me:pw@host` and handed
+    it back whole.
+  - The tab's note beside the secret is `retypeSecretNote()` (SettingsView.tsx), from a table
+    mirroring `SECRET_FOR_ADDRESS`; it replaced `navidromePasswordNote`.
+  - **Verified in the real page** against two listeners logging `X-API-Key`: a new address with
+    no key showed the red note on the key's row, Save gave the refusal in the save bar and the
+    collector received nothing; with the key typed, one save stored both ("Set here") and the
+    next ping reached the collector carrying only the typed key.
 - **Only `error` is decorated.** An unset OPTIONAL setting renders plain. When every row
   carries a colour, the row that needs attention stops standing out, which is the list's
   whole job.
@@ -3514,7 +3548,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1095 tests
+.venv/bin/python -m pytest tests/ -q  # 1126 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3559,7 +3593,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1095 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1126 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

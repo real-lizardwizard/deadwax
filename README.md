@@ -76,7 +76,7 @@ _Note: this runs on **OpenMediaVault**, with **[Komodo](https://komo.do)** manag
 
    MusicBrainz asks every app to identify itself with a way to contact whoever runs it, and rate limits the ones that don't ([their rules](https://MusicBrainz.org/doc/MusicBrainz_API/Rate_Limiting)). Set `MUSICBRAINZ_EMAIL` to your email address and deadwax does the rest: it sends `deadwax/<version> ( you@example.com )` with the version it's actually running filled in, so there's nothing to keep up to date when you upgrade. It can be set from the settings tab too. If you wrote a `MUSICBRAINZ_USERAGENT` by hand before this existed, it keeps working — its contact is lifted out and used — and the settings tab says so.
 
-**`SLSKD_URL` has to be reachable from inside this container**, which is not always the address you type into your browser. If slskd is another container on the same docker network, use its service name and internal port — `http://slskd:5030` — rather than your host's IP and published port. It needs the scheme (`http://`) either way; deadwax says so specifically if it's missing.
+**`SLSKD_URL` has to be reachable from inside this container**, which is not always the address you type into your browser. If slskd is another container on the same docker network, use its service name and internal port — `http://slskd:5030` — rather than your host's IP and published port. It needs the scheme (`http://`) either way; deadwax says so specifically if it's missing. It can't carry a user name or password, a `?` or a `#`, and **changing it from the settings tab takes the API key again**, typed in the same save, so the saved key is never sent to an address it wasn't entered for.
 
 **The one that trips everyone up:** `SLSKD_DOWNLOAD_PATH` has to point at the *same files* slskd writes its finished downloads to, as seen from inside this container. If the two containers disagree about that path, organizing quietly finds nothing. It's the most likely first-run problem by a mile.
 
@@ -412,7 +412,7 @@ Theres no tracking of what you download or listen to, so theres nothing to base 
 ### Any kind of login
 <details>
 <summary style="font-style:italic">Anyone who can reach it can use it</summary>
-There is no authentication of any kind. It can delete files and rewrite tags, so put it behind whatever you already use for the rest of your homelab, and dont expose it to the internet. It does refuse changes that another website sends through your browser: a page you happen to have open can't make it delete an album. Behind a reverse proxy that rewrites the <code>Host</code> header, set <code>TRUSTED_ORIGINS</code> (see <a href="docs/configuration.md">configuration</a>).
+There is no authentication of any kind. It can delete files and rewrite tags, so put it behind whatever you already use for the rest of your homelab, and dont expose it to the internet. It does refuse changes that another website sends through your browser: a page you happen to have open can't make it delete an album. Nor can a saved key or password be sent somewhere new: changing slskd's or Navidrome's address takes that service's key or password again, in the same save. Behind a reverse proxy that rewrites the <code>Host</code> header, set <code>TRUSTED_ORIGINS</code> (see <a href="docs/configuration.md">configuration</a>).
 </details>
 
 ### Undo

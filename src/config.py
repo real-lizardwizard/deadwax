@@ -65,47 +65,38 @@ def shadowed_by_empty_env(name: str) -> bool:
     )
 
 
-def describe_slskd_url(url: str | None) -> str | None:
-    """Return a human explanation of why this URL is unusable, or None if it's fine."""
-    if not url:
-        return "not set"
-
-    if "://" not in url:
-        return f"missing the scheme - use http://{url} rather than {url}"
-
-    scheme, _, rest = url.partition("://")
-
-    if scheme not in ("http", "https"):
-        return f"unsupported scheme '{scheme}', expected http or https"
-
-    if not rest.strip("/"):
-        return "has a scheme but no host"
-
-    return None
-
-
-def describe_navidrome_url(url: str | None) -> str | None:
+def _describe_address(url: str | None, *, example: str, alone: str, login: str) -> str | None:
     """
-    Why this can't be NAVIDROME_URL, or None if it can. Everything describe_slskd_url() refuses,
-    and more, because this address is sent a login on every request (1.0.3 audit):
+    Why this can't be the address of a service deadwax sends a secret to, or None if it can. Shared
+    by SLSKD_URL (the API key rides on every request) and NAVIDROME_URL (a token made from the
+    password does). Each caller supplies the words that name its own service:
 
-      - a user name or password in it (`http://me:pw@host`) would ride along as basic auth and
-        be quoted back in every error message the player shows;
-      - a `?` or `#` would let whatever follows swallow the path deadwax appends, so a call
-        meant for /rest/getCoverArt fetched any page on that host and relayed it as a cover.
+      - `example` is a working address, for the missing-scheme message;
+      - `alone` says what to give instead of a `?` or `#`;
+      - `login` says where a login belongs instead of in the address.
 
-    A PATH is allowed, since Navidrome behind a proxy or with ND_BASEPATH lives under one.
+    Refused, beyond "no scheme, no host" (1.0.3 audit for Navidrome, 1.0.5 for slskd):
+
+      - a user name or password in it (`http://me:pw@host`) would ride along as basic auth -
+        requests and httpx both lift it out of the URL - and be quoted back wherever the address is;
+      - a `?` or `#` never belongs in a service's address. httpx lets whatever follows swallow the
+        path deadwax appends, so a call meant for Navidrome's /rest/getCoverArt fetched any page on
+        that host; slskd_api's urljoin quietly drops it instead, so it only reads as something it
+        isn't. Refused either way.
+
+    A PATH is allowed: Navidrome's ND_BASEPATH and slskd's URL base both put the API under one, as
+    does a reverse proxy's subpath.
 
     Nothing here quotes the value back (1.0.3 review): this is logged at start-up, shown on the
-    settings row and in the player, and a value typed with a password in it - `me:pw@navidrome`,
-    with no scheme - would otherwise be repeated wherever it goes. describe_slskd_url()'s "use
-    http://<the value>" does exactly that, which is why the scheme is judged here.
+    settings row, and in the player's and the candidates panel's errors, and a value typed with a
+    password in it - `me:pw@host`, with no scheme - would otherwise be repeated wherever it goes.
+    The old slskd message, "use http://<the value>", did exactly that.
     """
     if not url:
         return "not set"
 
     if "://" not in url:
-        return "missing the scheme - it starts with http:// or https://, as in http://navidrome:4533"
+        return f"missing the scheme - it starts with http:// or https://, as in {example}"
 
     scheme, _, rest = url.partition("://")
     if scheme not in ("http", "https"):
@@ -115,14 +106,14 @@ def describe_navidrome_url(url: str | None) -> str | None:
         return "has a scheme but no host"
 
     if "?" in url or "#" in url:
-        return "has a ? or # in it - give Navidrome's address alone, with its base path if it has one"
+        return f"has a ? or # in it - {alone}"
 
     if any(c.isspace() for c in url):
         return "has a space in it"
 
     parts = urlsplit(url)
     if "@" in parts.netloc:
-        return "has a user name or password in it - those go in NAVIDROME_USER and NAVIDROME_PASSWORD"
+        return f"has a user name or password in it - {login}"
 
     if not parts.hostname:
         return "has a scheme but no host"
@@ -133,6 +124,55 @@ def describe_navidrome_url(url: str | None) -> str | None:
         return "has a port that isn't a number"
 
     return None
+
+
+def describe_slskd_url(url: str | None) -> str | None:
+    """
+    Why this can't be SLSKD_URL, or None if it can. Every request to it carries SLSKD_APIKEY, which
+    is full control of slskd - so since 1.0.5 it is held to what NAVIDROME_URL is. See
+    _describe_address.
+    """
+    return _describe_address(
+        url,
+        example="http://slskd:5030",
+        alone="give slskd's address alone, with its URL base if it has one",
+        login="deadwax signs in to slskd with SLSKD_APIKEY alone",
+    )
+
+
+def describe_navidrome_url(url: str | None) -> str | None:
+    """Why this can't be NAVIDROME_URL, or None if it can. See _describe_address."""
+    return _describe_address(
+        url,
+        example="http://navidrome:4533",
+        alone="give Navidrome's address alone, with its base path if it has one",
+        login="those go in NAVIDROME_USER and NAVIDROME_PASSWORD",
+    )
+
+
+def without_login(url: str | None, mark: str = "") -> str:
+    """
+    The address as it may be shown: any user name or password in it replaced by `mark` (removed, by
+    default). The clients refuse such an address, so this is the second line - an error quoting it
+    lands in the log, the page's event log and the player's screen, and the settings payload
+    renders on a page people screenshot into bug reports.
+
+    Read by hand rather than by urlsplit, which raises on some malformed values and finds no host
+    at all in one typed without a scheme - `me:pw@navidrome:4533` would come back whole. The login
+    is whatever comes before the last `@` of the authority: the part after `://` (or the whole
+    value, with none) up to the first `/`, `?` or `#`, which is where requests and httpx look.
+    """
+    url = url or ""
+    scheme, sep, rest = url.partition("://")
+    if not sep:
+        scheme, rest = "", url
+
+    end = min((i for i in (rest.find(c) for c in "/?#") if i != -1), default=len(rest))
+    authority = rest[:end]
+    if "@" not in authority:
+        return url
+
+    return f"{scheme}{sep}{mark}{authority.rpartition('@')[2]}{rest[end:]}"
 
 
 #? The name MusicBrainz and the Cover Art Archive are given, with the version appended from

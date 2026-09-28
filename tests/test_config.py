@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.config import _env, describe_slskd_url  # noqa: E402
+from src.config import _env, describe_slskd_url, without_login  # noqa: E402
 
 
 def test_missing_url_is_reported(monkeypatch):
@@ -21,23 +21,60 @@ def test_missing_url_is_reported(monkeypatch):
 
 
 def test_scheme_less_url_is_reported_with_the_fix_spelled_out():
-    problem = describe_slskd_url("slskd:5030")
+    problem = describe_slskd_url("slskd-box:5030")
     assert "missing the scheme" in problem
-    assert "http://slskd:5030" in problem
+    assert "http://slskd:5030" in problem, "a working example, as the fix"
+
+
+def test_the_value_is_never_quoted_back():
+    """
+    It used to say "use http://<the value>" - which, for `me:pw@slskd:5030`, repeated the password
+    in the start-up log, on the settings row and in every failed search (1.0.5).
+    """
+    for url in ("me:secret-pw@slskd:5030", "secret-pw://slskd:5030",
+                "http://me:secret-pw@slskd:5030", "http://slskd:5030/?k=secret-pw"):
+        problem = describe_slskd_url(url)
+        assert problem and "secret-pw" not in problem, url
 
 
 def test_scheme_without_a_host_is_reported():
     assert "no host" in describe_slskd_url("http://")
+    assert "no host" in describe_slskd_url("http://:5030")
 
 
 def test_unsupported_scheme_is_reported():
-    assert "unsupported scheme" in describe_slskd_url("ftp://slskd:5030")
+    assert "scheme other than http:// or https://" in describe_slskd_url("ftp://slskd:5030")
+
+
+def test_an_address_that_carries_more_than_slskds_is_reported():
+    """The API key rides on every request, so the address is held to what NAVIDROME_URL is (1.0.5)."""
+    assert "user name or password" in describe_slskd_url("http://me:pw@slskd:5030")
+    assert "SLSKD_APIKEY" in describe_slskd_url("http://me@slskd:5030")
+    assert "? or #" in describe_slskd_url("http://slskd:5030/?x=")
+    assert "? or #" in describe_slskd_url("http://slskd:5030#")
+    assert "space" in describe_slskd_url("http://sl skd:5030")
+    assert "port" in describe_slskd_url("http://slskd:port")
 
 
 def test_valid_urls_pass():
     for url in ["http://slskd:5030", "https://slskd.example.com",
-                "http://192.168.1.10:5030", "http://slskd:5030/"]:
+                "http://192.168.1.10:5030", "http://slskd:5030/",
+                "https://nas.example/slskd"]:  # slskd's URL base, or a proxy's subpath
         assert describe_slskd_url(url) is None, url
+
+
+def test_without_login_takes_out_a_login_however_the_address_was_typed():
+    """
+    The payload and the error messages show addresses through this. urlsplit finds no host in a
+    value typed without a scheme, so the version built on it handed `me:pw@host` back whole.
+    """
+    assert without_login("http://me:pw@slskd:5030/base") == "http://slskd:5030/base"
+    assert without_login("me:pw@slskd:5030") == "slskd:5030"
+    assert without_login("http://me:p@ss@slskd:5030") == "http://slskd:5030", "the LAST @ ends it"
+    assert without_login("http://me:pw@slskd:5030", "•••@") == "http://•••@slskd:5030"
+    assert without_login("http://slskd:5030/a@b?c=d@e") == "http://slskd:5030/a@b?c=d@e", "a path's @ is no login"
+    assert without_login("http://slskd:5030") == "http://slskd:5030"
+    assert without_login(None) == ""
 
 
 def test_whitespace_only_env_counts_as_unset(monkeypatch):

@@ -34,8 +34,14 @@ In order of likelihood:
   for the VPN, and the pill says so.
 - **`401`**: slskd rejected the API key. Check `SLSKD_APIKEY` against the key in slskd's
   configuration.
-- **`UNKNOWN_HTTP_ERROR` / `UNKNOWN_ERROR` / `UNEXPECTED`**: slskd answered with something
-  unexpected. The log has the details.
+- **`UNKNOWN_ERROR`** with **"SLSKD_URL is unusable (…)"** in the **Log**: the address in your
+  compose file or `.env` fails the check the settings tab makes on save - a user name or
+  password in it, a `?` or `#`, a space, no `http://` - and the brackets say which. deadwax won't
+  send slskd anything at such an address, the API key least of all. Fix it in Settings →
+  Connections or in compose. A reverse proxy in front of slskd that asks for a login of its own
+  can't be reached this way; point deadwax at slskd directly.
+- **`UNKNOWN_HTTP_ERROR` / `UNKNOWN_ERROR` / `UNEXPECTED`** otherwise: slskd answered with
+  something unexpected. The log has the details.
 
 ## The MusicBrainz pill is red
 
@@ -238,6 +244,13 @@ Every request deadwax sends Navidrome carries a login made from the password, so
 the saved password to a new address until the password has been typed for it. Change
 `NAVIDROME_URL` and type `NAVIDROME_PASSWORD` too, then save both at once. Saving the address it
 already is, clearing it, or reverting it doesn't need the password.
+
+## Saving settings says "type the slskd API key again with the new address"
+
+Every request deadwax sends slskd carries the API key, and the key gives full control of slskd,
+so deadwax won't send the saved key to a new address until it has been typed for it. Change
+`SLSKD_URL` and type `SLSKD_APIKEY` too, then save both at once; the key's row says so in red
+before you save. Saving the address it already is, or reverting it, doesn't need the key.
 
 ## Plays don't show up in Navidrome
 

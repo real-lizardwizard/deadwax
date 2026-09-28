@@ -240,6 +240,9 @@ class SlskdClient:
                 # here - it fails much later inside requests as
                 # "Invalid URL '///api/v0/searches': No scheme supplied", which says nothing
                 # about which setting is wrong or where to fix it.
+                #? Since 1.0.5 this is also where an address from compose or .env meets the
+                #? settings tab's rule - no login, no ? or # - since it never passed through the
+                #? tab. Nothing is sent to one, the API key least of all.
                 url_problem = describe_slskd_url(Config.SLSKD_URL)
                 if url_problem:
                     message = f"SLSKD_URL is unusable ({url_problem})"
