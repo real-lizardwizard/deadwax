@@ -49,6 +49,15 @@ on the spike that main needed had to be cherry-picked across.
   the next plain version then.
 - **A release is a tag on main.** A push to main publishes `:experimental`; a `v*` tag publishes
   `:<version>` and moves `:latest`.
+- **Every release gets written release notes (asked for, 2026-09-28: "always write release
+  notes").** The tag's publish run creates the GitHub Release itself, with generated notes that
+  are only a changelog link; once that run has finished, replace them:
+  `gh release edit vX.Y.Z --title "deadwax X.Y.Z" --notes-file <notes>.md`. Same shape as
+  v1.0.0, v1.0.2 and v1.0.4: **Fixed** (what changed for the person running it, in their words),
+  **New settings** as a table of setting, default and what it does, **Upgrading** with anything
+  they must do - anything that can break a working setup first, like 1.0.4's reverse-proxy note -
+  and the changelog link last. Every name, default and behaviour in it checked against the code
+  and docs. Part of tagging, not a follow-up.
 
 ### The name (v0.6.21)
 
