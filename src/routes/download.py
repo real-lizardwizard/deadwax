@@ -10,7 +10,8 @@ from src.config import Config, search_timeout_seconds
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
-from src.poller import retry_next_peer, tidy_cancelled_later, tidy_cancelled_transfers, untried_alternatives
+from src.poller import (retry_next_peer, retry_same_peer, tidy_cancelled_later, tidy_cancelled_transfers,
+                        untried_alternatives)
 from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
 
@@ -614,6 +615,28 @@ async def retry_job(request: Request, job_id: int):
     except Exception as e:
         logger.error(f"Exception in /jobs/{job_id}/retry: {e}")
         raise HTTPException(status_code=500, detail=f"Error trying the next peer: {e}")
+
+
+@router.post("/jobs/{job_id}/retry_same")
+async def retry_job_same_peer(request: Request, job_id: int):
+    """
+    Ask the same peer for a failed or cancelled download again (v1.0.7), for the files that
+    didn't arrive. 200 either way, as /retry: `retried` false with a `problem` - the peer
+    refused, or slskd is still stopping the last attempt - is shown on the row.
+    """
+    store = request.app.state.store
+    job = await store.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="No such download job")
+    if job["status"] not in RETRYABLE_STATUSES:
+        raise HTTPException(status_code=409, detail=f"this download is {job['status']}, not failed or cancelled")
+
+    try:
+        return await retry_same_peer(request.app.state.slskd_client, store, job)
+    except Exception as e:
+        logger.error(f"Exception in /jobs/{job_id}/retry_same: {e}")
+        raise HTTPException(status_code=500, detail=f"Error asking the peer again: {e}")
 
 
 @router.post("/jobs/clear")

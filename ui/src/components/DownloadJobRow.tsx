@@ -16,11 +16,14 @@ interface Props {
    */
   cancelling: boolean
   onCancel: (jobId: number) => Promise<void>
-  /** Moving to the next peer, until a poll shows it going again (v0.9.12). */
-  retrying: boolean
-  /** Why the last retry didn't move it, or null. */
+  /**
+   * Being started again, until a poll shows it going: on the next peer (v0.9.12), or asking the
+   * same one again (v1.0.7). null when neither.
+   */
+  retrying: 'next' | 'same' | null
+  /** Why the last retry didn't start it, or null. */
   retryProblem: string | null
-  onRetry: (jobId: number) => Promise<void>
+  onRetry: (jobId: number, samePeer?: boolean) => Promise<void>
 }
 
 /**
@@ -37,7 +40,10 @@ interface Props {
 export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying, retryProblem, onRetry }: Props) {
   const statusClass = JOB_STATUS_CLASS[job.status] ?? ''
   //? a failed or cancelled download with runners-up left can move to the next of them
-  const canRetry = (job.status === 'failed' || job.status === 'cancelled') && (job.alternatives_left ?? 0) > 0
+  //? a failed or cancelled download can always ask its peer again, and move to the next peer
+  //? when it has runners-up left
+  const stopped = job.status === 'failed' || job.status === 'cancelled'
+  const canRetry = stopped && (job.alternatives_left ?? 0) > 0
   const percent = Math.round(job.progress || 0)
 
   const cancel = async (event: MouseEvent) => {
@@ -79,19 +85,37 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
           a cancel takes is what made the button feel like it did nothing.
         */}
         <span class={`download-job-status ${cancelling || retrying ? 'mid' : statusClass}`}>
-          {cancelling ? 'cancelling…' : retrying ? 'trying next peer…' : job.status}
+          {cancelling ? 'cancelling…' : retrying === 'same' ? 'asking again…'
+            : retrying ? 'trying next peer…' : job.status}
         </span>
 
-        {canRetry && !retrying && (
+        {/*
+          One group, so the two move together: on a narrow panel they wrap to a line of their own
+          at the right rather than squeezing the album's name to nothing.
+        */}
+        {stopped && !retrying && (
+          <span class="download-job-retries">
           <button
             type="button"
             class="download-retry-button"
-            title={`Move this download to the next peer from the list you picked it from - `
-              + `${job.alternatives_left} other peer${job.alternatives_left === 1 ? '' : 's'} left`}
-            onClick={(event) => { event.stopPropagation(); void onRetry(job.id) }}
+            title={`Ask ${job.username} for it again. Files that already arrived aren't downloaded twice, `
+              + `and slskd can pick a partly downloaded file up where it stopped.`}
+            onClick={(event) => { event.stopPropagation(); void onRetry(job.id, true) }}
           >
-            ↻ next peer
+            ↻ retry
           </button>
+          {canRetry && (
+            <button
+              type="button"
+              class="download-retry-button"
+              title={`Move this download to the next peer from the list you picked it from - `
+                + `${job.alternatives_left} other peer${job.alternatives_left === 1 ? '' : 's'} left`}
+              onClick={(event) => { event.stopPropagation(); void onRetry(job.id) }}
+            >
+              ↻ next peer
+            </button>
+          )}
+          </span>
         )}
 
         {/* cancelling only means anything while something is still moving */}

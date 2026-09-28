@@ -62,7 +62,8 @@ running can be refused with "Only one concurrent operation is permitted": wait a
 
 It's waiting in the user's upload queue: **queue #N** says how far back you are. A user with a
 **free slot** starts straight away. If slskd stops reporting the transfers altogether, the
-download fails after about two minutes. Use **↻ next peer** to move it to someone else.
+download fails after about two minutes. Use **↻ retry** to ask the same user again, or **↻ next
+peer** to move it to someone else.
 
 ## MusicBrainz is slow, or searches fail
 

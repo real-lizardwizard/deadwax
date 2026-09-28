@@ -33,6 +33,7 @@ export function DownloadsPanel() {
     cancelling,
     pending,
     retrying,
+    retryingSame,
     retryProblems,
     retry,
     refresh,
@@ -131,6 +132,7 @@ export function DownloadsPanel() {
             jobs={jobs}
             pending={pending}
             retrying={retrying}
+            retryingSame={retryingSame}
             retryProblems={retryProblems}
             onRetry={retry}
             trackingEnabled={trackingEnabled}
@@ -148,8 +150,9 @@ interface ListProps {
   jobs: ReturnType<typeof useDownloadJobs>['jobs']
   pending: PendingDownload[]
   retrying: ReadonlySet<number>
+  retryingSame: ReadonlySet<number>
   retryProblems: ReadonlyMap<number, string>
-  onRetry: (jobId: number) => Promise<void>
+  onRetry: (jobId: number, samePeer?: boolean) => Promise<void>
   trackingEnabled: boolean
   speeds: Map<number, number>
   cancelling: ReadonlySet<number>
@@ -157,7 +160,7 @@ interface ListProps {
 }
 
 function DownloadsList(
-  { jobs, pending, retrying, retryProblems, onRetry, trackingEnabled, speeds, cancelling, onCancel }: ListProps,
+  { jobs, pending, retrying, retryingSame, retryProblems, onRetry, trackingEnabled, speeds, cancelling, onCancel }: ListProps,
 ) {
   // an unwritable database is not a broken app - downloads still work, they're just not
   // remembered - so this says which knob to turn rather than reading as a crash
@@ -183,7 +186,7 @@ function DownloadsList(
           liveSpeed={speeds.get(job.id) ?? null}
           cancelling={cancelling.has(job.id)}
           onCancel={onCancel}
-          retrying={retrying.has(job.id)}
+          retrying={retrying.has(job.id) ? (retryingSame.has(job.id) ? 'same' : 'next') : null}
           retryProblem={retryProblems.get(job.id) ?? null}
           onRetry={onRetry}
         />
