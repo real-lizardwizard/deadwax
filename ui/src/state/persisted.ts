@@ -34,6 +34,8 @@ export const STORAGE_KEYS = {
   settingsTab: 'deadwax-settings-tab',
   /** Which order the player's album grid is in - a Subsonic album list type. */
   playerOrder: 'deadwax-player-order',
+  /** Whether the player's gapless switch is on: 'on', or anything else for off (the default). */
+  playerGapless: 'deadwax-player-gapless',
 } as const
 
 /*
@@ -214,6 +216,21 @@ export function readPlayerOrder(): string | null {
 
 export function writePlayerOrder(order: string): void {
   writeRaw(STORAGE_KEYS.playerOrder, order)
+}
+
+/* ===== deadwax-player-gapless ===== */
+
+/**
+ * The player's own, like its order: a home-screen app keeps its storage apart from Safari's, so a
+ * switch in the settings tab would never reach it. Off unless it says 'on' - an experiment is
+ * never on by accident.
+ */
+export function readPlayerGapless(): boolean {
+  return readRaw(STORAGE_KEYS.playerGapless) === 'on'
+}
+
+export function writePlayerGapless(on: boolean): void {
+  writeRaw(STORAGE_KEYS.playerGapless, on ? 'on' : 'off')
 }
 
 /* ===== deadwax-preferences ===== */

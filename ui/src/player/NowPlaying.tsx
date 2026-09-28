@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 
+import { describeGaps } from '../lib/gapless'
 import { Cover } from './Library'
 import { AirPlayIcon, ChevronDownIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
 import { usePosition, type Player } from './usePlayer'
@@ -53,6 +54,32 @@ function Scrubber({ player }: { player: Player }) {
         <span>-{clock(length - shown)}</span>
       </div>
     </div>
+  )
+}
+
+/**
+ * The gapless switch, iOS's shape, and what the last song changes took. The readout is timed with
+ * the switch off as well, so the two can be compared on the phone: from one song's end to the next
+ * one's sound starting, and how the next one was started - see clockStep() in lib/gapless.
+ */
+function Gapless({ player }: { player: Player }) {
+  return (
+    <label class="pl-gapless">
+      <span class="pl-gapless-label">Gapless</span>
+      <button
+        type="button"
+        role="switch"
+        class={`pl-switch${player.gapless ? ' is-on' : ''}`}
+        aria-checked={player.gapless}
+        aria-label="Gapless"
+        //? a click, not a change event: this tap is what unlocks the second audio element on iOS
+        onClick={() => player.setGapless(!player.gapless)}
+      >
+        <span class="pl-switch-track">
+          <span class="pl-switch-knob" />
+        </span>
+      </button>
+    </label>
   )
 }
 
@@ -158,12 +185,14 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
 
         <div class="pl-sheet-footer">
           <span class="pl-sheet-album">{track.album}</span>
+          <Gapless player={player} />
           {player.airplay && (
             <button type="button" class="pl-icon-button" onClick={player.showAirPlay} aria-label="AirPlay">
               <AirPlayIcon class="pl-icon" />
             </button>
           )}
         </div>
+        <p class="pl-gapless-readout">{describeGaps(player.gaps)}</p>
       </div>
     </div>
   )

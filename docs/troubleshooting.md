@@ -315,6 +315,28 @@ for it again.
   dropping, say), or deadwax lost Navidrome. The player asks again by itself; if it has stopped,
   tap play.
 
+## With Gapless on, there's still a pause between songs, or the player reloads by itself
+
+The [Gapless switch](player.md#gapless-playback-experimental) is an experiment, and the readout
+under the player's controls says how each song change went. Compare it with the switch off on the
+same phone and connection: the difference is what the switch saves.
+
+- **`download unfinished`**: the next song hadn't finished downloading when this one ended, so it
+  was streamed, taking as long as with the switch off. On a connection that can't download a
+  whole song while the one before plays, this happens every time, and the switch only uses more
+  data: turn it off.
+- **`one element (airplay)`**: nothing is got ready while playing to an AirPlay speaker, on
+  purpose. Song changes there go the ordinary way.
+- **`had to load`, or numbers as big as with the switch off**: the phone threw away what the
+  second player had buffered, most likely with the screen locked. It still plays; it just
+  isn't gapless there.
+- **`failed before playing`**: the next song wouldn't play from what had been got ready, and was
+  asked for again; the time includes that.
+- **`one element (refused)`**: iOS wouldn't start the second player, and the song went on the one
+  that was playing.
+- **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
+  held in memory ahead of time, and hi-res albums come close to that. Turn the switch off.
+
 ## The log says a transcode "ended at … of the … bytes Navidrome estimated"
 
 That line, followed by `ASGI callable returned without completing response` from the web

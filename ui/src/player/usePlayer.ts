@@ -17,6 +17,15 @@
  * tried once more and then passed over for the next song (afterFailure() in lib/playQueue), on
  * the same element, so a dropped connection or a missing file doesn't end the music in a pocket.
  *
+ * The gapless switch (off by default, lib/gapless) is the one exception to the first rule, and it
+ * keeps to the reason for it: a SECOND element, put through load() in the same tap that first
+ * plays so that iOS unlocks it too, holds the next song muted and ready, and a song ending starts
+ * it from the 'ended' handler. The two then swap roles, so there are only ever two elements, both
+ * unlocked by a tap. Every rule above goes by whichever element is playing - `live()` - and events
+ * from the other one are dropped (routeEvent()). When the standby can't take the song, the song
+ * goes on the element that was playing, exactly as with the switch off; and with it off there is
+ * one element, as there always was.
+ *
  * The position changes several times a second, so it is not React state - rendering the whole
  * player four times a second to move one bar would be waste. Whatever shows it subscribes with
  * usePosition() below, and only that re-renders.
@@ -25,10 +34,16 @@
 import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import {
-  EMPTY_QUEUE, LOAD_RETRY_DELAY_MS, MEDIA_ERR_DECODE, NEW_LISTEN, afterFailure, current, listenHeard,
-  listenStarted, listenedStep, nextIndex, previousAction, startQueue, type PlayQueue, type QueueTrack,
+  PRELOAD_DELAY_MS, activeAfter, afterPlaybackFailure, clockStep, handoverDecision, memoryPlan, overMemoryMax,
+  routeEvent, standbyPlan, startChange, withReading, type Change, type ClockUpdate, type ElementSlot, type GapReading,
+  type HandoverDecision, type Standby,
+} from '../lib/gapless'
+import {
+  EMPTY_QUEUE, LOAD_RETRY_DELAY_MS, MEDIA_ERR_DECODE, NEW_LISTEN, current, listenHeard, listenStarted,
+  listenedStep, nextIndex, previousAction, startQueue, type PlayQueue, type QueueTrack,
 } from '../lib/playQueue'
-import { coverUrl, scrobble, streamUrl } from './api'
+import { readPlayerGapless, writePlayerGapless } from '../state/persisted'
+import { coverUrl, scrobble, streamFormat, streamUrl } from './api'
 
 export interface Player {
   queue: PlayQueue
@@ -40,6 +55,10 @@ export interface Player {
   error: string | null
   /** whether an AirPlay device is on the network - the button shows only then */
   airplay: boolean
+  /** whether the gapless switch is on - see lib/gapless */
+  gapless: boolean
+  /** the last few song changes, timed from one song's end to the next one's clock running, newest first */
+  gaps: GapReading[]
   /** `start` null with shuffle: no song in particular - see startQueue() */
   playTracks(tracks: QueueTrack[], start: number | null, shuffle?: boolean): void
   toggle(): void
@@ -47,6 +66,8 @@ export interface Player {
   previous(): void
   seek(seconds: number): void
   showAirPlay(): void
+  /** the switch - a tap, which is also what unlocks the second element */
+  setGapless(on: boolean): void
   /** the element's position, and a way to hear about it changing - see usePosition() */
   position(): number
   onPosition(listener: (seconds: number) => void): () => void
@@ -55,6 +76,7 @@ export interface Player {
 /** Safari's AirPlay additions to the media element, which the DOM types don't carry. */
 interface AirPlayAudio extends HTMLAudioElement {
   webkitShowPlaybackTargetPicker?: () => void
+  webkitCurrentPlaybackTargetIsWireless?: boolean
 }
 
 interface AvailabilityEvent extends Event {
@@ -102,11 +124,14 @@ export function usePlayer(): Player {
   const [duration, setDuration] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [airplay, setAirplay] = useState(false)
+  const [gapless, setGaplessShown] = useState(readPlayerGapless)
+  const [gaps, setGaps] = useState<GapReading[]>([])
 
   //? Everything the element's events and the lock screen's handlers read. They are set up once,
   //? so they read these rather than closing over a render's state.
   const engine = useMemo(() => {
-    const audio = createAudio()
+    //? the page's element, and - once the gapless switch has been on - the second one
+    const elements: AirPlayAudio[] = [createAudio()]
     const listeners = new Set<(seconds: number) => void>()
     const state = {
       queue: EMPTY_QUEUE as PlayQueue,
@@ -128,9 +153,32 @@ export function usePlayer(): Player {
       retried: false,
       retryTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       resumeAt: 0,
+      //? which of `elements` is playing - always 0 with the switch never on
+      active: 0 as ElementSlot,
+      gapless: readPlayerGapless(),
+      //? whether the second element has been through load() in a tap - iOS unlocks for good
+      spareUnlocked: false,
+      //? what the standby element holds or is getting, the wait before it starts getting it, and
+      //? the download into memory under way
+      standby: null as Standby | null,
+      preloadTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+      download: null as AbortController | null,
+      //? the blob: address each element holds a song in memory by, handed back when it lets go
+      memory: new Map<HTMLAudioElement, string>(),
+      //? The song change being timed, from 'ended' until the next song's clock runs (clockStep()).
+      //? Only a change that goes straight from one to the other is timed, so everything that
+      //? means the music stopped - a pause, asked for or not, a refused play(), a failure that
+      //? stops the queue - and anything the listener does, drops it.
+      change: null as Change | null,
     }
 
-    const canPlay = (type: string) => audio.canPlayType(type) !== ''
+    /** The element playing - or paused, or about to play. Everything the player does goes to it. */
+    const live = (): AirPlayAudio => elements[state.active]!
+    /** The other element, when there is one: the gapless switch's standby. */
+    const other = (): AirPlayAudio | null => elements[state.active === 0 ? 1 : 0] ?? null
+
+    const canPlay = (type: string) => live().canPlayType(type) !== ''
+    const isWireless = () => live().webkitCurrentPlaybackTargetIsWireless === true
 
     /**
      * The song's length in seconds: the element's once it knows a real one, the tags' until then,
@@ -139,12 +187,13 @@ export function usePlayer(): Player {
      * of listening of every song before counting it, and leave the lock screen with no scrubber.
      */
     function songLength(): number {
-      const own = audio.duration
+      const own = live().duration
       if (Number.isFinite(own) && own > 0) return own
       return current(state.queue)?.duration ?? 0
     }
 
     function updatePositionState() {
+      const audio = live()
       const media = session()
       const length = songLength()
       if (!media?.setPositionState || !(length > 0)) return
@@ -190,6 +239,28 @@ export function usePlayer(): Player {
       if (track && nowPlaying) scrobble(track.id, false)
     }
 
+    /** Give an element a source, handing back a blob: address it held a song in memory by. */
+    function setSource(element: AirPlayAudio, src: string) {
+      const held = state.memory.get(element)
+      element.src = src
+      if (held !== undefined && held !== src) {
+        URL.revokeObjectURL(held)
+        state.memory.delete(element)
+      }
+    }
+
+    /** An element lets go of its song entirely - what it held in memory too. */
+    function empty(element: AirPlayAudio) {
+      element.removeAttribute('src')
+      element.load()
+      const held = state.memory.get(element)
+      if (held !== undefined) {
+        URL.revokeObjectURL(held)
+        state.memory.delete(element)
+      }
+    }
+
+    /** A new song on the element playing - the one-element way, and the only way with the switch off. */
     function load(next: PlayQueue, autoplay: boolean) {
       const track = current(next)
       if (!track) return
@@ -206,15 +277,22 @@ export function usePlayer(): Player {
       listeners.forEach((listener) => listener(0))
       showOnLockScreen(track)
 
-      audio.src = streamUrl(track, canPlay)
+      setSource(live(), streamUrl(track, canPlay))
       if (autoplay) play()
+      fitStandby()
     }
 
-    /** The same song asked for again, on the same element - see onFailure(). */
+    /**
+     * The same song asked for again, on the same element - see onFailure(). A song held in memory
+     * is asked for from Navidrome instead: if asking again is needed, the copy is what to doubt.
+     */
     function reload() {
       cancelRetry()
       setError(null)
-      audio.load()
+      const audio = live()
+      const track = current(state.queue)
+      if (state.memory.has(audio) && track) setSource(audio, streamUrl(track, canPlay))
+      else audio.load()
     }
 
     function cancelRetry() {
@@ -224,7 +302,12 @@ export function usePlayer(): Player {
       setBuffering(false)
     }
 
-    function play() {
+    /**
+     * `refused`, for a handover: what to do if iOS won't start the standby - see handOver(). Any
+     * other refusal of a play() is the element's, as it always was.
+     */
+    function play(refused?: () => void) {
+      const audio = live()
       state.intendsToPlay = true
       //? play pressed on a song that has ended plays it again from the top: a new listen
       if (audio.ended) newListen()
@@ -236,11 +319,18 @@ export function usePlayer(): Player {
         //? AbortError is the previous load being replaced by a newer one, which is fine; and
         //? NotSupportedError is the song failing, which the element's 'error' deals with
         if (name === 'AbortError' || name === 'NotSupportedError') return
+        //? the standby wouldn't start - and it is still the one playing, so nothing has moved on
+        if (refused && audio === live()) {
+          refused()
+          return
+        }
         setPlaying(false)
         setBuffering(false)
         if (name === 'NotAllowedError') {
-          //? refused for want of a tap, so nothing is playing until there is one
+          //? refused for want of a tap, so nothing is playing until there is one - and a song
+          //? change it stopped is no gap to time
           state.intendsToPlay = false
+          state.change = null
           setError('Tap play to start - this browser only plays audio from a tap')
         }
       })
@@ -248,14 +338,17 @@ export function usePlayer(): Player {
 
     function pause() {
       state.intendsToPlay = false
+      //? a song change paused before it began playing isn't a gap worth timing
+      state.change = null
       cancelRetry()
-      audio.pause()
+      live().pause()
       //? already paused, as a failed song leaves it, the element sends no 'pause' to say so
       const media = session()
       if (media) media.playbackState = 'paused'
     }
 
     function seek(seconds: number) {
+      const audio = live()
       if (!audio.src) return
       const length = Number.isFinite(audio.duration) ? audio.duration : Infinity
       audio.currentTime = Math.max(0, Math.min(seconds, length))
@@ -270,7 +363,7 @@ export function usePlayer(): Player {
       seek(0)
       //? no 'playing' follows a seek to a start that is already buffered, so a restart while
       //? playing begins its listen here
-      if (!audio.paused) beginListen()
+      if (!live().paused) beginListen()
     }
 
     /** "Skipped ..." in place of the artist's name for a while, unless something replaces it. */
@@ -279,33 +372,314 @@ export function usePlayer(): Player {
       setTimeout(() => setError((shown) => (shown === message ? null : shown)), SKIP_NOTICE_MS)
     }
 
+    /* ===== the gapless switch's second element - see lib/gapless ===== */
+
+    /** The second element, made the first time the switch is on and kept for the page's life. */
+    function ensureSpare() {
+      if (elements[1]) return
+      const spare = createAudio()
+      //? A muted element is never the lock screen's Now Playing (canShowControlsManager in
+      //? WebKit), so the standby can't take the lock screen from the song playing.
+      spare.muted = true
+      elements.push(spare)
+      attach(spare)
+    }
+
+    /**
+     * iOS unlocks audio per element, from a tap, and for good: load() in a tap does it. So the
+     * second element goes through load() in the first tap that plays - before the playing element
+     * is started, so that one stays the element last touched - and in the tap that turns the
+     * switch on. One that already holds a song needs none, and load() would only start it over.
+     */
+    function unlockSpare() {
+      const spare = elements[1]
+      if (!state.gapless || !spare || state.spareUnlocked) return
+      state.spareUnlocked = true
+      if (!spare.getAttribute('src')) spare.load()
+    }
+
+    function cancelPreload() {
+      if (state.preloadTimer !== undefined) clearTimeout(state.preloadTimer)
+      state.preloadTimer = undefined
+      state.download?.abort()
+      state.download = null
+    }
+
+    /** The standby lets go of whatever it holds or is getting. */
+    function dropStandby() {
+      cancelPreload()
+      const standby = other()
+      if (standby?.getAttribute('src')) empty(standby)
+      state.standby = null
+    }
+
+    /**
+     * The queue moved on: a standby holding any song but the one after the new one lets go of it,
+     * and a wait to get one ready starts again from the new song's 'playing'.
+     */
+    function fitStandby() {
+      if (state.preloadTimer !== undefined) clearTimeout(state.preloadTimer)
+      state.preloadTimer = undefined
+      const plan = standbyPlan(state.queue, state.gapless, state.standby, isWireless())
+      if (plan.kind === 'clear' || (plan.kind === 'load' && state.standby)) dropStandby()
+    }
+
+    /**
+     * A song has started playing: the one after it is got ready a moment from now. Never while
+     * AirPlaying - standbyPlan() answers nothing to get ready then, as a handover can't happen.
+     */
+    function preloadSoon() {
+      if (!state.gapless || state.preloadTimer !== undefined || isWireless()) return
+      if (standbyPlan(state.queue, state.gapless, state.standby, false).kind !== 'load') return
+      state.preloadTimer = setTimeout(() => {
+        state.preloadTimer = undefined
+        preloadNow()
+      }, PRELOAD_DELAY_MS)
+    }
+
+    function preloadNow() {
+      //? AirPlay may have begun during the wait
+      const plan = standbyPlan(state.queue, state.gapless, state.standby, isWireless())
+      if (plan.kind !== 'load') return
+      dropStandby()
+      ensureSpare()
+      const element = other()
+      if (!element) return
+      element.muted = true
+      const standby: Standby = { index: plan.index, id: plan.track.id, stage: 'fetching', failed: false }
+      state.standby = standby
+      void download(standby, element, plan.track)
+    }
+
+    /**
+     * The next song, downloaded whole into memory and handed to the standby as a blob: address -
+     * where it fits (memoryPlan()). An element left holding only an ADDRESS may have its buffer
+     * thrown away on a locked phone, since a paused element in a hidden page is marked purgeable
+     * in WebKit; a copy in memory is there whatever iOS does, and costs no trip to the server when
+     * its turn comes. Anything that doesn't go into memory - too big, a transcode, a download that
+     * failed - hands the standby the address instead, to buffer as iOS allows. AirPlay beginning
+     * while it downloads lets the standby go altogether (standbyPlan()).
+     */
+    async function download(standby: Standby, element: AirPlayAudio, track: QueueTrack) {
+      const address = streamUrl(track, canPlay)
+      const controller = new AbortController()
+      state.download = controller
+      //? after every wait: still the standby's song, and nothing got ready for AirPlay
+      const wanted = (): boolean => {
+        if (state.standby !== standby) return false
+        if (!isWireless()) return true
+        dropStandby()
+        return false
+      }
+      const byAddress = () => {
+        if (!wanted()) return
+        if (state.download === controller) state.download = null
+        standby.stage = 'stream'
+        setSource(element, address)
+        element.load()
+      }
+      if (!wanted()) return
+      try {
+        const response = await fetch(address, { signal: controller.signal })
+        if (!wanted()) return
+        const declared = response.headers.get('Content-Length')
+        const contentLength = declared !== null && Number.isFinite(Number(declared)) ? Number(declared) : null
+        const plan = memoryPlan({
+          ok: response.ok,
+          contentType: response.headers.get('Content-Type'),
+          contentLength,
+          raw: streamFormat(track, canPlay) === 'raw',
+        })
+        if (plan === 'stream') {
+          controller.abort()
+          byAddress()
+          return
+        }
+        const blob = contentLength !== null ? await response.blob() : await readCounted(response, controller)
+        if (!wanted()) return
+        if (!blob) {
+          byAddress()
+          return
+        }
+        state.download = null
+        const kept = URL.createObjectURL(blob)
+        setSource(element, kept)
+        state.memory.set(element, kept)
+        element.load()
+        standby.stage = 'memory'
+      } catch {
+        //? let go of (the standby moved on, and this was aborted), or the download failed - then
+        //? the element can have a go itself, and says so with an error if it can't
+        byAddress()
+      }
+    }
+
+    /** A download that didn't say its size, read to the end - or null, abandoned, past the limit. */
+    async function readCounted(response: Response, controller: AbortController): Promise<Blob | null> {
+      const type = response.headers.get('Content-Type') ?? ''
+      if (!response.body) return response.blob()
+      const reader = response.body.getReader()
+      const parts: BlobPart[] = []
+      let received = 0
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        received += value.byteLength
+        if (overMemoryMax(received)) {
+          controller.abort()
+          return null
+        }
+        parts.push(value as BlobPart)
+      }
+      return new Blob(parts, { type })
+    }
+
+    /**
+     * Move to `next` by starting the standby, if it holds exactly that song - handoverDecision()
+     * says. The swap happens in this turn, and play() on the standby is called in it: from 'ended'
+     * that is inside the second WebKit allows after a song ends, and the standby was unlocked by a
+     * tap anyway. Anything else is left to the caller, which loads the song the one-element way.
+     *
+     * Also says, for timing the change, the incoming element's readyState (for a handover of what
+     * it held) and where its clock starts from.
+     */
+    function handOver(next: PlayQueue, autoplay: boolean): { decision: HandoverDecision; readyState: number | null; from: number } {
+      const incoming = other()
+      const decision = handoverDecision({
+        enabled: state.gapless, standby: state.standby, queue: next, index: next.index, autoplay, wireless: isWireless(),
+      })
+      const track = current(next)
+      if (decision.kind !== 'handover' || !incoming || !track) return { decision, readyState: null, from: 0 }
+
+      const outgoing = live()
+      cancelRetry()
+      //? aborts a download still under way - 'unfinished' plays the song from its address instead
+      cancelPreload()
+      if (decision.source === 'unfinished') setSource(incoming, streamUrl(track, canPlay))
+      //? what it held, when it held something: whether iOS kept it - see describeHow()
+      const readyState = decision.source === 'unfinished' ? null : incoming.readyState
+      const from = incoming.currentTime || 0
+      state.standby = null
+      state.active = activeAfter(state.active, 'handover')
+      //? muted before anything else touches it, so the lock screen never takes the element that
+      //? has finished for the song playing
+      outgoing.muted = true
+      incoming.muted = false
+
+      state.queue = next
+      state.retried = false
+      state.resumeAt = 0
+      newListen()
+      setQueue(next)
+      setDuration(songLength())
+      setError(null)
+      listeners.forEach((listener) => listener(0))
+      showOnLockScreen(track)
+
+      play(() => refusedHandover(next))
+      //? the element that finished lets go of its song, and becomes the next song's standby
+      empty(outgoing)
+      return { decision, readyState, from }
+    }
+
+    /**
+     * iOS wouldn't start the standby. The song goes on the element that was playing, which a tap
+     * unlocked long ago - the one-element way, straight away, so the music doesn't stop over it.
+     */
+    function refusedHandover(at: PlayQueue) {
+      if (state.queue !== at) return
+      const refused = live()
+      state.active = activeAfter(state.active, 'refused')
+      refused.muted = true
+      live().muted = false
+      empty(refused)
+      if (state.change) {
+        state.change = { ...state.change, how: { kind: 'same element', reason: 'refused' }, readyState: null, from: 0 }
+      }
+      load(at, true)
+    }
+
+    /**
+     * A 'timeupdate' from the element playing, while a song change is timed: the change ends when
+     * the incoming song's clock is seen running - see clockStep() - and the readout gets it.
+     */
+    function timeChange(update: ClockUpdate) {
+      if (!state.change) return
+      const step = clockStep(state.change, update)
+      if (step.kind === 'wait') {
+        state.change = step.change
+        return
+      }
+      state.change = null
+      if (step.kind === 'reading') {
+        const { reading } = step
+        setGaps((shown) => withReading(shown, reading))
+      }
+    }
+
     const actions = {
       playTracks(tracks: QueueTrack[], start: number | null, shuffle = false) {
+        state.change = null
+        //? before load() starts the song: the tap unlocks the second element as well
+        unlockSpare()
         load(startQueue(tracks, start, shuffle), true)
       },
       toggle() {
+        const audio = live()
         if (!audio.src) return
         //? a failed song shows play whether or not the browser counts the element as paused,
         //? and pressing it asks for the song again
-        if (audio.paused || audio.error) play()
-        else pause()
+        if (audio.paused || audio.error) {
+          //? the music had stopped, so whatever started it again is this tap, not a song change
+          state.change = null
+          unlockSpare()
+          play()
+        } else pause()
       },
       //? next and previous play if the listener meant the music to be playing - which a song
       //? that just failed leaves audio.paused saying it isn't
       next() {
         const index = nextIndex(state.queue)
-        if (index !== null) load({ ...state.queue, index }, state.intendsToPlay)
+        if (index === null) return
+        state.change = null
+        unlockSpare()
+        const next = { ...state.queue, index }
+        if (handOver(next, state.intendsToPlay).decision.kind === 'handover') return
+        load(next, state.intendsToPlay)
       },
       previous() {
-        const action = previousAction(state.queue, audio.currentTime)
+        const action = previousAction(state.queue, live().currentTime)
+        state.change = null
+        unlockSpare()
         if (action.kind === 'restart') restart()
         else load({ ...state.queue, index: action.index }, state.intendsToPlay)
       },
-      seek,
-      showAirPlay() {
-        audio.webkitShowPlaybackTargetPicker?.()
+      //? the scrubber and the lock screen's: a seek the listener made, during a song change, ends
+      //? its timing - the position it jumps to isn't the clock running
+      seek(seconds: number) {
+        state.change = null
+        seek(seconds)
       },
-      position: () => audio.currentTime || 0,
+      showAirPlay() {
+        live().webkitShowPlaybackTargetPicker?.()
+      },
+      setGapless(on: boolean) {
+        if (on === state.gapless) return
+        state.gapless = on
+        writePlayerGapless(on)
+        setGaplessShown(on)
+        if (on) {
+          ensureSpare()
+          //? this tap unlocks it, if no tap has yet
+          unlockSpare()
+          if (!live().paused) preloadSoon()
+          return
+        }
+        //? one element from here on - whichever is playing now - and the other lets go
+        state.active = activeAfter(state.active, 'switch off')
+        dropStandby()
+      },
+      position: () => live().currentTime || 0,
       onPosition(listener: (seconds: number) => void) {
         listeners.add(listener)
         return () => listeners.delete(listener)
@@ -313,8 +687,10 @@ export function usePlayer(): Player {
     }
 
     function onTimeUpdate() {
+      const audio = live()
       const position = audio.currentTime
       const at = performance.now()
+      timeChange({ position, at, playbackRate: audio.playbackRate, seeked: state.seeked })
       const step = listenedStep({
         previous: state.lastPosition,
         now: position,
@@ -336,35 +712,59 @@ export function usePlayer(): Player {
     function onEnded() {
       const index = nextIndex(state.queue)
       if (index === null) {
+        state.change = null
         state.intendsToPlay = false
         setPlaying(false)
         const media = session()
         if (media) media.playbackState = 'paused'
         return
       }
-      //? the moment that matters on a locked phone: same element, new source, straight away
-      load({ ...state.queue, index }, true)
+      //? timed from here to the next song's clock running, with the switch on or off - the readout
+      const endedAt = performance.now()
+      const next = { ...state.queue, index }
+      //? The moment that matters on a locked phone, straight away either way: the standby
+      //? started, or the same element given the next song's source. (A handover iOS refuses
+      //? says so later, from play()'s promise - see refusedHandover().)
+      const moved = handOver(next, true)
+      //? a new source starts its clock at 0, so `from` is 0 the one-element way
+      state.change = startChange(endedAt, moved.decision, moved.readyState, moved.from)
+      if (moved.decision.kind === 'handover') return
+      load(next, true)
     }
 
     /**
      * The song won't play. What to do about it is afterFailure()'s to say: ask again once for a
      * song that failed to load, then move on to the next as a song ending does - on the same
      * element and straight away, since on a locked phone nothing else will - and stop at the end
-     * of the queue, or when nobody meant it to be playing.
+     * of the queue, or when nobody meant it to be playing. A song playing from memory is asked
+     * for from Navidrome at once instead (afterPlaybackFailure()).
      */
     function onFailure() {
+      const audio = live()
       //? an element with no source reports an error too, which is not one worth showing
       if (!audio.src) return
       const failed = current(state.queue)
-      const action = afterFailure({
+      const action = afterPlaybackFailure({
         queue: state.queue,
         code: audio.error?.code ?? 0,
         intendsToPlay: state.intendsToPlay,
         retried: state.retried,
+        fromMemory: state.memory.has(audio),
       })
       const media = session()
       setPlaying(false)
       setBuffering(false)
+      //? the song the change went to failed before its clock moved: whatever the time comes to,
+      //? it includes getting over that, and the readout says so
+      if (state.change) state.change = { ...state.change, failed: true }
+
+      if (action.kind === 'stream') {
+        //? the copy in memory is what failed: the same song from Navidrome, where it stopped
+        state.resumeAt = audio.currentTime || 0
+        reload()
+        play()
+        return
+      }
 
       if (action.kind === 'retry') {
         state.retried = true
@@ -390,14 +790,23 @@ export function usePlayer(): Player {
       }
 
       state.intendsToPlay = false
+      //? the music has stopped: a tap starting it again later is no song change
+      state.change = null
       setError(describeMediaError(audio.error))
       if (media) media.playbackState = 'paused'
+    }
+
+    /** The standby's song won't load: when its turn comes, it goes the one-element way. */
+    function onStandbyError(element: AirPlayAudio) {
+      //? an element with no source reports an error too - the standby being emptied
+      if (!element.getAttribute('src') || !state.standby) return
+      state.standby.failed = true
     }
 
     const events: [string, EventListener][] = [
       ['play', () => {
         //? the element playing again by itself - iOS carrying on after a call - is wanted too
-        if (!audio.paused) state.intendsToPlay = true
+        if (!live().paused) state.intendsToPlay = true
         setPlaying(true)
         const media = session()
         if (media) media.playbackState = 'playing'
@@ -408,7 +817,12 @@ export function usePlayer(): Player {
         //? listener has stopped listening, so a song failing now must not start the music
         //? again. One that comes with the song ending or failing (Chromium sends a 'pause' after
         //? the 'error', with the error already set) is the player's to deal with, and doesn't.
-        if (audio.paused && !audio.ended && !audio.error) state.intendsToPlay = false
+        const audio = live()
+        if (audio.paused && !audio.ended && !audio.error) {
+          state.intendsToPlay = false
+          //? and a song change it interrupted - a call arriving at the change - isn't a gap
+          state.change = null
+        }
         setPlaying(false)
         const media = session()
         if (media && !state.intendsToPlay) media.playbackState = 'paused'
@@ -417,6 +831,9 @@ export function usePlayer(): Player {
       ['playing', () => {
         setBuffering(false)
         beginListen()
+        //? NOT the end of a timed song change: WebKit sends 'playing' from inside play() for an
+        //? element with data, before any sound - the change ends on the clock (timeChange())
+        preloadSoon()
       }],
       ['loadedmetadata', () => {
         //? a song asked for again after it failed part-way picks up where it stopped
@@ -430,6 +847,7 @@ export function usePlayer(): Player {
       ['canplay', () => setBuffering(false)],
       ['timeupdate', onTimeUpdate],
       ['durationchange', () => {
+        const audio = live()
         if (Number.isFinite(audio.duration) && audio.duration > 0) setDuration(audio.duration)
         updatePositionState()
       }],
@@ -444,27 +862,64 @@ export function usePlayer(): Player {
       ['webkitplaybacktargetavailabilitychanged', (event) => {
         setAirplay((event as AvailabilityEvent).availability === 'available')
       }],
+      //? AirPlay starting or stopping: a standby is let go of while it plays there, and the next
+      //? song got ready again once it stops - see standbyPlan()
+      ['webkitcurrentplaybacktargetiswirelesschanged', () => {
+        fitStandby()
+        if (!live().paused) preloadSoon()
+      }],
     ]
+
+    //? each element's listeners, each asking routeEvent() whether its event counts
+    const attached = new Map<AirPlayAudio, [string, EventListener][]>()
+    let mounted = false
+
+    function attach(element: AirPlayAudio) {
+      if (!mounted || attached.has(element)) return
+      const routed: [string, EventListener][] = events.map(([name, handler]) => [name, (event: Event) => {
+        const route = routeEvent(name, element === live())
+        if (route === 'player') handler(event)
+        else if (route === 'standby') onStandbyError(element)
+      }])
+      routed.forEach(([name, listener]) => element.addEventListener(name, listener))
+      attached.set(element, routed)
+    }
+
+    function mount(): () => void {
+      mounted = true
+      elements.forEach(attach)
+      return () => {
+        attached.forEach((routed, element) => routed.forEach(([name, listener]) => element.removeEventListener(name, listener)))
+        attached.clear()
+        mounted = false
+      }
+    }
+
+    //? a switch left on from before: the second element exists from the start, unlocked by the first tap
+    if (state.gapless) ensureSpare()
 
     const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
       ['play', () => {
-        if (audio.src) play()
+        if (!live().src) return
+        //? the lock screen's play, as toggle(): the listener starting the music, not a song change
+        state.change = null
+        play()
       }],
       ['pause', () => pause()],
       ['previoustrack', () => actions.previous()],
       ['nexttrack', () => actions.next()],
       ['seekto', (details) => {
-        if (details.seekTime != null) seek(details.seekTime)
+        if (details.seekTime != null) actions.seek(details.seekTime)
       }],
       //? NOT seekbackward/seekforward - on iOS they take the place of previous and next
     ]
 
-    return { audio, events, handlers, actions }
+    return { mount, handlers, actions }
   }, [])
 
   useEffect(() => {
-    const { audio, events, handlers } = engine
-    events.forEach(([name, handler]) => audio.addEventListener(name, handler))
+    const { mount, handlers } = engine
+    const unmount = mount()
 
     const media = session()
     for (const [action, handler] of handlers) {
@@ -476,7 +931,7 @@ export function usePlayer(): Player {
     }
 
     return () => {
-      events.forEach(([name, handler]) => audio.removeEventListener(name, handler))
+      unmount()
       for (const [action] of handlers) {
         try {
           media?.setActionHandler(action, null)
@@ -495,6 +950,8 @@ export function usePlayer(): Player {
     duration,
     error,
     airplay,
+    gapless,
+    gaps,
     ...engine.actions,
   }
 }

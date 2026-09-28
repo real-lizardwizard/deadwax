@@ -6,9 +6,9 @@ added to an iPhone's home screen and opened like an app. It plays from
 passes on the player's requests, so the phone never holds Navidrome's password and only ever
 needs to reach deadwax.
 
-It's early. It works in a browser, but the things it's really for (playing on a locked iPhone,
-moving to the next song by itself, the lock-screen controls) haven't been confirmed on a real
-iPhone yet. [The list is below](#not-yet-verified-on-a-real-iphone).
+It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
+seen working on a real iPhone; other things haven't been confirmed yet.
+[The list is below](#not-yet-verified-on-a-real-iphone).
 
 ## What you need
 
@@ -94,6 +94,103 @@ can't be reached. See [`RETAG_RENAME_WAIT`](configuration.md#organizing).
 - **Back** works: an open album is in the page's address, so the browser's back goes back to
   the grid, where you left it.
 
+## Gapless playback (experimental)
+
+Between two songs there's normally a short pause, about a second on an iPhone over a VPN: when
+one song ends, the phone has to ask deadwax for the next one and start it from nothing. The
+**Gapless** switch on the now-playing screen, beside the album's name, is an experiment in
+closing that gap. It's **off** by default. Its setting is kept on the device, and a home-screen
+app keeps its settings apart from Safari's, so turn it on in the app itself.
+
+With it on:
+
+- **The next song is got ready while this one plays.** A few seconds into each song, the player
+  downloads the whole of the next one into the phone's memory and loads it into a second audio
+  player, which is kept silent. When the song ends, the second player starts straight away and
+  the two swap places, so the next song is ready in turn. **Next** uses the ready song too.
+- **Memory is capped.** Files up to 64 MB are downloaded ahead, which covers about ten minutes of
+  CD-quality FLAC. Bigger files (most hi-res FLAC) and transcoded songs aren't downloaded ahead:
+  the second player is given the song's address and buffers what Safari lets it.
+- **Not on AirPlay.** While the sound is going to an AirPlay speaker nothing is got ready, and
+  every song change goes the ordinary way. Once AirPlay stops, the next song is got ready again.
+- **The music doesn't stop because of it.** If the next song can't be handed over when this one
+  ends (nothing got ready, a song that wouldn't load, AirPlay in use, or iOS refusing to start the
+  second player), that change goes the ordinary way, exactly as with the switch off. A song that
+  won't play from memory is asked for from Navidrome straight away. The usual rules for songs
+  that won't play still apply after that: one more try, then skip.
+- **A download that hasn't finished is streamed instead.** If this song ends before the next one
+  has finished downloading (a short song, a slow connection), the download is dropped and the
+  second player streams the song from its address, which takes as long as the ordinary way.
+- **It uses more data.** Each next song is downloaded in full, even if you skip it. **On a slow
+  connection** it can use more still and not help at all: when a whole song can't download while
+  the one before plays, every download is dropped part-way and the song streamed afresh, so part
+  of every song is sent twice, for a change no quicker than with the switch off. If the readout
+  keeps saying `download unfinished`, turn the switch off.
+- **Turning it off** takes effect at once: whichever player is playing carries on alone, and the
+  other lets go of what it was holding.
+
+### The readout
+
+Under the controls, the player shows how long the last few song changes took, newest first, and
+how the change was made. It's timed with the switch off as well, the same way, so you can compare
+the two.
+
+A change is timed from the moment one song ended to the moment the next one's **sound started**:
+when the player's clock for the new song is first seen moving. It isn't timed to the moment the
+browser says the song is playing, because Safari says that as soon as it's asked to play a song
+it has data for, before any sound comes out. A second player that claims to be ready but has lost
+what it buffered would read as a few milliseconds that way; timed on the clock, it reads as the
+silence it really is.
+
+| it says | meaning |
+| --- | --- |
+| `one element` | the switch is off: the ordinary way |
+| `handed over, from memory` | the second player started a song held in memory |
+| `handed over, streamed` | the second player started a song it had buffered from its address |
+| `handed over, streamed (download unfinished)` | the next song hadn't finished downloading, so the second player streamed it instead |
+| `…, had to load` | the second player didn't have enough of the song to start at once, so it loaded first: iOS may have thrown away what it had buffered |
+| `…, failed before playing` | the new song failed before it made a sound, and the time includes asking for it again (or skipping it) |
+| `one element (airplay)` | the switch is on but the change went the ordinary way; also `nothing ready`, `failed to get ready`, `another song ready`, `refused` |
+
+Only songs ending by themselves are timed, and only when the next one went straight to sound.
+Changes you make yourself (**Next**, **Previous**, a new song, moving the scrubber, pressing play)
+aren't timed, and neither is a change where the music stopped: a pause, iOS stopping for a call or
+Siri, iOS refusing to start the next song, or a song that wouldn't play at the end of the queue.
+Anything longer than 30 seconds isn't counted either. The readout is hidden with the phone on its
+side, to leave room for the cover. If it says the switch isn't helping,
+[troubleshooting](troubleshooting.md#with-gapless-on-theres-still-a-pause-between-songs-or-the-player-reloads-by-itself)
+says what each answer means.
+
+### What still needs trying on a real iPhone
+
+In a desktop browser (Chromium) it works. Timed on the clock as above, a song change took about
+145 ms with the switch off, or about 270 ms with 150 ms added to every answer from Navidrome to
+stand in for a VPN; with the switch on it took about 98 ms either way. Much of those 98 ms is the
+browser starting its sound output at all, which every device does at its own speed, so what to
+look at on the phone is the difference between the switch on and off, not either number alone.
+The parts that matter only an iPhone can answer. To try it:
+
+1. Turn **Gapless** off, play an album from a tap, and let a few songs change with the screen on,
+   to see what the ordinary way takes on your phone and connection. Then turn it on and let a
+   few more change. The readout should say `handed over, from memory`, with numbers well below
+   the ones before.
+2. **Lock the phone** and let at least ten songs change by themselves. Then unlock and open the
+   now-playing screen. The readout lists the last five: `from memory` with numbers like those with
+   the screen on means it works locked. `had to load`, or numbers as big as the switch-off ones
+   or bigger, mean iOS threw away what the second player had buffered, or held back the
+   download. `download unfinished` means the download couldn't keep up.
+3. While locked, check that the **lock screen** shows the right song and a playing state after
+   each change, and that previous, next and the scrubber still work.
+4. Try it in Safari as well as in the home-screen app.
+5. Play an album of big files (hi-res FLAC) for a while. If the app **reloads by itself**, that's
+   iOS taking memory back; say so, and turn the switch off.
+6. Try **AirPlay** with the switch on (the readout should say `one element (airplay)`), and a
+   phone call or Siri during a song change (that change shouldn't be timed at all).
+
+Even when it works, it isn't sample-exact: the second player still has to start, so an album
+mixed straight through (a live album, a DJ mix) may keep a tiny gap. Closing that completely
+would take a different kind of player.
+
 ## How plays are counted
 
 The player reports plays to Navidrome the way any Subsonic app does, so play counts, "Recently
@@ -153,7 +250,8 @@ fixes that.
 
 ## Known gaps
 
-- **Gapless playback**: there's a short gap between songs.
+- **Gapless playback**: there's a short gap between songs, unless you try the
+  [experimental Gapless switch](#gapless-playback-experimental).
 - **CarPlay**: not something a web page can offer.
 - **Offline**: nothing is kept on the phone for listening without a connection.
 - **Search**: there isn't any yet. Browse the grid.
@@ -170,14 +268,12 @@ fixes that.
 
 ## Not yet verified on a real iPhone
 
-The player has been built and tested in a desktop browser against a stand-in Navidrome that
-answers the way Navidrome's own code does. It hasn't yet been used on a real iPhone, or against
-a real Navidrome. Still to find out:
+The player was built and tested in a desktop browser against a stand-in Navidrome that answers
+the way Navidrome's own code does. Since then it has been used on a real iPhone, against a real
+Navidrome, and it **keeps playing with the screen locked** and **moves to the next song by
+itself while locked**, which is what iOS has historically been fussy about for web apps and the
+question the whole player existed to answer. Still to find out:
 
-- whether it **keeps playing with the screen locked**;
-- whether **the next song starts by itself while the phone is locked**, which is what iOS has
-  historically been fussy about for web apps, and the question the whole player exists to
-  answer;
 - whether the **lock-screen and Control Center controls** work;
 - whether **AirPlay** works;
 - whether **the home-screen app works over plain `http`**, as it will over a VPN;

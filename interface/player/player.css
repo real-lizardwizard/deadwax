@@ -89,12 +89,22 @@
     --pl-sheet-duration: 420ms;
     --pl-settle-duration: 520ms;
     --pl-paused-scale: 0.82;
+
+    /* the gapless switch: iOS's own shape and size, on in the brand purple */
+    --pl-switch-width: 51px;
+    --pl-switch-height: 31px;
+    --pl-switch-knob: 27px;
+    --pl-switch-inset: 2px;
+    --pl-switch-on: var(--accent);
+    --pl-switch-knob-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 3px 1px rgba(0, 0, 0, 0.06);
+    --pl-switch-duration: 240ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
     :root {
         --pl-sheet-duration: 1ms;
         --pl-settle-duration: 1ms;
+        --pl-switch-duration: 1ms;
     }
 }
 
@@ -684,6 +694,66 @@ img { display: block; }
     min-height: var(--pl-hit);
     color: var(--pl-text-2);
     font-size: var(--pl-text-footnote);
+}
+
+/* The gapless switch, beside the album's name, and what the last song changes took under it.
+   The label is part of the tap target, as in iOS's settings. */
+.pl-gapless {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--pl-gap-sm);
+    cursor: pointer;
+}
+
+.pl-switch {
+    display: grid;
+    flex: none;
+    place-items: center;
+    height: var(--pl-hit);
+}
+
+.pl-switch-track {
+    position: relative;
+    width: var(--pl-switch-width);
+    height: var(--pl-switch-height);
+    border-radius: calc(var(--pl-switch-height) / 2);
+    background: var(--pl-fill-strong);
+    transition: background-color var(--pl-switch-duration) var(--ease-out);
+}
+
+.pl-switch-knob {
+    position: absolute;
+    top: var(--pl-switch-inset);
+    left: var(--pl-switch-inset);
+    width: var(--pl-switch-knob);
+    height: var(--pl-switch-knob);
+    border-radius: 50%;
+    background: var(--pl-text);
+    box-shadow: var(--pl-switch-knob-shadow);
+    transition: transform var(--pl-switch-duration) var(--pl-sheet-ease);
+}
+
+.pl-switch.is-on .pl-switch-track { background: var(--pl-switch-on); }
+
+.pl-switch.is-on .pl-switch-knob {
+    transform: translateX(calc(var(--pl-switch-width) - var(--pl-switch-knob) - 2 * var(--pl-switch-inset)));
+}
+
+.pl-switch:focus-visible { outline: 2px solid var(--pl-accent); outline-offset: 2px; border-radius: var(--pl-radius-control); }
+
+.pl-gapless-readout {
+    margin: 0;
+    color: var(--pl-text-3);
+    font-size: var(--pl-text-caption);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+}
+
+/* On its side the cover already has little room, and the readout gives its line back to it. (A
+   media query can't read a custom property, so the height is written here.) */
+@media (max-height: 500px) {
+    .pl-gapless-readout { display: none; }
 }
 
 /* ===== before there is anything to play ===== */

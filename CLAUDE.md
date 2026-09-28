@@ -1898,6 +1898,8 @@ The user guide's page is `docs/player.md`.
   called in the same turn as the tap - an `await` in between loses the gesture. The same goes for
   a song that fails: it is asked for again, then skipped, on that element from its `error`
   handler (see "After review (1.0.3)"), never left for the lock screen's next and then play.
+  The gapless switch (off by default) adds exactly one more, unlocked by the same tap - see
+  "Gapless (experimental, 1.1.0-player.2)"; with it off this is still the whole story.
 - **No `seekbackward`/`seekforward` Media Session handlers, deliberately.** iOS shows EITHER
   track buttons or ±10s buttons on the lock screen, and setting those two replaces
   previous/next. Only play, pause, previoustrack, nexttrack and seekto are set.
@@ -1937,7 +1939,10 @@ The user guide's page is `docs/player.md`.
   seek to the end); previous restarting then going back; pause shrinking the art; drag-down
   closing the sheet; library scroll restored exactly (420px); the unreachable-Navidrome screen;
   the password masked in settings; the main page still mounting from the two-entry build.
-- **NOT verified, and they are the point of the spike:** anything on a real iPhone. Background
+- **NOT verified, and they are the point of the spike:** anything on a real iPhone. (Since then
+  James has used it on his for a week, on 1.1.0-player.1, and reports it plays locked and moves to
+  the next song by itself while locked, with a pause of about a second at every change - which
+  is what the gapless switch below is for.) Background
   playback with the screen locked, the next song starting while locked, the lock-screen
   controls, AirPlay, Add to Home Screen and the home-screen app over plain http, the safe areas
   (landscape included), the sheet gesture under a real finger, and whether the 1.5s retry of a
@@ -1947,7 +1952,8 @@ The user guide's page is `docs/player.md`.
   says it does (read at 46c4327, a shallow clone of 2026-09-26 not confirmed line for line
   against 0.64.2), which is what the slskd stub did too before the first real slskd refused its
   first search.
-- **Known gaps:** gapless playback (web audio on iOS gaps between tracks), CarPlay (impossible
+- **Known gaps:** gapless playback (web audio on iOS gaps between tracks - the experimental switch
+  below narrows it, unverified on the phone), CarPlay (impossible
   for a web app), offline, the queue surviving iOS killing the app, search, a mobile bitrate, a
   landscape layout for the now-playing sheet (the cover only shrinks to fit), and anything that
   reaches the REST of deadwax (search MusicBrainz and download from the phone - the integration
@@ -2308,6 +2314,171 @@ serving an undecodable "Broken" song and a "Flaky" one that fails once:
   667x375 and 844x390 the cover no longer reaches the title or the scrubber, and the scrubber
   takes touches while paused.
 - Not exercised: resuming a song that dropped part-way (the stub can't cut a stream mid-song).
+
+#### Gapless (experimental, 1.1.0-player.2)
+
+James, after a week on the iPhone: the player works, locked included, "except for a pause between
+songs" - about a second on EVERY change, even between two songs both played before, so it is not a
+first-load cost. It is the one-element design's own cost: on `ended` the element gets a new `src`,
+and Safari asks for bytes 0-1 and then the rest - two round trips over WireGuard, through deadwax to
+Navidrome - before AVFoundation starts from nothing. A research pass read WebKit's source (main, and
+the Safari 17.4/18/18.5 branches) for what iOS allows, and the switch is built on what it found. The
+guide's section is `docs/player.md#gapless-playback-experimental`.
+
+- **Off by default, and off is the old player exactly.** `deadwax-player-gapless` ('on' or 'off',
+  `readPlayerGapless` in persisted.ts) is the player's own, like its order: a home-screen app keeps
+  its storage apart from Safari's, so a switch in the settings tab would never reach it. With it off
+  no second element is made, `live()` is always the first, `handOver()` answers "off" and the song
+  change is `load()` as it was. The only new work is timing the change for the readout. **The
+  one-element rule still holds with the switch off**, and it isn't broken with it on either: the
+  second element is unlocked by a tap too, and there are only ever those two.
+- **Two elements that swap roles** (`usePlayer.ts`; the rules in `lib/gapless.ts`, pinned by
+  `ui/test/gapless.sim.cjs`). The second is made by the switch (or at start, when it was left on). It
+  is put through `load()` in the first tap that plays - `playTracks`, `toggle`, `next`, `previous` -
+  or in the switch's own tap (`unlockSpare`, once), BEFORE the playing element's `play()`. A few
+  seconds into each song (`PRELOAD_DELAY_MS`, 3s after `playing`) the STANDBY is given the next
+  song, muted. On `ended`, `handOver()` swaps `state.active` (`activeAfter()`), mutes the outgoing,
+  unmutes the incoming, calls `play()` on it in the same turn, and then `empty()`s the outgoing
+  (`removeAttribute('src')` + `load()`, its blob handed back), which becomes the next standby.
+  "Next" hands over the same way when the standby holds the next song and the music is playing.
+- **The WebKit facts it rests on** (HTMLMediaElement.cpp, MediaElementSession.cpp, Document.cpp):
+  - `<audio>` has no restrictions on iOS (MediaSessionManagerIOS `resetRestrictions()`; WebKit's own
+    iOS expectation has `mediaSessionRestrictions["audio"] = ""`), and an element unlocked by a tap
+    stays unlocked: `removeBehaviorRestrictionsAfterFirstUserGesture()` runs from `prepareForLoad()`
+    - which `load()` and a `src` change both call - whenever `processingUserGestureForMedia()`. So
+    `load()` in the tap is the unlock, with no play-then-pause blip.
+  - An element unlocked by a tap that fires `ended` starts a one-second grace
+    (`userActivatedMediaFinishedPlaying`; `maxIntervalForUserGestureForwardingAfterMediaFinishesPlaying
+    { 1_s }`), in which the document counts as handling a tap. So `play()` on the standby from the
+    `ended` handler is allowed twice over.
+  - **Why the standby is MUTED.** The lock screen's Now Playing is elected by
+    `preferMediaControlsForCandidateSessionOverOtherCandidateSession` - main content first, then the
+    most recent user interaction, and NOT whether the element is playing - and
+    `removeBehaviorRestriction(RequireUserGestureToControlControlsManager)` re-stamps
+    `m_mostRecentUserInteractionTime` on every gesture-time load or play, the grace second included.
+    Emptying the outgoing inside that second would stamp it newer than the song playing. A muted
+    element is never a candidate (`canShowControlsManager()` returns false for `muted()`), so a muted
+    standby can't take the lock screen whatever its stamp. At most one element is ever unmuted: the
+    outgoing is muted before the incoming is unmuted, in the refusal path too.
+  - **Why the next song goes into MEMORY.** iOS preloads before `play()` only after a tap, and only
+    from Safari 18.5 (292087@main removed `AutoPreloadingNotPermitted` with the first gesture;
+    cherry-picked to safari-7621, 18.5); and a paused element in a hidden document - a locked phone -
+    gets `MakeResourcesPurgeable` (`MediaElementSession::preferredBufferingPolicy`), so what it
+    buffered may be thrown away. A `blob:` copy is there whatever iOS does, and costs no trip.
+  - Timers in a hidden page are aligned to a second (`DOMTimer::hiddenPageAlignmentInterval`) and
+    `timeupdate` comes every ~250ms, so the handover is on `ended`, never a timer just before the end
+    (Feishin plays the next track 65ms early and has two tracks playing at once after a wake, #2290).
+- **What goes into memory** (`memoryPlan`): a file asked for as it is (`streamFormat()` 'raw'), typed
+  `audio/*` or `application/ogg`, no bigger than `MEMORY_MAX_BYTES` (64 MiB: ten minutes of CD FLAC,
+  few hi-res files) - a size not declared is counted as it arrives (`overMemoryMax`). Two are held at
+  the peak, the song playing and the next. Anything else hands the standby the ADDRESS (stage
+  'stream'), to buffer as iOS allows. A transcode is left out because its length is Navidrome's
+  estimate and it may end short. iOS reloads a page that uses too much memory, which stops the music.
+- **Nothing is got ready while AirPlaying** (review): `standbyPlan(..., wireless)` answers `none` or
+  `clear` then, so `preloadSoon`/`preloadNow` do nothing, `download()` lets the standby go if AirPlay
+  began while it waited (`wanted()`, after every await), and `webkitcurrentplaybacktargetiswirelesschanged`
+  on the playing element re-fits the standby (dropped when AirPlay starts, got ready again 3s after
+  it stops). It used to get every next song ready by address anyway, which `handoverDecision` then
+  never used: each song asked for three times, a Navidrome transcode each for songs that need one.
+  That also means a speaker is never handed a `blob:` it can't fetch, so `memoryPlan` lost its own
+  AirPlay rule.
+- **When it can't hand over, the one-element way** (`handoverDecision`): the switch off; "next" while
+  paused; AirPlay (`webkitCurrentPlaybackTargetIsWireless` - AirPlay keeps the one element it has
+  always worked with); nothing ready; another song ready (index AND id are compared, so a new album
+  at the same position isn't handed over to); the standby's own `error` ("failed to get ready").
+  **A standby still DOWNLOADING exactly the next song hands over BY ADDRESS** (source `'unfinished'`,
+  review): `handOver` aborts the download, gives the standby `streamUrl` and plays it, as stage
+  'stream' does - one fresh request, what the one-element way costs. It used to go the one-element way,
+  which aborted the download (`fitStandby` then wanted the song after) and asked for the song again on
+  the live element: the same gap, with part of every song sent twice. On a link where a whole song
+  can't download while the one before plays, the switch still sends part of every song twice and
+  closes nothing; the guide says so and says to turn it off when the readout keeps saying
+  `download unfinished`. A standby holding the right song that failed is KEPT (`standbyPlan`), or every
+  `playing` would download it again. `play()` refused on the standby (`NotAllowedError`) goes to
+  `refusedHandover()`: back to the element that was playing, `load()`, the readout saying
+  "refused". A song that fails FROM MEMORY is asked for from Navidrome at once, where it stopped,
+  without using its one retry (`afterPlaybackFailure` 'stream'): a decode error would otherwise skip
+  a song whose copy on Navidrome plays. `reload()` always goes to Navidrome for an element holding a
+  `blob:`. After that, retry-then-skip is exactly as before.
+- **Events** (`routeEvent`): everything from the element playing; from the standby only `error`
+  (marks it failed) and AirPlay availability (a fact about the network); the rest is dropped, so its
+  `pause`, `durationchange` or `timeupdate` can't stop the lock screen, shorten the song or count
+  listening nobody did. Every handler reads `live()`. The duration is set from the incoming element
+  at the handover, since its `durationchange` came while it was standing by.
+- **The standby lets go** when the queue moves to anything whose next song it doesn't hold
+  (`fitStandby`, which also restarts the 3s wait from the new song's `playing`), when the switch goes
+  off (whichever element is playing carries on alone: `activeAfter('switch off')`), and at a
+  handover (the outgoing is emptied).
+- **The readout** (`describeGaps`, under the sheet's footer, hidden below 500px tall): each song
+  change that happened by itself, with the switch on or off, the last `GAPS_KEPT` (5), and how it was
+  made - including the incoming element's `readyState` at a handover of what it held, where below
+  HAVE_FUTURE_DATA (3) reads "had to load" (pinned at 3 and 2 in the sim). **Timed on the incoming
+  song's media CLOCK** (`clockStep`, review): from `ended` (performance clock) to the first
+  `timeupdate` whose `currentTime` has moved past where the song started (`Change.from`: 0, or where
+  a seek landed), BACK-DATED by `(position - from) / playbackRate`, since `timeupdate` comes every
+  ~250ms and further apart on a locked phone. Not to `playing`: WebKit queues `playing` from inside
+  `play()` for an element with data (HTMLMediaElement::playInternal, `m_readyState >
+  HAVE_CURRENT_DATA`), before session admission and before AVFoundation makes a sound, so every
+  handover read 1-7ms whatever the silence - a purged buffer included, which is what the readout is
+  for - while the one-element way's `playing` waited for the network. The same rule in both modes.
+- **Only a change that goes straight from `ended` to sound is timed** (review). `state.change` is
+  dropped wherever `intendsToPlay` goes false without `pause()` - `play()`'s `NotAllowedError`, the
+  unasked `pause` handler (a call at the change), `onFailure`'s stop - and by the listener: `toggle()`
+  to play, the lock screen's play, a seek from the scrubber or lock screen (`actions.seek`; the
+  internal `seek()` a failed song's resume uses re-anchors `from` through `state.seeked` instead),
+  next, previous, a new album. `CHANGE_MAX_MS` (30s) drops anything older, clock or no clock. Before,
+  a refused next song tapped a minute later read as a 60,940ms gap. A song that FAILS before its clock
+  moves marks the change `failed` ("…, failed before playing"), since the time then includes the
+  reload, retry or skip.
+- **Verified in the real page** (Chromium, 390x844, the pane hidden - audio and `timeupdate` run
+  there) against a copy of the stub Navidrome serving 6-second FLACs, timed on the clock: switch off,
+  one element, 142-149ms a change, and 262-275ms with 150ms added to every stream answer; switch on,
+  every change a handover from memory at 95-99ms, delay or not (the download is long done). The
+  first-`playing` figure the readout used to show was 3ms for those handovers and 22-64ms for the
+  one element; most of the ~98ms left is Chromium starting its audio output, which every device
+  does at its own speed - so the guide tells James to compare on and off, not read either alone.
+  Fix by fix: a `play` hook pausing the incoming element at once (a call at the change) and
+  `play()` patched to reject `NotAllowedError` (twice with the switch on - the standby and the
+  fallback - once off) each left the readout unchanged through 3s of silence and a tap on play, in
+  both modes, and the next change was timed as normal (99, 98, 144, 142ms); a broken last song that
+  failed twice and stopped the queue, fixed and played 3s later, was not timed, while one whose
+  retry played 1.5s later read "one element, failed before playing" at 1650ms; a synthetic `error` on the incoming
+  element at its `play` read "handed over, from memory, failed before playing" at 144ms (it reloaded
+  from Navidrome), the next 96ms; with `webkitCurrentPlaybackTargetIsWireless` stubbed true no
+  download or standby source at all and "one element (airplay)", the standby got ready again 3s into
+  a song after the change event said AirPlay stopped, and emptied at once when it said it started;
+  with the stub trickling whole-file answers (no Range) over 20s, every change read "handed over,
+  streamed (download unfinished)" at 143-147ms, the elements alternating on stream addresses, each
+  download hung up part-way and each song asked for once by address.
+  **From the first build** (its timings were on `playing`): handovers after a reload with the switch
+  left on and a real tap as well as after turning it on; the elements alternate, the outgoing is
+  muted and emptied, and the Media Session title, artist, album, artwork, position state
+  and `playing` state follow each song; "now playing" and the submission once each per song (36s
+  songs at 4x); Next while the standby held the next song handed over; "previous" restarted on the
+  same element keeping the standby, then went back a song dropping it and getting the right one;
+  a standby whose download failed was handed the address and handed over "streamed"; a refusal
+  (`play()` patched to reject `NotAllowedError` once) fell back to the element that was playing in
+  61ms; a failure from memory (a synthetic `error` on the playing element) moved to Navidrome's copy
+  on the same element and played on, with no skip notice and no second "now playing"; with the
+  switch on, a Broken song got ready failed quietly, went the one-element way and was retried then
+  skipped, and a Flaky one failing three times was retried and played; switching off mid-album,
+  whichever element was playing (the first, and in another run the second) played the rest alone,
+  Broken and Flaky behaving as before.
+- **NOT verified - the phone's to answer**, and the guide lists them for James: that `load()` in a tap
+  unlocks the second element as read; whether a download or a buffer survives while locked (the
+  readout's "had to load" and big numbers say no); the lock screen during a swap; AirPlay with the
+  switch on; memory with hi-res albums (a page reload is iOS taking it back); Safari against the
+  home-screen app; a call or Siri during a handover; whether AVFoundation plays FLAC from a `blob:`
+  as it does from the address (WebKit serves ranges of a blob, so it should). WebKit bug 295518 (an
+  iOS 26 home-screen app silent after reopening) is known and unrelated; don't blame this for it.
+- **Not built, and why**: ManagedMediaSource with FLAC repackaged as fragmented MP4 is the only
+  sample-exact route that isn't Web Audio, but whether iOS plays FLAC through it at all is unknown
+  (Safari has played FLAC-in-MP4 MSE as silence before, WebKit bug 198583, Shaka #2355), it needs
+  `disableRemotePlayback` (so no AirPlay from it), and it evicts. Web Audio keeps playing locked only
+  with `navigator.audioSession.type = 'playback'`, has regressed there before (bug 261554, 17.2-17.3),
+  and a decoded 5-minute track is ~110 MB; Gapless-5 tells iOS users to turn it off for background
+  play. None of Feishin, Gapless-5, jellyfin-web, Navidrome's web UI or Plex web is gapless on a
+  locked iPhone.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -3651,6 +3822,7 @@ node ui/test/owned.sim.cjs      # which search results the library already holds
 node ui/test/latest.sim.cjs     # only the newest answer counts - both copies of the guard, answers arriving out of order
 node ui/test/candidates.sim.cjs # the candidates panel's filters, the edited-query rule, and what a row says
 node ui/test/playqueue.sim.cjs  # the phone player's queue - what previous does, shuffle's first song, what counts as a play
+node ui/test/gapless.sim.cjs    # the gapless switch - what the standby holds, hand over or not, which events count, memory
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with

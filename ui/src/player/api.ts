@@ -111,9 +111,13 @@ export function playableType(track: Pick<QueueTrack, 'contentType' | 'suffix'>):
  * guess.
  */
 export function streamUrl(track: QueueTrack, canPlay: (type: string) => boolean): string {
+  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${streamFormat(track, canPlay)}`)
+}
+
+/** Which of the two streamUrl() asks for: the file as it is, or a transcode to MP3. */
+export function streamFormat(track: QueueTrack, canPlay: (type: string) => boolean): 'raw' | 'mp3' {
   const type = playableType(track)
-  const format = !type || canPlay(type) ? 'raw' : 'mp3'
-  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${format}`)
+  return !type || canPlay(type) ? 'raw' : 'mp3'
 }
 
 /** Fire and forget: a play that isn't counted is not worth interrupting the music over. */
