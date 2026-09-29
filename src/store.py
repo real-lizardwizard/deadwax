@@ -653,7 +653,8 @@ class JobStore:
             logger.error(f"failed to un-ignore {album_path}: {e}")
             return False
 
-    async def mark_album_reviewed(self, album_path: str, new_path: str | None = None) -> bool:
+    async def mark_album_reviewed(self, album_path: str, new_path: str | None = None,
+                                  merged: bool = False) -> bool:
         """
         Record that this album has been looked at, following it if the folder just moved.
 
@@ -662,6 +663,13 @@ class JobStore:
         history of an album that is still very much there. The destination row is cleared
         first because the primary key would otherwise reject the move - and if something *is*
         already recorded there, it describes a folder that no longer exists.
+
+        Except after a MERGE (`merged`): a disc folder moved into its release's folder, which is
+        still there and is the album now (v0.9.13). Its row - first seen, filed by deadwax or
+        found, the issues you'd accepted - is that album's history, so it stays and is marked
+        reviewed, and the merged-away folder's row goes with the folder (v1.1.4). Until then
+        the merge replaced it with the disc folder's. With no row there, the moved row is the
+        best history there is, and it moves as for a rename.
         """
         if not self.available or not album_path:
             return False
@@ -670,7 +678,18 @@ class JobStore:
 
         def write():
             with self._connect() as connection:
-                if target != album_path:
+                if target != album_path and merged:
+                    kept = connection.execute(
+                        "UPDATE album_review SET reviewed_at = ? WHERE album_path = ?",
+                        (_now(), target),
+                    )
+                    if kept.rowcount:
+                        connection.execute(
+                            "DELETE FROM album_review WHERE album_path = ?", (album_path,)
+                        )
+                        return True
+
+                elif target != album_path:
                     connection.execute("DELETE FROM album_review WHERE album_path = ?", (target,))
 
                 #? Written as move-then-insert rather than as one upsert because the two cases

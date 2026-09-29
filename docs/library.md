@@ -102,7 +102,7 @@ Each album is checked for these, fresh on every scan:
 | No release id | never matched to a MusicBrainz release, so nothing else can be checked | pick its release in the metadata editor |
 | No artist tag | no file names an artist, so the name shown came from the folder | apply a release |
 | Mixed tags | the files disagree about which album they're from, often two albums sharing a folder | sort the files out, or apply a release |
-| Split across folders | this folder holds only some discs of a release whose other discs are elsewhere | apply the release to each; the second merges into the first |
+| Split across folders | this folder holds only some discs of a release whose other discs are elsewhere | apply the release to each; the second merges into the first, which keeps anything you'd said was fine about it |
 | Artist under two names | the artist's albums are under two folder names, usually a rename | **Move albums to …** on the artist's page |
 | Folder off-convention | the folder isn't named the way its tags say it should be | apply its release, which re-files it |
 | No original year | no `originaldate` tag, which the folder name uses | apply a release |

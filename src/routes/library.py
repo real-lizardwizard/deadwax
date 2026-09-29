@@ -537,12 +537,14 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
         #? Applying a release IS reviewing the album, so this clears it from the new-import
         #? prompt without a second click. It follows the rename because album_review is keyed
         #? on the path: leaving the row behind would orphan the history of an album that is
-        #? still very much there, and re-enrol it as brand new on the next scan.
+        #? still very much there, and re-enrol it as brand new on the next scan. A merge lands
+        #? in a folder that was already there, whose own row is kept instead (v1.1.4).
         store = _store(request)
         if store is not None:
             await store.mark_album_reviewed(
                 body.album_path,
                 plan["target_path"] if results.get("moved_to") else None,
+                merged=bool(results.get("merged")),
             )
 
         logger.info(

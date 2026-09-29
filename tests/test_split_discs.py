@@ -143,3 +143,47 @@ def test_no_cover_is_fetched_for_a_folder_about_to_join_one_that_has_it(tmp_path
     plan = plan_retag("Radiohead/OK Computer (Disc 2)", RELEASE, str(tmp_path), want_art=True)
 
     assert plan["merge"] and plan["art"]["action"] == ""
+
+
+def test_the_merged_into_folder_keeps_its_review_row(tmp_path, monkeypatch):
+    """
+    Through the real route: the apply passes the folder merged into as where the album went, and
+    that folder is still there with its own history - when it was first seen, and what you'd
+    accepted about it. A merge used to replace that row with the disc folder's (v1.1.4).
+    """
+    import asyncio
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from src.config import Config
+    from src.routes import library as route
+    from src.store import JobStore
+
+    disc_folder(tmp_path, "OK Computer (1997)", 1, ["Airbag", "Paranoid Android"])
+    disc_folder(tmp_path, "OK Computer (Disc 2)", 2, ["Lucky", "The Tourist"])
+    store = JobStore(str(tmp_path / "state" / "deadwax.db"))
+    store.init()
+    there, here = "Radiohead/OK Computer (1997)", "Radiohead/OK Computer (Disc 2)"
+    asyncio.run(store.record_albums_seen([{"path": there}, {"path": here}]))
+    asyncio.run(store.ignore_album_issues(there, ["no_art"]))
+    first_seen = asyncio.run(store.album_reviews())[there]["first_seen"]
+
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
+    monkeypatch.setattr(Config, "RETAG_RENAME_WAIT", "0")
+    app = FastAPI()
+    app.state.store = store
+    app.include_router(route.router, prefix="/deadwax/library")
+    route._cache_loaded_for = None
+
+    response = TestClient(app).post("/deadwax/library/retag/apply",
+                                    json={"album_path": here, "release": RELEASE})
+    route._cache_loaded_for = None
+
+    assert response.status_code == 200
+    assert response.json()["results"].get("merged")
+    reviews = asyncio.run(store.album_reviews())
+    assert here not in reviews
+    assert reviews[there]["ignored_issues"] == ["no_art"]
+    assert reviews[there]["first_seen"] == first_seen
+    assert reviews[there]["reviewed_at"]
