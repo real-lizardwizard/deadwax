@@ -48,14 +48,58 @@ def client_with(searches):
     return client
 
 
+async def until(condition, seconds=5.0):
+    """Wait for a condition rather than a fixed time - CI's runners are slower than a laptop."""
+    for _ in range(int(seconds / 0.005)):
+        if condition():
+            return
+        await asyncio.sleep(0.005)
+    raise AssertionError("timed out waiting")
+
+
 def test_cancelling_a_search_stops_and_deletes_every_search_it_started():
     searches = NeverFinishingSearches()
     client = client_with(searches)
 
     async def go():
         task = asyncio.create_task(client.search_all(["Kanye West Donda", "Ye Donda"], poll_interval=0.01, max_wait=60))
-        await asyncio.sleep(0.1)
+        await until(lambda: len(searches.started) == 2)
         task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(go())
+    assert searches.stopped == ["id:Kanye West Donda", "id:Ye Donda"]
+    assert searches.deleted == ["id:Kanye West Donda", "id:Ye Donda"]
+
+
+def test_a_search_still_starting_when_cancelled_is_stopped_too():
+    """
+    The race CI's slower runner found (v1.1.7): the cancel lands while the second start is still
+    in its thread. The thread can't be cancelled, so slskd starts that search anyway - and it was
+    never recorded, so it ran to its timeout for nobody.
+    """
+    import threading
+
+    release = threading.Event()
+
+    class SlowSecondStart(NeverFinishingSearches):
+        def search_text(self, searchText, **kwargs):
+            if self.started:
+                self.started.append(searchText)
+                release.wait(5)  # still starting when the cancel arrives
+                return {"id": f"id:{searchText}"}
+            return super().search_text(searchText, **kwargs)
+
+    searches = SlowSecondStart()
+    client = client_with(searches)
+
+    async def go():
+        task = asyncio.create_task(client.search_all(["Kanye West Donda", "Ye Donda"], poll_interval=0.01, max_wait=60))
+        await until(lambda: len(searches.started) == 2)
+        task.cancel()
+        await asyncio.sleep(0.05)
+        release.set()
         with pytest.raises(asyncio.CancelledError):
             await task
 

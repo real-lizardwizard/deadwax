@@ -170,7 +170,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             966 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             967 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -723,6 +723,12 @@ without asking whether it still answered the question on screen.
   cancel by stopping and deleting every search it started (`_abandon`). **Verified live**
   against the slow fake slskd: hanging up 1.5s into an 8s search, slskd was told to stop and
   delete it at once. It needed the middleware fix below first - see the gotcha.
+  **A cancel mid-START lost the search until v1.1.7.** Each start runs in a thread, which a cancel
+  can't stop: the POST reached slskd, but the CancelledError came out of the await before the id
+  was recorded, so `_abandon` never stopped that search. CI's slower runner found it - the test
+  cancelled on a fixed 0.1s, during the second start. The start is now shielded, and a cancel waits
+  for it and records its id before re-raising. The tests wait for a condition, never a fixed time,
+  and one cancels on purpose while the second start is held in its thread.
 
 ### The candidates panel in Preact (v0.9.10)
 
@@ -3260,7 +3266,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 966 tests
+.venv/bin/python -m pytest tests/ -q  # 967 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3304,7 +3310,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 966 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 967 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

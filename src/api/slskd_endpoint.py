@@ -364,12 +364,27 @@ class SlskdClient:
         for query in queries:
             logger.info(f"searching slskd for: {query}", extra={"frontend": True, "src": "slskd"})
 
+            #? The start runs in a thread, and a cancel can't stop a thread: the POST reaches slskd
+            #? and the search runs whether anyone is still waiting or not. So a cancel that lands
+            #? mid-start waits for the start and records its id before going on, or _abandon never
+            #? hears of that search and slskd runs it to its timeout for nobody (v1.1.7 - CI's
+            #? slower runner cancelled during the second start of two).
+            start = asyncio.ensure_future(asyncio.to_thread(
+                client.searches.search_text,
+                searchText=query,
+                searchTimeout=search_timeout_ms,
+            ))
             try:
-                state = await asyncio.to_thread(
-                    client.searches.search_text,
-                    searchText=query,
-                    searchTimeout=search_timeout_ms,
-                )
+                state = await asyncio.shield(start)
+
+            except asyncio.CancelledError:
+                try:
+                    begun = (await start).get("id")
+                except Exception:
+                    begun = None
+                if begun:
+                    running.append((query, begun))
+                raise
 
             except HTTPError as exc:
                 #? slskd refused to START the search, which is a different thing from a search
