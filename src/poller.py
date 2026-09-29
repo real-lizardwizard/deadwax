@@ -551,6 +551,42 @@ async def tidy_cancelled_on_start(slskd_client, store) -> int:
         return 0
 
 
+#? what the row of a download a stop caught mid-filing says, instead of "organizing" for ever
+INTERRUPTED_FILING = "deadwax stopped while filing this - check the library and slskd's folder"
+
+
+async def settle_interrupted_filing(store) -> int:
+    """
+    Once, on start: downloads a stop caught mid-filing, moved on to `complete` with a reason
+    (v1.1.3). Returns how many.
+
+    `organizing` is written as filing starts and only filing itself moves it on. Stopping the
+    container cancels the poller task wherever it is, and a CancelledError is not an Exception,
+    so _organize_if_enabled's own handler never sees it. A job left there is in neither
+    OPEN_STATUSES (never polled again) nor CLEARABLE_STATUSES ("clear finished" leaves it), and
+    the downloads panel polls every second while any job reads `organizing`. Nothing else writes
+    the status and one process runs one poller, so at start-up every such job was interrupted.
+
+    Not filed again: how far it got is unknown - a move may already have taken half the tracks
+    out of slskd's folder - and re-running the organizer over that unattended is a guess. The
+    row says where to look instead. Never raises: a start-up nicety must not stop the poller.
+    """
+    try:
+        stuck = await store.jobs_with_status(("organizing",))
+        for job in stuck:
+            await store.update_status(job["id"], "complete", INTERRUPTED_FILING)
+        if stuck:
+            logger.warning(
+                f"{len(stuck)} download(s) were being filed when deadwax stopped, check them in "
+                f"the library",
+                extra={"frontend": True, "src": "slskd"},
+            )
+        return len(stuck)
+    except Exception as e:
+        logger.error(f"couldn't settle downloads interrupted while filing: {e}")
+        return 0
+
+
 #? every ten minutes at the poll interval - the empty-folder sweep is a walk of slskd's
 #? incomplete folder, cheap but not free, and nothing about it is urgent
 EMPTY_DIR_SWEEP_POLLS = 120
@@ -580,6 +616,7 @@ async def run_download_poller(slskd_client, store) -> None:
     missing_counts: dict[int, int] = {}
     rate_samples: dict[int, RateAccumulator] = {}
 
+    await settle_interrupted_filing(store)
     await tidy_cancelled_on_start(slskd_client, store)
     await sweep_empty_incomplete_dirs()
     polls = 0

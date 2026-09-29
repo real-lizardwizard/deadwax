@@ -34,6 +34,13 @@ the missing tracks across and apply the album's release in the metadata editor, 
 album again: a track the album's folder already has is never filed twice, so only the missing
 ones are added.
 
+## A download says "deadwax stopped while filing this"
+
+deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
+Look at the album in the library (**Rescan** first) and in slskd's downloads folder: in move mode,
+whatever hadn't been filed yet is still in slskd's folder, and in copy mode all of it is. Anything
+missing is dealt with as in the section above. **Clear finished** removes the row.
+
 ## The slskd pill is red
 
 - **`CONNECTION_ERROR`**: slskd can't be reached at `SLSKD_URL` from inside the container. Use

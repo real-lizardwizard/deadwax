@@ -499,3 +499,58 @@ def test_a_download_still_in_progress_is_not_failed_by_one_rejection(tmp_path):
     )), store, {}))
 
     assert status_of(store, job_id) == "downloading"
+
+
+# ---------------------------------------------------------------- filing cut short by a stop
+
+def test_a_job_a_stop_caught_mid_filing_is_settled_on_start(tmp_path):
+    """
+    Stopping the container cancels the poller wherever it is, and a CancelledError isn't an
+    Exception, so a job being filed stayed `organizing` for ever: never polled again (not open),
+    never removed by "clear finished" (not clearable), and counted as active by the page (v1.1.3).
+    """
+    from src.poller import INTERRUPTED_FILING, settle_interrupted_filing
+    from src.store import CLEARABLE_STATUSES
+    store = make_store(tmp_path)
+    stuck, queued, filed = seed_job(store), seed_job(store), seed_job(store)
+    asyncio.run(store.update_status(stuck, "organizing"))
+    asyncio.run(store.update_status(filed, "organized"))
+
+    assert asyncio.run(settle_interrupted_filing(store)) == 1
+
+    jobs = {j["id"]: j for j in asyncio.run(store.list_jobs())}
+    assert (jobs[stuck]["status"], jobs[stuck]["error"]) == ("complete", INTERRUPTED_FILING)
+    assert (jobs[queued]["status"], jobs[filed]["status"]) == ("queued", "organized")
+
+    #? finished with a problem now, so it goes with the other finished rows
+    asyncio.run(store.delete_jobs(CLEARABLE_STATUSES))
+    assert [j["id"] for j in asyncio.run(store.list_jobs())] == [queued]
+
+
+def test_the_poller_settles_interrupted_filing_before_its_first_poll(tmp_path, monkeypatch):
+    from src import poller
+    from src.config import Config
+    monkeypatch.setattr(Config, "SLSKD_INCOMPLETE_PATH", "")
+    store = make_store(tmp_path)
+    job_id = seed_job(store)
+    asyncio.run(store.update_status(job_id, "organizing"))
+
+    async def stop(_seconds):
+        #? the first thing the loop does is wait for its first poll - stop it there
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(poller.asyncio, "sleep", stop)
+    try:
+        asyncio.run(poller.run_download_poller(FakeSlskd(), store))
+    except asyncio.CancelledError:
+        pass
+
+    assert status_of(store, job_id) == "complete"
+
+
+def test_nothing_to_settle_touches_nothing(tmp_path):
+    from src.poller import settle_interrupted_filing
+    store = make_store(tmp_path)
+    job_id = seed_job(store)
+    assert asyncio.run(settle_interrupted_filing(store)) == 0
+    assert status_of(store, job_id) == "queued"
