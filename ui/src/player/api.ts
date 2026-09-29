@@ -8,7 +8,7 @@
 
 import { get, post, url } from '../api/http'
 import type { QueueTrack } from '../lib/playQueue'
-import { asksForMp4 } from '../lib/streamWrap'
+import { asksForMp4, resamples, type MaxRate } from '../lib/streamWrap'
 
 export interface NavidromeStatus {
   configured: boolean
@@ -44,6 +44,11 @@ export interface Song {
   contentType?: string
   suffix?: string
   bitRate?: number
+  /** OpenSubsonic's, which Navidrome sends every client it doesn't list as legacy
+   *  (osChildFromMediaFile, server/subsonic/helpers.go): Hz, bits and channels */
+  samplingRate?: number
+  bitDepth?: number
+  channelCount?: number
 }
 
 export interface AlbumWithSongs extends Album {
@@ -113,19 +118,29 @@ export function playableType(track: Pick<QueueTrack, 'contentType' | 'suffix'>):
  *
  * `pageWraps` - Safari and every iPhone browser (wrapsFlac() in lib/streamWrap) - asks for a FLAC
  * inside an MP4 of the same frames, which is the form of it whose seeks Safari lands exactly.
+ *
+ * `maxRate` - the "Maximum quality" setting. At 48 kHz a hi-res FLAC (resamples() in lib/streamWrap)
+ * is asked for resampled, `max_rate=48000`, which deadwax sends only repackaged: in an MP4 in any
+ * browser. 'original', the default here, is every address exactly as it was before the setting.
  */
-export function streamUrl(track: QueueTrack, canPlay: (type: string) => boolean, pageWraps = false): string {
+export function streamUrl(
+  track: QueueTrack, canPlay: (type: string) => boolean, pageWraps = false, maxRate: MaxRate = 'original',
+): string {
   const format = streamFormat(track, canPlay)
-  const wrap = asksForMp4(track, format, pageWraps) ? '&wrap=mp4' : ''
-  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${format}${wrap}`)
+  const resampled = resamples(track, maxRate, format)
+  const wrap = asksForMp4(track, format, pageWraps, resampled) ? '&wrap=mp4' : ''
+  const rate = resampled ? '&max_rate=48000' : ''
+  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${format}${wrap}${rate}`)
 }
 
 /**
  * A FLAC song as fragmented MP4 - the pieces the gapless switch's one stream is made of (see
  * player/streamSource.ts). Always the file as it is: there is no FLAC in a transcode to repackage.
+ * Resampled, as streamUrl() says, when `maxRate` is 48 kHz and the song is hi-res.
  */
-export function fragmentedUrl(track: QueueTrack): string {
-  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=raw&wrap=fmp4`)
+export function fragmentedUrl(track: QueueTrack, maxRate: MaxRate = 'original'): string {
+  const rate = resamples(track, maxRate, 'raw') ? '&max_rate=48000' : ''
+  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=raw&wrap=fmp4${rate}`)
 }
 
 /** Which of the two streamUrl() asks for: the file as it is, or a transcode to MP3. */
@@ -153,5 +168,8 @@ export function toQueueTrack(song: Song, fallback: AlbumWithSongs): QueueTrack {
     duration: song.duration ?? 0,
     contentType: song.contentType ?? null,
     suffix: song.suffix ?? null,
+    sampleRate: song.samplingRate ?? 0,
+    bitDepth: song.bitDepth ?? 0,
+    channels: song.channelCount ?? 0,
   }
 }

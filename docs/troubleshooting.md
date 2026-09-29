@@ -331,8 +331,9 @@ at 0 ms:
   it shouldn't happen again for that song.
 - **FLAC songs reading `handed over` or `one element` instead**: they didn't go into a stream. A
   stream only starts from a tap (Play, a song, Next, Previous), so after a song that played the
-  other way the next ones do too until you tap. It also ends before a song that isn't FLAC, is
-  above 48 kHz, or has another sample rate than the songs before it. It doesn't start while the
+  other way the next ones do too until you tap. It also ends before a song that isn't FLAC, has
+  more than two channels, or comes from a file of another sample rate than the songs before it
+  (hi-res songs join under both Maximum quality choices). It doesn't start while the
   sound is on AirPlay, and after three failures in a row, or a cache deadwax can't use, it's off for
   10 minutes. A song deadwax won't repackage says why in deadwax's log, in a line starting
   `player: song`.
@@ -363,6 +364,34 @@ For the second player, which gets everything else ready:
   AirPlay in Control Center works whatever the button does. Say so if it happens.
 - **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
   held in memory ahead of time, and hi-res albums come close to that. Turn the switch off.
+
+## A hi-res song takes a while to start, or sounds quieter
+
+Both come from [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz)'s default, **Up to
+48 kHz**, which has deadwax resample FLAC songs above 48 kHz to 48 kHz (or 44.1 kHz).
+
+- **A wait before the first play of a song**: deadwax downloads it from Navidrome and resamples it
+  before sending anything, about 2.5 seconds for a 7-minute 24/192 song on an M2 Mac and several
+  times that on a NAS. It's kept in the player's cache afterwards and starts at once. In the gapless
+  stream only the first song you tap waits: the rest are got ready a minute ahead. With the Gapless
+  switch off, or while AirPlaying, the next song is asked for a few seconds into each song. If
+  waits come back for songs you've played before, the cache is too small to keep them: raise
+  [`PLAYER_CACHE_MB`](configuration.md#paths).
+- **Quieter than before, or than "Original"**: every resampled song is lowered by 3 dB, the same for
+  all of them, so that nothing clips and the joins stay exact. Turn the volume up a notch. Nothing
+  else about the sound changes.
+- **deadwax's log says** `was lowered a further 0.40 dB so nothing clips`: that song was mastered so
+  loud that even 3 dB wasn't room enough (rare: measured only on masters clipped very hard). It's
+  lowered by exactly enough, and its joins with the songs beside it step in level by that much.
+- **deadwax's log says** `is resampled without the song before it (...) - the join with the song
+  before may not be exact` (or `after`): deadwax couldn't read the neighbouring song's edge from
+  Navidrome just then, so that join may click. A play of the song more than ten minutes later tries
+  again; until then every play is that same copy.
+- **deadwax's log says** `songs above 48 kHz can't be resampled on this server`: the audio libraries
+  it needs didn't load, which happens when running from source without installing
+  `requirements.txt`. Hi-res songs are then sent as they are.
+- **Hi-res songs stall under "Original"**: an iPhone holds only a few seconds of 24/192 at a time,
+  so a weak connection can run it dry. Go back to **Up to 48 kHz**.
 
 ## After a long pause, play on the lock screen does nothing until the app is opened
 

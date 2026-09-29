@@ -29,6 +29,26 @@
  * passed against something that behaves like the platform. Its fragmented MP4 is byte for byte what
  * src/flac_mp4.py's fmp4_layout() writes for the same frames.
  *
+ * And the "Maximum quality" setting: its fake deadwax answers `max_rate=48000` for a song above
+ * 48 kHz with a copy of it at 48 or 44.1 kHz and 24 bits (its own frames and identity, ceil(samples /
+ * ratio) of them) and X-Deadwax-Resampled, as src/resample.py's does. What that pins: which address
+ * each browser asks a hi-res song at, the readout's words, the setting read back with care, a standby
+ * let go when a change of setting moves its song's address, a 192 kHz album resampled and joined in
+ * one stream, the same album under "Original" joined in one stream as it is (the rate kept, and held
+ * only as far ahead as the byte budget reaches), no stream copy asked of a song it knows can't
+ * stream, songs of two source rates never joined, a resampled copy deadwax refuses played as under
+ * "Original" (the file itself only when the song as it is is refused), a run that carries on as it
+ * began after a change, and the minute a first song deadwax is resampling gets for its head. And,
+ * with deadwax's make of a resampled MP4 modelled (net.resampleMakeMs) - held by the requests
+ * waiting on it, the element's and every fetch, and stopped once none has for half a second, as
+ * deadwax's is - the next song's copy asked for ahead when no standby or stream will get it (the
+ * switch off, or AirPlay), and let go when it is no longer next, or a stream will play it, but not
+ * when its own turn comes first; its make passed on, never thrown away, when AirPlay stops or starts
+ * mid-make and the standby takes over or lets go; one ask ahead a song, however often it pauses or
+ * plays; a resampled song that leaves the stream for AirPlay, the switch or the network going on as
+ * its resampled copy, at the level it had; and a hi-res song "Original" streamed as it is that won't
+ * decode keeping its MP4.
+ *
  * A script for the same reason as the other sims: there is no JS test runner here. It compiles
  * usePlayer.ts and what it imports with the repo's TypeScript into a temporary folder, beside a
  * ten-line preact/hooks that renders by calling the hook again.
@@ -144,7 +164,20 @@ const NET = { fetchDelay: 50, seekDelay: 300, staleClockWhileSeeking: false, ans
   bytesPerChunk: 256 * 1024, chunkDelay: null, bodyStallAt: null,
   //? scripted wrap=fmp4 answers - { [id or '*']: { status, scope, retryAfter, detail, times } } -
   //? and a slow make: { [id]: ms before the headers }
-  fmp4Answer: {}, headerDelay: {} }
+  fmp4Answer: {}, headerDelay: {},
+  //? how long deadwax takes to make a song's resampled MP4 (wrap=mp4 with max_rate) - download,
+  //? resample, repackage, all before the first byte: the first request for it starts the make, and
+  //? every request for it, the element's own or a fetch, is answered once it is done - unless all of
+  //? them let go before then, which stops it (holdMake()). 0: at once
+  resampleMakeMs: 0,
+  //? how long a make nobody waits on lives before deadwax stops it: its route notices a hang-up
+  //? within half a second, at any moment in that half second - 0 for the worst moment, at once
+  makeGraceMs: 500,
+  //? asks the network fails outright, by their labels (as `fetched` writes them)
+  failing: new Set(),
+  //? a rate the fake engine won't take: an init segment above it is an append error, as an engine
+  //? that won't play a stream copy at 192 kHz would give (null: every rate)
+  refuseInitAbove: null }
 const net = { ...NET }
 const fetched = []
 //? what the page let go of before its answer came - the same labels as `fetched`
@@ -161,12 +194,64 @@ URL.createObjectURL = (object) => {
 }
 URL.revokeObjectURL = (address) => { blobs.delete(address); sources.delete(address) }
 
+//? deadwax's makes of resampled MP4s: address (less its host) -> when it is done; when each began,
+//? and each one stopped before it was done
+const makes = new Map()
+const makesBegun = []
+const makesCancelled = []
+//? how many requests wait on each make - the element's own and every fetch
+const makeWaiters = new Map()
+const NO_HOLD = { wait: 0, release() {} }
+//? A request for `address` waiting on deadwax making it (net.resampleMakeMs): how long until it is
+//? done, starting the make if nothing is making it, and a release, for when the request is answered
+//? or let go of. A make nobody waits on for 500 ms before it is done is stopped, and the next request
+//? begins it again: deadwax's _mp4 cancels a make at no waiters, and its route notices a request
+//? hung up within half a second. Anything but a resampled MP4 waits on nothing.
+function holdMake(address) {
+  if (!net.resampleMakeMs || address.startsWith('blob:') || !/[?&]wrap=mp4(&|$)/.test(address) || !/[?&]max_rate=\d+/.test(address)) return NO_HOLD
+  const key = address.replace(/^.*\/stream\//, '')
+  if (!makes.has(key)) {
+    makes.set(key, now + net.resampleMakeMs)
+    makesBegun.push({ key, at: now })
+  }
+  const doneAt = makes.get(key)
+  if (doneAt <= now) return NO_HOLD
+  makeWaiters.set(key, (makeWaiters.get(key) ?? 0) + 1)
+  let released = false
+  return {
+    wait: doneAt - now,
+    release() {
+      if (released) return
+      released = true
+      const left = makeWaiters.get(key) - 1
+      makeWaiters.set(key, left)
+      const stop = () => {
+        if ((makeWaiters.get(key) ?? 0) === 0 && makes.get(key) === doneAt && doneAt > now) {
+          makes.delete(key)
+          makesCancelled.push({ key, at: now })
+        }
+      }
+      if (left === 0 && doneAt > now) {
+        if (net.makeGraceMs <= 0) stop()
+        else later(net.makeGraceMs, stop)
+      }
+    },
+  }
+}
+
 function lookup(src) {
   const id = src.startsWith('blob:') ? blobs.get(src) : decodeURIComponent(/\/stream\/([^?]+)/.exec(src)[1])
   const song = songs[id]
   if (!song) return { fail: 4, delay: 1 }
-  return { id, duration: song.duration, delay: src.startsWith('blob:') ? 2 : (song.delay ?? 60) }
+  const hold = src.startsWith('blob:') ? NO_HOLD : holdMake(src)
+  return { id, duration: song.duration, hold, delay: src.startsWith('blob:') ? 2 : Math.max(song.delay ?? 60, hold.wait) }
 }
+
+//? deadwax's resampling (src/resample.py's RESAMPLED_TO), written out again here rather than taken
+//? from the page's copy, so the page is held to the server's table and not to itself
+const RESAMPLED = { 88200: 44100, 176400: 44100, 352800: 44100, 96000: 48000, 192000: 48000, 384000: 48000 }
+//? what deadwax resamples a song to when asked `max_rate` - null when it sends it as it is
+const resampledTo = (id, maxRate) => (maxRate === '48000' ? RESAMPLED[songs[id]?.rate ?? 44100] ?? null : null)
 
 define('fetch', (address, init = {}) => {
   address = String(address)
@@ -174,16 +259,39 @@ define('fetch', (address, init = {}) => {
   if (/[?&]wrap=fmp4(&|$)/.test(address)) return fetchFmp4(address, init)
   const [, id, format] = /\/stream\/([^?]+)\?format=(\w+)/.exec(address)
   const wrap = /[?&]wrap=mp4(&|$)/.test(address)
+  const maxRate = /[?&]max_rate=(\d+)(&|$)/.exec(address)?.[1] ?? null
   const range = init.headers?.Range
-  const label = `${decodeURIComponent(id)}?${format}${wrap ? '+mp4' : ''}${range ? ` ${range}` : ''}`
+  //? `@48000` only when the page asked it, so every label from before the setting reads as it did
+  const label = `${decodeURIComponent(id)}?${format}${wrap ? '+mp4' : ''}${maxRate ? `@${maxRate}` : ''}${range ? ` ${range}` : ''}`
   fetched.push(label)
+  const hold = holdMake(address)
   return new Promise((resolve, reject) => {
     let aborted = false
-    init.signal?.addEventListener('abort', () => { aborted = true; abandoned.push(label); reject(new DOMException('aborted', 'AbortError')) })
-    later(net.fetchDelay, () => {
+    init.signal?.addEventListener('abort', () => {
       if (aborted) return
+      aborted = true
+      hold.release()
+      abandoned.push(label)
+      reject(new DOMException('aborted', 'AbortError'))
+    })
+    //? a resampled MP4 is answered once deadwax has made it - two bytes of it included
+    later(Math.max(net.fetchDelay, hold.wait), () => {
+      hold.release()
+      if (aborted) return
+      //? the network failing it, where the answer would have come
+      if (net.failing.has(label)) {
+        reject(new TypeError('Failed to fetch'))
+        return
+      }
+      //? deadwax resamples only a file it repackages: max_rate without format=raw and a wrap is its 400
+      if (maxRate && (!wrap || format !== 'raw')) {
+        resolve({ ok: false, status: 400, body: null, headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'application/json' : null) } })
+        return
+      }
       const mp4 = wrap && !net.sentAsFlac.has(decodeURIComponent(id))
       const headers = { 'content-type': mp4 ? 'audio/mp4' : 'audio/flac', 'content-length': range ? '2' : '1000' }
+      const out = mp4 ? resampledTo(decodeURIComponent(id), maxRate) : null
+      if (out) headers['x-deadwax-resampled'] = `${songs[decodeURIComponent(id)].rate}-${out}`
       resolve({
         ok: true, status: 200, body: null,
         headers: { get: (name) => headers[name.toLowerCase()] ?? null },
@@ -211,6 +319,15 @@ function mseSong(id) {
   const samples = song.samples ?? Math.round((song.seconds ?? ((song.duration ?? 10) + 0.3717)) * rate)
   return { id, rate, samples, seconds: samples / rate, channels: song.channels ?? 2, bits: song.bits ?? 16,
            bytesPerSecond: song.bytesPerSecond ?? 112_000, version: song.version ?? 1, audio: song.audio ?? id }
+}
+
+//? a song as deadwax's resampled copy of it holds it: `out` Hz, 24 bits, ceil(samples / ratio) samples
+//? (what src/resample.py's output_count() gives with the album's phase at 0), and audio of its own, so
+//? its frames and its identity are never the original's
+function resampledSong(id, out) {
+  const song = mseSong(id)
+  const samples = Math.ceil(song.samples / (song.rate / out))
+  return { ...song, rate: out, samples, seconds: samples / out, bits: 24, audio: `${song.audio}@${out}` }
 }
 
 const hexOf = (bytes) => Buffer.from(bytes).toString('hex')
@@ -298,9 +415,10 @@ function fmp4Moof(sequence, decodeTime, blocks, sizes) {
 }
 
 /** The wrap=fmp4 file for a song, built once: { bytes, initEnd (ftyp + moov), headEnd (+ sidx),
- *  fragments: [{ start, end, units, payload, first, frames }], song, identity }. */
-function fmp4File(id) {
-  const song = mseSong(id)
+ *  fragments: [{ start, end, units, payload, first, frames }], song, identity }. With `out`, the file
+ *  of its copy resampled to that rate. */
+function fmp4File(id, out = null) {
+  const song = out ? resampledSong(id, out) : mseSong(id)
   const key = [id, song.rate, song.samples, song.channels, song.bits, song.bytesPerSecond, song.audio].join('|')
   if (fmp4Files.has(key)) return fmp4Files.get(key)
   const identity = new Uint8Array(require('crypto').createHash('md5').update(`deadwax-fake:${song.audio}:${song.rate}:${song.samples}`).digest())
@@ -354,7 +472,7 @@ function fmp4File(id) {
 
 /* ===== the fake deadwax answering wrap=fmp4 ===== */
 
-//? every wrap=fmp4 request: { label, id, format, range, ifRange, at, status }
+//? every wrap=fmp4 request: { label, id, format, maxRate, range, ifRange, at, status }
 const fmp4Requests = []
 const abortError = () => new DOMException('The operation was aborted.', 'AbortError')
 
@@ -383,9 +501,12 @@ function errorAnswer({ status, scope: given, retryAfter, detail, body, contentTy
 
 //? what deadwax's answer_fragmented() and ranged_file() would say: 206 with Content-Range for one
 //? satisfiable range, 200 with the whole file for none, a malformed one or a stale If-Range, 416
-//? past the end; or whatever a test scripted for the song
-function fmp4Answer(id, format, range, ifRange) {
-  const key = net.fmp4Answer[id] ? id : net.fmp4Answer['*'] ? '*' : null
+//? past the end; or whatever a test scripted for the song (for its resampled copy alone: keyed
+//? `<id>@48000`). Asked `max_rate` for a song above 48 kHz, the file is its copy resampled: another
+//? ETag, and X-Deadwax-Resampled on every answer of it, as deadwax's
+function fmp4Answer(id, format, range, ifRange, maxRate = null) {
+  const variant = maxRate ? `${id}@${maxRate}` : null
+  const key = variant && net.fmp4Answer[variant] ? variant : net.fmp4Answer[id] ? id : net.fmp4Answer['*'] ? '*' : null
   if (key) {
     const scripted = net.fmp4Answer[key]
     if (scripted.times !== undefined && --scripted.times <= 0) delete net.fmp4Answer[key]
@@ -393,9 +514,11 @@ function fmp4Answer(id, format, range, ifRange) {
   }
   if (format !== 'raw') return errorAnswer({ status: 400 })
   if (!songs[id]) return errorAnswer({ status: 404 })
-  const file = fmp4File(id), size = file.bytes.length
-  const etag = `"fmp4-${id}-v${mseSong(id).version}"`
+  const out = resampledTo(id, maxRate)
+  const file = fmp4File(id, out), size = file.bytes.length
+  const etag = `"fmp4-${id}-v${mseSong(id).version}${out ? `@${out}` : ''}"`
   const common = { 'content-type': 'audio/mp4', 'accept-ranges': 'bytes', etag, 'cache-control': 'no-cache' }
+  if (out) common['x-deadwax-resampled'] = `${mseSong(id).rate}-${out}`
   const whole = { status: 200, headers: { ...common, 'content-length': String(size) }, body: file.bytes }
   if (!range || (ifRange != null && ifRange !== etag)) return whole
   const asked = /^bytes=(\d*)-(\d*)$/.exec(range.trim())
@@ -408,7 +531,11 @@ function fmp4Answer(id, format, range, ifRange) {
     if (end < start) return whole
     end = Math.min(end, size - 1)
   }
-  if (start >= size) return { status: 416, headers: { 'content-range': `bytes */${size}`, 'content-length': '0' }, body: new Uint8Array(0) }
+  if (start >= size) {
+    const headers = { 'content-range': `bytes */${size}`, 'content-length': '0' }
+    if (out) headers['x-deadwax-resampled'] = common['x-deadwax-resampled']
+    return { status: 416, headers, body: new Uint8Array(0) }
+  }
   const body = file.bytes.subarray(start, end + 1)
   return { status: 206, headers: { ...common, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': String(body.length) }, body }
 }
@@ -417,11 +544,12 @@ function fetchFmp4(address, init) {
   //? an address of another shape is the sim's mistake, not a network's: thrown, loudly, as above
   const [, rawId] = /\/stream\/([^?]+)\?/.exec(address)
   const format = /[?&]format=(\w+)/.exec(address)?.[1] ?? null
+  const maxRate = /[?&]max_rate=(\d+)(&|$)/.exec(address)?.[1] ?? null
   const id = decodeURIComponent(rawId)
   const range = headerIn(init.headers, 'Range'), ifRange = headerIn(init.headers, 'If-Range')
-  const label = `${id}?${format}+fmp4${range ? ` ${range}` : ''}`
+  const label = `${id}?${format}+fmp4${maxRate ? `@${maxRate}` : ''}${range ? ` ${range}` : ''}`
   fetched.push(label)
-  const request = { label, id, format, range, ifRange, at: now, status: null }
+  const request = { label, id, format, maxRate, range, ifRange, at: now, status: null }
   fmp4Requests.push(request)
   const signal = init.signal
   //? `until`: when the last byte of the body will have come - an abort before it was a let-go
@@ -437,7 +565,7 @@ function fetchFmp4(address, init) {
     })
     later(net.headerDelay[id] ?? net.fetchDelay, () => {
       if (exchange.aborted) return
-      const answer = fmp4Answer(id, format, range, ifRange)
+      const answer = fmp4Answer(id, format, range, ifRange, maxRate)
       request.status = answer.status
       //? status 0: the network failed - fetch rejects, as a browser's does
       if (answer.status === 0) { exchange.until = now; reject(new TypeError('Failed to fetch')); return }
@@ -675,6 +803,9 @@ class FakeAudio {
   load() { this.loadResource() }
   loadResource() {
     if (inGesture()) this.unlocked = true
+    //? whatever it was waiting on deadwax to make, it waits on no longer
+    this.hold?.release()
+    this.hold = null
     this.gen++
     if (this.tick) this.tick.dead = true
     for (const promise of this.pending) promise.reject(new DOMException('aborted', 'AbortError'))
@@ -687,7 +818,10 @@ class FakeAudio {
     if (!src) return
     if (sources.has(src)) { this.attachSource(sources.get(src)); return }
     const gen = this.gen, song = lookup(src)
+    //? its request waits on deadwax's make until the load is answered, or it is given something else
+    this.hold = song.hold ?? null
     later(song.delay, () => {
+      song.hold?.release()
       if (gen !== this.gen) return
       if (song.fail) {
         this.error = { code: song.fail }
@@ -1656,6 +1790,7 @@ class FakeSourceBuffer extends FakeTarget {
         if (type === 'moov') {
           if (this.moof) throw new Error('an initialization segment inside a media segment')
           const init = parseMoov(b, found)
+          if (net.refuseInitAbove !== null && init.rate > net.refuseInitAbove) throw new Error(`${init.rate} Hz, which this engine won't play`)
           this.init = init
           this.needRandomAccess = true
           if (!this.initReceived) { this.initReceived = true; this.source.firstInit(this, init) }
@@ -1769,7 +1904,7 @@ const { describeWrap } = require(path.join(OUT, 'lib/streamWrap.js'))
 /** A fresh page with no player on it: no elements, nothing queued, the storage empty, and the
  *  MediaSource globals it has - `mse`: 'managed', 'plain' or null. A song's `durations` entry is
  *  its tagged length, or an object of its fields ({ duration, seconds, rate, ... }). */
-function freshPage({ gapless = false, durations = {}, userAgent, maxTouchPoints, mse = null } = {}) {
+function freshPage({ gapless = false, durations = {}, userAgent, maxTouchPoints, mse = null, maxRate = null } = {}) {
   //? before the player is made: it decides once, for the page, whether FLAC comes in an MP4
   browser.userAgent = userAgent
   browser.maxTouchPoints = maxTouchPoints
@@ -1783,10 +1918,16 @@ function freshPage({ gapless = false, durations = {}, userAgent, maxTouchPoints,
   fmp4Requests.length = 0
   storage.clear()
   graceUntil = -1
-  Object.assign(net, NET, { sentAsFlac: new Set(), fmp4Answer: {}, headerDelay: {} })
+  makes.clear()
+  makesBegun.length = 0
+  makesCancelled.length = 0
+  makeWaiters.clear()
+  Object.assign(net, NET, { sentAsFlac: new Set(), fmp4Answer: {}, headerDelay: {}, failing: new Set() })
   for (const id of Object.keys(songs)) delete songs[id]
   for (const [id, song] of Object.entries(durations)) songs[id] = typeof song === 'object' ? { ...song } : { duration: song }
   if (gapless) storage.set('deadwax-player-gapless', 'on')
+  //? the "Maximum quality" setting as stored on the device - nothing stored is its default
+  if (maxRate !== null) storage.set('deadwax-player-max-rate', maxRate)
   //? before the player is made too: it decides once, for the page, whether there is a MediaSource
   mseGlobals(mse)
 }
@@ -1806,10 +1947,15 @@ function page(options = {}) {
   }
 }
 
-const tracks = (ids, suffixes = {}) => ids.map((id) => ({
+//? `formats`: what Navidrome says of a song ({ sampleRate, bitDepth, channels }). Left out by default,
+//? as a track built before the setting was: every check above that asks for a song at an address it
+//? knows goes on asking for it there
+const tracks = (ids, suffixes = {}, formats = {}) => ids.map((id) => ({
   id, title: `song ${id}`, artist: 'a', album: 'b', albumId: 'al', coverArt: null, duration: songs[id]?.duration ?? 0,
-  contentType: suffixes[id] === 'opus' ? 'audio/ogg' : 'audio/flac', suffix: suffixes[id] ?? 'flac',
+  contentType: suffixes[id] === 'opus' ? 'audio/ogg' : 'audio/flac', suffix: suffixes[id] ?? 'flac', ...formats[id],
 }))
+//? tracks whose songs Navidrome says are what the fake holds: their rate, 24 bits, two channels
+const hiresTracks = (ids) => tracks(ids, {}, Object.fromEntries(ids.map((id) => [id, { sampleRate: songs[id]?.rate ?? 44100, bitDepth: 24, channels: 2 }])))
 const near = (value, target, within = 0.6) => Math.abs(value - target) <= within
 
 /* ===== for checks over the MediaSource fake ===== */
@@ -2157,6 +2303,435 @@ async function outcome(promise, ms = 1_000) {
     check('song 1\'s answer came after "next": song 2 still only asked for', p.seekLine(), 'No seek yet · asked for FLAC in MP4')
     await run(200)
     check('...and then song 2\'s own answer', p.seekLine(), 'No seek yet · sent as FLAC, not in an MP4')
+  }
+
+  /* ======================================================================== */
+  console.log('\nthe "Maximum quality" setting: kept on the device, read with care')
+  {
+    const { readPlayerMaxRate } = require(path.join(OUT, 'state/persisted.js'))
+    const read = (stored) => {
+      storage.clear()
+      if (stored !== undefined) storage.set('deadwax-player-max-rate', stored)
+      return readPlayerMaxRate()
+    }
+    check('nothing stored: 48 kHz', read(undefined), '48000')
+    check('"original": Original', read('original'), 'original')
+    check('"48000": 48 kHz', read('48000'), '48000')
+    check('anything else - a typo, another rate, capitals, nothing: 48 kHz', ['orignal', '44100', 'Original', '', 'on'].map(read), ['48000', '48000', '48000', '48000', '48000'])
+    const p = page({ durations: { 1: 8 } })
+    check('the player says 48 kHz with nothing stored', p.player.maxRate, '48000')
+    tap(() => p.player.setMaxRate('original'))
+    check('set to Original: said, and kept on the device', [p.player.maxRate, storage.get('deadwax-player-max-rate')], ['original', 'original'])
+    const q = page({ durations: { 1: 8 }, maxRate: 'original' })
+    check('a page opened with Original stored starts at Original', q.player.maxRate, 'original')
+  }
+
+  console.log('\nthe "Maximum quality" setting: a hi-res song the URL way')
+  {
+    //? a 192 kHz song on an iPhone: asked for resampled, in an MP4, and the readout says what came
+    const p = page({ durations: { 1: { duration: 8, rate: 192000 } }, userAgent: IPHONE, maxTouchPoints: 5 })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    check('Safari: a 192 kHz song asked for resampled, in an MP4', /\/stream\/1\?format=raw&wrap=mp4&max_rate=48000$/.test(e0.src), true)
+    check('...said as asked for until the answer is in', p.seekLine(), 'No seek yet · asked for FLAC in MP4')
+    await run(100)
+    check('...two bytes of the same address asked for', fetched, ['1?raw+mp4@48000 bytes=0-1'])
+    check('...and the readout says what deadwax did', p.seekLine(), 'No seek yet · FLAC in MP4, 192 kHz resampled to 48 kHz')
+    await run(400)
+    tap(() => p.player.seek(4))
+    await run(400)
+    check('a seek: the line ends the same way', p.seekLine(), 'Last seek: asked 0:04, the player said 0:04 · FLAC in MP4, 192 kHz resampled to 48 kHz')
+  }
+  {
+    //? Arc: the file as it is for every other song, but deadwax sends a resampled one only repackaged
+    const p = page({ durations: { 1: { duration: 8, rate: 96000 }, 2: 8 }, userAgent: ARC, maxTouchPoints: 0 })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    check('Chromium: a 96 kHz song asked for resampled, in an MP4 too', /\/stream\/1\?format=raw&wrap=mp4&max_rate=48000$/.test(e0.src), true)
+    await run(100)
+    check('...asked about as well - the answer is what says it was resampled',
+      [fetched, p.seekLine()], [['1?raw+mp4@48000 bytes=0-1'], 'No seek yet · FLAC in MP4, 96 kHz resampled to 48 kHz'])
+    await run(9_000)
+    check('the CD song after it: as it is, and nothing asked about it', [p.player.track.id, /\/stream\/2\?format=raw$/.test(e0.src), p.player.wrapped, fetched.length], ['2', true, null, 1])
+  }
+  {
+    //? "Original": the hi-res song as it is - an MP4 of itself for Safari, as before, and the file in Chromium
+    const p = page({ durations: { 1: { duration: 8, rate: 192000 } }, userAgent: IPHONE, maxTouchPoints: 5, maxRate: 'original' })
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(100)
+    check('Original, Safari: the song in an MP4 of itself, no max_rate', [/\/stream\/1\?format=raw&wrap=mp4$/.test(elements[0].src), fetched], [true, ['1?raw+mp4 bytes=0-1']])
+    check('...and the readout says nothing of resampling', p.seekLine(), 'No seek yet · FLAC in MP4')
+  }
+  {
+    const p = page({ durations: { 1: { duration: 8, rate: 192000 } }, userAgent: ARC, maxTouchPoints: 0, maxRate: 'original' })
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(100)
+    check('Original, Chromium: the file as it is, nothing asked', [/\/stream\/1\?format=raw$/.test(elements[0].src), fetched, p.player.wrapped], [true, [], null])
+  }
+  {
+    //? what deadwax can't read, the page doesn't ask it to resample
+    const p = page({ durations: { 1: { duration: 8, rate: 96000 } }, userAgent: ARC, maxTouchPoints: 0 })
+    tap(() => p.player.playTracks(tracks(['1'], {}, { 1: { sampleRate: 96000, bitDepth: 20, channels: 2 } }), 0))
+    check('24/96 of 20 bits: as it is', /\/stream\/1\?format=raw$/.test(elements[0].src), true)
+  }
+  {
+    //? the standby holds the next song at the address the setting gave it: a change of setting lets it
+    //? go, and it is got again at the new one - the song playing carries on as it was asked for
+    const p = page({ gapless: true, durations: { 1: 20, 2: { duration: 8, rate: 192000 } } })
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(3_500)
+    check('the next song, 192 kHz, downloaded resampled and held in memory', [fetched, e1.src.startsWith('blob:')], [['2?raw+mp4@48000'], true])
+    tap(() => p.player.setMaxRate('48000'))
+    check('the setting set to what it already is: nothing let go', [e1.src.startsWith('blob:'), fetched.length], [true, 1])
+    tap(() => p.player.setMaxRate('original'))
+    check('set to Original: the standby lets go of it at once', e1.getAttribute('src'), null)
+    check('...and the song playing carries on, at its address', [/\/stream\/1\?format=raw$/.test(e0.src), e0.playingNow], [true, true])
+    await run(3_500)
+    check('...then the next song is got again, as it is (the file itself, here)', [fetched, e1.src.startsWith('blob:')], [['2?raw+mp4@48000', '2?raw'], true])
+    await run(14_000)
+    check('and handed over from memory at song 1\'s end', [p.player.track.id, /handed over, from memory$/.test(p.gapLine())], ['2', true])
+  }
+  {
+    //? a song that is never resampled has one address under both settings: its standby is kept
+    const p = page({ gapless: true, durations: { 1: 20, 2: 8 } })
+    const [, e1] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(3_500)
+    const held = e1.src
+    tap(() => p.player.setMaxRate('original'))
+    await run(3_500)
+    check('a CD song standing by: kept across the change, not fetched again', [e1.src === held && held.startsWith('blob:'), fetched], [true, ['2?raw']])
+  }
+
+  console.log('\nthe next song\'s resampled copy made ready ahead, when nothing else gets it ready')
+  //? deadwax makes a resampled copy - the download, the resample and the repackage, the whole song -
+  //? before its first byte, and only while it is asked for. With the switch off there is no standby,
+  //? and while AirPlaying none is used, so nothing asked for the next song until its turn and every
+  //? song change was the whole make in silence. Song 1 here is a CD song, so the first tap waits on
+  //? nothing; 2 and 3 are 192 kHz, and deadwax takes 15 s to make each
+  const warmAlbum = () => ({ 1: 30, 2: { duration: 30, rate: 192000 }, 3: { duration: 30, rate: 192000 } })
+  //? the two bytes asked ahead - the same ask as checkWrapped()'s of the song playing, so a let-go is
+  //? counted: one of each is let go when song 2 is skipped past while playing, the probe and the warm-up
+  const warmOf = (id) => `${id}?raw+mp4@48000 bytes=0-1`
+  const letGo = (label) => abandoned.filter((l) => l === label).length
+  const copyOf = (id) => `${id}?format=raw&wrap=mp4&max_rate=48000`
+  const changeMs = (line) => Number(/^Last song change (\d+) ms, one element( \(airplay\))?( · |$)/.exec(line)?.[1] ?? NaN)
+  for (const [name, options, wireless] of [
+    ['Arc, the switch off', { userAgent: ARC, maxTouchPoints: 0 }, false],
+    ['iPhone, the switch off', { userAgent: IPHONE, maxTouchPoints: 5 }, false],
+    ['iPhone, the switch on but AirPlaying', { userAgent: IPHONE, maxTouchPoints: 5, gapless: true, mse: 'managed' }, true],
+  ]) {
+    const p = page({ ...options, durations: warmAlbum() })
+    net.resampleMakeMs = 15_000
+    const [e0] = elements
+    if (wireless) e0.webkitCurrentPlaybackTargetIsWireless = true
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(2_500)
+    check(`${name}: song 1 playing, and nothing asked of song 2 in its first moments`, [p.player.track.id, e0.playingNow, fetched.includes(warmOf('2'))], ['1', true, false])
+    await run(1_000)
+    check(`${name}: ...a few seconds in, two bytes of song 2's resampled copy asked for, and its make begun`,
+      [fetched.includes(warmOf('2')), makesBegun.map((m) => m.key)], [true, [copyOf('2')]])
+    await run(27_000)
+    check(`${name}: at song 1's end, song 2 at once - resampled, made while song 1 played`,
+      [p.player.track.id, e0.playingNow, (e0.getAttribute('src') ?? '').endsWith(copyOf('2')), changeMs(p.gapLine()) < 500, makesBegun.length],
+      ['2', true, true, true, 1])
+    check(`${name}: ...the change read the one-element way${wireless ? ', while AirPlaying' : ''}`, / \(airplay\)$/.test(p.gapLine()), wireless)
+    await run(3_500)
+    check(`${name}: ...and a few seconds into song 2, song 3's copy asked for in turn`, [fetched.includes(warmOf('3')), makesBegun.map((m) => m.key)], [true, [copyOf('2'), copyOf('3')]])
+  }
+  for (const [name, maxRate, durations] of [
+    ['under Original', 'original', warmAlbum()],
+    ['a CD song next', '48000', { 1: 30, 2: 30 }],
+  ]) {
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, maxRate, durations })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(29_000)
+    check(`${name}: nothing asked of song 2 ahead - it is relayed as it is, with nothing to make`, [p.player.track.id, fetched.filter((f) => f.startsWith('2?'))], ['1', []])
+  }
+  {
+    //? a skip to the song being made ready: the ask is kept, since the element's own request waits on
+    //? the same make, and letting go first could have deadwax stop it and start again. A skip on past
+    //? it lets it go
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: warmAlbum() })
+    net.resampleMakeMs = 15_000
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(8_000)
+    tap(() => p.player.next())
+    await run(9_000)
+    check('"next" to the song being made ready: its ask kept, and it plays once that one make is done, not after one of its own',
+      [p.player.track.id, letGo(warmOf('2')), e0.playingNow, makesBegun.length], ['2', 0, false, 1])
+    await run(1_500)
+    check('...playing at 18 s, the make begun at 3 s done', [e0.playingNow, (e0.getAttribute('src') ?? '').endsWith(copyOf('2'))], [true, true])
+  }
+  {
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: warmAlbum() })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(8_000)
+    tap(() => p.player.next())
+    await run(2_000)
+    tap(() => p.player.next())
+    check('"next" twice while song 2 is made: its ask let go at song 3, with the readout\'s', [p.player.track.id, letGo(warmOf('2'))], ['3', 2])
+  }
+  {
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { ...warmAlbum(), 7: 30 } })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(5_000)
+    tap(() => p.player.playTracks(hiresTracks(['7']), 0))
+    check('another album tapped while song 2 is made: its ask let go there and then', letGo(warmOf('2')), 1)
+  }
+  {
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: warmAlbum() })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(5_000)
+    tap(() => p.player.setMaxRate('original'))
+    await run(5_000)
+    check('the setting set to Original while song 2\'s copy is made: its ask let go, and nothing asked instead',
+      [letGo(warmOf('2')), fetched.filter((f) => f.startsWith('2?'))], [1, [warmOf('2')]])
+  }
+  {
+    //? the switch turned off while a resampled stream plays: from then on nothing gets the next song
+    //? ready but this
+    const p = page({ gapless: true, mse: 'managed', userAgent: IPHONE, maxTouchPoints: 5, durations: { 1: { duration: 30, rate: 192000 }, 2: { duration: 30, rate: 192000 } } })
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(2_000)
+    const [e0] = elements
+    check('a 192 kHz album in one stream, nothing asked of song 2\'s MP4', [e0.srcObject === mediaSources[0], fetched.some((f) => f.startsWith('2?raw+mp4'))], [true, false])
+    tap(() => p.player.setGapless(false))
+    await run(3_500)
+    check('...the switch off: song 2\'s resampled copy asked for ahead', fetched.includes(warmOf('2')), true)
+  }
+  {
+    //? ...and while a song plays by address, with nothing to start it again: the standby that was to
+    //? get song 2 ready lets go, and the warm-up takes over
+    const p = page({ gapless: true, userAgent: ARC, maxTouchPoints: 0, durations: warmAlbum() })
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(1_000)
+    tap(() => p.player.setGapless(false))
+    await run(3_500)
+    check('the switch off before the standby got song 2: its resampled copy asked for ahead instead', [fetched.filter((f) => f.startsWith('2?')), elements[0].playingNow], [[warmOf('2')], true])
+  }
+
+  console.log('\nthe next song\'s resampled copy: one make a song, passed on at every handover, never thrown away')
+  //? deadwax's make as the fake holds it: by its waiters - the element's request and every fetch - and
+  //? stopped 500 ms after the last lets go before it is done, as deadwax's _mp4 stops one nobody waits
+  //? for. So a handover that lets go of a make rather than passing it on is a make thrown away, begun
+  //? again from nothing: the NAS's download and resample wasted, and the song change waiting on it
+  const makesOf = (id) => makesBegun.filter((m) => m.key === copyOf(id)).length
+  const cancelsOf = (id) => makesCancelled.filter((m) => m.key === copyOf(id)).length
+  const hires = (seconds) => ({ duration: seconds, rate: 192000 })
+  const srcOf = (element) => element.getAttribute('src') ?? ''
+  //? AirPlay starting or stopping, as WebKit says it on the element
+  const airplay = (element, on) => {
+    element.webkitCurrentPlaybackTargetIsWireless = on
+    element.dispatch('webkitcurrentplaybacktargetiswirelesschanged')
+  }
+  //? the last song change's length, whichever way it went
+  const lastChangeMs = (line) => Number(/^Last song change (\d+) ms/.exec(line)?.[1] ?? NaN)
+  {
+    //? the fake itself first
+    page({ userAgent: ARC, maxTouchPoints: 0, durations: { 2: hires(30), 3: hires(30), 4: hires(30) } })
+    net.resampleMakeMs = 10_000
+    const address = (id) => `/deadwax/navidrome/stream/${id}?format=raw&wrap=mp4&max_rate=48000`
+    const one = new AbortController()
+    fetch(address('2'), { headers: { Range: 'bytes=0-1' }, signal: one.signal }).catch(() => {})
+    await run(2_000)
+    one.abort()
+    await run(400)
+    fetch(address('2'), { headers: { Range: 'bytes=0-1' } }).catch(() => {})
+    await run(200)
+    check('the fake make: let go of and asked for again within 500 ms, it carries on', [makesOf('2'), cancelsOf('2')], [1, 0])
+    const two = new AbortController()
+    fetch(address('3'), { signal: two.signal }).catch(() => {})
+    await run(100)
+    two.abort()
+    await run(700)
+    fetch(address('3')).catch(() => {})
+    check('...nobody waiting on it for 500 ms: stopped, and the next ask begins it again', [cancelsOf('3'), makesOf('3')], [1, 2])
+    const element = tap(() => document.createElement('audio'))
+    element.src = address('4')
+    await run(2_000)
+    check('...an element given its address waits on it too', cancelsOf('4'), 0)
+    element.removeAttribute('src')
+    element.load()
+    await run(600)
+    check('...and given nothing instead, lets go of it', cancelsOf('4'), 1)
+  }
+  for (const [name, options, wireless] of [
+    ['Arc, the switch off', { userAgent: ARC, maxTouchPoints: 0 }, false],
+    ['iPhone, the switch off', { userAgent: IPHONE, maxTouchPoints: 5 }, false],
+    ['iPhone, the switch on but AirPlaying', { userAgent: IPHONE, maxTouchPoints: 5, gapless: true, mse: 'managed' }, true],
+  ]) {
+    //? a song 1 shorter than the make: song 2 waits only what is left of the make begun 3 s into song 1
+    const p = page({ ...options, durations: { 1: 8, 2: hires(30), 3: hires(30) } })
+    net.resampleMakeMs = 15_000
+    const [e0] = elements
+    if (wireless) e0.webkitCurrentPlaybackTargetIsWireless = true
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(28_000)
+    const gap = lastChangeMs(p.gapLine())
+    check(`${name}, a song 1 of 8 s: song 2 plays resampled after what was left of its make (about 10 s), one make, never stopped`,
+      [p.player.track.id, e0.playingNow, srcOf(e0).endsWith(copyOf('2')), gap > 9_500 && gap < 10_500, makesOf('2'), cancelsOf('2')],
+      ['2', true, true, true, 1, 0])
+  }
+  {
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, durations: warmAlbum() })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(8_000)
+    tap(() => p.player.next())
+    await run(12_000)
+    check('iPhone, "next" to the song being made ready: it plays once that make is done - one make, never stopped',
+      [p.player.track.id, elements[0].playingNow, makesOf('2'), cancelsOf('2')], ['2', true, 1, 0])
+  }
+  for (const first of [40, 20]) {
+    //? the switch on, AirPlaying: song 2's copy asked for ahead. AirPlay stops mid-make, and the standby
+    //? takes over: its download joins the same make, which carries on - the ask ahead isn't let go
+    //? first, which would leave deadwax nobody waiting for 3 s, until the standby asked again
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, gapless: true, durations: { 1: first, 2: hires(30), 3: hires(30) } })
+    net.resampleMakeMs = 15_000
+    const [e0] = elements
+    e0.webkitCurrentPlaybackTargetIsWireless = true
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(6_000)
+    const warmed = fetched.includes(warmOf('2'))
+    airplay(e0, false)
+    await run(first * 1000)
+    if (first === 40) {
+      check('AirPlay stopping while song 2\'s copy is asked for ahead: the standby hands it over at song 1\'s end',
+        [warmed, p.player.track.id, /handed over/.test(p.gapLine())], [true, '2', true])
+      check('...one make of it, never stopped', [makesOf('2'), cancelsOf('2')], [1, 0])
+    } else {
+      check('...and with a song 1 of 20 s, handed over from memory, at once: the make was made by 18 s',
+        [p.player.track.id, p.gapLine(), makesOf('2'), cancelsOf('2')], ['2', 'Last song change 0 ms, handed over, from memory', 1, 0])
+    }
+  }
+  for (const [first, grace] of [[40, 500], [20, 500], [40, 0]]) {
+    //? the switch on: the standby is downloading song 2's copy when AirPlay starts, and lets go of it -
+    //? the ask ahead takes the make over there and then, before deadwax sees nobody waiting. With no
+    //? grace at all (deadwax noticing the hang-up at once), the ask must already be on its way
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, gapless: true, durations: { 1: first, 2: hires(30), 3: hires(30) } })
+    net.resampleMakeMs = 15_000
+    net.makeGraceMs = grace
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(6_000)
+    const downloading = fetched.includes('2?raw+mp4@48000')
+    airplay(e0, true)
+    await run(first * 1000)
+    if (grace === 0) {
+      check('...deadwax stopping a make the moment nobody waits: the ask ahead was already waiting, one make, never stopped',
+        [p.player.track.id, makesOf('2'), cancelsOf('2')], ['2', 1, 0])
+    } else if (first === 40) {
+      check('AirPlay starting while the standby downloads song 2\'s copy: song 2 at song 1\'s end, one element (airplay), at once',
+        [downloading, p.player.track.id, / \(airplay\)$/.test(p.gapLine()), lastChangeMs(p.gapLine()) < 500], [true, '2', true, true])
+      check('...one make of it, never stopped', [makesOf('2'), cancelsOf('2')], [1, 0])
+    } else {
+      check('...and with a song 1 of 20 s, still at once: the make was made by 18 s, not begun again at 9 s',
+        [p.player.track.id, lastChangeMs(p.gapLine()) < 500, makesOf('2'), cancelsOf('2')], ['2', true, 1, 0])
+    }
+  }
+  {
+    //? the switch turned on while song 2's copy is asked for ahead: the standby's download joins it
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, durations: { 1: 40, 2: hires(30), 3: hires(30) } })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(6_000)
+    tap(() => p.player.setGapless(true))
+    await run(36_000)
+    check('the switch turned on while song 2\'s copy is asked for ahead: handed over by the standby, one make, never stopped',
+      [p.player.track.id, /handed over/.test(p.gapLine()), makesOf('2'), cancelsOf('2')], ['2', true, 1, 0])
+  }
+  {
+    //? pauses, plays and seeks over song 1, before and after the ask ahead is answered: each is a
+    //? 'playing', and none asks again
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { 1: 60, 2: hires(30), 3: hires(30) } })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(4_000)
+    for (let k = 0; k < 10; k++) {
+      tap(() => p.player.toggle())
+      await run(300)
+      tap(() => p.player.toggle())
+      await run(700)
+      tap(() => p.player.seek(5 + k * 3))
+      await run(1_000)
+    }
+    await run(20_000)
+    const ahead = fetched.filter((f) => f === warmOf('2')).length
+    await run(20_000)
+    check('ten pauses, plays and seeks over song 1: song 2 asked for ahead once, one make, never stopped - and it plays at once',
+      [ahead, makesOf('2'), cancelsOf('2'), p.player.track.id, lastChangeMs(p.gapLine()) < 500], [1, 1, 0, '2', true])
+  }
+  {
+    //? the ask ahead fails outright: the element asks at song 2's turn, and nothing asks before then
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { 1: 60, 2: hires(30) } })
+    net.resampleMakeMs = 15_000
+    net.failing.add(warmOf('2'))
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    for (let k = 0; k < 5; k++) {
+      await run(5_000)
+      tap(() => p.player.toggle())
+      await run(200)
+      tap(() => p.player.toggle())
+    }
+    await run(15_000)
+    check('an ask ahead that fails: made once, not asked again on every play', [p.player.track.id, fetched.filter((f) => f === warmOf('2')).length], ['1', 1])
+  }
+  {
+    //? a 192 kHz album start to end with the switch off: each song asked for ahead once, made once
+    const ids = ['1', '2', '3', '4', '5', '6']
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, durations: Object.fromEntries(ids.map((id) => [id, hires(20)])) })
+    net.resampleMakeMs = 5_000
+    tap(() => p.player.playTracks(hiresTracks(ids), 0))
+    await run(6 * 20_000 + 10_000)
+    check('six 192 kHz songs, the switch off: each made once, none stopped, every change after the first at once',
+      [p.player.track.id, ids.map(makesOf), makesCancelled.length, p.player.gaps.slice(0, 4).every((g) => g.ms < 500)], ['6', [1, 1, 1, 1, 1, 1], 0, true])
+    //? the first song's is its readout's ask only; each other's the ask ahead and its readout's at its turn
+    check('...the two bytes asked of each song', ids.map((id) => fetched.filter((f) => f === warmOf(id)).length), [1, 2, 2, 2, 2, 2])
+  }
+  {
+    //? skipping through a 192 kHz album: nothing asked ahead of a song skipped past within its first
+    //? 3 s, and each song's make let go of once it is skipped past
+    const ids = ['1', '2', '3', '4', '5', '6']
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: Object.fromEntries(ids.map((id) => [id, hires(30)])) })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(ids), 0))
+    for (let k = 0; k < 4; k++) {
+      await run(800)
+      tap(() => p.player.next())
+    }
+    await run(2_000)
+    check('four quick skips: each song asked about once, by its readout, nothing ahead; 1 to 4 stopped once skipped past, 5 being made',
+      [p.player.track.id, ids.map((id) => fetched.filter((f) => f === warmOf(id)).length), ['1', '2', '3', '4'].map(cancelsOf), makesOf('5'), cancelsOf('5')],
+      ['5', [1, 1, 1, 1, 1, 0], [1, 1, 1, 1], 1, 0])
+  }
+  {
+    //? song 2 playing by the ask ahead's make, still under way, when the setting goes to Original: the
+    //? kept ask lets go, and the element still waits on the make - which carries on
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { 1: 10, 2: hires(30), 3: hires(30) } })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(11_000)
+    tap(() => p.player.setMaxRate('original'))
+    await run(10_000)
+    check('Original set while song 2 waits on its make: the make carries on, and song 2 plays resampled, as it was asked for',
+      [p.player.track.id, elements[0].playingNow, srcOf(elements[0]).endsWith(copyOf('2')), makesOf('2'), cancelsOf('2')], ['2', true, true, 1, 0])
+  }
+  {
+    //? the switch on and no MediaSource: the standby gets each song, and nothing is asked ahead of it
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, gapless: true, durations: { 1: 20, 2: hires(20), 3: hires(20) } })
+    net.resampleMakeMs = 5_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(45_000)
+    check('the switch on, no MediaSource: each song got by the standby, and asked about only by its readout, at its turn',
+      [p.player.track.id, fetched.filter((f) => /bytes=0-1$/.test(f)), makesCancelled.length],
+      ['3', ['1?raw+mp4 bytes=0-1', '2?raw+mp4@48000 bytes=0-1', '3?raw+mp4@48000 bytes=0-1'], 0])
   }
 
   /* ======================================================================== */
@@ -2750,6 +3325,26 @@ async function outcome(promise, ms = 1_000) {
     await run(1_000)
     check('a 96 kHz first song: the URL way, in an MP4 for Safari', [e0.srcObject, /\/stream\/1\?format=raw&wrap=mp4$/.test(e0.getAttribute('src') ?? ''), e0.playingNow], [null, true, true])
   }
+  {
+    //? a hi-res song Navidrome gave no rate for: nothing known keeps it out, so the stream asks for its
+    //? head, and the head's format refuses it under 48 kHz. That is remembered for 48 kHz alone: a tap
+    //? on it again asks for no stream copy, and under "Original", which takes 96 kHz, it streams
+    const p = streamPage({ durations: { 1: { duration: 5, rate: 96000 }, 2: 5 } })
+    const live = () => elements.find((e) => e.playingNow) ?? elements[0]
+    const ofOne = () => fmp4Requests.filter((r) => r.id === '1').length
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(1_000)
+    const asked = ofOne()
+    check('a 96 kHz song with no rate from Navidrome: its head asked for, then the URL way', [asked > 0, live().srcObject, live().playingNow], [true, null, true])
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(1_000)
+    check('...a tap on it again under 48 kHz: no stream copy asked', [ofOne(), mediaSources.length, live().srcObject, live().playingNow], [asked, 1, null, true])
+    tap(() => p.player.setMaxRate('original'))
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(1_000)
+    check('...under Original it is not held out by what 48 kHz found: it streams as it is',
+      [ofOne() > asked, mediaSources.length, live().srcObject === mediaSources[1], live().playingNow, p.seekLine()], [true, 2, true, true, 'No seek yet · in one stream, 96 kHz'])
+  }
 
   console.log('\none stream: failures leave it for the song playing, at its position')
   {
@@ -3185,6 +3780,15 @@ async function outcome(promise, ms = 1_000) {
     check('the fragments that came with the head are appended from it, not fetched again', Number(/bytes=(\d+)/.exec(first?.range ?? '')?.[1]) > 131072, true)
   }
   {
+    //? the album's last song too: reaching it ends the run, and ending the run pumps - which once
+    //? left the outer pump to fetch again, from fragment 0, what the song's head had brought
+    const p = streamPage({ durations: { 1: 12, 2: 11, 3: 13 } })
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(40_000)
+    const firstPieces = ['1', '2', '3'].map((id) => Number(/bytes=(\d+)/.exec(fmp4Requests.find((r) => r.id === id && r.range !== 'bytes=0-262143')?.range ?? '')?.[1]))
+    check('every song of an album, the last included, appends its head\'s fragments from the head', firstPieces.every((start) => start > 131072), true)
+  }
+  {
     const p = streamPage({ durations: { 1: 5, 2: { duration: 5, rate: 48000 } } })
     const [e0] = elements
     tap(() => p.player.playTracks(tracks(['1', '2']), 0))
@@ -3202,6 +3806,541 @@ async function outcome(promise, ms = 1_000) {
       for (const e of elements.slice(1)) { const s = e.getAttribute('src'); if (s) seen.add(s) }
     }
     check('nothing of the run is downloaded a second time for the standby', [fetched.filter((f) => !/\+fmp4/.test(f)), [...seen]], [[], []])
+  }
+
+  /* ----- "Maximum quality": hi-res albums in one stream, resampled by deadwax ----- */
+  //? where each song of a resampled run starts, in seconds - its copy's own samples at 48 kHz
+  const resampledStarts = (ids) => ids.map((id) => resampledSong(id, 48000)).reduce((acc, song) => [...acc, acc[acc.length - 1] + song.seconds], [0])
+  const hires192 = (seconds) => ({ duration: seconds, rate: 192000 })
+
+  for (const [name, options] of [['iPhone', {}], ['Arc', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }]]) {
+    console.log(`\none stream, ${name}: a 192 kHz album, resampled by deadwax, joined in one stream`)
+    const p = streamPage({ ...options, durations: { 1: hires192(6), 2: hires192(5), 3: hires192(7) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(600)
+    const sb = streamOf(e0).sourceBuffers[0]
+    check(`${name}: the tap streams it`, [p.player.track.id, e0.playingNow, mediaSources.length], ['1', true, 1])
+    check(`${name}: every copy asked for resampled`, fmp4Requests.length > 0 && fmp4Requests.every((r) => r.maxRate === '48000'), true)
+    check(`${name}: the length shown is the resampled copy's own`, near(p.player.duration, resampledSong('1', 48000).seconds, 1e-9), true)
+    check(`${name}: the readout says what deadwax did`, p.seekLine(), 'No seek yet · in one stream, 192 kHz resampled to 48 kHz')
+    const at = resampledStarts(['1', '2', '3'])
+    await run((at[3] - e0.currentTime) * 1000 + 1500)
+    //? the last init segment is song 3's; every song's frames are 4096 samples at 48 kHz but its last
+    const whole = sb.frames.filter((f) => Math.abs((f.end - f.start) * 48000 - 4096) < 0.1)
+    check(`${name}: every song placed at 48 kHz, 24-bit, on one timescale`,
+      [sb.init.rate, sb.init.bits, sb.init.timescale, [...new Set(sb.frames.map((f) => f.id))], sb.frames.length - whole.length <= 3],
+      [48000, 24, 48000, ['1', '2', '3'], true])
+    check(`${name}: the album joined and ended, still one MediaSource`, [p.player.track.id, e0.stalls.length, e0.ended, mediaSources.length], ['3', 0, true, 1])
+    check(`${name}: every join 0 ms, in one stream`, p.gapLine(), 'Last song change 0 ms, in one stream · before: 0 ms')
+    //? to the microsecond, which is what Chromium rounds a frame's time to (WebKit keeps the samples)
+    const firsts = ['2', '3'].map((id) => sb.frames.find((f) => f.id === id)?.start)
+    check(`${name}: each song's first frame placed where its copy begins, to the microsecond`, firsts.map((t, k) => Math.abs(t - at[k + 1]) <= 1e-6), [true, true])
+  }
+
+  /* ----- "Original": hi-res albums in one stream as they are ----- */
+  //? a 24/192 FLAC as it is: about 690 KB a second, so an iPhone's 5.26 MiB holds some 8 s of it
+  const original192 = (seconds) => ({ duration: seconds, rate: 192000, bits: 24, bytesPerSecond: 690_000 })
+
+  //? the byte budgets are the same at every rate: 3 MiB ahead on a ManagedMediaSource is about 5 s of
+  //? 24/192 (not the half minute of a CD song), 8 MiB on a plain one about 12 s
+  for (const [name, options, [atLeast, atMost]] of [['iPhone', {}, [4, 6]], ['Arc', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }, [10, 13]]]) {
+    console.log(`\none stream, ${name}: a 192 kHz album under "Original", joined in one stream as it is`)
+    const p = streamPage({ ...options, maxRate: 'original', durations: { 1: original192(6), 2: original192(5), 3: original192(7) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(600)
+    const sb = streamOf(e0).sourceBuffers[0]
+    check(`${name}: the tap streams it`, [p.player.track.id, e0.playingNow, mediaSources.length], ['1', true, 1])
+    check(`${name}: the readout says the rate was kept`, p.seekLine(), 'No seek yet · in one stream, 192 kHz')
+    const at = starts(['1', '2', '3'])
+    //? what the buffer holds is evicted behind the playhead as the album goes, so it is watched as it
+    //? plays: where each song's first frame went, and how far ahead of the playhead the stream held
+    const firsts = new Map()
+    let aheadMost = 0
+    const until = now + ((at[3] - e0.currentTime) * 1000 + 1500)
+    while (now < until) {
+      await run(250)
+      for (const frame of sb.frames) if (!firsts.has(frame.id)) firsts.set(frame.id, frame.start)
+      const held = rangesOf(sb.buffered).find(([from, to]) => from <= e0.currentTime + 1e-6 && e0.currentTime < to)
+      if (held && e0.currentTime > 1 && e0.currentTime < at[3] - 8) aheadMost = Math.max(aheadMost, held[1] - e0.currentTime)
+    }
+    check(`${name}: every fmp4 address the song as it is - no max_rate in any`, fmp4Requests.length > 0 && fmp4Requests.every((r) => r.maxRate === null), true)
+    check(`${name}: every song placed at 192 kHz, 24-bit, on one timescale`, [sb.init.rate, sb.init.bits, sb.init.timescale, [...firsts.keys()]],
+      [192000, 24, 192000, ['1', '2', '3']])
+    check(`${name}: the album joined and ended, still one MediaSource`, [p.player.track.id, e0.stalls.length, e0.ended, mediaSources.length], ['3', 0, true, 1])
+    check(`${name}: every join 0 ms, in one stream`, p.gapLine(), 'Last song change 0 ms, in one stream · before: 0 ms')
+    check(`${name}: each song's first frame placed where it begins, to the microsecond`, ['2', '3'].map((id, k) => Math.abs(firsts.get(id) - at[k + 1]) <= 1e-6), [true, true])
+    check(`${name}: the last song too says the rate it kept`, p.seekLine(), 'No seek yet · in one stream, 192 kHz')
+    check(`${name}: held ${atLeast}-${atMost} s ahead of the playhead, by its byte budget`, [aheadMost > atLeast, aheadMost < atMost, +aheadMost.toFixed(1)],
+      [true, true, +aheadMost.toFixed(1)])
+  }
+  //? what a stream can't take under "Original" either is known without asking deadwax for a copy
+  for (const [label, format] of [
+    ['six channels at 192 kHz', { sampleRate: 192000, bitDepth: 24, channels: 6 }],
+    ['20 bits at 96 kHz', { sampleRate: 96000, bitDepth: 20, channels: 2 }],
+    ['32 bits at 192 kHz', { sampleRate: 192000, bitDepth: 32, channels: 2 }],
+    ['705.6 kHz, above 384 kHz', { sampleRate: 705600, bitDepth: 24, channels: 2 }],
+  ]) {
+    const p = streamPage({ maxRate: 'original', durations: { 1: { duration: 6, rate: format.sampleRate }, 2: 6 } })
+    tap(() => p.player.playTracks(tracks(['1', '2'], {}, { 1: format }), 0))
+    await run(600)
+    check(`Original, a known ${label}: no stream copy asked, the URL way`, [fmp4Requests.length, mediaSources.length, elements[0].playingNow], [0, 0, true])
+  }
+  {
+    //? six channels at 48 kHz: never streamed, known without asking, whatever the setting
+    const p = streamPage({ durations: { 1: { duration: 6, rate: 48000 }, 2: 6 } })
+    tap(() => p.player.playTracks(tracks(['1', '2'], {}, { 1: { sampleRate: 48000, bitDepth: 24, channels: 6 } }), 0))
+    await run(600)
+    check('a known six-channel song: no stream copy asked', [fmp4Requests.length, mediaSources.length, elements[0].playingNow], [0, 0, true])
+  }
+
+  console.log('\none stream: songs of different source rates never join')
+  for (const [label, second, standby, readout] of [
+    ['a 96 kHz song after a 192 kHz one - both resampled to 48 kHz', { duration: 5, rate: 96000 }, '2?raw+mp4@48000', 'No seek yet · FLAC in MP4, 96 kHz resampled to 48 kHz'],
+    ['a 48 kHz, 24-bit song after a 192 kHz one - the same format out', { duration: 5, rate: 48000, bits: 24 }, '2?raw+mp4', 'No seek yet · FLAC in MP4'],
+  ]) {
+    const p = streamPage({ durations: { 1: hires192(5), 2: second } })
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(600)
+    const sb = streamOf(e0).sourceBuffers[0]
+    await run((resampledSong('1', 48000).seconds + 1) * 1000)
+    check(`${label}: its head was asked for, and it was not joined`, [heads('2'), sb.frames.some((f) => f.id === '2')], [1, false])
+    check('...it was got ready on the standby by its address, and handed over at song 1\'s end',
+      [fetched.includes(standby), p.player.track.id, e1.playingNow, /handed over, from memory$/.test(p.gapLine())], [true, '2', true, true])
+    check('...and the readout says how it came', p.seekLine(), readout)
+  }
+  {
+    //? both 192 kHz: resampled alike, one run - the positive side of the rule
+    const p = streamPage({ durations: { 1: hires192(5), 2: hires192(5) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run((resampledStarts(['1', '2'])[1] + 1) * 1000)
+    check('two 192 kHz songs: joined in the one stream', [p.player.track.id, e0.srcObject === mediaSources[0], p.gapLine()], ['2', true, 'Last song change 0 ms, in one stream'])
+  }
+
+  console.log('\none stream: a resampled song that leaves it for AirPlay, the switch or the network goes on resampled')
+  //? Resampled songs are lowered so nothing clips: the original from where the song left the stream
+  //? would be the rest of it louder, and the next song quieter again. So a song the stream had begun
+  //? goes on as its resampled copy, in an MP4 - which deadwax makes from the stream's own copy of it,
+  //? in a moment - asked about at that same address. (A copy that won't decode, and a head that never
+  //? came, are the original: below, and "a first song deadwax is resampling gets a minute".)
+  for (const [name, options] of [['iPhone', {}], ['Arc', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }]]) {
+    for (const how of ['AirPlay', 'the switch off', 'a piece that never comes']) {
+      const lost = how === 'a piece that never comes'
+      const p = streamPage({ ...options, durations: { 1: hires192(lost ? 60 : 8), 2: hires192(8) } })
+      const [e0] = elements
+      const src = () => e0.getAttribute('src') ?? ''
+      tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+      await run(1_000)
+      const position = e0.currentTime
+      if (how === 'AirPlay') {
+        e0.webkitShowPlaybackTargetPicker = () => {}
+        tap(() => p.player.showAirPlay())
+      } else if (how === 'the switch off') tap(() => p.player.setGapless(false))
+      //? every ask for song 1's copy fails from now: the stream plays what it has, then leaves
+      else net.fmp4Answer['1@48000'] = { status: 0, times: 999 }
+      await run(lost ? 50_000 : 600)
+      check(`${name}, ${how}: song 1 goes on as its resampled copy, in an MP4, from where it was`,
+        [p.player.track.id, e0.srcObject, src().endsWith('/stream/1?format=raw&wrap=mp4&max_rate=48000'), e0.currentTime >= (lost ? 25 : position - 0.3), e0.playingNow],
+        ['1', null, true, true, true])
+      check(`${name}, ${how}: ...asked about at that address, and the readout says so`,
+        [fetched.includes('1?raw+mp4@48000 bytes=0-1'), p.seekLine()],
+        [true, 'No seek yet · FLAC in MP4, 192 kHz resampled to 48 kHz'])
+    }
+  }
+  {
+    //? the setting set to Original during the run: the song goes on as the copy the run was playing -
+    //? and the readout asks about that same address, not the one the setting now gives
+    const p = streamPage({ durations: { 1: hires192(20), 2: hires192(8) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(1_000)
+    tap(() => p.player.setMaxRate('original'))
+    e0.webkitShowPlaybackTargetPicker = () => {}
+    tap(() => p.player.showAirPlay())
+    await run(600)
+    check('Original set mid-run, then AirPlay: the run\'s copy, and asked about at its address',
+      [(e0.getAttribute('src') ?? '').endsWith('/stream/1?format=raw&wrap=mp4&max_rate=48000'), fetched.filter((f) => /^1\?raw\+mp4/.test(f)), p.seekLine()],
+      [true, ['1?raw+mp4@48000 bytes=0-1'], 'No seek yet · FLAC in MP4, 192 kHz resampled to 48 kHz'])
+  }
+
+  for (const [name, options] of [['iPhone', {}], ['Arc', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }]]) {
+    //? AirPlay as it really comes: the picker, the song on as its resampled copy, and only a moment later
+    //? the element saying it plays to the speaker. In between the standby began getting song 2 ready,
+    //? which starts its make - and AirPlay lets the standby go: the ask ahead takes the make over
+    const p = streamPage({ ...options, durations: { 1: hires192(40), 2: hires192(30) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(2_000)
+    e0.webkitShowPlaybackTargetPicker = () => {}
+    tap(() => p.player.showAirPlay())
+    await run(1_000)
+    net.resampleMakeMs = 10_000
+    await run(3_000)
+    airplay(e0, true)
+    await run(40_000)
+    check(`${name}, AirPlay: song 2 at its turn resampled, at once - made while song 1 played to the speaker, one make, never stopped`,
+      [p.player.track.id, srcOf(e0).endsWith(copyOf('2')), lastChangeMs(p.gapLine()) < 500, makesOf('2'), cancelsOf('2')], ['2', true, true, 1, 0])
+  }
+  {
+    //? the head never came (a resample too slow for the stream), AirPlay tapped at 10 s: nothing of the
+    //? song played resampled, so it goes on as it is, relayed at once - not a resampled MP4 to wait for
+    const p = streamPage({ durations: { 1: hires192(120), 2: hires192(5) } })
+    net.headerDelay['1'] = 40_000
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(100)
+    delete net.headerDelay['1']
+    await run(10_000)
+    e0.webkitShowPlaybackTargetPicker = () => {}
+    tap(() => p.player.showAirPlay())
+    await run(600)
+    check('no head in yet, AirPlay: the song as it is, relayed at once', [e0.srcObject, /\/stream\/1\?format=raw$/.test(srcOf(e0)), e0.playingNow], [null, true, true])
+  }
+  {
+    //? its head in at 30 s, AirPlay at 35 s: the song had begun resampled, and goes on so
+    const p = streamPage({ durations: { 1: hires192(120), 2: hires192(5) } })
+    net.headerDelay['1'] = 30_000
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(100)
+    delete net.headerDelay['1']
+    await run(35_000)
+    e0.webkitShowPlaybackTargetPicker = () => {}
+    tap(() => p.player.showAirPlay())
+    await run(600)
+    check('its head in at 30 s, AirPlay at 35 s: its resampled MP4', [e0.srcObject, srcOf(e0).endsWith(copyOf('1')), e0.playingNow], [null, true, true])
+  }
+  {
+    //? left for the switch, then Original set, then the connection drops: asked for again at the address
+    //? it was playing - its resampled copy - not the one the setting gives now
+    const p = streamPage({ durations: { 1: hires192(60), 2: hires192(30) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(2_000)
+    tap(() => p.player.setGapless(false))
+    await run(1_000)
+    tap(() => p.player.setMaxRate('original'))
+    await run(1_000)
+    const at = e0.currentTime
+    e0.fail(2)
+    await run(3_000)
+    check('left for the switch, Original set, the connection dropped: asked for again at its resampled address, from where it was',
+      [srcOf(e0).endsWith(copyOf('1')), e0.playingNow, e0.currentTime >= at - 0.3], [true, true, true])
+  }
+  {
+    //? the switch off in song 2 of the run: song 2 on as its resampled copy too, not only a run's first
+    const p = streamPage({ durations: { 1: hires192(6), 2: hires192(30) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(9_000)
+    tap(() => p.player.setGapless(false))
+    await run(600)
+    check('the switch off in song 2 of the run: song 2 on as its resampled MP4', [p.player.track.id, srcOf(e0).endsWith(copyOf('2')), e0.playingNow], ['2', true, true])
+  }
+  for (const [name, options, readout] of [['iPhone', {}, 'No seek yet · sent as FLAC, not in an MP4'], ['Arc', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }, 'No seek yet']]) {
+    //? nothing resampled: a CD stream, and a 192 kHz one under Original, leave as the file as it is
+    for (const [label, maxRate, durations] of [['a CD stream', '48000', { 1: 30, 2: 30 }], ['Original, 192 kHz as it is', 'original', { 1: hires192(30), 2: hires192(30) }]]) {
+      const p = streamPage({ ...options, maxRate, durations })
+      const [e0] = elements
+      tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+      await run(2_000)
+      e0.webkitShowPlaybackTargetPicker = () => {}
+      tap(() => p.player.showAirPlay())
+      await run(600)
+      check(`${name}, ${label}, AirPlay: the file as it is, relayed at once`, [/\/stream\/1\?format=raw$/.test(srcOf(e0)), e0.playingNow, p.seekLine()], [true, true, readout])
+    }
+  }
+
+  console.log('\none stream: a song the stream will play is not asked for ahead as well')
+  //? A stream asks for its songs' FRAGMENTED MP4s, which deadwax makes apart from the MP4 a song by
+  //? address is: an ask ahead for the MP4 of a song a stream plays is a second make of the song, at
+  //? the same time, for nothing
+  {
+    const p = streamPage({ durations: { 1: hires192(20), 2: hires192(20), 3: 20 } })
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(15_000)
+    check('a resampled stream: nothing asked of song 2 outside it', fetched.filter((f) => /^2\?/.test(f) && !/\+fmp4/.test(f)), [])
+    await run(30_000)
+    check('...song 3, a CD song after the run, got by the standby, then asked about by its readout at its turn',
+      [p.player.track.id, fetched.filter((f) => /^3\?/.test(f) && !/\+fmp4/.test(f))], ['3', ['3?raw+mp4', '3?raw+mp4 bytes=0-1']])
+  }
+  for (const [label, how, start] of [
+    ['the switch turned on, then "next"', 'switch', 1],
+    ['AirPlay stopped, then "next"', 'airplay', 1],
+    ['the switch turned on, then song 1 tapped again', 'switch', 0],
+    ['AirPlay stopped, then song 1 tapped again', 'airplay', 0],
+  ]) {
+    //? song 2's MP4 asked for ahead, and then a stream begins - on song 2, or on song 1 with song 2 in
+    //? its run: the ask ahead lets go, and deadwax stops that make
+    const p = streamPage({ gapless: how === 'airplay', durations: { 1: 40, 2: hires192(30), 3: hires192(30) } })
+    net.resampleMakeMs = 15_000
+    const [e0] = elements
+    if (how === 'airplay') e0.webkitCurrentPlaybackTargetIsWireless = true
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(5_000)
+    const warmed = fetched.includes(warmOf('2'))
+    if (how === 'switch') tap(() => p.player.setGapless(true))
+    else airplay(e0, false)
+    await run(1_000)
+    if (start === 1) tap(() => p.player.next())
+    else tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(2_000)
+    check(`${label} while song 2's copy is asked for ahead: a stream on song ${start + 1}, and the ask ahead let go of, its make stopped`,
+      [warmed, p.player.track.id, e0.srcObject === mediaSources[0], abandoned.includes(warmOf('2')), makesOf('2'), cancelsOf('2')],
+      [true, String(start + 1), true, true, 1, 1])
+  }
+
+  console.log('\none stream: a resampled song whose copy won\'t decode plays the original')
+  //? each browser's address for song 1 as it is, the way "Original" asks for it: an MP4 of itself in
+  //? Safari, the file itself in Chromium - and what the readout says of each
+  const asIs = [
+    ['iPhone', {}, /\/stream\/1\?format=raw&wrap=mp4$/, 'No seek yet · FLAC in MP4'],
+    ['Arc', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }, /\/stream\/1\?format=raw$/, 'No seek yet'],
+  ]
+  for (const [name, options, original] of asIs) {
+    const p = streamPage({ ...options, durations: { 1: hires192(8), 2: hires192(8) } })
+    const [e0] = elements
+    const src = () => e0.getAttribute('src') ?? ''
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(2_000)
+    const position = e0.currentTime
+    e0.fail(3)
+    await run(600)
+    //? from where it had got to, relayed at once: an MP4 might mean deadwax making it first
+    check(`${name}: a decode error in a resampled stream: the original, the file as it is, from where it was`,
+      [e0.srcObject === null, /\/stream\/1\?format=raw$/.test(src()), e0.currentTime >= position - 0.3, e0.playingNow], [true, true, true, true])
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(600)
+    //? its resampled copy failed, not the song: from its start it is asked for as under "Original", and
+    //? a stream started at 48 kHz takes no 192 kHz song as it is, so there is none to ask
+    check(`${name}: ...a tap on it again: as under Original, no max_rate, and no stream copy asked`,
+      [original.test(src()), mediaSources.length, e0.playingNow], [true, 1, true])
+  }
+  for (const [name, options, original, readout] of asIs) {
+    //? deadwax won't make song 1's resampled copy (a file it can't resample): that copy is refused, not
+    //? the song - it plays as it would under "Original", never the file itself for that
+    const p = streamPage({ ...options, durations: { 1: hires192(8) } })
+    net.fmp4Answer['1@48000'] = { status: 415 }
+    const [e0] = elements
+    const src = () => e0.getAttribute('src') ?? ''
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(800)
+    check(`${name}: its resampled copy refused: played as under Original, no max_rate`, [e0.srcObject, original.test(src()), e0.playingNow], [null, true, true])
+    check(`${name}: ...and the readout says how it came`, p.seekLine(), readout)
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(600)
+    check(`${name}: ...a tap on it again: no stream tried - one at 48 kHz takes no 192 kHz song as it is - the same address`,
+      [mediaSources.length, original.test(src())], [1, true])
+    const asks = fmp4Requests.length
+    tap(() => p.player.setMaxRate('original'))
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(600)
+    const since = fmp4Requests.slice(asks)
+    check(`${name}: ...under Original the song itself is not taken for refused: it streams as it is`,
+      [streamOf(e0) === mediaSources[1], since.length > 0 && since.every((r) => r.maxRate === null), e0.playingNow, p.seekLine()],
+      [true, true, true, 'No seek yet · in one stream, 192 kHz'])
+  }
+  for (const [name, options, , , label] of asIs.map((row, k) => [...row, ['2?raw+mp4', '2?raw'][k]])) {
+    //? the next song's resampled copy refused at its head: the run ends before it, and the standby gets
+    //? it as under "Original" - never the resampled copy again, never the file itself in Safari
+    const p = streamPage({ ...options, durations: { 1: hires192(5), 2: hires192(5) } })
+    net.fmp4Answer['2@48000'] = { status: 415 }
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(600)
+    const sb = streamOf(e0).sourceBuffers[0]
+    await run((resampledSong('1', 48000).seconds + 1) * 1000)
+    check(`${name}: song 2's resampled copy refused: its head asked once, and it wasn't joined`, [heads('2'), sb.frames.some((f) => f.id === '2')], [1, false])
+    check(`${name}: ...the standby got it as under Original, and it was handed over at song 1's end`,
+      [fetched.includes(label), fetched.some((f) => /^2\?raw\+mp4@/.test(f)), p.player.track.id, e1.playingNow, /handed over, from memory$/.test(p.gapLine())],
+      [true, false, '2', true, true])
+  }
+  {
+    //? only the song as it is refused means the file itself: its resampled copy refused first (Safari
+    //? gets the MP4 of it as it is), then, under Original, its own copy too
+    const p = streamPage({ durations: { 1: hires192(8) } })
+    net.fmp4Answer['1'] = { status: 415 }
+    const [e0] = elements
+    const src = () => e0.getAttribute('src') ?? ''
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(800)
+    check('deadwax refusing every copy: the resampled one first - Safari gets the MP4 of the song as it is', [e0.srcObject, /\/stream\/1\?format=raw&wrap=mp4$/.test(src())], [null, true])
+    tap(() => p.player.setMaxRate('original'))
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(800)
+    check('...under Original its own copy refused too: now the file itself, as for any song deadwax won\'t repackage',
+      [mediaSources.length, e0.srcObject, /\/stream\/1\?format=raw$/.test(src()), e0.playingNow], [2, null, true, true])
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(600)
+    check('...a tap on it again: no stream tried, the file itself', [mediaSources.length, /\/stream\/1\?format=raw$/.test(src())], [2, true])
+    tap(() => p.player.setMaxRate('48000'))
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(600)
+    check('...and back at 48 kHz, with both copies refused: the file itself still', [mediaSources.length, /\/stream\/1\?format=raw$/.test(src())], [2, true])
+  }
+
+  console.log('\none stream: under Original, a hi-res song the stream can\'t decode keeps its MP4')
+  //? No phone has been seen to play a song above 48 kHz in a stream, and AVFoundation decodes deadwax's
+  //? MP4 of the same frames: the rate is the likelier cause than the bytes. So the first song of such a
+  //? run that won't decode is kept out of streams under Original only, isn't counted as the stream
+  //? failing, and keeps the MP4 Safari's seeks land in
+  {
+    const p = streamPage({ maxRate: 'original', durations: { 1: hires192(8), 2: hires192(8) } })
+    const [e0] = elements
+    const src = () => e0.getAttribute('src') ?? ''
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(2_000)
+    check('Original: a 192 kHz song streaming as it is', [e0.srcObject === mediaSources[0], p.seekLine()], [true, 'No seek yet · in one stream, 192 kHz'])
+    const position = e0.currentTime
+    e0.fail(3)
+    await run(600)
+    check('...a decode error: the file as it is from where it was, relayed at once, as ever',
+      [e0.srcObject, /\/stream\/1\?format=raw$/.test(src()), e0.currentTime >= position - 0.3, e0.playingNow], [null, true, true, true])
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(600)
+    check('...a tap on it again: no stream tried, and Safari still gets its MP4',
+      [mediaSources.length, /\/stream\/1\?format=raw&wrap=mp4$/.test(src()), e0.playingNow, p.seekLine()], [1, true, true, 'No seek yet · FLAC in MP4'])
+    tap(() => p.player.setMaxRate('48000'))
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(600)
+    check('...and at 48 kHz it streams, resampled', [mediaSources.length, e0.srcObject === mediaSources[1], p.seekLine()], [2, true, 'No seek yet · in one stream, 192 kHz resampled to 48 kHz'])
+  }
+  {
+    //? an engine that won't take a 192 kHz stream at all: each song's init segment refused, before it
+    //? ever plays - three of them must not turn streaming off for CD albums too
+    const p = streamPage({ maxRate: 'original', durations: { 1: hires192(8), 2: hires192(8), 3: hires192(8), 4: 6, 5: 6, 6: 6 } })
+    net.refuseInitAbove = 48000
+    const [e0] = elements
+    const src = () => e0.getAttribute('src') ?? ''
+    for (const id of ['1', '2', '3']) {
+      tap(() => p.player.playTracks(hiresTracks([id, '4']), 0))
+      await run(3_000)
+    }
+    check('Original, an engine refusing 192 kHz: three songs refused at their init segment, each played the URL way',
+      [mediaSources.length, e0.srcObject, p.player.track.id, e0.playingNow], [3, null, '3', true])
+    tap(() => p.player.playTracks(tracks(['5', '6']), 0))
+    await run(1_000)
+    check('...a CD album after them still streams', [mediaSources.length, e0.srcObject === mediaSources[3], e0.playingNow], [4, true, true])
+    const later = []
+    for (const id of ['1', '2', '3']) {
+      tap(() => p.player.playTracks(hiresTracks([id]), 0))
+      await run(600)
+      later.push(src().endsWith(`/stream/${id}?format=raw&wrap=mp4`))
+    }
+    check('...and each of the three is asked for in its MP4 from then on, with no stream tried', [later, mediaSources.length], [[true, true, true], 4])
+  }
+  {
+    //? a later song of a run whose first decoded at its rate: its bytes are what to doubt, as for any song
+    const p = streamPage({ maxRate: 'original', durations: { 1: hires192(5), 2: hires192(8) } })
+    const [e0] = elements
+    const src = () => e0.getAttribute('src') ?? ''
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run((mseSong('1').seconds + 1.5) * 1000)
+    check('Original: song 2 joined the 192 kHz run, after song 1 played', [p.player.track.id, e0.srcObject === mediaSources[0]], ['2', true])
+    e0.fail(3)
+    await run(600)
+    tap(() => p.player.playTracks(hiresTracks(['2']), 0))
+    await run(600)
+    check('...a decode error in it: refused, the file itself from then on, as for a CD song', [mediaSources.length, /\/stream\/2\?format=raw$/.test(src())], [1, true])
+  }
+
+  {
+    //? the song the tap starts at is the first of its run wherever it is in the album: third, here
+    const p = streamPage({ maxRate: 'original', durations: { 1: hires192(8), 2: hires192(8), 3: hires192(8), 4: hires192(8) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3', '4']), 2))
+    await run(2_000)
+    e0.fail(3)
+    await run(600)
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3', '4']), 2))
+    await run(600)
+    check('Original: the first of its run tapped third in the album, a decode error: kept out of streams, and it keeps its MP4',
+      [mediaSources.length, srcOf(e0).endsWith('/stream/3?format=raw&wrap=mp4'), e0.playingNow], [1, true, true])
+  }
+  {
+    //? its resampled copy refused at 48 kHz, then under Original it streams as it is and won't decode
+    //? either: kept out of streams under Original only - and at 48 kHz, asked for as under Original, it
+    //? is its MP4, never the file
+    const p = streamPage({ durations: { 1: hires192(8) } })
+    net.fmp4Answer['1@48000'] = { status: 415 }
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(800)
+    tap(() => p.player.setMaxRate('original'))
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(2_000)
+    const streamedAsIs = e0.srcObject === mediaSources[1]
+    e0.fail(3)
+    await run(600)
+    tap(() => p.player.setMaxRate('48000'))
+    tap(() => p.player.playTracks(hiresTracks(['1']), 0))
+    await run(600)
+    check('its resampled copy refused, then undecodable as it is under Original: at 48 kHz its MP4, and no stream',
+      [streamedAsIs, mediaSources.length, srcOf(e0).endsWith('/stream/1?format=raw&wrap=mp4'), e0.playingNow], [true, 2, true, true])
+  }
+
+  console.log('\none stream: the setting changed mid-run - the run carries on as it began')
+  {
+    //? song 1 long enough that song 2's head is asked for well after the change
+    const p = streamPage({ durations: { 1: hires192(100), 2: hires192(20) } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(1_500)
+    tap(() => p.player.setMaxRate('original'))
+    check('the setting changed before song 2\'s head was asked for', heads('2'), 0)
+    await run((resampledStarts(['1', '2'])[1] + 6) * 1000 - 1_500)
+    const pieces2 = fmp4Requests.filter((r) => r.id === '2' && !/bytes=0-262143/.test(r.range ?? ''))
+    check('song 2 joined the run, 0 ms', [p.player.track.id, e0.srcObject === mediaSources[0], p.gapLine()], ['2', true, 'Last song change 0 ms, in one stream'])
+    check('...every ask of the run still for the resampled copy', fmp4Requests.length > 0 && fmp4Requests.every((r) => r.maxRate === '48000'), true)
+    check('...song 2\'s pieces pinned to its resampled copy\'s ETag', pieces2.length > 0 && pieces2.every((r) => r.ifRange === '"fmp4-2-v1@48000"'), true)
+    const asks = fmp4Requests.length
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(600)
+    const since = fmp4Requests.slice(asks)
+    check('the next tap uses Original: a stream of its own, the hi-res song as it is - no max_rate',
+      [since.length > 0 && since.every((r) => r.maxRate === null), mediaSources.length, e0.srcObject === mediaSources[1], e0.playingNow, p.seekLine()],
+      [true, 2, true, true, 'No seek yet · in one stream, 192 kHz'])
+  }
+
+  console.log('\none stream: a first song deadwax is resampling gets a minute for its head')
+  {
+    const p = streamPage({ durations: { 1: hires192(60), 2: hires192(5) } })
+    net.headerDelay['1'] = 40_000
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(100)
+    delete net.headerDelay['1']
+    warns.length = 0
+    await run(32_000)
+    check('32 s in, its head still on its way: the stream waits on - not the URL way', [e0.srcObject === mediaSources[0], leftStream()], [true, []])
+    await run(10_000)
+    check('its head in at 40 s: it plays, resampled, in the stream', [e0.srcObject === mediaSources[0], e0.playingNow, p.seekLine()], [true, true, 'No seek yet · in one stream, 192 kHz resampled to 48 kHz'])
+  }
+  {
+    const p = streamPage({ durations: { 1: hires192(120), 2: hires192(5) } })
+    net.headerDelay['1'] = 80_000
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(100)
+    delete net.headerDelay['1']
+    await run(55_000)
+    check('55 s: still waiting for it', e0.srcObject === mediaSources[0], true)
+    await run(12_000)
+    check('past a minute: the URL way, the original as it is, relayed at once', [e0.srcObject === null, /\/stream\/1\?format=raw$/.test(e0.getAttribute('src') ?? ''), e0.playingNow], [true, true, true])
+  }
+  {
+    //? the rule is for a song deadwax is asked to resample only: a CD song's slow head is left as before
+    const p = streamPage({ durations: { 1: 60, 2: 5 } })
+    net.headerDelay['1'] = 40_000
+    const [e0] = elements
+    tap(() => p.player.playTracks(hiresTracks(['1', '2']), 0))
+    await run(100)
+    delete net.headerDelay['1']
+    await run(32_000)
+    check('a CD song\'s head 40 s away: the URL way after about 20 s, as it always was', [e0.srcObject === null, /\/stream\/1\?format=raw$/.test(e0.getAttribute('src') ?? ''), e0.playingNow], [true, true, true])
   }
   console.warn = realWarn
 

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'preact/hooks'
 
 import type { FormatPreference } from '../api/types'
+import type { MaxRate } from '../lib/streamWrap'
 
 /**
  * localStorage-backed state.
@@ -36,6 +37,9 @@ export const STORAGE_KEYS = {
   playerOrder: 'deadwax-player-order',
   /** Whether the player's gapless switch is on: 'on', or anything else for off (the default). */
   playerGapless: 'deadwax-player-gapless',
+  /** The player's "Maximum quality": '48000' (the default, and anything unknown) or 'original'.
+   *  The player's own, like its gapless switch. */
+  playerMaxRate: 'deadwax-player-max-rate',
 } as const
 
 /*
@@ -231,6 +235,21 @@ export function readPlayerGapless(): boolean {
 
 export function writePlayerGapless(on: boolean): void {
   writeRaw(STORAGE_KEYS.playerGapless, on ? 'on' : 'off')
+}
+
+/* ===== deadwax-player-max-rate ===== */
+
+/**
+ * The player's "Maximum quality", per device like the gapless switch and for the same reason.
+ * 'original' only when it says exactly that: anything else - nothing stored, an old or mistyped
+ * value, storage that can't be read - is 48 kHz, the setting that keeps a hi-res album gapless.
+ */
+export function readPlayerMaxRate(): MaxRate {
+  return readRaw(STORAGE_KEYS.playerMaxRate) === 'original' ? 'original' : '48000'
+}
+
+export function writePlayerMaxRate(rate: MaxRate): void {
+  writeRaw(STORAGE_KEYS.playerMaxRate, rate)
 }
 
 /* ===== deadwax-preferences ===== */

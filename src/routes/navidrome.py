@@ -247,6 +247,10 @@ async def stream(
     format: str | None = Query(None, pattern=r"^[a-z0-9]{1,10}$"),
     max_bitrate: int | None = Query(None, ge=0, le=3200),
     wrap: Literal["mp4", "fmp4"] | None = None,
+    #? a string, converted below: FastAPI won't take the query's "48000" for the number 48000, and
+    #? a Literal[48000] refuses every request. DECLARED, like everything the page sends - a
+    #? parameter left out is ignored without a word, and the song would come back as it is
+    max_rate: Literal["48000"] | None = None,
 ):
     """
     A song's audio, with the page's byte range and conditions passed through.
@@ -265,6 +269,15 @@ async def stream(
     since the stream can't take the FLAC: the fragments with byte ranges, a 415 saying why when the
     song can't be repackaged, or a 503 saying whether to ask again (`scope`: song or server).
 
+    `max_rate=48000`, with `format=raw` and a `wrap` only (anything else is a 400), is the player's
+    "Up to 48 kHz": a FLAC song above 48 kHz - 88.2 to 384 kHz, at a whole ratio, 16- or 24-bit - is
+    resampled by deadwax to 48 kHz or 44.1 kHz, as 24-bit FLAC in either container, so the gapless
+    stream can take it; its answers say `X-Deadwax-Resampled: <from>-<to>`. Nothing below 20 kHz
+    changes (src/resample.py says how that is kept), and the songs of an album still join exactly,
+    each resampled with its neighbours' samples on one grid (src/album_context.py). Any other song is
+    answered exactly as without it - the same bytes, the same ETag. It is a variant of its own: the
+    same song asked for without it is another file, answered on its own.
+
     `format=raw` is the file as it is, which is the only kind Navidrome can answer a byte range
     for, and the player asks for it for every file the phone can play. It is asked for by name
     because Navidrome answers `raw` before it looks at anything set for this client on its
@@ -275,6 +288,12 @@ async def stream(
 
     Never cached without asking: a retag rewrites a file in place under the same URL.
     """
+    rate = int(max_rate) if max_rate else None
+    if rate is not None and (format != "raw" or wrap is None):
+        #? a transcode has no FLAC to resample, and the FLAC relayed as it is can't be either
+        raise HTTPException(status_code=400, detail="max_rate needs format=raw and wrap=mp4 or wrap=fmp4: only "
+                                                    "the file as it is, repackaged by deadwax, can be resampled")
+
     if wrap == "fmp4":
         if format != "raw":
             #? a transcode has no FLAC frames to put in fragments, and relaying one would feed the
@@ -283,7 +302,7 @@ async def stream(
                                                         "can be repackaged")
         try:
             #? as for the MP4: the phone hanging up is looked for, and cancels the answer
-            return await unless_abandoned(request, player_cache.cache.answer_fragmented(song_id, request))
+            return await unless_abandoned(request, player_cache.cache.answer_fragmented(song_id, request, rate))
         except ClientGone:
             return Response(status_code=204)
         except NavidromeError as e:
@@ -294,7 +313,7 @@ async def stream(
             #? uvicorn never cancels a handler whose phone has gone, so this looks every half second
             #? and cancels the answer itself - which takes the request off the MP4 it waits for, and a
             #? make nobody waits for stops, its download from Navidrome included
-            wrapped = await unless_abandoned(request, player_cache.cache.answer(song_id, request))
+            wrapped = await unless_abandoned(request, player_cache.cache.answer(song_id, request, rate))
         except ClientGone:
             return Response(status_code=204)
         except NavidromeError as e:

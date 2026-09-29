@@ -47,11 +47,12 @@
 import { HEAD_FETCH_BYTES, initBytes, parseHead, piecesInside, type Fmp4Head } from '../lib/fmp4'
 import {
   BODY_STALL_MS, FILL_TO_S, HEADER_TIMEOUT_MS, MANAGED_AHEAD_BYTES, PIECE_MAX_BYTES, PIECE_MAX_SECONDS, PLAIN_AHEAD_BYTES,
-  SOURCEOPEN_TIMEOUT_MS, STUCK_MS, aheadBytes, aheadSeconds, classifyAnswer, covered, formatStreamable, joins,
-  lowerBudget, nextWant, placeSong, rangesOf, retryDelay, shouldFill, songAt, type Answer, type Ranges, type RunSong,
-  type Want,
+  RESAMPLE_HEAD_WAIT_MS, SOURCEOPEN_TIMEOUT_MS, STREAM_MAX_RATE, STUCK_MS, aheadBytes, aheadSeconds, classifyAnswer,
+  covered, formatStreamable, joins, lowerBudget, nextWant, placeSong, rangesOf, retryDelay, shouldFill, songAt,
+  sourceRateOf, type Answer, type Ranges, type RunSong, type Want,
 } from '../lib/streamPlan'
 import type { QueueTrack } from '../lib/playQueue'
+import { resampledFrom, type MaxRate, type Resampled } from '../lib/streamWrap'
 
 /** Why the stream can't go on for a song - the player leaves the stream for it. */
 export type StreamFailure =
@@ -77,21 +78,29 @@ export type StreamFailure =
 export interface StreamEvents {
   /** nothing joins the run after `lastIndex`; known as early as the next song's head says so */
   runEnded(source: StreamSource, lastIndex: number): void
-  /** the song at `index` never streams this page: deadwax won't repackage it or its head can't be read
-   *  (`formatOnly` false - ask for it as the file as it is, too), or only its format keeps it out
-   *  (`formatOnly` true - an MP4 of it for the URL way is fine) */
+  /** the copy of the song at `index` this stream asked for never streams this page: deadwax won't
+   *  repackage it or its head can't be read (`formatOnly` false - that copy isn't asked for the URL
+   *  way either), or only its format keeps it out of a stream under this one's setting (`formatOnly`
+   *  true - an MP4 of it for the URL way is fine) */
   refused(source: StreamSource, index: number, why: string, formatOnly: boolean): void
   /** the song at `index` can't go on in the stream: play it the URL way */
   failed(source: StreamSource, index: number, kind: StreamFailure, why: string): void
   /** deadwax's cache can't be used at all (503, scope server): stop streaming for a while */
   engineOff(source: StreamSource, why: string): void
+  /** the song at `index` has its place in the run - its head is in, and what deadwax did to it known */
+  placed(source: StreamSource, index: number): void
 }
 
 export interface StreamDeps {
-  /** the song's fragmented MP4 */
+  /** the song's fragmented MP4 - asked once per song, for its head; its pieces come from the same */
   urlOf(track: QueueTrack): string
   /** whether a song may join a stream at all, from what the queue knows (FLAC, raw, switch on...) */
   streamable(track: QueueTrack): boolean
+  /** whether its address asks deadwax to resample it - a first head then gets longer to come */
+  resamples(track: QueueTrack): boolean
+  /** the "Maximum quality" setting the stream started with, for its whole life: under "Original" it
+   *  takes a song above 48 kHz as it is (formatStreamable() in lib/streamPlan) */
+  maxRate: MaxRate
   /** whether the listener means the music to be playing - the stuck watchdog asks */
   intendsToPlay(): boolean
 }
@@ -152,6 +161,10 @@ interface Head {
   /** the first bytes as fetched with the head - the first fragment(s) ride along - until used */
   lead: Uint8Array | null
   etag: string
+  /** the address the head came from, which every piece of the song is fetched from too */
+  url: string
+  /** what deadwax says it resampled the song from and to (X-Deadwax-Resampled), or null */
+  resampled: Resampled | null
 }
 
 type HeadState =
@@ -226,6 +239,10 @@ export class StreamSource {
   /** a QuotaExceededError that clearing didn't cure: wait for the playhead to move before trying again */
   private quotaWaitAt: number | null = null
   private lastProgress = { position: -1, at: 0 }
+  /** pump() calls so far - how one call can tell that another ran inside it */
+  private pumps = 0
+  /** when attach() put the stream on the element (performance clock) */
+  private attachedAt = 0
   private timers = new Set<ReturnType<typeof setTimeout>>()
   private readonly elementListeners: [string, EventListener][]
 
@@ -254,6 +271,7 @@ export class StreamSource {
    */
   attach(startAt = 0): void {
     const element = this.element
+    this.attachedAt = performance.now()
     this.ms.addEventListener('sourceopen', () => this.opened())
     if (this.engine.managed) {
       //? before attaching: without it WebKit never opens a ManagedMediaSource at all
@@ -292,6 +310,26 @@ export class StreamSource {
   /** The run's last song, once known. */
   runEnd(): number | null {
     return this.end
+  }
+
+  /** The "Maximum quality" setting the stream started with, which it keeps - see StreamDeps. */
+  get maxRate(): MaxRate {
+    return this.deps.maxRate
+  }
+
+  /** What deadwax resampled the song at `index` from and to, once its head is in - for the readout. */
+  resampled(index: number): Resampled | null {
+    const entry = this.heads.get(index)
+    return entry?.state === 'done' ? entry.head.resampled : null
+  }
+
+  /** The rate of the song at `index` when it streams above 48 kHz as it is ("Original"), once its
+   *  head is in - for the readout, which shows the rate was kept. */
+  hiRes(index: number): number | null {
+    const entry = this.heads.get(index)
+    if (entry?.state !== 'done' || entry.head.resampled) return null
+    const rate = entry.head.head.format.sampleRate
+    return rate > STREAM_MAX_RATE ? rate : null
   }
 
   /** Whether song-relative `seconds` of the placed song at `index` is buffered now. */
@@ -399,7 +437,8 @@ export class StreamSource {
   }
 
   private async loadHead(index: number, track: QueueTrack, entry: Extract<HeadState, { state: 'pending' }>) {
-    const got = await this.get(this.deps.urlOf(track), 0, HEAD_FETCH_BYTES - 1, null, entry.controller)
+    const url = this.deps.urlOf(track)
+    const got = await this.get(url, 0, HEAD_FETCH_BYTES - 1, null, entry.controller)
     if (this.closed || this.heads.get(index) !== entry) return
     const answer = got ? this.judge(got, 0, HEAD_FETCH_BYTES - 1, false) : null
     if (!got || !answer) return
@@ -413,7 +452,8 @@ export class StreamSource {
         return
       }
       const head = parsed.head
-      this.heads.set(index, { state: 'done', head: { head, init: initBytes(head, got.bytes).slice(), lead: got.bytes, etag } })
+      const resampled = resampledFrom(got.headers?.get('X-Deadwax-Resampled') ?? null)
+      this.heads.set(index, { state: 'done', head: { head, init: initBytes(head, got.bytes).slice(), lead: got.bytes, etag, url, resampled } })
       this.place()
       this.pump()
       return
@@ -469,12 +509,12 @@ export class StreamSource {
       if (!entry || entry.state !== 'done') return
       const prev = this.songs[this.songs.length - 1] ?? null
       const { head } = entry.head
-      if (!joins(prev, head)) {
+      if (!joins(prev, head, this.deps.maxRate)) {
         const track = this.tracks[index]
-        //? a format this engine doesn't stream never will; a song that merely differs from the run's
-        //? (44.1 then 48 kHz) can start its own run another time
+        //? a format this engine doesn't stream never will (in a stream started under this setting); a
+        //? song that merely differs from the run's (44.1 then 48 kHz) can start its own run another time
         const why = `${head.format.sampleRate} Hz / ${head.format.bitsPerSample}-bit / ${head.format.channels} channels isn't streamed`
-        const never = !formatStreamable(head.format)
+        const never = !formatStreamable(head.format, this.deps.maxRate)
         if (never) {
           this.heads.set(index, { state: 'gone' })
           this.events.refused(this, index, why, true)
@@ -483,8 +523,20 @@ export class StreamSource {
         else this.fail(index, never ? 'format' : 'refused', `${track?.title ?? 'the song'}: ${why}`)
         return
       }
+      //? The same format out isn't enough when deadwax resampled one of them: a 96 kHz song and a
+      //? 192 kHz one both come out 48 kHz, and so does a 48 kHz song beside a resampled 96 kHz one -
+      //? and deadwax gives neither side of a change of rate the other's samples, so the join would
+      //? click in music that runs on. Only the same SOURCE rate joins; the run ends before the other,
+      //? which starts a run of its own another time, like 44.1 then 48 kHz.
+      const prevEntry = prev ? this.heads.get(prev.index) : undefined
+      if (prev && prevEntry?.state === 'done' &&
+          sourceRateOf(prev.head, prevEntry.head.resampled?.from ?? null) !== sourceRateOf(head, entry.head.resampled?.from ?? null)) {
+        this.endAt(index - 1)
+        return
+      }
       const song = placeSong(prev, index, this.tracks[index]!.id, head)
       this.songs.push(song)
+      this.events.placed(this, index)
       if (this.seek?.stage === 'wait' && this.seek.index === index) this.pump()
     }
   }
@@ -557,6 +609,7 @@ export class StreamSource {
   /** Do the next thing, if nothing is in flight. Called by every event that might have freed it. */
   private pump() {
     if (this.busy()) return
+    const pass = ++this.pumps
     if (this.cutAt !== null) {
       const from = this.cutAt
       this.cutAt = null
@@ -581,6 +634,10 @@ export class StreamSource {
     const ranges = this.buffered()
     const want = nextWant(this.songs, ranges, t, { maxBytes: this.pieceMax, maxSeconds: PIECE_MAX_SECONDS })
     this.lookAhead(want?.song ?? songAt(this.songs, t), want)
+    //? lookAhead can end the run, and endAt pumps: that pump has done this one's work already, with
+    //? what it found - carrying on here would act on `want` as it was before, and fetch again the
+    //? fragments that came with the last song's head (every album's last song did)
+    if (this.pumps !== pass) return
     if (!want) {
       this.maybeEnd(t, ranges)
       return
@@ -609,7 +666,7 @@ export class StreamSource {
     if (this.fetching || this.retry) return
     const entry = this.heads.get(want.song.index)
     if (!entry || entry.state !== 'done') return
-    const { lead, etag } = entry.head
+    const { lead, etag, url } = entry.head
     if (lead) {
       //? the fragments that rode along with the head are appended from it: a first piece of a CD song
       //? runs past the 256 KiB, and asking for all of it again would fetch those bytes twice
@@ -628,8 +685,8 @@ export class StreamSource {
     }
     const controller = new AbortController()
     this.fetching = { controller, want }
-    const track = this.tracks[want.song.index]!
-    void this.get(this.deps.urlOf(track), want.start, want.end - 1, etag, controller).then((got) => {
+    //? from the address its head came from: what the run was started with, whatever is asked now
+    void this.get(url, want.start, want.end - 1, etag, controller).then((got) => {
       if (this.closed || this.fetching?.controller !== controller) return
       this.fetching = null
       if (!got) return
@@ -649,11 +706,12 @@ export class StreamSource {
     const index = want.song.index
     if (answer.kind === 'changed' || answer.kind === 'refused' || answer.kind === 'fatal' || answer.kind === 'engine-off') {
       if (answer.kind === 'engine-off') this.events.engineOff(this, "deadwax's cache for the player can't be used")
+      //? a refusal is said as one first, whichever song it is - the player keeps it by the copy asked for
+      if (answer.kind === 'refused') this.events.refused(this, index, whyOf(answer), false)
       //? a LATER song that can't be had, while the song playing still has music: the run ends before
       //? it, and it plays the URL way at its turn - the song playing is never cut short for it
       const playing = songAt(this.songs, this.element.currentTime)
       if (playing && index > playing.index && !this.waitingOn(want)) {
-        if (answer.kind === 'refused') this.events.refused(this, index, whyOf(answer), false)
         this.cutAt = want.song.start
         this.endAt(index - 1)
         return
@@ -880,7 +938,7 @@ export class StreamSource {
     this.progressed()
     const idle = !this.fetching && !this.retry && this.op === null && !this.piece && this.rest.length === 0
     const stuck = this.deps.intendsToPlay() && !this.element.paused && performance.now() - this.lastProgress.at > STUCK_MS
-    if (stuck && idle) {
+    if (stuck && idle && !this.resampling()) {
       //? at the very end of the last placed song, it is that song that can't go on
       const t = this.element.currentTime
       const last = this.songs[this.songs.length - 1]
@@ -890,6 +948,17 @@ export class StreamSource {
     }
     this.pump()
     this.later(5000, () => this.watch())
+  }
+
+  /**
+   * The run's first head still on its way for a song deadwax was asked to resample, within
+   * RESAMPLE_HEAD_WAIT_MS of the start: nothing moves while deadwax makes it, and that is not stuck.
+   * Past it, the song goes the URL way - as the file as it is, relayed at once - like any other.
+   */
+  private resampling(): boolean {
+    if (this.songs.length > 0 || this.heads.get(this.startIndex)?.state !== 'pending') return false
+    const track = this.tracks[this.startIndex]
+    return !!track && this.deps.resamples(track) && performance.now() - this.attachedAt < RESAMPLE_HEAD_WAIT_MS
   }
 
   private fail(index: number, kind: StreamFailure, why: string) {

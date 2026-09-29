@@ -138,6 +138,11 @@ src/
                    already on disk. Same plan/execute split, for the same reasons.
   scan_wait.py     PURE. Whether Navidrome has finished a scan that began after an apply's
                    tags were written, so the folder can be renamed - see "The scan wait".
+  resample.py      a hi-res FLAC resampled to 48/44.1 kHz, 24-bit FLAC, with its album neighbours' edges
+                   on one grid so joins stay exact; numpy/soxr/soundfile, imported lazily. See
+                   "Maximum quality: hi-res resampled to 48 kHz".
+  album_context.py which songs sit beside a song on its album, the grid phase, and their edges, from
+                   Navidrome - for resample.py.
   flac_mp4.py      PURE. A FLAC file as an MP4 of the very same frames, no ffmpeg - what makes
                    Safari's seeks land. See "FLAC in an MP4, for Safari". And as a FRAGMENTED
                    MP4, `fmp4_layout()`, for the gapless stream - see "One stream for FLAC".
@@ -178,8 +183,9 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one;
                    player/streamSource.ts is its one-stream gapless engine, with the pure
-                   lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC".
-tests/             1457 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+                   lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC"; player/Settings.tsx
+                   is its settings sheet (Maximum quality).
+tests/             1652 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -3282,6 +3288,134 @@ wrote a failing scenario first. Everything confirmed was fixed:
   join rule), and the tick before play (progressed-while-paused, since the sim's timers run). Three
   new tests in test_player_cache.py catch the three server mutations.
 
+#### Maximum quality: hi-res resampled to 48 kHz (1.1.0-player.6)
+
+James, on 24/192 Dark Side of the Moon never going into the one stream (formatStreamable admitted 48
+kHz and below): "let's transcode it down to 48khz and push that under one condition. I don't want to
+lose any sound quality ... let's make it a setting in the app, a maximum stream quality." Then: "if
+it's possible to keep 24/192, obviously that would be preferrable". The guide's section is
+`docs/player.md#maximum-quality-hi-res-at-48-khz`. The design, the research and every measurement are
+in the session scratchpad's `resample/` (SPEC.md, research_ios.md, research_libs.md, verify_audio.md,
+review_confirmed.md); what matters is below.
+
+- **The setting**: `deadwax-player-max-rate` ('48000', the default and anything invalid, or
+  'original'), per device like the Gapless switch, in a sheet from the gear beside the Library title
+  (`ui/src/player/Settings.tsx`, `role="radiogroup"`, focus kept and returned - WebKit doesn't focus a
+  tapped button, so the gear focuses itself first). It applies from the next song started or got
+  ready; a stream keeps the setting it started with (its `urlOf`, `streamable` and format gate are
+  fixed at `startStream`), and `fitStandby()` lets go of a standby readied at an address that changed.
+- **What is resampled, and the one rule both sides share**: FLAC at 88.2/176.4/352.8 kHz -> 44.1 and
+  96/192/384 -> 48 (whole ratios 2, 4, 8 only), 16 or 24 bits (libsndfile 1.2.2 can't open 20- or
+  32-bit FLAC), 1-2 channels. `RESAMPLED_TO` exists in `src/resample.py` AND `ui/src/lib/streamWrap.ts`
+  (`resamples()`); keep them in step. The page knows a song's rate from Navidrome's OpenSubsonic
+  `samplingRate`/`bitDepth`/`channelCount` on getAlbum's songs (read in Navidrome's source:
+  osChildFromMediaFile, sent to every client not listed as legacy) and asks with `max_rate=48000`:
+  `wrap=mp4&max_rate=48000` in ANY browser (Chromium plays FLAC in MP4) and the stream's
+  `wrap=fmp4&max_rate=48000`. A song with no rate from Navidrome is asked as before. The server reads
+  STREAMINFO and decides; a song it doesn't resample is answered from the SAME file, same ETag, as
+  without max_rate.
+- **Why this keeps the condition (research_ios.md, with sources)**: Apple says an iPhone plays at most
+  24/48 natively; speaker, AirPods (lossy AAC anyway), Apple's adapters and AirPlay run at 44.1/48, so
+  iOS converts hi-res itself - and its conversion of a 96 kHz file was measured rolling off 3.5-4.5 dB
+  near 20 kHz (older iOS). WebKit never calls setPreferredSampleRate, so whether a USB DAC ever gets a
+  song's own rate from Safari is unknown - "Original" is for that. libsoxr VHQ in float64, measured
+  independently (verify_audio.md): 20 Hz-20 kHz within 7e-9 dB and 6e-10 rad, no delay, polarity kept,
+  -0.01 dB at 22.24 kHz (20.44 at 44.1), aliasing >= 184 dB down, 24-bit rounding +-0.5 LSB, matching
+  a from-scratch float64 sinc and ffmpeg swr to the last bit. Undithered on purpose (deterministic,
+  lowest total noise; spurs at -152 dBFS at worst, 30 dB under any DAC).
+- **3 dB of headroom on every resampled song (`HEADROOM_DB`), never a per-song gain.** Removing the
+  ultrasonics pushes a hard-clipped master's peaks past full scale: measured 0.77-1.73 dB at 6 dB of
+  clipping, up to 2.87 at 12, one stretch of a real 24/192 recording clipped 18 dB at 3.11. The first
+  cut lowered only the songs that went over, by exactly enough - and every join between a lowered
+  song and an unlowered neighbour then stepped by that gain (about 11 % of the waveform at 1 dB, a
+  tick). One fixed gain for every song keeps the joins exact and costs level only, which is what the
+  phone's own float volume stage does when it converts hi-res itself. A song past even 3 dB gets a
+  second pass, lowered exactly enough, and a WARNING naming the step at its joins. The headroom is in
+  the cache key. Don't "tidy" it back to a per-song gain, and say so to James if he asks why 48 kHz
+  is quieter: match levels before comparing.
+- **The joins: context and one grid.** Resampling a song on its own treats the silence around it as
+  music - measured -24 to -6 dB error at every join of continuous music. So each song is resampled
+  with the last 16384 input samples of the album's song before and the first 16384 of the song after
+  (enough at 8:1; 1024 does at 2 and 4), on ONE grid for the album: phase = `(-earlier) % ratio`
+  (the NEGATIVE of the earlier same-rate tracks' total samples - the plus sign joins at -14.7 dB, one
+  sample long), output count `ceil((N - phase)/ratio)` (soxr alone gives floor(N/ratio + 1/2), so
+  zeros are flushed after), next phase `(phase - N) % ratio`. Then the songs concatenate to one
+  resample of the whole album: -207 dB (float64), 31 of 32 joins 0 LSB within 10 ms, the rest 1 LSB.
+  `src/album_context.py` finds the album through the client's internal calls (getSong, getAlbum,
+  STREAMINFO by small range reads - NOT player routes; test_there_is_no_general_proxy is unchanged),
+  single-flight per (version, cap), sticky when Navidrome hiccups, bounded on the cache's clock. A
+  song Navidrome answers for but won't serve is off the grid; Navidrome not answering at all means
+  the song is resampled alone, logged once.
+- **A made file is keyed by the context it actually got.** The plan (phase, neighbours) is in the
+  cache key; a neighbour read that failed during the make used to leave a clicking file under the key
+  promising that context, for good, and a later re-make put different bytes under the same ETag.
+  Now the file is stored under the plan with that side removed, and that make is remembered for
+  `LOST_SECONDS` (10 minutes): every fresh start in that time is that file, with no context read,
+  and a play after it tries again. Ten minutes, not VERSION_SECONDS, because the re-check found both
+  ends of a 30 s memory wrong: a song got ready minutes ahead (the standby, the warm-up) began on
+  the file made without the side, then the handover's readout probe made it again WITH the side and
+  Safari's element carried on into the new file at the old offsets; and a neighbour whose reads
+  always time out cost a 10 s wait at every song change. The pins keep up to `PIN_FILES_KEPT` (4)
+  fragmented MP4s per URL, so two phones on the two files of one song each stay on their own. A
+  stream copy that isn't whole (cut short) is cleared and the MP4 made the ordinary way, never
+  refused for it.
+- **Context decoding goes through soundfile's PUBLIC API**: whole frames found with flac_mp4's header
+  rules plus next number plus CRC-16, put in a minimal FLAC of their own ('fLaC', STREAMINFO as the
+  only block with total_samples = those frames' samples and the MD5 zeroed, the frames untouched and
+  numbered wherever they are). A raw prefix or a tail with the original STREAMINFO fails in libsndfile
+  ('lost sync', 'psf_fseek failed'); the rebuilt one was exact in 1120 randomised decodes. The frame
+  search has a false-sync budget like flac_mp4's: without it a crafted neighbour made the search
+  quadratic - measured 27 s at a 16 KB frame and days at what CONTEXT_READ_MAX allows, in worker
+  threads that `wait_for` abandons but can't stop.
+- **The make** (`src/player_cache.py`): download, context (outside both gates), the resample under its
+  OWN lock (a resample holds a block, not the song, and can run a minute on a NAS - another phone's
+  50 ms repackage mustn't wait behind it), then the repackage under the old gate; cancellable through
+  a threading.Event set by `_to_the_end`. The resampled FLAC is written through Python's own file,
+  since libsndfile by path raised RuntimeError mid-file on a full disk and NOTHING at the last frame
+  (a truncated FLAC); refused writes surface as ENOSPC, so the old retry clears room and resamples once
+  more. WRAP_MAX_BYTES and the cap's reservation are judged by the estimated OUTPUT (the source streams
+  from disk). A song damaged part-way is refused and remembered. An MP4 of a resampled song whose fMP4
+  is cached is made FROM the fMP4 ('fLaC' + dfLa STREAMINFO + the frames) - no download, no resample -
+  which is what lets leaving the stream carry a resampled song on at the same level.
+  `X-Deadwax-Resampled: 192000-48000` rides on every answer of a resampled file (200, 206, 416);
+  `_answered`/`_pinned` are keyed by (song, cap), and Chromium's `bytes=0-` long after the URL's last
+  answer is a fresh start, not a carry-on. numpy/soxr/soundfile are imported lazily: without them
+  max_rate is ignored, logged once, and the resample tests skip - except one that fails when CI is
+  set, so CI can't skip them silently.
+- **The page**: the stream joins only across the same SOURCE rate (the header's `from`, else the head's
+  own rate): a 96 kHz song and a 192 kHz one both come out 48 kHz with no context between them. Under
+  "Original" hi-res FLAC (1-2 ch, 16/24, up to 384 kHz) joins the stream as it is - an iPhone holds
+  ~8 s of 24/192, so it runs ~4-5 s ahead; a first-of-run decode failure at that rate keeps the song
+  out of Original streams only, not refused. A resampled first song's pending head gets
+  `RESAMPLE_HEAD_WAIT_MS` (60 s) before the stuck watchdog gives up. With the Gapless switch off or
+  while AirPlaying, nothing got the next song ready, so every hi-res change waited for a whole make:
+  `warmSoon()` holds a `bytes=0-1` ask for the next song's resampled copy from 3 s into each song
+  (held, since a make nobody waits for is cancelled). The warm-up is kept while its song is next and
+  resampled, whoever else asks for it, so the standby's download joins the same make; it is let go
+  when a stream will play the song; and when AirPlay starts while the standby downloads, the warm-up
+  takes the make over by asking AT ONCE (`warmSoon(0)` doesn't wait a tick), since deadwax may notice
+  the standby's hang-up at any moment of its half-second check - the sim's `makeGraceMs: 0` pins that
+  ordering. A refused resampled copy falls back to the
+  song's ORIGINAL address (its MP4 in Safari), not the raw FLAC. Readout: ` · in one stream, 192 kHz
+  resampled to 48 kHz`, ` · FLAC in MP4, 192 kHz resampled to 48 kHz`, ` · in one stream, 192 kHz`.
+- **Found in the real page, fixed with it**: every album's LAST song fetched again the fragments its
+  head had brought - lookAhead ends the run, endAt pumps, and the outer pump then acted on a stale
+  want. `pump()` counts its calls and stops when another ran inside it; a sim check fails without it.
+- **Reviewed**: four lenses and a skeptic per finding; 25 confirmed and fixed (the context-keyed
+  files, the false-sync budget, the warm-ahead and the level jump on leaving the stream were the four
+  major), each with a test that fails without it.
+- **Verified in the real page** (Chromium, the stub Navidrome with a continuous 24/192 album split at
+  non-multiples of 4 samples, deadwax with the audio libraries): under Up to 48 kHz every head asked
+  `max_rate=48000` and came back `192000-48000`, each song resampled in about 0.1 s, the joins read
+  0 ms, and recorded through Web Audio the tone came out at exactly -3 dB with the residual at both
+  joins -93 dB, the same as mid-song (a click would be -10 to -30); under Original, full level, no
+  header, joins -95.7 dB, the readout `in one stream, 192 kHz`. The settings sheet checked with real
+  clicks and keys.
+- **NOT verified - the phone's**: any of it on an iPhone; how long the first song waits on the NAS;
+  whether an iPhone streams 24/192 FLAC at all under Original; the image's real size with the wheels
+  (numpy 2.5.3, soxr 1.1.0, soundfile 0.14.0, cffi, pycparser: about 75 MB installed, measured
+  outside docker - python:3.14-slim already has libstdc++6, libgcc-s1 and zlib1g).
+
 ### Artists who have renamed (v0.6.18)
 
 James: "so Ye shows up as Kanye, that seems like a gap somewhere" - and then "I want to make
@@ -4599,7 +4733,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1457 tests
+.venv/bin/python -m pytest tests/ -q  # 1652 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -4630,6 +4764,7 @@ node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks 
 node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (WebKit, not Chromium), which songs, what the readout says
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
+node ui/test/settings.sim.cjs   # the settings sheet - focus given back as WebKit needs, the two notes word for word
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -4650,7 +4785,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1457 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1652 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

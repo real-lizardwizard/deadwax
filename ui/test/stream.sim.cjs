@@ -10,7 +10,9 @@
  * needs never fetched because an eviction left a hole the bookkeeping didn't know about; the same
  * bytes fetched over and over after a seek back; a buffer filled past what iOS allows; a partial
  * answer appended at the wrong place; a stream kept going after the file changed under it; or a
- * song counted as heard twice across a join.
+ * song counted as heard twice across a join. And, since "Maximum quality", which songs are known to
+ * be kept out before deadwax is asked for a copy the head's check would only refuse, and the source
+ * rate a join is judged by when deadwax resampled a song.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -32,8 +34,10 @@ const plan = require(path.join(OUT, 'lib/streamPlan.js'))
 const {
   formatStreamable, joins, placeSong, songAt, fragmentAt, fragmentSpan, rangesOf, covered, aheadSeconds,
   nextWant, aheadBytes, shouldFill, lowerBudget, classifyAnswer, retryDelay, streamable, splitAcrossJoin, joinStallMs,
+  knownFormatOut, sourceRateOf, streamMaxRate, STREAM_MAX_RATE, ORIGINAL_MAX_RATE,
   PIECE_MAX_BYTES, PIECE_MAX_SECONDS, REFILL_BELOW_S, FILL_TO_S, MANAGED_AHEAD_BYTES, PLAIN_AHEAD_BYTES,
   RETRY_DELAYS_MS, RETRY_AFTER_MAX_MS, HEADER_TIMEOUT_MS, BODY_STALL_MS, SOURCEOPEN_TIMEOUT_MS, STUCK_MS, ENGINE_OFF_MS,
+  RESAMPLE_HEAD_WAIT_MS,
 } = plan
 const { LISTEN_SLACK_SECONDS } = require(path.join(OUT, 'lib/playQueue.js'))
 
@@ -84,7 +88,8 @@ check('CD: 44.1 kHz, 16-bit, stereo', formatStreamable(CD), true)
 check('48 kHz, 24-bit, stereo (the phone lab played it)', formatStreamable({ sampleRate: 48000, channels: 2, bitsPerSample: 24 }), true)
 check('mono', formatStreamable({ ...CD, channels: 1 }), true)
 check('32 kHz', formatStreamable({ ...CD, sampleRate: 32000 }), true)
-//? above 48 kHz the sample entry holds a clamped rate no engine has been seen to play
+//? a stream started under 48 kHz (the setting's default, and when none is said) takes nothing above
+//? it as it is: its hi-res songs arrive resampled
 check('88.2 kHz: no', formatStreamable({ ...CD, sampleRate: 88200 }), false)
 check('96 kHz: no', formatStreamable({ ...CD, sampleRate: 96000, bitsPerSample: 24 }), false)
 check('48001 Hz: no', formatStreamable({ ...CD, sampleRate: 48001 }), false)
@@ -95,6 +100,22 @@ check('8-bit: no', formatStreamable({ ...CD, bitsPerSample: 8 }), false)
 check('20-bit: no', formatStreamable({ ...CD, bitsPerSample: 20 }), false)
 check('32-bit: no', formatStreamable({ ...CD, bitsPerSample: 32 }), false)
 check('no rate: no', formatStreamable({ ...CD, sampleRate: 0 }), false)
+check('the same when the stream says it started under 48 kHz', formatStreamable({ ...CD, sampleRate: 96000, bitsPerSample: 24 }, '48000'), false)
+
+//? a stream started under "Original" takes a song above 48 kHz as it is, up to 384 kHz - each stream
+//? keeps the setting it started with, and one under 48 kHz gets its hi-res songs resampled
+const HIRES = { sampleRate: 192000, channels: 2, bitsPerSample: 24 }
+check('the highest rate a stream takes, by its setting', [streamMaxRate('48000'), streamMaxRate('original'), STREAM_MAX_RATE, ORIGINAL_MAX_RATE],
+  [48000, 384000, 48000, 384000])
+check('Original: 192 kHz, 24-bit, stereo', formatStreamable(HIRES, 'original'), true)
+check('Original: 88.2, 96, 176.4, 352.8 and 384 kHz', [88200, 96000, 176400, 352800, 384000].map((sampleRate) => formatStreamable({ ...HIRES, sampleRate }, 'original')),
+  [true, true, true, true, true])
+check('Original: a rate between the whole ratios too (64 kHz)', formatStreamable({ ...HIRES, sampleRate: 64000 }, 'original'), true)
+check('Original: 16-bit and mono', [formatStreamable({ ...HIRES, bitsPerSample: 16 }, 'original'), formatStreamable({ ...HIRES, channels: 1 }, 'original')], [true, true])
+check('Original: a CD song still', formatStreamable(CD, 'original'), true)
+check('Original: 384001 Hz and 705.6 kHz: no', [384001, 705600].map((sampleRate) => formatStreamable({ ...HIRES, sampleRate }, 'original')), [false, false])
+check('Original: six channels, 20 bits, 32 bits: no', [{ channels: 6 }, { bitsPerSample: 20 }, { bitsPerSample: 32 }].map((f) => formatStreamable({ ...HIRES, ...f }, 'original')),
+  [false, false, false])
 
 /* ========================================================================== */
 console.log('\nwhich songs join a run')
@@ -110,6 +131,15 @@ console.log('\nwhich songs join a run')
   //? the same format on another clock: the placement would count in two different units
   check('the same format on another timescale ends it', joins(first, head([[1000, 100]], CD, 1000)), false)
   check('a format that can\'t stream ends it even after a streamable run', joins(first, song(4, 1000, { ...CD, channels: 6 })), false)
+}
+{
+  const hires = (seconds, sampleRate = 192000) => song(seconds, 700_000, { sampleRate, channels: 2, bitsPerSample: 24 })
+  const [first] = run([hires(3)])
+  check('under Original a 192 kHz song starts a run', joins(null, hires(3), 'original'), true)
+  check('...under 48 kHz it can\'t, as it is', joins(null, hires(3), '48000'), false)
+  check('...and another 192 kHz song joins it', joins(first, hires(4), 'original'), true)
+  check('...a 96 kHz one ends it: another rate, another timescale', joins(first, hires(4, 96000), 'original'), false)
+  check('...so does a CD song after it', joins(first, song(4), 'original'), false)
 }
 
 /* ========================================================================== */
@@ -403,8 +433,45 @@ console.log('\nwhich songs may go into a stream')
 {
   const yes = { gapless: true, engine: true, isFlac: true, raw: true, wireless: false, refused: false, engineOff: false }
   check('the switch on, an engine, a FLAC as it is, no AirPlay, never refused, the engine on', streamable(yes), true)
-  const noes = { gapless: false, engine: false, isFlac: false, raw: false, wireless: true, refused: true, engineOff: true }
+  const noes = { gapless: false, engine: false, isFlac: false, raw: false, wireless: true, refused: true, engineOff: true, formatOut: true }
   for (const key of Object.keys(noes)) check(`...except ${key} ${noes[key]}`, streamable({ ...yes, [key]: noes[key] }), false)
+  check('...and a question that says nothing of its format is a yes, as before', streamable({ ...yes, formatOut: false }), true)
+}
+
+/* ========================================================================== */
+console.log('\nwhat the queue already knows of a song\'s format')
+
+//? Navidrome's samplingRate, bitDepth and channelCount, 0 where it didn't say - a song that can't
+//? stream is known without asking deadwax for a copy the head's check would only refuse
+check('a CD song', knownFormatOut({ sampleRate: 44100, bitDepth: 16, channels: 2 }, false), false)
+check('48 kHz, 24-bit', knownFormatOut({ sampleRate: 48000, bitDepth: 24, channels: 2 }, false), false)
+check('96 kHz as it is, in a stream under 48 kHz (a copy deadwax refused)', knownFormatOut({ sampleRate: 96000, bitDepth: 24, channels: 2 }, false), true)
+check('96 kHz resampled: deadwax\'s copy is 48 kHz, 24-bit', knownFormatOut({ sampleRate: 96000, bitDepth: 24, channels: 2 }, true), false)
+check('six channels, resampled or not', [false, true].map((resampled) => knownFormatOut({ sampleRate: 48000, bitDepth: 24, channels: 6 }, resampled)), [true, true])
+check('20 bits, not resampled', knownFormatOut({ sampleRate: 44100, bitDepth: 20, channels: 2 }, false), true)
+check('...32 bits', knownFormatOut({ sampleRate: 44100, bitDepth: 32, channels: 2 }, false), true)
+check('...a resampled copy is 24-bit whatever it came from', knownFormatOut({ sampleRate: 96000, bitDepth: 20, channels: 2 }, true), false)
+check('mono', knownFormatOut({ sampleRate: 44100, bitDepth: 16, channels: 1 }, false), false)
+check('nothing said (all 0): the head decides', knownFormatOut({ sampleRate: 0, bitDepth: 0, channels: 0 }, false), false)
+check('no fields at all (a track built before them): the head decides', knownFormatOut({}, false), false)
+//? a stream under "Original" takes a hi-res song as it is: only what it can't take is known out
+check('Original: 192 kHz, 24-bit, as it is - in', knownFormatOut({ sampleRate: 192000, bitDepth: 24, channels: 2 }, false, 'original'), false)
+check('Original: 384 kHz, 16-bit - in', knownFormatOut({ sampleRate: 384000, bitDepth: 16, channels: 2 }, false, 'original'), false)
+check('Original: 705.6 kHz - out', knownFormatOut({ sampleRate: 705600, bitDepth: 24, channels: 2 }, false, 'original'), true)
+check('Original: six channels at 192 kHz - out', knownFormatOut({ sampleRate: 192000, bitDepth: 24, channels: 6 }, false, 'original'), true)
+check('Original: 20 bits and 32 bits at 192 kHz - out', [20, 32].map((bitDepth) => knownFormatOut({ sampleRate: 192000, bitDepth, channels: 2 }, false, 'original')), [true, true])
+check('Original: nothing said - the head decides', knownFormatOut({}, false, 'original'), false)
+check('48 kHz named as the setting: 96 kHz as it is - out', knownFormatOut({ sampleRate: 96000, bitDepth: 24, channels: 2 }, false, '48000'), true)
+
+/* ========================================================================== */
+console.log('\nthe rate a song had before deadwax made its copy')
+
+{
+  const hires48 = head([[4096, 20000]], { sampleRate: 48000, channels: 2, bitsPerSample: 24 })
+  check('what deadwax says it resampled from', sourceRateOf(hires48, 192000), 192000)
+  check('...another song from 96 kHz comes out the same, and is told apart', sourceRateOf(hires48, 96000), 96000)
+  check('no header: the head\'s own rate', sourceRateOf(hires48, null), 48000)
+  check('a CD song', sourceRateOf(head([[4096, 12000]]), null), 44100)
 }
 
 /* ========================================================================== */
@@ -444,6 +511,7 @@ check('ahead: 3 MiB managed, 8 MiB plain', [MANAGED_AHEAD_BYTES, PLAIN_AHEAD_BYT
 check('the managed budget and a piece stay under iOS\'s 5.26 MiB cap', MANAGED_AHEAD_BYTES + PIECE_MAX_BYTES < 5.26 * (1 << 20), true)
 check('timers: a 90 s header wait, an 8 s stalled body, 5 s to open, 15 s stuck, 10 min off',
   [HEADER_TIMEOUT_MS, BODY_STALL_MS, SOURCEOPEN_TIMEOUT_MS, STUCK_MS, ENGINE_OFF_MS], [90_000, 8_000, 5_000, 15_000, 600_000])
+check('a first song deadwax resamples gets a minute for its head - still inside the header wait', [RESAMPLE_HEAD_WAIT_MS, RESAMPLE_HEAD_WAIT_MS < HEADER_TIMEOUT_MS], [60_000, true])
 check('Retry-After honoured up to 30 s', RETRY_AFTER_MAX_MS, 30_000)
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

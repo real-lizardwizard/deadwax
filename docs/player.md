@@ -128,10 +128,13 @@ pieces of a few seconds, keeping about 30 seconds ahead of what you're hearing.
   played the other way goes the other way too, and the next tap starts a stream again. A new
   stream has to open and fetch before iOS lets a page that isn't playing go to sleep, so it waits
   for you.
-- **The songs have to match**: FLAC, up to 48 kHz, one or two channels, 16 or 24 bits, and all of
-  one format. The stream ends before a song that isn't FLAC (an MP3, an Opus file), a hi-res song
-  above 48 kHz, or a song of another sample rate than the ones before it. That song plays from the
-  second player, with the usual short change, and the stream picks up again at your next tap.
+- **The songs have to match**: FLAC, one or two channels, 16 or 24 bits, and all of one format, from
+  files of one sample rate. Hi-res songs join too: resampled to 48 kHz under
+  [Maximum quality](#maximum-quality-hi-res-at-48-khz)'s default, or as they are under "Original".
+  The stream ends before a song that isn't FLAC (an MP3, an Opus file), a song with more than two
+  channels, or a song from a file of another sample rate than the ones before it (a 96 kHz song
+  after 192 kHz ones, even though both come out at 48 kHz). That song plays from the second player,
+  with the usual short change, and the stream picks up again at your next tap.
 - **Next, Previous and the scrubber** move inside the stream when the song is in it. As the stream
   crosses into a song, the lock screen shows that song's title, cover and its own position, and
   plays are counted song by song as usual.
@@ -143,7 +146,8 @@ pieces of a few seconds, keeping about 30 seconds ahead of what you're hearing.
   repackage a song, the connection drops for longer than the stream holds, the browser can't play
   what it was sent), the song you're hearing carries on the other way from where it had got to. It
   comes as the FLAC file as it is, so in Safari a seek in that one song can land a little off (see
-  [Seeking](#seeking-and-where-safari-lands)). A later song that can't be had just ends the stream
+  [Seeking](#seeking-and-where-safari-lands)). A resampled song carries on resampled instead, at the
+  same level, in an MP4 deadwax makes at once from the stream's copy. A later song that can't be had just ends the stream
   before it, and plays from the second player at its turn: the song you're hearing isn't cut
   short. Three failures in a row with no stream getting as far as playing in between, or
   deadwax's cache being unusable, turn streaming off for 10 minutes; the second player is used
@@ -213,7 +217,10 @@ silence it really is.
 | `…, failed before playing` | the new song failed before it made a sound, and the time includes asking for it again (or skipping it) |
 | `one element (airplay)` | the switch is on but the change went the ordinary way; also `nothing ready`, `failed to get ready`, `another song ready`, `refused` |
 
-The **Last seek** line under it ends ` · in one stream` while the song is playing in a stream.
+The **Last seek** line under it ends ` · in one stream` while the song is playing in a stream. For a
+hi-res song it also says what happened to its rate: ` · in one stream, 192 kHz resampled to 48 kHz`
+(or ` · FLAC in MP4, 192 kHz resampled to 48 kHz` when it played the other way), or
+` · in one stream, 192 kHz` when it streamed as it is under "Original".
 
 Only songs ending by themselves are timed, and only when the next one went straight to sound.
 Changes you make yourself (**Next**, **Previous**, a new song, moving the scrubber, pressing play)
@@ -241,11 +248,80 @@ second player's song changes took about 98 ms there against about 145 ms with th
 3. From the app and from the lock screen, try **Next**, **Previous** and the scrubber, and seek
    back to near the start of a song that played a few minutes ago.
 4. Try **AirPlay** while a stream plays: the song should carry on and the list of speakers open.
-5. Play an album with an MP3 or a hi-res song in the middle. The stream should end before it,
-   that song play from the second player, and a tap start a stream again after it.
+5. Play an album with an MP3, or a song of another sample rate, in the middle. The stream should
+   end before it, that song play from the second player, and a tap start a stream again after it.
 6. Pause for a minute or two and carry on, from the app and from the lock screen. After a long
    pause on the lock screen, iOS may not let play work until you open the app; that isn't the
    stream (see [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened)).
+7. Play a 24/192 album whose tracks run into each other, from a tap, with
+   [Maximum quality](#maximum-quality-hi-res-at-48-khz) at **Up to 48 kHz**. The first song may
+   take a few seconds to start (that's deadwax resampling it). After that the Last seek line should
+   end `in one stream, 192 kHz resampled to 48 kHz`, the song changes read `in one stream`, and
+   you shouldn't hear the joins, locked or not. Then try **Original**: the line ends `in one
+   stream, 192 kHz`. Listen for the music stalling on a weaker connection, and match the volume
+   before comparing, since resampled songs are 3 dB quieter.
+
+## Maximum quality: hi-res at 48 kHz
+
+The **Settings** button (the gear beside **Library** at the top of your albums) opens **Maximum
+quality**, with two choices. Like the Gapless switch, it's kept on the device.
+
+- **Up to 48 kHz** (the default): FLAC songs at 88.2, 96, 176.4, 192, 352.8 or 384 kHz, 16 or 24
+  bits, are resampled by deadwax to 48 kHz (44.1 kHz for the 88.2 kHz family) and sent as lossless
+  24-bit FLAC. They then join the gapless stream like any CD-quality album, which a 24/192 album
+  couldn't before. Every other song is sent exactly as before, bit for bit.
+- **Original**: songs above 48 kHz are sent as they are. With the Gapless switch on, FLAC ones join
+  the stream too, as they are. An iPhone can only hold about 5 MB of a stream at a time, which is
+  8 seconds or so of 24/192, so the stream runs only 4 or 5 seconds ahead of you: a weak connection
+  can make these songs stall where 48 kHz ones wouldn't.
+
+**Why 48 kHz loses nothing you can hear on an iPhone.** Apple says an iPhone plays at most 24-bit/48
+kHz, and that anything higher needs an external DAC. Its speaker, AirPods (which get lossy AAC over
+Bluetooth anyway), Apple's Lightning and USB-C headphone adapters, and AirPlay all run at 44.1 or 48
+kHz, so the phone converts a 192 kHz song down itself before you hear it, whatever deadwax sends.
+The only question is which conversion you get:
+
+- deadwax's uses libsoxr's highest-quality setting. It is flat to within 0.01 dB up to 22.2 kHz
+  (20.4 kHz for 44.1 kHz), changes 20 kHz by less than 0.0000001 dB, adds no delay and keeps the
+  phase. It keeps 24 bits (the rounding is 144 dB below full scale) and aliasing at least 184 dB
+  down. Measured against two independent references, it matches to the last bit.
+- iOS's own conversion of a 96 kHz file was measured rolling off 3.5 to 4.5 dB near 20 kHz (on
+  older iOS versions; nothing newer has been measured).
+
+What 48 kHz does remove is everything above about 22 kHz, where human hearing stops (in the
+best-known study, a 24 kHz tone was heard only at 88 dB or louder, and nothing above 26 kHz at all).
+The one place 192 kHz might reach your ears is a USB DAC running at the song's own rate. Whether
+Safari on an iPhone ever asks for that isn't known (WebKit never asks the phone for a sample rate),
+so "Original" stays, if you have one to try it with.
+
+**Resampled songs are 3 dB quieter.** Taking out the ultrasonics can push a loud master's peaks
+past full scale. Measured on masters clipped hard when they were made, it was up to 2.9 dB over.
+So every resampled song is lowered by the same 3 dB. That leaves room so nothing clips, and because
+every song of an album gets the same gain, the joins stay exact. It's a change of level only, the
+same as a notch down on the volume. Turn it up, and when you compare "Up to 48 kHz" with "Original",
+match their levels first, or the louder one will sound better. A master that still goes over is
+lowered further, by exactly enough, and deadwax's log says so. Its joins with the songs beside it
+then step in level by that much.
+
+**The joins stay exact.** Resampling a song on its own treats the silence either side of it as part
+of the music, which puts a click at every join of an album whose tracks run into each other. So
+deadwax resamples each song with the edges of its neighbours on the album, on one sample grid for
+the whole album. The songs then fit together exactly as if the whole album had been resampled at
+once. It finds the album and its order from Navidrome. If a neighbour can't be read just then, that
+join may not be exact and deadwax's log says so. For the next ten minutes every play of that song
+is that same copy (so a song already playing never changes under you, and a neighbour that keeps
+failing costs one wait, not one at every song change); a play after that tries again.
+
+**The first play of a hi-res song takes longer.** deadwax downloads the song from Navidrome and
+resamples it before sending anything. A 7-minute 24/192 song takes about 2.5 seconds on an M2 Mac,
+and a NAS will be several times slower. In a stream, the next song is got ready about a minute
+ahead, so only the first song you tap waits, and the stream gives it up to a minute before playing
+it the other way. With the Gapless switch off, or while AirPlaying, the player asks deadwax for the
+next song's copy a few seconds into each song. Once made, a song is kept in the player's cache (see
+[`PLAYER_CACHE_MB`](configuration.md#paths)), and plays at once from then on.
+
+**Changing the setting** takes effect from the next song started or got ready. A stream that is
+playing carries on as it began.
 
 ## Seeking, and where Safari lands
 
@@ -405,6 +481,7 @@ fixes that.
 
 - **Gapless playback**: there's a short gap between songs, unless you try the
   [experimental Gapless switch](#gapless-playback-experimental).
+- **Hi-res through a USB DAC**: whether Safari ever runs a DAC at a song's own rate is unknown.
 - **Play from the lock screen after a long pause** may do nothing until the app is opened: iOS
   puts a web page that isn't playing to sleep. See
   [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened).
@@ -444,4 +521,7 @@ question the whole player existed to answer. Still to find out:
 - whether the scrubber takes a tap and a drag under a real finger, which a desktop browser can only
   stand in for;
 - everything about [the one stream](#what-still-needs-trying-on-a-real-iphone) as deadwax builds
-  it, though the way it's built was proved on an iPhone first.
+  it, though the way it's built was proved on an iPhone first;
+- hi-res songs resampled to 48 kHz, and above all a 24/192 album's joins, and how long the first
+  song waits on your NAS; and 24/192 streamed as it is under "Original" (whether an iPhone keeps up
+  with it, and plays FLAC at that rate in a stream at all).

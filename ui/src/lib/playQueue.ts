@@ -23,6 +23,12 @@ export interface QueueTrack {
   /** the file's extension, e.g. opus - what tells an Opus file from a Vorbis one, since Navidrome
    *  gives both the same audio/ogg (see streamUrl in player/api.ts) */
   suffix: string | null
+  /** Hz, bits and channels, as Navidrome read them from the file; 0 when it didn't say. What tells a
+   *  hi-res song deadwax resamples (resamples() in lib/streamWrap) from one it sends as it is, and a
+   *  song the gapless stream can't take, before anything is asked of deadwax. */
+  sampleRate: number
+  bitDepth: number
+  channels: number
 }
 
 export interface PlayQueue {

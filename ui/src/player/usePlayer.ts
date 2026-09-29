@@ -34,6 +34,12 @@
  * tap or a lock-screen command; whatever it can't play (a song that isn't FLAC, a failure, AirPlay)
  * goes the ways above, and the stream is left for it at the position it had reached (leaveStream()).
  *
+ * The "Maximum quality" setting (per device, 48 kHz unless set to "Original") decides which address
+ * a hi-res FLAC is asked for at: resampled by deadwax to 48 or 44.1 kHz, still lossless and so able
+ * to join a stream, or as it is. resamples() in lib/streamWrap is the one rule; everything here asks
+ * it through addressOf() and streamable(). A stream keeps the setting it started with - its songs'
+ * addresses can't change under it - and the next song started or got ready uses the new one.
+ *
  * The position changes several times a second, so it is not React state - rendering the whole
  * player four times a second to move one bar would be waste. Whatever shows it subscribes with
  * usePosition() below, and only that re-renders. From a seek until the element says it has landed,
@@ -54,9 +60,11 @@ import {
   listenedStep, nextIndex, previousAction, startQueue, type PlayQueue, type QueueTrack,
 } from '../lib/playQueue'
 import { reportedPosition, seekStep, type PendingSeek, type SeekEvent, type SeekReading } from '../lib/scrub'
-import { ENGINE_OFF_MS, joinStallMs, splitAcrossJoin, streamable as mayStream, type RunSong } from '../lib/streamPlan'
-import { asksForMp4, isFlac, wrappedAs, wrapsFlac, type Wrapped } from '../lib/streamWrap'
-import { readPlayerGapless, writePlayerGapless } from '../state/persisted'
+import { ENGINE_OFF_MS, joinStallMs, knownFormatOut, splitAcrossJoin, streamable as mayStream, type RunSong } from '../lib/streamPlan'
+import {
+  asksForMp4, isFlac, resampledFrom, resamples, wrappedAs, wrapsFlac, type MaxRate, type Wrapped,
+} from '../lib/streamWrap'
+import { readPlayerGapless, readPlayerMaxRate, writePlayerGapless, writePlayerMaxRate } from '../state/persisted'
 import { coverUrl, fragmentedUrl, scrobble, streamFormat, streamUrl } from './api'
 import { StreamSource, mediaSourceEngine, type StreamEvents, type StreamFailure } from './streamSource'
 
@@ -72,6 +80,8 @@ export interface Player {
   airplay: boolean
   /** whether the gapless switch is on - see lib/gapless */
   gapless: boolean
+  /** the "Maximum quality" setting: hi-res songs resampled to 48 kHz or 44.1 kHz, or sent as they are */
+  maxRate: MaxRate
   /** the last few song changes, timed from one song's end to the next one's clock running, newest first */
   gaps: GapReading[]
   /** the last seek the listener made, and where its song's end says it landed - see SeekReading */
@@ -88,6 +98,9 @@ export interface Player {
   showAirPlay(): void
   /** the switch - a tap, which is also what unlocks the second element */
   setGapless(on: boolean): void
+  /** the setting, kept on this device; from the next song started or got ready - a stream playing
+   *  carries on as it began */
+  setMaxRate(rate: MaxRate): void
   /** the element's position, and a way to hear about it changing - see usePosition() */
   position(): number
   onPosition(listener: (seconds: number) => void): () => void
@@ -119,6 +132,17 @@ function describeMediaError(error: MediaError | null): string {
 /** How long "Skipped ..." stands where the artist's name goes before the next song's own returns. */
 const SKIP_NOTICE_MS = 5000
 
+/** The next song's resampled copy, asked for ahead of its turn - see warmSoon(). */
+interface Warm {
+  address: string
+  /** the wait before it is asked for */
+  timer: ReturnType<typeof setTimeout> | undefined
+  /** its two bytes on their way - deadwax makes the copy while someone waits for it */
+  controller: AbortController | null
+  /** deadwax has answered: the copy is made (or it said why not) */
+  done: boolean
+}
+
 /** HTMLMediaElement.HAVE_METADATA: the element knows the song's length, and a seek moves it. */
 const HAVE_METADATA = 1
 
@@ -148,6 +172,7 @@ export function usePlayer(): Player {
   const [error, setError] = useState<string | null>(null)
   const [airplay, setAirplay] = useState(false)
   const [gapless, setGaplessShown] = useState(readPlayerGapless)
+  const [maxRate, setMaxRateShown] = useState(readPlayerMaxRate)
   const [gaps, setGaps] = useState<GapReading[]>([])
   const [lastSeek, setLastSeek] = useState<SeekReading | null>(null)
   const [wrapped, setWrapped] = useState<Wrapped | null>(null)
@@ -181,16 +206,25 @@ export function usePlayer(): Player {
       //? which of `elements` is playing - always 0 with the switch never on
       active: 0 as ElementSlot,
       gapless: readPlayerGapless(),
+      //? the "Maximum quality" setting, for every address asked from here on
+      maxRate: readPlayerMaxRate(),
       //? whether the second element has been through load() in a tap - iOS unlocks for good
       spareUnlocked: false,
       //? what the standby element holds or is getting, the wait before it starts getting it, and
       //? the download into memory under way
       standby: null as Standby | null,
+      //? the address the standby's song was got from: a change of setting can leave a standby holding
+      //? the right song at an address the song would no longer be asked for at
+      standbyAddress: null as string | null,
       preloadTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       download: null as AbortController | null,
       //? checkWrapped()'s two bytes, let go of at the next song: deadwax stops making an MP4 once
       //? nobody is waiting for it, and this would otherwise wait for every song skipped past
       wrapCheck: null as AbortController | null,
+      //? warmSoon()'s two bytes of the next song's resampled copy, with no standby to get it ready -
+      //? and one that song's turn came before deadwax answered, kept until that song changes
+      warm: null as Warm | null,
+      warmCarried: null as Warm | null,
       //? the blob: address each element holds a song in memory by, handed back when it lets go
       memory: new Map<HTMLAudioElement, string>(),
       //? The song change being timed, from 'ended' until the next song's clock runs (clockStep()).
@@ -205,10 +239,14 @@ export function usePlayer(): Player {
       //? the one-stream engine's streams, by element - at most one each, only ever on the element playing
       streams: new Map<HTMLAudioElement, StreamSource>(),
       //? songs deadwax won't repackage (or whose stream failed to decode): never streamed again this
-      //? page, and asked for as the file as it is, not in an MP4
+      //? page, and not asked for in an MP4. By variant (variantOf()): a song's resampled copy refused
+      //? has the song asked for as it is, as under "Original" (askedAt()), and only the song as it is
+      //? refused has it asked for as the file itself
       refused: new Set<string>(),
-      //? songs only their format keeps out of a stream (hi-res, surround): never streamed, but still
-      //? asked for in an MP4 by Safari - its seeks land there
+      //? songs only their format keeps out of a stream (surround, 20 bits, a rate the stream won't
+      //? take): never streamed, but still asked for in an MP4 by Safari - its seeks land there. By
+      //? variant and by the setting of the stream that found it out (formatKeyOf()): a stream under
+      //? "Original" takes a hi-res song that one under 48 kHz doesn't
       noStream: new Set<string>(),
       //? streaming is off until then (performance clock): deadwax's cache can't be used, or three
       //? streams in a row failed
@@ -241,24 +279,60 @@ export function usePlayer(): Player {
       maxTouchPoints: typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0,
       canPlayType: (type) => elements[0]!.canPlayType(type),
     })
-    /** Where a song's audio is, for this page - see streamUrl(). A song deadwax won't repackage is
-     *  asked for as it is: asking for an MP4 of it would only have deadwax try again and give up. */
-    const addressOf = (track: QueueTrack) => streamUrl(track, canPlay, pageWraps && !state.refused.has(track.id))
+    /** Whether deadwax is asked to resample this song under `cap` - resamples() in lib/streamWrap. */
+    const resampledAt = (track: QueueTrack, cap: MaxRate) => resamples(track, cap, streamFormat(track, canPlay))
+    /**
+     * Which of a song's two copies `cap` asks for, as `refused` knows them (and `noStream`, with the
+     * stream's setting): the id for the song as it is, `<id>@48000` for its resampled copy. A song never resampled is the same one
+     * under either setting, as it should be - it has the same address.
+     */
+    const variantOf = (track: QueueTrack, cap: MaxRate) => (resampledAt(track, cap) ? `${track.id}@${cap}` : track.id)
+    /**
+     * The setting a song is asked for at under `cap`: `cap` - unless deadwax refused its resampled
+     * copy (a 415, or a copy the browser couldn't decode), and then as under "Original", the song as
+     * it is. Asking for that copy again would only have deadwax try again and give up.
+     */
+    const askedAt = (track: QueueTrack, cap: MaxRate): MaxRate => (state.refused.has(variantOf(track, cap)) ? 'original' : cap)
+    /** What `noStream` knows a song by: the copy asked for, and the setting of the stream it was
+     *  kept out of - a stream's format rule depends on it (formatStreamable() in lib/streamPlan). */
+    const formatKeyOf = (track: QueueTrack, cap: MaxRate) => `${variantOf(track, askedAt(track, cap))} under ${cap}`
+    /** Where a song's audio is for this page under `cap` - see streamUrl(). A song whose resampled
+     *  copy deadwax refused is asked for as under "Original": in an MP4 of itself for Safari, as it is
+     *  for Chromium. A song deadwax won't repackage as it is, as the file itself: asking for an MP4 of
+     *  it would only have deadwax try again and give up. */
+    const addressAt = (track: QueueTrack, cap: MaxRate) => {
+      const asked = askedAt(track, cap)
+      return streamUrl(track, canPlay, pageWraps && !state.refused.has(variantOf(track, asked)), asked)
+    }
+    /** Where a song's audio is, at the setting as it is now. */
+    const addressOf = (track: QueueTrack) => addressAt(track, state.maxRate)
     //? MediaSource with FLAC in an MP4, if the browser has it - decided once, for the page
     const engine = mediaSourceEngine()
 
-    /** Whether a song can go in a stream now - see streamable() in lib/streamPlan. */
-    function streamable(track: QueueTrack): boolean {
+    /**
+     * Whether a song can go in a stream started under `cap` - see streamable() in lib/streamPlan. What
+     * the queue knows of its format is asked first (knownFormatOut()): a song above 48 kHz that a
+     * stream under 48 kHz would get as it is (a rate deadwax doesn't resample, or a resampled copy it
+     * refused), or one with more than two channels, would otherwise have deadwax make a copy of it
+     * only for the head's check to refuse it. Under "Original" a hi-res song streams as it is.
+     */
+    function streamable(track: QueueTrack, cap: MaxRate = state.maxRate): boolean {
+      const asked = askedAt(track, cap)
       return mayStream({
         gapless: state.gapless,
         engine: engine !== null,
         isFlac: isFlac(track),
         raw: streamFormat(track, canPlay) === 'raw',
         wireless: isWireless(),
-        refused: state.refused.has(track.id) || state.noStream.has(track.id),
+        refused: state.refused.has(variantOf(track, asked)) || state.noStream.has(formatKeyOf(track, cap)),
         engineOff: performance.now() < state.engineOffUntil,
+        formatOut: knownFormatOut(track, resampledAt(track, asked), cap),
       })
     }
+
+    /** What the readout says of the song at `index` playing in `stream`: what deadwax did to it. */
+    const inStream = (stream: StreamSource, index: number, id: string): Wrapped =>
+      ({ id, got: 'stream', resampled: stream.resampled(index), hiRes: stream.hiRes(index) })
 
     /** Where the current song starts in the live stream - 0 without one. Always the QUEUE's song, never
      *  the one under the playhead: between a join and the 'timeupdate' that sees it, positions run on
@@ -319,27 +393,36 @@ export function usePlayer(): Player {
      * Whether the song now playing came inside an MP4, for the readout: an audio element never says
      * what type it was sent, and deadwax sends the FLAC as it is when it won't repackage a file. So
      * it is asked with two bytes, as Safari itself asks first - deadwax makes the MP4 once for both.
+     * The answer also says whether deadwax resampled it (X-Deadwax-Resampled), which is why a song
+     * asked for resampled is asked about in every browser, not only Safari.
      *
      * The ask before is let go of first. deadwax keeps making an MP4 only while a request waits for
      * it, so skipping through songs stops the ones skipped past - but only if their asks go too.
+     *
+     * `cap`: the setting the element was given the song at - the setting as it is now, but for a song
+     * a stream began, which carries on at the stream's (leaveStream()). Asked at the element's own
+     * address, so deadwax makes one copy for both.
      */
-    function checkWrapped(track: QueueTrack) {
+    function checkWrapped(track: QueueTrack, cap: MaxRate = state.maxRate) {
       state.wrapCheck?.abort()
       state.wrapCheck = null
-      if (!asksForMp4(track, streamFormat(track, canPlay), pageWraps)) {
+      const format = streamFormat(track, canPlay)
+      const resampled = resampledAt(track, askedAt(track, cap))
+      if (!asksForMp4(track, format, pageWraps, resampled)) {
         setWrapped(null)
         return
       }
       const id = track.id
       const controller = new AbortController()
       state.wrapCheck = controller
-      setWrapped({ id, got: null })
-      fetch(addressOf(track), { headers: { Range: 'bytes=0-1' }, signal: controller.signal })
+      setWrapped({ id, got: null, resampled: null, hiRes: null })
+      fetch(addressAt(track, cap), { headers: { Range: 'bytes=0-1' }, signal: controller.signal })
         .then((response) => {
           response.body?.cancel().catch(() => {})
           if (!response.ok) return
           const got = wrappedAs(response.headers.get('Content-Type'))
-          setWrapped((shown) => (shown?.id === id ? { id, got } : shown))
+          const said = resampledFrom(response.headers.get('X-Deadwax-Resampled'))
+          setWrapped((shown) => (shown?.id === id ? { id, got, resampled: said, hiRes: null } : shown))
         })
         .catch(() => {
           //? let go of (the song changed), or failed - the readout goes on saying it was asked
@@ -445,7 +528,8 @@ export function usePlayer(): Player {
         if (autoplay) play()
         state.wrapCheck?.abort()
         state.wrapCheck = null
-        setWrapped({ id: track.id, got: 'stream' })
+        //? what deadwax did to it is known once its head is in - see streamEvents.placed
+        setWrapped({ id: track.id, got: 'stream', resampled: null, hiRes: null })
         fitStandby()
         return
       }
@@ -470,8 +554,15 @@ export function usePlayer(): Player {
       },
       refused(source, index, _why, formatOnly) {
         const track = source.tracks[index]
-        if (track) (formatOnly ? state.noStream : state.refused).add(track.id)
+        if (track && formatOnly) state.noStream.add(formatKeyOf(track, source.maxRate))
+        else if (track) state.refused.add(variantOf(track, askedAt(track, source.maxRate)))
         if (state.streams.get(live()) === source) fitStandby()
+      },
+      placed(source, index) {
+        //? the song playing, placed: the readout can say what deadwax did to it
+        const track = source.tracks[index]
+        if (state.streams.get(live()) !== source || index !== state.queue.index || source.tracks !== state.queue.tracks || !track) return
+        setWrapped(inStream(source, index, track.id))
       },
       failed(source, index, kind, why) {
         if (state.streams.get(live()) !== source) return
@@ -501,10 +592,16 @@ export function usePlayer(): Player {
       }
       element.removeAttribute('src')
       element.muted = false
+      //? the setting as it is now, for this stream's whole life: a change mid-run leaves its later
+      //? songs at the addresses they would have had, and the next tap starts one at the new setting
+      const cap = state.maxRate
       const stream = new StreamSource(element, next.tracks, next.index, engine, {
-        urlOf: fragmentedUrl,
-        streamable,
+        //? a song whose resampled copy deadwax refused, as under "Original" - see askedAt()
+        urlOf: (song) => fragmentedUrl(song, askedAt(song, cap)),
+        streamable: (song) => streamable(song, cap),
+        resamples: (song) => resamples(song, askedAt(song, cap), 'raw'),
         intendsToPlay: () => state.intendsToPlay,
+        maxRate: cap,
       }, streamEvents)
       state.streams.set(element, stream)
       stream.attach()
@@ -534,7 +631,7 @@ export function usePlayer(): Player {
       readSeek({ kind: 'song change' })
       report(0)
       showOnLockScreen(track)
-      setWrapped({ id: track.id, got: 'stream' })
+      setWrapped(inStream(stream, next.index, track.id))
       updatePositionState()
       const audio = live()
       //? no 'playing' comes for a seek into data already there while playing: the listen begins here
@@ -552,13 +649,25 @@ export function usePlayer(): Player {
      * the URL way from where it had got to, on the same element. As the file as it is, never an MP4 of
      * it - deadwax relays that at once, where an MP4 might mean downloading and repackaging the whole
      * song first; the cost is only Safari's seek precision, for this one song. The listen carries on.
+     *
+     * But a song the stream had begun RESAMPLED goes on as its resampled copy, in an MP4 (the stream's
+     * setting, which it kept): deadwax makes that from the stream's own copy of the song, in a moment,
+     * without downloading or resampling it again. The original would be the song 3 dB louder from
+     * where it left the stream, with the next song back down - resampled songs are lowered so nothing
+     * clips. One whose copy wouldn't decode (refused, so askedAt() says "Original"), or whose head
+     * never came - a resample too slow for the stream - is the song as it is, relayed at once.
      * `usual`: the song's usual address instead (an MP4 for Safari) - for a song only its format kept
-     * out of the stream, which has played nothing yet and whose seeks should land.
+     * out of the stream, or whose resampled copy deadwax refused (its usual address is then the song as
+     * it is, as under "Original"), which has played nothing yet and whose seeks should land.
      */
     function leaveStream(position: number, usual = false) {
       const track = current(state.queue)
       if (!track) return
       const element = live()
+      //? the setting to carry the song on at: the stream's, if it had begun the song - what it asked
+      //? for, less a copy refused since - else the song as it is
+      const stream = state.streams.get(element)
+      const cap: MaxRate = stream && stream.song(state.queue.index) ? askedAt(track, stream.maxRate) : 'original'
       detach(element)
       state.join = null
       state.resumeAt = position
@@ -567,9 +676,12 @@ export function usePlayer(): Player {
       if (usual) {
         setSource(element, addressOf(track))
         checkWrapped(track)
+      } else if (resampledAt(track, cap)) {
+        setSource(element, addressAt(track, cap))
+        checkWrapped(track, cap)
       } else {
         setSource(element, streamUrl(track, canPlay, false))
-        setWrapped(pageWraps && streamFormat(track, canPlay) === 'raw' && isFlac(track) ? { id: track.id, got: 'flac' } : null)
+        setWrapped(pageWraps && streamFormat(track, canPlay) === 'raw' && isFlac(track) ? { id: track.id, got: 'flac', resampled: null, hiRes: null } : null)
       }
       if (state.intendsToPlay) play()
       fitStandby()
@@ -577,7 +689,9 @@ export function usePlayer(): Player {
 
     /**
      * A stream that can't go on for the song at `index`. A song of its own that failed to decode or was
-     * refused never streams again. A song AFTER the one playing moves the queue on to it, the URL way,
+     * refused never streams again - though a hi-res song "Original" streamed as it is, the first of its
+     * run, is kept out of streams under that setting only, and keeps its MP4 (rateOut, below). A song
+     * AFTER the one playing moves the queue on to it, the URL way,
      * as a song change - but only with the playhead at the join, waiting on it; otherwise (the stream
      * says so for a later song only when it has to: a decode error, or nothing to go on with) the song
      * playing leaves the stream from where it had got to and plays on. Three failures without a join
@@ -585,9 +699,23 @@ export function usePlayer(): Player {
      */
     function streamFailed(source: StreamSource, index: number, kind: StreamFailure, why: string) {
       const failedTrack = source.tracks[index]
-      if (failedTrack && (kind === 'decode' || kind === 'refused')) state.refused.add(failedTrack.id)
-      if (failedTrack && kind === 'format') state.noStream.add(failedTrack.id)
-      if (kind !== 'format') state.failedStreams += 1
+      //? A song above 48 kHz the stream took as it is ("Original") that wouldn't decode, the first of
+      //? its run: its RATE is the likelier cause, not its bytes - no phone has been seen to play one in
+      //? a stream, and AVFoundation decodes deadwax's MP4 of the same frames. So it is kept out of
+      //? streams under that setting, as a format is, and isn't counted as the stream failing: Safari
+      //? still gets its MP4, whose seeks land, and three such songs don't turn streaming off for CD
+      //? albums too. A later song of a run whose first decoded is at the same rate: its bytes, as ever.
+      const rateOut = !!failedTrack && kind === 'decode' && source.hiRes(index) !== null && source.song(index - 1) === null
+      //? A refusal is in `refused` already - the stream says `refused` before it fails a song for one -
+      //? and a copy that wouldn't decode goes in now: the copy the stream asked for, resampled or not.
+      if (failedTrack && kind === 'decode' && !rateOut) state.refused.add(variantOf(failedTrack, askedAt(failedTrack, source.maxRate)))
+      if (failedTrack && (kind === 'format' || rateOut)) state.noStream.add(formatKeyOf(failedTrack, source.maxRate))
+      //? its resampled copy refused before any of it played - not the song as it is: the song as under
+      //? "Original", at its usual address. There is no place to carry on from, and its seeks should land.
+      const copyRefused = !!failedTrack && kind === 'refused' && source.song(index) === null &&
+        resampledAt(failedTrack, source.maxRate) && state.refused.has(variantOf(failedTrack, source.maxRate)) &&
+        !state.refused.has(failedTrack.id)
+      if (kind !== 'format' && !rateOut) state.failedStreams += 1
       if (state.failedStreams >= 3) {
         state.engineOffUntil = performance.now() + ENGINE_OFF_MS
         state.failedStreams = 0
@@ -598,7 +726,7 @@ export function usePlayer(): Player {
         load({ ...state.queue, index }, state.intendsToPlay)
         return
       }
-      leaveStream(songPosition(), kind === 'format' && index === state.queue.index)
+      leaveStream(songPosition(), (kind === 'format' || copyRefused) && index === state.queue.index)
     }
 
     /**
@@ -776,6 +904,7 @@ export function usePlayer(): Player {
       const standby = other()
       if (standby && hasSource(standby)) empty(standby)
       state.standby = null
+      state.standbyAddress = null
     }
 
     /** What standbyPlan() needs to know of a live stream: where its run ends (null while unknown). */
@@ -786,26 +915,118 @@ export function usePlayer(): Player {
 
     /**
      * The queue moved on: a standby holding any song but the one after the new one lets go of it,
-     * and a wait to get one ready starts again from the new song's 'playing'.
+     * and a wait to get one ready starts again from the new song's 'playing'. So does one holding the
+     * right song at an address it wouldn't be asked for at now - got before the "Maximum quality"
+     * setting changed - which standbyPlan(), knowing songs and not addresses, would keep.
      */
     function fitStandby() {
+      fitWarm()
       if (state.preloadTimer !== undefined) clearTimeout(state.preloadTimer)
       state.preloadTimer = undefined
       const plan = standbyPlan(state.queue, state.gapless, state.standby, isWireless(), liveRun())
-      if (plan.kind === 'clear' || (plan.kind === 'load' && state.standby)) dropStandby()
+      const held = state.standby ? state.queue.tracks[state.standby.index] : undefined
+      const moved = plan.kind === 'keep' && held !== undefined && state.standbyAddress !== null && state.standbyAddress !== addressOf(held)
+      if (plan.kind === 'clear' || (plan.kind === 'load' && state.standby) || moved) dropStandby()
     }
 
     /**
      * A song has started playing: the one after it is got ready a moment from now. Never while
-     * AirPlaying - standbyPlan() answers nothing to get ready then, as a handover can't happen.
+     * AirPlaying - standbyPlan() answers nothing to get ready then, as a handover can't happen - nor
+     * with the switch off; then only a resampled copy is made ready ahead (warmSoon()).
      */
     function preloadSoon() {
-      if (!state.gapless || state.preloadTimer !== undefined || isWireless()) return
+      if (!state.gapless || isWireless()) {
+        warmSoon()
+        return
+      }
+      if (state.preloadTimer !== undefined) return
       if (standbyPlan(state.queue, state.gapless, state.standby, false, liveRun()).kind !== 'load') return
       state.preloadTimer = setTimeout(() => {
         state.preloadTimer = undefined
         preloadNow()
       }, PRELOAD_DELAY_MS)
+    }
+
+    /**
+     * The address of the next song's resampled copy - null for any other song, and for one the live
+     * stream will play, which asks for another copy of it (its fragmented MP4). deadwax makes a
+     * resampled copy only when it is asked for, and all of it before the first byte: download,
+     * resample and repackage the whole song.
+     *
+     * Whether anything else will get the song ready - a standby, with the switch on and no AirPlay -
+     * is preloadSoon()'s question, asked before a warm-up starts, and not this one's. A warm-up under
+     * way is kept while its song is next and still resampled, whoever else will ask for it: a standby
+     * taking over asks for this same address, and its download joins the same make. Let go first,
+     * deadwax would see nobody waiting and stop the make, and the standby would start it again.
+     */
+    function warmAddress(): string | null {
+      //? inside the stream's run (as standbyPlan() reads it), the next song is the stream's to get
+      const run = liveRun()
+      if (run && (run.runEnd === null || state.queue.index < run.runEnd)) return null
+      const index = nextIndex(state.queue)
+      const track = index === null ? undefined : state.queue.tracks[index]
+      return track && resampledAt(track, askedAt(track, state.maxRate)) ? addressOf(track) : null
+    }
+
+    /**
+     * The queue moved on, the setting changed or a stream began: a warm-up for a song that is no longer
+     * next, or that a stream will play, lets go, and deadwax stops a make nobody waits for. Not one for
+     * the song now PLAYING by that address, whose own request waits on the same make: letting go first
+     * could leave deadwax a moment with nobody waiting, and it would stop the make and start it again.
+     * That one is kept until its song changes.
+     */
+    function fitWarm() {
+      //? the song playing by its address - one a stream plays asks for another copy, its fragmented MP4
+      const playing = current(state.queue)
+      const playingAt = playing && !liveStream() ? addressOf(playing) : null
+      const carried = state.warmCarried
+      if (carried && carried.address !== playingAt) {
+        state.warmCarried = null
+        carried.controller?.abort()
+      }
+      const warm = state.warm
+      if (!warm || warm.address === warmAddress()) return
+      state.warm = null
+      if (warm.timer !== undefined) clearTimeout(warm.timer)
+      if (!warm.controller || warm.done) return
+      if (warm.address === playingAt) state.warmCarried = warm
+      else warm.controller.abort()
+    }
+
+    /**
+     * A song has started playing with no standby to get the next one ready: if that one is resampled,
+     * its copy is asked for a moment from now all the same - two bytes, as checkWrapped() asks, held
+     * until deadwax answers, which is once the copy is made - so it is made while this one plays, and
+     * the song change finds it ready instead of waiting the whole make in silence. Any other song is
+     * relayed or repackaged as it always was, and isn't asked for ahead. `delay` 0: at once, to take
+     * over the make of a standby being let go (AirPlay starting) before deadwax sees nobody waiting.
+     */
+    function warmSoon(delay = PRELOAD_DELAY_MS) {
+      fitWarm()
+      const address = warmAddress()
+      if (address === null || state.warm !== null) return
+      const warm: Warm = { address, timer: undefined, controller: null, done: false }
+      state.warm = warm
+      const ask = () => {
+        warm.timer = undefined
+        if (state.warm !== warm) return
+        const controller = new AbortController()
+        warm.controller = controller
+        fetch(address, { headers: { Range: 'bytes=0-1' }, signal: controller.signal })
+          .then((response) => response.body?.cancel().catch(() => {}))
+          .catch(() => {
+            //? let go of (the queue moved on), or failed - the element asks for it at its turn
+          })
+          .finally(() => {
+            warm.done = true
+            if (state.warmCarried === warm) state.warmCarried = null
+          })
+      }
+      //? At once when there's no wait - taking over a standby's download as AirPlay starts: the ask
+      //? has to be on its way before that download is let go of on the next line of the caller, or
+      //? deadwax can see nobody waiting on the make in between and stop it
+      if (delay <= 0) ask()
+      else warm.timer = setTimeout(ask, delay)
     }
 
     function preloadNow() {
@@ -834,6 +1055,7 @@ export function usePlayer(): Player {
      */
     async function download(standby: Standby, element: AirPlayAudio, track: QueueTrack) {
       const address = addressOf(track)
+      state.standbyAddress = address
       const raw = streamFormat(track, canPlay) === 'raw'
       const controller = new AbortController()
       state.download = controller
@@ -940,6 +1162,7 @@ export function usePlayer(): Player {
       const readyState = decision.source === 'unfinished' ? null : incoming.readyState
       const from = incoming.currentTime || 0
       state.standby = null
+      state.standbyAddress = null
       state.active = activeAfter(state.active, 'handover')
       //? muted before anything else touches it, so the lock screen never takes the element that
       //? has finished for the song playing
@@ -1083,6 +1306,18 @@ export function usePlayer(): Player {
         //? one element from here on - whichever is playing now - and the other lets go
         state.active = activeAfter(state.active, 'switch off')
         dropStandby()
+        //? with no standby, the next song's resampled copy is made ready ahead instead
+        if (!live().paused) preloadSoon()
+      },
+      setMaxRate(rate: MaxRate) {
+        if (rate === state.maxRate) return
+        state.maxRate = rate
+        writePlayerMaxRate(rate)
+        setMaxRateShown(rate)
+        //? the song playing carries on as it was asked for, and a stream as it began; a standby got
+        //? ready at the old setting lets go, and the next song is got ready at the new one
+        fitStandby()
+        if (!live().paused) preloadSoon()
       },
       position: () => songPosition(),
       onPosition(listener: (seconds: number) => void) {
@@ -1185,7 +1420,7 @@ export function usePlayer(): Player {
       report(now)
       showOnLockScreen(track)
       updatePositionState()
-      setWrapped({ id: track.id, got: 'stream' })
+      setWrapped(inStream(stream, song.index, track.id))
       beginListen()
       fitStandby()
       const end = stream.runEnd()
@@ -1413,6 +1648,9 @@ export function usePlayer(): Player {
       //? AirPlay starting or stopping: a standby is let go of while it plays there, and the next
       //? song got ready again once it stops - see standbyPlan()
       ['webkitcurrentplaybacktargetiswirelesschanged', () => {
+        //? a standby still getting the next song, let go as AirPlay starts: its make is taken over at
+        //? once, before deadwax sees nobody waiting and stops it
+        if (isWireless() && state.standby?.stage === 'fetching' && !live().paused) warmSoon(0)
         fitStandby()
         if (!live().paused) preloadSoon()
       }],
@@ -1452,6 +1690,12 @@ export function usePlayer(): Player {
         state.streams.clear()
         state.wrapCheck?.abort()
         state.wrapCheck = null
+        for (const warm of [state.warm, state.warmCarried]) {
+          if (warm?.timer !== undefined) clearTimeout(warm.timer)
+          warm?.controller?.abort()
+        }
+        state.warm = null
+        state.warmCarried = null
         mounted = false
       }
     }
@@ -1512,6 +1756,7 @@ export function usePlayer(): Player {
     error,
     airplay,
     gapless,
+    maxRate,
     gaps,
     lastSeek,
     wrapped,

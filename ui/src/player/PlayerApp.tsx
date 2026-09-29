@@ -4,6 +4,7 @@ import { AlbumPage } from './AlbumPage'
 import { Library } from './Library'
 import { MiniPlayer } from './MiniPlayer'
 import { NowPlaying } from './NowPlaying'
+import { Settings } from './Settings'
 import { navidromeStatus, type Album, type NavidromeStatus } from './api'
 import { usePlayer } from './usePlayer'
 
@@ -36,7 +37,7 @@ function Unavailable({ status, onRetry }: { status: NavidromeStatus | null; onRe
 }
 
 /**
- * The player: the library, one album, and what's playing.
+ * The player: the library, one album, what's playing, and its settings.
  *
  * The album is in the address so that iOS's swipe back and the back button both work. The
  * library stays mounted while an album is open - hidden, not thrown away - so coming back finds
@@ -48,6 +49,7 @@ export function PlayerApp() {
   const [albumId, setAlbumId] = useState(albumInHash)
   const [preview, setPreview] = useState<Album | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const libraryScroll = useRef(0)
   //? whether the open album was reached from the library, so "back" can be history's own back
   const cameFromLibrary = useRef(false)
@@ -96,12 +98,13 @@ export function PlayerApp() {
   return (
     <div class={`pl-app${player.track ? ' has-mini' : ''}`}>
       <div hidden={albumId !== null}>
-        <Library onOpen={openAlbum} />
+        <Library onOpen={openAlbum} onSettings={() => setSettingsOpen(true)} />
       </div>
       {albumId !== null && <AlbumPage id={albumId} preview={preview} player={player} onBack={back} />}
 
       <MiniPlayer player={player} onOpen={() => setSheetOpen(true)} />
       <NowPlaying player={player} open={sheetOpen} onClose={() => setSheetOpen(false)} />
+      <Settings player={player} open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }

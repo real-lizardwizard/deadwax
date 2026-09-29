@@ -15,6 +15,12 @@
  * none). Anywhere else, WebKit says AppleWebKit/ and Chromium, which says that too, also says Chrome/.
  * Then only if the browser says it can play FLAC in an MP4 at all.
  *
+ * And the one rule for which songs deadwax RESAMPLES (resamples()): with the "Maximum quality"
+ * setting at 48 kHz, a hi-res FLAC is asked for with `max_rate=48000`, which deadwax answers with
+ * the song resampled to 48 or 44.1 kHz and still lossless FLAC, repackaged - so in an MP4 in every
+ * browser, and as fragmented MP4 for the gapless stream. Its addresses, whether it may stream, and
+ * the readout all ask this one function, so they can't disagree.
+ *
  * Pure, like the rest of lib/, so ui/test/wrap.sim.cjs can hold it to the answers.
  */
 
@@ -51,13 +57,63 @@ export function isFlac(track: Pick<QueueTrack, 'suffix' | 'contentType'>): boole
 }
 
 /**
- * Whether this song is asked for inside an MP4: a page that wraps, a FLAC, and the file as it is -
- * a transcode is produced as it plays, and there is no FLAC in it to repackage.
+ * The player's "Maximum quality" setting: '48000' has deadwax resample songs above 48 kHz, 'original'
+ * sends every song as it is. Per device, like the gapless switch (readPlayerMaxRate in
+ * state/persisted), and 48 kHz unless it says otherwise.
+ */
+export type MaxRate = '48000' | 'original'
+export const DEFAULT_MAX_RATE: MaxRate = '48000'
+
+/**
+ * Which rates deadwax resamples, and to what - the same table as the server's (RESAMPLED_TO in
+ * src/resample.py). Only whole ratios: 2, 4 or 8 times 44.1 or 48 kHz. Any other rate above 48 kHz is
+ * sent as it is, and everything at or below 48 kHz is never touched.
+ */
+export const RESAMPLED_TO: Readonly<Record<number, number>> = {
+  88200: 44100, 176400: 44100, 352800: 44100,
+  96000: 48000, 192000: 48000, 384000: 48000,
+}
+
+/**
+ * Whether deadwax is asked to resample this song: the setting at 48 kHz, a FLAC asked for as it is,
+ * a rate from the table, and 16 or 24 bits where Navidrome says - the server can't read the other
+ * depths, and sends such a song as it is. A rate or depth Navidrome didn't give (0, or none at all)
+ * is unknown, and an unknown rate is not resampled: the song is asked for exactly as it always was.
+ */
+export function resamples(
+  track: Pick<QueueTrack, 'suffix' | 'contentType'> & Partial<Pick<QueueTrack, 'sampleRate' | 'bitDepth'>>,
+  cap: MaxRate, format: 'raw' | 'mp3',
+): boolean {
+  if (cap !== '48000' || format !== 'raw' || !isFlac(track)) return false
+  const rate = track.sampleRate ?? 0
+  const depth = track.bitDepth ?? 0
+  return RESAMPLED_TO[rate] !== undefined && (depth === 0 || depth === 16 || depth === 24)
+}
+
+/** What deadwax says it did: `X-Deadwax-Resampled: 192000-48000`. */
+export interface Resampled {
+  from: number
+  to: number
+}
+
+/** The header read, or null when there is none, or it says something else. */
+export function resampledFrom(header: string | null): Resampled | null {
+  const match = /^\s*(\d+)-(\d+)\s*$/.exec(header ?? '')
+  if (!match) return null
+  const from = Number(match[1])
+  const to = Number(match[2])
+  return from > 0 && to > 0 ? { from, to } : null
+}
+
+/**
+ * Whether this song is asked for inside an MP4: a page that wraps, or a song deadwax resamples -
+ * which it sends only repackaged, in any browser - a FLAC, and the file as it is. A transcode is
+ * produced as it plays, and there is no FLAC in it to repackage.
  */
 export function asksForMp4(
-  track: Pick<QueueTrack, 'suffix' | 'contentType'>, format: 'raw' | 'mp3', pageWraps: boolean,
+  track: Pick<QueueTrack, 'suffix' | 'contentType'>, format: 'raw' | 'mp3', pageWraps: boolean, resampled = false,
 ): boolean {
-  return pageWraps && format === 'raw' && isFlac(track)
+  return (pageWraps || resampled) && format === 'raw' && isFlac(track)
 }
 
 /**
@@ -65,11 +121,16 @@ export function asksForMp4(
  * deadwax sent the FLAC as it is instead (a file it wouldn't repackage - its log says why), null
  * not known yet. Null altogether for a song not asked for that way. `stream` is a song playing
  * inside a one-stream run (lib/streamPlan.ts): fragmented MP4 appended to a MediaSource, which is
- * known the moment it plays, so there is nothing to ask.
+ * known the moment it plays, so there is nothing to ask. `resampled` is what deadwax's answer said
+ * it did to a hi-res song, null when it didn't (or hasn't said yet). `hiRes` is the rate of a song
+ * playing in a stream above 48 kHz as it is - under "Original" - so the readout can show the rate
+ * was kept; null for every other song.
  */
 export interface Wrapped {
   id: string
   got: 'mp4' | 'flac' | 'stream' | null
+  resampled: Resampled | null
+  hiRes: number | null
 }
 
 /** What an answer's Content-Type says came back. */
@@ -77,15 +138,25 @@ export function wrappedAs(contentType: string | null): 'mp4' | 'flac' {
   return (contentType ?? '').split(';')[0]!.trim().toLowerCase() === 'audio/mp4' ? 'mp4' : 'flac'
 }
 
+/** A rate as the readout says it: 192 kHz, 44.1 kHz. */
+function khz(rate: number): string {
+  return `${rate / 1000} kHz`
+}
+
 /**
  * The end of the readout's "Last seek" line: how the song playing came, so the phone can show it
- * was sent as an MP4 - which is what makes a seek land there. Nothing for a song that wasn't asked
- * for that way (every song in Chromium), or for another song than `trackId`.
+ * was sent as an MP4 - which is what makes a seek land there - and when deadwax resampled it, from
+ * what to what, or the rate a hi-res song kept in a stream. Nothing for a song that wasn't asked for
+ * that way (every song in Chromium but a resampled or streaming one), or for another song than
+ * `trackId`.
  */
 export function describeWrap(wrapped: Wrapped | null, trackId: string | null): string {
   if (!wrapped || wrapped.id !== trackId) return ''
-  if (wrapped.got === 'mp4') return ' · FLAC in MP4'
+  const rate = wrapped.resampled
+    ? `, ${khz(wrapped.resampled.from)} resampled to ${khz(wrapped.resampled.to)}`
+    : wrapped.hiRes ? `, ${khz(wrapped.hiRes)}` : ''
+  if (wrapped.got === 'mp4') return ` · FLAC in MP4${rate}`
   if (wrapped.got === 'flac') return ' · sent as FLAC, not in an MP4'
-  if (wrapped.got === 'stream') return ' · in one stream'
+  if (wrapped.got === 'stream') return ` · in one stream${rate}`
   return ' · asked for FLAC in MP4'
 }

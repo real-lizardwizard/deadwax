@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { isAbort, latestOnly } from '../lib/latest'
 import { readPlayerOrder, writePlayerOrder } from '../state/persisted'
 import { PAGE_SIZE, albumPage, coverUrl, type Album, type AlbumOrder } from './api'
+import { SettingsIcon } from './icons'
 
 const ORDERS: { id: AlbumOrder; label: string }[] = [
   { id: 'newest', label: 'Recently added' },
@@ -55,7 +56,7 @@ function appendPage(shown: Album[], page: Album[]): Album[] {
  * shifts by one and repeats the album at the old page's edge - which is why a page leaves out
  * albums already shown, while the offset goes on following what the server handed out.
  */
-export function Library({ onOpen }: { onOpen: (album: Album) => void }) {
+export function Library({ onOpen, onSettings }: { onOpen: (album: Album) => void; onSettings: () => void }) {
   const [order, setOrder] = useState<AlbumOrder>(savedOrder)
   const [albums, setAlbums] = useState<Album[]>([])
   const [loading, setLoading] = useState(false)
@@ -138,6 +139,21 @@ export function Library({ onOpen }: { onOpen: (album: Album) => void }) {
     <section class="pl-library">
       <header class="pl-large-header">
         <h1 class="pl-large-title">Library</h1>
+        <button
+          type="button"
+          class="pl-icon-button pl-header-button"
+          //? WebKit - Safari, and every iPhone browser - doesn't focus a button that is clicked or
+          //? tapped, and the settings sheet gives focus back to whatever had it as it opened: so the
+          //? button takes it itself, first, or focus would fall to the page when the sheet closes
+          onClick={(event) => {
+            event.currentTarget.focus()
+            onSettings()
+          }}
+          aria-label="Settings"
+          aria-haspopup="dialog"
+        >
+          <SettingsIcon class="pl-icon" />
+        </button>
       </header>
 
       <div class="pl-orders" role="tablist" aria-label="Order">

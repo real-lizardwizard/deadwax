@@ -102,6 +102,20 @@
     --pl-switch-on: var(--accent);
     --pl-switch-knob-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 3px 1px rgba(0, 0, 0, 0.06);
     --pl-switch-duration: 240ms;
+
+    /* the settings sheet: over the mini player (10) and the now-playing sheet (20), in iOS's raised
+       grouped palette - a sheet a step lighter than the page, its rows a step lighter again */
+    --pl-settings-z: 30;
+    --pl-settings-max: 520px;
+    --pl-settings-radius: 14px;
+    --pl-settings-bg: #1c1c1e;
+    --pl-settings-row: #2c2c2e;
+    --pl-settings-scrim: rgba(0, 0, 0, 0.5);
+    --pl-settings-header: 56px;
+    --pl-settings-row-pad: 11px;
+    /* how much of the page stays in sight above the sheet at its tallest */
+    --pl-settings-room: 40px;
+    --pl-check: 22px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -122,8 +136,9 @@ html {
     -webkit-text-size-adjust: 100%;
 }
 
-/* the page behind the full player must not scroll under a finger on it */
-html.pl-sheet-open { overflow: hidden; }
+/* the page behind the full player, or the settings, must not scroll under a finger on it */
+html.pl-sheet-open,
+html.pl-settings-open { overflow: hidden; }
 
 body {
     margin: 0;
@@ -198,8 +213,17 @@ img { display: block; }
 /* ===== library ===== */
 
 .pl-large-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pl-gap-sm);
     padding: calc(var(--pl-safe-top) + 12px) var(--pl-edge-right) var(--pl-gap-xs) var(--pl-edge-left);
 }
+
+.pl-large-header .pl-large-title { min-width: 0; }
+
+/* a bar button beside the large title, tinted like iOS's */
+.pl-header-button { color: var(--pl-accent); }
 
 .pl-orders {
     display: flex;
@@ -797,6 +821,151 @@ img { display: block; }
 @media (max-height: 500px) {
     .pl-readouts { display: none; }
 }
+
+/* ===== settings ===== */
+
+/*
+  A sheet from the bottom over a dimmed page, as iOS's are (Settings.tsx). Hidden, it stays laid out
+  and slides away; visibility waits for the slide to finish, as the now-playing sheet's does. At its
+  tallest it leaves a strip of the page in sight, and past that it scrolls - on its side, in 390px of
+  height, it must - so overflow-y: auto, and overflow-x: hidden as well: auto on one axis alone
+  promotes the other to auto too. The header stays at the top while it scrolls, so Done is always
+  there. Every row is at least a tap target tall, and the words wrap; nothing is cut short.
+*/
+.pl-settings {
+    position: fixed;
+    inset: 0;
+    z-index: var(--pl-settings-z);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    visibility: hidden;
+    transition: visibility 0s linear var(--pl-sheet-duration);
+}
+
+.pl-settings.is-open { visibility: visible; transition: none; }
+
+.pl-settings-backdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--pl-settings-scrim);
+    opacity: 0;
+    transition: opacity var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.pl-settings.is-open .pl-settings-backdrop { opacity: 1; }
+
+.pl-settings-sheet {
+    position: relative;
+    width: 100%;
+    max-width: var(--pl-settings-max);
+    max-height: calc(100dvh - var(--pl-safe-top) - var(--pl-settings-room));
+    margin: 0 auto;
+    padding: 0 var(--pl-edge-right) calc(var(--pl-safe-bottom) + var(--pl-gutter)) var(--pl-edge-left);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: var(--pl-settings-radius) var(--pl-settings-radius) 0 0;
+    background: var(--pl-settings-bg);
+    outline: none;
+    transform: translateY(100%);
+    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.pl-settings.is-open .pl-settings-sheet { transform: translateY(0); }
+
+/* the title in the middle and Done at the right, as a sheet's nav bar has them */
+.pl-settings-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    min-height: var(--pl-settings-header);
+    background: var(--pl-settings-bg);
+}
+
+.pl-settings-title {
+    grid-column: 2;
+    margin: 0;
+    font-size: var(--pl-text-body);
+    font-weight: var(--pl-weight-semibold);
+}
+
+.pl-settings-done {
+    grid-column: 3;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: var(--pl-hit);
+    min-height: var(--pl-hit);
+    color: var(--pl-accent);
+    font-size: var(--pl-text-body);
+    font-weight: var(--pl-weight-semibold);
+}
+
+.pl-settings-section { padding-bottom: var(--pl-gap-sm); }
+
+.pl-settings-heading {
+    margin: var(--pl-gap-sm) 0 6px;
+    padding: 0 var(--pl-gap);
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-footnote);
+    font-weight: var(--pl-weight-regular);
+    text-transform: uppercase;
+}
+
+.pl-settings-group {
+    overflow: hidden;
+    border-radius: var(--pl-radius-control);
+    background: var(--pl-settings-row);
+}
+
+.pl-settings-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: var(--pl-hit);
+    padding: var(--pl-settings-row-pad) var(--pl-gap);
+    text-align: left;
+    transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+/* iOS's separator, inset to where the words begin */
+.pl-settings-row + .pl-settings-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: var(--pl-gap);
+    border-top: 0.5px solid var(--pl-separator);
+}
+
+.pl-settings-row:active { background: var(--pl-fill); }
+
+.pl-settings-row:focus-visible,
+.pl-settings-done:focus-visible {
+    outline: 2px solid var(--pl-accent);
+    outline-offset: -2px;
+    border-radius: var(--pl-radius-control);
+}
+
+.pl-settings-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.pl-settings-label { font-size: var(--pl-text-body); line-height: 1.3; }
+
+.pl-settings-note {
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-footnote);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.pl-settings-check { flex: none; width: var(--pl-check); height: var(--pl-check); color: var(--pl-accent); }
+.pl-settings-check.is-off { visibility: hidden; }
 
 /* ===== before there is anything to play ===== */
 

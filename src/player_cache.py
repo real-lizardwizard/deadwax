@@ -32,7 +32,8 @@ ONE URL, ONE FILE. The element reads each range against what it was sent before,
 never answered as the FLAC on one request and the MP4 on the next: their bytes and lengths differ,
 and a splice of the two is a decode error. So what each song was last answered as is remembered
 (`_answered`). A request carrying on from bytes the phone already has - anything but a fresh start,
-which is Safari's two-byte probe or the whole file - gets that same container: a song sent as FLAC
+which is Safari's two-byte probe, the whole file, or Chromium's `bytes=0-` long after the URL was last
+answered (`starts_over()`) - gets that same container: a song sent as FLAC
 stays FLAC, and a song sent as an MP4 is made again and waited for when its MP4 has gone, or
 answered 503 when it can't be had, never with FLAC bytes. A fresh start after a FLAC answer stays
 FLAC for VERSION_SECONDS too, so the page's readout and the element can't be told different things.
@@ -56,6 +57,27 @@ the fragmented MP4 the song was last served as is answered from it, while the ca
 asking Navidrome anything - so a Navidrome redeploy or a retag in the middle of a song doesn't break
 the stream (`_pinned`).
 
+MAXIMUM QUALITY (`max_rate=48000`, 1.1.0-player.6): with the player's "Up to 48 kHz", a FLAC song
+above 48 kHz - 88.2 to 384 kHz, at a whole ratio - is resampled to 48 kHz or 44.1 kHz on the way
+into either container, still lossless FLAC, 24-bit, so the gapless stream can take it. How, and why
+nothing that can be heard is lost, is src/resample.py; which album it is in and which songs lend it
+context, src/album_context.py. Here it is one more variant of the song: the neighbours' samples
+read, the download as ever, then the resample to a temporary FLAC in a worker thread under a gate of
+its own (one at a time, but never holding up another song's repackage), the .part gone, then that
+FLAC repackaged. Its key carries the plan - the cap, the rate, the album's grid, the neighbours by
+version - so a resampled song and the song as it is are two files, two ETags, two makes and two
+refusals, and what one URL was answered as (`_answered`, `_pinned`) is kept per URL: the song id,
+or the song id and the cap. Its answers say so, in X-Deadwax-Resampled (`192000-48000`). A
+neighbour whose samples couldn't be read just now is left out of the key of the file made without
+them, so a key always names one set of bytes; every fresh start in the next VERSION_SECONDS gets that
+file, without waiting on that neighbour again, and a play after that asks for the neighbour again
+(_make). A song the cap doesn't touch is answered from the very file, and with the very ETag, it
+would be without it. And a request carrying on from a resampled MP4 is served from that same file
+while it is there, since its plan could change under it (a neighbour retagged) and Safari sends no
+If-Range. The MP4 of a song the gapless stream has resampled is made from the stream's own copy,
+with no download and no resample, for the page leaving the stream in the middle of it - or the
+ordinary way, when that copy isn't whole.
+
 WHERE: PLAYER_CACHE_PATH (asked for, so the cache can live on an SSD), or the container's
 temporary space when that is empty - never the config volume, which is what people back up. Either way deadwax keeps to a folder of its own inside it, `deadwax-player`,
 which it makes private (0700) and checks is still its own (a real folder, not a link, its owner,
@@ -66,8 +88,9 @@ filesystem with no temporary space means no cache - FLAC for Safari, said once -
 that won't start.
 
 HOW MUCH: PLAYER_CACHE_MB of MP4s, a gigabyte by default, least recently served going first. Room
-for a song is made BEFORE it is fetched, counting the songs being made as well as those made, so
-the MP4s never add up to more than the cap. While a song is made there is a second copy of it on
+for a song is made BEFORE it is fetched, counting the songs being made as well as those made - a
+resampled song at about the size it resamples to, a quarter of its source or less - so the MP4s
+never add up to more than the cap. While a song is made there is a second copy of it on
 disk too (the download, beside the MP4 being written), so the folder's peak is the cap plus that
 copy. Nor does the cache take the last of the disk: a make needs room for both copies and
 DISK_SPARE_BYTES besides, older songs are cleared to find it - none at all when clearing them
@@ -96,8 +119,9 @@ import secrets
 import shutil
 import stat
 import tempfile
+import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from email.utils import formatdate
 from enum import Enum
 from pathlib import Path
@@ -108,6 +132,8 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from starlette.background import BackgroundTask
 
+from src import resample
+from src.album_context import AlbumContexts, CannotPlan
 from src.api.navidrome_endpoint import NavidromeError, navidrome
 from src.config import Config, player_cache_bytes
 from src.flac_mp4 import CannotRepackage, fmp4_layout, mp4_layout
@@ -190,6 +216,23 @@ IN_USE_SECONDS = 120
 #? Bounded; the song served longest ago is forgotten first.
 PINS_KEPT = 1024
 
+#? And how many of one song's fragmented MP4s: a resampled song made without a neighbour it couldn't
+#? read just now, then made again with it, is two files, and a phone streaming the first carries on
+#? from it while another phone starts the second.
+PIN_FILES_KEPT = 4
+
+#? How long a make that lost a side of its plan is remembered (_lose()), in seconds: every fresh start
+#? in that time is that same file at once, with no context read. Long enough to outlast a song got
+#? ready ahead of its turn - the standby, the warm-up with the Gapless switch off - whose phone would
+#? otherwise start it from the file it has and carry on into one made again with the context, and so
+#? that a neighbour whose reads always run out of time costs one wait in that time, not one a song
+#? change. Short enough that a join left inexact by a one-off failure is tried again soon.
+LOST_SECONDS = 600
+
+#? How many makes that lost a side of their plan are remembered, each for LOST_SECONDS. Bounded; the
+#? oldest are forgotten first.
+LOSSES_KEPT = 256
+
 #? What a song was last answered as.
 MP4, FLAC = "mp4", "flac"
 
@@ -214,13 +257,33 @@ class Version:
         material = json.dumps([FORMAT_VERSION, self.song_id, self.size, self.stamp])
         return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
-    def key_for(self, wrap: "Wrap") -> str:
+    def key_for(self, wrap: "Wrap", plan: "resample.ResamplePlan | None" = None) -> str:
         """The cache key of this version in that container: the MP4's is `key`, unchanged, so the
-        MP4s already cached stay valid; the fragmented one's has material of its own."""
-        if wrap.name == MP4_WRAP.name:
+        MP4s already cached stay valid; the fragmented one's has material of its own. Resampled, it
+        carries the plan too, and both format versions: the resample's and the container's."""
+        if plan is not None:
+            container = FORMAT_VERSION if wrap.name == MP4_WRAP.name else FMP4_FORMAT_VERSION
+            material = json.dumps([resample.RESAMPLE_FORMAT_VERSION, container, wrap.name, self.song_id,
+                                   self.size, self.stamp, *plan.material()])
+        elif wrap.name == MP4_WRAP.name:
             return self.key
-        material = json.dumps([FMP4_FORMAT_VERSION, wrap.name, self.song_id, self.size, self.stamp])
+        else:
+            material = json.dumps([FMP4_FORMAT_VERSION, wrap.name, self.song_id, self.size, self.stamp])
         return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _answer_key(song_id: str, max_rate: int | None) -> str | tuple[str, int]:
+    """
+    What a URL is remembered by - what "one URL, one container" is about: the song id, or the song
+    id and the cap for a URL asking for the song resampled. Two URLs of one song never share what
+    they were answered as, and a URL whose cap didn't apply still has its own.
+    """
+    return song_id if max_rate is None else (song_id, max_rate)
+
+
+def _resampled_header(plan: "resample.ResamplePlan | None") -> dict[str, str] | None:
+    """What a resampled song's answers carry, and nothing for any other."""
+    return {"x-deadwax-resampled": plan.header} if plan is not None else None
 
 
 def _total(content_range: str | None) -> int | None:
@@ -296,14 +359,30 @@ def continues(header: str | None) -> bool:
     return spec.replace(" ", "") != "0-1"
 
 
+def starts_over(header: str | None) -> bool:
+    """
+    Whether a request asks for the whole of the file from its first byte, open-ended (`bytes=0-`):
+    how Chromium starts every play of a song, where Safari starts with its two-byte probe. It is
+    read as carrying on (continues()) - Safari's rest straight after its probe is the same words -
+    unless the URL was last answered long enough ago that it can only be a new play (see
+    Mp4Cache.answer()). Safari's `bytes=0-N` with an end is left as it always was.
+    """
+    if not header:
+        return False
+    unit, _, spec = header.partition("=")
+    return unit.strip().lower() == "bytes" and spec.replace(" ", "") == "0-"
+
+
 def _open_cached(path: Path):
     """A cached MP4, opened for reading - never through a link, which nothing of deadwax's makes."""
     return os.fdopen(os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)), "rb")
 
 
-async def ranged_file(path: Path, request: Request, etag: str) -> Response:
+async def ranged_file(path: Path, request: Request, etag: str, extra: dict[str, str] | None = None) -> Response:
     """
-    A file from the cache, whole or as the byte range asked for, as audio/mp4.
+    A file from the cache, whole or as the byte range asked for, as audio/mp4. `extra` headers go
+    on every answer of it - the 200, the 206 and the 416 alike (a resampled song's
+    X-Deadwax-Resampled).
 
     Not Starlette's FileResponse, which was read (0.50) before deciding: its 416 says
     `Content-Range: */N` without the unit RFC 9110 requires, it refuses a suffix range longer than
@@ -330,6 +409,7 @@ async def ranged_file(path: Path, request: Request, etag: str) -> Response:
         "last-modified": last_modified,
         #? the same as a stream relayed from Navidrome: a cached copy is asked about, never trusted
         "cache-control": "no-cache",
+        **(extra or {}),
     }
 
     try:
@@ -412,6 +492,47 @@ FMP4_WRAP = Wrap("fmp4", ".f.mp4", "a fragmented MP4", "a fragmented MP4 for the
                  _fmp4_pieces)
 
 
+def _flac_from_fragmented(source, target: Path) -> None:
+    """
+    The FLAC a fragmented MP4 of deadwax's own carries, written to `target`: 'fLaC', its STREAMINFO
+    out of the dfLa box as the only block, then every mdat's frames in order, untouched - frame for
+    frame the FLAC it was made from, so the plain MP4 made of this is the one that FLAC would make.
+    `source` is the file, open. Read a box at a time and copied in batches, never held whole. Raises
+    ValueError for a file not laid out as deadwax lays them out, and the disk's own OSError. Runs in
+    a worker thread.
+    """
+    source.seek(0, os.SEEK_END)
+    size = source.tell()
+    info, bodies, pos = None, [], 0
+    while pos < size:
+        source.seek(pos)
+        header = source.read(8)
+        length = int.from_bytes(header[:4], "big")
+        if len(header) < 8 or length < 8 or pos + length > size:
+            raise ValueError("it isn't a fragmented MP4 laid out as deadwax lays them out")
+        if header[4:] == b"moov":
+            moov = source.read(length - 8)
+            at = moov.find(b"dfLa")
+            if at < 0 or moov[at + 8:at + 12] != bytes((0x80, 0, 0, 34)):
+                raise ValueError("its moov carries no STREAMINFO")
+            info = moov[at + 12:at + 46]
+        elif header[4:] == b"mdat":
+            bodies.append((pos + 8, length - 8))
+        pos += length
+    if info is None or len(info) != 34 or not bodies:
+        raise ValueError("it has no STREAMINFO or no frames")
+    with open(target, "wb") as out:
+        out.write(b"fLaC" + bytes((0x80, 0, 0, 34)) + info)
+        for start, left in bodies:
+            source.seek(start)
+            while left:
+                chunk = source.read(min(WRITE_BATCH, left))
+                if not chunk:
+                    raise ValueError("it ended part-way through its frames")
+                out.write(chunk)
+                left -= len(chunk)
+
+
 def _repackage(part: Path, target: Path, pieces: Callable[[bytes], list]) -> int:
     """
     The FLAC at `part` written out at `target` in the container `pieces` lays out (a Wrap's), under
@@ -439,6 +560,12 @@ def _etag(key: str) -> str:
     return f'"{key[:32]}"'
 
 
+def _key_of(path: Path) -> str:
+    """The cache key a cached file is named by, as much of it as its name holds - all that _etag()
+    and the file's path are made from."""
+    return path.name[:40]
+
+
 def _refusal(reason: str) -> Response:
     """The gapless player's answer for a song this version of which can't be repackaged: 415, and
     why - which it doesn't ask for again, and plays the ordinary way."""
@@ -453,22 +580,28 @@ def _unavailable(scope: str, detail: str) -> Response:
                         headers={"retry-after": str(wait), "cache-control": "no-store"})
 
 
-async def _to_the_end(work):
+async def _to_the_end(work, stop: threading.Event | None = None):
     """
     A worker thread's result, waited for to its end even when whatever awaits it is cancelled
     meanwhile - and then the cancellation carried on. A thread can't be stopped, and the gate it
     runs under has to stay held until it is done, or a second song could be held in memory beside
-    it.
+    it. What CAN be done is asking it to stop: `stop` is set first, and the resample, which looks at
+    it once a block, ends within one instead of running to the end with the gate held.
     """
     job = asyncio.ensure_future(work)
     try:
         return await asyncio.shield(job)
     except asyncio.CancelledError:
+        if stop is not None:
+            stop.set()
         while not job.done():
             try:
                 await asyncio.wait({job})
             except asyncio.CancelledError:
                 pass
+        if not job.cancelled():
+            #? retrieved - it is resample.Stopped, most likely - so it is never "never retrieved"
+            job.exception()
         raise
 
 
@@ -622,13 +755,20 @@ class Mp4Cache:
         self._working: dict[str, _Make] = {}
         #? cache key -> why it can't be repackaged, oldest first
         self._refused: dict[str, str] = {}
-        #? song id -> (MP4 or FLAC, when, on the monotonic clock) - what it was last answered as,
-        #? the song answered longest ago first. The MP4 path's alone: the gapless player is never
-        #? sent FLAC, so it neither reads nor writes this
-        self._answered: dict[str, tuple[str, float]] = {}
-        #? song id -> the key of the fragmented MP4 it was last served as, the song served longest ago
-        #? first - what an If-Range naming that file is answered from without asking Navidrome
-        self._pinned: dict[str, str] = {}
+        #? URL (_answer_key: the song id, or the song id and the cap) -> (MP4 or FLAC, when, on the
+        #? monotonic clock, and for a resampled MP4 the key and headers of the file it was served
+        #? from) - what it was last answered as, the URL answered longest ago first. The MP4 path's
+        #? alone: the gapless player is never sent FLAC, so it neither reads nor writes this
+        self._answered: dict[str | tuple[str, int], tuple[str, float, tuple[str, dict | None] | None]] = {}
+        #? URL -> (the version of the song it was last served, {the key of a fragmented MP4 of that
+        #? version it was served as: the headers its answers carry}, the file served last at the end),
+        #? the URL served longest ago first - what an If-Range naming one of those files is answered
+        #? from without asking Navidrome
+        self._pinned: dict[str | tuple[str, int], tuple[Version | None, dict[str, dict | None]]] = {}
+        #? a resampled song's cache key (each container's own, by the plan it was asked for) -> (until,
+        #? on the monotonic clock; the plan it was really made by) - a make that lost a side of its
+        #? plan in the last LOST_SECONDS (_make)
+        self._lost: dict[str, tuple[float, resample.ResamplePlan]] = {}
         #? file name -> when it was last served (wall_clock()). A file not here - one made before a
         #? restart - counts as used when it was made. Kept apart from the file's own times, because
         #? its mtime is its Last-Modified: touching it would change the validator under a seek.
@@ -644,9 +784,16 @@ class Mp4Cache:
         #? what `_used` and IN_USE_SECONDS are measured on - the wall clock, since a file made before
         #? a restart counts by its mtime - and a test moves on the same way
         self.wall_clock = time.time
-        #? one repackage at a time, made for the event loop that uses it
+        #? one repackage at a time, and apart from them one resample at a time, made for the event
+        #? loop that uses them
         self._gate_loop: asyncio.AbstractEventLoop | None = None
         self._gate_lock: asyncio.Lock | None = None
+        self._resample_lock: asyncio.Lock | None = None
+        #? what is known of the albums of songs resampled: their grids, their songs' STREAMINFO. On
+        #? this cache's clock, so its memories expire with the versions'
+        self.albums = AlbumContexts(self._version, lambda: self.clock(), VERSION_SECONDS)
+        #? whether it has been said that the audio libraries are missing
+        self._said_libraries = False
 
     @property
     def directory(self) -> Path | None:
@@ -661,76 +808,158 @@ class Mp4Cache:
         return self._max_bytes if self._max_bytes is not None else player_cache_bytes()
 
     def _gate(self) -> asyncio.Lock:
+        """The repackages' gate: one at a time, since the whole song is in memory while it is."""
+        return self._gates()[0]
+
+    def _resample_gate(self) -> asyncio.Lock:
+        """The resamples' gate, apart from the repackages': a resample holds a block of the song at a
+        time, not the song, and can run for a minute on a NAS - the 50 ms repackage of another phone's
+        CD song mustn't wait behind it. One at a time all the same, for the CPU. The two are never
+        held together, so they can't hold each other up."""
+        return self._gates()[1]
+
+    def _gates(self) -> tuple[asyncio.Lock, asyncio.Lock]:
         loop = asyncio.get_running_loop()
         if self._gate_loop is not loop:
-            self._gate_loop, self._gate_lock = loop, asyncio.Lock()
-        return self._gate_lock
+            self._gate_loop, self._gate_lock, self._resample_lock = loop, asyncio.Lock(), asyncio.Lock()
+        return self._gate_lock, self._resample_lock
 
-    def path_for(self, version: Version, wrap: Wrap = MP4_WRAP) -> Path:
-        return self.directory / f"{version.key_for(wrap)[:40]}{wrap.suffix}"
+    def path_for(self, version: Version, wrap: Wrap = MP4_WRAP,
+                 plan: resample.ResamplePlan | None = None) -> Path:
+        return self.directory / f"{version.key_for(wrap, plan)[:40]}{wrap.suffix}"
 
     @staticmethod
-    def etag_for(version: Version, wrap: Wrap = MP4_WRAP) -> str:
-        return _etag(version.key_for(wrap))
+    def etag_for(version: Version, wrap: Wrap = MP4_WRAP, plan: resample.ResamplePlan | None = None) -> str:
+        return _etag(version.key_for(wrap, plan))
 
-    async def answer(self, song_id: str, request: Request) -> Response | None:
+    def _resampling(self) -> bool:
+        """Whether songs can be resampled here: the audio libraries are there. Said once when not -
+        and a request asking for it is then answered as if it hadn't."""
+        missing = resample.missing_libraries()
+        if missing and not self._said_libraries:
+            self._said_libraries = True
+            logger.warning(f"player: songs above 48 kHz can't be resampled on this server - {missing} "
+                           f"couldn't be loaded - so they are sent as they are, whatever the player's maximum "
+                           f"quality says")
+        return missing is None
+
+    async def answer(self, song_id: str, request: Request, max_rate: int | None = None) -> Response | None:
         """
         The song as an MP4, with the request's byte range - or None, and the caller sends the FLAC
         as it is - or a 503, for a request carrying on from an MP4 that can't be had just now (see
         the module's docstring). NavidromeError is raised as it would be for the FLAC: a song
         Navidrome doesn't have, a login it refuses, a Navidrome that isn't there.
 
+        `max_rate` (48000): resampled when it is above that, and answered exactly as without it when
+        it isn't. A resampled song that can't be had goes as any song's MP4 does: the FLAC as it is.
+
         Cancelling it (the route does when the phone hangs up) takes this request off the make it
         waits for, and a make nobody waits for any more stops.
         """
-        carrying_on = continues(request.headers.get("range"))
-        last = self._answered.get(song_id)
+        if max_rate is not None and not self._resampling():
+            max_rate = None
+        url = _answer_key(song_id, max_rate)
+        header = request.headers.get("range")
+        last = self._answered.get(url)
+        #? Chromium starts every play with `bytes=0-`, which reads as carrying on - Safari's rest
+        #? straight after its probe is the same words. Long after this URL was last answered it is a
+        #? new play, and is answered as one: a FLAC answered once after a make that failed isn't kept
+        #? for good, and a song whose audio was replaced isn't served from the old file hours later
+        carrying_on = continues(header) and not (
+            last is not None and starts_over(header) and self.clock() - last[1] >= VERSION_SECONDS)
         if last is not None and last[0] == FLAC and (carrying_on or self.clock() - last[1] < VERSION_SECONDS):
-            return self._as_flac(song_id)
+            return self._as_flac(url)
 
         folder = await self._folder()
         if folder is None:
-            return self._instead(song_id, carrying_on, "the player's cache has nowhere to go")
+            return self._instead(url, carrying_on, "the player's cache has nowhere to go")
+        if carrying_on and max_rate is not None:
+            served = await self._served_answer(url, folder, request, last)
+            if served is not None:
+                return served
         try:
             version = await self._version(song_id)
         except httpx.TransportError:
-            return self._instead(song_id, carrying_on, "Navidrome broke off saying which file it has")
+            return self._instead(url, carrying_on, "Navidrome broke off saying which file it has")
         if version is None:
-            return self._as_flac(song_id)
-        if version.size > self.wrap_max_bytes:
-            self._refuse(version, self._too_big(version), warn=False)
-            return self._as_flac(song_id)
+            return self._as_flac(url)
+        plan = None
+        if max_rate is not None:
+            try:
+                plan = await self.albums.plan(version, max_rate)
+            except CannotPlan as e:
+                return self._instead(url, carrying_on, f"its file couldn't be looked at to resample it ({e})")
+        if self._held_size(version, plan) > self.wrap_max_bytes:
+            self._refuse(version, self._too_big(version, plan), warn=False, plan=plan)
+            return self._as_flac(url)
 
+        extra = _resampled_header(plan)
         for _ in range(2):
-            path = await self._mp4(version, folder)
+            path = await self._mp4(version, folder, MP4_WRAP, plan)
             if not isinstance(path, Path):
                 break
+            #? the key of the file there, which names it: a song resampled without a neighbour its
+            #? plan names is kept under a plan without it (_make), and has an ETag of its own
+            key = _key_of(path)
             try:
-                response = await ranged_file(path, request, self.etag_for(version))
+                response = await ranged_file(path, request, _etag(key), extra)
             except FileNotFoundError:
                 #? cleared out between being found and being opened: made again, and waited for
                 continue
             except OSError as e:
                 logger.warning(f"player: the MP4 of song {song_id} couldn't be opened ({e})")
                 break
-            self._mark(song_id, MP4)
+            self._mark(url, MP4, (key, extra) if plan is not None else None)
             return response
-        return self._instead(song_id, carrying_on, "its MP4 couldn't be made again just now")
+        return self._instead(url, carrying_on, "its MP4 couldn't be made again just now")
 
-    async def answer_fragmented(self, song_id: str, request: Request) -> Response:
+    async def _served_answer(self, url, folder: Path, request: Request, last) -> Response | None:
+        """
+        A request carrying on from the resampled MP4 this URL was last served as, answered from that
+        file while the cache has it - without asking Navidrome, or making the song's plan again.
+        None, and the ordinary way, for anything else.
+
+        The plan is in the file's key, and it can change in the middle of a song: a song beside it
+        retagged, an album Navidrome couldn't list the first time. Safari sends no If-Range, so the
+        ordinary way would answer its next range from the new file - another length, spliced into
+        what it has. Carrying on from the file it has been reading is right either way. The next
+        time the song starts afresh it gets the plan as it is then.
+        """
+        if last is None or last[0] != MP4 or len(last) < 3 or last[2] is None:
+            return None
+        key, extra = last[2]
+        path = folder / f"{key[:40]}{MP4_WRAP.suffix}"
+        if not await asyncio.to_thread(_is_cached, path):
+            return None
+        try:
+            response = await ranged_file(path, request, _etag(key), extra)
+        except OSError:
+            #? cleared out since it was found: the ordinary way makes it again
+            return None
+        self._used[path.name] = self.wall_clock()
+        self._mark(url, MP4, (key, extra))
+        return response
+
+    async def answer_fragmented(self, song_id: str, request: Request, max_rate: int | None = None) -> Response:
         """
         The song as a fragmented MP4 for the gapless player, with the request's byte range - always
         an answer of its own, never the FLAC, which a MediaSource can't take (see the module's
         docstring for the answers). NavidromeError is raised as for the FLAC: a song Navidrome
         doesn't have, a login it refuses, a Navidrome that isn't there.
 
+        `max_rate` (48000): resampled when it is above that, and answered exactly as without it when
+        it isn't. A resampled song that can't be made is a 415 like any other.
+
         Cancelling it (the route does when the phone hangs up) takes this request off the make it
         waits for, and a make nobody waits for any more stops - as for the MP4.
         """
+        if max_rate is not None and not self._resampling():
+            max_rate = None
+        url = _answer_key(song_id, max_rate)
         folder = await self._folder()
         if folder is None:
             return _unavailable(SERVER, "the player's cache can't be used on this server just now")
-        pinned = await self._pinned_answer(song_id, folder, request)
+        pinned = await self._pinned_answer(url, folder, request)
         if pinned is not None:
             return pinned
         try:
@@ -741,17 +970,28 @@ class Mp4Cache:
             return _unavailable(SONG, "Navidrome broke off saying which file it has")
         if version is None:
             return _refusal(self._why_not.get(song_id) or "it isn't a FLAC file")
-        if version.size > self.wrap_max_bytes:
-            return _refusal(self._refuse(version, self._too_big(version), warn=False, wrap=FMP4_WRAP))
+        plan = None
+        if max_rate is not None:
+            try:
+                plan = await self.albums.plan(version, max_rate)
+            except CannotPlan as e:
+                logger.warning(f"player: song {song_id}'s file couldn't be looked at to resample it ({e}); "
+                               f"{FMP4_WRAP.instead}")
+                return _unavailable(SONG, "its file couldn't be looked at just now")
+        if self._held_size(version, plan) > self.wrap_max_bytes:
+            return _refusal(self._refuse(version, self._too_big(version, plan), warn=False, wrap=FMP4_WRAP,
+                                         plan=plan))
 
-        key = version.key_for(FMP4_WRAP)
+        key, extra = version.key_for(FMP4_WRAP, plan), _resampled_header(plan)
         got: Path | Room | None = None
         for _ in range(2):
-            got = await self._mp4(version, folder, FMP4_WRAP)
+            got = await self._mp4(version, folder, FMP4_WRAP, plan)
             if not isinstance(got, Path):
                 break
+            #? the key of the file there, as for the MP4 - its ETag and its pin
+            served = _key_of(got)
             try:
-                response = await ranged_file(got, request, _etag(key))
+                response = await ranged_file(got, request, _etag(served), extra)
             except FileNotFoundError:
                 #? cleared out between being found and being opened: made again, and waited for
                 continue
@@ -759,7 +999,7 @@ class Mp4Cache:
                 logger.warning(f"player: the fragmented MP4 of song {song_id} couldn't be opened ({e})")
                 got = None
                 break
-            self._pin(song_id, key)
+            self._pin(url, served, extra, version)
             return response
         if key in self._refused:
             return _refusal(self._refused[key])
@@ -772,11 +1012,12 @@ class Mp4Cache:
                                       "made are done")
         return _unavailable(SONG, "its fragmented MP4 couldn't be made just now")
 
-    async def _pinned_answer(self, song_id: str, folder: Path, request: Request) -> Response | None:
+    async def _pinned_answer(self, url, folder: Path, request: Request) -> Response | None:
         """
-        A request whose If-Range names the fragmented MP4 this song was last served as, answered
+        A request whose If-Range names the fragmented MP4 this URL was last served as, answered
         from that file while the cache still has it - WITHOUT asking Navidrome which version it has.
-        None, and the ordinary way, for anything else.
+        None, and the ordinary way, for anything else. A pin is only ever for the URL it was served
+        under: the song asked for as it is never gets its resampled file, nor the other way round.
 
         The page streams a song as ranges of one file, each carrying that file's ETag as If-Range,
         and the ordinary way asks Navidrome again every VERSION_SECONDS. Then a Navidrome being
@@ -786,55 +1027,85 @@ class Mp4Cache:
         from the file it has been reading is right either way: it is the very bytes it has been
         sent. Once the file is gone the ordinary way asks Navidrome, and a version that changed
         meanwhile answers If-Range with the whole file, as it should.
+
+        A few files of the song as it is now are kept, not only the last (PIN_FILES_KEPT): a
+        resampled song made without a neighbour that couldn't be read just now is made again with it
+        once that neighbour reads, and another phone starting the song then gets the new file - while
+        the phone already streaming the first carries on from the first, each ETag its own bytes. A
+        file of an older version of the song is let go once the URL is served a newer one: the old
+        ETag names another version then, and gets the whole new file.
         """
-        key = self._pinned.get(song_id)
-        if key is None or request.headers.get("if-range") != _etag(key):
+        held = self._pinned.get(url)
+        if held is None:
             return None
+        version, pins = held
+        wanted = request.headers.get("if-range")
+        key = next((key for key in pins if _etag(key) == wanted), None)
+        if key is None:
+            return None
+        extra = pins[key]
         path = folder / f"{key[:40]}{FMP4_WRAP.suffix}"
         if not await asyncio.to_thread(_is_cached, path):
             return None
         try:
-            response = await ranged_file(path, request, _etag(key))
+            response = await ranged_file(path, request, _etag(key), extra)
         except OSError:
             #? cleared out since it was found: the ordinary way makes it again
             return None
         self._used[path.name] = self.wall_clock()
-        self._pin(song_id, key)
+        self._pin(url, key, extra, version)
         return response
 
-    def _pin(self, song_id: str, key: str) -> None:
-        self._pinned.pop(song_id, None)
-        self._pinned[song_id] = key
+    def _pin(self, url, key: str, extra: dict | None = None, version: Version | None = None) -> None:
+        """Remember that this URL was served the fragmented MP4 of `key`, of that version of the song -
+        beside the others of it it was served (a few), and without any of another version."""
+        held = self._pinned.pop(url, None)
+        pins = held[1] if held is not None and held[0] == version else {}
+        pins.pop(key, None)
+        pins[key] = extra
+        while len(pins) > PIN_FILES_KEPT:
+            del pins[next(iter(pins))]
+        self._pinned[url] = (version, pins)
         while len(self._pinned) > PINS_KEPT:
             del self._pinned[next(iter(self._pinned))]
 
-    def _too_big(self, version: Version) -> str:
+    @staticmethod
+    def _held_size(version: Version, plan: resample.ResamplePlan | None) -> int:
+        """What repackaging this song holds in memory: the file itself - or, resampled, about the FLAC
+        the resample writes, since the source is only ever read from disk a block at a time."""
+        return plan.estimated_bytes(version.size) if plan is not None else version.size
+
+    def _too_big(self, version: Version, plan: resample.ResamplePlan | None = None) -> str:
+        if plan is not None:
+            return (f"resampled it would be about {self._held_size(version, plan) >> 20} MiB, more than the "
+                    f"{self.wrap_max_bytes >> 20} MiB a song is held in memory to repackage")
         return (f"it is {version.size >> 20} MiB, more than the {self.wrap_max_bytes >> 20} MiB a song is "
                 f"held in memory to repackage")
 
-    def _mark(self, song_id: str, container: str) -> None:
-        self._answered.pop(song_id, None)
-        self._answered[song_id] = (container, self.clock())
+    def _mark(self, url, container: str, served: tuple[str, dict | None] | None = None) -> None:
+        self._answered.pop(url, None)
+        self._answered[url] = (container, self.clock(), served)
         while len(self._answered) > ANSWERS_KEPT:
             del self._answered[next(iter(self._answered))]
 
-    def _as_flac(self, song_id: str) -> None:
-        self._mark(song_id, FLAC)
+    def _as_flac(self, url) -> None:
+        self._mark(url, FLAC)
         return None
 
-    def _instead(self, song_id: str, carrying_on: bool, why: str) -> Response | None:
+    def _instead(self, url, carrying_on: bool, why: str) -> Response | None:
         """
         What a request gets when its MP4 can't be had: the FLAC - unless it carries on from an MP4
         this URL was answered with, where FLAC bytes under another length would be spliced into what
         the phone already has. That gets a 503, and the page's own retry starts the song afresh.
         """
-        last = self._answered.get(song_id)
+        last = self._answered.get(url)
         if carrying_on and last is not None and last[0] == MP4:
+            song_id = url if isinstance(url, str) else url[0]
             logger.warning(f"player: song {song_id} was being played as an MP4, and {why}; Safari is "
                            f"asked to try again rather than sent the FLAC, whose bytes aren't the MP4's")
             return Response(status_code=503, headers={"retry-after": str(RETRY_AFTER_SECONDS),
                                                       "cache-control": "no-store"})
-        return self._as_flac(song_id)
+        return self._as_flac(url)
 
     async def _folder(self) -> Path | None:
         """The folder to keep MP4s in now, made and checked, or None - said once - when there is none."""
@@ -918,17 +1189,25 @@ class Mp4Cache:
         stamp = json.dumps([upstream.headers.get("last-modified"), upstream.headers.get("etag")])
         return Version(song_id=song_id, size=size, stamp=stamp)
 
-    def _refuse(self, version: Version, reason: str, warn: bool = True, wrap: Wrap = MP4_WRAP) -> str:
-        """Remember that this version can't be wrapped in that container, and say so the first
-        time. Returns the reason remembered."""
-        key = version.key_for(wrap)
+    def _refuse(self, version: Version, reason: str, warn: bool = True, wrap: Wrap = MP4_WRAP,
+                plan: resample.ResamplePlan | None = None) -> str:
+        """Remember that this version can't be wrapped in that container - resampled as `plan` says,
+        when there is one - and say so the first time. Returns the reason remembered."""
+        key = version.key_for(wrap, plan)
         if key in self._refused:
             return self._refused[key]
         self._refused[key] = reason
         while len(self._refused) > REFUSALS_KEPT:
             del self._refused[next(iter(self._refused))]
         say = logger.warning if warn else logger.info
-        if wrap is MP4_WRAP:
+        if plan is not None and wrap is MP4_WRAP:
+            say(f"player: song {version.song_id} is sent as the FLAC it is, not resampled to "
+                f"{resample.khz(plan.out_rate)} in an MP4 - {reason}")
+        elif plan is not None:
+            say(f"player: song {version.song_id} isn't streamed by the gapless player resampled to "
+                f"{resample.khz(plan.out_rate)} - it can't be put in {wrap.noun}: {reason}. The player plays it "
+                f"the ordinary way")
+        elif wrap is MP4_WRAP:
             say(f"player: song {version.song_id} is sent to Safari as FLAC, not in an MP4 - {reason}. "
                 f"It plays, but Safari's seeks in it can land seconds off")
         else:
@@ -936,23 +1215,34 @@ class Mp4Cache:
                 f"{wrap.noun}: {reason}. The player plays it the ordinary way")
         return reason
 
-    async def _mp4(self, version: Version, folder: Path, wrap: Wrap = MP4_WRAP) -> Path | Room | None:
+    async def _mp4(self, version: Version, folder: Path, wrap: Wrap = MP4_WRAP,
+                   plan: resample.ResamplePlan | None = None) -> Path | Room | None:
         """
-        The cached file of this version in that container, made if it isn't there. Otherwise why
-        not: the Room there was no room of, or None - refused (in `_refused`) or failed.
+        The cached file of this version in that container - resampled as `plan` says, when there
+        is one - made if it isn't there. Otherwise why not: the Room there was no room of, or None -
+        refused (in `_refused`) or failed.
         """
-        key = version.key_for(wrap)
+        key = version.key_for(wrap, plan)
         path = folder / f"{key[:40]}{wrap.suffix}"
         if await asyncio.to_thread(_is_cached, path):
             self._used[path.name] = self.wall_clock()
             return path
         if key in self._refused:
             return None
+        #? made a moment ago without a side of its plan that couldn't be read: that file, with no wait
+        #? on that side again - see _make()
+        lost = self._lost_side(key)
+        if lost is not None:
+            made = folder / f"{version.key_for(wrap, lost)[:40]}{wrap.suffix}"
+            if await asyncio.to_thread(_is_cached, made):
+                self._used[made.name] = self.wall_clock()
+                return made
 
-        #? keyed on the container's own key: an MP4 and a fragmented MP4 of one song are two makes
+        #? keyed on the container's own key: an MP4 and a fragmented MP4 of one song are two makes, and
+        #? so are the song as it is and resampled
         make = self._working.get(key)
         if make is None:
-            make = _Make(asyncio.ensure_future(self._make(version, path, wrap)))
+            make = _Make(asyncio.ensure_future(self._make(version, path, wrap, plan, lost)))
             self._working[key] = make
 
             def finished(done: asyncio.Task, key: str = key, this: _Make = make) -> None:
@@ -977,65 +1267,128 @@ class Mp4Cache:
                     del self._working[key]
                 make.task.cancel()
 
-    async def _make(self, version: Version, path: Path, wrap: Wrap) -> Path | Room | None:
+    async def _make(self, version: Version, path: Path, wrap: Wrap, plan: resample.ResamplePlan | None = None,
+                    lost: resample.ResamplePlan | None = None) -> Path | Room | None:
         """
         Fetch, repackage, store. Never raises but for being cancelled: every way it can fail is
         logged here, and answers the Room there wasn't, or None - so the MP4's request is sent the
-        FLAC instead, and the gapless player its own answer.
+        FLAC instead, and the gapless player its own answer. What it answers is the file made, which
+        isn't always `path` - see below.
+
+        With a `plan`, the song is resampled first: its neighbours' samples are read (_context), then
+        the download is resampled with them (_resampled) to a FLAC of its own beside it, kept until
+        the make ends, so a disk that fills while repackaging it is tried again without resampling it
+        again. A disk that fills during the resample itself is tried again the same way -
+        resample.resample_file raises the disk's own OSError(ENOSPC), and the download is still
+        there, since it goes only once the resample is done: the half-written FLAC is written over
+        from its start. Room is made at the source's size on the disk all the same - the download and
+        the resampled FLAC, then that FLAC and the MP4, are each two copies of about a song at most -
+        and within the cap at the size of the file it makes (_kept_size).
+
+        A side the plan names whose samples couldn't be read just now (Navidrome slow or down for a
+        moment, a neighbour changed since it was looked at) is resampled against silence, and that
+        file is kept under the plan WITHOUT that neighbour - which is what its bytes are. Under the
+        plan's own key it would be served for good as the song made with its context, clicking at
+        that join long after Navidrome was fine again, and a make of it later with the context would
+        be other bytes under the same ETag. This way each key names one set of bytes.
+
+        And that make is remembered for VERSION_SECONDS (_lose()): `lost`, the plan it was really
+        made by, when _mp4() finds a make that lost a side in that time. Every fresh start in it goes
+        to that file, with no read of the side that failed - so Safari's probe, the readout's, a
+        standby that loaded the song and the element taking over from it are all one file, never
+        one made without the context and one made with it a moment later, whose bytes a continuation
+        would be served at the first's offsets. And a neighbour whose reads always run out of time
+        costs one wait of CONTEXT_SECONDS in that time, not one for every fresh start. Once it has
+        passed, the context is asked for again: a song keeps no click for longer than that.
+
+        The MP4 of a resampled song whose fragmented MP4 the cache has, made by the same plan, is
+        made from that - the page leaving the gapless stream in the middle of a song asks for it -
+        with no download and no resample: the frames are the same, so the song carries on at once,
+        at the level it had (_from_twin). A copy of it that isn't whole is cleared out, and the song
+        is made the ordinary way.
         """
         folder = path.parent
         what = f"song {version.song_id}"
-        part = folder / f"{path.stem}.{secrets.token_hex(4)}.part"
-        self._reserved += version.size
+        token = secrets.token_hex(4)
+        part = folder / f"{path.stem}.{token}.part"
+        #? not ending in .mp4: _prepare() clears it if a process dies with it there
+        resampled = folder / f"{path.stem}.{token}.resampled.flac" if plan is not None else None
+        kept = self._kept_size(version, plan)
+        made, context = None, (None, None)
+        self._reserved += kept
         try:
             await asyncio.to_thread(self._prepare, folder)
             if await asyncio.to_thread(_is_cached, path):
                 return path
-            room = await asyncio.to_thread(self._make_room, folder, version.size)
-            if room is Room.DISK:
-                logger.warning(f"player: {what} isn't put in {wrap.made} - the disk holding the cache ({folder}) "
-                               f"is short of space even with older songs cleared out of it; {wrap.no_cache}")
-                return room
-            if room is Room.SHORT:
-                logger.warning(f"player: {what} isn't put in {wrap.made} - the disk holding the cache ({folder}) "
-                               f"is short of space for a song its size ({version.size >> 20} MiB), even with "
-                               f"older songs cleared out of it; {wrap.instead}")
-                return room
+            if plan is not None:
+                #? made a moment ago without a side: by the plan it had, not asking for that side again
+                tried = plan if lost is None else lost
+                if tried is not plan:
+                    path = folder / f"{version.key_for(wrap, tried)[:40]}{wrap.suffix}"
+                if wrap is MP4_WRAP:
+                    got = await self._from_twin(version, path, tried, kept, resampled)
+                    if got is not None:
+                        return got
+                context, had = await self._context(version, tried)
+                if had != tried:
+                    #? a side couldn't be read just now: the fresh starts of the next VERSION_SECONDS
+                    #? get what is made without it, and don't wait on that side again
+                    self._lose(version.key_for(wrap, plan), had)
+                if had != plan:
+                    path = folder / f"{version.key_for(wrap, had)[:40]}{wrap.suffix}"
+                    if await asyncio.to_thread(_is_cached, path):
+                        self._used[path.name] = self.wall_clock()
+                        return path
+                    if wrap is MP4_WRAP and had != tried:
+                        got = await self._from_twin(version, path, had, kept, resampled)
+                        if got is not None:
+                            return got
+            room = await self._room(folder, version.size, kept, what, wrap)
             if not room:
-                logger.warning(f"player: {what} isn't put in {wrap.made} just now - the cache has room for it "
-                               f"only by clearing a song being played, or the songs being made fill it "
-                               f"(PLAYER_CACHE_MB may be small for the songs played at once); {wrap.instead}")
                 return room
 
             fetched = False
-            for attempt in (1, 2):
-                try:
-                    if not fetched:
-                        if not await self._download(version, part, wrap):
-                            return None
-                        fetched = True
-                    began = time.monotonic()
-                    async with self._gate():
-                        size = await _to_the_end(asyncio.to_thread(_repackage, part, path, wrap.pieces))
-                    break
-                except OSError as e:
-                    if e.errno != errno.ENOSPC or attempt == 2:
-                        raise
-                    #? something else filled the disk since room was made: older songs go, and once more
-                    freed = await asyncio.to_thread(self._clear, folder, MAKE_ROOM_FACTOR * version.size,
-                                                    path.name)
-                    logger.info(f"player: the disk holding the cache filled up while {what} was being put in "
-                                f"{wrap.noun}; {freed >> 20} MiB of songs played longest ago were cleared, and it "
-                                f"is tried once more")
 
-            took = (time.monotonic() - began) * 1000
-            logger.info(f"player: {what} put in {wrap.made} ({size >> 10} KiB, repackaged in {took:.0f} ms)")
+            async def flac() -> Path | None:
+                """The FLAC repackaged: the download, or the download resampled."""
+                nonlocal fetched, made
+                if not fetched:
+                    if not await self._download(version, part, wrap):
+                        return None
+                    fetched = True
+                if plan is None:
+                    return part
+                made = await self._resampled(plan, part, resampled, *context)
+                return resampled
+
+            written = await self._written(flac, path, wrap, version)
+            if written is None:
+                return None
+            size, took = written
+            if plan is None:
+                logger.info(f"player: {what} put in {wrap.made} ({size >> 10} KiB, repackaged in {took:.0f} ms)")
+            else:
+                logger.info(f"player: {what} resampled from {resample.khz(plan.source_rate)} to "
+                            f"{resample.khz(plan.out_rate)}, {round(made.lowered_db, 2):g} dB down, and put in "
+                            f"{wrap.made} ({size >> 10} KiB, resampled in {made.seconds * 1000:.0f} ms, repackaged "
+                            f"in {took:.0f} ms)")
+                if made.beyond_db is not None:
+                    logger.warning(f"player: {what} was lowered a further {made.beyond_db:.2f} dB so nothing "
+                                   f"clips - its joins with the songs beside it step in level by that much. "
+                                   f"Resampled it would have peaked at {made.peak_db:+.2f} dBFS, past the "
+                                   f"{resample.HEADROOM_DB:g} dB every resampled song is lowered by - a master "
+                                   f"clipped very hard when it was made")
             self._used[path.name] = self.wall_clock()
-            #? room was made for the FLAC's size; the file made can be a little bigger (an MP4's boxes)
-            await asyncio.to_thread(self._evict, folder, path.name, max(0, size - version.size))
+            #? room was made for the size it was expected to be; the file made can be a little bigger
+            #? (an MP4's boxes, a resampled 16-bit song written at 24 bits)
+            await asyncio.to_thread(self._evict, folder, path.name, max(0, size - kept))
             return path
         except CannotRepackage as e:
-            self._refuse(version, f"its FLAC stream couldn't be repackaged with certainty ({e})", wrap=wrap)
+            self._refuse(version, f"its FLAC stream couldn't be repackaged with certainty ({e})", wrap=wrap,
+                         plan=plan)
+            return None
+        except resample.CannotResample as e:
+            self._refuse(version, f"it couldn't be resampled exactly ({e})", wrap=wrap, plan=plan)
             return None
         except asyncio.CancelledError:
             logger.info(f"player: putting {what} in {wrap.noun} was stopped - nobody was waiting for it any more")
@@ -1048,8 +1401,183 @@ class Mp4Cache:
             logger.exception(f"player: putting {what} in {wrap.made} failed; {wrap.instead}")
             return None
         finally:
-            self._reserved -= version.size
+            self._reserved -= kept
             await asyncio.to_thread(part.unlink, missing_ok=True)
+            if resampled is not None:
+                await asyncio.to_thread(resampled.unlink, missing_ok=True)
+
+    async def _from_twin(self, version: Version, path: Path, plan: resample.ResamplePlan, kept: int,
+                         target: Path) -> Path | Room | None:
+        """
+        The resampled MP4 at `path` made out of the fragmented MP4 of this song made by the same
+        `plan`, when the cache has it: its FLAC written to `target` (_flac_from_fragmented) and
+        repackaged - no download, no resample. What _make() answers, or None to carry on without it.
+
+        None too for a copy that isn't whole - cut short by a power cut on a filesystem that doesn't
+        order the rename after the data, or by a disk error: cut in the middle of a box it isn't laid
+        out as deadwax lays them out, and cut at a box boundary its frames hold fewer samples than its
+        STREAMINFO says, which the muxer won't vouch for. Either way the song is fine and only this
+        copy isn't, so it is cleared out, and the make downloads and resamples the song as it would
+        have without it. Never the reason the song goes unresampled, and never refused for it.
+        """
+        folder = path.parent
+        what = f"song {version.song_id}"
+        name = f"{version.key_for(FMP4_WRAP, plan)[:40]}{FMP4_WRAP.suffix}"
+        twin = await asyncio.to_thread(self._twin, folder / name)
+        if twin is None:
+            return None
+        try:
+            #? the FLAC out of it and the MP4 are the two copies on the disk
+            room = await self._room(folder, kept, kept, what, MP4_WRAP)
+            if not room:
+                return room
+
+            async def flac() -> Path:
+                await asyncio.to_thread(_flac_from_fragmented, twin, target)
+                return target
+
+            try:
+                size, took = await self._written(flac, path, MP4_WRAP, version)
+            except ValueError as e:
+                #? CannotRepackage is one: the frames short of STREAMINFO's samples
+                logger.warning(f"player: the fragmented MP4 of {what} in the cache isn't whole ({e}), so it is "
+                               f"cleared out and the song is made the ordinary way")
+                await asyncio.to_thread(self._drop, folder, name)
+                await asyncio.to_thread(target.unlink, missing_ok=True)
+                return None
+        finally:
+            await asyncio.to_thread(twin.close)
+        logger.info(f"player: {what} put in {MP4_WRAP.made}, resampled from {resample.khz(plan.source_rate)} to "
+                    f"{resample.khz(plan.out_rate)}, out of the fragmented MP4 of it the gapless player has - no "
+                    f"download, no resample ({size >> 10} KiB, repackaged in {took:.0f} ms)")
+        self._used[path.name] = self.wall_clock()
+        await asyncio.to_thread(self._evict, folder, path.name, max(0, size - kept))
+        return path
+
+    async def _room(self, folder: Path, size: int, kept: int, what: str, wrap: Wrap) -> Room:
+        """_make_room() for a make (see there), and why when there is none."""
+        room = await asyncio.to_thread(self._make_room, folder, size, kept)
+        if room is Room.DISK:
+            logger.warning(f"player: {what} isn't put in {wrap.made} - the disk holding the cache ({folder}) "
+                           f"is short of space even with older songs cleared out of it; {wrap.no_cache}")
+        elif room is Room.SHORT:
+            logger.warning(f"player: {what} isn't put in {wrap.made} - the disk holding the cache ({folder}) "
+                           f"is short of space for a song its size ({size >> 20} MiB), even with older songs "
+                           f"cleared out of it; {wrap.instead}")
+        elif not room:
+            logger.warning(f"player: {what} isn't put in {wrap.made} just now - the cache has room for it only by "
+                           f"clearing a song being played, or the songs being made fill it (PLAYER_CACHE_MB may be "
+                           f"small for the songs played at once); {wrap.instead}")
+        return room
+
+    async def _written(self, flac, path: Path, wrap: Wrap, version: Version) -> tuple[int, float] | None:
+        """
+        The FLAC `flac()` gives repackaged at `path`, in the container `wrap` lays out: the file's
+        size and how long the repackage took, in ms - or None when `flac()` gives none (a download
+        that failed, and said so). One repackage at a time, under the gate.
+
+        If the disk fills meanwhile - something else writing since room was made - the songs played
+        longest ago are cleared for MAKE_ROOM_FACTOR times the song, and it is tried once more: the
+        repackage alone once `flac()` has given its FLAC, `flac()` again when that is what filled it
+        (a resample, from the download still there).
+        """
+        folder = path.parent
+        source = None
+        for attempt in (1, 2):
+            try:
+                if source is None:
+                    source = await flac()
+                    if source is None:
+                        return None
+                began = time.monotonic()
+                async with self._gate():
+                    size = await _to_the_end(asyncio.to_thread(_repackage, source, path, wrap.pieces))
+                return size, (time.monotonic() - began) * 1000
+            except OSError as e:
+                if e.errno != errno.ENOSPC or attempt == 2:
+                    raise
+                #? something else filled the disk since room was made: older songs go, and once more
+                freed = await asyncio.to_thread(self._clear, folder, MAKE_ROOM_FACTOR * version.size, path.name)
+                logger.info(f"player: the disk holding the cache filled up while song {version.song_id} was being "
+                            f"put in {wrap.noun}; {freed >> 20} MiB of songs played longest ago were cleared, and it "
+                            f"is tried once more")
+        return None
+
+    def _lose(self, key: str, had: resample.ResamplePlan) -> None:
+        """Remember, for LOST_SECONDS, that the make of `key` - a resampled song's, by the plan it
+        was asked for - lost a side of that plan and was made by `had` (see _make)."""
+        self._lost.pop(key, None)
+        self._lost[key] = (self.clock() + LOST_SECONDS, had)
+        while len(self._lost) > LOSSES_KEPT:
+            del self._lost[next(iter(self._lost))]
+
+    def _lost_side(self, key: str) -> resample.ResamplePlan | None:
+        """The plan the make of `key` was really made by, when it lost a side of its plan in the last
+        LOST_SECONDS - or None, and the context is asked for again."""
+        lost = self._lost.get(key)
+        if lost is None:
+            return None
+        if lost[0] <= self.clock():
+            del self._lost[key]
+            return None
+        return lost[1]
+
+    @staticmethod
+    def _kept_size(version: Version, plan: resample.ResamplePlan | None) -> int:
+        """
+        What a make's file will take of the cap, as near as can be told before it is made: the
+        song's own size - or, resampled, about the FLAC it resamples to (ResamplePlan.estimated_bytes,
+        measured 1.0 to 1.07 times the file made from a 24-bit source), with a quarter more for a
+        16-bit source, whose file comes out a little bigger than its depth says (1.15 to 1.24 times),
+        and never more than the source. Judged at the source's size, a resampled song a quarter of
+        it cleared four times the songs it needed to, and one whose source didn't fit beside the
+        song playing wasn't made, though its file would have. What a file comes out over this is
+        trimmed after it is made (_evict), never from a song being played.
+        """
+        if plan is None:
+            return version.size
+        estimate = plan.estimated_bytes(version.size)
+        return min(version.size, estimate * 5 // 4 if plan.bits < resample.OUTPUT_BITS else estimate)
+
+    @staticmethod
+    def _twin(path: Path):
+        """
+        The fragmented MP4 at `path` - a song's by the plan the MP4 is being made by, the frames that
+        MP4 holds - opened, or None when the cache hasn't got it. Opened before room is made, so
+        clearing older songs can't take it away first: an open file outlives its name.
+        """
+        try:
+            return _open_cached(path)
+        except OSError:
+            return None
+
+    async def _context(self, version: Version, plan: resample.ResamplePlan):
+        """
+        The neighbours' samples for resampling this song as `plan` says - small byte ranges of their
+        files, outside both gates - and the plan the song made with them is: `plan` itself, or `plan`
+        without each side that couldn't be had just now. resample_file never reads the plan's
+        neighbours, only these samples, so that plan describes exactly the bytes made.
+        """
+        before, after = await self.albums.context(plan, version.song_id)
+        had = replace(plan, before=plan.before if before is not None else None,
+                      after=plan.after if after is not None else None)
+        return (before, after), had
+
+    async def _resampled(self, plan: resample.ResamplePlan, part: Path, target: Path, before,
+                         after) -> resample.Resampled:
+        """
+        The download at `part` resampled into `target` as `plan` says, with the neighbours' samples
+        (_context; None for a side without), and the download let go of. It runs in a worker thread
+        under a gate of its own (_resample_gate), one at a time but never holding up another song's
+        repackage, and is asked to stop when nobody waits for the song any more (_to_the_end).
+        """
+        stop = threading.Event()
+        async with self._resample_gate():
+            made = await _to_the_end(asyncio.to_thread(resample.resample_file, part, target, plan=plan,
+                                                       before=before, after=after, stop=stop), stop)
+        #? the .part goes: the resampled FLAC is what is repackaged, and is kept for a second try
+        await asyncio.to_thread(part.unlink, missing_ok=True)
+        return made
 
     async def _download(self, version: Version, part: Path, wrap: Wrap) -> bool:
         """The whole file into `part`, exactly the version looked at. False, and said, otherwise."""
@@ -1140,11 +1668,12 @@ class Mp4Cache:
         self._used.pop(name, None)
         return True
 
-    def _make_room(self, folder: Path, size: int) -> Room:
+    def _make_room(self, folder: Path, size: int, kept: int | None = None) -> Room:
         """
         Room for a song of `size` bytes about to be made, by clearing the songs played longest ago:
-        its file within the cap beside those made and those being made, and both its copies on the
-        disk with DISK_SPARE_BYTES to spare.
+        its file - `kept` bytes, what _kept_size() expects it to come to, or `size` - within the cap
+        beside those made and those being made, and both its copies (MAKE_ROOM_FACTOR x `size`) on
+        the disk with DISK_SPARE_BYTES to spare.
 
         Never by clearing a song served in the last IN_USE_SECONDS - one being played, whose next
         range would only make it again, clearing this one in turn: Room.BUSY when nothing else would
@@ -1154,11 +1683,12 @@ class Mp4Cache:
         Past the cap it goes only as the one way this allows: a song too big for what is left of it,
         with nothing being played kept beside it, goes past by that one song at most.
         """
+        kept = size if kept is None else kept
         entries = self._entries(folder)
         now = self.wall_clock()
         held = sum(length for _, _, length in entries)
         playing = sum(length for served, _, length in entries if now - served < IN_USE_SECONDS)
-        others = self._reserved - size
+        others = self._reserved - kept
         cap = self.max_bytes
         need = MAKE_ROOM_FACTOR * size + DISK_SPARE_BYTES
         try:
@@ -1175,7 +1705,7 @@ class Mp4Cache:
                 return Room.BUSY if free + held >= need else Room.SHORT
 
         def fits() -> bool:
-            return (free is None or free >= need) and held + others + size <= cap
+            return (free is None or free >= need) and held + others + kept <= cap
 
         #? not `size`: fits() reads that, the song's own, and a loop rebinding it judged every song
         #? against the one about to be cleared instead

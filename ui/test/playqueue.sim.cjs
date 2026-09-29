@@ -8,7 +8,8 @@
  * a shuffle that ignores the song you tapped, a play counted for skipping to the end, a week of
  * listening on a locked phone that counted nothing, a favourite heard twice and counted once, an
  * album in a pocket stopped dead by one missing file, or a setting on Navidrome's Players page
- * quietly turning every song into a transcode Safari can't seek in.
+ * quietly turning every song into a transcode Safari can't seek in. And which address a hi-res song
+ * gets under the "Maximum quality" setting, from what Navidrome says of it.
  *
  * Run it with:  node ui/test/playqueue.sim.cjs
  */
@@ -29,7 +30,7 @@ const {
   LISTEN_SLACK_SECONDS, NEW_LISTEN, listenStarted, listenHeard, afterFailure, LOAD_RETRY_DELAY_MS,
   MEDIA_ERR_ABORTED, MEDIA_ERR_NETWORK, MEDIA_ERR_DECODE, MEDIA_ERR_SRC_NOT_SUPPORTED,
 } = require(path.join(OUT, 'lib/playQueue.js'));
-const { playableType, streamUrl } = require(path.join(OUT, 'player/api.js'));
+const { playableType, streamUrl, fragmentedUrl, toQueueTrack } = require(path.join(OUT, 'player/api.js'));
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -277,6 +278,42 @@ check('no type and no suffix is nothing to ask', playableType({ contentType: nul
   check('Opus is transcoded there',
     streamUrl(track('o', { contentType: 'audio/ogg', suffix: 'opus' }), vorbisOnly),
     '/deadwax/navidrome/stream/o?format=mp3');
+}
+
+/* ========================================================================== */
+console.log('\nhi-res songs, and the "Maximum quality" setting');
+
+{
+  const hires = track('h', { sampleRate: 192000, bitDepth: 24, channels: 2 });
+  const chromium = () => true;
+  check('no setting given: every address as it was before it existed',
+    [streamUrl(hires, iphone), streamUrl(hires, iphone, true), fragmentedUrl(hires)],
+    ['/deadwax/navidrome/stream/h?format=raw', '/deadwax/navidrome/stream/h?format=raw&wrap=mp4', '/deadwax/navidrome/stream/h?format=raw&wrap=fmp4']);
+  check('"Original": the same', [streamUrl(hires, iphone, true, 'original'), fragmentedUrl(hires, 'original')],
+    ['/deadwax/navidrome/stream/h?format=raw&wrap=mp4', '/deadwax/navidrome/stream/h?format=raw&wrap=fmp4']);
+  check('48 kHz, Safari: resampled, in an MP4', streamUrl(hires, iphone, true, '48000'), '/deadwax/navidrome/stream/h?format=raw&wrap=mp4&max_rate=48000');
+  check('48 kHz, Chromium: in an MP4 too - deadwax only sends a resampled song repackaged',
+    streamUrl(hires, chromium, false, '48000'), '/deadwax/navidrome/stream/h?format=raw&wrap=mp4&max_rate=48000');
+  check('...and the stream\'s fragmented MP4', fragmentedUrl(hires, '48000'), '/deadwax/navidrome/stream/h?format=raw&wrap=fmp4&max_rate=48000');
+  check('a CD FLAC at 48 kHz: untouched, in either browser',
+    [streamUrl(track('c', { sampleRate: 44100, bitDepth: 16 }), chromium, false, '48000'), streamUrl(track('c', { sampleRate: 44100 }), iphone, true, '48000'), fragmentedUrl(track('c', { sampleRate: 48000 }), '48000')],
+    ['/deadwax/navidrome/stream/c?format=raw', '/deadwax/navidrome/stream/c?format=raw&wrap=mp4', '/deadwax/navidrome/stream/c?format=raw&wrap=fmp4']);
+  check('a rate Navidrome didn\'t give: as it always was', streamUrl(track('u'), chromium, false, '48000'), '/deadwax/navidrome/stream/u?format=raw');
+  check('a browser that can\'t play FLAC gets a transcode, never resampled',
+    streamUrl(hires, (type) => type === 'audio/mpeg', true, '48000'), '/deadwax/navidrome/stream/h?format=mp3');
+  check('a 24/96 FLAC of 20 bits: sent as it is (the server can\'t read it)',
+    streamUrl(track('t', { sampleRate: 96000, bitDepth: 20 }), chromium, false, '48000'), '/deadwax/navidrome/stream/t?format=raw');
+}
+
+{
+  const album = { id: 'al', name: 'The Album', artist: 'Them', coverArt: 'cv' };
+  const song = { id: 's', title: 'One', samplingRate: 192000, bitDepth: 24, channelCount: 2 };
+  const got = toQueueTrack(song, album);
+  check('Navidrome\'s samplingRate, bitDepth and channelCount carried into the queue',
+    [got.sampleRate, got.bitDepth, got.channels], [192000, 24, 2]);
+  const bare = toQueueTrack({ id: 's', title: 'One' }, album);
+  check('...0 for each when it didn\'t say', [bare.sampleRate, bare.bitDepth, bare.channels], [0, 0, 0]);
+  check('...beside what was always there', [bare.album, bare.artist, bare.albumId, bare.coverArt], ['The Album', 'Them', 'al', 'cv']);
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');

@@ -28,6 +28,7 @@
 
 import { sameFormat, type FlacFormat, type Fmp4Head } from './fmp4'
 import { LISTEN_SLACK_SECONDS } from './playQueue'
+import type { MaxRate } from './streamWrap'
 
 /** The most one fetch and one appendBuffer carries, in bytes and in seconds of audio. */
 export const PIECE_MAX_BYTES = 1 << 20
@@ -63,18 +64,71 @@ export const BODY_STALL_MS = 8_000
 export const SOURCEOPEN_TIMEOUT_MS = 5_000
 /** Meant to be playing, the playhead not moving, and nothing in flight or scheduled: stuck. */
 export const STUCK_MS = 15_000
+/**
+ * How long a run's FIRST song may keep the stream waiting for its head when deadwax was asked to
+ * resample it, counted from the stream's start. deadwax downloads, resamples and repackages the whole
+ * song before the first byte, and for a long hi-res song on a NAS that is well past the ~20 s the
+ * stuck rule allows any other first song.
+ */
+export const RESAMPLE_HEAD_WAIT_MS = 60_000
 /** How long the stream engine stays off after deadwax says its cache can't be used at all. */
 export const ENGINE_OFF_MS = 10 * 60_000
 
 /**
- * Whether a song of this format may be streamed at all: what the phone lab proved or what is close
- * to it. Above 48 kHz the sample entry holds a clamped rate (its 16.16 field can't hold 96 kHz) that
- * no engine has been seen to play; more than two channels, or depths other than 16 and 24 bits, are
- * untested. Such a song plays the URL way - the stream ends before it.
+ * The highest rate a stream takes a song at, by the "Maximum quality" setting it started with:
+ * 48 kHz, what the phone lab proved (a hi-res song arrives resampled to it) - and under "Original",
+ * a song above that as it is, up to 384 kHz, the highest rate deadwax knows of.
  */
-export function formatStreamable(f: FlacFormat): boolean {
-  return f.sampleRate > 0 && f.sampleRate <= 48000 && f.channels >= 1 && f.channels <= 2 &&
+export const STREAM_MAX_RATE = 48000
+export const ORIGINAL_MAX_RATE = 384000
+
+/** The highest rate a stream started under `cap` takes - see STREAM_MAX_RATE. */
+export function streamMaxRate(cap: MaxRate): number {
+  return cap === 'original' ? ORIGINAL_MAX_RATE : STREAM_MAX_RATE
+}
+
+/**
+ * Whether a song of this format may be streamed at all, in a stream started under `cap` (each keeps
+ * the setting it started with; '48000' when not said): one or two channels, 16 or 24 bits, and a rate
+ * up to streamMaxRate(cap). More channels, or other depths, are untested. Such a song plays the URL
+ * way - the stream ends before it.
+ *
+ * Under "Original" a song above 48 kHz streams as it is, which the lab never played on a phone: its
+ * sample entry holds a clamped rate (the 16.16 field can't hold 96 kHz), and a song the engine won't
+ * decode leaves the stream as any song does. The byte budgets are the same at every rate, so such a
+ * song is held seconds ahead, not half a minute: an iPhone's 5.26 MiB holds about 8 s of 24/192 FLAC,
+ * and MANAGED_AHEAD_BYTES keeps the stream some 4-5 s ahead of the playhead (5.5 s at most in
+ * player.sim, a piece on its way included; the same 3 MiB is about 25 s of a CD song). Enough on a steady connection; a weak one can make it stall, as Settings says.
+ */
+export function formatStreamable(f: FlacFormat, cap: MaxRate = '48000'): boolean {
+  return f.sampleRate > 0 && f.sampleRate <= streamMaxRate(cap) && f.channels >= 1 && f.channels <= 2 &&
     (f.bitsPerSample === 16 || f.bitsPerSample === 24)
+}
+
+/**
+ * Whether what the queue already knows of a song - Navidrome's rate, depth and channels, 0 where it
+ * didn't say - keeps it out of a stream started under `cap`, before deadwax is asked for a copy of it
+ * only for the head's format check to refuse it. More than two channels never streams; a rate above
+ * streamMaxRate(cap), or a depth other than 16 or 24 bits, only when the song isn't `resampled`
+ * (deadwax's copy of a resampled song is 48 or 44.1 kHz and 24-bit). Anything unknown counts for
+ * nothing: the head still decides.
+ */
+export function knownFormatOut(
+  f: { sampleRate?: number; bitDepth?: number; channels?: number }, resampled: boolean, cap: MaxRate = '48000',
+): boolean {
+  const rate = f.sampleRate ?? 0
+  const depth = f.bitDepth ?? 0
+  if ((f.channels ?? 0) > 2) return true
+  if (resampled) return false
+  return rate > streamMaxRate(cap) || (depth > 0 && depth !== 16 && depth !== 24)
+}
+
+/**
+ * The rate a song's audio had before deadwax made its copy: what deadwax says it resampled from, or
+ * the head's own rate. Songs join a run only across the same one - see StreamSource.place().
+ */
+export function sourceRateOf(head: Fmp4Head, resampledFrom: number | null): number {
+  return resampledFrom ?? head.format.sampleRate
 }
 
 /** A song placed in the run: where it sits on the stream's timeline. */
@@ -95,9 +149,10 @@ export interface RunSong {
  * Whether a song with this head can join the run after `prev` (null: it would start the run). A run
  * holds ONE format and one timescale: a song that changes either ends the run before it, and plays
  * the URL way. (AVFoundation's handling of a format change mid-stream is untested closed source.)
+ * `cap` is the setting the stream started with - see formatStreamable().
  */
-export function joins(prev: RunSong | null, head: Fmp4Head): boolean {
-  if (!formatStreamable(head.format)) return false
+export function joins(prev: RunSong | null, head: Fmp4Head, cap: MaxRate = '48000'): boolean {
+  if (!formatStreamable(head.format, cap)) return false
   if (!prev) return true
   return prev.head.timescale === head.timescale && sameFormat(prev.head.format, head.format)
 }
@@ -407,11 +462,14 @@ export interface StreamableQuestion {
   refused: boolean
   /** deadwax said its cache can't be used, less than ENGINE_OFF_MS ago */
   engineOff: boolean
+  /** what the queue knows of its format already keeps it out - see knownFormatOut(). A no, like the
+   *  two above it, so a question that doesn't say (undefined) is a yes. */
+  formatOut: boolean
 }
 
 /** Whether a song may go into a stream. Every no plays it the URL way, as with the switch off. */
 export function streamable(q: StreamableQuestion): boolean {
-  return q.gapless && q.engine && q.isFlac && q.raw && !q.wireless && !q.refused && !q.engineOff
+  return q.gapless && q.engine && q.isFlac && q.raw && !q.wireless && !q.refused && !q.engineOff && !q.formatOut
 }
 
 /** The listening one update across a join adds: to the song that ended, and to the one after. */
