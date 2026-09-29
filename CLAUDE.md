@@ -164,7 +164,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             940 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             941 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2105,6 +2105,11 @@ metadata as well".
 - **A track keeps its OWN artist.** `tag_values` gave every track the release's artist, so
   applying a release to a compilation rewrote eighteen artists into one. The track's credit wins
   where it has one; `albumartist` stays the release's, which is what the two tags are for.
+  **Until v1.0.10 that held for downloads only.** `execute_retag` rebuilt each track from its
+  plan entry's title, number and disc, so the editor PREVIEWED each track's own artist and then
+  wrote the release's on every one - Various Artists over a whole compilation. A plan entry now
+  carries the matched `track` whole and the apply writes that. `test_credits.py` had tested
+  `write_tags` alone, which is why it never showed; the new test goes through plan and apply.
 - **The artist ids are written at last**: `musicbrainz_albumartistid` and `musicbrainz_artistid`.
   Nothing deadwax filed had ever recorded WHO an artist was, only which release - which is why
   the artist page has to fall back to searching by name at all.
@@ -3154,7 +3159,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 940 tests
+.venv/bin/python -m pytest tests/ -q  # 941 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3198,7 +3203,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 940 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 941 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

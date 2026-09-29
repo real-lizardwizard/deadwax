@@ -247,11 +247,13 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
             "matched": track is not None,
             "track_title": (track or {}).get("title", ""),
             "track_position": (track or {}).get("position"),
-            #? carried so execute_retag can rebuild the same track the plan was computed from -
-            #? without them it would write the running number and no disc, and the write would
-            #? disagree with the preview it is carrying out
             "track_disc": (track or {}).get("disc"),
             "track_disc_position": (track or {}).get("disc_position"),
+            #? the matched track WHOLE, which execute_retag writes: the tags above were computed
+            #? from all of it. Rebuilt from the fields above alone, the write lost the track's own
+            #? artist and ids, and a compilation previewed as Portishead and Björk was written as
+            #? "Various Artists" on both (fixed v1.0.10)
+            "track": track,
             "changes": differing,
         })
 
@@ -529,16 +531,8 @@ def execute_retag(
             continue
 
         try:
-            track = (
-                {
-                    "title": entry["track_title"],
-                    "position": entry["track_position"],
-                    "disc": entry.get("track_disc"),
-                    "disc_position": entry.get("track_disc_position"),
-                }
-                if entry["matched"] else None
-            )
-            write_tags(path, release, track)
+            #? the very track the plan's tags were computed from, so the write is the preview
+            write_tags(path, release, entry.get("track") if entry["matched"] else None)
             results["tagged"] += 1
 
         except Exception as e:
