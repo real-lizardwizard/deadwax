@@ -73,8 +73,21 @@ export type StandbyPlan =
  * Nothing is got ready while the sound goes to AirPlay (`wireless`): handoverDecision() never
  * hands over there, so a standby would only download or buffer every next song for nothing,
  * beside the stream the speaker is playing - and have Navidrome transcode songs nobody hears.
+ *
+ * `live` is set when the element playing holds a ONE-STREAM run of FLAC songs (lib/streamPlan.ts):
+ * `runEnd` is the queue index of the run's last song once it is known, null before. Inside the run
+ * the songs follow each other in the stream and nothing is got ready; once the queue is at the
+ * run's last song, the song after it is got ready as ever - always by URL, since a stream only
+ * ever lives on the element playing. Null is the element playing a song by URL, as it always was.
  */
-export function standbyPlan(queue: PlayQueue, enabled: boolean, standby: Standby | null, wireless: boolean): StandbyPlan {
+export function standbyPlan(
+  queue: PlayQueue, enabled: boolean, standby: Standby | null, wireless: boolean,
+  live: { runEnd: number | null } | null = null,
+): StandbyPlan {
+  //? the live element plays a run of songs as one stream: the song after the one playing is in
+  //? that stream, not the standby's to get ready - until the run's last song is playing, and the
+  //? song after the run is the one that goes the URL way at its 'ended'
+  if (live && (live.runEnd === null || queue.index < live.runEnd)) return standby ? { kind: 'clear' } : { kind: 'none' }
   const index = enabled && !wireless ? nextIndex(queue) : null
   const track = index === null ? null : queue.tracks[index]
   if (index === null || !track) return standby ? { kind: 'clear' } : { kind: 'none' }
@@ -243,6 +256,12 @@ export function afterPlaybackFailure(failure: Failure & { fromMemory: boolean })
 }
 
 /**
+ * How a song change was made: a handover, the one element, or - inside a one-stream run - the
+ * stream simply playing on from one song into the next.
+ */
+export type ChangeHow = HandoverDecision | { kind: 'stream' }
+
+/**
  * The longest a song change is timed for, in ms. One that takes longer didn't go straight from a
  * song's end to the next one's sound: the music stopped - a refused play(), a call, a failure at
  * the end of the queue - and something started it again later, and timing that would read as a
@@ -255,7 +274,7 @@ export const CHANGE_MAX_MS = 30_000
 export interface Change {
   /** performance clock, ms */
   endedAt: number
-  how: HandoverDecision
+  how: ChangeHow
   /** for a handover, the incoming element's readyState when it was started (0 nothing - 4
    *  enough to play through): whether iOS had kept what it buffered; null otherwise */
   readyState: number | null
@@ -265,14 +284,14 @@ export interface Change {
   failed: boolean
 }
 
-export function startChange(endedAt: number, how: HandoverDecision, readyState: number | null, from = 0): Change {
+export function startChange(endedAt: number, how: ChangeHow, readyState: number | null, from = 0): Change {
   return { endedAt, how, readyState, from, failed: false }
 }
 
 /** One song change, timed. */
 export interface GapReading {
   ms: number
-  how: HandoverDecision
+  how: ChangeHow
   readyState: number | null
   failed: boolean
 }
@@ -280,6 +299,16 @@ export interface GapReading {
 export function gapReading(change: Change, soundAt: number): GapReading {
   const { endedAt, how, readyState, failed } = change
   return { ms: Math.max(0, Math.round(soundAt - endedAt)), how, readyState, failed }
+}
+
+/**
+ * A join inside a one-stream run, as a reading. There is no 'ended' to time from - the stream
+ * plays on - so the player measures the stall itself (a 'waiting' across the join, or the wall
+ * clock against the media clock across it: streamPlan's joinStallMs) and hands it in. Whole
+ * milliseconds, never below 0, like every other reading.
+ */
+export function streamReading(ms: number): GapReading {
+  return { ms: Math.max(0, Math.round(ms)), how: { kind: 'stream' }, readyState: null, failed: false }
 }
 
 /** A 'timeupdate' from the element the song changed to. */
@@ -332,12 +361,13 @@ const SOURCE_WORDS: Record<HandoverSource, string> = {
   unfinished: 'streamed (download unfinished)',
 }
 
-/** How the change was made, in words: "handed over, from memory", "one element (airplay)". */
+/** How the change was made, in words: "handed over, from memory", "one element (airplay)", "in one stream". */
 export function describeHow(reading: GapReading): string {
   const { how, readyState, failed } = reading
   //? the time includes getting over a failure - asking again, or skipping - so it isn't the gap
   const after = failed ? ', failed before playing' : ''
   if (how.kind === 'same element') return `${how.reason === 'off' ? 'one element' : `one element (${how.reason})`}${after}`
+  if (how.kind === 'stream') return `in one stream${after}`
   //? HAVE_FUTURE_DATA (3) or better is ready to play; below it the element had to load first
   const ready = readyState !== null && readyState < 3 ? ', had to load' : ''
   return `handed over, ${SOURCE_WORDS[how.source]}${ready}${after}`

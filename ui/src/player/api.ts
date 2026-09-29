@@ -120,6 +120,14 @@ export function streamUrl(track: QueueTrack, canPlay: (type: string) => boolean,
   return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${format}${wrap}`)
 }
 
+/**
+ * A FLAC song as fragmented MP4 - the pieces the gapless switch's one stream is made of (see
+ * player/streamSource.ts). Always the file as it is: there is no FLAC in a transcode to repackage.
+ */
+export function fragmentedUrl(track: QueueTrack): string {
+  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=raw&wrap=fmp4`)
+}
+
 /** Which of the two streamUrl() asks for: the file as it is, or a transcode to MP3. */
 export function streamFormat(track: QueueTrack, canPlay: (type: string) => boolean): 'raw' | 'mp3' {
   const type = playableType(track)

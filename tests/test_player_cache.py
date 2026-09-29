@@ -23,6 +23,7 @@ lifespan, so nothing connects anywhere.
 
 import asyncio
 import errno
+import hashlib
 import json
 import logging
 import os
@@ -48,7 +49,10 @@ from src.player_cache import FOLDER_NAME, Mp4Cache, continues  # noqa: E402
 from src.routes import download as download_routes  # noqa: E402
 from src.store import JobStore  # noqa: E402
 import test_navidrome as navidrome_tests  # noqa: E402
-from test_navidrome import FLAC, MP4, STAMP, WRAPPED, cached, navidrome_file, streamed  # noqa: E402
+from src.flac_mp4 import flac_to_fmp4, flac_to_mp4  # noqa: E402
+from test_flac_mp4 import encode  # noqa: E402
+from test_navidrome import (FLAC, FMP4, FRAGMENTED, HEAD, MP4, STAMP, WRAPPED, cached,  # noqa: E402
+                            fragmented, navidrome_file, streamed)
 
 #? test_navidrome.py's fake Navidrome, the real app, and a cache in a folder of the test's own -
 #? that one autouse, so every test here starts with nothing cached and nothing remembered
@@ -120,6 +124,13 @@ def leftovers(cache: Mp4Cache) -> list[str]:
 
 def said(caplog, words: str) -> list[logging.LogRecord]:
     return [record for record in caplog.records if words in record.getMessage()]
+
+
+def played_long_ago(cache: Mp4Cache) -> None:
+    """Everything served so far was served more than IN_USE_SECONDS ago - no longer being played, so
+    the next make may clear it (a song being played never is)."""
+    later = time.time() + player_cache.IN_USE_SECONDS + 1
+    cache.wall_clock = lambda: later
 
 
 # ---------------------------------------------------------------- skipping songs
@@ -427,14 +438,15 @@ def test_a_full_disk_clears_older_songs_and_tries_once_more(upstream, client, mp
     stream = "/deadwax/navidrome/stream/{}?format=raw&wrap=mp4"
     client.get(stream.format("older"))
     [older] = cached(mp4_cache)
+    played_long_ago(mp4_cache)
     real = player_cache._repackage
     full = []
 
-    def fills_once(part, target):
+    def fills_once(part, target, pieces):
         if not full:
             full.append(1)
             raise OSError(errno.ENOSPC, "No space left on device")
-        return real(part, target)
+        return real(part, target, pieces)
 
     monkeypatch.setattr(player_cache, "_repackage", fills_once)
     caplog.set_level(logging.INFO)
@@ -450,7 +462,7 @@ def test_a_disk_that_stays_full_sends_the_flac_and_leaves_nothing(upstream, clie
     state, _ = upstream
     fake, state["handler"] = navidrome_file()
 
-    def always_full(part, target):
+    def always_full(part, target, pieces):
         raise OSError(errno.ENOSPC, "No space left on device")
 
     monkeypatch.setattr(player_cache, "_repackage", always_full)
@@ -482,6 +494,7 @@ def test_room_on_the_disk_is_made_before_a_song_is_fetched(upstream, client, mp4
     stream = "/deadwax/navidrome/stream/{}?format=raw&wrap=mp4"
     client.get(stream.format("older"))
     [older] = cached(mp4_cache)
+    played_long_ago(mp4_cache)
     a_disk(monkeypatch, mp4_cache, player_cache.DISK_SPARE_BYTES + 2 * len(FLAC) + older.stat().st_size - 1)
 
     response = client.get(stream.format("newer"))
@@ -768,6 +781,417 @@ def test_a_shared_cache_path_gets_a_private_folder_of_deadwaxs_own(upstream, cli
     made = list((shared / FOLDER_NAME).glob("*.mp4"))
     assert len(made) == 1 and stat.S_IMODE((shared / FOLDER_NAME).stat().st_mode) == 0o700
     assert stat.S_IMODE(shared.stat().st_mode) == 0o777 and other.read_bytes() == b"theirs"
+
+
+# ---------------------------------------------------------------- the gapless player's fragmented MP4s
+
+def test_a_phone_that_hangs_up_on_the_stream_stops_its_make(upstream, mp4_cache, monkeypatch):
+    """wrap=fmp4 through the real app: the phone gone, the route answers 204 into nothing, and the make
+    nobody waits for stops, its download from Navidrome with it."""
+    state, _ = upstream
+    bodies = unhurried_navidrome(state, step=0.05)
+    monkeypatch.setattr(download_routes, "DISCONNECT_CHECK_SECONDS", 0.02)
+    app = start()
+    sent = []
+
+    async def hang_up():
+        await asgi_get(app, "/deadwax/navidrome/stream/song-1", "format=raw&wrap=fmp4", 0.15, sent,
+                       headers=[(b"range", HEAD.encode())])
+        await asyncio.sleep(0.2)
+
+    asyncio.run(hang_up())
+
+    [body] = bodies["song-1"]
+    assert body.closed and not body.finished
+    assert fragmented(mp4_cache) == [] and leftovers(mp4_cache) == []
+    assert mp4_cache._working == {}
+    assert [m["status"] for _, m in sent if m["type"] == "http.response.start"] == [204]
+
+
+def test_each_container_has_a_key_of_its_own_and_the_mp4s_is_unchanged():
+    """The MP4's key material is what it always was, so MP4s already cached stay valid; the
+    fragmented MP4's names its container and its own format version, so neither's bump clears the
+    other's files, and the two never share a name, a make or a refusal."""
+    version = player_cache.Version(song_id="song-1", size=1234, stamp=json.dumps([STAMP, None]))
+    sha = lambda material: hashlib.sha256(json.dumps(material).encode()).hexdigest()  # noqa: E731
+
+    assert version.key == version.key_for(player_cache.MP4_WRAP) == sha([2, "song-1", 1234, version.stamp])
+    assert version.key_for(player_cache.FMP4_WRAP) == sha([1, "fmp4", "song-1", 1234, version.stamp])
+    cache = Mp4Cache(Path("/nowhere"))
+    assert cache.path_for(version).name == version.key[:40] + ".mp4"
+    assert cache.path_for(version, player_cache.FMP4_WRAP).name == version.key_for(player_cache.FMP4_WRAP)[:40] + ".f.mp4"
+    assert cache.etag_for(version) != cache.etag_for(version, player_cache.FMP4_WRAP)
+
+
+def test_the_songs_remembered_for_if_range_are_bounded(monkeypatch):
+    monkeypatch.setattr(player_cache, "PINS_KEPT", 2)
+    cache = Mp4Cache(Path("/nowhere"))
+    for song in ("a", "b", "a", "c"):
+        cache._pin(song, f"key-{song}")
+    assert list(cache._pinned) == ["a", "c"], "the song served longest ago forgotten first"
+
+
+def navidrome_goes_down(state):
+    def refused(request):
+        raise httpx.ConnectError("connection refused")
+    state["handler"] = refused
+
+
+def test_the_stream_carries_on_from_its_file_while_navidrome_is_down(upstream, client, mp4_cache):
+    """
+    A Navidrome redeploy in the middle of a song: every call to it fails. The page's next pieces
+    carry the song's ETag as If-Range, and are answered from the file already made without asking
+    Navidrome - though VERSION_SECONDS have passed, when the ordinary way would ask.
+    """
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file()
+    head = client.get(FRAGMENTED, headers={"Range": HEAD})
+    etag = head.headers["etag"]
+
+    navidrome_goes_down(state)
+    later = mp4_cache.clock() + player_cache.VERSION_SECONDS * 10
+    mp4_cache.clock = lambda: later
+    pieces = [client.get(FRAGMENTED, headers={"Range": f"bytes={a}-{a + 4999}", "If-Range": etag})
+              for a in (1000, 20000, 60000)]
+    unpinned = client.get(FRAGMENTED, headers={"Range": "bytes=1000-5999"})
+
+    for a, piece in zip((1000, 20000, 60000), pieces):
+        assert (piece.status_code, piece.content, piece.headers["etag"]) == (206, FMP4[a:a + 5000], etag)
+    assert unpinned.status_code == 502, "without the If-Range it is the ordinary way, which asks Navidrome"
+
+    for made in fragmented(mp4_cache):
+        made.unlink()
+    gone = client.get(FRAGMENTED, headers={"Range": "bytes=1000-5999", "If-Range": etag})
+    assert gone.status_code == 502, "once the file is gone, Navidrome has to be asked"
+
+
+def test_the_stream_carries_on_from_its_file_across_a_retag(upstream, client, mp4_cache):
+    """
+    A retag in the middle of a song: Navidrome's Last-Modified moves, so the song's key and ETag
+    would too, and the next piece would be answered with the whole new file - which the page must
+    take for the song having changed under it. Its If-Range keeps it on the file it is reading.
+    """
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file()
+    first = client.get(FRAGMENTED, headers={"Range": HEAD})
+    etag = first.headers["etag"]
+
+    fake["last_modified"] = "Sun, 27 Sep 2026 09:00:00 GMT"
+    later = mp4_cache.clock() + player_cache.VERSION_SECONDS + 1
+    mp4_cache.clock = lambda: later
+    piece = client.get(FRAGMENTED, headers={"Range": "bytes=40000-49999", "If-Range": etag})
+
+    assert (piece.status_code, piece.content, piece.headers["etag"]) == (206, FMP4[40000:50000], etag)
+    assert fake["whole"] == 1, "nothing fetched for it"
+
+    #? the next time the song starts (no If-Range) it is the new version: its own make, its own ETag
+    fresh = client.get(FRAGMENTED, headers={"Range": HEAD})
+    assert fresh.status_code == 206 and fresh.headers["etag"] != etag and fresh.content == FMP4
+    assert fake["whole"] == 2
+    old = client.get(FRAGMENTED, headers={"Range": "bytes=40000-49999", "If-Range": etag})
+    assert (old.status_code, old.content) == (200, FMP4), "the old ETag is another version now: the whole file"
+
+
+def test_a_pin_is_only_ever_for_the_song_it_was_served_as(upstream, client, mp4_cache):
+    """One song's ETag names nothing of another's: song-2 asked with song-1's is the ordinary way."""
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file()
+    etag = client.get(FRAGMENTED, headers={"Range": HEAD}).headers["etag"]
+    navidrome_goes_down(state)
+
+    other = client.get("/deadwax/navidrome/stream/song-2?format=raw&wrap=fmp4",
+                       headers={"Range": "bytes=1000-5999", "If-Range": etag})
+
+    assert other.status_code == 502
+
+
+def two_songs():
+    """Two songs of one size, as FLAC and as each container, and a Navidrome serving both."""
+    songs = {"one": encode(blocks=(4096,) * 12 + (1000,), seed=31)[0], "two": encode(blocks=(4096,) * 12 + (1000,), seed=32)[0]}
+    return songs, {name: flac_to_mp4(data) for name, data in songs.items()}, {
+        name: flac_to_fmp4(data) for name, data in songs.items()}
+
+
+def serving(state, songs):
+    counts = {name: 0 for name in songs}
+
+    def handle(request):
+        song = request.url.params["id"]
+        if not request.headers.get("range"):
+            counts[song] += 1
+        return navidrome_file(songs[song])[1](request)
+
+    state["handler"] = handle
+    return counts
+
+
+def test_a_song_being_streamed_is_never_cleared_for_the_next(upstream, client, tmp_path, monkeypatch):
+    """
+    A cap of about a song and a half. The next song's first request comes while the current one is
+    still being fetched piece by piece: it is told to ask again (503, song) rather than clear the
+    current song - which would be made again at its next piece, clearing the next one in turn. The
+    current song is downloaded once for its whole play.
+    """
+    state, _ = upstream
+    songs, _, fmp4s = two_songs()
+    counts = serving(state, songs)
+    cache = Mp4Cache(tmp_path / "small", max_bytes=len(fmp4s["one"]) * 3 // 2)
+    monkeypatch.setattr(player_cache, "cache", cache)
+    url = "/deadwax/navidrome/stream/{}?format=raw&wrap=fmp4"
+
+    head = client.get(url.format("one"), headers={"Range": HEAD})
+    etag = head.headers["etag"]
+    answers = []
+    for at in (10000, 50000, 90000, 130000):
+        answers.append(client.get(url.format("two"), headers={"Range": HEAD}))
+        piece = client.get(url.format("one"), headers={"Range": f"bytes={at}-{at + 9999}", "If-Range": etag})
+        assert (piece.status_code, piece.content) == (206, fmp4s["one"][at:at + 10000])
+
+    for answer in answers:
+        assert answer.status_code == 503 and answer.json()["scope"] == "song"
+        assert answer.headers["retry-after"] == str(player_cache.RETRY_AFTER_SECONDS)
+    assert counts == {"one": 1, "two": 0}, "the current song never fetched again, the next never started"
+
+    #? the current song done a while ago: now the next is made, and the last one goes
+    later = time.time() + player_cache.IN_USE_SECONDS + 1
+    cache.wall_clock = lambda: later
+    two = client.get(url.format("two"), headers={"Range": HEAD})
+    assert (two.status_code, two.content) == (206, fmp4s["two"])
+    assert [path.name for path in fragmented(cache)] == [cache.path_for(cache._versions["two"][1], player_cache.FMP4_WRAP).name]
+
+
+def test_a_song_safari_is_playing_is_never_cleared_for_the_next_either(upstream, client, tmp_path, monkeypatch):
+    """The same rule for the MP4: the next song, starting, is sent as FLAC - as when there's no room
+    for it at all - and the one being played isn't made again."""
+    state, _ = upstream
+    songs, mp4s, _ = two_songs()
+    counts = serving(state, songs)
+    cache = Mp4Cache(tmp_path / "small", max_bytes=len(mp4s["one"]) * 3 // 2)
+    monkeypatch.setattr(player_cache, "cache", cache)
+    url = "/deadwax/navidrome/stream/{}?format=raw&wrap=mp4"
+
+    client.get(url.format("one"), headers={"Range": "bytes=0-1"})
+    two = client.get(url.format("two"), headers={"Range": "bytes=0-1"})
+    seek = client.get(url.format("one"), headers={"Range": "bytes=90000-"})
+
+    assert (two.headers["content-type"], two.content) == ("audio/flac", songs["two"][:2])
+    assert (seek.status_code, seek.content) == (206, mp4s["one"][90000:])
+    assert counts["one"] == 1
+
+
+def test_the_songs_being_played_go_last_when_the_cap_comes_down(tmp_path):
+    """Trimmed back under a lowered cap: what nobody is playing first, and a song being played only
+    when that isn't enough - never the one just made."""
+    cache = Mp4Cache(tmp_path / "c", max_bytes=1000)
+    folder, _ = player_cache._own(cache.directory)
+    now = time.time()
+    for name, served in (("idle-a.mp4", now - 1000), ("idle-b.f.mp4", now - 900), ("playing.f.mp4", now - 5),
+                         ("new.mp4", now)):
+        (folder / name).write_bytes(bytes(300))
+        cache._used[name] = served
+
+    cache._max_bytes = 700
+    cache._evict(folder, "new.mp4")
+    assert sorted(p.name for p in folder.iterdir()) == ["new.mp4", "playing.f.mp4"]
+    cache._max_bytes = 400
+    cache._evict(folder, "new.mp4")
+    assert sorted(p.name for p in folder.iterdir()) == ["new.mp4"]
+
+
+def test_room_is_never_made_by_clearing_a_song_being_played(tmp_path):
+    cache = Mp4Cache(tmp_path / "c", max_bytes=1000)
+    folder, _ = player_cache._own(cache.directory)
+    now = time.time()
+    for name, served in (("idle.mp4", now - 1000), ("playing.f.mp4", now - 5)):
+        (folder / name).write_bytes(bytes(400))
+        cache._used[name] = served
+
+    cache._reserved = 500
+    assert cache._make_room(folder, 500) is player_cache.Room.MADE
+    assert sorted(p.name for p in folder.iterdir()) == ["playing.f.mp4"], "the idle one went; that was enough"
+    cache._reserved = 700
+    assert cache._make_room(folder, 700) is player_cache.Room.BUSY
+    assert sorted(p.name for p in folder.iterdir()) == ["playing.f.mp4"]
+    assert not cache._make_room(folder, 700), "and it reads as no room"
+
+
+def test_a_disk_that_fills_mid_make_never_clears_a_song_being_played(tmp_path):
+    """The disk filling while a song is made (something else writing): what nobody is playing goes,
+    and if that isn't enough the make fails, as one that found no room does - the song being played
+    stays."""
+    cache = Mp4Cache(tmp_path / "c", max_bytes=10_000)
+    folder, _ = player_cache._own(cache.directory)
+    now = time.time()
+    for name, served in (("idle.mp4", now - 1000), ("playing.f.mp4", now - 5), ("new.f.mp4", now)):
+        (folder / name).write_bytes(bytes(400))
+        cache._used[name] = served
+
+    assert cache._clear(folder, 800, "new.f.mp4") == 400
+    assert sorted(p.name for p in folder.iterdir()) == ["new.f.mp4", "playing.f.mp4"]
+
+
+def test_an_unusable_cache_folder_is_a_503_for_the_whole_cache_naming_no_folder(upstream, client, tmp_path,
+                                                                                 monkeypatch, caplog):
+    """No folder the cache may use won't clear by itself: scope "server", a long Retry-After - the page
+    stops streaming for a while rather than asking again every song - and the folder is in the log,
+    never in the answer."""
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file()
+    shared = tmp_path / "shared-with-a-secret-name"
+    shared.mkdir()
+    (shared / FOLDER_NAME).symlink_to(tmp_path)
+    monkeypatch.setattr(Config, "PLAYER_CACHE_PATH", str(shared))
+    monkeypatch.setattr(player_cache, "cache", Mp4Cache())
+
+    response = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    assert response.status_code == 503
+    assert response.json()["scope"] == "server"
+    assert response.headers["retry-after"] == str(player_cache.SERVER_RETRY_AFTER_SECONDS)
+    assert response.headers["cache-control"] == "no-store"
+    assert "secret" not in response.text and str(tmp_path) not in response.text
+    assert said(caplog, "the player's cache can't be kept") and said(caplog, "gapless player doesn't stream")
+    assert fake["whole"] == 0
+
+
+def test_a_disk_short_even_when_emptied_is_a_503_for_the_whole_cache(upstream, client, mp4_cache, monkeypatch):
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file()
+    a_disk(monkeypatch, mp4_cache, player_cache.DISK_SPARE_BYTES + len(FLAC))
+
+    response = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    assert (response.status_code, response.json()["scope"]) == (503, "server")
+    assert response.headers["retry-after"] == str(player_cache.SERVER_RETRY_AFTER_SECONDS)
+    assert str(mp4_cache.directory) not in response.text
+    assert fake["whole"] == 0, "nothing fetched"
+
+
+def names_in(cache):
+    return sorted(p.name for p in cache.directory.glob("*.mp4"))
+
+
+def name_of(cache, song, wrap=player_cache.FMP4_WRAP):
+    return cache.path_for(cache._versions[song][1], wrap).name
+
+
+def test_a_song_made_bigger_than_its_flac_never_clears_one_being_played(upstream, client, tmp_path, monkeypatch):
+    """
+    Room is made for a song at its FLAC's size, and its fragmented MP4 comes out a little bigger. That
+    little was trimmed off the cache straight after the make, from whatever was served longest ago -
+    which, with every other song being played, was the song on the playhead: its next piece had it
+    made again, or told to wait while the next song stayed in use. Found in review (1.1.0-player.5).
+    """
+    state, _ = upstream
+    songs = {"one": encode(blocks=(4096,) * 40 + (1000,), seed=41)[0],
+             "two": encode(blocks=(4096,) * 120 + (1000,), seed=42)[0]}
+    fmp4s = {name: flac_to_fmp4(data) for name, data in songs.items()}
+    assert len(fmp4s["two"]) > len(songs["two"]), "the case: the made file is bigger than the room made for it"
+    counts = serving(state, songs)
+    cache = Mp4Cache(tmp_path / "c", max_bytes=len(fmp4s["one"]) + len(songs["two"]))
+    monkeypatch.setattr(player_cache, "cache", cache)
+    url = "/deadwax/navidrome/stream/{}?format=raw&wrap=fmp4"
+
+    etag = client.get(url.format("one"), headers={"Range": HEAD}).headers["etag"]
+    assert client.get(url.format("two"), headers={"Range": HEAD}).status_code == 206
+    piece = client.get(url.format("one"), headers={"Range": "bytes=10000-19999", "If-Range": etag})
+
+    assert (piece.status_code, piece.content) == (206, fmp4s["one"][10000:20000])
+    assert names_in(cache) == sorted([name_of(cache, "one"), name_of(cache, "two")])
+    assert counts == {"one": 1, "two": 1}
+
+
+def test_two_songs_played_in_turn_are_each_made_once(upstream, client, tmp_path, monkeypatch):
+    """The same, with songs of one length: each make cleared the other, and every piece of one made
+    it again - a whole song downloaded and repackaged per piece."""
+    state, _ = upstream
+    songs = {"one": encode(blocks=(4096,) * 60 + (1000,), seed=41)[0],
+             "two": encode(blocks=(4096,) * 60 + (1000,), seed=42)[0]}
+    fmp4s = {name: flac_to_fmp4(data) for name, data in songs.items()}
+    counts = serving(state, songs)
+    cache = Mp4Cache(tmp_path / "c", max_bytes=len(fmp4s["one"]) + len(songs["two"]))
+    monkeypatch.setattr(player_cache, "cache", cache)
+    url = "/deadwax/navidrome/stream/{}?format=raw&wrap=fmp4"
+
+    tags = {name: client.get(url.format(name), headers={"Range": HEAD}).headers["etag"] for name in ("one", "two")}
+    for at in (10000, 20000, 30000):
+        for name in ("one", "two"):
+            piece = client.get(url.format(name), headers={"Range": f"bytes={at}-{at + 999}", "If-Range": tags[name]})
+            assert (piece.status_code, piece.content) == (206, fmp4s[name][at:at + 1000])
+    assert counts == {"one": 1, "two": 1}
+
+
+def test_a_disk_short_for_one_long_song_is_a_503_for_that_song_only(upstream, client, tmp_path, monkeypatch, caplog):
+    """
+    A disk that can't take a long song even with the cache emptied, but takes ordinary ones: that
+    song is a 503 for itself - the gapless player's run ends before it and it plays the ordinary way
+    - not the whole cache off for ten minutes. And nothing is cleared for it, since clearing couldn't
+    have found enough: the review found every idle song wiped each time the long one came up.
+    """
+    state, _ = upstream
+    songs = {"idle": encode(blocks=(4096,) * 12 + (1000,), seed=50)[0],
+             "short": encode(blocks=(4096,) * 12 + (1000,), seed=51)[0],
+             "long": encode(blocks=(4096,) * 120 + (1000,), seed=52)[0]}
+    serving(state, songs)
+    cache = Mp4Cache(tmp_path / "c")
+    monkeypatch.setattr(player_cache, "cache", cache)
+    #? these songs are kilobytes: a "small song" at their scale, as 16 MiB is at a real library's
+    monkeypatch.setattr(player_cache, "SMALL_SONG_BYTES", len(songs["short"]))
+    player_cache._own(cache.directory)
+    a_disk(monkeypatch, cache, player_cache.DISK_SPARE_BYTES + 2 * len(songs["long"]) - 1)
+    url = "/deadwax/navidrome/stream/{}?format=raw&wrap=fmp4"
+    client.get(url.format("idle"), headers={"Range": HEAD})
+    cache._used[name_of(cache, "idle")] = time.time() - 10_000
+
+    long = client.get(url.format("long"), headers={"Range": HEAD})
+
+    assert (long.status_code, long.json()["scope"]) == (503, "song")
+    assert long.headers["retry-after"] == str(player_cache.RETRY_AFTER_SECONDS)
+    assert names_in(cache) == [name_of(cache, "idle")], "nothing cleared for a song that couldn't fit anyway"
+    assert said(caplog, "short of space for a song its size")
+    assert client.get(url.format("short"), headers={"Range": HEAD}).status_code == 206
+
+
+def test_leftovers_are_cleared_and_fragmented_mp4s_kept(upstream, client, mp4_cache):
+    """A .f.mp4 is a finished file like any .mp4; a make's .part or .tmp left by a process that
+    stopped part-way - fragmented or not - is cleared the first time the folder is used."""
+    state, _ = upstream
+    _, state["handler"] = navidrome_file()
+    folder, _ = player_cache._own(mp4_cache.directory)
+    old = time.time() - player_cache.LEFTOVER_SECONDS * 2
+    names = ["kept.f.mp4", "kept.mp4", "gone.f.1a2b3c4d.part", "gone.f.1a2b3c4d.tmp", "gone.1a2b3c4d.part"]
+    for name in names:
+        (folder / name).write_bytes(b"x")
+        os.utime(folder / name, (old, old))
+
+    assert client.get(FRAGMENTED).content == FMP4
+
+    left = sorted(p.name for p in folder.iterdir())
+    assert "kept.f.mp4" in left and "kept.mp4" in left
+    assert not [name for name in left if "gone" in name]
+
+
+def test_fragmented_mp4s_count_against_the_cap_with_the_mp4s(upstream, client, tmp_path, monkeypatch):
+    """One cap for both containers, the song played longest ago going first whichever it is."""
+    state, _ = upstream
+    songs, mp4s, fmp4s = two_songs()
+    serving(state, songs)
+    #? room for two fragmented MP4s, and so for an MP4 (a little smaller) beside one - never three
+    assert len(mp4s["one"]) < len(fmp4s["one"])
+    cache = Mp4Cache(tmp_path / "capped", max_bytes=len(fmp4s["one"]) + len(fmp4s["two"]) + 10)
+    monkeypatch.setattr(player_cache, "cache", cache)
+
+    client.get("/deadwax/navidrome/stream/one?format=raw&wrap=mp4")
+    client.get("/deadwax/navidrome/stream/two?format=raw&wrap=fmp4")
+    assert len(cached(cache)) == 2
+    played_long_ago(cache)
+    third = client.get("/deadwax/navidrome/stream/one?format=raw&wrap=fmp4")
+
+    assert third.content == fmp4s["one"]
+    kept = sorted(path.name for path in cached(cache))
+    assert kept == sorted([cache.path_for(cache._versions["two"][1], player_cache.FMP4_WRAP).name,
+                           cache.path_for(cache._versions["one"][1], player_cache.FMP4_WRAP).name])
+    assert sum(path.stat().st_size for path in cached(cache)) <= cache.max_bytes
 
 
 # ---------------------------------------------------------------- the two settings

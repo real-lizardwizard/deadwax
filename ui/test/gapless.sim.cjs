@@ -34,6 +34,7 @@ const {
 const {
   MEDIA_ERR_ABORTED, MEDIA_ERR_NETWORK, MEDIA_ERR_DECODE, MEDIA_ERR_SRC_NOT_SUPPORTED,
 } = require(path.join(OUT, 'lib/playQueue.js'));
+const { streamReading } = require(path.join(OUT, 'lib/gapless.js'));
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -259,6 +260,46 @@ const update = (position, at, fields = {}) => ({ position, at, playbackRate: 1, 
   check('a minute of silence is never a reading', clockStep(change, update(0.3, 61_000)).kind, 'stale');
 }
 check('a clock starting from somewhere else still counts from there', clockStep(startChange(0, handed, 4, 3), update(3.1, 400)).reading.ms, 300);
+
+/* ========================================================================== */
+console.log('\nwith a run of songs playing as one stream');
+
+{
+  //? the one-stream engine plays consecutive FLAC songs on the live element; the standby is only
+  //? ever for the song AFTER the run, and only once the run's last song is playing
+  const six = ['1', '2', '3', '4', '5', '6'].map(track);
+  const q = (index) => at(index, six);
+  check('no stream (null): exactly as before, 4 arguments or 5', [standbyPlan(q(0), true, null, false, null), standbyPlan(q(3), true, standby(4, '5'), false, null)],
+    [standbyPlan(q(0), true, null, false), standbyPlan(q(3), true, standby(4, '5'), false)]);
+  check('a stream, its end not known yet: nothing got ready', standbyPlan(q(0), true, null, false, { runEnd: null }), { kind: 'none' });
+  check('...and anything held let go', standbyPlan(q(0), true, standby(1, '2'), false, { runEnd: null }), { kind: 'clear' });
+  check('the run ends at song 4, song 2 playing: nothing - the next song is in the stream', standbyPlan(q(1), true, null, false, { runEnd: 3 }), { kind: 'none' });
+  check('...a standby held from before the stream: let go', standbyPlan(q(1), true, standby(2, '3'), false, { runEnd: 3 }).kind, 'clear');
+  check('the run\'s last song playing: the song after the run, by URL', standbyPlan(q(3), true, null, false, { runEnd: 3 }), { kind: 'load', index: 4, track: six[4] });
+  check('...already held: kept', standbyPlan(q(3), true, standby(4, '5'), false, { runEnd: 3 }), { kind: 'keep' });
+  check('...holding another song: the right one', standbyPlan(q(3), true, standby(5, '6'), false, { runEnd: 3 }), { kind: 'load', index: 4, track: six[4] });
+  check('the queue past the run\'s end: the song after the one playing, as ever', standbyPlan(q(4), true, null, false, { runEnd: 3 }), { kind: 'load', index: 5, track: six[5] });
+  check('the run ends at the queue\'s last song: nothing after it', standbyPlan(q(5), true, null, false, { runEnd: 5 }), { kind: 'none' });
+  check('...holding something: let it go', standbyPlan(q(5), true, standby(4, '5'), false, { runEnd: 5 }).kind, 'clear');
+  check('the run\'s end reached while AirPlaying: nothing, as ever', standbyPlan(q(3), true, null, true, { runEnd: 3 }), { kind: 'none' });
+  check('the run\'s end reached with the switch off: nothing', standbyPlan(q(3), false, null, false, { runEnd: 3 }), { kind: 'none' });
+}
+{
+  const stream = { kind: 'stream' };
+  check('a join inside the stream, timed', streamReading(12), { ms: 12, how: { kind: 'stream' }, readyState: null, failed: false });
+  check('...in whole milliseconds', streamReading(12.6).ms, 13);
+  check('...never below 0', streamReading(-4).ms, 0);
+  check('said as "in one stream"', describeHow(streamReading(0)), 'in one stream');
+  check('...one that failed before playing says so', describeHow(gapReading({ ...startChange(0, stream, null), failed: true }, 40)), 'in one stream, failed before playing');
+  check('a readyState on a stream reading changes nothing ("had to load" is a handover\'s)', describeHow(gapReading(startChange(0, stream, 1), 40)), 'in one stream');
+  {
+    let readings = [];
+    for (const r of [reading(handed, 40, 4), streamReading(0), streamReading(3)]) readings = withReading(readings, r);
+    check('the line, with joins in the stream beside a handover', describeGaps(readings), 'Last song change 3 ms, in one stream · before: 0, 40 ms');
+  }
+  const change = startChange(1000, stream, null);
+  check('a stream change is timed on the clock like any other', clockStep(change, update(0.25, 1260)).reading, { ms: 10, how: stream, readyState: null, failed: false });
+}
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

@@ -246,7 +246,7 @@ async def stream(
     request: Request,
     format: str | None = Query(None, pattern=r"^[a-z0-9]{1,10}$"),
     max_bitrate: int | None = Query(None, ge=0, le=3200),
-    wrap: Literal["mp4"] | None = None,
+    wrap: Literal["mp4", "fmp4"] | None = None,
 ):
     """
     A song's audio, with the page's byte range and conditions passed through.
@@ -259,6 +259,12 @@ async def stream(
     One URL stays on one container: a range carrying on from an MP4 that can't be had just now is
     a 503, never the FLAC's bytes under another length.
 
+    `wrap=fmp4`, with `format=raw` only (anything else is a 400), asks for the same frames as a
+    FRAGMENTED MP4, which the gapless player feeds to one MediaSource stream across songs. It is
+    cached like the MP4 but apart from it, and always answered by deadwax itself - never relayed,
+    since the stream can't take the FLAC: the fragments with byte ranges, a 415 saying why when the
+    song can't be repackaged, or a 503 saying whether to ask again (`scope`: song or server).
+
     `format=raw` is the file as it is, which is the only kind Navidrome can answer a byte range
     for, and the player asks for it for every file the phone can play. It is asked for by name
     because Navidrome answers `raw` before it looks at anything set for this client on its
@@ -269,6 +275,20 @@ async def stream(
 
     Never cached without asking: a retag rewrites a file in place under the same URL.
     """
+    if wrap == "fmp4":
+        if format != "raw":
+            #? a transcode has no FLAC frames to put in fragments, and relaying one would feed the
+            #? stream something it can't take
+            raise HTTPException(status_code=400, detail="wrap=fmp4 needs format=raw: only the file as it is "
+                                                        "can be repackaged")
+        try:
+            #? as for the MP4: the phone hanging up is looked for, and cancels the answer
+            return await unless_abandoned(request, player_cache.cache.answer_fragmented(song_id, request))
+        except ClientGone:
+            return Response(status_code=204)
+        except NavidromeError as e:
+            raise _fail(e)
+
     if wrap == "mp4" and format == "raw":
         try:
             #? uvicorn never cancels a handler whose phone has gone, so this looks every half second

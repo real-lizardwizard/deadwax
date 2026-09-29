@@ -646,14 +646,7 @@ def _moov(frames: FlacFrames, audio_at: int) -> bytes:
                      struct.pack(">8xHHH2x", 0, 0, 0x0100), _MATRIX, struct.pack(">II", 0, 0))
     mdhd = _full_box(b"mdhd", version, 0, times, struct.pack(">I", info.sample_rate), length,
                      struct.pack(">HH", _LANGUAGE_UND, 0))
-    hdlr = _full_box(b"hdlr", 0, 0, struct.pack(">I4s12x", 0, b"soun"), b"SoundHandler\x00")
-
-    dfla = _full_box(b"dfLa", 0, 0, bytes((0x80 | _STREAMINFO,)),
-                     len(info.raw).to_bytes(3, "big"), info.raw)
-    entry = _box(b"fLaC", bytes(6), struct.pack(">H8xHHHHI", 1, info.channels,
-                                                 info.bits_per_sample, 0, 0,
-                                                 _entry_rate(info.sample_rate)), dfla)
-    stsd = _full_box(b"stsd", 0, 0, struct.pack(">I", 1), entry)
+    stsd = _stsd(info)
 
     durations = _runs(frames.block_sizes)
     stts = _full_box(b"stts", 0, 0, struct.pack(">I", len(durations)),
@@ -682,10 +675,30 @@ def _moov(frames: FlacFrames, audio_at: int) -> bytes:
     #? no stss: every FLAC frame is a sync sample, which is what its absence says (isoflac.txt
     #? 3.3.6.1 forbids one); and no edit list, so the track plays from its first sample
     stbl = _box(b"stbl", stsd, stts, stsc, stsz, stco)
-    dinf = _box(b"dinf", _full_box(b"dref", 0, 0, struct.pack(">I", 1), _full_box(b"url ", 0, 1)))
-    minf = _box(b"minf", _full_box(b"smhd", 0, 0, bytes(4)), dinf, stbl)
-    trak = _box(b"trak", tkhd, _box(b"mdia", mdhd, hdlr, minf))
+    minf = _box(b"minf", _SMHD, _DINF, stbl)
+    trak = _box(b"trak", tkhd, _box(b"mdia", mdhd, _HDLR, minf))
     return _box(b"moov", mvhd, trak)
+
+
+#? what both kinds of MP4 say about the track the same way: that it is sound, a sound media
+#? header (balance 0), and one data reference - the file itself (flags 1: "the media is in this file")
+_HDLR = _full_box(b"hdlr", 0, 0, struct.pack(">I4s12x", 0, b"soun"), b"SoundHandler\x00")
+_SMHD = _full_box(b"smhd", 0, 0, bytes(4))
+_DINF = _box(b"dinf", _full_box(b"dref", 0, 0, struct.pack(">I", 1), _full_box(b"url ", 0, 1)))
+
+
+def _stsd(info: StreamInfo) -> bytes:
+    """
+    The sample description: one 'fLaC' entry carrying STREAMINFO, alone, in a 'dfLa' box - the
+    same in the plain MP4 and the fragmented one, which is what lets a player take one song's
+    format for the other's.
+    """
+    dfla = _full_box(b"dfLa", 0, 0, bytes((0x80 | _STREAMINFO,)),
+                     len(info.raw).to_bytes(3, "big"), info.raw)
+    entry = _box(b"fLaC", bytes(6), struct.pack(">H8xHHHHI", 1, info.channels,
+                                                 info.bits_per_sample, 0, 0,
+                                                 _entry_rate(info.sample_rate)), dfla)
+    return _full_box(b"stsd", 0, 0, struct.pack(">I", 1), entry)
 
 
 #? 'isom' is the brand isoflac.txt requires; the rest is what ffmpeg writes for the same stream,
@@ -731,3 +744,129 @@ def flac_to_mp4(data: bytes) -> bytes:
         data = bytes(data)
     head, start, end = mp4_layout(data)
     return b"".join((head, memoryview(data)[start:end]))
+
+
+# --- the fragmented MP4, for one stream across songs ----------------------------------------
+#
+# The player's gapless engine plays consecutive FLAC songs as ONE MediaSource stream, and a
+# SourceBuffer takes fragmented MP4: an init segment (ftyp + moov, which describes the track and
+# holds no samples) and then fragments (moof + mdat), each a run of whole frames with its own
+# small table. The layout is the one ffmpeg wrote for the phone lab that played seamlessly on
+# James's iPhone - `-movflags frag_keyframe+empty_moov+default_base_moof+skip_trailer
+# -frag_duration 1000000` - box for box, without its udta, plus a sidx after the moov: the index
+# the page reads to find which bytes hold which second, and never appends.
+
+#? The most fragments one index can list: sidx counts its references in 16 bits. At a second a
+#? fragment that is over 18 hours; a song that long plays the ordinary way.
+SIDX_MAX_REFERENCES = 0xFFFF
+
+#? ffmpeg's brands for a fragmented file, the lab's exactly
+_FMP4_FTYP = _box(b"ftyp", b"iso5", struct.pack(">I", 0x200), b"iso5", b"iso6", b"mp41")
+
+#? tfhd: default-base-is-moof (offsets count from the moof) | a default sample duration | size |
+#? flags, as ffmpeg writes it
+_TFHD_FLAGS = 0x020038
+#? a FLAC frame depends on no other (sample_depends_on 2, and not a non-sync sample): MSE drops
+#? frames after any jump - a seek, the next song's init - until it meets one flagged so, and every
+#? FLAC frame is one
+_SYNC_SAMPLE = 0x02000000
+#? trun: a data offset and every sample's size; and every sample's duration when they differ
+_TRUN_SIZES = 0x000201
+_TRUN_DURATIONS = 0x000100
+#? a sidx reference that starts with a sync sample (starts_with_SAP 1, SAP_type 1), as each does
+_STARTS_WITH_SAP = 0x90000000
+
+
+def _init_moov(info: StreamInfo) -> bytes:
+    """The fragmented file's moov: the track, with durations of 0 and empty tables - the samples are
+    in the fragments - and an mvex saying fragments follow."""
+    rate = struct.pack(">I", info.sample_rate)
+    zero = struct.pack(">I", 0)
+    times = struct.pack(">II", 0, 0)
+    mvhd = _full_box(b"mvhd", 0, 0, times, rate, zero, struct.pack(">IH10x", 0x10000, 0x0100),
+                     _MATRIX, bytes(24), struct.pack(">I", 2))
+    #? flags 3: enabled, in the movie; alternate group 1 - ffmpeg's for an audio track
+    tkhd = _full_box(b"tkhd", 0, 3, times, struct.pack(">II", 1, 0), zero,
+                     struct.pack(">8xHHH2x", 0, 1, 0x0100), _MATRIX, struct.pack(">II", 0, 0))
+    mdhd = _full_box(b"mdhd", 0, 0, times, rate, zero, struct.pack(">HH", _LANGUAGE_UND, 0))
+    stbl = _box(b"stbl", _stsd(info), _full_box(b"stts", 0, 0, zero), _full_box(b"stsc", 0, 0, zero),
+                _full_box(b"stsz", 0, 0, struct.pack(">II", 0, 0)), _full_box(b"stco", 0, 0, zero))
+    minf = _box(b"minf", _SMHD, _DINF, stbl)
+    trak = _box(b"trak", tkhd, _box(b"mdia", mdhd, _HDLR, minf))
+    #? trex: track 1, the one sample description, and no defaults of its own - each tfhd has them
+    mvex = _box(b"mvex", _full_box(b"trex", 0, 0, struct.pack(">IIIII", 1, 1, 0, 0, 0)))
+    return _box(b"moov", mvhd, trak, mvex)
+
+
+def _fragment(sequence: int, before: int, blocks: tuple[int, ...], sizes: list[int]) -> bytes:
+    """
+    One fragment's moof and the header of the mdat after it, for frames of these block sizes and
+    byte sizes, `before` samples into the song. The frames themselves follow the mdat header.
+    """
+    duration, size = blocks[0], sizes[0]
+    if all(block == duration for block in blocks):
+        flags, rows = _TRUN_SIZES, struct.pack(f">{len(sizes)}I", *sizes)
+    else:
+        #? a variable-block stream, or the short last frame of a fixed one
+        flags = _TRUN_SIZES | _TRUN_DURATIONS
+        rows = b"".join(struct.pack(">II", block, length) for block, length in zip(blocks, sizes))
+    mfhd = _full_box(b"mfhd", 0, 0, struct.pack(">I", sequence))
+    tfhd = _full_box(b"tfhd", 0, _TFHD_FLAGS, struct.pack(">IIII", 1, duration, size, _SYNC_SAMPLE))
+    #? version 1: 64 bits, since samples into a long hi-res song pass 32
+    tfdt = _full_box(b"tfdt", 1, 0, struct.pack(">Q", before))
+
+    def moof(offset: int) -> bytes:
+        trun = _full_box(b"trun", 0, flags, struct.pack(">Ii", len(blocks), offset), rows)
+        return _box(b"moof", mfhd, _box(b"traf", tfhd, tfdt, trun))
+
+    #? the data offset counts from the moof's first byte to the first frame, past the mdat header;
+    #? the moof is the same length whatever offset it carries
+    length = len(moof(0))
+    return moof(length + 8) + struct.pack(">I4s", 8 + sum(sizes), b"mdat")
+
+
+def fmp4_layout(data: bytes) -> tuple[bytes, list[tuple[bytes, int, int]]]:
+    """
+    The fragmented MP4 for the FLAC file `data`: the head (ftyp, moov, sidx) and each fragment as
+    (its moof and mdat header, start, end) - the fragment on disk is those bytes and then
+    data[start:end], the FLAC's own frames, untouched. So a caller writes the head and then, per
+    fragment, its header and a slice of the file it already holds, as with mp4_layout().
+
+    The fragments are the same whole-frame groups of about a second as mp4_layout()'s chunks, which
+    is also what ffmpeg made the lab's files of (11 frames of 4096 at 44.1 kHz). Byte for byte the
+    same every time. Raises NotFlac or Unsupported (both CannotRepackage) for everything
+    find_frames() refuses, and Unsupported for a song with more fragments than a sidx can list.
+    """
+    frames = find_frames(data)
+    info = frames.info
+    counts = _chunks(frames)
+    if len(counts) > SIDX_MAX_REFERENCES:
+        raise Unsupported(f"too long for a fragment index: {len(counts)} fragments, where one lists at most "
+                          f"{SIDX_MAX_REFERENCES}")
+    sizes = frames.sizes()
+    bounds = frames.starts + (frames.end,)
+    fragments, references, index, before = [], [], 0, 0
+    for sequence, count in enumerate(counts, start=1):
+        blocks = frames.block_sizes[index:index + count]
+        start, end = bounds[index], bounds[index + count]
+        header = _fragment(sequence, before, blocks, sizes[index:index + count])
+        fragments.append((header, start, end))
+        #? referenced_size is 31 bits: a fragment is about a second, and never near 2 GiB under
+        #? MAX_INPUT_BYTES
+        references.append(struct.pack(">III", len(header) + end - start, sum(blocks), _STARTS_WITH_SAP))
+        index += count
+        before += sum(blocks)
+    #? v0: reference_ID 1, the sample rate as timescale, the first sample at 0, and the first
+    #? fragment straight after this box (first_offset 0)
+    sidx = _full_box(b"sidx", 0, 0, struct.pack(">IIIIHH", 1, info.sample_rate, 0, 0, 0, len(references)),
+                     *references)
+    return b"".join((_FMP4_FTYP, _init_moov(info), sidx)), fragments
+
+
+def flac_to_fmp4(data: bytes) -> bytes:
+    """The FLAC file `data` as a fragmented MP4 of the same frames - see fmp4_layout()."""
+    if not isinstance(data, bytes):
+        data = bytes(data)
+    head, fragments = fmp4_layout(data)
+    view = memoryview(data)
+    return b"".join([head, *(part for header, start, end in fragments for part in (header, view[start:end]))])

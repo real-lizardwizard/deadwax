@@ -17,6 +17,7 @@ import hashlib
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -31,7 +32,7 @@ from src.api.app import start  # noqa: E402
 from src.api.navidrome_endpoint import (NavidromeClient, NavidromeError, auth_params,  # noqa: E402
                                         navidrome, subsonic_body, without_login)
 from src.config import Config, describe_navidrome_url  # noqa: E402
-from src.flac_mp4 import flac_to_mp4  # noqa: E402
+from src.flac_mp4 import flac_to_fmp4, flac_to_mp4  # noqa: E402
 from src.player_cache import Mp4Cache, Unsatisfiable, byte_range  # noqa: E402
 from src.routes import navidrome as navidrome_routes  # noqa: E402
 from src.routes.settings import _validate, settings  # noqa: E402
@@ -1083,6 +1084,10 @@ def test_the_least_recently_played_go_first_past_the_cap(upstream, client, monke
     assert len(cached(cache)) == 2
     #? played again - a cache hit - so "b" is now the one played longest ago
     client.get(stream.format("a"), headers={"Range": "bytes=0-1"})
+    #? and both a while ago: a song served in the last IN_USE_SECONDS is being played, and is never
+    #? cleared for another (test_player_cache.py has that rule)
+    later = time.time() + player_cache.IN_USE_SECONDS + 1
+    cache.wall_clock = lambda: later
     third = client.get(stream.format("c"))
 
     assert third.content == flac_to_mp4(songs["c"])
@@ -1107,6 +1112,257 @@ def test_a_cache_file_is_named_by_a_hash_never_by_the_id(upstream, client, mp4_c
     assert made.parent == mp4_cache.directory
     assert "SECRET" not in made.name and "escape" not in made.name
     assert len(made.stem) == 40 and all(c in "0123456789abcdef" for c in made.stem)
+
+
+# ---------------------------------------------------------------- a fragmented MP4, for the gapless player
+
+FMP4 = flac_to_fmp4(FLAC)
+FRAGMENTED = "/deadwax/navidrome/stream/song-1?format=raw&wrap=fmp4"
+#? what the page asks for first of a song: its init segment, index and first fragments
+HEAD = "bytes=0-262143"
+
+
+def fragmented(cache: Mp4Cache) -> list[Path]:
+    return sorted(cache.directory.glob("*.f.mp4")) if cache.directory.exists() else []
+
+
+def plain(cache: Mp4Cache) -> list[Path]:
+    return [path for path in cached(cache) if not path.name.endswith(".f.mp4")]
+
+
+def test_fmp4_sends_the_fragmented_mp4_with_ranges(upstream, client, mp4_cache):
+    """
+    The same FLAC frames in fragments, which the gapless player feeds to one MediaSource: made once,
+    kept, and served as audio/mp4 with byte ranges and a strong ETag - under the same guard as any
+    stream, and never gzipped.
+    """
+    state, seen = upstream
+    fake, state["handler"] = navidrome_file()
+    size = len(FMP4)
+    assert size < 262144, "the head fetch below is the whole file"
+
+    head = client.get(FRAGMENTED, headers={"Range": HEAD, "Accept-Encoding": "gzip"})
+    assert head.status_code == 206
+    assert head.content == FMP4, "byte for byte what fmp4_layout makes of the file"
+    assert head.headers["content-type"] == "audio/mp4"
+    assert head.headers["content-range"] == f"bytes 0-{size - 1}/{size}"
+    assert head.headers["content-length"] == str(size)
+    assert head.headers["accept-ranges"] == "bytes"
+    assert head.headers["cache-control"] == "no-cache"
+    assert "content-encoding" not in head.headers
+    for name, value in MEDIA_HEADERS.items():
+        assert head.headers[name] == value
+    etag = head.headers["etag"]
+    assert etag.startswith('"') and not etag.startswith("W/")
+
+    piece = client.get(FRAGMENTED, headers={"Range": "bytes=5000-9999", "If-Range": etag})
+    assert (piece.status_code, piece.content) == (206, FMP4[5000:10000])
+    assert piece.headers["content-range"] == f"bytes 5000-9999/{size}"
+
+    whole = client.get(FRAGMENTED)
+    assert (whole.status_code, whole.content, whole.headers["etag"]) == (200, FMP4, etag)
+
+    for stale in ('"another-version"', f"W/{etag}"):
+        changed = client.get(FRAGMENTED, headers={"Range": "bytes=5000-9999", "If-Range": stale})
+        assert (changed.status_code, changed.content) == (200, FMP4), "another version: the whole file"
+
+    assert fake["whole"] == 1, "fetched from Navidrome once, whole"
+    assert all(query(r)["format"] == "raw" and query(r)["id"] == "song-1" for r in seen)
+    assert len(fragmented(mp4_cache)) == 1 and plain(mp4_cache) == []
+    assert mp4_cache._answered == {}, "the MP4 path's one-URL-one-file memory is never the stream's"
+
+
+def test_fmp4_is_only_for_the_file_as_it_is(upstream, client, mp4_cache):
+    """A transcode has no FLAC frames to fragment, and is never relayed to the stream instead."""
+    state, seen = upstream
+    state["handler"] = transcoding
+
+    response = client.get("/deadwax/navidrome/stream/song-1?format=mp3&wrap=fmp4")
+    no_format = client.get("/deadwax/navidrome/stream/song-1?wrap=fmp4")
+
+    assert response.status_code == no_format.status_code == 400
+    assert response.headers["content-type"] == "application/json"
+    assert "format=raw" in response.json()["detail"]
+    assert seen == [], "Navidrome was never asked"
+    assert cached(mp4_cache) == []
+
+
+def test_an_mp4_and_an_fmp4_of_one_song_are_cached_apart(upstream, client, mp4_cache):
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file()
+
+    mp4 = client.get(WRAPPED)
+    fmp4 = client.get(FRAGMENTED)
+    again = client.get(WRAPPED, headers={"Range": "bytes=1000-"})
+
+    assert (mp4.content, fmp4.content, again.content) == (MP4, FMP4, MP4[1000:])
+    assert mp4.headers["etag"] != fmp4.headers["etag"]
+    assert again.headers["etag"] == mp4.headers["etag"]
+    assert len(plain(mp4_cache)) == 1 and len(fragmented(mp4_cache)) == 1
+    assert plain(mp4_cache)[0].stem.removesuffix(".f") != fragmented(mp4_cache)[0].stem.removesuffix(".f")
+    assert fake["whole"] == 2, "each made from its own download"
+
+
+def test_an_mp4_and_an_fmp4_made_at_once_share_neither_make_nor_file(upstream, mp4_cache, monkeypatch):
+    """Safari's element and the gapless player asking for one song together: two makes, two files,
+    each answered with its own - a shared make would have served one of them the other's bytes."""
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file(slow=True)
+    made = []
+    monkeypatch.setattr(player_cache, "mp4_layout", lambda data, real=player_cache.mp4_layout: made.append("mp4")
+                        or real(data))
+    monkeypatch.setattr(player_cache, "fmp4_layout", lambda data, real=player_cache.fmp4_layout: made.append("fmp4")
+                        or real(data))
+
+    async def both():
+        transport = httpx.ASGITransport(app=start())
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as phone:
+            return await asyncio.gather(phone.get(WRAPPED, headers={"Range": "bytes=0-1"}),
+                                        phone.get(FRAGMENTED, headers={"Range": HEAD}),
+                                        phone.get(FRAGMENTED, headers={"Range": "bytes=0-1"}))
+
+    mp4, head, probe = asyncio.run(both())
+
+    assert (mp4.status_code, mp4.content) == (206, MP4[:2])
+    assert (head.status_code, head.content) == (206, FMP4)
+    assert (probe.status_code, probe.content) == (206, FMP4[:2])
+    assert sorted(made) == ["fmp4", "mp4"], "one make each, however many asked"
+    assert fake["whole"] == 2
+    assert len(plain(mp4_cache)) == 1 and len(fragmented(mp4_cache)) == 1
+
+
+def test_an_fmp4_is_never_sent_the_flac_the_mp4_path_was(upstream, client, mp4_cache):
+    """
+    The MP4 path keeps a song it answered as FLAC on FLAC (one URL, one file) - and the gapless
+    player must not inherit that: it can't play FLAC, and its URL is its own.
+    """
+    state, _ = upstream
+    fake, file_handler = navidrome_file()
+
+    def handle(request):
+        if request.headers.get("range"):
+            return file_handler(request)
+        fake["whole"] += 1
+        if fake["whole"] == 1:
+            return streamed(200, FLAC, {"content-type": "audio/flac", "last-modified": STAMP},
+                            fails=httpx.ReadError("connection reset"), fails_after=8192)
+        return streamed(200, FLAC, {"content-type": "audio/flac", "last-modified": STAMP})
+
+    state["handler"] = handle
+    safari = client.get(WRAPPED, headers={"Range": "bytes=0-1"})
+    assert safari.headers["content-type"] == "audio/flac"
+    stream = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    assert (stream.status_code, stream.headers["content-type"], stream.content) == (206, "audio/mp4", FMP4)
+    assert mp4_cache._answered["song-1"][0] == player_cache.FLAC, "the MP4 path's memory, untouched"
+
+
+@pytest.mark.parametrize("serve, why", [
+    (lambda: navidrome_file(FLAC[:-700]), "checksum"),
+    (lambda: navidrome_file(AUDIO, content_type="audio/mpeg"), "isn't a FLAC file"),
+    (lambda: navidrome_file(AUDIO), "first bytes aren't a FLAC file's"),
+    (lambda: navidrome_file(b""), "empty"),
+], ids=["the muxer won't vouch for it", "an mp3", "typed flac, isn't", "an empty file"])
+def test_an_fmp4_that_cant_be_made_is_a_415_saying_why(upstream, client, mp4_cache, serve, why):
+    """Never the FLAC, relayed or otherwise: a 415 the page takes as "play this one the ordinary
+    way", with the reason, not to be cached - a later version of the file may do."""
+    state, _ = upstream
+    fake, state["handler"] = serve()
+
+    first = client.get(FRAGMENTED, headers={"Range": HEAD, "Accept-Encoding": "gzip"})
+    second = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    for response in (first, second):
+        assert response.status_code == 415
+        assert response.headers["content-type"] == "application/json"
+        assert response.headers["cache-control"] == "no-store"
+        assert why in response.json()["detail"]
+        assert "content-encoding" not in response.headers
+        for name, value in MEDIA_HEADERS.items():
+            assert response.headers[name] == value
+    assert fake["whole"] <= 1, "fetched at most once, to try: a refusal is remembered"
+    assert fragmented(mp4_cache) == []
+
+
+def test_a_song_the_mp4_path_sent_as_flac_is_still_a_415_for_the_stream(upstream, client, mp4_cache, caplog):
+    """Refused on both: Safari was sent the FLAC, the gapless player a 415 - and each is said in its
+    own words, since "sent to Safari as FLAC" is no account of what the stream got."""
+    state, _ = upstream
+    cut = FLAC[:-700]
+    fake, state["handler"] = navidrome_file(cut)
+
+    safari = client.get(WRAPPED, headers={"Range": "bytes=0-1"})
+    stream = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    assert (safari.headers["content-type"], safari.content) == ("audio/flac", cut[:2])
+    assert stream.status_code == 415 and stream.headers["content-type"] == "application/json"
+    assert b"fLaC" not in stream.content
+    refusals = [r.getMessage() for r in caplog.records if "song-1" in r.getMessage() and "checksum" in r.getMessage()]
+    assert len(refusals) == 2
+    assert "sent to Safari as FLAC" in refusals[0]
+    assert "gapless player" in refusals[1] and "fragmented MP4" in refusals[1] and "Safari" not in refusals[1]
+
+
+def test_an_fmp4_too_big_to_hold_is_a_415_without_fetching_it(upstream, client, monkeypatch):
+    state, _ = upstream
+    fake, state["handler"] = navidrome_file()
+    monkeypatch.setattr(player_cache, "cache", Mp4Cache(player_cache.cache.directory, wrap_max_bytes=len(FLAC) - 1))
+
+    response = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    assert response.status_code == 415 and "more than the" in response.json()["detail"]
+    assert fake["whole"] == 0
+
+
+def test_an_fmp4_navidrome_couldnt_send_just_now_is_a_503_for_the_song(upstream, client, mp4_cache):
+    """A download that broke is this song's trouble, for now: 503 with scope "song" and a short
+    Retry-After - and not remembered, so the page's next ask makes it."""
+    state, _ = upstream
+    fake, file_handler = navidrome_file()
+
+    def handle(request):
+        if request.headers.get("range"):
+            return file_handler(request)
+        fake["whole"] += 1
+        if fake["whole"] == 1:
+            return streamed(200, FLAC, {"content-type": "audio/flac", "last-modified": STAMP},
+                            fails=httpx.ReadError("connection reset"), fails_after=8192)
+        return streamed(200, FLAC, {"content-type": "audio/flac", "last-modified": STAMP})
+
+    state["handler"] = handle
+    broken = client.get(FRAGMENTED, headers={"Range": HEAD})
+    again = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    assert broken.status_code == 503
+    assert broken.json()["scope"] == "song" and broken.json()["detail"]
+    assert broken.headers["retry-after"] == str(player_cache.RETRY_AFTER_SECONDS)
+    assert broken.headers["cache-control"] == "no-store"
+    assert "content-range" not in broken.headers
+    assert (again.status_code, again.content) == (206, FMP4)
+
+
+def test_a_look_at_the_file_that_breaks_off_is_a_503_for_the_song(upstream, client):
+    state, _ = upstream
+    fake, file_handler = navidrome_file()
+
+    def handle(request):
+        if request.headers.get("range") == "bytes=0-3":
+            headers = {"content-type": "audio/flac", "content-range": f"bytes 0-3/{len(FLAC)}"}
+            return streamed(206, FLAC[:4], headers, fails=httpx.ReadError("connection reset"), fails_after=0)
+        return file_handler(request)
+
+    state["handler"] = handle
+    response = client.get(FRAGMENTED, headers={"Range": HEAD})
+
+    assert (response.status_code, response.json()["scope"]) == (503, "song")
+    assert fake["whole"] == 0
+
+
+def test_a_song_navidrome_doesnt_have_is_a_404_for_the_fmp4_too(upstream, client):
+    state, _ = upstream
+    state["handler"] = lambda request: httpx.Response(200, json=failed(70, "Song not found"))
+
+    assert client.get(FRAGMENTED, headers={"Range": HEAD}).status_code == 404
 
 
 @pytest.mark.parametrize("header, expected", [

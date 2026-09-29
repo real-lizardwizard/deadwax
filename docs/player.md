@@ -103,16 +103,68 @@ can't be reached. See [`RETAG_RENAME_WAIT`](configuration.md#organizing).
 
 Between two songs there's normally a short pause, about a second on an iPhone over a VPN: when
 one song ends, the phone has to ask deadwax for the next one and start it from nothing. The
-**Gapless** switch on the now-playing screen, beside the album's name, is an experiment in
-closing that gap. It's **off** by default. Its setting is kept on the device, and a home-screen
-app keeps its settings apart from Safari's, so turn it on in the app itself.
+**Gapless** switch on the now-playing screen, beside the album's name, closes that gap. It's
+**off** by default. Its setting is kept on the device, and a home-screen app keeps its settings
+apart from Safari's, so turn it on in the app itself.
 
-With it on:
+With it on, the player works one of two ways, song by song: FLAC songs played one after another
+go into **one stream**, and everything else is got ready on a **second player**.
+
+### One stream, for FLAC
+
+FLAC songs played one after another are joined end to end into one continuous stream on a single
+audio player, the way a CD plays: there's nothing to start between two songs, so there's nothing
+to hear. Each song is joined on the exact sample where the one before it ends, which is what an
+album mixed straight through (a live album, a DJ mix) needs.
+
+deadwax repackages each song for this, as the same FLAC audio in a fragmented MP4, with no
+re-encoding, and keeps it in the player's cache beside Safari's MP4s. The player fetches it in
+pieces of a few seconds, keeping about 30 seconds ahead of what you're hearing.
+
+- **Where it works**: Safari on an iPhone, an iPad or a Mac, and Chromium browsers (Chrome, Arc,
+  Edge). A browser that can't do it uses the second player for every song.
+- **A stream starts from a tap**: **Play** or **Shuffle** on an album, tapping a song, or **Next**
+  and **Previous**, in the app or on the lock screen. A song that starts by itself after one
+  played the other way goes the other way too, and the next tap starts a stream again. A new
+  stream has to open and fetch before iOS lets a page that isn't playing go to sleep, so it waits
+  for you.
+- **The songs have to match**: FLAC, up to 48 kHz, one or two channels, 16 or 24 bits, and all of
+  one format. The stream ends before a song that isn't FLAC (an MP3, an Opus file), a hi-res song
+  above 48 kHz, or a song of another sample rate than the ones before it. That song plays from the
+  second player, with the usual short change, and the stream picks up again at your next tap.
+- **Next, Previous and the scrubber** move inside the stream when the song is in it. As the stream
+  crosses into a song, the lock screen shows that song's title, cover and its own position, and
+  plays are counted song by song as usual.
+- **AirPlay**: a stream can't go to an AirPlay speaker, because Safari only allows one with AirPlay
+  turned off. The AirPlay button still works: tapping it takes the song you're hearing out of the
+  stream, carrying on from where it was, and opens the list of speakers. On a Mac, tap it a second
+  time for the list. While the sound is on an AirPlay speaker, no stream starts.
+- **When something goes wrong, the music carries on.** If the stream can't go on (deadwax won't
+  repackage a song, the connection drops for longer than the stream holds, the browser can't play
+  what it was sent), the song you're hearing carries on the other way from where it had got to. It
+  comes as the FLAC file as it is, so in Safari a seek in that one song can land a little off (see
+  [Seeking](#seeking-and-where-safari-lands)). A later song that can't be had just ends the stream
+  before it, and plays from the second player at its turn: the song you're hearing isn't cut
+  short. Three failures in a row with no stream getting as far as playing in between, or
+  deadwax's cache being unusable, turn streaming off for 10 minutes; the second player is used
+  meanwhile.
+- **The first time a song is played** deadwax downloads it from Navidrome whole and repackages it
+  before sending anything, which is quick on the same machine. If nothing has come after about 25
+  seconds, the song plays the other way.
+- **It needs room in the player's cache**, as Safari's MP4s do: see
+  [`PLAYER_CACHE_MB`](configuration.md#paths). A song too big for what the cache's disk has free
+  plays the other way, and the songs around it still stream.
+
+### The second player, for everything else
+
+For songs the stream doesn't take, and in browsers without it, the next song is got ready on a
+second audio player while this one plays. This was the only way before 1.1.0-player.5. It still
+leaves a short gap (the second player has to start), just a shorter one.
 
 - **The next song is got ready while this one plays.** A few seconds into each song, the player
-  downloads the whole of the next one into the phone's memory and loads it into a second audio
-  player, which is kept silent. When the song ends, the second player starts straight away and
-  the two swap places, so the next song is ready in turn. **Next** uses the ready song too.
+  downloads the whole of the next one into the phone's memory and loads it into the second player,
+  which is kept silent. When the song ends, the second player starts straight away and the two
+  swap places, so the next song is ready in turn. **Next** uses the ready song too.
 - **Memory is capped.** Files up to 64 MB are downloaded ahead, which covers about ten minutes of
   CD-quality FLAC. Bigger files (most hi-res FLAC) and transcoded songs aren't downloaded ahead:
   the second player is given the song's address and buffers what Safari lets it.
@@ -131,8 +183,9 @@ With it on:
   the one before plays, every download is dropped part-way and the song streamed afresh, so part
   of every song is sent twice, for a change no quicker than with the switch off. If the readout
   keeps saying `download unfinished`, turn the switch off.
-- **Turning it off** takes effect at once: whichever player is playing carries on alone, and the
-  other lets go of what it was holding.
+
+**Turning the switch off** takes effect at once: the song you're hearing carries on alone, from
+where it was, and anything got ready is let go of.
 
 ### The readout
 
@@ -151,6 +204,7 @@ silence it really is.
 
 | it says | meaning |
 | --- | --- |
+| `in one stream` | the stream crossed from one song into the next. 0 ms when the next song's audio was already there; otherwise how long the stream waited for it |
 | `one element` | the switch is off: the ordinary way |
 | `handed over, from memory` | the second player started a song held in memory |
 | `handed over, streamed` | the second player started a song it had buffered from its address |
@@ -158,6 +212,8 @@ silence it really is.
 | `…, had to load` | the second player didn't have enough of the song to start at once, so it loaded first: iOS may have thrown away what it had buffered |
 | `…, failed before playing` | the new song failed before it made a sound, and the time includes asking for it again (or skipping it) |
 | `one element (airplay)` | the switch is on but the change went the ordinary way; also `nothing ready`, `failed to get ready`, `another song ready`, `refused` |
+
+The **Last seek** line under it ends ` · in one stream` while the song is playing in a stream.
 
 Only songs ending by themselves are timed, and only when the next one went straight to sound.
 Changes you make yourself (**Next**, **Previous**, a new song, moving the scrubber, pressing play)
@@ -170,35 +226,26 @@ says what each answer means.
 
 ### What still needs trying on a real iPhone
 
-In a desktop browser (Chromium) it works. Timed on the clock as above, a song change took about
-145 ms with the switch off, or about 270 ms with 150 ms added to every answer from Navidrome to
-stand in for a VPN; with the switch on it took about 98 ms either way. Much of those 98 ms is the
-browser starting its sound output at all, which every device does at its own speed, so what to
-look at on the phone is the difference between the switch on and off, not either number alone.
-On an iPhone, song changes have read 94 and 96 ms. The parts that matter only an iPhone can
-answer. To try it:
+The stream is built on the recipe a test page proved on an iPhone first: seamless in Safari and in
+Arc, with the screen locked, fetching over the network while locked. deadwax's own player has been
+checked in a desktop browser (Chromium): recorded as it played, the joins came out to the sample,
+the lock screen followed each song, and seeks, Next and Previous landed where they should. The
+second player's song changes took about 98 ms there against about 145 ms with the switch off, and
+94 and 96 ms on an iPhone. To try the stream on the phone:
 
-1. Turn **Gapless** off, play an album from a tap, and let a few songs change with the screen on,
-   to see what the ordinary way takes on your phone and connection. Then turn it on and let a
-   few more change. The readout should say `handed over, from memory`, with numbers well below
-   the ones before.
-2. **Lock the phone** and let at least ten songs change by themselves. Then unlock and open the
-   now-playing screen. The readout lists the last five: `from memory` with numbers like those with
-   the screen on means it works locked. `had to load`, or numbers as big as the switch-off ones
-   or bigger, mean iOS threw away what the second player had buffered, or held back the
-   download. `download unfinished` means the download couldn't keep up.
-3. While locked, check that the **lock screen** shows the right song and a playing state after
-   each change, and that previous, next and the scrubber still work.
-4. Try it in Safari as well as in the home-screen app.
-5. Play an album of big files (hi-res FLAC) for a while. If the app **reloads by itself**, that's
-   iOS taking memory back; say so, and turn the switch off.
-6. Try **AirPlay** with the switch on (the readout should say `one element (airplay)`, and the
-   AirPlay button should stay put as songs change), and a phone call or Siri during a song change
-   (that change shouldn't be timed at all).
-
-Even when it works, it isn't sample-exact: the second player still has to start, so an album
-mixed straight through (a live album, a DJ mix) may keep a tiny gap. Closing that completely
-would take a different kind of player.
+1. Turn **Gapless** on and play an album of CD-quality FLAC from a tap, with the screen on. The
+   readout should say `in one stream` at 0 ms, and you shouldn't hear the joins.
+2. **Lock the phone** and let at least ten songs change by themselves. The lock screen should show
+   each song's title and its own position as it comes. Unlock and open the now-playing screen: the
+   readout lists the last five changes.
+3. From the app and from the lock screen, try **Next**, **Previous** and the scrubber, and seek
+   back to near the start of a song that played a few minutes ago.
+4. Try **AirPlay** while a stream plays: the song should carry on and the list of speakers open.
+5. Play an album with an MP3 or a hi-res song in the middle. The stream should end before it,
+   that song play from the second player, and a tap start a stream again after it.
+6. Pause for a minute or two and carry on, from the app and from the lock screen. After a long
+   pause on the lock screen, iOS may not let play work until you open the app; that isn't the
+   stream (see [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened)).
 
 ## Seeking, and where Safari lands
 
@@ -319,7 +366,9 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
 should cover FLAC, MP3, AAC and ALAC. That's the only kind of file Navidrome can send in pieces (byte ranges), which is
 what Safari needs to start a song quickly and to skip around in it. The one change is that Safari
 gets a FLAC inside an MP4 of the same audio, so that its seeks land
-([Seeking](#seeking-and-where-safari-lands)); that's sent in pieces too.
+([Seeking](#seeking-and-where-safari-lands)); that's sent in pieces too. With the Gapless switch
+on, FLAC songs [in a stream](#one-stream-for-flac) come as a fragmented MP4 of the same audio, in
+any browser.
 
 **A file the phone can't play is transcoded to MP3** by Navidrome as it plays. On an iPhone
 that's mostly Ogg (Vorbis or Opus) and WMA. A transcode is made as it goes, so the first time
@@ -356,6 +405,9 @@ fixes that.
 
 - **Gapless playback**: there's a short gap between songs, unless you try the
   [experimental Gapless switch](#gapless-playback-experimental).
+- **Play from the lock screen after a long pause** may do nothing until the app is opened: iOS
+  puts a web page that isn't playing to sleep. See
+  [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened).
 - **CarPlay**: not something a web page can offer.
 - **Offline**: nothing is kept on the phone for listening without a connection.
 - **Search**: there isn't any yet. Browse the grid.
@@ -390,4 +442,6 @@ question the whole player existed to answer. Still to find out:
   iPhone, and the MP4s landing exactly was measured on a Mac's Safari engine only (see
   [Seeking](#seeking-and-where-safari-lands)); and how long a song's first play waits there;
 - whether the scrubber takes a tap and a drag under a real finger, which a desktop browser can only
-  stand in for.
+  stand in for;
+- everything about [the one stream](#what-still-needs-trying-on-a-real-iphone) as deadwax builds
+  it, though the way it's built was proved on an iPhone first.

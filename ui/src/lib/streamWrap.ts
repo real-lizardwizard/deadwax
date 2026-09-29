@@ -63,11 +63,13 @@ export function asksForMp4(
 /**
  * What came back for the song playing when it was asked for inside an MP4: `mp4` it was, `flac`
  * deadwax sent the FLAC as it is instead (a file it wouldn't repackage - its log says why), null
- * not known yet. Null altogether for a song not asked for that way.
+ * not known yet. Null altogether for a song not asked for that way. `stream` is a song playing
+ * inside a one-stream run (lib/streamPlan.ts): fragmented MP4 appended to a MediaSource, which is
+ * known the moment it plays, so there is nothing to ask.
  */
 export interface Wrapped {
   id: string
-  got: 'mp4' | 'flac' | null
+  got: 'mp4' | 'flac' | 'stream' | null
 }
 
 /** What an answer's Content-Type says came back. */
@@ -84,5 +86,6 @@ export function describeWrap(wrapped: Wrapped | null, trackId: string | null): s
   if (!wrapped || wrapped.id !== trackId) return ''
   if (wrapped.got === 'mp4') return ' · FLAC in MP4'
   if (wrapped.got === 'flac') return ' · sent as FLAC, not in an MP4'
+  if (wrapped.got === 'stream') return ' · in one stream'
   return ' · asked for FLAC in MP4'
 }

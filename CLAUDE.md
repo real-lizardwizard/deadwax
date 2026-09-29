@@ -139,10 +139,12 @@ src/
   scan_wait.py     PURE. Whether Navidrome has finished a scan that began after an apply's
                    tags were written, so the folder can be renamed - see "The scan wait".
   flac_mp4.py      PURE. A FLAC file as an MP4 of the very same frames, no ffmpeg - what makes
-                   Safari's seeks land. See "FLAC in an MP4, for Safari".
+                   Safari's seeks land. See "FLAC in an MP4, for Safari". And as a FRAGMENTED
+                   MP4, `fmp4_layout()`, for the gapless stream - see "One stream for FLAC".
   player_cache.py  those MP4s made from Navidrome's file and kept on disk (PLAYER_CACHE_PATH or
                    temp space, PLAYER_CACHE_MB), served with byte ranges; the stream route's
-                   `wrap=mp4`. One URL stays one container - see "After review (the cache)".
+                   `wrap=mp4`, and `wrap=fmp4` for the gapless stream. One URL stays one
+                   container - see "After review (the cache)".
   track_tags.py    tags edited BY HAND, on one track or a selection at once. The fourth
                    writer, and the same plan/execute split again - see "Editing tags by hand".
   artists.py       PURE. What an artist page shows, and where artist pictures come from -
@@ -174,8 +176,10 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
   player/          the phone player's page, manifest, icons and its own stylesheet.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-                   ui/src/player/ is the phone player, a second entry beside the main one.
-tests/             1326 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+                   ui/src/player/ is the phone player, a second entry beside the main one;
+                   player/streamSource.ts is its one-stream gapless engine, with the pure
+                   lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC".
+tests/             1457 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2543,7 +2547,8 @@ guide's section is `docs/player.md#gapless-playback-experimental`.
   home-screen app; a call or Siri during a handover; whether AVFoundation plays FLAC from a `blob:`
   as it does from the address (WebKit serves ranges of a blob, so it should). WebKit bug 295518 (an
   iOS 26 home-screen app silent after reopening) is known and unrelated; don't blame this for it.
-- **Not built, and why**: ManagedMediaSource with FLAC repackaged as fragmented MP4 is the only
+- ~~Not built~~ **Built in 1.1.0-player.5, after a lab page proved it on the iPhone** - see "One
+  stream for FLAC". What this entry said then: ManagedMediaSource with FLAC repackaged as fragmented MP4 is the only
   sample-exact route that isn't Web Audio, but whether iOS plays FLAC through it at all is unknown
   (Safari has played FLAC-in-MP4 MSE as silence before, WebKit bug 198583, Shaka #2355), it needs
   `disableRemotePlayback` (so no AirPlay from it), and it evicts. Web Audio keeps playing locked only
@@ -3127,6 +3132,155 @@ reproduced with review4's script before the fix and after it, and again after in
   stays FLAC now, and wraps once `VERSION_SECONDS` have passed); `player.sim.cjs` checks that
   Next lets go of song 1's probe. Fifteen mutations, each undoing one fix, were all caught, and
   so is the make-room one.
+
+#### One stream for FLAC (1.1.0-player.5)
+
+James, with the second-player gapless still leaving ~100 ms on the iPhone: build "the method that
+just worked on iOS" - a lab page (scratchpad, never in the repo) that played consecutive FLAC songs
+through one ManagedMediaSource seamlessly on his iPhone, in Safari and in Arc, locked, fetching over
+the network while locked. The second-player way stays, for every song the stream doesn't take. The
+guide's section is `docs/player.md#one-stream-for-flac`.
+
+- **The recipe is exactly the lab's; don't vary it without the phone.**
+  - ManagedMediaSource on WebKit (the only MSE an iPhone has), plain MediaSource in Chromium, chosen
+    once per page by `mediaSourceEngine()` (streamSource.ts). Type `audio/mp4; codecs="fLaC"` first
+    (WebKit's ManagedMediaSource takes only the ISO fourcc), `"flac"` second.
+  - Each song as a fragmented MP4 of its own FLAC frames, made by deadwax (`wrap=fmp4`).
+  - Each song's init segment appended immediately before its media: without it WebKit clicked at
+    the join.
+  - Songs placed with `timestampOffset` = the run's earlier samples / rate. WebKit rounds it to the
+    sample timescale (`roundTowardsTimeScaleWithRoundingMargin`), so a join lands on the exact
+    sample however long the run.
+  - `disableRemotePlayback = true` BEFORE attaching a ManagedMediaSource, or WebKit leaves it
+    `closed` without a word (the open is deferred until AirPlay can't be asked of the element). It
+    goes on as `srcObject`; Chromium refuses a MediaSource as srcObject, so a `blob:` URL there.
+- **The server: `fmp4_layout()` in flac_mp4.py**, pure like the MP4 muxer and sharing its frame
+  splitting: ftyp (iso5), a moov with mvex/trex, a sidx, then a moof and mdat per second of frames,
+  every sample flagged sync (tfhd default flags 0x02000000). Byte for byte the lab's ffmpeg file,
+  but for the sidx (added) and udta (left out). player_cache keeps them beside the MP4s as files of
+  their own (`.f.mp4`, `FMP4_WRAP`, `FMP4_FORMAT_VERSION` in the key), with their own makes and
+  refusals. `answer_fragmented()` answers byte ranges; a 415 JSON when this version can't be
+  repackaged; a 503 with `scope` "song" (Retry-After 2) or "server" (30); never the FLAC, which a
+  MediaSource can't take. The route takes `wrap=fmp4` only with `format=raw` (400 otherwise).
+  **The If-Range pin** (`_pinned`, `PINS_KEPT` 1024): a range whose If-Range names the file the
+  song was last served as is answered from it without asking Navidrome, so a Navidrome redeploy or
+  a retag mid-song doesn't break the stream.
+- **The page: `ui/src/player/streamSource.ts` owns the stream** (which songs are in it and where,
+  fetching, appending, seeking, saying when it can't go on and for which song); usePlayer keeps the
+  queue, the lock screen and the listening. The rules are pure in `lib/streamPlan.ts` (placing
+  songs, what to fetch next, what an answer means, retries) and `lib/fmp4.ts` (reading a head),
+  pinned by `stream.sim.cjs` and `fmp4.sim.cjs`; the wiring by `player.sim.cjs`, whose fake
+  MediaSource parses the real fragmented MP4, places frames as WebKit does, evicts under Safari's
+  cap, clamps seeks to `seekable` and waits at holes.
+- **What the browser does NOT do for us**, each read in WebKit's or Chromium's source:
+  - An iPhone holds about 5.26 MiB of audio in a SourceBuffer (Chromium 12 MiB). So pieces of at
+    most 5 s or 1 MiB, fed 10 to 30 s ahead (`REFILL_BELOW_S`, `FILL_TO_S`) within 3 MiB (8 MiB
+    plain); a QuotaExceededError clears what is behind (keeping a second), then splits the piece at
+    a fragment boundary, then waits for the playhead - never on a playhead that is itself waiting.
+  - What to fetch is worked out from `buffered` every time (`nextWant`), never from a cursor:
+    eviction and seeks leave holes anywhere.
+  - A seek is clamped to `seekable`, [0, duration] for a finite duration that grows only as data
+    comes, so the duration is raised first; and Safari 27.0 evicts relative to where the playhead
+    WAS, so a seek to unbuffered time removes every other range, appends only the target's piece,
+    and appends nothing more until 'seeked' (the stages: wait, clear, place, append, land).
+  - `endOfStream()` is a state: an append, a remove or a `timestampOffset` reopens an ended source,
+    and an open one stalls at its end instead of ending - on a locked phone, the music stopping. It
+    is called again whenever the run is all in.
+  - An aborted append's 'updateend' arrives after whatever came next: nothing trusts an
+    'updateend' while `updating` is true.
+  - `srcObject` beats `src`, and any `load()` detaches a MediaSource for good: usePlayer's
+    `detach()`, and `reload()` on a stream leaves the stream instead of reloading.
+- **A new stream only in a gesture** (a tap, a lock-screen command): outside one - a song ending, a
+  skip after a failure - a new MediaSource would have to open, fetch and append before iOS
+  suspends a page that isn't playing. Those go the URL way, and the next tap streams again. No
+  standby holds a song of the run (`standbyPlan`'s `live`).
+- **What joins**: FLAC, up to 48 kHz, one or two channels, 16 or 24 bits (`formatStreamable`), in
+  the same format as the song before (`joins`). A song kept out by its format only is `noStream`
+  (it still gets its MP4 for Safari the URL way); one deadwax won't repackage, or whose bytes won't
+  decode, is `refused` (the file as it is). A song that fails the stream plays the URL way from
+  where it had got to, as the raw FLAC (`leaveStream`): deadwax relays that at once, where an MP4
+  could mean a make first.
+- **AirPlay**: a stream can't go to AirPlay. `showAirPlay()` leaves the stream in the same tap, then
+  shows the picker (a Mac wants a second tap). Availability events are ignored while
+  `disableRemotePlayback` is set - WebKit says "none" then - and no stream starts while wireless.
+- **The readout**: a join reads `in one stream`, 0 ms, or the stall from 'waiting' to 'playing' if
+  the stream waited there; the seek line ends ` · in one stream`.
+- **Engine off**: three failures with no stream playing in between, or a 503 with scope "server",
+  and no stream is tried for `ENGINE_OFF_MS` (10 minutes); the second player meanwhile.
+- **Verified in the real page** (Chromium, the stub Navidrome, 8081): recorded through Web Audio, an
+  album's signal ran 39.7776 s against 39.7777 expected, the largest residual 0.00004, no spikes;
+  joins at 0 ms; the lock screen's title switched within 250 ms of each join; Mixed (FLAC then MP3)
+  handed over to the MP3 on the standby in 46 ms and went on the URL way; hi-res went the URL way; a
+  seek in song 2 landed exactly (19.100 = 16.3218 + 2.778); "previous" restarted at the song's own
+  start on the same source; deadwax repackaged each song in about a millisecond; and, after the
+  review, a 25 s pause then play carried on in the same stream.
+- **NOT verified - the phone's to answer**: deadwax's own build on an iPhone at all (the lab proved
+  the recipe, not this code); the lock screen's title and scrubber per song; seeks, Next and
+  Previous from the lock screen; leaving for AirPlay; the fetching pattern against the real cache
+  over WireGuard.
+- **Play on the lock screen after a long pause does nothing until the app is opened** (James, on
+  the lab and on the player as it was): iOS suspends a paused web page - WebKit releases the
+  page's MediaPlayback assertion once nothing plays, and remote commands queue to the suspended
+  web process until something wakes it. Not fixable cleanly from a page; the one loophole, never
+  pausing (playing silence), keeps the phone awake and the lock screen claiming a song plays. So
+  it's in troubleshooting, not worked around.
+
+##### After review (the stream)
+
+A review in four lenses (engine, player, server, tests), each finding checked by a skeptic who
+wrote a failing scenario first. Everything confirmed was fixed:
+
+- **A later song's trouble cut the song playing** (major). A piece of song N+1 answered changed,
+  refused, fatal or engine-off, or an append error on its bytes, failed song N+1 at once, and
+  usePlayer loaded it: up to ~28 s of song N lost. Now `pieceFailed` for a later song, while the
+  playhead still has music (`!waitingOn`), ends the run before it (`endAt(index - 1)`) and removes
+  whatever of it was appended (`cutAt`: `remove(start, Infinity)`), so `endOfStream` can't stretch
+  the timeline over it; a 404 or 415 also marks it refused. An append error on a later song marks it
+  refused and fails the song PLAYING as `'broken'`, which leaves the stream from where it was: both
+  engines give up the whole source on an append error. `streamFailed` moves the queue on only with
+  the playhead at the join (`songPosition() >= songLength() - 0.5`) and never for 'decode' - a
+  second guard, which the engine fix means never fires. `endAt` now reports `runEnded` again
+  whenever the end moves earlier; reported once, the standby kept the song after the OLD end.
+- **A seek to a song's last moments stalled** when nothing was placed after it: both `covered()`
+  checks asked for 50 ms past the song's end. Now `Math.min(target + 0.05, song.end)`.
+- **Resuming after a pause was taken for stuck**: the watchdog's clock moved only with the
+  position. `progressed()` refreshes while paused, and `play()` ticks the stream before
+  `audio.play()`, for a locked phone whose timers haven't run.
+- **The head's first fragments were fetched twice** for any CD song (the lead was used only when a
+  whole piece fitted in it): they're appended from the lead, and the first ask starts after them.
+- **A second split lost the first split's other half**: `rest` is a queue.
+- **`get()` read a whole 200 before looking at it** (a changed song's entire file): the status
+  first; only a 206, capped at what was asked, or a 503's first 4 KiB (its scope) is read.
+- **"Three failed streams in a row" meant three without a crossing**: reset when the engine goes off
+  and on 'playing' with a stream.
+- **Next into the run's last song never readied the song after the run**, and `runEnded` started
+  that download at once beside the stream's first fill: `preloadSoon()` in both.
+- **The next song's head was asked a whole song early**, so with a small cap it looked idle (only
+  its head served) when the song after it was made, was cleared, and its first piece got a 503.
+  `lookAhead` now waits until the feeding is within `FILL_TO_S` of the last song's end, about a
+  minute before the join; a song that can't join is still known at once.
+- **Server: a made file bigger than its FLAC cleared the song being played.** Room is made at the
+  FLAC's size, and `_evict` then trimmed the MP4's few KiB of boxes off whatever was served longest
+  ago - with a small cap, the song on the playhead, and two songs played in turn re-made a whole song
+  per piece. `_evict(over=)` never clears a song in use for that overhead.
+- **Server: a disk short for ONE long song turned streaming off for 10 minutes and wiped the idle
+  songs.** `Room.SHORT` (503, scope "song") when clearing every idle song still wouldn't be enough,
+  and then nothing is cleared; `Room.DISK` (scope "server") only when even a small song
+  (`SMALL_SONG_BYTES`, 16 MiB, or this one if smaller) wouldn't fit with everything cleared.
+- **Kept as it was**: a first song whose head takes more than about 25 s is left for the URL way
+  (the watchdog doesn't count a head on its way). Waiting out the 90 s header timeout would be longer
+  silence, and on the NAS a make takes about a second.
+- **Tests**: player.sim.cjs gained the skeptics' probes and a check per fix - a later song's 404,
+  401, change and append error at two points in a 4-minute song, a run cut after its end was known,
+  If-Range on every piece, a seek to the end with a minute left, pause and play just before a
+  watch, slow first heads, when the next head is asked, moving inside the stream, the Opus song
+  after a run, a last song too short to be seen, gestures, AirPlay, the lock screen, a stalled
+  body, flaky pieces, 503s, failures not in a row, sample-exact joins, the lead, double splits -
+  and `check()` shows a MediaSource by its kind instead of crashing on `JSON.stringify`. Sixteen
+  mutations, one per fix, were each caught, three of them only together with a partner they back
+  up: the seek's wait-stage check (the append stage), the append error's blame (`streamFailed`'s
+  join rule), and the tick before play (progressed-while-paused, since the sim's timers run). Three
+  new tests in test_player_cache.py catch the three server mutations.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -4445,7 +4599,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1326 tests
+.venv/bin/python -m pytest tests/ -q  # 1457 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -4474,6 +4628,8 @@ node ui/test/gapless.sim.cjs    # the gapless switch - what the standby holds, h
 node ui/test/scrub.sim.cjs      # the player's scrubber - a point on the bar, fingers and keys, a seek on its way, where it landed
 node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks on their way, the readout across song ends, a handover
 node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (WebKit, not Chromium), which songs, what the readout says
+node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
+node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -4494,7 +4650,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1326 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1457 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
@@ -4564,7 +4720,8 @@ A green suite here means the logic is sound, not that it works against real infr
     landscape insets, `timeupdate` while locked, which Ogg codecs it says it plays, whether a
     failed song's 1.5s retry fires on a locked phone (and whether WebKit sends `pause` after
     `error`, as Chromium does), how long the scan wait really takes against a real Navidrome, and
-    where seeks land in Safari on the phone (the readout's "Last seek" line). **The week gates step 2 of the multi-user
+    where seeks land in Safari on the phone (the readout's "Last seek" line), and now the one
+    stream as deadwax builds it (the list under "One stream for FLAC"). **The week gates step 2 of the multi-user
     plan.** If the next song won't start with the screen locked, that is the answer to "can a web
     app do this", and native is back on the table.
 

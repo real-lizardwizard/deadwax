@@ -322,6 +322,27 @@ The [Gapless switch](player.md#gapless-playback-experimental) is an experiment, 
 between the cover and the song's title says how each song change went. Compare it with the switch off on the
 same phone and connection: the difference is what the switch saves.
 
+FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), reading `in one stream`
+at 0 ms:
+
+- **`in one stream` with a number above 0**: the stream had to wait for the next song's audio. The
+  connection couldn't keep 30 seconds ahead, or deadwax was still making the next song (its first
+  play: deadwax downloads it from Navidrome whole first). Once the song is in the player's cache,
+  it shouldn't happen again for that song.
+- **FLAC songs reading `handed over` or `one element` instead**: they didn't go into a stream. A
+  stream only starts from a tap (Play, a song, Next, Previous), so after a song that played the
+  other way the next ones do too until you tap. It also ends before a song that isn't FLAC, is
+  above 48 kHz, or has another sample rate than the songs before it. It doesn't start while the
+  sound is on AirPlay, and after three failures in a row, or a cache deadwax can't use, it's off for
+  10 minutes. A song deadwax won't repackage says why in deadwax's log, in a line starting
+  `player: song`.
+- **The song carried on, but the readout went from `in one stream` to the other way mid-song**:
+  the stream couldn't go on (the connection dropped for too long, deadwax couldn't send a song,
+  or the browser couldn't play what it was sent), and the song carried on from where it had got
+  to. In Safari a seek in that one song can land a little off. The next tap starts a stream again.
+
+For the second player, which gets everything else ready:
+
 - **`download unfinished`**: the next song hadn't finished downloading when this one ended, so it
   was streamed, taking as long as with the switch off. On a connection that can't download a
   whole song while the one before plays, this happens every time, and the switch only uses more
@@ -342,6 +363,19 @@ same phone and connection: the difference is what the switch saves.
   AirPlay in Control Center works whatever the button does. Say so if it happens.
 - **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
   held in memory ahead of time, and hi-res albums come close to that. Turn the switch off.
+
+## After a long pause, play on the lock screen does nothing until the app is opened
+
+A while after the music stops, iOS puts the player's page to sleep: once nothing is playing, Safari
+gives up the page's permission to run in the background, and the lock screen's buttons wait until
+the page wakes, which is when you open it. So play on the lock screen seems to do nothing, and when
+you open the app it starts at once. It happens with the Gapless switch on or off, and to any web
+page that plays music, and a short pause usually isn't long enough for it.
+
+There's no clean way round it from a web page. The only one would be never to stop, playing
+silence while paused, which keeps the phone awake, uses battery, and leaves the lock screen saying
+something is playing, so deadwax doesn't. Open the app and press play; the song carries on from
+where it was.
 
 ## A song seeks to the wrong place
 

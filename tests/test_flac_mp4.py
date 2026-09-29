@@ -7,20 +7,30 @@ a copy of the next frame's header, the worst false sync there can be. The encode
 put every frame, so the MP4's tables are checked against the truth rather than against what the
 module itself found. No binary fixtures are committed and nothing here needs ffmpeg or flac;
 the few tests that use them (decoding both files to PCM and comparing) skip when they're absent.
+
+The fragmented MP4 the gapless player streams (fmp4_layout) is read back box by box the same way,
+and a few of its heads are committed as TEXT - tests/fixtures/fmp4_heads.json, which the page's
+own parser (ui/test/fmp4.sim.cjs) is held to - and made again here, so the writer and that parser
+can't drift apart.
 """
 
+import base64
 import hashlib
+import json
+import os
 import random
+import re
 import shutil
 import struct
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from src import flac_mp4
-from src.flac_mp4 import CannotRepackage, NotFlac, Unsupported, flac_to_mp4
+from src.flac_mp4 import CannotRepackage, NotFlac, Unsupported, flac_to_fmp4, flac_to_mp4, fmp4_layout
 
-# --- a FLAC encoder, verbatim subframes only -------------------------------------------------
+# --- a FLAC encoder, verbatim subframes (or constant ones) -----------------------------------
 
 BLOCK_CODES = {192: 1, 576: 2, 1152: 3, 2304: 4, 4608: 5, 256: 8, 512: 9, 1024: 10, 2048: 11,
                4096: 12, 8192: 13, 16384: 14, 32768: 15}
@@ -88,14 +98,18 @@ def frame_header(number, block, *, rate, channels, bps, variable, rate_style):
 
 
 def encode(*, rate=44100, channels=2, bps=16, blocks=(4096,) * 4 + (1000,), variable=False,
-           rate_style="table", seed=1, plant=None, total=None, id3=b"", trailer=b"", max_framesize=None):
+           rate_style="table", seed=1, plant=None, total=None, id3=b"", trailer=b"", max_framesize=None,
+           constant=False):
     """A FLAC file, and the frames in it as (offset, bytes, block size).
 
     `plant` maps a frame index to (byte offset into its first channel's samples, bytes) - or to a
     function of the list of every frame's header that returns them, to copy a real header in.
     `max_framesize` is what STREAMINFO says the largest frame is: the truth unless it is given,
-    and 0 for "not known", as an encoder writing to a pipe leaves it.
+    and 0 for "not known", as an encoder writing to a pipe leaves it. `constant` writes each
+    channel of each frame as one CONSTANT subframe instead - a single sample standing for the whole
+    block, which is valid FLAC a dozen bytes a frame, for files whose audio nobody looks at.
     """
+    assert not (constant and plant), "a constant subframe has no samples to plant anything in"
     rng = random.Random(seed)
     width = bps // 8
     headers, number = [], 0
@@ -105,25 +119,34 @@ def encode(*, rate=44100, channels=2, bps=16, blocks=(4096,) * 4 + (1000,), vari
         number += block if variable else 1
     frames, pcm = [], bytearray()
     for index, (block, header) in enumerate(zip(blocks, headers)):
-        samples = [[rng.randrange(-(1 << (bps - 1)), 1 << (bps - 1)) for _ in range(block)]
-                   for _ in range(channels)]
         body = bytearray()
-        for channel in samples:
-            #? subframe header 0b0_000001_0: verbatim, no wasted bits
-            body.append(0x02)
-            body += b"".join(s.to_bytes(width, "big", signed=True) for s in channel)
-        if plant and index in plant:
-            at, what = plant[index]
-            what = what(headers) if callable(what) else what
-            body[1 + at:1 + at + len(what)] = what
+        if constant:
+            values = []
+            for _ in range(channels):
+                #? subframe header 0b0_000000_0: constant, no wasted bits
+                value = rng.randrange(-(1 << (bps - 1)), 1 << (bps - 1))
+                body.append(0x00)
+                body += value.to_bytes(width, "big", signed=True)
+                values.append([value] * block)
+        else:
+            samples = [[rng.randrange(-(1 << (bps - 1)), 1 << (bps - 1)) for _ in range(block)]
+                       for _ in range(channels)]
+            for channel in samples:
+                #? subframe header 0b0_000001_0: verbatim, no wasted bits
+                body.append(0x02)
+                body += b"".join(s.to_bytes(width, "big", signed=True) for s in channel)
+            if plant and index in plant:
+                at, what = plant[index]
+                what = what(headers) if callable(what) else what
+                body[1 + at:1 + at + len(what)] = what
+            #? what STREAMINFO's MD5 is taken over: interleaved, little-endian - read back from the
+            #? planted body so the checksum matches what the file really holds
+            values = [[int.from_bytes(body[at:at + width], "big", signed=True)
+                       for at in range(1 + c * (1 + block * width), (c + 1) * (1 + block * width), width)]
+                      for c in range(channels)]
         frame = header + bytes(body)
         frame += struct.pack(">H", crc16(frame))
         frames.append(frame)
-        #? what STREAMINFO's MD5 is taken over: interleaved, little-endian - read back from the
-        #? planted body so the checksum matches what the file really holds
-        values = [[int.from_bytes(body[at:at + width], "big", signed=True)
-                   for at in range(1 + c * (1 + block * width), (c + 1) * (1 + block * width), width)]
-                  for c in range(channels)]
         for i in range(block):
             for c in range(channels):
                 pcm += values[c][i].to_bytes(width, "little", signed=True)
@@ -307,6 +330,38 @@ def test_the_output_is_the_same_every_time():
     """No timestamps: the same file makes the same bytes, which is what lets a copy be cached."""
     flac, _ = encode()
     assert flac_to_mp4(flac) == flac_to_mp4(bytearray(flac))
+
+
+#? One of each shape the muxer handles differently, for the goldens below and the fragmented ones
+GOLDEN_CASES = {
+    "fixed blocks": dict(blocks=(4096,) * 30 + (1234,)),
+    "variable blocks": dict(blocks=(1152, 4608, 576, 4096, 192, 2000, 16, 4608, 4608, 4608, 333), variable=True),
+    "96 kHz 24-bit": dict(rate=96000, bps=24, blocks=(4096,) * 30 + (77,)),
+    "6 channels": dict(rate=48000, channels=6, blocks=(1152,) * 50 + (300,)),
+    "id3v2 in front": dict(id3=id3v2(), blocks=(4096,) * 12 + (1000,), seed=3),
+    "id3v1 and ape after": dict(blocks=(4096,) * 12 + (1000,), seed=4, trailer=(
+        b"APETAGEX" + struct.pack("<IIII8x", 2000, 64, 0, 0xA0000000) + bytes(32)
+        + b"APETAGEX" + struct.pack("<IIII8x", 2000, 64, 0, 0x80000000) + b"TAG" + bytes(125))),
+}
+
+#? sha256 of flac_to_mp4() for each, recorded from the muxer as 1.1.0-player.5 shipped it. The
+#? player's cache names an MP4 by FORMAT_VERSION and serves ranges of it across a re-make after an
+#? eviction, so an MP4 whose bytes changed under the same FORMAT_VERSION would be spliced into one
+#? made before: a change here needs FORMAT_VERSION (player_cache.py) bumped, never just new hashes.
+MP4_GOLDENS = {
+    "fixed blocks": "88f3b18de7da93e68ca8aa7d0c7c98ab8765070097028a59713af911b13f2faa",
+    "variable blocks": "577295f264d68515fe8bc7772059b2fad3028815d7f9f85f9ad0f8beb3e27378",
+    "96 kHz 24-bit": "bad4dc51343376fc8cac8e4ac38ce22adfd0af350cc4470ad879d14baeff9de3",
+    "6 channels": "34cafbd463e1d08ab4615340f63403bf88cd41c64b63bc389e60444dc0dad9b3",
+    "id3v2 in front": "2099b3efa268a5a331ce206cffe72afeefab250ed5f71a3ffad659d8139fb14b",
+    "id3v1 and ape after": "2eab9b641060cd2b388f4cf35d5d8c93fbd9606c7ef37bdf0bf1a009b276508c",
+}
+
+
+@pytest.mark.parametrize("name", list(MP4_GOLDENS))
+def test_the_mp4_is_byte_for_byte_what_it_was(name):
+    flac, _ = encode(**GOLDEN_CASES[name])
+    assert hashlib.sha256(flac_to_mp4(flac)).hexdigest() == MP4_GOLDENS[name]
 
 
 def next_header(index):
@@ -973,6 +1028,317 @@ def test_a_duration_past_32_bits_uses_version_1_headers():
     assert struct.unpack(">IQ", mdhd[20:32]) == (192000, 65535 * 70000)
 
 
+# --- the fragmented MP4, for one stream across songs ------------------------------------------
+
+def full(body):
+    """(version, flags, the rest) of a FullBox's body."""
+    return body[0], int.from_bytes(body[1:4], "big"), body[4:]
+
+
+def children(data, *path):
+    return [k for k, _, _ in boxes(data, *_body(data, *path))]
+
+
+def read_fmp4(data):
+    """
+    Everything an MSE player takes from a fragmented file, read box by box and checked as it goes:
+    ftyp, moov and sidx, then moof + mdat pairs to the end - each fragment's samples found the way
+    a player finds them, from its moof (default-base-is-moof) through its trun.
+    """
+    top = boxes(data)
+    kinds = [k for k, _, _ in top]
+    assert kinds[:3] == [b"ftyp", b"moov", b"sidx"], kinds[:4]
+    assert len(kinds) % 2 == 1 and kinds[3:] == [b"moof", b"mdat"] * ((len(kinds) - 3) // 2), kinds
+    ftyp = box(data, b"ftyp")
+    stbl = (b"moov", b"trak", b"mdia", b"minf", b"stbl")
+
+    version, flags, mvhd = full(box(data, b"moov", b"mvhd"))
+    assert (version, flags) == (0, 0)
+    creation, modification, movie_scale, movie_duration = struct.unpack(">IIII", mvhd[:16])
+    version, tkhd_flags, tkhd = full(box(data, b"moov", b"trak", b"tkhd"))
+    assert version == 0
+    track, _, track_duration = struct.unpack(">III", tkhd[8:20])
+    layer, group, volume = struct.unpack(">HHH", tkhd[28:34])
+    version, flags, mdhd = full(box(data, b"moov", b"trak", b"mdia", b"mdhd"))
+    assert (version, flags) == (0, 0)
+    _, _, timescale, duration, language, _ = struct.unpack(">IIIIHH", mdhd)
+    stsd = box(data, *stbl, b"stsd")
+    assert struct.unpack(">I", stsd[4:8])[0] == 1
+    entry = stsd[8:]
+    entry_size, entry_kind = struct.unpack(">I4s", entry[:8])
+    assert entry_kind == b"fLaC" and entry_size == len(entry)
+    channels, sample_size, _, _, entry_rate = struct.unpack(">HHHHI", entry[24:36])
+    (dfla_kind, dfla_start, dfla_end), = boxes(entry, 36)
+    tables = {kind: box(data, *stbl, kind) for kind in (b"stts", b"stsc", b"stsz", b"stco")}
+    trex = full(box(data, b"moov", b"mvex", b"trex"))
+
+    (_, sidx_start, sidx_end) = top[2]
+    version, flags, sidx = full(data[sidx_start:sidx_end])
+    assert (version, flags) == (0, 0)
+    reference_id, sidx_scale, earliest, first_offset, _, count = struct.unpack(">IIIIHH", sidx[:20])
+    references = [struct.unpack(">III", sidx[20 + 12 * i:32 + 12 * i]) for i in range(count)]
+    assert len(sidx) == 20 + 12 * count
+
+    fragments, expected_t0 = [], 0
+    for (_, moof_start, moof_end), (_, mdat_start, mdat_end) in zip(top[3::2], top[4::2]):
+        base = moof_start - 8
+        assert children(data[base:moof_end], b"moof") == [b"mfhd", b"traf"]
+        moof = data[base:moof_end]
+        assert children(moof, b"moof", b"traf") == [b"tfhd", b"tfdt", b"trun"]
+        _, _, mfhd = full(box(moof, b"moof", b"mfhd"))
+        _, tfhd_flags, tfhd = full(box(moof, b"moof", b"traf", b"tfhd"))
+        fields, at = {"track": struct.unpack(">I", tfhd[:4])[0]}, 4
+        for bit, name, width in [(0x01, "base offset", 8), (0x02, "description", 4), (0x08, "duration", 4),
+                                 (0x10, "size", 4), (0x20, "flags", 4)]:
+            if tfhd_flags & bit:
+                fields[name] = int.from_bytes(tfhd[at:at + width], "big")
+                at += width
+        assert at == len(tfhd)
+        tfdt_version, _, tfdt = full(box(moof, b"moof", b"traf", b"tfdt"))
+        t0 = struct.unpack(">Q" if tfdt_version == 1 else ">I", tfdt)[0]
+        trun_version, trun_flags, trun = full(box(moof, b"moof", b"traf", b"trun"))
+        samples_in, = struct.unpack(">I", trun[:4])
+        at, data_offset = 4, None
+        if trun_flags & 0x01:
+            data_offset, = struct.unpack(">i", trun[at:at + 4])
+            at += 4
+        if trun_flags & 0x04:
+            at += 4
+        durations, sizes = [], []
+        for _ in range(samples_in):
+            durations.append(struct.unpack(">I", trun[at:at + 4])[0] if trun_flags & 0x100 else fields["duration"])
+            at += 4 if trun_flags & 0x100 else 0
+            sizes.append(struct.unpack(">I", trun[at:at + 4])[0] if trun_flags & 0x200 else fields["size"])
+            at += 4 if trun_flags & 0x200 else 0
+            at += 4 * bool(trun_flags & 0x400) + 4 * bool(trun_flags & 0x800)
+        assert at == len(trun)
+        #? the samples are where the moof says: counted from the moof's first byte, and exactly
+        #? filling the mdat after it
+        first = base + data_offset
+        assert first == mdat_start and first + sum(sizes) == mdat_end
+        samples, offset = [], first
+        for size in sizes:
+            samples.append(data[offset:offset + size])
+            offset += size
+        assert t0 == expected_t0, "each fragment starts where the one before ended"
+        expected_t0 += sum(durations)
+        fragments.append({
+            "start": base, "end": mdat_end, "sequence": struct.unpack(">I", mfhd)[0], "tfhd_flags": tfhd_flags,
+            "tfhd": fields, "tfdt_version": tfdt_version, "t0": t0, "trun_version": trun_version,
+            "trun_flags": trun_flags, "durations": durations, "sizes": sizes, "samples": samples,
+            "units": sum(durations), "moof_size": moof_end - base,
+        })
+
+    assert [f["start"] for f in fragments][:1] == [sidx_end], "the first fragment straight after the index"
+    return {
+        "ftyp": (ftyp[:4], struct.unpack(">I", ftyp[4:8])[0], [ftyp[i:i + 4] for i in range(8, len(ftyp), 4)]),
+        "init_end": top[1][2], "index_end": sidx_end,
+        "moov": children(data, b"moov"), "trak": children(data, b"moov", b"trak"),
+        "mdia": children(data, b"moov", b"trak", b"mdia"), "minf": children(data, b"moov", b"trak", b"mdia", b"minf"),
+        "stbl": children(data, *stbl),
+        "mvhd": (creation, modification, movie_scale, movie_duration, struct.unpack(">I", mvhd[92:96])[0]),
+        "tkhd": (tkhd_flags, track, track_duration, layer, group, volume),
+        "timescale": timescale, "duration": duration, "language": language,
+        "hdlr": box(data, b"moov", b"trak", b"mdia", b"hdlr"), "stsd": stsd,
+        "channels": channels, "sample_size": sample_size, "entry_rate": entry_rate,
+        "dfla": (dfla_kind, entry[dfla_start:dfla_end]),
+        "tables": {kind: full(body)[2] for kind, body in tables.items()}, "trex": trex,
+        "sidx": {"reference_id": reference_id, "timescale": sidx_scale, "earliest": earliest,
+                 "first_offset": first_offset, "references": references},
+        "fragments": fragments,
+    }
+
+
+def assert_same_fragmented_frames(fmp4, flac, frames):
+    """Every frame once, in order, each one sample timed by its block size - and the FLAC's own bytes."""
+    got = read_fmp4(fmp4)
+    assert [s for f in got["fragments"] for s in f["samples"]] == [f for _, f, _ in frames]
+    assert [d for f in got["fragments"] for d in f["durations"]] == [b for _, _, b in frames]
+    first, last = frames[0][0], frames[-1][0] + len(frames[-1][1])
+    assert b"".join(fmp4[f["start"] + f["moof_size"] + 8:f["end"]] for f in got["fragments"]) == flac[first:last]
+    return got
+
+
+CD_FIXED = dict(blocks=(4096,) * 30 + (1234,))
+#? fragment by fragment: ten 4608s (one duration), then a mix (13 frames), then 4096s and a short one
+CD_VARIABLE = dict(blocks=(4608,) * 10 + (1152, 4608, 576, 4096, 192, 2000) + (4608,) * 7 + (4096,) * 5 + (333,),
+                   variable=True)
+
+
+def test_an_fmp4_is_the_labs_layout_box_for_box():
+    """
+    What ffmpeg wrote for the phone lab (-movflags frag_keyframe+empty_moov+default_base_moof, one
+    second a fragment), which played seamlessly on James's iPhone: box for box, field for field,
+    less its udta, plus the sidx the page reads as the index.
+    """
+    flac, frames = encode(**CD_FIXED)
+    fmp4 = flac_to_fmp4(flac)
+    got = assert_same_fragmented_frames(fmp4, flac, frames)
+
+    assert got["ftyp"] == (b"iso5", 512, [b"iso5", b"iso6", b"mp41"])
+    assert got["moov"] == [b"mvhd", b"trak", b"mvex"], "no mehd, no udta"
+    assert got["trak"] == [b"tkhd", b"mdia"], "no edit list"
+    assert got["mdia"] == [b"mdhd", b"hdlr", b"minf"]
+    assert got["minf"] == [b"smhd", b"dinf", b"stbl"]
+    assert got["stbl"] == [b"stsd", b"stts", b"stsc", b"stsz", b"stco"]
+    assert got["mvhd"] == (0, 0, 44100, 0, 2), "timescale the sample rate, duration 0, next track 2"
+    assert got["tkhd"] == (3, 1, 0, 0, 1, 0x0100), "enabled and in the movie, track 1, alternate group 1"
+    assert (got["timescale"], got["duration"], got["language"]) == (44100, 0, flac_mp4._LANGUAGE_UND)
+    assert got["hdlr"][8:12] == b"soun" and got["hdlr"].endswith(b"SoundHandler\x00")
+    assert box(fmp4, b"moov", b"trak", b"mdia", b"minf", b"dinf", b"dref") == (
+        bytes(4) + struct.pack(">I", 1) + struct.pack(">I4sI", 12, b"url ", 1))
+    assert got["tables"] == {b"stts": bytes(4), b"stsc": bytes(4), b"stsz": bytes(8), b"stco": bytes(4)}
+    assert got["trex"] == (0, 0, struct.pack(">IIIII", 1, 1, 0, 0, 0))
+    #? the sample description is the plain MP4's, byte for byte - one song's format is the other's
+    assert got["stsd"] == box(flac_to_mp4(flac), b"moov", b"trak", b"mdia", b"minf", b"stbl", b"stsd")
+    assert (got["channels"], got["sample_size"], got["entry_rate"]) == (2, 16, 44100 << 16)
+
+    assert [len(f["samples"]) for f in got["fragments"]] == [11, 11, 9], "whole frames, about a second each"
+    for number, fragment in enumerate(got["fragments"], start=1):
+        assert fragment["sequence"] == number
+        assert fragment["tfhd_flags"] == 0x020038
+        assert fragment["tfhd"] == {"track": 1, "duration": fragment["durations"][0],
+                                    "size": fragment["sizes"][0], "flags": 0x02000000}
+        assert (fragment["tfdt_version"], fragment["trun_version"]) == (1, 0)
+    assert [f["trun_flags"] for f in got["fragments"]] == [0x201, 0x201, 0x301], "durations only for the short last"
+
+
+def test_the_sidx_indexes_every_fragment():
+    flac, frames = encode(**CD_FIXED)
+    fmp4 = flac_to_fmp4(flac)
+    got = read_fmp4(fmp4)
+    sidx = got["sidx"]
+
+    assert (sidx["reference_id"], sidx["timescale"], sidx["earliest"], sidx["first_offset"]) == (1, 44100, 0, 0)
+    assert [(size, units) for size, units, _ in sidx["references"]] == [
+        (f["end"] - f["start"], f["units"]) for f in got["fragments"]]
+    assert all(size < 1 << 31 for size, _, _ in sidx["references"]), "reference_type 0: media, not another index"
+    assert {sap for _, _, sap in sidx["references"]} == {0x90000000}, "each starts with a sync sample"
+    assert sum(size for size, _, _ in sidx["references"]) == len(fmp4) - got["index_end"]
+    assert sum(units for _, units, _ in sidx["references"]) == sum(b for _, _, b in frames)
+
+
+def test_the_layout_is_the_head_and_each_fragments_header_then_its_frames():
+    """What the cache writes: the head, then per fragment its moof and mdat header and a slice of the
+    FLAC it already holds - never a copy of the audio."""
+    flac, frames = encode(**CD_VARIABLE)
+    head, fragments = fmp4_layout(flac)
+    fmp4 = flac_to_fmp4(flac)
+    got = read_fmp4(fmp4)
+
+    assert fmp4.startswith(head) and len(head) == got["index_end"]
+    assert len(fragments) == len(got["fragments"])
+    starts = iter(frames)
+    for (header, start, end), fragment in zip(fragments, got["fragments"]):
+        assert header == fmp4[fragment["start"]:fragment["start"] + fragment["moof_size"] + 8]
+        assert header[-8:] == struct.pack(">I4s", 8 + end - start, b"mdat")
+        held = [next(starts) for _ in fragment["samples"]]
+        assert (start, end) == (held[0][0], held[-1][0] + len(held[-1][1])), "whole frames, straight from the FLAC"
+
+
+def test_trun_lists_durations_only_in_a_fragment_whose_frames_differ():
+    """0x201 where every frame has the fragment's default duration, 0x301 where any differs - in the
+    middle of a variable-block stream too, not only at a short last frame."""
+    flac, frames = encode(**CD_VARIABLE)
+    got = assert_same_fragmented_frames(flac_to_fmp4(flac), flac, frames)
+
+    assert [len(f["samples"]) for f in got["fragments"]] == [10, 13, 6]
+    assert [f["trun_flags"] for f in got["fragments"]] == [0x201, 0x301, 0x301]
+    assert got["fragments"][1]["durations"] == [1152, 4608, 576, 4096, 192, 2000] + [4608] * 7
+    assert [f["tfhd"]["duration"] for f in got["fragments"]] == [4608, 1152, 4096], "the first frame's"
+
+
+def test_every_sample_is_a_sync_sample():
+    """A FLAC frame depends on no other: tfhd flags them all so (sample_depends_on 2, not non-sync),
+    as ffmpeg does, and no trun overrides it."""
+    flac, _ = encode(**CD_VARIABLE)
+    for fragment in read_fmp4(flac_to_fmp4(flac))["fragments"]:
+        assert fragment["tfhd"]["flags"] == 0x02000000
+        assert not fragment["trun_flags"] & (0x004 | 0x400)
+
+
+def test_each_fragment_starts_where_the_one_before_ended():
+    flac, frames = encode(**CD_VARIABLE)
+    got = read_fmp4(flac_to_fmp4(flac))
+    assert [f["t0"] for f in got["fragments"]] == [0, 46080, 46080 + 44880]
+    assert got["fragments"][-1]["t0"] + got["fragments"][-1]["units"] == sum(b for _, _, b in frames)
+
+
+@pytest.mark.parametrize("rate, channels, bps, per_fragment", [(96000, 2, 24, 24), (48000, 6, 16, 42)],
+                         ids=["96 kHz 24-bit", "6 channels"])
+def test_hi_res_and_surround_are_still_written(rate, channels, bps, per_fragment):
+    """The page decides what it streams (48 kHz, stereo, 16 or 24 bits); deadwax writes any FLAC it
+    can split, with the real rate as the timescale and the sample entry's clamped as isoflac says."""
+    block = 4096 if rate == 96000 else 1152
+    flac, frames = encode(rate=rate, channels=channels, bps=bps, blocks=(block,) * (per_fragment + 5) + (77,))
+    got = assert_same_fragmented_frames(flac_to_fmp4(flac), flac, frames)
+    assert (got["timescale"], got["mvhd"][2], got["sidx"]["timescale"]) == (rate, rate, rate)
+    assert (got["channels"], got["sample_size"]) == (channels, bps)
+    assert got["entry_rate"] == min(rate, 48000) << 16
+    assert [len(f["samples"]) for f in got["fragments"]] == [per_fragment, 6]
+
+
+def test_tags_around_the_audio_are_left_out_of_the_fmp4():
+    flac, frames = encode(**GOLDEN_CASES["id3v1 and ape after"])
+    assert_same_fragmented_frames(flac_to_fmp4(flac), flac, frames)
+    untagged, _ = encode(blocks=(4096,) * 12 + (1000,), seed=3)
+    tagged, frames = encode(**GOLDEN_CASES["id3v2 in front"])
+    assert flac_to_fmp4(tagged) == flac_to_fmp4(untagged)
+    assert_same_fragmented_frames(flac_to_fmp4(tagged), tagged, frames)
+
+
+def test_the_fmp4_is_the_same_every_time():
+    flac, _ = encode(**CD_VARIABLE)
+    assert flac_to_fmp4(flac) == flac_to_fmp4(bytearray(flac)) == flac_to_fmp4(flac)
+    assert fmp4_layout(flac) == fmp4_layout(flac)
+
+
+@pytest.mark.parametrize("make, refusal", [
+    (lambda: encode()[0][:-700], Unsupported),
+    (lambda: encode(blocks=(4096, 4096, 1024, 4096, 100))[0], Unsupported),
+    (lambda: b"RIFF" + bytes(40), NotFlac),
+    (lambda: encode()[0] + bytes(16), Unsupported),
+], ids=["cut short", "fixed blocks changing size", "not flac", "zeros after the audio"])
+def test_what_the_mp4_refuses_the_fmp4_refuses(make, refusal):
+    data = make()
+    with pytest.raises(refusal) as mp4:
+        flac_to_mp4(data)
+    with pytest.raises(refusal) as fmp4:
+        fmp4_layout(data)
+    assert str(fmp4.value) == str(mp4.value)
+
+
+def test_a_song_with_more_fragments_than_an_index_can_list_is_refused(monkeypatch):
+    """sidx counts its references in 16 bits - 18 hours at a second a fragment. Not built at that
+    length here: the bound is lowered to what a short file reaches."""
+    assert flac_mp4.SIDX_MAX_REFERENCES == 0xFFFF
+    flac, _ = encode(**CD_FIXED)
+    monkeypatch.setattr(flac_mp4, "SIDX_MAX_REFERENCES", 3)
+    assert len(fmp4_layout(flac)[1]) == 3
+    monkeypatch.setattr(flac_mp4, "SIDX_MAX_REFERENCES", 2)
+    with pytest.raises(Unsupported, match="too long for a fragment index"):
+        fmp4_layout(flac)
+
+
+#? sha256 of flac_to_fmp4() for GOLDEN_CASES, recorded once the structure matched the lab's file.
+#? player_cache.py names a fragmented MP4 by FMP4_FORMAT_VERSION, and the page's If-Range carries
+#? on across a re-make after an eviction: a change here (CHUNK_SECONDS included) needs that bumped.
+FMP4_GOLDENS = {
+    "fixed blocks": "d9151d16fa9d315caf67e5ebbb931c920146620930f684568efe486a154f3cff",
+    "variable blocks": "2daae0d520d68c9f417a7bf3ef095635538d56b560ba8292d36f8661533a2be8",
+    "96 kHz 24-bit": "ad40646058a969e26e665068db724f711ed15c3ab693f1149e922701b7062499",
+    "6 channels": "9b94926b693da5e247395918f16d61385c72818951e1d90a8f8f221ae0d36485",
+    "id3v2 in front": "30f8dcef98d67cb359c232a7874d9dc81669ae320d968fe826b5a52aeadcef1b",
+    "id3v1 and ape after": "c3125860acd635beaf380058cd1d06f41c806fbd1f92f1d7096f2b0d1f8e5e4f",
+}
+
+
+@pytest.mark.parametrize("name", list(FMP4_GOLDENS))
+def test_the_fmp4_is_byte_for_byte_what_it_was(name):
+    flac, _ = encode(**GOLDEN_CASES[name])
+    assert hashlib.sha256(flac_to_fmp4(flac)).hexdigest() == FMP4_GOLDENS[name]
+
+
 # --- against real decoders, where there are some ---------------------------------------------
 
 FFMPEG = shutil.which("ffmpeg")
@@ -994,10 +1360,10 @@ def probe(path):
     return dict(line.split("=", 1) for line in out.splitlines())
 
 
-def check_decodes_the_same(tmp_path, flac):
+def check_decodes_the_same(tmp_path, flac, wrap=flac_to_mp4):
     source, repacked = tmp_path / "in.flac", tmp_path / "out.mp4"
     source.write_bytes(flac)
-    repacked.write_bytes(flac_to_mp4(flac))
+    repacked.write_bytes(wrap(flac))
     pcm = decode(source)
     assert pcm and decode(repacked) == pcm
     return probe(repacked)
@@ -1023,6 +1389,36 @@ def test_the_mp4_decodes_to_the_same_pcm_as_the_flac(tmp_path, case):
     assert info["codec_name"] == "flac"
     assert info["channels"] == str(case.get("channels", 2))
     assert abs(float(info["duration"]) - total / rate) < 0.001
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("case", [
+    dict(),
+    dict(rate=96000, bps=24, blocks=(4096,) * 30 + (77,)),
+    dict(channels=6, rate=48000, blocks=(1152,) * 50 + (300,)),
+    CD_VARIABLE,
+    dict(blocks=(4096,) * 8, plant={3: (1000, next_header(3))}),
+    dict(id3=id3v2(), trailer=b"TAG" + bytes(125)),
+    dict(trailer=bytes(2)),
+], ids=["cd", "96k 24-bit", "6 channels", "variable blocks", "false sync", "tags around it", "two zeros after"])
+def test_the_fmp4_decodes_to_the_same_pcm_as_the_flac(tmp_path, case):
+    """ffmpeg reads a fragmented MP4 as a player does - init, index, fragments - to the very samples."""
+    flac, frames = encode(**case)
+    info = check_decodes_the_same(tmp_path, flac, wrap=flac_to_fmp4)
+    assert info["codec_name"] == "flac"
+    assert info["channels"] == str(case.get("channels", 2))
+    assert abs(float(info["duration"]) - sum(b for _, _, b in frames) / case.get("rate", 44100)) < 0.001
+
+
+@needs_ffmpeg
+def test_ffmpegs_own_flac_repackages_losslessly_as_an_fmp4(tmp_path):
+    """A real encoder's frames (LPC, Rice coding) in fragments."""
+    source = tmp_path / "ffmpeg.flac"
+    subprocess.run([FFMPEG, "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=4",
+                    "-f", "lavfi", "-i", "anoisesrc=d=4:a=0.3", "-filter_complex", "amix=inputs=2",
+                    "-ar", "44100", "-ac", "2", "-sample_fmt", "s16", "-c:a", "flac", str(source)], check=True)
+    info = check_decodes_the_same(tmp_path, source.read_bytes(), wrap=flac_to_fmp4)
+    assert abs(float(info["duration"]) - 4.0) < 0.001
 
 
 @needs_ffmpeg
@@ -1100,3 +1496,92 @@ def test_libflac_accepts_what_the_test_encoder_writes(tmp_path):
         path = tmp_path / "t.flac"
         path.write_bytes(data)
         subprocess.run([FLAC, "-s", "-t", str(path)], check=True)
+
+
+@needs_ffmpeg
+def test_constant_frames_are_real_flac_too(tmp_path):
+    """The heads committed for the page's parser are made of constant subframes, to stay small:
+    ffmpeg decodes each to its one value, held for the block, in the FLAC and in the fragments."""
+    flac, frames = encode(**HEAD_CASES["cd, fixed blocks, a short last frame"])
+    check_decodes_the_same(tmp_path, flac, wrap=flac_to_fmp4)
+    pcm = decode(tmp_path / "in.flac")
+    assert len(pcm) == sum(b for _, _, b in frames) * 2 * 4
+    assert pcm[:8] * 4096 == pcm[:8 * 4096], "the first frame is one value a channel, all through"
+
+
+# --- the heads the page's parser is held to --------------------------------------------------
+
+FIXTURE = Path(__file__).resolve().parent / "fixtures" / "fmp4_heads.json"
+#? what the page fetches first of a song (HEAD_FETCH_BYTES in ui/src/lib/fmp4.ts): the
+#? init segment, the index and the first fragments, in one range
+HEAD_FETCH_BYTES = 262144
+
+#? Constant subframes keep these a few kilobytes: the parser reads boxes, never the audio.
+HEAD_CASES = {
+    "cd, fixed blocks, a short last frame": dict(blocks=(4096,) * 30 + (1234,), constant=True, seed=11),
+    "48 kHz 24-bit": dict(rate=48000, bps=24, blocks=(4608,) * 25 + (100,), constant=True, seed=12),
+    "cd, variable blocks": dict(CD_VARIABLE, constant=True, seed=13),
+    "an id3v2 tag in front": dict(id3=id3v2(), blocks=(4096,) * 20 + (777,), constant=True, seed=14),
+}
+
+
+def head_fixture() -> str:
+    """tests/fixtures/fmp4_heads.json as the writer makes it now, and as the page must read it."""
+    heads = []
+    for name, case in HEAD_CASES.items():
+        flac, frames = encode(**case)
+        fmp4 = flac_to_fmp4(flac)
+        got = assert_same_fragmented_frames(fmp4, flac, frames)
+        heads.append({
+            "name": name,
+            "total": len(fmp4),
+            "expect": {
+                "initEnd": got["init_end"],
+                "indexEnd": got["index_end"],
+                "timescale": got["timescale"],
+                "units": sum(b for _, _, b in frames),
+                "format": {"sampleRate": case.get("rate", 44100), "channels": case.get("channels", 2),
+                           "bitsPerSample": case.get("bps", 16)},
+                #? [start, end) in the file, and the units before it and in it
+                "fragments": [[f["start"], f["end"], f["t0"], f["units"]] for f in got["fragments"]],
+            },
+            "b64": base64.b64encode(fmp4[:HEAD_FETCH_BYTES]).decode("ascii"),
+        })
+    text = json.dumps({"heads": heads}, indent=2)
+    #? a list of numbers on one line, so a fragment reads as one
+    return re.sub(r"\[\s*(-?\d+(?:,\s*-?\d+)*)\s*\]", lambda m: "[" + re.sub(r"\s+", " ", m.group(1)) + "]", text) + "\n"
+
+
+def test_the_committed_heads_are_what_the_writer_makes():
+    """
+    The page's fmp4 parser is tested against these (ui/test/fmp4.sim.cjs), so a change to the writer
+    that this doesn't see would leave the two disagreeing with both suites green. Run with
+    REGENERATE_FMP4_HEADS=1 to write the file afresh - after checking the parser still reads it.
+    """
+    made = head_fixture()
+    if os.environ.get("REGENERATE_FMP4_HEADS") == "1":
+        FIXTURE.parent.mkdir(exist_ok=True)
+        FIXTURE.write_text(made, encoding="ascii")
+    assert FIXTURE.read_text(encoding="ascii") == made, "the writer changed: REGENERATE_FMP4_HEADS=1 writes it again"
+    assert made.isascii()
+
+
+def test_the_committed_heads_say_what_they_hold():
+    """Each head, read back from its bytes: whole files (they are small), with the fragments the
+    index lists, and a trun with durations in the fragments whose frames differ."""
+    heads = json.loads(FIXTURE.read_text(encoding="ascii"))["heads"]
+    assert [head["name"] for head in heads] == list(HEAD_CASES)
+    for head in heads:
+        data = base64.b64decode(head["b64"])
+        assert len(data) == min(head["total"], HEAD_FETCH_BYTES)
+        expect = head["expect"]
+        got = read_fmp4(data)
+        assert (got["init_end"], got["index_end"], got["timescale"]) == (
+            expect["initEnd"], expect["indexEnd"], expect["timescale"])
+        assert [size for size, _, _ in got["sidx"]["references"]] == [end - start for start, end, _, _ in expect["fragments"]]
+        assert expect["fragments"][0][0] == expect["indexEnd"] and expect["fragments"][-1][1] == head["total"]
+        assert sum(units for _, _, _, units in expect["fragments"]) == expect["units"]
+    flags = {head["name"]: [f["trun_flags"] for f in read_fmp4(base64.b64decode(head["b64"]))["fragments"]]
+             for head in heads}
+    assert flags["cd, variable blocks"] == [0x201, 0x301, 0x301]
+    assert flags["cd, fixed blocks, a short last frame"] == [0x201, 0x201, 0x301]

@@ -132,6 +132,9 @@ check('asked, the answer not in yet', describeWrap({ id: 's1', got: null }, 's1'
 check('an MP4 came', describeWrap({ id: 's1', got: 'mp4' }, 's1'), ' · FLAC in MP4')
 check('the FLAC came instead', describeWrap({ id: 's1', got: 'flac' }, 's1'), ' · sent as FLAC, not in an MP4')
 check('about another song than the one playing: nothing', describeWrap({ id: 's1', got: 'mp4' }, 's2'), '')
+//? a song inside a one-stream run: fragmented MP4 appended to a MediaSource, known as it plays
+check('a song playing in one stream', describeWrap({ id: 's1', got: 'stream' }, 's1'), ' · in one stream')
+check('...about another song: nothing', describeWrap({ id: 's1', got: 'stream' }, 's2'), '')
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)
