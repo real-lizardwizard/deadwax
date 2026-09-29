@@ -508,6 +508,23 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   as well as boxes. **Verified in headless Brave**: a saved (1300, 820) now restores at exactly
   (836, 536) in 900 x 600, the 64px clamp above. **Not verified**: the metadata editor, which
   mounts only when opened and has no library in the scratch setup.
+- **A press outside a panel's box is on no edge of it (v1.0.9).** James: comparing covers in the
+  metadata editor, "the x highlights but doesn't do anything", while Close worked. The cover
+  viewer was drawn INSIDE `#metadata-window`, so `panelFor()` called a press on it a press on
+  the editor, and `edgeAt()` never asked whether the pointer was inside the box: "above the top"
+  passed as the top edge. Once the editor had been moved (no centring transform, so the fixed
+  viewer covered the screen) its ✕ sat above the editor; the press began a resize, the editor
+  took pointer capture, and the click landed on `#metadata-window`. Close, below the editor,
+  failed the bottom test's `>= scrollbar` half and escaped. Two fixes: `edgeAt` returns '' for
+  a pointer outside the box, and the viewer renders BESIDE the editor's window (a fragment),
+  which also makes it full screen when the editor is centred - inside the transform it had been
+  the editor's 900 x 680. **A script's click can't show this**: a synthetic pointer can't be
+  captured, so the click went through in every scripted test, in Arc too. **Verified with real
+  input in headless Brave**: before, the moved editor's ✕ logged pointerdown on the button and
+  then capture, pointerup and click on the editor; after, the ✕ closes the viewer centred or
+  moved, the viewer is 1440 x 900, Escape, the scrim and Close each close only the viewer, and
+  the editor still resizes from its top and left edges (60 and 50px) while a press just above
+  it does nothing.
 
 ### One tracklist per release group (v0.8.2)
 

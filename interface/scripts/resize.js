@@ -121,6 +121,17 @@ function edgeAt(panel, clientX, clientY) {
     const box = panel.getBoundingClientRect();
 
     /*
+      A press outside the box is on no edge of it. The target can be inside the panel while the
+      pointer is not - anything drawn from inside it that reaches past its box - and the tests
+      below read "above the top" as the top edge. The metadata editor's cover viewer did exactly
+      that (v1.0.9): once the editor had been moved, the viewer's ✕ sat above it, every press on
+      it began a resize, and the pointer capture took the click away from the button.
+     */
+    if (clientX < box.left || clientX > box.right || clientY < box.top || clientY > box.bottom) {
+        return '';
+    }
+
+    /*
       A visible scrollbar lives inside the right edge, so treat that strip as content rather
       than as a resize handle - otherwise you can never drag the scrollbar of a panel that
       has one. Same reasoning vertically.
