@@ -170,7 +170,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             955 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             957 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -335,6 +335,15 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   need a scan to exist — absent at exactly the moment it has something to say. The poller writes
   one row as it files each download, and `/queue/new_imports` is a single indexed count that
   touches no filesystem. This is the only reason the import source is recorded at all.
+  **A PARTLY filed download is announced too (v1.1.2).** Some files failing to file ends the job
+  `complete` with "N file(s) failed to organize", and until 1.1.2 only a clean `organized` called
+  `note_library_changed()` and enrolled the album - so the tracks that did land were in the
+  library, `/library/owned` answered from a snapshot without them, and the badge never counted
+  them. Both now happen whenever `organized` is non-zero outside a dry run, whatever the status,
+  and BEFORE the status is written (the page reacts to `organized` by re-asking both). Enrolling
+  also needs `tracks_organized` (execute_plan's count of audio files among `organized`): a folder
+  left holding only a cover is no album to the scan, and a badge naming it could never be
+  cleared. `tests/test_poller.py` fails a copy on purpose to cover both.
 - **A move-organize clears the slskd folder out, and the line it will not cross is AUDIO**
   (v0.6.20, asked for: "I'd like the album folder to be deleted when the songs are").
   `cleanup_source_dirs` used `rmdir`, which refuses a non-empty folder by construction - so
@@ -3220,7 +3229,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 955 tests
+.venv/bin/python -m pytest tests/ -q  # 957 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3264,7 +3273,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 955 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 957 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

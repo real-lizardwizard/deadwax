@@ -720,7 +720,10 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
     if mode not in ORGANIZE_MODES:
         mode = "dry_run"
 
-    results = {"organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
+    #? `tracks_organized` is how many of `organized` were audio rather than a cover or sidecar: a
+    #? folder that ends up holding only a cover.jpg is not an album to the scan, so the poller
+    #? enrols a filed album for review only when a track reached it (v1.1.2)
+    results = {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
                "dry_run": mode == "dry_run", "mode": mode}
 
     if mode == "off":
@@ -745,6 +748,8 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
         if mode == "dry_run":
             logger.info(f"[dry run] would place {source.name} -> {target}")
             results["organized"] += 1
+            if not operation.get("companion"):
+                results["tracks_organized"] += 1
             continue
 
         #? never clobber. An existing destination is far more likely to be a real album the
@@ -764,6 +769,7 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
 
             if not operation.get("companion"):
                 write_tags(target, release, operation.get("track"), drop_stale_release_id=True)
+                results["tracks_organized"] += 1
 
             results["organized"] += 1
 
@@ -1015,7 +1021,7 @@ async def organize_job(job: dict, download_root: str, library_root: str, mode: s
 
     if not plan["operations"]:
         logger.error(f"nothing to organize for {label}", extra={"frontend": True, "src": "slskd"})
-        return {"organized": 0, "skipped": 0, "failed": 0,
+        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "failed": 0,
                 "dry_run": mode == "dry_run", "mode": mode, "plan": plan}
 
     results = await asyncio.to_thread(execute_plan, plan, job.get("release") or {}, mode)

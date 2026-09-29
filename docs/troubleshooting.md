@@ -24,6 +24,16 @@ In order of likelihood:
    never filed again, so a second copy of an album is left in slskd's folder, and the download
    reads *already in the store*. See [organizing](organizing.md).
 
+## A download says "N file(s) failed to organize"
+
+Some of its files couldn't be written into the library. The ones that could are there, and the
+album shows as **New** in the library like any other filed download. The rest are still in
+slskd's folder (a move never clears that folder out while anything failed). The container's own
+log names each file and why, most often permissions or a full disk. Fix that, then either copy
+the missing tracks across and apply the album's release in the metadata editor, or download the
+album again: a track the album's folder already has is never filed twice, so only the missing
+ones are added.
+
 ## The slskd pill is red
 
 - **`CONNECTION_ERROR`**: slskd can't be reached at `SLSKD_URL` from inside the container. Use

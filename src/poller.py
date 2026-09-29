@@ -182,6 +182,21 @@ async def _organize_if_enabled(job: dict, store) -> None:
             job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, Config.ORGANIZE_MODE
         )
 
+        #? Whatever status the job ends on, a file that reached the library changed it (v1.1.2).
+        #? Some files failing leaves the job `complete`, but the tracks that did land are in the
+        #? library all the same - and until 1.1.2 only a clean `organized` said so, so /owned went
+        #? on answering from a snapshot without the album and the new-import badge never counted
+        #? it. Done before the status is written: the page reacts to `organized` by asking /owned
+        #? and the badge again, and must find both already knowing.
+        if not results.get("dry_run") and results.get("organized"):
+            #? the cache doesn't know about this folder yet, so the next "what do I own" asks the
+            #? disk rather than the saved scan - see /library/owned
+            note_library_changed()
+            #? a cover alone doesn't make the folder an album the scan would list, and a badge
+            #? naming an album it can't show you is worse than no badge
+            if results.get("tracks_organized"):
+                await _enrol_for_review(job, results, store)
+
         if results.get("dry_run"):
             #? nothing actually moved, so don't claim it did
             await store.update_status(job["id"], "complete", "dry run - not organized")
@@ -217,10 +232,6 @@ async def _organize_if_enabled(job: dict, store) -> None:
 
         else:
             await store.update_status(job["id"], "organized")
-            #? the cache doesn't know about this folder yet, so the next "what do I own" asks the
-            #? disk rather than the saved scan - see /library/owned
-            note_library_changed()
-            await _enrol_for_review(job, results, store)
             _fetch_lyrics_later(results)
 
     except Exception as e:
@@ -293,9 +304,10 @@ async def _enrol_for_review(job: dict, results: dict, store) -> None:
     deliberately not scanned until you open its tab, so a badge that had to diff two scans
     would need a scan to exist. One row, written once, keyed on where the album landed.
 
-    Everything it needs is already in the plan the organizer just executed. It never raises -
-    the download succeeded and the album is filed, so failing to note it down is not a reason
-    to report the job as broken.
+    Everything it needs is already in the plan the organizer just executed. Called whenever a
+    track reached the library, including when others failed to (v1.1.2): the album is there
+    either way, and part of an album is exactly what wants looking at. It never raises - the
+    files are filed, so failing to note it down is not a reason to report the job as broken.
     """
     album_dir = (results.get("plan") or {}).get("album_dir")
 
