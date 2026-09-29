@@ -24,7 +24,7 @@ confidently wrong deployment advice. Don't bring them back.
 | branch | what |
 | --- | --- |
 | `main` | **the one line that ships.** Every change that ships lands here, and since 1.0.5 only main takes version numbers. Each push is built as `:experimental`; a `v*` tag on it is a release. Until 1.0.0 it held the old Lidarr-based v0.2.1, still tag `v0.2.1`. |
-| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for), which builds its own `:player` image. It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code there than on main; its two fix commits came to main as 1.0.3 and 1.0.4. From here it follows the rules. |
+| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for), which builds its own `:player` image. It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code there than on main; its two fix commits came to main as 1.0.3 and 1.0.4. From here it follows the rules. It ships as 2.0.0 (James, 2026-09-29), so its commits are `2.0.0-player.N`. |
 | `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2), kept for step 1's port. Everything after it on that branch shipped on experimental. |
 | ~~`experimental/slskdn-no-lidarr`~~ | **deleted after 1.0.4.** Where all the 0.x work happened: v0.3.0 to v0.9.2 were tagged from it, and every commit of it is in main's history. |
 
@@ -38,10 +38,11 @@ on the spike that main needed had to be cherry-picked across.
 - **main is the one line that ships.** Don't start a second line that releases too.
 - **Only main takes version numbers.** A commit on any other branch leaves `__version__` alone.
   A branch that publishes its own image needs a version to show, and takes a PRE-RELEASE of the
-  next minor - `1.1.0-player.1`, `1.1.0-player.2` - never a plain number. When main takes that minor
-  itself - 1.1.0, the disc titles, on 2026-09-29 - the branch moves on to the next one, so
-  player-spike's next commit after merging main is `1.2.0-player.1`: a `1.1.0-player.N` would
-  sort before the release it came after. The publish workflow
+  version it will ship as - never a plain number, and always one that sorts AFTER main's latest
+  release. player-spike began as `1.1.0-player.1`, `1.1.0-player.2`...; once main released 1.1.0
+  itself (the disc titles, 2026-09-29) those sorted before a release they came after. James has
+  decided player-spike stays a branch until it ships as **2.0.0**, so it numbers
+  `2.0.0-player.N`, from `2.0.0-player.7` (its merge of main's 1.1.0). The publish workflow
   never moves `:latest` for a version with a hyphen, so it can't pass for a release, and a plain
   number always means one commit on main.
 - **A bug main has too is fixed ON MAIN first**, in its own commit with its own patch bump, and
