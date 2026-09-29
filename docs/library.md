@@ -226,4 +226,5 @@ each track's credited artist alone, and removes the old folder once it's empty.
 **Delete…** removes the album's folder and everything in it, **permanently**. The confirmation
 names the track count and size, and lists any files that aren't audio, in case one is the only
 copy of a rip log. It only ever deletes a folder that holds audio directly, inside your library,
-and never the library folder itself.
+and never the library folder itself. A deleted album leaves the **New** count and the review
+queue straight away.

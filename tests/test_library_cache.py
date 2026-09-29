@@ -370,6 +370,39 @@ def test_deleting_an_album_drops_it_from_the_saved_scan(tmp_path, monkeypatch, s
     assert run(store.load_library_cache(str(tmp_path), SCAN_FORMAT)) == []
 
 
+def test_deleting_a_new_import_takes_it_off_the_badge_at_once(tmp_path, monkeypatch, store):
+    """
+    Its review row used to stay until the next full scan pruned it, and meanwhile the
+    new-imports badge counted an album that no longer existed and couldn't be named (v1.1.5).
+    """
+    seed_album(tmp_path)
+    path = "Tame Impala/The Slow Rush (2020)"
+    run(store.record_albums_seen([{"path": path, "album": "The Slow Rush"}], source="import"))
+    assert run(store.new_import_summary())["count"] == 1
+    client = make_client(tmp_path, monkeypatch, store)
+
+    response = client.post("/deadwax/library/delete", json={"album_path": path})
+
+    assert response.status_code == 200
+    assert run(store.new_import_summary())["count"] == 0
+    assert path not in run(store.album_reviews())
+
+
+def test_a_refused_delete_keeps_the_review_row(tmp_path, monkeypatch, store):
+    """Nothing was deleted, so nothing is forgotten - here the folder holds no audio directly."""
+    notes = tmp_path / "Tame Impala" / "Notes"
+    notes.mkdir(parents=True)
+    (notes / "rip.log").write_text("the only copy")
+    run(store.record_albums_seen([{"path": "Tame Impala/Notes"}], source="import"))
+    client = make_client(tmp_path, monkeypatch, store)
+
+    response = client.post("/deadwax/library/delete", json={"album_path": "Tame Impala/Notes"})
+
+    assert response.status_code == 400
+    assert notes.is_dir()
+    assert "Tame Impala/Notes" in run(store.album_reviews())
+
+
 # ---------------------------------------------------------------- the track viewer
 
 def test_the_track_viewer_reads_every_tag_live(tmp_path, monkeypatch):

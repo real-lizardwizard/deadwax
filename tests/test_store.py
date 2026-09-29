@@ -384,6 +384,19 @@ def test_a_merge_into_a_folder_with_no_row_brings_the_moved_one(tmp_path):
     assert reviews["a/discs 1-2"]["reviewed_at"]
 
 
+def test_forgetting_a_deleted_album_drops_its_row_and_nothing_else(tmp_path):
+    store = review_store(tmp_path)
+    asyncio.run(store.record_albums_seen(
+        [{"path": "a/gone", "album": "Gone"}, {"path": "a/kept", "album": "Kept"}], source="import",
+    ))
+
+    assert asyncio.run(store.forget_album_review("a/gone")) is True
+    assert list(asyncio.run(store.album_reviews())) == ["a/kept"]
+    assert [a["album"] for a in asyncio.run(store.new_import_summary())["albums"]] == ["Kept"]
+    #? nothing recorded is nothing to forget, and says so
+    assert asyncio.run(store.forget_album_review("a/never")) is False
+
+
 def test_reviewing_an_unknown_album_records_it_where_it_is_now(tmp_path):
     """
     A retag can move an album the store never enrolled. Recording the source path would leave

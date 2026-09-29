@@ -1010,6 +1010,12 @@ async def delete(request: Request, body: DeleteRequest):
         #? would draw a deleted album until the next scan noticed it was gone
         await _persist_cache(request)
 
+        #? and its review row, which the next full scan would prune - until then an unreviewed
+        #? import was counted by the new-imports badge while naming nothing (v1.1.5)
+        store = _store(request)
+        if store is not None:
+            await store.forget_album_review(body.album_path)
+
         return result
 
     except HTTPException:

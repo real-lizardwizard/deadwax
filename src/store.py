@@ -757,6 +757,33 @@ class JobStore:
             logger.error(f"failed to forget missing albums: {e}")
             return 0
 
+    async def forget_album_review(self, album_path: str) -> bool:
+        """
+        Drop one album's review row, for an album deadwax has just deleted (v1.1.5).
+
+        forget_missing_albums() would get to it, but only on the next full scan - and until then
+        an `import` row for it went on being counted by the new-imports badge while naming an
+        album that no longer exists, the exact state that method is there to end. The delete is
+        the moment it is known to be gone, so it goes then. Never raises: the album is deleted
+        either way, and failing to tidy its row is not a reason to report the delete as failed.
+        """
+        if not self.available or not album_path:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                cursor = connection.execute(
+                    "DELETE FROM album_review WHERE album_path = ?", (album_path,)
+                )
+                return cursor.rowcount > 0
+
+        try:
+            return await asyncio.to_thread(write)
+
+        except Exception as e:
+            logger.error(f"failed to forget the review record for {album_path}: {e}")
+            return False
+
     async def new_import_summary(self, limit: int = 8) -> dict:
         """
         Albums deadwax filed that you haven't looked at yet.
