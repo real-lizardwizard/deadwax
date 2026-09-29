@@ -50,6 +50,13 @@ export const trackNodeId = (album: LibraryAlbum, track: LibraryTrack) =>
   `track:${album.path}\u0000${track.filename}`
 
 /**
+ * A disc's own title, where its files carry one (DISCSUBTITLE) - '' when not, which is most discs.
+ * From the scan, so the tree and the track table have it the moment they draw their "Disc N".
+ */
+export const discTitle = (album: LibraryAlbum, disc: number): string =>
+  album.disc_titles?.[String(disc)] ?? ''
+
+/**
  * When an album arrived, in unix seconds, or 0 when nothing says.
  *
  * The EARLIER of two imperfect clocks. `first_seen` is when deadwax first recorded the album:
@@ -181,8 +188,9 @@ export type TreeRow =
   | { kind: 'edition'; id: string; level: number; parent: string; open: boolean; album: LibraryAlbum; group: AlbumGroup }
   /** "1979", "September 2026", "T" - a group header. Not a node: nothing to select. */
   | { kind: 'heading'; id: null; level: 1; parent: null; label: string }
-  /** A "Disc 2" divider. Not a node either: keyboard navigation skips both. */
-  | { kind: 'disc'; id: null; level: number; parent: string; disc: number }
+  /** A "Disc 2" divider, with the disc's title where its files carry one ('' when not). Not a
+   *  node either: keyboard navigation skips both. */
+  | { kind: 'disc'; id: null; level: number; parent: string; disc: number; title: string }
   | { kind: 'track'; id: string; level: number; parent: string; album: LibraryAlbum; track: LibraryTrack; match: boolean }
 
 export interface TreeOpenState {
@@ -220,7 +228,7 @@ function pushTracks(
     const trackDisc = track.disc ?? 1
     if (split && trackDisc !== disc) {
       disc = trackDisc
-      rows.push({ kind: 'disc', id: null, level, parent, disc })
+      rows.push({ kind: 'disc', id: null, level, parent, disc, title: discTitle(album, disc) })
     }
 
     rows.push({ kind: 'track', id, level, parent, album, track, match })

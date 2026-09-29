@@ -930,6 +930,9 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
     let position = 0;
 
     (release.media || []).forEach((medium, discIndex) => {
+        // the DISC's own title, where MusicBrainz gives it one ('' when not) - written as
+        // DISCSUBTITLE. Same rule as discTitle in flattenTracks(); keep the two in step.
+        const discTitle = (medium.title || '').trim() || null;
         (medium.tracks || []).forEach((track, trackIndex) => {
             position += 1;
             // the track's OWN credit - the release's on an ordinary album, somebody else's on
@@ -943,6 +946,7 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
                 disc_position: track.position ?? trackIndex + 1,
                 artist: credit ? getArtistNames(credit) : null,
                 artist_mbids: getArtistIds(credit),
+                disc_title: discTitle,
             });
         });
     });

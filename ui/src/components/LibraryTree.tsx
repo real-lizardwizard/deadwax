@@ -256,6 +256,7 @@ export function LibraryTree(
             style={`--tree-level:${row.level};${place}`}
           >
             Disc {row.disc}
+            {row.title && <span class="disc-title" title={row.title}> · {row.title}</span>}
           </div>
         ) : (
           <TreeItem

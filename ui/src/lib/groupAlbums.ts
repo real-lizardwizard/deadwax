@@ -34,9 +34,21 @@ export function folderSummary(editions: readonly { split_discs?: boolean; editio
 /**
  * What one folder is called among its album's others: its edition, or - for a disc of a release
  * stored one folder per disc - which discs it holds (v0.9.13), after the edition when it has one.
+ * A folder of ONE disc that has a title says it too (v1.1.0): "Disc 4 · Live at Wembley 1974" -
+ * such a folder has no disc headings of its own, so this is the only place it would show.
  */
-export function editionName(album: { edition: string; disc_label?: string | null }): string {
-  if (album.disc_label) return album.edition ? `${album.edition} · ${album.disc_label}` : album.disc_label
+export function editionName(album: {
+  edition: string
+  disc_label?: string | null
+  discs?: number[]
+  disc_titles?: Record<string, string>
+}): string {
+  if (album.disc_label) {
+    const [only, ...rest] = album.discs ?? []
+    const title = only !== undefined && !rest.length ? album.disc_titles?.[String(only)] : ''
+    const label = title ? `${album.disc_label} · ${title}` : album.disc_label
+    return album.edition ? `${album.edition} · ${label}` : label
+  }
   return album.edition || 'Standard'
 }
 

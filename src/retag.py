@@ -29,6 +29,7 @@ from src.editions import resolve_edition_label
 from src.logger import logger
 from src.library import find_cover_file
 from src.matching import AUDIO_EXTENSIONS, file_extension, match_tracks_to_files
+from src.tagkeys import easy_file
 from src.api.coverart_endpoint import extension_for
 from src.organizer import (build_album_dirname, country_in_folder, filed_artist, is_within,
                            read_album_mbid, sanitize_filename, tag_values, write_tags)
@@ -37,10 +38,8 @@ from src.organizer import (build_album_dirname, country_in_folder, filed_artist,
 
 def read_current_tags(path: Path) -> dict:
     """The tags a file carries now, limited to the keys a retag would touch."""
-    import mutagen
-
     try:
-        audio = mutagen.File(str(path), easy=True)
+        audio = easy_file(path)
     except Exception:
         return {}
 
@@ -49,7 +48,7 @@ def read_current_tags(path: Path) -> dict:
 
     current = {}
     for key in ("album", "albumartist", "artist", "date", "originaldate", "title", "tracknumber",
-                "discnumber", "musicbrainz_albumid", "musicbrainz_releasegroupid",
+                "discnumber", "discsubtitle", "musicbrainz_albumid", "musicbrainz_releasegroupid",
                 "musicbrainz_albumartistid", "musicbrainz_artistid",
                 "releasecountry", "media", "catalognumber"):
         try:

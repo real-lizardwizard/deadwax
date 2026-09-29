@@ -3679,6 +3679,18 @@ span.red { color: var(--red-text); }
     text-transform: uppercase;
     letter-spacing: var(--tracking-wide);
     color: var(--main-muted-text);
+    /* one line, always: the windowed tree measures ONE height per kind of row, and a disc title
+       that wrapped would run over the rows below it (v1.1.0). The whole title is its tooltip. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* A disc's own title after "Disc 4", in both the tree and the track table (v1.1.0): the words as
+   MusicBrainz or the files have them, so not uppercased like the label beside them. */
+.disc-title {
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 /*

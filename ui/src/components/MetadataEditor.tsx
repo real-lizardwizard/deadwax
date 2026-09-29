@@ -785,8 +785,12 @@ export function MetadataEditor(
                     </span>
                     <span
                       class={`metadata-release-tracks${tracks && tracks !== album.track_count ? ' mismatch' : ''}`}
+                      //? a line a disc, with its own title where MusicBrainz gives one (v1.1.0) -
+                      //? the title applying this release writes as the disc's
                       title={(release.media ?? []).length > 1
-                        ? (release.media ?? []).map((m, i) => `disc ${i + 1}: ${m['track-count'] ?? '?'} tracks`).join(', ')
+                        ? (release.media ?? []).map((m, i) =>
+                            `disc ${m.position ?? i + 1}${m.title ? ` · ${m.title}` : ''}: ${m['track-count'] ?? '?'} tracks`)
+                          .join('\n')
                         : undefined}
                     >
                       {(release.media ?? []).length > 1 ? `${(release.media ?? []).length} discs · ` : ''}

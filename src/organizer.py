@@ -25,6 +25,7 @@ from pathlib import Path
 from src.editions import edition_discriminator, resolve_edition_label
 from src.naming import DEFAULT_ALBUM_FOLDER, render_album_folder, validate_template
 from src.logger import logger
+from src.tagkeys import easy_file
 from src.matching import (AUDIO_EXTENSIONS, file_extension, match_tracks_to_files, normalize,
                           split_remote_path)
 
@@ -642,6 +643,15 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
         if not multi_disc and _disc_number((current or {}).get("discnumber")) not in (None, 1):
             values["discnumber"] = "1"
 
+        #? The disc's own title - MusicBrainz's medium title, Picard's DISCSUBTITLE, which
+        #? Navidrome shows too: "Live at Wembley 1974" on a box set's fourth disc (v1.1.0).
+        #? Written whenever MusicBrainz has one, one disc or several, unlike the disc NUMBER: the
+        #? rule above exists because "1" would land on every album, and a title lands only where
+        #? somebody gave the disc one. An untitled disc writes nothing, so a title a file already
+        #? carries stays - the rule below, for every tag here.
+        if track.get("disc_title"):
+            values["discsubtitle"] = track["disc_title"]
+
     #? empty values are dropped rather than written as blanks - clearing a tag the user
     #? already has because MusicBrainz didn't supply one would be destructive. A list is left
     #? as a list: several artist ids are several values, not one string with commas in it.
@@ -659,10 +669,8 @@ def write_tags(path: Path, release: dict, track: dict | None, drop_stale_release
     later instead of being a deadwax-only artifact. Tagging failures are logged and
     tolerated: a filed-but-untagged file is a far better outcome than a half-organized album.
     """
-    import mutagen
-
     try:
-        audio = mutagen.File(str(path), easy=True)
+        audio = easy_file(path)
     except Exception as e:
         logger.warning(f"could not read tags on {path.name}: {e}")
         return

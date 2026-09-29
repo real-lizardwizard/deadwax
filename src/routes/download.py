@@ -35,6 +35,10 @@ class Track(BaseModel):
     #? nothing anywhere saying why.
     artist: str | None = None
     artist_mbids: list[str] = Field(default_factory=list)
+    #? The title of this track's DISC - MusicBrainz's medium title, written as DISCSUBTITLE
+    #? (v1.1.0). Declared for the same reason again: undeclared, it would vanish here and the
+    #? download would file with no disc titles while the editor's apply wrote them.
+    disc_title: str | None = None
 
 
 class FindCandidatesRequest(BaseModel):

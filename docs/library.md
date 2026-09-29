@@ -85,6 +85,14 @@ length.
 A tag that's only in the file (not the saved scan) shows `·` until the files have been read. A
 disc number shown faded is a default: the file has no disc tag, so it counts as disc 1.
 
+A multi-disc set is split under **Disc 1**, **Disc 2** headings, here and in the tree. A disc
+that has its own title says it too: **Disc 4 · Live at Wembley 1974**, and so does a set kept
+one folder per disc, on each folder's row. The title is the
+`DISCSUBTITLE` tag (Picard's name for it; Navidrome shows it as well). deadwax writes it when a
+download or an applied release gives the disc a title, and you can set it by hand (below). The
+**Disc title** column shows what each file carries, including one that disagrees with the rest
+of its disc.
+
 ## What needs attention
 
 Each album is checked for these, fresh on every scan:
@@ -139,7 +147,9 @@ and album tags. You:
 
 Tick tracks in the track table (Shift-click for a range, Ctrl/Cmd-click for one at a time), then
 **Edit N tracks…**, or **Edit all tracks…** with none ticked. You can edit title, artist, album,
-album artist, track, disc, date, original date, genre and composer:
+album artist, track, disc, disc title, date, original date, genre and composer. A disc title is
+the one to set for a box set or a bootleg whose discs MusicBrainz leaves untitled: tick that
+disc's tracks and type it once.
 
 - A field whose value differs between the ticked tracks starts empty and says **Several
   values**. Leave it alone and each track keeps its own.

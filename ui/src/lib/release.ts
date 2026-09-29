@@ -126,8 +126,11 @@ function flattenTracks(release: Release): Track[] {
   let position = 0
 
   for (const [discIndex, medium] of (release.media ?? []).entries()) {
-    const discTracks = (medium as { tracks?: unknown[] }).tracks ?? []
-    const disc = (medium as { position?: number }).position ?? discIndex + 1
+    const discTracks = medium.tracks ?? []
+    const disc = medium.position ?? discIndex + 1
+    //? the disc's own title ('' from MusicBrainz when it has none) - written as DISCSUBTITLE.
+    //? Same rule as discTitle in main.js's buildExpectedFromRelease; keep the two in step.
+    const discTitle = (medium.title ?? '').trim() || null
 
     for (const [trackIndex, raw] of discTracks.entries()) {
       const entry = raw as {
@@ -149,6 +152,7 @@ function flattenTracks(release: Release): Track[] {
         disc_position: entry.position ?? trackIndex + 1,
         artist: creditName(credit) || null,
         artist_mbids: creditIds(credit),
+        disc_title: discTitle,
       })
     }
   }

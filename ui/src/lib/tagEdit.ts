@@ -33,6 +33,7 @@ export const EDIT_FIELDS: readonly EditField[] = [
   { key: 'albumartist', label: 'Album artist' },
   { key: 'tracknumber', label: 'Track', short: true, numeric: true },
   { key: 'discnumber', label: 'Disc', short: true, numeric: true },
+  { key: 'discsubtitle', label: 'Disc title' },
   { key: 'date', label: 'Year', short: true },
   { key: 'originaldate', label: 'Original year', short: true },
   { key: 'genre', label: 'Genre' },

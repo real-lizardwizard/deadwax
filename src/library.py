@@ -30,6 +30,7 @@ from src.logger import logger
 from src.artists import ARTIST_ART_STEMS
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.lyrics import has_lyrics_file, lyrics_filename
+from src.tagkeys import easy_file
 
 #? The shape of what read_album_dir() returns, as a number. BUMP IT whenever that dict gains,
 #? loses or changes a field. The cache below is persisted to SQLite and outlives the process,
@@ -43,7 +44,8 @@ from src.lyrics import has_lyrics_file, lyrics_filename
 #?   5  albums carry `release_group_mbid`
 #?   6  albums carry `discs`, the disc numbers their files are tagged with
 #?   7  albums carry `albumartist_mbids` - WHO the album is by, as MusicBrainz ids
-SCAN_FORMAT = 7
+#?   8  tracks carry `disc_title`, albums `disc_titles` - each disc's own title
+SCAN_FORMAT = 8
 
 #? path -> (mtime, album dict). Reading tags costs milliseconds per file and a real library
 #? is thousands of files, so a rescan re-reads only the folders that actually changed. The
@@ -415,10 +417,8 @@ def _track_number(raw: str) -> int | None:
 
 def read_track(path: Path) -> dict | None:
     """One audio file's tags, or None if it isn't readable audio."""
-    import mutagen
-
     try:
-        audio = mutagen.File(str(path), easy=True)
+        audio = easy_file(path)
     except Exception as e:
         logger.debug(f"could not read {path.name}: {e}")
         return None
@@ -452,6 +452,8 @@ def read_track(path: Path) -> dict | None:
         #? sets, where track numbers restart on every disc and ordering on them alone deals
         #? the two discs out alternately.
         "disc": _track_number(_first(audio, "discnumber")),
+        #? the disc's own title (DISCSUBTITLE, v1.1.0) - rolled up per disc in read_album_dir
+        "disc_title": _first(audio, "discsubtitle"),
         "length": round(length, 1),
         "size": size,
         "format": file_extension(path.name),
@@ -603,6 +605,16 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
     #? the commonest SET of ids, kept as a list - a collaboration is several ids at once
     albumartist_mbids = _commonest(["\n".join(t.get("albumartist_mbids") or []) for t in tracks])
 
+    #? Each disc's title, where its files carry one (v1.1.0): what turns "Disc 4" into "Disc 4 ·
+    #? Live at Wembley 1974" in the tree and the track table, which draw their disc headings from
+    #? the scan and would otherwise have to wait for every file's details. Keyed by the disc as a
+    #? STRING: the cache is saved as JSON, which hands number keys back as strings after a restart.
+    disc_titles = {}
+    for disc in sorted({t["disc"] or 1 for t in tracks}):
+        title = _commonest([t.get("disc_title", "") for t in tracks if (t["disc"] or 1) == disc])
+        if title:
+            disc_titles[str(disc)] = title
+
     try:
         relative = str(directory.relative_to(library_root))
     except ValueError:
@@ -634,6 +646,7 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
         #? WHICH discs - what tells "disc 2 of this release, in a folder of its own" from a
         #? second copy of the same release (v0.9.13; see _mark_multi_edition)
         "discs": sorted({t["disc"] for t in tracks if t["disc"]}),
+        "disc_titles": disc_titles,
         "albumartist_mbids": albumartist_mbids.split("\n") if albumartist_mbids else [],
         "lyrics_count": lyrics_count,
         #? disc images beside the tracks - what a player shows for a song with a disc number
@@ -1221,10 +1234,8 @@ def read_track_details(path: Path) -> dict | None:
     whole library in one response, and carrying thirty tags per track for thousands of tracks
     would make every visit to the tab pay for detail it only ever shows one album at a time.
     """
-    import mutagen
-
     try:
-        audio = mutagen.File(str(path), easy=True)
+        audio = easy_file(path)
     except Exception as e:
         logger.debug(f"could not read {path.name}: {e}")
         return None
@@ -1293,7 +1304,7 @@ def read_album_details(directory: Path) -> list[dict]:
 TRACK_DEFAULT_FIELDS = ("artist", "album", "albumartist", "date", "originaldate", "release_mbid", "format")
 
 #? Per-track fields the interface never reads (the album carries its own), dropped on the wire.
-TRACK_SERVER_ONLY_FIELDS = ("release_group_mbid", "albumartist_mbids")
+TRACK_SERVER_ONLY_FIELDS = ("release_group_mbid", "albumartist_mbids", "disc_title")
 
 
 def compact_for_wire(albums: list[dict]) -> list[dict]:

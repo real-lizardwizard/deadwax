@@ -38,7 +38,10 @@ on the spike that main needed had to be cherry-picked across.
 - **main is the one line that ships.** Don't start a second line that releases too.
 - **Only main takes version numbers.** A commit on any other branch leaves `__version__` alone.
   A branch that publishes its own image needs a version to show, and takes a PRE-RELEASE of the
-  next minor - `1.1.0-player.1`, `1.1.0-player.2` - never a plain number. The publish workflow
+  next minor - `1.1.0-player.1`, `1.1.0-player.2` - never a plain number. When main takes that minor
+  itself - 1.1.0, the disc titles, on 2026-09-29 - the branch moves on to the next one, so
+  player-spike's next commit after merging main is `1.2.0-player.1`: a `1.1.0-player.N` would
+  sort before the release it came after. The publish workflow
   never moves `:latest` for a version with a hyphen, so it can't pass for a release, and a plain
   number always means one commit on main.
 - **A bug main has too is fixed ON MAIN first**, in its own commit with its own patch bump, and
@@ -149,6 +152,8 @@ src/
                    network is passed in so none of it needs one to test - see "Lyrics".
   disc_art.py      CD art as disc.<ext> / disc<N>.<ext>. The SEVENTH writer - choosing is pure,
                    writing is narrow - see "CD art and embedded pictures".
+  tagkeys.py       tag names mutagen's Easy MP4 doesn't know (the disc title), registered once,
+                   and easy_file() to open a file with them - see "Disc titles".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), app.py, same_origin.py (refuses
@@ -164,7 +169,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             941 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             955 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -1509,6 +1514,60 @@ drawn whole: 12,720 rows for a song search on a thousand albums.
 - **The scan reads `discnumber` and orders disc-first**, so a two-disc set stops interleaving
   (1, 1, 2, 2...). `disc_count` counts distinct TAGGED discs - 0 when untagged, never a guessed
   1 - and only `disc_count > 1` is split under "Disc N" headings.
+
+### Disc titles (v1.1.0)
+
+James: "is it possible to save cd titles? ... the dark side of the moon 50th anniversary box set,
+it just says disc 1 2 3 4. I would like to make it where disc 4 actually says 'Live at Wembley -
+From Pre-FM Master Tape'".
+
+- **It is MusicBrainz's MEDIUM title, written as `discsubtitle`**: Picard's DISCSUBTITLE, ID3's
+  TSST (a v2.4 frame), an MP4 freeform atom. Navidrome reads all three (its mapping lists `tsst`,
+  `discsubtitle`, `----:com.apple.itunes:discsubtitle`) and returns them as OpenSubsonic
+  `discTitles`. Every medium MusicBrainz sends has a `title`, '' for most. James's exact words are
+  disc 4 of a 2018 GB BOOTLEG, "The High Resolution Remasters" (`74a781e4-...`), there as "TDSOTM -
+  Live at Wembley - From Pre-FM Master Tape"; the official 2023 box calls its live discs "The Dark
+  Side of the Moon Live at Wembley Empire Pool, London, 1974".
+- **Carried per TRACK, as `disc_title`**, by both builders (`buildExpectedFromRelease` in main.js,
+  `flattenTracks` in release.ts - the same trim-to-null rule; keep them in step) and declared on
+  the download `Track` (the pydantic trap, a sixth time). Per track because `tag_values` already
+  takes everything about the disc from the track. It reaches the file on both paths because the
+  organizer and, since v1.0.10, `execute_retag` both hand `write_tags` the matched track whole.
+- **Written whenever MusicBrainz has one, one disc or several**, unlike the disc NUMBER: that
+  rule exists because "1" would land on every album, and a title lands only where somebody gave
+  the disc one. An untitled disc writes nothing, so a title a file carries stays - the rule for
+  every tag - which also means only a hand edit clears a wrong one. `read_current_tags` reads it
+  back, or every titled disc would show a change for ever.
+- **Easy MP4 had no key for it**, so an m4a could neither show nor take one. `src/tagkeys.py`
+  registers the freeform atom `----:com.apple.iTunes:DISCSUBTITLE`, and the places that read or
+  write it open files through `easy_file()`, which registers first. Four keys `tag_values` already
+  wrote have the same m4a gap (originaldate, musicbrainz_releasegroupid, media, catalognumber: an
+  m4a album never reads "nothing to change") - known, and left alone: James isn't worried about
+  m4a for now.
+- **The scan carries ONE map per album, `disc_titles`, keyed by the disc as a STRING** - the
+  saved scan is JSON, which would hand number keys back as strings after a restart;
+  `discTitle()` in libraryTree.ts looks up `String(disc)`. The commonest title per disc, untitled
+  discs left out; the per-track `disc_title` is server-only on the wire. From the scan, not the
+  live details, because the tree never loads details, and the table's headings would appear late
+  and disagree with the tree's. The "Disc title" column (live, off by default) still shows what
+  each FILE carries. `SCAN_FORMAT` 8, so the first visit after upgrading waits for one full scan.
+- **Shown as "Disc 4 · <title>"** on the tree's disc rows, the track table's headings and a
+  track's "disc 4 of 4" line; the editor's release rows list each disc's title in their tooltip.
+  A folder holding ONE disc of a set kept one folder per disc has no headings (its `disc_count` is
+  1), so `editionName()` names it there instead: "Disc 4 · <title>" on its tree and editions rows
+  - found by the review, and the likelier shape of James's "it just says disc 1 2 3 4".
+  The title is a `.disc-title` span in its own case beside the uppercase label. **`.tree-disc` is
+  one line with an ellipsis**: the windowed tree measures one height per KIND of row, and a title
+  that wrapped would run over the rows below. The whole title is its tooltip.
+- **Hand-editable as "Disc title"** (`EDITABLE_TAGS` / `EDIT_FIELDS`), for the discs MusicBrainz
+  leaves untitled, and for trimming a bootleg's "TDSOTM - ".
+- **Verified in the real page** (headless Brave) on a scratch copy of the bootleg's 55 tracks
+  tagged with its release and no titles: the editor's release row listed the four disc titles,
+  the preview showed `discsubtitle - -> TDSOTM - Live at Wembley...` on disc 4's ten tracks, the
+  apply wrote them and then read "Nothing to change", and the tree and table read "Disc 4 · TDSOTM
+  - Live at Wembley - From Pre-FM Master Tape" at 1440 and 390px, no overflow, every disc row one
+  height. Ticking disc 4 and setting Disc title by hand made it "Disc 4 · Live at Wembley - From
+  Pre-FM Master Tape". A row's Find on that release sent all 55 tracks with their disc titles.
 
 ### Editing tags by hand (v0.6.9)
 
@@ -3147,7 +3206,8 @@ compile time.
   move `:latest` on every commit, which is exactly what `:experimental` exists to prevent —
   see the image-tag note below. Bump the version as you go; tag when you mean to ship.
 - Versions: `v0.x` tags until **1.0.0, released on 2026-09-27** when James called it polished,
-  as the first release on `main`. The patch bump per commit carries on from there.
+  as the first release on `main`. The patch bump per commit carries on from there; the MINOR
+  moves when James says so - 1.1.0 (2026-09-29, disc titles) was "push it as 1.1".
 - Image tags: `:experimental` = main, rebuilt on every push (the experimental branch's until
   1.0.5); `:latest` = the newest real release. `:latest` only ever moves for a real release, never a branch or prerelease —
   the workflow enforces this by skipping `:latest` for any version containing a hyphen.
@@ -3159,7 +3219,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 941 tests
+.venv/bin/python -m pytest tests/ -q  # 955 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3203,7 +3263,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 941 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 955 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
