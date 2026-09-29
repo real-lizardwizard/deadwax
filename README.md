@@ -217,7 +217,7 @@ Opening the tab is instant after the first time. The last scan is saved in deadw
 Cover art comes from a file beside the tracks, then from art embedded in the audio, then from the Cover Art Archive. Click a cover to see it full size; click again to zoom in on the spot you clicked, scroll to zoom by degrees, and drag to move around it.
 <br><br>
 
-![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience Edition in the pane](assets/images/library.png)
+![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience Edition in the pane, its discs headed "2011 Remaster" and "Unreleased Tracks"](assets/images/library.png)
 
 </details>
 

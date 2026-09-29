@@ -34,7 +34,7 @@ opens to one row per edition first.
 
 It stays quick on a big library: only the rows in view are ever drawn.
 
-![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience edition in the details pane](../assets/images/library.png)
+![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience edition in the details pane, its discs headed "2011 Remaster" and "Unreleased Tracks"](../assets/images/library.png)
 
 ### Arranging
 

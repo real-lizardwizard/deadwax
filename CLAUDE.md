@@ -2769,6 +2769,11 @@ the same way, on the same generated library.** What it took beyond the above:
   phone library shot opens a single-edition album; and `glob` reads `[FLAC]` in a folder name as
   a character class (`glob.escape`).
 
+**v1.1.6 recaptured `library.png` for disc titles**, with the same harness and library. The generated
+Experience edition carried no disc titles, so MusicBrainz's for its release (`588ca0a5`, "2011
+Remaster" and "Unreleased Tracks") were written straight into its FLACs as `discsubtitle`, as an
+apply would. A library generated afresh needs the same, or the shot shows bare "Disc 1", "Disc 2".
+
 - **`--screenshot` and `--virtual-time-budget` cannot do this, and two attempts hung proving
   it.** The flag fires once load settles, which is before any driving has happened. Virtual
   time is the usual answer and it does not work here either: deadwax polls continuously, so
