@@ -113,5 +113,75 @@ check('no measurement renders as nothing', C.measuredSpeed(candidate()), null);
 check('one transfer is not hedged', C.measuredSpeed(candidate({ measured_speed: 800 * 1024, measured_samples: 1 })).text, 'you got 800 KB/s');
 check('an average is', C.measuredSpeed(candidate({ measured_speed: 800 * 1024, measured_samples: 4 })).text, 'you got ~800 KB/s');
 
+console.log('\nalready in the store (step 2)');
+{
+  const held = (fields = {}) => ({
+    path: 'Portishead/Dummy (1994)', paths: ['Portishead/Dummy (1994)'], artist: 'Portishead', album: 'Dummy',
+    edition: '', track_count: 10, expected_tracks: 10, formats: ['flac'], complete: true,
+    fills_gaps: false, filed_to: null, ...fields,
+  });
+  const answer = (fields = {}) => ({ query: '', queries: [], response_count: 0, candidates: [], ...fields });
+
+  check('held complete stands in for the results, folder, count and formats',
+    C.storeStatus(answer({ held: held() })),
+    { kind: 'held', title: 'Already in your library', lines: ['Portishead/Dummy (1994)', '10 of 10 tracks · FLAC'] });
+  check('...every folder of a set stored one per disc, and every format',
+    C.storeStatus(answer({ held: held({ paths: ['A/B (Disc 1)', 'A/B (Disc 2)'], track_count: 20, expected_tracks: 20, formats: ['flac', 'mp3'] }) })).lines,
+    ['A/B (Disc 1)', 'A/B (Disc 2)', '20 of 20 tracks · FLAC, MP3']);
+  check('...with no tracklist to count against, just the count',
+    C.storeStatus(answer({ held: held({ expected_tracks: 0, track_count: 1 }) })).lines[1], '1 track · FLAC');
+  check('held in part is NOT a status - the search ran', C.storeStatus(answer({ held: held({ track_count: 9, complete: false }) })), null);
+  const part = (fields = {}) => held({ track_count: 9, complete: false, ...fields });
+  check('...a note: held where filing would go, a download files only what that folder lacks',
+    C.storeNotes(answer({ held: part({ fills_gaps: true, filed_to: 'Portishead/Dummy (1994)' }) })),
+    ["You have 9 of 10 tracks of this pressing, in Portishead/Dummy (1994). Downloading it files only the tracks that folder doesn't have yet."]);
+  check('...held somewhere filing would NOT go, it says the copy is separate and where',
+    C.storeNotes(answer({ held: part({ path: 'Portishead/Dummy', paths: ['Portishead/Dummy'], filed_to: 'Portishead/Dummy (1994)' }) })),
+    ['You have 9 of 10 tracks of this pressing, in Portishead/Dummy. A download would be filed separately, in Portishead/Dummy (1994), rather than fill in that folder.']);
+  check('...and when where it would go is unknown, only that it may be separate',
+    C.storeNotes(answer({ held: part() })),
+    ['You have 9 of 10 tracks of this pressing, in Portishead/Dummy (1994). A download may be filed separately rather than fill in that folder.']);
+  check('...a set in two folders names which one fills',
+    C.storeNotes(answer({ held: part({ paths: ['A/B (1997)', 'A/B (Disc 2)'], fills_gaps: true, filed_to: 'A/B (1997)' }) })),
+    ["You have 9 of 10 tracks of this pressing, in A/B (1997) and A/B (Disc 2). Downloading it files only the tracks A/B (1997) doesn't have yet."]);
+  check('...never the promise that it fills in the missing ones - a download brings only what its folder has',
+    [part({ fills_gaps: true, filed_to: 'Portishead/Dummy (1994)' }), part()].some((h) => C.storeNotes(answer({ held: h }))[0].includes('fills in the missing')),
+    false);
+
+  const downloading = (fields = {}) => ({ job_id: 4, status: 'downloading', username: 'bob', files: 10, done_files: 4, ...fields });
+  check('downloading names the peer and how far it has got, and where to cancel it',
+    C.storeStatus(answer({ downloading: downloading() })),
+    { kind: 'downloading', title: 'Already downloading', lines: ['From bob · 4 of 10 files', 'Open Downloads to cancel it if you want another peer.'] });
+  check('each state in a few words',
+    ['queued', 'downloading', 'organizing', 'complete'].map((status) => C.downloadProgressText(downloading({ status }))),
+    ['queued', '4 of 10 files', 'being filed into your library now', 'being filed into your library now']);
+  check('being filed: downloaded, and no line about cancelling for another peer',
+    ['organizing', 'complete'].map((status) => C.storeStatus(answer({ downloading: downloading({ status }) }))),
+    [0, 1].map(() => ({ kind: 'downloading', title: 'Already downloaded', lines: ['From bob · being filed into your library now'] })));
+  check('...and a download slskd said nothing about is just downloading',
+    C.downloadProgressText(downloading({ done_files: undefined })), 'downloading');
+  check('downloading wins over held, as the server checks it first',
+    C.storeStatus(answer({ downloading: downloading(), held: held() })).kind, 'downloading');
+  check('a download of PART of it is a note, not a status - the search ran',
+    [C.storeStatus(answer({ downloading_part: downloading({ files: 5, done_files: 2 }) })),
+     C.storeNotes(answer({ downloading_part: downloading({ files: 5, done_files: 2 }) }))],
+    [null, ['A download of part of this pressing is already running: 5 files from bob · 2 of 5 files.']]);
+  check('...one file, queued, beside a part held (the running download first)',
+    C.storeNotes(answer({ downloading_part: downloading({ files: 1, status: 'queued' }), held: part({ fills_gaps: true, filed_to: 'Portishead/Dummy (1994)' }) })),
+    ['A download of part of this pressing is already running: 1 file from bob · queued.',
+     "You have 9 of 10 tracks of this pressing, in Portishead/Dummy (1994). Downloading it files only the tracks that folder doesn't have yet."]);
+
+  const pressing = (fields = {}) => ({ path: 'Portishead/Dummy (1994) [2014 vinyl]', release_mbid: 'x', edition: '2014 vinyl', year: '2014', track_count: 11, formats: ['flac'], ...fields });
+  check('another pressing, by its edition',
+    C.storeNotes(answer({ other_pressings: [pressing()] })),
+    ['You also have another pressing: 2014 vinyl · FLAC · Portishead/Dummy (1994) [2014 vinyl]']);
+  check('...or its year when the folder has no edition, one line each',
+    C.storeNotes(answer({ other_pressings: [pressing({ edition: '', path: 'Portishead/Dummy (1994)', year: '1994' }), pressing({ formats: [] })] })),
+    ['You also have another pressing: 1994 · FLAC · Portishead/Dummy (1994)',
+     'You also have another pressing: 2014 vinyl · Portishead/Dummy (1994) [2014 vinyl]']);
+  check('other pressings are noted beside a status too', C.storeNotes(answer({ held: held(), other_pressings: [pressing()] })).length, 1);
+  check('an ordinary result says nothing', [C.storeStatus(answer()), C.storeNotes(answer())], [null, []]);
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

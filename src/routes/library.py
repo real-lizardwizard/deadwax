@@ -36,6 +36,7 @@ from src.api.navidrome_endpoint import NavidromeError, navidrome
 from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_SECONDS,
                            SCAN_WAIT_CAP_SECONDS, ScanStatus, WaitState, begin, read_status,
                            scanned_since_hold, step)
+from src.store_index import index_folder, mark_deleted, reconcile_scan, reindex_merged, reindex_moved
 from src.track_tags import execute_tag_edits, plan_tag_edits
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
@@ -103,6 +104,11 @@ async def _persist_cache(request: Request, scan: dict | None = None) -> None:
     Called after every real scan AND after every forget. The forget matters as much as the
     scan: an in-place retag doesn't move the folder's mtime, so a saved row left behind would
     load the pre-edit tags straight back in on the next restart and they would match.
+
+    After a real scan it also brings the store index in line (step 2 - src/store_index.py):
+    every album recorded, and what the scan no longer found marked missing. `scan` is only ever
+    a real scan - a snapshot never comes through here, and must not: it is the last scan, not
+    the disk.
     """
     upserts, removals = drain_cache_changes()
     store = _store(request)
@@ -119,6 +125,9 @@ async def _persist_cache(request: Request, scan: dict | None = None) -> None:
         await store.record_library_scan(
             root, scan["scanned_at"], scan["scan_seconds"], scan["album_count"]
         )
+        #? from when the walk began: a writer's update since is newer than anything it saw
+        began = (scan.get("scanned_at") or 0) - (scan.get("scan_seconds") or 0)
+        await reconcile_scan(store, root, scan["albums"], since=began if began > 0 else None)
 
 
 async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False) -> dict:
@@ -573,6 +582,11 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
             #? during it (Docker's grace is 10s) doesn't restart onto a saved scan of the OLD tags
             forget_cached_album(plan["source"])
             await _persist_cache(request)
+            #? ...and the store index learns the new release now, where the album still is - for
+            #? the whole pause, up to 90s with Navidrome, Find and /enqueue would otherwise let the
+            #? pressing just applied be downloaded again (step 2 review). The move or merge after
+            #? the pause then carries this same row on.
+            await index_folder(_store(request), Config.LIBRARY_PATH or "", plan["source"])
             pause = _Pause(by, rename=True)
             if not results["failed"]:
                 #? a hold is carried on from only when these are the tags it held - new id tags
@@ -601,11 +615,22 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
             forget_cached_album(results["moved_to"])
         await _persist_cache(request)
 
+        #? The store index follows the album (step 2), keeping its row - and so its id - through
+        #? a rename; a disc folder merged into its release's becomes a tombstone pointing there.
+        #? Re-read either way: the release id is usually what the apply just changed.
+        store = _store(request)
+        root = Config.LIBRARY_PATH or ""
+        if results.get("merged"):
+            await reindex_merged(store, root, plan["source"], results["moved_to"])
+        elif results.get("moved_to"):
+            await reindex_moved(store, root, plan["source"], results["moved_to"])
+        else:
+            await index_folder(store, root, plan["source"])
+
         #? Applying a release IS reviewing the album, so this clears it from the new-import
         #? prompt without a second click. It follows the rename because album_review is keyed
         #? on the path: leaving the row behind would orphan the history of an album that is
         #? still very much there, and re-enrol it as brand new on the next scan.
-        store = _store(request)
         if store is not None:
             await store.mark_album_reviewed(
                 body.album_path,
@@ -1159,9 +1184,12 @@ async def tags_apply(request: Request, body: TagEditRequest):
         forget_cached_album(plan["source"])
         await _persist_cache(request)
 
+        #? the store index holds the album's name and artist, which an edit can change (step 2)
+        store = _store(request)
+        await index_folder(store, Config.LIBRARY_PATH or "", plan["source"])
+
         #? Editing an album's tracks is looking at it, as applying a release is, so it stops
         #? being a new import you haven't seen. Its issues stand - see /queue/reviewed.
-        store = _store(request)
         if store is not None:
             await store.mark_album_reviewed(body.album_path)
 
@@ -1294,6 +1322,9 @@ async def delete(request: Request, body: DeleteRequest):
         #? delete_album forgot the folder; this makes the saved scan forget it too, or a restart
         #? would draw a deleted album until the next scan noticed it was gone
         await _persist_cache(request)
+
+        #? its store index row stays, as a `deleted` tombstone - step 5's history keys on the id
+        await mark_deleted(_store(request), Config.LIBRARY_PATH or "", body.album_path)
 
         return result
 
@@ -1732,6 +1763,9 @@ async def artist_refile_apply(request: Request, body: ArtistRefileRequest):
         if store is not None:
             await store.mark_album_reviewed(moved["from"], moved["to"])
     await _persist_cache(request)
+    #? each album's store index row moves with it, id and all, and learns its new album artist
+    for moved in results["moved"]:
+        await reindex_moved(store, root, moved["from"], moved["to"])
 
     logger.info(
         f"moved {len(results['moved'])} album(s) of {body.artist} under {plan['to_folder']}",

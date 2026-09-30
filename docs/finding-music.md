@@ -87,6 +87,9 @@ A pressing whose MusicBrainz id matches an album in your library is marked **In 
 with a purple edge. The marks update by themselves when a download is filed while you're
 looking.
 
+**Find** on a pressing you already have complete, or one that's already downloading in full,
+says so instead of searching Soulseek. See [when you already have it](downloading.md#when-you-already-have-it).
+
 ## The filter column
 
 On the left (behind **Show** on a phone), the filter column is built from whatever release
@@ -108,4 +111,5 @@ There are two **Find** buttons, and the difference matters:
   card hasn't listed its pressings yet, the button shows a sweep while it asks MusicBrainz, and
   if MusicBrainz can't answer, it falls back to searching for the album as a whole.
 
-Either opens the **candidates panel**; see [Downloading](downloading.md).
+Either opens the **candidates panel**; see [Downloading](downloading.md). If the pressing is
+already in your library, or already downloading in full, the panel says so and doesn't search.

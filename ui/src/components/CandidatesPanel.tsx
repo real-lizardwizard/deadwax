@@ -9,7 +9,8 @@ import {
   EDITION_TAG_COLORS, autoGrabPick, NO_QUALITY_FILTERS, PEER_SPEED_HINT, SIGNAL_LABELS, SORT_LABELS,
   activeQualityCount, activeSignalCount, bitrateText, candidateKey, depthRateText, measuredSpeed,
   noSignalMinimums, passesFilters, peerSpeedLabel, queryOverride, resultFormats, scoreClass,
-  sortCandidates, trackSummary, type CandidateFilters, type CandidateSort, type QualityFilters,
+  sortCandidates, storeNotes, storeStatus, trackSummary, type CandidateFilters, type CandidateSort,
+  type QualityFilters, type StoreStatus,
 } from '../lib/candidates'
 import { requestDownload } from '../lib/downloadRequests'
 import { formatSize } from '../lib/format'
@@ -30,6 +31,10 @@ import { readDownloadDefaults, readPreferences } from '../state/persisted'
  * - filters changed mid-search apply to the answer when it lands, and never redraw the last one;
  * - Re-search overrides only when the query was EDITED (lib/candidates.ts, queryOverride);
  * - the advertised speed reads "peer avg", never a bare rate.
+ *
+ * Since step 2 (2.0.0-player.7) a Find can come back without having searched: the pressing is
+ * already in your library complete, or already downloading, and that status stands where the
+ * results would. Part of it held, and other pressings held, are notes above the results.
  */
 
 interface Search {
@@ -105,9 +110,11 @@ export function CandidatesPanel() {
        * reader went with the vanilla panel and nothing had ever acted on it). Only on a fresh
        * Find, never a Re-search you are steering by hand; only the top of the list as your
        * default filters and sort show it; and only when that scores AUTO_GRAB_MIN_SCORE or
-       * better, because a weak best match is exactly when you want to choose.
+       * better, because a weak best match is exactly when you want to choose. Never for a
+       * pressing already held or downloading (step 2) - the server searched nothing for those,
+       * and the check stays explicit rather than resting on the empty list.
        */
-      const grab = fromFind && readDownloadDefaults().autoGrab
+      const grab = fromFind && readDownloadDefaults().autoGrab && !storeStatus(result)
         ? autoGrabPick(result.candidates, filtersRef.current, sortRef.current)
         : null
       if (grab) {
@@ -474,7 +481,20 @@ function CandidatesBody(
     return <h4 class="text red candidates-status">search failed: {search.error}</h4>
   }
 
-  const { candidates, response_count: responses, queries } = search.result!
+  const result = search.result!
+  const { candidates, response_count: responses, queries } = result
+  const notes = <StoreNotes notes={storeNotes(result)} />
+
+  //? already in the library complete, or already downloading: nothing was searched (step 2)
+  const status = storeStatus(result)
+  if (status) {
+    return (
+      <>
+        <StoreStatusBox status={status} />
+        {notes}
+      </>
+    )
+  }
 
   if (!candidates.length) {
     //? what was actually searched, when it was more than the box shows: "no matches" after
@@ -483,22 +503,29 @@ function CandidatesBody(
       ? ` (searched as ${queries!.map((q) => `"${q}"`).join(' and ')})`
       : ''
     return (
-      <h4 class="text default-muted candidates-status">
-        no matches from {responses} responses{searched} — try editing the query above
-      </h4>
+      <>
+        {notes}
+        <h4 class="text default-muted candidates-status">
+          no matches from {responses} responses{searched} — try editing the query above
+        </h4>
+      </>
     )
   }
 
   if (!visible.length) {
     return (
-      <h4 class="text default-muted candidates-status">
-        {candidates.length} candidates, none match your filters
-      </h4>
+      <>
+        {notes}
+        <h4 class="text default-muted candidates-status">
+          {candidates.length} candidates, none match your filters
+        </h4>
+      </>
     )
   }
 
   return (
     <>
+      {notes}
       {autoGrabbed && (
         <p class="text default-muted candidates-autograb">
           Grabbed the best match for you - it's the one marked Queued. Auto-grab can be turned off
@@ -514,6 +541,35 @@ function CandidatesBody(
         />
       ))}
     </>
+  )
+}
+
+/**
+ * What stands where the results would, when Find didn't search (step 2): the pressing is in your
+ * library complete, or downloading already. No Download - Downloads is where a download in
+ * flight is cancelled, and a better copy replacing a held one is not built yet.
+ */
+function StoreStatusBox({ status }: { status: StoreStatus }) {
+  return (
+    <div class={`candidates-store is-${status.kind}`}>
+      <h4 class="text white candidates-store-title">{status.title}</h4>
+      {status.lines.map((line, index) => (
+        //? the folders (or the peer) first; the last line is the detail under them
+        <p key={index} class={`text ${index && index === status.lines.length - 1 ? 'default-muted' : 'default-secondary'} candidates-store-line`}>
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+/** Part of this pressing held, and other pressings of the album held - above the results. */
+function StoreNotes({ notes }: { notes: string[] }) {
+  if (!notes.length) return null
+  return (
+    <ul class="candidates-notes">
+      {notes.map((note, index) => <li key={index} class="text default-secondary candidates-note">{note}</li>)}
+    </ul>
   )
 }
 

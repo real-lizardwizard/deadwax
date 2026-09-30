@@ -324,18 +324,27 @@ def existing_tracks(directory: Path) -> list[dict]:
     return found
 
 
+def planned_key(release: dict, track: dict | None) -> tuple[int, int] | None:
+    """
+    The (disc, track) a track of this release is filed as - numbered exactly as tag_values
+    numbers it: per disc on a multi-disc release, running otherwise. None without a position.
+    Also what the store index's held check compares a folder against (store_index.held_copy).
+    """
+    if not track or not track.get("position"):
+        return None
+    if _is_multi_disc(release) and track.get("disc") and track.get("disc_position"):
+        return (int(track["disc"]), int(track["disc_position"]))
+    return (1, int(track["position"]))
+
+
 def _planned_track(release: dict, track: dict | None, source: Path) -> tuple[tuple[int, int] | None, str]:
     """
-    Where an incoming file will sit and what it's called. A matched track says so itself,
-    numbered exactly as tag_values numbers it (per disc on a multi-disc release, running
-    otherwise). An unmatched file - every file of a grab made without a tracklist - is asked its
-    own tags.
+    Where an incoming file will sit and what it's called. A matched track says so itself
+    (planned_key). An unmatched file - every file of a grab made without a tracklist - is asked
+    its own tags.
     """
-    if track and track.get("position"):
-        if _is_multi_disc(release) and track.get("disc") and track.get("disc_position"):
-            key = (int(track["disc"]), int(track["disc_position"]))
-        else:
-            key = (1, int(track["position"]))
+    key = planned_key(release, track)
+    if key is not None:
         return key, normalize(track.get("title") or "")
     return _read_track(source)
 
@@ -363,7 +372,7 @@ def find_duplicate(existing: list[dict], key, title: str, same_release: bool) ->
     return None
 
 
-def resolve_album_dir(library_root: str, release: dict) -> tuple[Path, str]:
+def resolve_album_dir(library_root: str, release: dict, quiet: bool = False) -> tuple[Path, str]:
     """
     Where this release's folder should be, avoiding a different release's folder.
 
@@ -375,6 +384,9 @@ def resolve_album_dir(library_root: str, release: dict) -> tuple[Path, str]:
     Crucially this does NOT treat an untagged folder as a collision. A library that predates
     deadwax has no MBIDs, and forking every one of those albums into a second folder would
     be far worse than sharing one.
+
+    `quiet` asks without saying so in the event log - Find wants to know where a download
+    WOULD be filed (store_index.filing_folder), and nothing is being filed.
     """
     artist = sanitize_filename(filed_artist(release), "Unknown Artist")
     artist_dir = Path(library_root) / artist
@@ -393,7 +405,7 @@ def resolve_album_dir(library_root: str, release: dict) -> tuple[Path, str]:
         if existing is None or not wanted_mbid or existing == wanted_mbid:
             return candidate, discriminator
 
-        if not discriminator:
+        if not discriminator and not quiet:
             logger.info(
                 f"'{candidate.name}' already holds a different release, "
                 f"filing this edition separately",
@@ -997,8 +1009,13 @@ def remove_incomplete_downloads(
     return results
 
 
-async def organize_job(job: dict, download_root: str, library_root: str, mode: str) -> dict:
-    """Plan then execute, with the logging the UI's event log surfaces."""
+async def organize_job(job: dict, download_root: str, library_root: str, mode: str,
+                       on_plan=None) -> dict:
+    """
+    Plan then execute, with the logging the UI's event log surfaces. `on_plan(plan)`, when
+    given, is told the plan before anything is written - the poller marks the album folder as
+    being filed, so a scan landing mid-copy doesn't take it for an album moved there by hand.
+    """
     label = f"{job.get('artist')} - {job.get('album')}"
     plan = await asyncio.to_thread(plan_organization, job, download_root, library_root)
 
@@ -1010,6 +1027,8 @@ async def organize_job(job: dict, download_root: str, library_root: str, mode: s
         return {"organized": 0, "skipped": 0, "failed": 0,
                 "dry_run": mode == "dry_run", "mode": mode, "plan": plan}
 
+    if on_plan is not None:
+        on_plan(plan)
     results = await asyncio.to_thread(execute_plan, plan, job.get("release") or {}, mode)
 
     if mode == "move":

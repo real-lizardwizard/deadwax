@@ -1,4 +1,4 @@
-import type { Candidate } from '../api/types'
+import type { Candidate, DownloadInFlight, FindCandidatesResponse, HeldPressing } from '../api/types'
 import { formatSpeed } from './format'
 
 /**
@@ -298,4 +298,141 @@ export function autoGrabPick(
   const list = sortCandidates(candidates.filter((c) => passesFilters(c, filters)), sort)
   const pick = list[0]
   return pick && Math.round(pick.score * 100) >= AUTO_GRAB_MIN_SCORE ? { pick, list } : null
+}
+
+/*
+ * What Find says about the library and the downloads before - or instead of - searching (step 2
+ * of the multi-user plan; src/store_index.py). A pressing already held complete, or already
+ * downloading whole, isn't searched for: its status replaces the results. Part of it held, a
+ * download of part of it running, or another pressing of the album held, is a note above them.
+ * Every line is built here, so ui/test/candidates.sim.cjs holds what the panel says.
+ */
+
+/** "FLAC", "FLAC, MP3" - formats as the panel names them. */
+export function formatNames(formats: readonly string[] | undefined): string {
+  return (formats ?? []).filter(Boolean).map((f) => f.toUpperCase()).join(', ')
+}
+
+/** "a", "a and b", "a, b and c". */
+function listed(items: readonly string[]): string {
+  if (items.length < 2) return items[0] ?? ''
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+}
+
+/** "10 of 10 tracks", or "9 tracks" when no tracklist was sent to count against. */
+export function heldTrackText(held: HeldPressing): string {
+  const plural = (n: number) => (n === 1 ? 'track' : 'tracks')
+  return held.expected_tracks
+    ? `${held.track_count} of ${held.expected_tracks} ${plural(held.expected_tracks)}`
+    : `${held.track_count} ${plural(held.track_count)}`
+}
+
+/**
+ * Past downloading, on its way into the library. There is nothing left to cancel for another
+ * peer then, and the server counts `complete` only in the seconds before the poller starts
+ * filing it (store.COMPLETE_IN_FLIGHT_SECONDS).
+ */
+export function beingFiled(download: DownloadInFlight): boolean {
+  return download.status === 'organizing' || download.status === 'complete'
+}
+
+/** How far a download in flight has got, in a few words. */
+export function downloadProgressText(download: DownloadInFlight): string {
+  if (beingFiled(download)) return 'being filed into your library now'
+  switch (download.status) {
+    case 'queued':
+      return 'queued'
+    case 'downloading':
+      return download.done_files === undefined ? 'downloading' : `${download.done_files} of ${download.files} files`
+    default:
+      return download.status
+  }
+}
+
+/** A status that stands in for the results: a heading, and lines under it. */
+export interface StoreStatus {
+  kind: 'held' | 'downloading'
+  title: string
+  lines: string[]
+}
+
+/**
+ * The status in place of the results, when there is one - downloading first, since a job in
+ * flight is what the server checks first too - or null for an ordinary result.
+ */
+export function storeStatus(result: FindCandidatesResponse | null | undefined): StoreStatus | null {
+  const downloading = result?.downloading
+  if (downloading) {
+    const line = `From ${downloading.username} · ${downloadProgressText(downloading)}`
+    //? being filed: the files are all in, so there's no other peer to cancel it for
+    return beingFiled(downloading)
+      ? { kind: 'downloading', title: 'Already downloaded', lines: [line] }
+      : {
+          kind: 'downloading',
+          title: 'Already downloading',
+          lines: [line, 'Open Downloads to cancel it if you want another peer.'],
+        }
+  }
+  const held = result?.held
+  if (held?.complete) {
+    return {
+      kind: 'held',
+      title: 'Already in your library',
+      lines: [
+        //? every folder, for a set stored one folder per disc
+        ...(held.paths?.length ? held.paths : [held.path]),
+        [heldTrackText(held), formatNames(held.formats)].filter(Boolean).join(' · '),
+      ],
+    }
+  }
+  return null
+}
+
+/**
+ * What a download would do with a part held - said only as far as it is true. Filing fills in
+ * just the one folder it files into (`filed_to`), skipping the tracks already there; a part held
+ * anywhere else - Picard's `Artist/Album`, an older template - gets a separate copy beside it.
+ * Never "fills in the missing ones": a download brings only what the folder picked holds, which
+ * may be missing the very tracks you are.
+ */
+function whatADownloadDoes(held: HeldPressing): string {
+  const folders = held.paths?.length ? held.paths : [held.path]
+  const those = folders.length > 1 ? 'those folders' : 'that folder'
+  if (held.fills_gaps && held.filed_to) {
+    return folders.length > 1
+      ? `Downloading it files only the tracks ${held.filed_to} doesn't have yet.`
+      : "Downloading it files only the tracks that folder doesn't have yet."
+  }
+  return held.filed_to
+    ? `A download would be filed separately, in ${held.filed_to}, rather than fill in ${those}.`
+    : `A download may be filed separately rather than fill in ${those}.`
+}
+
+/**
+ * The notes above the results: a download of part of this pressing already running, part of it
+ * held, and each other pressing held.
+ */
+export function storeNotes(result: FindCandidatesResponse | null | undefined): string[] {
+  const notes: string[] = []
+  const part = result?.downloading_part
+  if (part) {
+    //? a lone disc folder, say - it stops nothing, since it will never bring the rest
+    const files = `${part.files} ${part.files === 1 ? 'file' : 'files'}`
+    notes.push(
+      `A download of part of this pressing is already running: ${files} from ${part.username} · `
+      + `${downloadProgressText(part)}.`,
+    )
+  }
+  const held = result?.held
+  if (held && !held.complete) {
+    notes.push(
+      `You have ${held.track_count} of ${held.expected_tracks} tracks of this pressing, in `
+      + `${listed(held.paths?.length ? held.paths : [held.path])}. ${whatADownloadDoes(held)}`,
+    )
+  }
+  for (const pressing of result?.other_pressings ?? []) {
+    const parts = [pressing.edition || pressing.year, formatNames(pressing.formats), pressing.path].filter(Boolean)
+    notes.push(`You also have another pressing: ${parts.join(' · ')}`)
+  }
+  return notes
 }

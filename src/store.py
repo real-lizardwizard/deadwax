@@ -1,5 +1,5 @@
 """
-The application's SQLite state. Two tables, for two things worth remembering.
+The application's SQLite state - the things worth remembering, and why each is kept.
 
 **Download jobs.** slskd has no idea what it's downloading *for*. It knows "user bob is
 sending me 12 files"; it does not know those files are MusicBrainz release f5093c06-... with a
@@ -18,7 +18,11 @@ metadata_health.py derives that from the scan every time - because a written-dow
 attention" flag is a flag that goes stale the moment something fixes the album without
 clearing it. Storing only the ignores means the queue empties itself.
 
-Both tables live in one file and one connection. A failure to open it degrades rather than
+**The store index** (step 2 of the multi-user plan): every album folder in the library under an
+id that survives a rename, so a release already held - or already on its way - is not fetched a
+second time. See store_album in the schema and src/store_index.py.
+
+Every table lives in one file and one connection. A failure to open it degrades rather than
 raises: downloads still work untracked, and the queue still works without remembering what
 you ignored.
 """
@@ -26,7 +30,7 @@ you ignored.
 import asyncio
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.config import Config
@@ -154,6 +158,46 @@ CREATE TABLE IF NOT EXISTS library_scan (
     scan_seconds  REAL NOT NULL,
     album_count   INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS store_album (
+    -- The store index (step 2 of the multi-user plan, 2.0.0-player.7): every album folder in
+    -- the library, with an id that stays put while the album moves about.
+    --
+    -- Not the scan, and not library_cache. Step 5's per-user ledger keys on this `id`, and
+    -- both the path and the release id change when an album is re-filed or a release is
+    -- applied - so every writer UPDATES the row it moved rather than dropping it and adding
+    -- another, and no row is ever deleted. An album that goes away becomes a tombstone:
+    -- `missing` when a scan stops finding it (far more often an unmounted share than a deleted
+    -- album), `deleted` when deadwax deleted it, `merged` when a disc folder merged into
+    -- `merged_into`. See src/store_index.py for who writes what.
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- Config.LIBRARY_PATH as configured, as library_cache keys it
+    root               TEXT NOT NULL,
+    -- relative to root, exactly as the scan's album["path"]
+    path               TEXT NOT NULL,
+    release_mbid       TEXT,
+    release_group_mbid TEXT,
+    artist             TEXT,
+    album              TEXT,
+    year               TEXT,
+    -- the folder's own edition, never the scan's display "Standard"
+    edition            TEXT,
+    track_count        INTEGER,
+    -- JSON list, e.g. ["flac"]
+    formats            TEXT NOT NULL DEFAULT '[]',
+    -- present | missing | deleted | merged
+    state              TEXT NOT NULL DEFAULT 'present',
+    merged_into        INTEGER,
+    first_seen         TEXT NOT NULL,
+    updated_at         TEXT NOT NULL,
+    gone_at            TEXT
+);
+-- one LIVE row per folder; tombstones may share a path with each other and with the live row
+CREATE UNIQUE INDEX IF NOT EXISTS idx_store_album_live ON store_album(root, path) WHERE state = 'present';
+CREATE INDEX IF NOT EXISTS idx_store_album_release ON store_album(root, release_mbid);
+CREATE INDEX IF NOT EXISTS idx_store_album_group ON store_album(root, release_group_mbid);
+-- "is this release already downloading" is asked at every Find and every enqueue
+CREATE INDEX IF NOT EXISTS idx_jobs_release ON jobs(release_mbid);
 """
 
 #? Columns added to `jobs` after it first shipped, with the definition an existing database is
@@ -173,9 +217,74 @@ CLEARABLE_STATUSES = ("complete", "organized", "failed", "cancelled")
 #? what "try the next peer" can start again - anything still moving is left to finish
 RETRYABLE_STATUSES = ("failed", "cancelled")
 
+#? How long a job in `organizing` still counts as on its way into the library (step 2). Bounded
+#? because a job can be STRANDED there - deadwax stopped mid-filing never comes back to it - and
+#? a stranded job must not block its release for ever. An hour is far longer than any filing takes.
+FILING_IN_FLIGHT_SECONDS = 3600
+
+#? ...and a job `complete` with no error, which is the moment between the last file arriving and
+#? the poller moving it to `organizing` - the same pass, so seconds. Any older, and it finished
+#? while organizing was off and nothing will ever file it: the poller organizes a job only at the
+#? moment it completes. Counting that one "on its way" for an hour, once organizing was turned
+#? on, blocked the pressing with nothing to cancel (step 2 review).
+COMPLETE_IN_FLIGHT_SECONDS = 120
+
+#? what a store_album row can be; everything but `present` is a tombstone
+STORE_ALBUM_STATES = ("present", "missing", "deleted", "merged")
+
+#? the columns an album's scan decides - compared by index_reconcile to skip unchanged rows
+_INDEX_FIELDS = ("release_mbid", "release_group_mbid", "artist", "album", "year", "edition",
+                 "track_count", "formats")
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _index_fields(album: dict) -> dict:
+    """What store_album holds of a scan album (library.read_album_dir's shape)."""
+    return {
+        #? '' is how the scan says "untagged"; NULL in the index, so `IS` compares two alike
+        "release_mbid": (album.get("release_mbid") or "").strip() or None,
+        "release_group_mbid": (album.get("release_group_mbid") or "").strip() or None,
+        "artist": album.get("artist") or "",
+        "album": album.get("album") or "",
+        "year": album.get("year") or "",
+        "edition": album.get("edition") or "",
+        "track_count": int(album.get("track_count") or 0),
+        "formats": json.dumps(sorted(album.get("formats") or [])),
+    }
+
+
+def _index_row(row: sqlite3.Row) -> dict:
+    entry = dict(row)
+    try:
+        entry["formats"] = json.loads(entry.get("formats") or "[]")
+    except (TypeError, ValueError):
+        entry["formats"] = []
+    return entry
+
+
+def pair_moved(found: list[str], missing: list[tuple[int, str]]) -> dict[str, int]:
+    """
+    Which newly found folders of ONE release are which `missing` rows of it - {path: row id} -
+    for a move made outside deadwax. Only unambiguous pairs: one of each; or else, one of each
+    under the same folder name, which is what a renamed ARTIST folder leaves every album with.
+    Two discs of a set, or two copies, moved together otherwise swapped ids (step 2 review).
+    """
+    if len(found) == 1 and len(missing) == 1:
+        return {found[0]: missing[0][0]}
+    new_by_name: dict[str, list[str]] = {}
+    for path in found:
+        new_by_name.setdefault(Path(path).name, []).append(path)
+    old_by_name: dict[str, list[int]] = {}
+    for row_id, path in missing:
+        old_by_name.setdefault(Path(path).name, []).append(row_id)
+    return {
+        paths[0]: old_by_name[name][0]
+        for name, paths in new_by_name.items()
+        if len(paths) == 1 and len(old_by_name.get(name, ())) == 1
+    }
 
 
 class JobStore:
@@ -443,6 +552,66 @@ class JobStore:
 
         except Exception:
             logger.error(f"failed to read job {job_id}")
+            return None
+
+    async def in_flight_job(self, release_mbid: str | None, excluding_job_id: int | None = None,
+                            filing: bool = True, now: datetime | None = None,
+                            covering: int = 0) -> dict | None:
+        """
+        The newest job still bringing this release in, or None (step 2).
+
+        In flight is `queued` or `downloading`, or on its way into the library: `organizing`
+        updated within FILING_IN_FLIGHT_SECONDS, or `complete` with no error updated within
+        COMPLETE_IN_FLIGHT_SECONDS. `filing` says whether a `complete` job is going to be filed
+        at all - with organizing off, `complete` is where a download ends. The short bound covers
+        the rest: a job that completed while organizing was off is never filed after it is
+        turned on. `excluding_job_id` is the job being retried, which is not another download of
+        the release but the same one. `covering` is how many files a job must be fetching to count:
+        the release's audio tracks, to ask for a job bringing the WHOLE pressing in - one for part
+        of it (a lone disc folder, a 9-of-10 folder) is no reason to refuse the rest.
+        """
+        if not self.available or not release_mbid:
+            return None
+
+        statuses = OPEN_STATUSES + ("organizing",) + (("complete",) if filing else ())
+        at = now or datetime.now(timezone.utc)
+
+        def recent(stamp: str | None, seconds: int) -> bool:
+            try:
+                when = datetime.fromisoformat(stamp or "")
+            except ValueError:
+                #? a timestamp nobody can read can't prove the job is still moving
+                return False
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+            return when >= at - timedelta(seconds=seconds)
+
+        def read():
+            placeholders = ",".join("?" for _ in statuses)
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"SELECT * FROM jobs WHERE release_mbid = ? AND status IN ({placeholders}) "
+                    f"AND id != ? ORDER BY id DESC",
+                    (release_mbid, *statuses, excluding_job_id if excluding_job_id is not None else -1),
+                ).fetchall()
+
+            for row in rows:
+                job = self._row_to_job(row)
+                if len(job["files"]) < covering:
+                    continue
+                if row["status"] in OPEN_STATUSES:
+                    return job
+                #? filing that stopped with an error has stopped - see _organize_if_enabled
+                bound = FILING_IN_FLIGHT_SECONDS if row["status"] == "organizing" else COMPLETE_IN_FLIGHT_SECONDS
+                if not row["error"] and recent(row["updated_at"], bound):
+                    return job
+            return None
+
+        try:
+            return await asyncio.to_thread(read)
+
+        except Exception as e:
+            logger.error(f"failed to look for a download of {release_mbid} in flight ({e})")
             return None
 
     # ---------------------------------------------------------------- album review
@@ -977,6 +1146,388 @@ class JobStore:
         except Exception as e:
             logger.error(f"could not read the library scan time ({e})")
             return None
+
+    # ===== the store index ====================================================
+    #
+    # store_album - see the schema for why it has stable ids and tombstones, and
+    # src/store_index.py for the writers that keep it in step and the checks that read it.
+    # Everything degrades to "nothing indexed": the index says whether a download can be
+    # skipped, and a broken one must never stop a download - it only stops the skipping.
+
+    @staticmethod
+    def _index_write(connection: sqlite3.Connection, root: str, path: str, fields: dict, now: str,
+                     row_id: int | None) -> int:
+        """Bring `row_id` back to life at `path` with these fields - or, with no row, insert one."""
+        values = [fields[name] for name in _INDEX_FIELDS]
+        if row_id is not None:
+            assignments = ", ".join(f"{name} = ?" for name in _INDEX_FIELDS)
+            connection.execute(
+                f"UPDATE store_album SET path = ?, {assignments}, state = 'present', merged_into = NULL, "
+                f"gone_at = NULL, updated_at = ? WHERE id = ?",
+                (path, *values, now, row_id),
+            )
+            return row_id
+        columns = ", ".join(_INDEX_FIELDS)
+        marks = ", ".join("?" for _ in _INDEX_FIELDS)
+        cursor = connection.execute(
+            f"INSERT INTO store_album (root, path, {columns}, state, first_seen, updated_at) "
+            f"VALUES (?, ?, {marks}, 'present', ?, ?)",
+            (root, path, *values, now, now),
+        )
+        return cursor.lastrowid
+
+    @staticmethod
+    def _missing_here(connection: sqlite3.Connection, root: str, path: str, release_mbid: str | None):
+        """
+        The `missing` row at this very path of this release that went LAST - the same folder,
+        back. By when it went, not by id: the highest id is only the row made last, and an older
+        dead copy's tombstone at the same path would otherwise take the album's id.
+        """
+        return connection.execute(
+            "SELECT id FROM store_album WHERE root = ? AND path = ? AND state = 'missing' "
+            "AND release_mbid IS ? ORDER BY gone_at DESC, id DESC LIMIT 1",
+            (root, path, release_mbid),
+        ).fetchone()
+
+    @classmethod
+    def _index_upsert(cls, connection: sqlite3.Connection, root: str, path: str, fields: dict, now: str) -> int:
+        """
+        The live row for this folder, updated - else its own `missing` row brought back (same
+        path, same release) - else a new row.
+
+        Only ever by the SAME path. A folder written by deadwax itself - filed, re-tagged,
+        re-read after a rename - is that folder, and taking some other folder's row because it
+        holds the same release is how a fresh download used to walk off with an unmounted
+        share's id. Moves outside deadwax are paired by index_reconcile, which sees both ends.
+        And only `missing`: a row deadwax deleted, or merged into another, is never brought
+        back - a deleted album filed again at the same path is a new album with a new row.
+        """
+        live = connection.execute(
+            "SELECT id FROM store_album WHERE root = ? AND path = ? AND state = 'present'", (root, path),
+        ).fetchone()
+        if live is not None:
+            assignments = ", ".join(f"{name} = ?" for name in _INDEX_FIELDS)
+            connection.execute(f"UPDATE store_album SET {assignments}, updated_at = ? WHERE id = ?",
+                               (*[fields[name] for name in _INDEX_FIELDS], now, live["id"]))
+            return live["id"]
+
+        back = cls._missing_here(connection, root, path, fields["release_mbid"])
+        return cls._index_write(connection, root, path, fields, now, back["id"] if back else None)
+
+    async def index_upsert(self, root: str, album: dict) -> int | None:
+        """Record one album folder (library.read_album_dir's shape). Returns its row id."""
+        if not self.available or not root or not album.get("path"):
+            return None
+
+        def write():
+            with self._connect() as connection:
+                return self._index_upsert(connection, root, album["path"], _index_fields(album), _now())
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not index {album.get('path')} ({e})")
+            return None
+
+    async def index_reconcile(self, root: str, albums: list[dict], still_there=None,
+                              since: float | None = None, not_pairable=None) -> tuple[int, int]:
+        """
+        Bring the index in line with a full scan: every album recorded, and every live row the
+        scan didn't find marked `missing`. Returns (rows written, rows marked missing).
+
+        Nothing is marked missing after a scan that found NO albums - an empty library is far
+        more often an unmounted volume than a deleted collection, the rule forget_missing_albums
+        keeps too.
+
+        **A scan is a picture of the past.** The walk can take seconds on a NAS, and deadwax's
+        own writers - filing, apply, refile, delete - don't wait for it, so by the time this runs
+        a folder it listed may have been deleted or renamed, and one it didn't may have been
+        filed. So `still_there(path)` (whether audio sits in that folder NOW) is asked about every
+        row the scan didn't find before it is marked missing, AND about every folder the scan
+        found that has no live row before it is recorded - otherwise a stale scan brings back a
+        row deadwax just deleted, or leaves a live row at the old name of one it just renamed.
+        `since` (when the scan began, epoch seconds) keeps it from rewriting a live row a writer
+        updated after that - an apply re-tagging in place while the walk went by. Every look at
+        the disk happens before the first write, so no write lock is held while it looks.
+
+        **Moves outside deadwax** (a file manager, Picard) show as a path gone and a path found.
+        A found folder first takes its own `missing` row (same path, same release). The rest are
+        paired with `missing` rows of the same release only where that is unambiguous - one of
+        each, or else one of each under the same folder name, which a renamed artist folder
+        keeps - so the discs of a set, or two copies of a release, moved together can't swap ids.
+        The rows THIS scan just marked missing are tried first, since a move is a path gone and a
+        path found in the same scan; older tombstones only for what is still unpaired - otherwise
+        one stale tombstone of the release made every later rename ambiguous. A folder in
+        `not_pairable(path)` - one the poller is filing right now - is never paired: it is a new
+        folder, whatever tombstones its release has. Anything still unpaired is a new row.
+
+        One read and only the writes that change something: this runs after every real scan of
+        the library tab, and a thousand unchanged albums should cost a comparison, not a
+        thousand UPDATEs.
+        """
+        if not self.available or not root:
+            return 0, 0
+
+        scanned = {album["path"]: _index_fields(album) for album in albums or [] if album.get("path")}
+        #? whole seconds, as updated_at is written: a row stamped in the scan's first second
+        #? counts as newer, which at worst leaves one refresh to the next scan
+        began = datetime.fromtimestamp(int(since), timezone.utc) if since else None
+
+        def newer(stamp: str | None) -> bool:
+            if began is None:
+                return False
+            try:
+                when = datetime.fromisoformat(stamp or "")
+            except (TypeError, ValueError):
+                return False
+            return (when if when.tzinfo else when.replace(tzinfo=timezone.utc)) >= began
+
+        def there(path: str) -> bool:
+            """Whether the folder holds audio now - taken on the scan's word when nobody can look."""
+            return still_there is None or bool(still_there(path))
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                live = {
+                    row["path"]: row for row in connection.execute(
+                        "SELECT * FROM store_album WHERE root = ? AND state = 'present'", (root,))
+                }
+                gone = [path for path in live if path not in scanned] if scanned else []
+                if still_there is not None:
+                    gone = [path for path in gone if not still_there(path)]
+                found = [path for path in scanned if path not in live and there(path)]
+
+                #? The looks at the disk are done; from here this holds the write lock, so no writer
+                #? can slip a live row in under it. One that did so DURING the looks is caught here:
+                #? a found folder a writer has indexed meanwhile is the writer's, left alone - taking
+                #? it too broke the partial unique index and rolled the whole reconcile back.
+                connection.execute("BEGIN IMMEDIATE")
+                if found:
+                    marks = ",".join("?" for _ in found)
+                    taken = {row["path"] for row in connection.execute(
+                        f"SELECT path FROM store_album WHERE root = ? AND state = 'present' AND path IN ({marks})",
+                        (root, *found))}
+                    found = [path for path in found if path not in taken]
+
+                connection.executemany(
+                    "UPDATE store_album SET state = 'missing', gone_at = ?, updated_at = ? "
+                    "WHERE root = ? AND path = ? AND state = 'present'",
+                    [(now, now, root, path) for path in gone],
+                )
+
+                written = 0
+                for path, row in live.items():
+                    fields = scanned.get(path)
+                    if fields is None or all(row[name] == fields[name] for name in _INDEX_FIELDS):
+                        continue
+                    if newer(row["updated_at"]):
+                        continue
+                    assignments = ", ".join(f"{name} = ?" for name in _INDEX_FIELDS)
+                    connection.execute(f"UPDATE store_album SET {assignments}, updated_at = ? WHERE id = ?",
+                                       (*[fields[name] for name in _INDEX_FIELDS], now, row["id"]))
+                    written += 1
+
+                #? the same folder back where it was
+                unpaired: list[str] = []
+                for path in found:
+                    back = self._missing_here(connection, root, path, scanned[path]["release_mbid"])
+                    if back is not None:
+                        self._index_write(connection, root, path, scanned[path], now, back["id"])
+                        written += 1
+                    else:
+                        unpaired.append(path)
+
+                #? moved outside deadwax: paired by release, only where that is unambiguous - against
+                #? what this scan just marked missing first, then older tombstones
+                just_gone = {live[path]["id"] for path in gone}
+                by_release: dict[str, list[str]] = {}
+                for path in unpaired:
+                    if scanned[path]["release_mbid"] and not (not_pairable and not_pairable(path)):
+                        by_release.setdefault(scanned[path]["release_mbid"], []).append(path)
+                pairs: dict[str, int] = {}
+                for release_mbid, paths in by_release.items():
+                    missing = [(row["id"], row["path"]) for row in connection.execute(
+                        "SELECT id, path FROM store_album WHERE root = ? AND release_mbid = ? "
+                        "AND state = 'missing' ORDER BY id", (root, release_mbid))]
+                    recent = [entry for entry in missing if entry[0] in just_gone]
+                    older = [entry for entry in missing if entry[0] not in just_gone]
+                    first = pair_moved(paths, recent)
+                    pairs.update(first)
+                    pairs.update(pair_moved([path for path in paths if path not in first], older))
+
+                for path in unpaired:
+                    self._index_write(connection, root, path, scanned[path], now, pairs.get(path))
+                    written += 1
+                return written, len(gone)
+
+        try:
+            written, gone = await asyncio.to_thread(write)
+            if written or gone:
+                logger.debug(f"store index: {written} album(s) recorded, {gone} marked missing")
+            return written, gone
+        except Exception as e:
+            logger.error(f"could not bring the store index up to date ({e})")
+            return 0, 0
+
+    @staticmethod
+    def _moving_row(connection: sqlite3.Connection, root: str, path: str):
+        """
+        The row a move or merge from `path` is about: its live one - or, when a Find or a scan
+        marked it missing in the moment between the folder leaving and this call (the folder
+        really was gone for that moment), the `missing` row there that went LAST (by gone_at, as
+        _missing_here chooses - not the highest id, which may be an older album's tombstone).
+        """
+        return connection.execute(
+            "SELECT id, state FROM store_album WHERE root = ? AND path = ? AND state IN ('present', 'missing') "
+            "ORDER BY state = 'present' DESC, gone_at DESC, id DESC LIMIT 1",
+            (root, path)).fetchone()
+
+    async def index_move(self, root: str, old_path: str, new_path: str,
+                         release_mbid: str | None = None) -> int | None:
+        """
+        The row at `old_path` lives at `new_path` now - the same row, so the same id - live again
+        if a Find or scan had just marked it missing. Nothing when there is no row there at all;
+        the re-index that follows adds one.
+
+        Should the destination already have a live row of its own (something indexed the new
+        folder first), that one is the newcomer: it is marked merged into the row that moved,
+        which is the one with a history. Except when only a TOMBSTONE is left at the old path and
+        the destination's live row carries the moving album's release (`release_mbid`; any, when
+        the caller doesn't know it): then a scan landed between the move on disk and this call and
+        has already paired the album there, and the tombstone may well be some older album's -
+        merging the live row into it would hand the album's id to that one. Nothing is done.
+        """
+        if not self.available or not root or old_path == new_path:
+            return None
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                moving = self._moving_row(connection, root, old_path)
+                if moving is None:
+                    return None
+                if moving["state"] != "present":
+                    there = connection.execute(
+                        "SELECT id, release_mbid FROM store_album WHERE root = ? AND path = ? "
+                        "AND state = 'present'", (root, new_path)).fetchone()
+                    if there is not None and (release_mbid is None or there["release_mbid"] == release_mbid):
+                        return there["id"]
+                connection.execute(
+                    "UPDATE store_album SET state = 'merged', merged_into = ?, gone_at = ?, updated_at = ? "
+                    "WHERE root = ? AND path = ? AND state = 'present' AND id != ?",
+                    (moving["id"], now, now, root, new_path, moving["id"]))
+                connection.execute(
+                    "UPDATE store_album SET path = ?, state = 'present', gone_at = NULL, updated_at = ? "
+                    "WHERE id = ?", (new_path, now, moving["id"]))
+                return moving["id"]
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not move {old_path} in the store index ({e})")
+            return None
+
+    async def index_merge(self, root: str, source_path: str, target_path: str) -> int | None:
+        """
+        The folder at `source_path` was merged into the one at `target_path` - a disc folder into
+        its release's (retag._merge_into). Its row becomes a `merged` tombstone pointing at the
+        target's (found as index_move finds it). With no row for the target, it is a move instead.
+        """
+        if not self.available or not root:
+            return None
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                source = self._moving_row(connection, root, source_path)
+                if source is None:
+                    return None
+                target = connection.execute(
+                    "SELECT id FROM store_album WHERE root = ? AND path = ? AND state = 'present'",
+                    (root, target_path)).fetchone()
+                if target is None:
+                    connection.execute(
+                        "UPDATE store_album SET path = ?, state = 'present', gone_at = NULL, updated_at = ? "
+                        "WHERE id = ?", (target_path, now, source["id"]))
+                    return source["id"]
+                connection.execute(
+                    "UPDATE store_album SET state = 'merged', merged_into = ?, gone_at = ?, updated_at = ? "
+                    "WHERE id = ?", (target["id"], now, now, source["id"]))
+                return target["id"]
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not merge {source_path} in the store index ({e})")
+            return None
+
+    async def index_gone(self, root: str, path: str, state: str) -> bool:
+        """The live row at `path` becomes a tombstone: `missing`, `deleted` or `merged`."""
+        if not self.available or not root or state not in STORE_ALBUM_STATES or state == "present":
+            return False
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                cursor = connection.execute(
+                    "UPDATE store_album SET state = ?, gone_at = ?, updated_at = ? "
+                    "WHERE root = ? AND path = ? AND state = 'present'",
+                    (state, now, now, root, path))
+                return cursor.rowcount > 0
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not mark {path} {state} in the store index ({e})")
+            return False
+
+    async def _index_read(self, sql: str, params: tuple, what: str) -> list[dict]:
+        if not self.available:
+            return []
+
+        def read():
+            with self._connect() as connection:
+                return [_index_row(row) for row in connection.execute(sql, params).fetchall()]
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not read {what} from the store index ({e})")
+            return []
+
+    async def index_present(self, root: str, release_mbid: str | None) -> list[dict]:
+        """Every live folder indexed as this release - two or more for a set stored one per disc."""
+        if not root or not release_mbid:
+            return []
+        return await self._index_read(
+            "SELECT * FROM store_album WHERE root = ? AND release_mbid = ? AND state = 'present' ORDER BY path",
+            (root, release_mbid), "a release")
+
+    async def index_pressings(self, root: str, release_group_mbid: str | None,
+                              excluding_release: str | None) -> list[dict]:
+        """Every live folder of this album (release group) that is some OTHER pressing."""
+        if not root or not release_group_mbid:
+            return []
+        return await self._index_read(
+            "SELECT * FROM store_album WHERE root = ? AND release_group_mbid = ? AND state = 'present' "
+            "AND COALESCE(release_mbid, '') != ? ORDER BY path",
+            (root, release_group_mbid, excluding_release or ""), "an album's pressings")
+
+    async def index_count(self, root: str) -> int:
+        """How many rows the index holds for this root, tombstones included."""
+        if not self.available or not root:
+            return 0
+
+        def read():
+            with self._connect() as connection:
+                return connection.execute("SELECT COUNT(*) FROM store_album WHERE root = ?", (root,)).fetchone()[0]
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not count the store index ({e})")
+            return 0
 
 
 #? slskd reports a stopped transfer as "Completed, <substate>". "Succeeded" is the only good

@@ -24,6 +24,33 @@ In order of likelihood:
    never filed again, so a second copy of an album is left in slskd's folder, and the download
    reads *already in the store*. See [organizing](organizing.md).
 
+## Find says "Already downloading", but nothing is
+
+**Find** won't search for a pressing while a download of all of it is queued or arriving, and
+names the user it's coming from. Open **Downloads**: the download is there, and cancelling it (or
+letting it fail) lets **Find** search again. A download of only part of it, such as one disc's
+folder, doesn't stop the search: it's a note above the results.
+
+"Already downloaded", with "being filed into your library now", means every file has arrived and
+it's being filed. That takes seconds. A download that finished while organizing was off is never
+filed later, and stops counting two minutes after it finished. One that stopped part-way through
+being filed, because deadwax was restarted mid-filing, stops counting an hour after filing began.
+
+## Find says you have only some of a pressing you have all of
+
+The note ("You have 9 of 10 tracks of this pressing") counts the release's tracks in the folder,
+matching each file by its title, and by its disc and track number when the title isn't the
+release's. A file whose title and numbers are both different from MusicBrainz's (a track tagged by
+hand, or from another database) isn't counted. Applying the release to the album in the library
+tab's metadata editor gives every file the release's titles and numbers, and then it counts. The
+search still runs, so nothing is lost meanwhile.
+
+## Find says "Already in your library", but I want another copy
+
+deadwax won't fetch a second copy of a pressing you have complete. The panel names the folder. To
+replace it, delete the album in the library tab first, then **Find** again. A different pressing
+of the same album is searched as usual, with a note that you have the other one.
+
 ## The slskd pill is red
 
 - **`CONNECTION_ERROR`**: slskd can't be reached at `SLSKD_URL` from inside the container. Use

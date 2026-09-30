@@ -121,6 +121,29 @@ export function creditIds(credit: ArtistCredit[] | undefined): string[] {
   return ids
 }
 
+/**
+ * Formats that are video whatever is on them. A plain "DVD" or "DVD-R" may be DVD-Audio, so it
+ * counts only by its recording's own flag - an audio track taken for video would call a part
+ * held complete and refuse a download.
+ */
+const VIDEO_FORMATS = new Set([
+  'DVD-Video', 'Blu-ray', 'Blu-ray-R', 'HD-DVD', 'VHS', 'VCD', 'SVCD', 'Betamax', 'LaserDisc',
+  'CED', 'UMD', 'DualDisc (DVD-Video side)',
+])
+
+/**
+ * A track that never arrives as an audio file: on a video medium, or of a video recording.
+ * Marked `video` so the "already have it" checks leave it out (store_index.audio_tracks). The
+ * twin of isVideoTrack() in interface/scripts/credits.mjs, which builds a download's payload;
+ * ui/test/credits.sim.cjs holds the two to the same answers.
+ */
+export function isVideoTrack(
+  medium: { format?: string | null } | undefined,
+  track: { recording?: { video?: boolean } } | undefined,
+): boolean {
+  return track?.recording?.video === true || VIDEO_FORMATS.has(medium?.format || '')
+}
+
 function flattenTracks(release: Release): Track[] {
   const tracks: Track[] = []
   let position = 0
@@ -135,7 +158,7 @@ function flattenTracks(release: Release): Track[] {
         position?: number
         length?: number | null
         'artist-credit'?: ArtistCredit[]
-        recording?: { title?: string; length?: number | null; 'artist-credit'?: ArtistCredit[] }
+        recording?: { title?: string; length?: number | null; 'artist-credit'?: ArtistCredit[]; video?: boolean }
       }
       position += 1
       //? the track's own credit, which is the release's on an ordinary album and somebody
@@ -149,6 +172,7 @@ function flattenTracks(release: Release): Track[] {
         disc_position: entry.position ?? trackIndex + 1,
         artist: creditName(credit) || null,
         artist_mbids: creditIds(credit),
+        video: isVideoTrack(medium as { format?: string | null }, entry),
       })
     }
   }

@@ -154,7 +154,7 @@ def test_the_job_says_it_was_already_in_the_store(monkeypatch):
     monkeypatch.setattr(Config, "LIBRARY_PATH", "/music")
     monkeypatch.setattr(Config, "ORGANIZE_MODE", "move")
 
-    async def organized(*args):
+    async def organized(*args, **kwargs):
         return {"organized": 0, "skipped": 10, "duplicates": 10, "failed": 0, "dry_run": False}
 
     monkeypatch.setattr(poller, "organize_job", organized)
@@ -220,7 +220,7 @@ def test_already_in_the_store_counts_the_tracks_not_a_skipped_cover(monkeypatch)
     monkeypatch.setattr(Config, "LIBRARY_PATH", "/music")
     monkeypatch.setattr(Config, "ORGANIZE_MODE", "move")
 
-    async def organized(*args):
+    async def organized(*args, **kwargs):
         return {"organized": 0, "skipped": 11, "duplicates": 10, "failed": 0, "dry_run": False}
 
     monkeypatch.setattr(poller, "organize_job", organized)

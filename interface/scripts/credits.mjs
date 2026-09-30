@@ -56,3 +56,24 @@ export function getArtistIds(artistCredit) {
     }
     return ids;
 }
+
+// ------------------------------------------------------------------ one rule about tracks
+//
+// Here for the same reason as the credit helpers: main.js builds a download's payload with it,
+// and flattenTracks() in ui/src/lib/release.ts builds the editor's with its TypeScript twin,
+// isVideoTrack() - ui/test/credits.sim.cjs asks both the same cases.
+//
+// A track that never arrives as an audio file: one on a video medium, or of a recording
+// MusicBrainz marks as video. Marked `video` on the payload so the "already have it" checks
+// leave it out (store_index.audio_tracks) - otherwise a CD+DVD deluxe held whole could never
+// read as complete. Only formats that are video whatever is on them: a plain "DVD" or "DVD-R"
+// may be DVD-Audio, so it counts only by its recording's own flag. (Getting it wrong the other
+// way - an audio track taken for video - would call a part held complete and refuse a download.)
+const VIDEO_FORMATS = new Set([
+    'DVD-Video', 'Blu-ray', 'Blu-ray-R', 'HD-DVD', 'VHS', 'VCD', 'SVCD', 'Betamax', 'LaserDisc',
+    'CED', 'UMD', 'DualDisc (DVD-Video side)',
+]);
+
+export function isVideoTrack(medium, track) {
+    return track?.recording?.video === true || VIDEO_FORMATS.has(medium?.format || '');
+}

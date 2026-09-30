@@ -22,6 +22,68 @@ press **Re-search** (or Enter) to search for exactly what you typed instead. An 
 Close the panel or start another **Find** mid-search, and the search is stopped in slskd as
 well: only the newest search's answer is ever shown.
 
+## When you already have it
+
+Before it searches, **Find** looks for the pressing you picked in your library and in your
+downloads, by its MusicBrainz release id:
+
+- **Already in your library**: every track of that pressing is there. Soulseek isn't searched.
+  The panel shows the folder, how many of its tracks it holds ("10 of 10 tracks") and in what
+  format, and there's nothing to download.
+- **Already downloading**: a download of that whole pressing is queued or arriving. Soulseek
+  isn't searched for this either. The panel names the user it's coming from and how far it has
+  got ("queued", "4 of 10 files"). To try another user, cancel it in Downloads and press **Find**
+  again.
+- **Part of it downloading**: a download of only some of its tracks is under way, such as one
+  disc's folder on its own (fewer files than the pressing has tracks). It will never bring the
+  rest, so the search runs as usual, with a note above the results naming the user and how far
+  it has got.
+- **Already downloaded**: every file of a download of it has arrived and it's being filed into
+  your library right now. There's nothing to cancel; once it's filed, **Find** says what your
+  library holds of it.
+- **Part of it held**: the library has some of its tracks but not all. The search runs as usual,
+  with a note above the results: "You have 9 of 10 tracks of this pressing, in *folder*." The
+  note then says what a download would do, because that depends on where it would be filed:
+  - "Downloading it files only the tracks that folder doesn't have yet": the part you have is
+    in the folder a download of it is filed into, so the tracks already there aren't filed a
+    second time.
+  - "A download would be filed separately, in *folder*, rather than fill in that folder": the
+    part you have is in a folder named some other way (by Picard, or by an older folder naming
+    template), so a download is filed as a separate folder, tracks you have included.
+- **Another pressing of the same album held**: the search runs, with a note for each pressing
+  you have, "You also have another pressing:" and its edition (or year), format and folder. This
+  note shows beside the others as well.
+
+What counts as held is checked on disk every time: the folder has to still be there, with its
+files tagged as that release (deadwax reads the first one), and what's counted is the release's
+tracks it holds. Each file is matched to a track by its title first, so a set numbered across
+its discs, or a stray disc number, still counts; a file whose title isn't the release's (or
+that has none) is matched by its disc and track number instead. A track you have twice, as FLAC
+and MP3 say, counts once, and audio that isn't one of its tracks doesn't count. A folder whose first file
+isn't tagged as that release, such as one shared with untagged files from before deadwax,
+doesn't count, so the download goes ahead and filing skips whatever tracks the folder already
+has (see [organizing](organizing.md)). An album copied in by another program counts once a scan
+has seen it: opening the library tab, or **Rescan**. A card's **Find** that couldn't pick a
+pressing, because MusicBrainz didn't answer, has no release id and isn't checked.
+
+The tracks of a DVD-Video or Blu-ray in a pressing (a deluxe edition's concert film, say), and
+any track MusicBrainz lists as a video, aren't counted: they never arrive as audio, so a pressing
+is complete once you have all of its audio. A plain "DVD" is counted as audio unless MusicBrainz
+marks its tracks as video, since it may be a DVD-Audio disc.
+
+The same check stops a second copy getting through another way:
+
+- **Download** is refused, and the row in Downloads says why ("already in your library: *folder*"
+  or "already downloading from *user*"), when the album was filed or started somewhere else (in
+  another tab, say) after the panel opened. Two presses at once only ever queue one download. A
+  download of only part of the pressing refuses nothing.
+- **↻ retry** and **↻ next peer** don't start a download again once that pressing has been filed
+  complete, while another download of all of it is under way, or when the download has already
+  been retried meanwhile (from another tab, or by `AUTO_RETRY_PEER`) or cleared from the list.
+  The row shows the reason while it is still stopped. `AUTO_RETRY_PEER` makes the same check,
+  and says why it didn't retry in the event log (except when a click on the row got there first,
+  which isn't a failure).
+
 ## Reading a candidate
 
 Each row is one folder on one user's share, or one set of folders: an album shared one folder

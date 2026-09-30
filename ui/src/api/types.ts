@@ -45,6 +45,8 @@ export interface Track {
   /** The track's own credit, where it differs from the release's — a split, a compilation. */
   artist?: string | null
   artist_mbids?: string[]
+  /** On a video medium, or a video recording: never an audio file (lib/release.ts isVideoTrack). */
+  video?: boolean
 }
 
 /**
@@ -212,6 +214,66 @@ export interface FindCandidatesResponse {
   queries?: string[]
   response_count: number
   candidates: Candidate[]
+  /**
+   * This pressing as the library holds it, looked at on disk (step 2, src/store_index.py
+   * held_copy). `complete` means Soulseek wasn't searched at all and `candidates` is empty;
+   * otherwise it is a note above the results. Absent or null when none of it is held.
+   */
+  held?: HeldPressing | null
+  /** A download of the WHOLE pressing already in flight - nothing was searched. */
+  downloading?: DownloadInFlight | null
+  /**
+   * A download of only PART of it in flight (a lone disc folder, fewer files than the pressing
+   * has audio tracks) - a note above the results; it will never bring the rest.
+   */
+  downloading_part?: DownloadInFlight | null
+  /** The album's OTHER pressings the library holds, one per folder. */
+  other_pressings?: OtherPressing[]
+}
+
+export interface HeldPressing {
+  /** Relative to the library - the first folder, when a set is stored one folder per disc. */
+  path: string
+  paths: string[]
+  artist: string
+  album: string
+  edition: string
+  /**
+   * Distinct tracks of the release held across those folders, read from the files just now - a
+   * track held twice (FLAC and MP3) counts once, audio that is no track of it not at all.
+   */
+  track_count: number
+  /** The release's AUDIO tracks (a DVD's aren't counted), 0 when no tracklist was sent. */
+  expected_tracks: number
+  /** File extensions, lowercase - 'flac'. */
+  formats: string[]
+  complete: boolean
+  /**
+   * Held in part: whether a download would be filed INTO one of these folders (filing then files
+   * only what that folder lacks), rather than as a separate copy beside them.
+   */
+  fills_gaps: boolean
+  /** Where a download would be filed, relative to the library - null when it couldn't be told. */
+  filed_to: string | null
+}
+
+export interface DownloadInFlight {
+  job_id: number
+  /** queued | downloading | organizing | complete (downloaded, being filed this moment) */
+  status: string
+  username: string
+  files: number
+  /** How many have arrived, when slskd said. */
+  done_files?: number
+}
+
+export interface OtherPressing {
+  path: string
+  release_mbid: string | null
+  edition: string
+  year: string
+  track_count: number
+  formats: string[]
 }
 
 export interface EnqueueRequest {

@@ -1,6 +1,6 @@
 import { init} from './init.js';
 import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel } from './sort.mjs';
-import { getArtistIds, getArtistNames, getCurrentArtistNames } from './credits.mjs';
+import { getArtistIds, getArtistNames, getCurrentArtistNames, isVideoTrack } from './credits.mjs';
 import { chooseBase, diffTracklists, formatSeconds, releaseTracks, representativeRelease, summarizeDiff } from './tracklistDiff.mjs';
 import { buildOwnedIndex, describeFolders, describeGroupOwnership, ownedForGroup, ownedForRelease } from './owned.mjs';
 import { isAbort, latestOnly } from './latest.mjs';
@@ -943,6 +943,9 @@ function buildExpectedFromRelease(release, releaseGroupContext) {
                 disc_position: track.position ?? trackIndex + 1,
                 artist: credit ? getArtistNames(credit) : null,
                 artist_mbids: getArtistIds(credit),
+                // on a DVD or Blu-ray, or a video recording: never an audio file, so the
+                // "already have it" checks leave it out (isVideoTrack, in step with release.ts)
+                video: isVideoTrack(medium, track),
             });
         });
     });

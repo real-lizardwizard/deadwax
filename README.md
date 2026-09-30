@@ -97,7 +97,7 @@ It's the same app under a new name, and 0.7.0 is the first release under it. Poi
 | `:latest` | **the current release** — slskd direct, no Lidarr. 1.0.0 onward, and what the settings above describe. |
 | `:1.0.0` etc | pinned releases of that same line (0.6.20 and older are under the old `jimbrainz` image name) |
 | `:experimental` | `main`, rebuilt on every push. Ahead of `:latest` until the next release is tagged, and moves under you. |
-| `:player` | the `player-spike` branch: the phone player on trial, ahead of the multi-user work. Versioned `1.1.0-player.N`, rebuilt on every push, and moves under you. |
+| `:player` | the `player-spike` branch: the phone player and the multi-user work on trial, on their way to 2.0.0. Versioned `2.0.0-player.N` (`1.1.0-player.N` before 2.0.0-player.7), rebuilt on every push, and moves under you. |
 | `:0.2.1` and older | the original Lidarr-based line (git tag `v0.2.1`). Does **not** understand the settings above. |
 
 > **If you were already pulling `:latest` from before 0.3.0, read this.** Up to 0.2.1 that tag was the Lidarr-based version. From **0.3.0 onward it is this slskd-direct rewrite**, which has no Lidarr support at all and takes different settings. Pulling `:latest` will replace one with the other. Pin **`:0.2.1`** if you want the Lidarr version to keep working.
@@ -171,6 +171,8 @@ Search results say which albums are already in your library — <em>In your libr
 It goes by the MusicBrainz ids in your tags, so it knows the <em>pressing</em>, not just the album: every album deadwax filed or corrected has them. A folder with no ids at all, from a library older than deadwax, can only be matched by artist and album name, so it says <em>Maybe in your library</em> — the name can't tell which edition it is. Matching its release in the metadata editor settles it.
 <br><br>
 The marks come from the saved scan, so they cost nothing and never hold a search up. Anything deadwax does to the library — filing a download, applying a release, deleting — is caught up on by the next search, and an album filed while you're looking marks itself. Something copied in by another program appears after a Rescan, as it does in the library tab.
+<br><br>
+<strong>Find</strong> won't fetch what you already have. On a pressing that's in your library complete it doesn't search Soulseek at all, and says where the album is, how many tracks and in what format; on one that's already downloading in full it names the user it's coming from and how far it has got. A pressing you have only part of is searched as usual, with a note saying which of its tracks you have and whether a download would fill in that folder or be filed as a separate one; a download of part of it already running (one disc's folder, say) and any other pressing of the album you hold are noted too. It's checked on disk each time, not taken on the scan's word, and it counts the pressing's tracks, not files: each file is matched by its title, then its number, and the same track as FLAC and MP3 is one. A deluxe edition's DVD or Blu-ray isn't waited for, since its tracks never arrive as audio. A second tab, a double click or two retries at once can't sneak a second copy through either: the download is refused, and the row in Downloads says why.
 </details>
 
 ### Downloads that remember what they're for

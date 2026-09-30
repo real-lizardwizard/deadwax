@@ -20,7 +20,8 @@ from src.logger import logger
 from src.lyrics import fetch_album_lyrics
 from src.organizer import organize_job, remove_empty_incomplete_dirs, remove_incomplete_downloads
 from src.peer_speed import RateAccumulator, measured_rate, observe
-from src.store import index_transfers_by_user, settled_transfer_ids, summarize_transfers
+from src.store import RETRYABLE_STATUSES, index_transfers_by_user, settled_transfer_ids, summarize_transfers
+from src.store_index import already_have, filing_finished, filing_started, index_folder, release_lock
 
 
 POLL_INTERVAL_SECONDS = 5.0
@@ -177,10 +178,28 @@ async def _organize_if_enabled(job: dict, store) -> None:
 
     await store.update_status(job["id"], "organizing")
 
+    #? the album folder being filed, from the moment the plan names it until the index has it: a
+    #? scan landing mid-copy must not pair it with some other copy's tombstone (store_index)
+    filing: list[str | None] = []
+
+    def plan_made(plan: dict) -> None:
+        filing.append(filing_started(Config.LIBRARY_PATH or "", plan.get("album_dir")))
+
     try:
         results = await organize_job(
-            job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, Config.ORGANIZE_MODE
+            job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, Config.ORGANIZE_MODE, on_plan=plan_made
         )
+
+        #? Whatever the status says below - organized, or complete with some files failed -
+        #? tracks were placed, so the store index learns the folder (step 2). BEFORE the status
+        #? moves on from `organizing`: until then a Find of this release sees the job in flight,
+        #? and after it the index has to be able to say the album is here, or there is a moment
+        #? where neither is true and a second download gets through.
+        if results.get("organized") and not results.get("dry_run"):
+            await index_folder(store, Config.LIBRARY_PATH, (results.get("plan") or {}).get("album_dir"))
+        for key in filing:
+            filing_finished(key)
+        filing.clear()
 
         if results.get("dry_run"):
             #? nothing actually moved, so don't claim it did
@@ -229,6 +248,10 @@ async def _organize_if_enabled(job: dict, store) -> None:
             extra={"frontend": True, "src": "slskd"},
         )
         await store.update_status(job["id"], "complete", f"organize failed: {e}")
+
+    finally:
+        for key in filing:
+            filing_finished(key)
 
 
 #? Lyrics lookups in flight. asyncio holds only a WEAK reference to a task, so one nobody keeps
@@ -373,6 +396,51 @@ def untried_alternatives(job: dict) -> list[dict]:
 RETRY_ASKS = 3
 
 
+def _job_release(job: dict) -> dict:
+    """The release a job is for, with its id wherever the row keeps it."""
+    release = dict(job.get("release") or {})
+    release["release_mbid"] = release.get("release_mbid") or job.get("release_mbid")
+    return release
+
+
+#? what a retry says when the job it was asked about has moved on while it waited
+MOVED_ON = "this download has already moved on - it's been retried or restarted meanwhile"
+#? ...and when it was cleared from the list while it waited
+CLEARED = "this download has been cleared from the list - search again to download it"
+
+
+def _retry_lock(job: dict) -> str | None:
+    """
+    What a retry of this job locks on: its release - or, for a job with no release id, the job
+    itself. Without that a job with no release id took no lock, so two retries of it (auto-retry
+    and a click) both got past the re-read below and asked two peers (step 2 review).
+    """
+    release_mbid = _job_release(job)["release_mbid"]
+    if release_mbid:
+        return release_mbid
+    return f"job:{job['id']}" if job.get("id") is not None else None
+
+
+async def _fresh_job(store, job: dict) -> tuple[dict, str | None]:
+    """
+    The job as it is NOW, read under the retry's lock - and why a retry mustn't go on, if so.
+
+    The caller's copy was read before the lock: the route reads it, checks it's failed, and
+    waits; auto-retry holds its copy from the poll. By the time the lock is had, another retry
+    may have moved the job to a peer - and going on with the stale copy asked slskd a second
+    time and pointed the job back at the old peer, two downloads of one album (step 2 review).
+    A row that has gone ("clear finished" while the retry waited) is not retried either: slskd
+    would fetch an album no job is watching, and nothing would ever file it. Only with the store
+    down, when nothing can be read at all, is the caller's copy all there is.
+    """
+    fresh = await store.get_job(job["id"]) if job.get("id") is not None else None
+    if fresh is None:
+        return job, (CLEARED if job.get("id") is not None and getattr(store, "available", False) else None)
+    if fresh.get("status") not in RETRYABLE_STATUSES:
+        return fresh, MOVED_ON
+    return fresh, None
+
+
 async def retry_next_peer(slskd_client, store, job: dict) -> dict:
     """
     Move a failed or cancelled job to the next peer from the list it was picked from.
@@ -383,7 +451,24 @@ async def retry_next_peer(slskd_client, store, job: dict) -> dict:
     the new folder and is queued again - the same job, carrying on - and the old attempt's settled
     transfers leave slskd's list, and its partials go too where SLSKD_INCOMPLETE_PATH is set
     (they are another peer's, so nothing will resume from them).
+
+    Not for a release that has since been filed complete, or is downloading under another job
+    (step 2), nor for a job that has itself moved on since the caller read it - it answers `moved`
+    false with that as the problem, which the row shows after a click (AUTO_RETRY_PEER, which
+    comes through here too, puts it in the log). Checked on the job as it is now, and the peers
+    asked, under the release's lock (the job's own, with no release id), as /enqueue does.
     """
+    async with release_lock(_retry_lock(job)):
+        job, problem = await _fresh_job(store, job)
+        problem = problem or await already_have(store, _job_release(job), excluding_job_id=job.get("id"))
+        if problem:
+            return {"moved": False, "username": None, "directory": None,
+                    "left": len(untried_alternatives(job)), "problem": problem}
+        return await _move_to_next_peer(slskd_client, store, job)
+
+
+async def _move_to_next_peer(slskd_client, store, job: dict) -> dict:
+    """retry_next_peer, past the check."""
     candidates = untried_alternatives(job)
     tried = list(job.get("tried") or [{"username": job["username"], "directory": job.get("directory")}])
     problem = None if candidates else "no other peers to try - search again for more"
@@ -436,7 +521,20 @@ async def retry_same_peer(slskd_client, store, job: dict) -> dict:
     "Already in progress" inside a 201 that says nothing about it, so the job is left as it was
     and the problem says to try again in a moment. When slskd's list can't be read at all,
     every file is asked for, which at worst fetches one again.
+
+    Refused, as retry_next_peer is, for a release filed complete or downloading under another
+    job since, or a job that has moved on since the caller read it (step 2), under the same lock.
     """
+    async with release_lock(_retry_lock(job)):
+        job, problem = await _fresh_job(store, job)
+        problem = problem or await already_have(store, _job_release(job), excluding_job_id=job.get("id"))
+        if problem:
+            return {"retried": False, "username": job.get("username"), "files": 0, "problem": problem}
+        return await _ask_same_peer(slskd_client, store, job)
+
+
+async def _ask_same_peer(slskd_client, store, job: dict) -> dict:
+    """retry_same_peer, past the check."""
     username = job["username"]
     files = job.get("files") or []
 
@@ -472,7 +570,8 @@ async def _auto_retry(slskd_client, store, job: dict) -> None:
     if (Config.AUTO_RETRY_PEER or "off").strip().lower() != "on" or not untried_alternatives(job):
         return
     outcome = await retry_next_peer(slskd_client, store, job)
-    if not outcome["moved"]:
+    if not outcome["moved"] and outcome["problem"] not in (MOVED_ON, CLEARED):
+        #? a click got there first, or the row went: nothing failed, so nothing is said
         logger.warning(
             f"couldn't move {job.get('artist')} - {job.get('album')} to another peer: {outcome['problem']}",
             extra={"frontend": True, "src": "slskd"},

@@ -82,6 +82,24 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
   check('a quote in a name stays inside its phrase',
         release.fieldedAlbumQuery('The "Blue" Album', 'A').split('"').length % 2, 1);
 
+  console.log('\na track that never arrives as audio - both payload builders, one answer');
+  //? what the "already have it" checks leave out (store_index.audio_tracks): a download's payload
+  //? (credits.mjs) and the editor's (release.ts) must mark the same tracks
+  const VIDEO_CASES = [
+    ['a CD track', { format: 'CD' }, { recording: { video: false } }, false],
+    ['a track on a DVD-Video', { format: 'DVD-Video' }, { recording: {} }, true],
+    ['a track on a Blu-ray', { format: 'Blu-ray' }, {}, true],
+    ['a plain "DVD" may be DVD-Audio - only its recording says', { format: 'DVD' }, { recording: { video: false } }, false],
+    ['...and when the recording is a video, it is', { format: 'DVD' }, { recording: { video: true } }, true],
+    ['a video recording on a CD (an enhanced CD\'s clip)', { format: 'CD' }, { recording: { video: true } }, true],
+    ['Blu-spec CD is a CD, whatever its name', { format: 'Blu-spec CD' }, {}, false],
+    ['no medium format and no recording', {}, undefined, false],
+  ];
+  for (const [label, medium, track, expected] of VIDEO_CASES) {
+    check(`${label} (download, credits.mjs)`, credits.isVideoTrack(medium, track), expected);
+    check(`${label} (editor, release.ts)`, release.isVideoTrack(medium, track), expected);
+  }
+
   console.log(failures ? `\n${failures} FAILED\n` : '\nall passed\n');
   process.exit(failures ? 1 : 0);
 })().catch((error) => {

@@ -14,6 +14,8 @@ from src.poller import (retry_next_peer, retry_same_peer, tidy_cancelled_later, 
                         untried_alternatives)
 from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
+from src.store_index import (already_have, describe_job, filing_folder, held_copy, in_flight,
+                             other_pressings, release_lock)
 
 router = APIRouter()
 
@@ -35,6 +37,11 @@ class Track(BaseModel):
     #? nothing anywhere saying why.
     artist: str | None = None
     artist_mbids: list[str] = Field(default_factory=list)
+    #? On a video medium (DVD-Video, Blu-ray) or a video recording: a track that never arrives as
+    #? an audio file, so the "already have it" checks leave it out (store_index.audio_tracks).
+    #? Declared for the reason everything above is - undeclared, a CD+DVD pressing held whole
+    #? could never read as complete.
+    video: bool = False
 
 
 class FindCandidatesRequest(BaseModel):
@@ -51,6 +58,20 @@ class FindCandidatesRequest(BaseModel):
     #? this pressing did. Names the folder; see build_album_dirname.
     original_year: str | None = None
     release_mbid: str | None = None
+    #? Which ALBUM the pressing belongs to, for "you also have another pressing" (step 2).
+    #? Declared because the browser has always sent it and pydantic dropped it without a word -
+    #? the trap this file's comments describe four times over.
+    release_group_mbid: str | None = None
+    #? What names an edition's folder (src/editions.py), declared for the same reason: Find works
+    #? out where a download WOULD be filed, to say truthfully whether it fills in a part already
+    #? held (store_index.filing_folder), and without these it would work out the wrong folder.
+    #? Both Find builders send the first four, as they send them to /enqueue; edition_label is
+    #? sent by nothing yet, and is here because EnqueueRelease has it and filing reads it.
+    disambiguation: str | None = None
+    media_format: str | None = None
+    country: str | None = None
+    catalog_number: str | None = None
+    edition_label: str | None = None
     edition_tags: list[str] = Field(default_factory=list)
     tracks: list[Track] = Field(default_factory=list)
     format_preference: str = "prefer_lossless"
@@ -225,6 +246,79 @@ async def unless_abandoned(request: Request, work, check_every: float | None = N
             task.cancel()
 
 
+#? how long Find waits on slskd to say how far an in-flight download has got - the answer is a
+#? nicety on a panel that isn't searching, and must not hold it up
+PROGRESS_BUDGET_SECONDS = 3.0
+
+
+async def _files_done(slskd_client, job: dict) -> int | None:
+    """How many of an in-flight job's files slskd says have arrived, or None if it won't say."""
+    try:
+        downloads = await asyncio.wait_for(slskd_client.get_downloads([job["username"]]),
+                                           timeout=PROGRESS_BUDGET_SECONDS)
+        summary = summarize_transfers(job, index_transfers_by_user(downloads))
+        return summary["files_done"] if summary["matched"] else None
+    except Exception:
+        return None
+
+
+def _nothing_here() -> dict:
+    return {"downloading": None, "downloading_part": None, "held": None, "other_pressings": []}
+
+
+async def _describe_in_flight(request: Request, job: dict) -> dict:
+    """describe_job, with how far it has got: slskd's count while it downloads, every file after."""
+    described = describe_job(job)
+    if job["status"] in OPEN_STATUSES:
+        done = await _files_done(request.app.state.slskd_client, job)
+        if done is not None:
+            described["done_files"] = done
+    else:
+        #? organizing, or complete and about to be: every file is in
+        described["done_files"] = described["files"]
+    return described
+
+
+async def _store_state(request: Request, body: "FindCandidatesRequest") -> dict:
+    """
+    What the library and the downloads already have of this pressing (step 2), for a Find:
+    {"downloading", "downloading_part", "held", "other_pressings"}. Only for a release with an
+    id - the card's fallback without a tracklist is searched as it always was. Never raises: a
+    check that fails is a check that says nothing, and the search runs.
+
+    `downloading` is a job bringing the WHOLE pressing in (as many files as it has audio tracks),
+    which stops the search. A job for part of it - a lone disc folder, a 9-of-10 folder - will
+    never bring the rest, so it is `downloading_part`, a note, and the search runs.
+    """
+    state = _nothing_here()
+    if not body.release_mbid:
+        return state
+
+    store = getattr(request.app.state, "store", None)
+    root = Config.LIBRARY_PATH or ""
+    release = body.model_dump()
+    try:
+        state["other_pressings"] = await other_pressings(store, root, body.release_group_mbid, body.release_mbid)
+        job = await in_flight(store, body.release_mbid, release=release)
+        if job is not None:
+            state["downloading"] = await _describe_in_flight(request, job)
+            return state
+
+        part = await in_flight(store, body.release_mbid, release=release, whole=False)
+        if part is not None:
+            state["downloading_part"] = await _describe_in_flight(request, part)
+        held = await held_copy(store, root, body.release_mbid, release)
+        if held is not None and not held["complete"]:
+            #? a download fills in a part only when filing would put it in that very folder
+            held["filed_to"] = await filing_folder(root, release)
+            held["fills_gaps"] = held["filed_to"] in held["paths"]
+        state["held"] = held
+    except Exception as e:
+        logger.warning(f"could not check what is already here for {body.album}: {e}")
+        return _nothing_here()
+    return state
+
+
 @router.post("/find_candidates")
 async def find_candidates(request: Request, body: FindCandidatesRequest):
     """
@@ -233,11 +327,27 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
     The ranking is the whole point - see src/matching.py. Candidates that don't match the
     requested edition are ranked down but deliberately still returned, since Soulseek folder
     names often omit edition text entirely and filtering would hide real results.
+
+    Asks first whether it is needed at all (step 2): a pressing already downloading whole, or
+    already in the library complete, isn't searched for - the answer says which, with no
+    candidates. One held in part is searched as usual, with a note saying how much is held and
+    whether a download would fill in that folder or be filed separately (store_index.
+    filing_folder); a download of part of it already running, and other pressings of the album
+    held, are notes too.
     """
     lookup = None
 
     try:
         slskd_client = request.app.state.slskd_client
+
+        #? before any search starts - a few indexed reads, and per folder held a listing and each
+        #? audio file's tags (existing_tracks), in a thread
+        store_state = await _store_state(request, body)
+        if store_state["downloading"] or (store_state["held"] and store_state["held"]["complete"]):
+            what = "downloading" if store_state["downloading"] else "in your library"
+            logger.info(f"not searching for {body.artist} - {body.album}: it is already {what}",
+                        extra={"frontend": True, "src": "slskd"})
+            return {**store_state, "query": "", "queries": [], "response_count": 0, "candidates": []}
 
         if body.query_override:
             #? typed by hand - searched exactly as typed, and only that
@@ -315,6 +425,8 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
             "queries": queries,
             "response_count": len(responses),
             "candidates": serialized,
+            #? part of it held (a note that downloading fills the gaps), and other pressings
+            **store_state,
         }
 
     except HTTPException:
@@ -408,25 +520,42 @@ def _serialize_candidate(candidate: dict) -> dict:
 
 @router.post("/enqueue")
 async def enqueue(request: Request, body: EnqueueRequest):
+    """
+    Queue a download with slskd, and record the job.
+
+    Refused with 409 when the whole release is already downloading, or already in the library
+    complete (step 2) - Find says so first, so this is the race it can't see: a second tab, a
+    double click, a panel left open while the album was filed. A job for part of it (a lone disc
+    folder) refuses nothing: it will never bring the rest. The check, slskd's enqueue and the
+    job's row are all under the release's lock, so of two at once only one reaches slskd; the
+    other finds its job. A release with no id is neither checked nor locked.
+    """
     try:
         slskd_client = request.app.state.slskd_client
         files = [f.model_dump() for f in body.files]
+        release = body.release.model_dump()
 
-        ok, reason = await slskd_client.enqueue(body.username, files)
+        async with release_lock(release.get("release_mbid")):
+            problem = await already_have(getattr(request.app.state, "store", None), release)
+            if problem:
+                #? the downloads panel shows this on the row you just asked for, as "refused: ..."
+                raise HTTPException(status_code=409, detail=problem)
 
-        if not ok:
-            #? slskd's own words where it gave any - "bob is offline" is an answer, "refused"
-            #? is a shrug. The downloads panel shows this on the row you just asked for.
-            raise HTTPException(status_code=502, detail=reason or "slskd refused the download")
+            ok, reason = await slskd_client.enqueue(body.username, files)
 
-        #? record only after slskd accepts, so a rejected download never leaves a phantom job
-        job_id = await request.app.state.store.create_job(
-            username=body.username,
-            directory=body.directory,
-            files=files,
-            release=body.release.model_dump(),
-            alternatives=[a.model_dump() for a in body.alternatives],
-        )
+            if not ok:
+                #? slskd's own words where it gave any - "bob is offline" is an answer, "refused"
+                #? is a shrug. The downloads panel shows this on the row you just asked for.
+                raise HTTPException(status_code=502, detail=reason or "slskd refused the download")
+
+            #? record only after slskd accepts, so a rejected download never leaves a phantom job
+            job_id = await request.app.state.store.create_job(
+                username=body.username,
+                directory=body.directory,
+                files=files,
+                release=release,
+                alternatives=[a.model_dump() for a in body.alternatives],
+            )
 
         return {"status": "ok", "queued": len(files), "job_id": job_id}
 

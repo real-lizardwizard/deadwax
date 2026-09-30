@@ -44,6 +44,10 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
   //? when it has runners-up left
   const stopped = job.status === 'failed' || job.status === 'cancelled'
   const canRetry = stopped && (job.alternatives_left ?? 0) > 0
+  //? why a retry didn't go ahead - said only while the row is still stopped: a click that lost to
+  //? auto-retry, or to another tab, answers "already moved on", and the row moving on is the
+  //? point, so its progress takes the line back
+  const problem = stopped ? retryProblem : null
   const percent = Math.round(job.progress || 0)
 
   const cancel = async (event: MouseEvent) => {
@@ -135,8 +139,8 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
       <div class="download-job-meta">
         <span class="text default-secondary download-job-user">{job.username}</span>
         <span class="text default-muted">·</span>
-        <span class={`download-job-detail text ${retryProblem ? 'red' : jobDetailClass(job)}`}>
-          {retryProblem ?? jobDetailText(job, liveSpeed)}
+        <span class={`download-job-detail text ${problem ? 'red' : jobDetailClass(job)}`}>
+          {problem ?? jobDetailText(job, liveSpeed)}
         </span>
         {(job.attempt ?? 1) > 1 && (
           <span class="text default-muted" title="Moved to another peer after the one before failed">
