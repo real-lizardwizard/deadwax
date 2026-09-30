@@ -184,7 +184,8 @@ disc's tracks and type it once.
   trying again.
 - **Get CD art** saves a picture of the disc itself, as `disc.jpg` (or `disc1.jpg`,
   `disc2.jpg`… per disc of a set), from the Cover Art Archive's scans of that exact release, and
-  otherwise from fanart.tv if you've set a key. Navidrome shows it for the songs on that disc.
+  otherwise from fanart.tv if you've set a key. Navidrome shows it for the songs on that disc,
+  and it's the face of the record on the phone player's [turntable](player.md#the-turntable).
   **Get CD art · N** does every album in view.
 - **Get lyrics** looks up lyrics on LRCLIB for the tracks that have none, and saves each as a
   `.lrc` beside its track. The button then reports how many it found (**Lyrics · 9 of 10**, with

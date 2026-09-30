@@ -1,8 +1,9 @@
 /**
  * You > Playback in the app: "Maximum quality" (app/QualityChoice.tsx, 2.0.0-player.9 - it was the
  * player's settings sheet, player/Settings.tsx, opened by a gear beside the Library title, until
- * the tabs) and "Gapless" (app/GaplessChoice.tsx, 2.0.0-player.10 - it was a switch on the
- * now-playing screen until then). The components themselves, compiled with the repo's TypeScript
+ * the tabs), "Gapless" (app/GaplessChoice.tsx, 2.0.0-player.10 - it was a switch on the
+ * now-playing screen until then) and "Now Playing opens as" (app/LookChoice.tsx, 2.0.0-player.11:
+ * the cover or the turntable). The components themselves, compiled with the repo's TypeScript
  * and rendered by a small stand-in for Preact into plain objects, with a document that knows which
  * element has focus.
  *
@@ -17,8 +18,12 @@
  *  - Gapless is a checkbox, and ITS TAP CALLS THE PLAYER IN THE SAME TURN: setGapless has been
  *    called by the time the click handler returns (that tap unlocks the second audio element on
  *    iOS), with the opposite of what it was.
- *  - Where they live now: You's Playback section, Gapless first, each on the storage key it always
- *    had, per device; the gear, the sheet and the switch are gone.
+ *  - "Now Playing opens as" is a radio group the same way - Cover, then Turntable - and is kept on
+ *    its own key, per device, read back as the turntable only when it says exactly that: anything
+ *    else, or storage that can't be read, is the cover.
+ *  - Where they live now: You's Playback section - Gapless, then Now Playing opens as, then Maximum
+ *    quality - each on the storage key it always had, per device; the gear, the sheet and the
+ *    switch are gone.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -33,7 +38,8 @@ const REPO = path.resolve(UI, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-settings-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', '--rootDir', 'src', '--outDir', OUT,
+  'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', 'src/app/LookChoice.tsx', 'src/state/persisted.ts',
+  '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -102,13 +108,22 @@ document.activeElement = document.body
 const define = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true })
 define('document', document)
 define('HTMLElement', FakeElement)
-define('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
+//? a storage that can be told what it holds, and to refuse, as a private window's does
+const stored = new Map()
+let refusing = false
+define('localStorage', {
+  getItem(key) { if (refusing) throw new Error('SecurityError'); return stored.has(key) ? stored.get(key) : null },
+  setItem(key, value) { if (refusing) throw new Error('QuotaExceededError'); stored.set(key, String(value)) },
+  removeItem(key) { stored.delete(key) },
+})
 
 /* ===== rendering ===== */
 
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { QualityChoice, QUALITIES } = require(path.join(OUT, 'app/QualityChoice.js'))
 const { GaplessChoice } = require(path.join(OUT, 'app/GaplessChoice.js'))
+const { LookChoice, LOOKS } = require(path.join(OUT, 'app/LookChoice.js'))
+const persisted = require(path.join(OUT, 'state/persisted.js'))
 
 //? each element of a tree, found by where it sits, keeps one FakeElement across renders; a ref names it
 function mount(component, name) {
@@ -154,8 +169,8 @@ function keyOn(view, group, key) {
   let prevented = false
   const currentTarget = {
     querySelector(selector) {
-      const rate = /\[data-rate="([^"]+)"\]/.exec(selector)?.[1]
-      const [radio] = view.find((node) => node.props?.role === 'radio' && node.props['data-rate'] === rate)
+      const [, name, value] = /\[(data-rate|data-look)="([^"]+)"\]/.exec(selector) ?? []
+      const [radio] = view.find((node) => node.props?.role === 'radio' && node.props[name] === value)
       return radio?.element ?? null
     },
   }
@@ -234,6 +249,49 @@ console.log('\n"Gapless" is a checkbox, and its tap calls the player in the same
   check('a click is the only thing it listens for', Object.keys(box().props).filter((name) => /^on[A-Z]/.test(name)), ['onClick'])
 }
 
+console.log('\n"Now Playing opens as" is a radio group too, kept on its own key')
+{
+  let look = 'cover'
+  const chosen = []
+  const view = mount(LookChoice, 'look')
+  const render = () => view.render({ look, onChange: (next) => { chosen.push(next); look = next } })
+  render()
+  //? found afresh after each render: the group's keys go by the look it was drawn with
+  const group = () => view.find((node) => node.props?.role === 'radiogroup')[0]
+  const [title] = view.find((node) => node.type === 'h3')
+  const radios = () => view.find((node) => node.props?.role === 'radio')
+  check('a radio group labelled by its heading', [!!group(), group()?.props['aria-labelledby'] === title?.props.id, title?.props.children], [true, true, 'Now Playing opens as'])
+  check('...and described by the note under it in You, as Gapless is by its own', group()?.props['aria-describedby'], 'app-look-note')
+  check('Cover, then Turntable, the cover chosen', radios().map((r) => [words(r), r.props['aria-checked'], r.props.tabIndex]), [['Cover', true, 0], ['Turntable', false, -1]])
+  check('...the words the looks are named by', LOOKS.map((l) => [l.look, l.label]), [['cover', 'Cover'], ['turntable', 'Turntable']])
+  radios()[1].props.onClick()
+  render()
+  check('a tap on Turntable picks it, and the tab stop moves with it', [chosen, radios().map((r) => [r.props['aria-checked'], r.props.tabIndex])], [['turntable'], [[false, -1], [true, 0]]])
+  document.activeElement = document.body
+  let prevented = keyOn(view, group(), 'ArrowDown')
+  render()
+  check('ArrowDown from the last wraps to the first, taking the focus', [prevented, look, document.activeElement === radios()[0].element], [true, 'cover', true])
+  prevented = keyOn(view, group(), 'ArrowLeft')
+  render()
+  check('ArrowLeft wraps back', [prevented, look, document.activeElement === radios()[1].element], [true, 'turntable', true])
+  check('any other key is left alone', [keyOn(view, group(), 'Enter'), look], [false, 'turntable'])
+
+  check('its key, per device', persisted.STORAGE_KEYS.playerOpensAs, 'deadwax-player-opens-as')
+  stored.clear()
+  check('nothing kept: the cover, as Now Playing always was', persisted.readPlayerOpensAs(), 'cover')
+  persisted.writePlayerOpensAs('turntable')
+  check('kept, and read back', [stored.get('deadwax-player-opens-as'), persisted.readPlayerOpensAs()], ['turntable', 'turntable'])
+  persisted.writePlayerOpensAs('cover')
+  check('...both ways', [stored.get('deadwax-player-opens-as'), persisted.readPlayerOpensAs()], ['cover', 'cover'])
+  const readsAs = (value) => { stored.set('deadwax-player-opens-as', value); return persisted.readPlayerOpensAs() }
+  check('the turntable only when it says exactly that', ['Turntable', 'turntable ', 'vinyl', '', '"turntable"'].map(readsAs), ['cover', 'cover', 'cover', 'cover', 'cover'])
+  refusing = true
+  let threw = false
+  try { persisted.writePlayerOpensAs('turntable') } catch { threw = true }
+  check('storage refused: the cover, and nothing thrown either way', [persisted.readPlayerOpensAs(), threw], ['cover', false])
+  refusing = false
+}
+
 console.log('\nwhere they live now')
 {
   const you = fs.readFileSync(path.join(UI, 'src/app/You.tsx'), 'utf8')
@@ -248,6 +306,10 @@ console.log('\nwhere they live now')
   check('on the same storage key, per device', /playerMaxRate: 'deadwax-player-max-rate'/.test(persisted), true)
   check('Gapless in the same section, above it, handed the player itself',
     [playback.includes('<GaplessChoice player={player} />'), playback.indexOf('<GaplessChoice') < playback.indexOf('<QualityChoice')], [true, true])
+  check('Now Playing opens as between them, handed the setting App keeps',
+    [playback.includes('<LookChoice look={opensAs} onChange={onOpensAs} />'),
+      playback.indexOf('<GaplessChoice') < playback.indexOf('<LookChoice'), playback.indexOf('<LookChoice') < playback.indexOf('<QualityChoice')],
+    [true, true, true])
   check('...on the key it always had', /playerGapless: 'deadwax-player-gapless'/.test(persisted), true)
   check('...and You no longer sends you to the now-playing screen for it', /now-playing screen/.test(playback), false)
   const nowPlaying = fs.readFileSync(path.join(UI, 'src/player/NowPlaying.tsx'), 'utf8')

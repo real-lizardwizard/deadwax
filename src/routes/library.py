@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from src.config import Config
@@ -16,7 +16,7 @@ from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, answers_to, artist_facts
 from src.api.artist_images_endpoint import ArtistImagesClient
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.config import COVER_ART_SIZES, rename_wait_seconds
-from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, plan_disc_art,
+from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, disc_face, plan_disc_art,
                           save_disc_art)
 from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, compact_for_wire, delete_album,
                          drain_cache_changes, embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
@@ -1044,6 +1044,13 @@ async def track_picture(album: str, file: str, index: int = 0):
                     headers={"Cache-Control": "private, max-age=300"})
 
 
+async def _disc_art_answer(entry: Path) -> Response:
+    """A CD art file as the two disc art routes serve it: typed by its extension, kept 5 minutes."""
+    mime = MIME_BY_EXTENSION.get(file_extension(entry.name), "image/jpeg")
+    return Response(content=await asyncio.to_thread(entry.read_bytes), media_type=mime,
+                    headers={"Cache-Control": "private, max-age=300"})
+
+
 @router.get("/disc_art")
 async def disc_art(album: str, file: str):
     """One CD art image beside an album's tracks - only names the scan counts as disc art."""
@@ -1052,9 +1059,96 @@ async def disc_art(album: str, file: str):
     if entry is None or entry.name not in find_disc_art([entry]):
         raise HTTPException(status_code=404, detail="no such image")
 
-    mime = MIME_BY_EXTENSION.get(file_extension(entry.name), "image/jpeg")
-    return Response(content=await asyncio.to_thread(entry.read_bytes), media_type=mime,
-                    headers={"Cache-Control": "private, max-age=300"})
+    return await _disc_art_answer(entry)
+
+
+async def _navidrome_release(album_id: str) -> str | None:
+    """
+    The release a Navidrome album is, by Navidrome's own reading of its files: getAlbum's
+    `musicBrainzId` (the `musicbrainz_albumid` tag). None when Navidrome can't be asked, doesn't
+    know the album, or has no release id for it - the turntable then draws its plain record.
+
+    An internal call, as album_context.py makes one: nothing of Navidrome's answer goes back to
+    the page, and the id is never joined onto a path - it is only ever Navidrome's `id` parameter.
+    """
+    try:
+        body = await navidrome.call("getAlbum", {"id": album_id})
+    except NavidromeError as e:
+        logger.debug(f"no release for Navidrome album {album_id!r}: {e}")
+        return None
+    album = body.get("album")
+    release = album.get("musicBrainzId") if isinstance(album, dict) else None
+    return release.strip() if isinstance(release, str) and release.strip() else None
+
+
+def _disc_face_entry(root: str, paths: list[str], disc: int) -> tuple[Path | None, list[str]]:
+    """
+    The record's face for one disc among the release's folders (disc_face), as an entry of its
+    folder's own listing - or None - and the indexed folders that have GONE. Every guard
+    /disc_art has: each folder inside the library (resolved, so a symlink out of it is refused),
+    and only names find_disc_art counts as disc art, found in the listing and never joined from
+    anything a caller sent. One more, for a route the phone reaches: the file itself must resolve
+    inside its folder.
+
+    A folder that simply isn't there any more - renamed or deleted outside deadwax, before a scan
+    has noticed - is not a refusal: the paths are deadwax's own index, never the caller's, and
+    warning of one "outside the library" sent whoever read the log hunting for a traversal that
+    wasn't there. It is returned as gone, for the route to mark `missing` as held_copy does.
+    """
+    library = Path(root)
+    folders: list[tuple[Path, list[Path]]] = []
+    gone: list[str] = []
+    for relative in paths:
+        directory = library / relative
+        if not is_within(directory, library):
+            logger.warning(f"refused the turntable's disc art outside the library: {relative!r}")
+            continue
+        if not directory.is_dir():
+            logger.debug(f"the turntable's disc art: {relative!r} is indexed but gone")
+            gone.append(relative)
+            continue
+        try:
+            entries = [entry for entry in directory.iterdir() if entry.is_file()]
+        except OSError:
+            continue
+        folders.append((directory, entries))
+
+    chosen = disc_face([find_disc_art(entries) for _, entries in folders], disc)
+    if chosen is None:
+        return None, gone
+    directory, entries = folders[chosen[0]]
+    entry = next(entry for entry in entries if entry.name == chosen[1])
+    return (entry if is_within(entry, directory) else None), gone
+
+
+@router.get("/disc_art/navidrome")
+async def navidrome_disc_art(request: Request, album: str = Query(..., min_length=1, max_length=256),
+                             disc: int = Query(1, ge=0, le=999)):
+    """
+    The player's turntable (2.0.0-player.11): the CD art that is the record's face, for the
+    Navidrome album playing and its disc. NOT a Navidrome relay - the page asks deadwax for a
+    file in the library, and deadwax finds it: the album's release id from Navidrome (getAlbum,
+    internally), its folder from the store index, the picture from that folder's listing
+    (`disc<N>.*`, then `disc.*` - see disc_face).
+
+    404 whenever there is no such picture - no LIBRARY_PATH, Navidrome unset or down or not
+    knowing the album, no release id, no folder in the index, no CD art in it - and the page draws
+    its plain black record with the cover as the label. Served as /disc_art serves one: a media
+    answer (GuardMedia's headers, never gzipped - MEDIA_PATHS in app.py), kept 5 minutes.
+    """
+    root = Config.LIBRARY_PATH or ""
+    release = await _navidrome_release(album) if root else None
+    store = _store(request)
+    rows = await store.index_present(root, release) if release and store is not None else []
+    entry, gone = await asyncio.to_thread(_disc_face_entry, root, [row["path"] for row in rows], disc) if rows else (None, [])
+    #? a folder that has gone becomes a `missing` tombstone, as held_copy marks one - the next scan
+    #? (or the folder coming back) revives it
+    for path in gone:
+        await store.index_gone(root, path, "missing")
+    if entry is None:
+        raise HTTPException(status_code=404, detail="no CD art for that album")
+
+    return await _disc_art_answer(entry)
 
 
 class DiscArtRequest(BaseModel):

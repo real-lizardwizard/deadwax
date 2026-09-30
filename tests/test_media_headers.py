@@ -59,8 +59,8 @@ def test_the_rest_of_the_app_is_left_alone():
 
 def test_exactly_the_media_routes_are_named():
     for path in ("/deadwax/library/art", "/deadwax/library/artist/art", "/deadwax/library/disc_art",
-                 "/deadwax/library/tracks/picture", "/deadwax/navidrome/stream/song-1",
-                 "/deadwax/navidrome/cover/al-1"):
+                 "/deadwax/library/disc_art/navidrome", "/deadwax/library/tracks/picture",
+                 "/deadwax/navidrome/stream/song-1", "/deadwax/navidrome/cover/al-1"):
         assert serves_media(path), path
 
     #? "/deadwax/library/art" as a prefix caught all of these, and kept their JSON from being gzipped

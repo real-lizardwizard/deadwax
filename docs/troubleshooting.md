@@ -377,6 +377,30 @@ own (`192 kHz to 48 kHz, 3 dB quieter`), and two rows that are new, **Why** and 
 ([the phone player](player.md#info--debug) lists them all). The **Gapless** switch that sat beside
 the album's name is a checkbox in **You**, under **Playback**, and keeps the setting it had.
 
+## The turntable shows a plain black record, not the album's CD art
+
+The record's face is the CD art deadwax holds for the album - a `disc.jpg` (or `disc2.jpg` for a
+song on disc 2) beside its tracks - and the plain record, with the cover as its label, is what it
+shows when it can't find one. In the order to check:
+
+- **The album has no CD art yet.** On the main page's Library tab, press **Get CD art** on the
+  album (it's only there while the album has none). When the Cover Art Archive and fanart.tv have
+  no picture of the disc either, there's none to be had. A `cd.jpg` that came with a download
+  doesn't count: it's whatever its sharer scanned.
+- **The album isn't tagged with a release.** deadwax finds the album's folder by the MusicBrainz
+  release id in its files, which Navidrome reads. An untagged rip has none: match a release in the
+  metadata editor, then Get CD art.
+- **Navidrome hasn't read the new tags yet, or can't be reached.** You's **Connections** says
+  whether Navidrome answers. After a retag, Navidrome notices the files by itself a few seconds
+  later.
+- **deadwax hasn't seen the folder.** It knows the library's folders from its scans and from what
+  it files; one copied in by another program is unknown until the main page's Library tab has
+  been opened (or **Rescan**).
+- **It was saved while the turntable was showing.** The turntable looks again each time the
+  now-playing screen opens: close it and open it again, or switch to the cover and back with the
+  button at the top right. (A picture replaced by hand can take up to five minutes to change: the
+  phone keeps one that long.)
+
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
 [Gapless](player.md#gapless-playback-experimental) (in **You**, under **Playback**) is an

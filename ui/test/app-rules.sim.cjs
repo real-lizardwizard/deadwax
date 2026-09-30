@@ -27,6 +27,11 @@
  *    element on iOS. It is the ONE new file on the list below, and Now Playing left it.
  *  - Nothing in Now Playing's body that can change height sits below the song's title: no
  *    readouts, the failure line above the title, the icon row a fixed height.
+ *  - The turntable (2.0.0-player.11, player/Turntable.tsx) plays or pauses from its record's
+ *    click, in the tap - the one more file on the list below - and seeks only as a finger lets
+ *    go or a key steps, never on the way. Its record and arm are OUTSIDE Now Playing's grip, so
+ *    neither starts the sheet's drag; the look is chosen in Now Playing, below App, and App keeps
+ *    only the setting; the time line takes the bar's place at one fixed height.
  *  - App moves the browser's history only through lib/appHistory.ts's router, which the routes
  *    sim drives end to end.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
@@ -97,6 +102,8 @@ const ALLOWED = {
   'player/NowPlaying.tsx': ['toggle', 'next', 'previous', 'showAirPlay'],
   //? the Gapless checkbox in You > Playback, since 2.0.0-player.10: its click calls setGapless
   'app/GaplessChoice.tsx': ['setGapless'],
+  //? the turntable's record, since 2.0.0-player.11: its click plays or pauses (a tap)
+  'player/Turntable.tsx': ['toggle'],
   //? names them for ActionsContext and calls none (pickActions)
   'app/context.ts': ['playTracks', 'toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
 }
@@ -169,6 +176,7 @@ console.log('\nthe playback actions only from the files allowed')
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
     'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
+    'player/Turntable.tsx': ['toggle'],
   })
   check('app/context.ts names them and calls none',
     [...code(read('app/context.ts')).matchAll(/\.(playTracks|toggle|next|previous|setGapless|showAirPlay)\s*\(/g)].map((m) => m[1]), [])
@@ -285,12 +293,43 @@ console.log('\nnothing below the title in Now Playing can change height')
   check('the failure line is above the title', [at('class="pl-sheet-error"') !== -1, at('class="pl-sheet-error"') < at('class="pl-sheet-title"')], [true, true])
   check('then the title, the album line, the bar, the transport, the icons',
     ['class="pl-sheet-title"', 'pl-sheet-artist', '<Scrubber ', 'class="pl-transport"', 'class="pl-sheet-footer"'].map(at).every((place, index, all) => place !== -1 && (index === 0 || place > all[index - 1])), true)
+  check('...the turntable\'s time line in the bar\'s place, one or the other',
+    /\{turntable \? <TurntableTime player=\{player\} previewing=\{previewing\} \/> : <Scrubber player=\{player\} \/>\}/.test(body), true)
   check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline">\{byline\}<\/span>/g) ?? []).length, 2)
   const footer = body.slice(at('class="pl-sheet-footer"'))
   check('the icon row: AirPlay only with a speaker, ••• always, and no dead Lyrics or Up next',
     [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /Lyrics|Up next/.test(footer)], [true, true, false])
   const css = fs.readFileSync(path.resolve(SRC, '../../interface/player/player.css'), 'utf8')
   check('...a fixed height, so AirPlay coming and going moves nothing', /\.pl-sheet-footer \{[^}]*(?<![-\w])height: var\(--pl-hit\);/.test(css), true)
+  const appCss = fs.readFileSync(path.resolve(SRC, '../../interface/player/app.css'), 'utf8')
+  check('...and the time line one line, whatever it says', /\.app-tt-time \{[^}]*white-space: nowrap;/.test(appCss), true)
+}
+
+console.log('\nthe turntable: a tap in the click, a seek as it lets go, and none of it the grip\'s')
+{
+  const table = code(read('player/Turntable.tsx'))
+  const click = /const onRecordClick = \(\) => \{([\s\S]*?)\n  \}/.exec(table)?.[1] ?? ''
+  check('the record plays or pauses from its click, nothing awaited before it',
+    [/<button\b[^>]*class="app-tt-record"[\s\S]*?onClick=\{onRecordClick\}/.test(table), /player\.toggle\(\)/.test(click), /\bawait\b|\.then\(/.test(click)], [true, true, false])
+  //? every player.seek in the file, by the handler it is in: the release and the arm's keys, never a move
+  const handlers = [...table.matchAll(/const (\w+) = [^\n]*=> \{?[\s\S]*?\n  \}/g)].map((match) => [match[1], match[0]])
+  check('it seeks only as a finger lets go or a key steps',
+    handlers.filter(([, body]) => /player\.seek\(/.test(body)).map(([name]) => name).sort(), ['onArmKey', 'onRelease'])
+  check('...and moving reaches the player not at all', /player\./.test(handlers.find(([name]) => name === 'onMove')?.[1] ?? 'player.'), false)
+  check('no frame loop and nothing from the engine\'s clock: the spin is CSS, the arm usePosition',
+    [/requestAnimationFrame|setInterval|setTimeout/.test(table), /usePosition\(player\)/.test(table), /visibilitychange/.test(table)], [false, true, true])
+  const sheet = code(read('player/NowPlaying.tsx'))
+  //? the element, not the type TurntablePreview or TurntableTime
+  const drawn = sheet.search(/<Turntable\s/)
+  const grip = sheet.slice(sheet.indexOf('class={`pl-sheet-grip'), drawn)
+  //? from inside the grip's opening tag to the turntable: every <div> opened there closed, and one
+  //? more - the grip's own
+  check('the record and the arm are outside the grip - drawn after it closes, never inside it',
+    [drawn > sheet.indexOf('class={`pl-sheet-grip'), (grip.match(/<\/div>/g) ?? []).length - (grip.match(/<div\b/g) ?? []).length], [true, 1])
+  check('the look is Now Playing\'s, opened as the setting says',
+    [/const \[look, setLook\] = useState<Look>\(openAs\)/.test(sheet), /useLayoutEffect\(\(\) => \{\s*if \(open\) setLook\(openAs\)\s*\}, \[open\]\)/.test(sheet)], [true, true])
+  const app = code(read('app/App.tsx'))
+  check('...App keeps only the setting, and never draws the turntable', [/<Turntable\b/.test(app), /setLook|otherLook/.test(app), /openAs=\{opensAs\}/.test(app)], [false, false, true])
 }
 
 console.log('\nwhat Info reads is taken in the tap, and asks the engine\'s element only')

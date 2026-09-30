@@ -92,6 +92,17 @@ export const MoreIcon = solid(
   </>,
 )
 
+/* Now Playing's look button (2.0.0-player.11), as the boards draw it: a record on the cover,
+   a square - the cover - on the turntable. */
+export const RecordIcon = thin(
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="2.5" />
+  </>,
+)
+
+export const SquareIcon = thin(<rect x="4.5" y="4.5" width="15" height="15" rx="2" />)
+
 /* ===== the tab bar's five, as the canvas boards draw them ===== */
 
 export const HomeIcon = thin(<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z" />)

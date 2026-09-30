@@ -290,3 +290,62 @@ def test_gapless_is_a_checkbox_not_a_switch():
     assert box["width"] == box["height"] == "var(--dw-checkbox)"
     assert declarations(APP, ".app-check-row")["min-height"] == "var(--dw-row)"
 
+
+
+# ---------------------------------------------------------------- the turntable (2.0.0-player.11)
+
+def test_the_record_turns_at_33_and_a_third_and_only_when_told():
+    face = declarations(APP, ".app-tt-face")
+    #? one turn in --dw-record-turn, forever - but paused, where it is, until the page says spin
+    assert face["animation"] == "app-tt-spin var(--dw-record-turn) linear infinite"
+    assert face["animation-play-state"] == "paused"
+    assert declarations(APP, ".app-tt-face.is-spinning")["animation-play-state"] == "running"
+    assert declarations(APP, "to", "@keyframes app-tt-spin")["transform"] == "rotate(360deg)"
+    #? stopped for good under reduced motion
+    assert declarations(APP, ".app-tt-face", "@media (prefers-reduced-motion: reduce)")["animation"] == "none"
+    #? its own value, never a duration reduced motion collapses to 1ms - that would spin it 1800
+    #? times faster instead of stopping it
+    assert ALL_TOKENS["--dw-record-turn"] == "1.8s"
+    collapsed = declarations(THEME_CSS, ":root", "@media (prefers-reduced-motion: reduce)")
+    assert "--dw-record-turn" not in collapsed and "--duration" not in ALL_TOKENS["--dw-record-turn"]
+
+
+def test_the_record_and_the_arm_take_every_touch_and_the_grip_only_the_top_row():
+    for selector in (".app-tt-record", ".app-tt-handle"):
+        found = declarations(APP, selector)
+        assert found["touch-action"] == "none", selector
+        assert found["-webkit-touch-callout"] == "none" and found["user-select"] == "none", selector
+    #? on the turntable the grip is the top row alone; the turntable takes the cover's room
+    assert declarations(APP, ".pl-sheet-grip.app-grip-top")["flex"] == "none"
+    assert declarations(APP, ".app-tt")["flex"] == "1 1 auto" and declarations(APP, ".app-tt")["min-height"] == "0"
+    #? the drawing's layers take no touch, so a press lands on the record or the arm's handle
+    assert declarations(APP, ".app-tt-layer")["pointer-events"] == "none"
+    assert declarations(APP, ".app-tt-sheen")["pointer-events"] == "none"
+    #? the arm's handle is a tap target at the least - but never more than a share of the plinth:
+    #? on a phone on its side the plinth can be 45px, and a 44px ring covered most of the record,
+    #? its middle included, so a tap or a turn there took the arm
+    assert declarations(APP, ".app-tt-handle")["min-width"] == "min(var(--pl-hit), var(--app-tt-handle-cap))"
+    assert ALL_TOKENS["--app-tt-handle-cap"] == "30%"
+    assert ALL_TOKENS["--pl-hit"] == "44px"  # the cap bites only on a plinth under about 147px
+
+
+def test_a_failure_line_on_the_turntable_moves_nothing_a_finger_goes_to():
+    """A failure comes and goes (the skipped-song note clears itself), and on the turntable the
+    room above the song's name is the record and the arm: taking its line from there resized and
+    moved them under a finger. So there it is laid over the plinth's foot, out of the flow."""
+    error = declarations(APP, ".app-is-turntable .pl-sheet-error")
+    assert error["position"] == "absolute" and error["bottom"] == "100%"
+    assert error["left"] == error["right"] == "0"
+    assert declarations(APP, ".app-is-turntable .pl-sheet-titles")["position"] == "relative"
+    #? two lines at most, and a press through it reaches what is under it
+    assert error["-webkit-line-clamp"] == "2" and error["overflow"] == "hidden"
+    assert error["pointer-events"] == "none"
+
+
+def test_the_look_button_is_a_tap_target_and_the_time_line_one_line():
+    button = declarations(APP, ".app-look-button")
+    assert button["width"] == button["height"] == "var(--pl-hit)"
+    assert ALL_TOKENS["--app-look-face"] == "36px"  # the boards' drawn box, inside the 44px target
+    time = declarations(APP, ".app-tt-time")
+    assert time["white-space"] == "nowrap" and time["overflow"] == "hidden"
+    assert time["font-family"] == "var(--dw-font-mono)"

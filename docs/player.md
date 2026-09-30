@@ -101,7 +101,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   names the tab it goes back to.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
-- **You**: **Gapless** ([below](#gapless-playback-experimental)) and **Maximum quality**
+- **You**: **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as**
+  ([the turntable](#the-turntable)) and **Maximum quality**
   ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
@@ -113,12 +114,13 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **Now playing**: a large cover (a grey square for an album without one), the song's title, and
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
   to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons, with
-  an **AirPlay** button when there's a speaker on the network to send to, and **•••**. Drag it
-  down, or tap the arrow at its top, to close it (Escape closes it too). While it's open nothing
-  behind it can be reached by the keyboard or VoiceOver; opening it moves to its close arrow, and
-  closing it goes back to where you were. Until 2.0.0-player.10 it also showed two lines about how
-  the song was sent and how the last song changes and seek went, and the Gapless switch: those are
-  in [Info → Debug](#info--debug) and in **You** now.
+  an **AirPlay** button when there's a speaker on the network to send to, and **•••**. The button
+  at its top right, a round record, shows it as [a turntable](#the-turntable) instead. Drag it
+  down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
+  it's open nothing behind it can be reached by the keyboard or VoiceOver; opening it moves to its
+  close arrow, and closing it goes back to where you were. Until 2.0.0-player.10 it also showed two
+  lines about how the song was sent and how the last song changes and seek went, and the Gapless
+  switch: those are in [Info → Debug](#info--debug) and in **You** now.
 - **•••** on the now-playing screen opens a short menu: **Info**, and **Go to album**, which closes
   the now-playing screen and opens the song's album in the tab you're on, as if you'd tapped it
   there.
@@ -153,6 +155,59 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **The look** is deadwax's own, the same "touch of Windows 7" as its other screens: Noto Sans,
   with monospace for track numbers and times, square-ish corners, no blur. It's drawn from the
   same fonts deadwax serves itself, so it needs no internet.
+
+## The turntable
+
+The now-playing screen has a second look, made for the phone: the song on a record turning on a
+turntable. **The button at its top right** switches between the two, for as long as the screen
+stays open - a round record on the cover, a square (the cover) on the turntable. Which one it
+opens as is **Now Playing opens as**, in **You** under **Playback**: **Cover**, the default, or
+**Turntable**. Like the other two there, it's kept on that device. The button never changes the
+setting: close the screen and open it again, and it's back to what You says.
+
+- **The record's face is the album's CD art**: the `disc.jpg` (or `.png`) that the main page's
+  **Get CD art** saves beside the tracks - see [the library](library.md#covers-cd-art-and-lyrics).
+  For a set, it's the playing song's disc's own (`disc2.jpg` for a song on disc 2), or, where the
+  disc has none of its own, a `disc.jpg` that stands for every disc. With no CD art, it's a plain
+  black record with the album's cover as its label. A `cd.jpg` that came with a download isn't
+  used: it's whatever its sharer scanned, and Get CD art is still offered beside it.
+- **Finding it**: the phone only knows Navidrome's name for the album, so deadwax asks Navidrome
+  which MusicBrainz release the album is (Navidrome reads that from the files), and finds the
+  folder filed as that release. So an album with no release id in its tags - an untagged rip -
+  always gets the plain record; match a release in the metadata editor first, as Get CD art needs
+  anyway. CD art saved while the turntable is showing appears the next time the now-playing screen
+  opens (or when you switch to the cover and back); a picture replaced by hand can take up to five
+  minutes to change, as the phone keeps one that long. [Troubleshooting](troubleshooting.md#the-turntable-shows-a-plain-black-record-not-the-albums-cd-art)
+  goes through why it might show the plain record.
+- **The record turns at 33⅓ rpm** while the song plays, and stops where it is when you pause.
+  It also stops while the phone is locked or the app is in the background, so nothing is drawn for
+  nobody. With **Reduce Motion** on (the iPhone's Settings → Accessibility → Motion), it doesn't
+  turn at all.
+- **The arm moves in from the edge of the record towards the middle** as the song plays, so where
+  it is says how far through the song you are. The line under the song's name says the time:
+  "2:31 of 7:05".
+- **Tap the record** to pause, or to play.
+- **Turn the record** to move through the song: a whole turn is 1.8 seconds, as a real record at
+  33⅓ turns, and turning it back goes back. The song keeps playing while you hold the record, and
+  moves when you let go (you don't hear it as you turn, yet): on or back by as much as you turned
+  it, from wherever it has got to. While you turn, the time line says **Scrubbing** and where
+  letting go will go.
+- **Drag the arm** to jump anywhere in the song: to the middle of the record is the end, to its
+  edge the start. It starts to move once your finger has gone a few pixels, from where the song
+  is, so a small wobble moves nothing. The song jumps when you let go; while you hold the arm, the
+  time line says **Needle up** and the time letting go will go to.
+- **From the keyboard, and with VoiceOver**, the arm is a slider like the scrubber (arrows move 5
+  seconds, Page Up and Page Down 30, Home and End to the ends), and the record is a button that
+  says whether a tap pauses or plays.
+- **Everything else is the same as on the cover**: previous, play/pause and next, and the row of
+  buttons under them. The screen still closes only by a drag down from its top row, the arrow, or
+  Escape: a drag on the record or the arm never closes it. A note that a song was skipped or
+  couldn't be played sits over the foot of the turntable, so the record and the arm never move or
+  change size when it comes and goes.
+- **On a phone on its side** the turntable is small (there's no landscape layout yet); the arm's
+  handle shrinks with it rather than covering the record.
+
+There's no hint on how to use it: the record and the arm are the instructions.
 
 ## Gapless playback (experimental)
 
@@ -623,6 +678,9 @@ question the whole player existed to answer. Still to find out:
 - **what Navidrome sends** for a song and an album: [Info → Debug](#info--debug)'s **Navidrome
   sent** lists the field names, and later parts of the app want `musicBrainzId`, `played` and
   `playCount` from it;
+- **the turntable** under a real finger: turning the record and dragging the arm without the
+  screen moving or closing, a tap on the record pausing, and whether it turns smoothly and stops
+  while the phone is locked;
 - **Info and the ••• menu** under a real finger: that Info's list scrolls and nothing behind it
   does, that a tap above it closes it, and that the Gapless checkbox in You turns gapless on from
   its tap as the switch did;

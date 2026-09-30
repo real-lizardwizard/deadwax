@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { useSheet } from '../app/useSheet'
 import { clock, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
+import { lookButtonLabel, otherLook, playingDisc, type Look } from '../lib/turntable'
+import { discArtUrl, playedAlbum } from './api'
 import { Cover } from './Cover'
-import { AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
+import {
+  AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, RecordIcon, SquareIcon,
+} from './icons'
+import { Turntable, TurntableTime, type TurntablePreview } from './Turntable'
 import { usePosition, type Player } from './usePlayer'
 
 /** How far a drag down has to go before letting go closes the sheet. */
@@ -133,6 +138,14 @@ function Scrubber({ player }: { player: Player }) {
  * A sheet like the others (app/useSheet.ts): its own scroll lock, focus in to the close button and
  * back to what opened it, Escape. It is inert while closed, and while Info or the menu is over it
  * (`covered`).
+ *
+ * TWO LOOKS (2.0.0-player.11): the cover and the bar, or the turntable (Turntable.tsx) - the
+ * record in the cover's place and a time line in the bar's. It opens as You > Playback's "Now
+ * Playing opens as" says (`openAs`), every time, and the button at the top right switches for as
+ * long as it stays open, leaving the setting alone. The look is chosen here, below App, so
+ * switching it re-renders this sheet and never the engine. The sheet still closes only from its
+ * grip - the top row alone on the turntable, whose record and arm sit OUTSIDE the grip, so neither
+ * starts the sheet's drag and the sheet's drag never starts from them.
  */
 export function NowPlaying({
   player,
@@ -142,6 +155,7 @@ export function NowPlaying({
   onClose,
   onMore,
   onAlbum,
+  openAs,
 }: {
   player: Player
   open: boolean
@@ -154,17 +168,28 @@ export function NowPlaying({
   onMore: (event: MouseEvent) => void
   /** close the sheet and open the song's album */
   onAlbum: () => void
+  /** You > Playback's "Now Playing opens as": the look it opens in, every time */
+  openAs: Look
 }) {
   const track = player.track
   const [dragY, setDragY] = useState(0)
   const drag = useRef<{ pointer: number; startY: number; captured: boolean } | null>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
+  //? the look showing: the setting's as it opens, switched by the button while it stays open
+  const [look, setLook] = useState<Look>(openAs)
+  const [previewing, setPreviewing] = useState<TurntablePreview>(null)
 
   //? the page behind must not scroll under a finger on the sheet; focus goes to the close button -
   //? the first thing in it - as it opens, since everything behind it is inert now (App)
   useSheet({ open, covered, onClose, lockClass: 'pl-sheet-open', first: closeButton, opener })
 
+  //? every opening starts as the setting says, before the paint - never as the button left it
+  useLayoutEffect(() => {
+    if (open) setLook(openAs)
+  }, [open])
+
   if (!track) return null
+  const turntable = look === 'turntable'
 
   const onPointerDown = (event: PointerEvent) => {
     drag.current = { pointer: event.pointerId, startY: event.clientY, captured: false }
@@ -202,15 +227,17 @@ export function NowPlaying({
 
   return (
     <div
-      class={`pl-sheet${open ? ' is-open' : ''}${dragY ? ' is-dragging' : ''}`}
+      class={`pl-sheet${open ? ' is-open' : ''}${dragY ? ' is-dragging' : ''}${turntable ? ' app-is-turntable' : ''}`}
       style={open && dragY ? { transform: `translateY(${dragY}px)` } : undefined}
       aria-hidden={!open || covered}
       inert={!open || covered}
     >
       <Cover id={track.coverArt} size={300} class="pl-sheet-backdrop" />
 
+      {/* the sheet's drag to close starts here and nowhere else: the top row and the cover - and
+          on the turntable only the top row, the record and the arm being outside it */}
       <div
-        class="pl-sheet-grip"
+        class={`pl-sheet-grip${turntable ? ' app-grip-top' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}
@@ -219,19 +246,39 @@ export function NowPlaying({
         //? with any picture, and cancel the pointer - the sheet stopped following it mid-drag.
         onDragStart={(event) => event.preventDefault()}
       >
-        <button ref={closeButton} type="button" class="pl-sheet-close" onClick={onClose} aria-label="Close">
-          <ChevronDownIcon class="pl-icon" />
-        </button>
-        <div class={`pl-sheet-art${player.playing ? '' : ' is-paused'}`}>
-          <Cover id={track.coverArt} size={1000} class="pl-sheet-cover" />
+        <div class="app-np-top">
+          <button ref={closeButton} type="button" class="pl-sheet-close" onClick={onClose} aria-label="Close">
+            <ChevronDownIcon class="pl-icon" />
+          </button>
+          {/* the other look, for as long as this stays open - the setting is You's */}
+          <button type="button" class="app-look-button" onClick={() => setLook(otherLook(look))} aria-label={lookButtonLabel(look)}>
+            <span class="app-look-face">
+              {turntable ? <SquareIcon class="app-look-icon" /> : <RecordIcon class="app-look-icon" />}
+            </span>
+          </button>
         </div>
+        {!turntable && (
+          <div class={`pl-sheet-art${player.playing ? '' : ' is-paused'}`}>
+            <Cover id={track.coverArt} size={1000} class="pl-sheet-cover" />
+          </div>
+        )}
       </div>
+
+      {turntable && (
+        <Turntable
+          player={player}
+          open={open}
+          discArt={discArtUrl(track.albumId, playingDisc(playedAlbum(track.albumId)?.song, track.id))}
+          onPreview={setPreviewing}
+        />
+      )}
 
       <div class="pl-sheet-body">
         <div class="pl-sheet-titles">
           {/* A failure comes and goes, so it is ABOVE the title: the body sits against the bottom
               of the sheet, and a line appearing here moves the cover - never the album line, the
-              bar or the buttons under a finger. */}
+              bar or the buttons under a finger. On the turntable, where that room is the record
+              and the arm, app.css lays it over the plinth's foot instead, out of the flow. */}
           {player.error && <p class="pl-sheet-error">{player.error}</p>}
           <h2 class="pl-sheet-title">{track.title}</h2>
           {/* one box either way, so which it is never moves the bar; the ellipsis is the span's,
@@ -247,7 +294,7 @@ export function NowPlaying({
           )}
         </div>
 
-        <Scrubber player={player} />
+        {turntable ? <TurntableTime player={player} previewing={previewing} /> : <Scrubber player={player} />}
 
         <div class="pl-transport">
           <button type="button" class="pl-transport-button" onClick={player.previous} aria-label="Previous">

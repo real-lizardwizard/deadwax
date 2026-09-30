@@ -71,7 +71,7 @@ exports.root = (component) => {
 fs.writeFileSync(path.join(OUT, 'player/Cover.js'), 'exports.Cover = function Cover() { return null }\n')
 fs.writeFileSync(path.join(OUT, 'player/icons.js'), `
 const glyph = (name) => { const f = function () { return null }; Object.defineProperty(f, 'name', { value: name }); return f }
-for (const name of ['ChevronRightIcon', 'ChevronDownIcon', 'AirPlayIcon', 'MoreIcon', 'NextIcon', 'PauseIcon', 'PlayIcon', 'PreviousIcon', 'CheckIcon']) exports[name] = glyph(name)
+for (const name of ['ChevronRightIcon', 'ChevronDownIcon', 'AirPlayIcon', 'MoreIcon', 'NextIcon', 'PauseIcon', 'PlayIcon', 'PreviousIcon', 'CheckIcon', 'RecordIcon', 'SquareIcon']) exports[name] = glyph(name)
 `)
 fs.writeFileSync(path.join(OUT, 'player/usePlayer.js'), 'exports.usePosition = () => 0\n')
 
@@ -424,7 +424,7 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   let closes = 0
   const view = mount(NowPlaying, 'now playing')
   const draw = (open, covered = false) => view.render({
-    player, open, covered, opener: openerRef, onClose: () => { closes += 1 }, onMore: () => {}, onAlbum: () => {},
+    player, open, covered, opener: openerRef, onClose: () => { closes += 1 }, onMore: () => {}, onAlbum: () => {}, openAs: 'cover',
   })
   const sheet = () => one(view, byClass('pl-sheet'))
   const close = () => one(view, byClass('pl-sheet-close'))
@@ -442,18 +442,18 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
   check('the icon row: ••• only, with no speaker to send to', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['More: info, go to album'])
   let albums = 0
-  view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 } })
+  view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
   check('...and a tap on it asks App to go there', albums, 1)
   //? a song whose album the queue has no id for: the same line, as words that go nowhere
   const lone = { ...player, track: queueTrack({ albumId: null }), airplay: true }
-  view.render({ player: lone, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 } })
+  view.render({ player: lone, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   check('no album id: the line is words, not a button, in the same box',
     [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
     [0, 'Pink Floyd — Wish You Were Here'])
   check('...••• says the menu holds only Info, and AirPlay sits before it with a speaker there',
     view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'More: info'])
-  view.render({ player: { ...player, error: 'Skipped "Shine On" - it wouldn\'t play' }, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {} })
+  view.render({ player: { ...player, error: 'Skipped "Shine On" - it wouldn\'t play' }, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover' })
   const titles = one(view, byClass('pl-sheet-titles')).props.children.filter(Boolean)
   check('a failure is drawn above the title, never under it', titles.map((node) => node.props.class.split(' ')[0]), ['pl-sheet-error', 'pl-sheet-title', 'pl-sheet-artist'])
 }

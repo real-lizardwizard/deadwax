@@ -26,6 +26,8 @@ from src import __version__
 MEDIA_PATHS = frozenset({
     "/deadwax/library/art", "/deadwax/library/artist/art", "/deadwax/library/disc_art",
     "/deadwax/library/tracks/picture",
+    #? the player's turntable face (2.0.0-player.11): CD art found by a Navidrome album id
+    "/deadwax/library/disc_art/navidrome",
 })
 #? The player's, whose ids are in the path.
 MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/")

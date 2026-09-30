@@ -16,9 +16,11 @@
  *  - Each connection row is a live region of its own, read whole, so VoiceOver hears "slskd,
  *    NOT_LOGGED_IN", not a bare word with no service - and the list itself is not one.
  *  - The link to the main page opens beside the app.
- *  - Playback holds Gapless and then Maximum quality (2.0.0-player.10): Gapless is handed the
- *    player itself - the object whose setGapless its tap calls - and the notes say where the
- *    settings are kept and when each applies, with no pointer to the now-playing screen.
+ *  - Playback holds Gapless, then "Now Playing opens as" (2.0.0-player.11), then Maximum quality:
+ *    Gapless is handed the player itself - the object whose setGapless its tap calls - the look
+ *    the setting App keeps and App's way to change it, and the notes say where the button that
+ *    switches looks is, where the settings are kept and when each applies, with no pointer to the
+ *    now-playing screen.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -102,6 +104,9 @@ globalThis.__you = {
   },
 }
 const ME = { user: 'local', admin: true, auth: 'off', version: '2.0.0-player.9' }
+//? "Now Playing opens as", as App hands it to You: the setting, and the way to change it
+const chosenLooks = []
+const LOOK = { opensAs: 'turntable', onOpensAs: (look) => chosenLooks.push(look) }
 const answersWith = (value) => () => Promise.resolve(value)
 const failsWith = (words) => () => Promise.reject(new Error(words))
 
@@ -157,16 +162,16 @@ const checkAgain = () => find((node) => node.type === 'button' && text(node) ===
 
 async function main() {
   console.log('\nnothing is asked until You first shows')
-  draw({ shown: false })
+  draw({ shown: false, ...LOOK })
   await settle()
   check('hidden, never opened: no ping, no /me', asked, { me: 0, musicbrainz: 0, slskd: 0, navidrome: 0 })
 
   console.log('\n/deadwax/me asked with the pings, and asked again')
   meAnswers.push(failsWith('deadwax is restarting'))
-  draw({ shown: true })
+  draw({ shown: true, ...LOOK })
   check('shown: /me and the three pings, once each', asked, { me: 1, musicbrainz: 1, slskd: 1, navidrome: 1 })
   await settle()
-  draw({ shown: true })
+  draw({ shown: true, ...LOOK })
   check('/me failed: the version and logins say they are not known', about(), { Version: 'unknown', Logins: 'unknown' })
   check('...the failure is said', failure(), ["deadwax didn't answer: deadwax is restarting"])
   check('...and the identity line claims nothing', identity(), [])
@@ -175,17 +180,17 @@ async function main() {
   meAnswers.push(answersWith(ME))
   checkAgain().props.onClick()
   check('"Check again" asks /me again, with the pings', asked, { me: 2, musicbrainz: 2, slskd: 2, navidrome: 2 })
-  draw({ shown: true })
+  draw({ shown: true, ...LOOK })
   check('...the old failure cleared as the ask begins', [failure(), about().Version], [[], '…'])
   await settle()
-  draw({ shown: true })
+  draw({ shown: true, ...LOOK })
   check('deadwax back: the version and logins, and nothing failed', [about(), failure()], [{ Version: '2.0.0-player.9', Logins: 'Off' }, []])
   check('...and the identity line says what deadwax said', identity(), ['Logins are off'])
 
   meAnswers.push(failsWith('no answer'))
   checkAgain().props.onClick()
   await settle()
-  draw({ shown: true })
+  draw({ shown: true, ...LOOK })
   check('a failed ask after a good one keeps the version, and says it failed', [about().Version, failure()], ['2.0.0-player.9', ["deadwax didn't answer: no answer"]])
 
   console.log('\neach connection row is read whole')
@@ -199,7 +204,7 @@ async function main() {
     'NavidromeNavidrome 0.64.2',
   ])
 
-  console.log('\nPlayback: Gapless, then Maximum quality')
+  console.log('\nPlayback: Gapless, then Now Playing opens as, then Maximum quality')
   const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
   const playback = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-playback-title')[0]
   const inPlayback = []
@@ -212,13 +217,19 @@ async function main() {
     visit(node.props?.children)
   }
   visit(playback)
-  check('both in the Playback section, Gapless first', inPlayback, ['GaplessChoice', 'QualityChoice'])
+  check('all three in the Playback section: Gapless, then Now Playing opens as, then Maximum quality', inPlayback, ['GaplessChoice', 'LookChoice', 'QualityChoice'])
   check('Gapless is handed the player itself', named('GaplessChoice')[0]?.props.player === globalThis.__you.player, true)
-  check('the notes: what Gapless does, and where both are kept', notes, [
+  const look = named('LookChoice')[0]
+  look?.props.onChange('cover')
+  check('Now Playing opens as is handed App\'s setting, and App\'s way to change it', [look?.props.look, chosenLooks], ['turntable', ['cover']])
+  check('the notes: what Gapless does, where the button is, and where all three are kept', notes, [
     'An experiment: it shortens the pause between songs, and FLAC songs played one after another can join in one stream, with none at all.',
-    'Both are kept on this device. Maximum quality is used from the next song.',
+    'The button at the top right of Now Playing switches between them until it closes.',
+    'All three are kept on this device. Maximum quality is used from the next song.',
   ])
   check('...the first is what the checkbox is described by', find((node) => node.props?.id === 'app-gapless-note').map(text).length, 1)
+  check('...the second what the looks are: the one note by that id, the button\'s',
+    find((node) => node.props?.id === 'app-look-note').map(text), ['The button at the top right of Now Playing switches between them until it closes.'])
 
   console.log('\nthe main page opens beside the app')
   const link = find((node) => node.type === 'a')[0]

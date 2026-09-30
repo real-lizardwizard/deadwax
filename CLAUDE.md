@@ -201,7 +201,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". Since
                    2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
                    with the player inside them - see "The one app".
-tests/             1833 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1853 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -3936,8 +3936,9 @@ the `/deadwax/me` seam, and disc titles on the album page.
   - The playback actions (playTracks, toggle, next, previous, setGapless, showAirPlay) are reached
     only from an allowlist: AlbumPage (playTracks), MiniPlayer (toggle, next), NowPlaying (toggle,
     next, previous, showAirPlay), GaplessChoice (setGapless, since 2.0.0-player.10 moved Gapless to
-    You), and `app/context.ts`, which names them and calls none. Adding a file is a deliberate edit
-    to the sim, like the Navidrome route list.
+    You), Turntable (toggle, the record's tap, since 2.0.0-player.11), and `app/context.ts`, which
+    names them and calls none. Adding a file is a deliberate edit to the sim, like the Navidrome
+    route list.
   - Nothing outside `app/` and `player/` imports usePlayer, the contexts or App.
   - Only App imports usePlayer as a VALUE, under any name (review: `usePlayer as useEngine`
     slipped past the call count), and `app/context.ts` calls none of the actions it names (a
@@ -4078,7 +4079,8 @@ be a switch in the global settings".
   song with no album id, which nothing makes today), the scrubber, the transport, and a row of
   icons: AirPlay while there is a speaker, and ••• always, at the right end. Only what does
   something today: no Lyrics, Up next or turntable buttons, and no "Now Playing opens as" setting
-  (the turntable is the next slice). The two readouts and the Gapless switch left it.
+  (the turntable came next - see "The turntable (2.0.0-player.11)"). The two readouts and the
+  Gapless switch left it.
 - **Nothing whose height can change sits below the title** - the rule from the 1.1.0-player.2
   review, which put the readouts ABOVE the title. With them gone, the one line that comes and goes
   is `player.error` (a failure, the skip notice), and it moved above the title too: it moves the
@@ -4227,6 +4229,179 @@ be a switch in the global settings".
   after this change) and everything on the iPhone - Info's scroll and the page not moving under a
   finger, a tap above Info closing it, focus coming back with VoiceOver, the Gapless checkbox
   unlocking the second element from its tap, and what the Navidrome sent row says against 0.64.2.
+
+### The turntable (2.0.0-player.11)
+
+James: "I would like to definitely build the turntable" - on the phone ("I don't think it makes a
+lot of sense on desktop") - "as long as it has the disc art on the 'record'"; earlier, "the playhead
+moved toward the center of the disc as the song plays, tapping on the disc and rotating it is how
+you seek, and maybe the skip and other things are at the bottom", "a toggle somewhere to go between
+the apple music style and the turntable style", and of the board's first-time hint, "the
+instructions for how to use it are a little annoying". The boards are `NowPlaying.dc.html` and
+`Turntable.dc.html` (its DCLogic is where the drag maths came from), and `You.dc.html`.
+
+- **Two looks, one sheet.** A button at Now Playing's top right (`.app-look-button`, a 44px target
+  holding the boards' 36px secondary box) switches the cover and the turntable - a record icon on
+  the cover, a square on the turntable, labelled with the look it switches TO ("Show as a
+  turntable" / "Show the cover", `lookButtonLabel`). You > Playback's **Now Playing opens as**
+  (`app/LookChoice.tsx`, a radio group exactly like Maximum quality's, between Gapless and it) says
+  which it opens as: Cover (the default) or Turntable, per device under `deadwax-player-opens-as`
+  (`readPlayerOpensAs`: the turntable only when it says exactly that). **App keeps only the
+  SETTING** (`opensAs`, handed to You and to Now Playing); **the look showing is Now Playing's own
+  state**, reset to the setting by a layout effect as the sheet opens, every time - so the button
+  never changes the setting, and switching re-renders the sheet and never App or the engine.
+- **Gesture ownership: the record and the arm are OUTSIDE the grip.** On the turntable the grip is
+  the top row alone (`.pl-sheet-grip.app-grip-top`, `flex: none`), and `<Turntable>` is drawn after
+  the grip closes, as the grip's sibling - so neither starts the sheet's drag and the sheet's drag
+  never starts from them, with no stopPropagation to forget. On the cover the grip is the top row
+  and the cover, as before. `app-rules.sim.cjs` counts the divs to hold it; the turntable sim finds
+  no Turntable inside the grip's tree.
+- **The record's face is the album's CD art**: deadwax's own `disc.<ext>`, or `disc<N>.<ext>` for
+  the playing song's disc (the disc number from the album answer the queue was played from -
+  `playedAlbum`, `playingDisc`; 1 when unknown, since a one-disc album deadwax filed carries none),
+  else the unnumbered `disc.*`. With none - a 404, or while it loads - plain black vinyl with the
+  grooves and the album's COVER as the round label (the board's `discArt=false`). The label hides
+  (`has-art`) only once the art has LOADED: CD art is often a transparent PNG, and the cover would
+  show through its hole. An image that failed is remembered by ADDRESS, as `Cover` does, so the next
+  disc's is still asked for - and only while Now Playing stays open: **each opening asks again**
+  (an effect on `open`, not on mounting - with the setting on Turntable the turntable stays mounted
+  across a close, and a failure kept by the mount alone made "close and open it again" in the docs
+  untrue and latched a Navidrome blip until the look was switched twice).
+  - **Only the `disc` stem, never a download's `cd.jpg`** (`disc_face` in src/disc_art.py): that is
+    whatever its sharer scanned, and Get CD art is still offered beside it (a `cd*` file doesn't
+    hide the button) - so the face is what Get CD art gives, and nothing else.
+- **The route: `GET /deadwax/library/disc_art/navidrome?album=<Navidrome album id>&disc=<n>`**, with
+  the library routes - NOT a Navidrome relay, and `test_there_is_no_general_proxy` is unchanged.
+  The phone knows only Navidrome's id, so deadwax finds the file: getAlbum's `musicBrainzId` (the
+  `musicbrainz_albumid` tag as Navidrome read it) through the internal `navidrome.call()`, as
+  album_context.py calls it; every live folder the store index has for that release
+  (`store.index_present` - two or more for a set stored one folder per disc, so disc N's own
+  picture in any of them beats a shared one in an earlier one); and the picture from each folder's
+  own listing. The id is only ever Navidrome's `id` parameter, never joined onto a path. Every guard
+  `/disc_art` has - each folder `is_within` the library, resolved (a symlink out is refused), and
+  only names `find_disc_art` counts, found in the listing - plus one: the chosen file must resolve
+  inside its folder. **A folder the index has that is simply gone** (renamed or deleted outside
+  deadwax, before a scan noticed) is NOT a refusal: the paths are deadwax's own index, never the
+  caller's, and warning of one "outside the library" (as the first cut did, on every showing) sent
+  whoever read the log hunting for a traversal. It is logged at debug and marked `missing`, as
+  `held_copy` marks one (the next scan, or the folder coming back, revives it); only a folder that
+  resolves OUTSIDE the library is warned of. **`/disc_art` itself follows a symlinked FILE out of the folder** (`_listed`
+  takes `is_file()`, which follows links) - noticed here, a gap main has too, left for main per
+  "a bug main has too is fixed on main first". Served by the same `_disc_art_answer` (typed by
+  extension, `private, max-age=300`), and a media answer: `MEDIA_PATHS` in app.py (GuardMedia's
+  headers, never gzipped). **404 for every "none"**: no LIBRARY_PATH, Navidrome unset or down or not
+  knowing the album (a NavidromeError is caught), no release id, nothing indexed, no CD art - the
+  page draws the plain record. A 404 carries no caching, so CD art saved meanwhile shows the next
+  time Now Playing opens on the turntable (or the look is switched to it).
+- **The drawing and the maths are one set of numbers** (`lib/turntable.ts`, pure): the board's
+  geometry in the plinth's units (`STAGE` 372 x 368, `RECORD`, `PLATTER`, `GROOVES` 148 -> 64,
+  `ARM` pivot and reach 205, `ARM_PARTS`), drawn as percentages inline and as two SVGs on the same
+  viewBox (the platter under the record; the arm over it, `pointer-events: none`), with the record
+  a real `<button>` and the arm's handle an HTML slider on top. The stage is as big as fits the room
+  both ways (`container-type: size` on `.app-tt`, `min(100cqw, 100cqh * aspect, 440px)`, the aspect
+  inline from `STAGE`), the width alone where container units aren't known.
+- **The arm follows the song** (usePosition, like the scrubber - no timer of its own): the needle is
+  where a circle of the groove's radius round the record's centre meets the arm's reach round its
+  pivot (`needleAt`), about 99 to 122.5 degrees across a song. **Dragged, the angle says the time**
+  (`armTimeAt`), held to the arm's sweep - past either end is the song's start or end, never the
+  circle's far side where the reach meets the grooves again. The head lifts while held. **Nothing
+  moves until the finger has travelled `TAP_SLOP_PX`**: the needle stays over the song as it plays
+  (`time: null`), so a nudge shows nothing it won't go to. The first cut previewed the arm from the
+  first move and seeked only past the slop - and the whole song is about 83 CSS px of needle on a
+  390px phone, so 8px was 40 seconds shown and then silently dropped, the arm snapping back. **The
+  move that crosses it takes hold** (`grab`): the song where it is THEN is put at the slop's edge
+  along the finger's way, so the arm moves on from the song with no jump - not the 40 s a grab
+  from the press would jump, and not losing the tens of px a quick finger's first move can cover
+  (a grab at the crossing finger would). From there it keeps that grab, so it never jumps to the
+  finger either.
+- **Turning the record: 1.8 s a turn** (`SECONDS_PER_TURN`, 33 1/3 rpm), forwards clockwise and
+  backwards too; each move's turn is the short way round (the atan2 seam at the left is a small
+  turn, not a whole one); nothing counts inside `SPINDLE_SHARE` of the centre, where the angle
+  swings wildly. The record turns with the hand (an inline rotate on `.app-tt-turn`, kept where the
+  hand left it on release) around the CSS spin. **A turn is an OFFSET** (`offset`, seconds) **from
+  wherever the song is when it lets go**, because the song PLAYS ON under the finger - only the
+  record stops. The board anchored to the time at the press, which works on the board because its
+  clock stops while the record is held; here it seeked back behind what was playing - three
+  seconds for a finger that rested three seconds before turning, and short of the song for any
+  forward turn slower than 33 1/3 rpm, which is most of them. The offset is clamped at each move
+  against the song as it is then (turning back past 0:00 holds it there, and forward moves it at
+  once - the board's behaviour).
+- **Letting go seeks exactly what is shown**: `dragEnd` seeks `shownTime(preview(drag), position)`,
+  the same sum the arm and the time line draw, from the song's position as last drawn
+  (`drawnAt`, the render's usePosition). A record turned by nothing (round the spindle, or dragged
+  straight out) seeks nowhere. **A drag is measured in the stage's box as the press found it**
+  (`pressBox`): anything that moves the layout under a still finger moves nothing.
+- **Seek on RELEASE only**, through the player's own `seek` (the scrubber's path): the drag previews
+  the time (the time line, "Scrubbing · 2:31 of 7:05" or "Needle up · ...") and turns the record,
+  and the audio does not scrub - that is a later slice. Keys on the arm step as the scrubber's
+  (`keyTarget`). A cancel seeks nowhere and a drag begun on a song that has since changed is
+  dropped (`dragEnd`/`dragFor`); another finger moves and ends nothing (`recordMove`/`armMove`/
+  `dragEnd` compare pointer ids) and STARTS nothing - `recordStart`/`armStart` take any pointer, so
+  that rule is the component's (`pressable`: `isPrimary`, and no right-click). Both drags capture
+  the pointer. `app-rules.sim.cjs` holds `player.seek` to `onRelease` and `onArmKey` alone.
+- **A tap plays or pauses, from the CLICK, in the tap** - the transport's way, and the one new file
+  on `app-rules.sim.cjs`'s allowlist (`player/Turntable.tsx: toggle`). A press that never travels
+  `TAP_SLOP_PX` (8, the furthest it got, not where it ended) is a tap: it seeks nothing. A press that
+  does is a drag, and the click after it is NOT a tap (`turned`). **The flag is set by the MOVE that
+  takes a turn past the slop**, not only by its release: a drag dropped because the song changed
+  under it has no release that says so, and a mouse's click still comes (Chromium sends it to the
+  element holding the pointer) - so the first cut paused the new song. **It is cleared by the next
+  primary press**, because not every drag has a click after it (WebKit synthesises none after a
+  moved touch): cleared only by a click, it would swallow the next real tap. A second finger is no
+  press, and doesn't clear it.
+- **No per-frame work while the page is hidden.** The spin is a CSS animation on `.app-tt-face`,
+  `animation-play-state: paused` unless `is-spinning`, which is `spinning()`: playing AND Now
+  Playing open AND the page showing (`useVisible`, on `visibilitychange` - a locked phone) AND no
+  finger holding the record. Paused, it stays where it is. Nothing runs from the engine's clock and
+  there is no rAF loop (the sim fails on rAF, setInterval or setTimeout in Turntable.tsx). Reduced
+  motion: `animation: none`. **`--dw-record-turn: 1.8s` is its own token**, never a section 7
+  duration: reduced motion collapses those to 1ms, which would spin the record 1800 times faster
+  instead of stopping it (theme.css's universal rule also clamps any animation to 1ms and one
+  iteration). The sim holds the token to `SECONDS_PER_TURN`.
+- **The time line replaces the scrubber** (`TurntableTime`, mono, centred, one `nowrap` line - the
+  body sits against the bottom, so its height must not change), the title and album line centred as
+  the board sets them; the transport and the icon row are the cover look's. Now Playing holds the
+  preview (`onPreview`), which Turntable clears as it unmounts (pinned: unmounted mid-drag, the last
+  word is null). **The failure line is laid over the plinth's foot on the turntable**
+  (`.app-is-turntable .pl-sheet-error`: absolute above the title, two lines at most,
+  `pointer-events: none`). In the flow, above the title, it took its height from `.app-tt`, and the
+  stage (`100cqh`) shrank with it - on any height-limited phone (375x667, Safari with its bars, on
+  its side) the record and the arm resized and moved when the skipped-song note came or cleared
+  itself, and a finger holding the arm jumped about 14% of the song. On the cover that room is the
+  cover, which no finger goes to; here it is controls.
+- **The arm's handle is a tap target unless the plinth is too small to hold one**:
+  `min-width: min(var(--pl-hit), var(--app-tt-handle-cap))`, the cap 30% of the stage. On a phone on
+  its side (844x390) the plinth is about 45px and a 44px ring covered 52-85% of the record, its
+  middle included: a tap there neither paused nor played, and a small turn dragged the arm and
+  seeked minutes away. The cap bites only below a 147px plinth. A real landscape layout is still
+  not built.
+- **Accessibility**: the record is a `<button>` named for what a tap does ("The record: a tap pauses
+  the song" / "plays"), Enter and Space included; the arm's handle is `role="slider"` with the
+  scrubber's value and words, out of the tab order and disabled with no length; the look button is
+  named for the look it switches to; You's radio group is described by the note under it
+  (`app-look-note`: the button switches only until Now Playing closes - why the two can disagree),
+  as Gapless is by its own.
+- **No hint and no coach mark** (James, above): the board's `firstTime` tweak is not built, and the
+  sim fails on its words.
+- **Deliberately left out**: audible scrubbing (a later slice); the desktop (James: phone only - the
+  app has one layout until slice 8's desktop frame, which is where the button stays out); the
+  board's Lyrics and Up next icons, as on the cover.
+- **Verified**: 1853 Python tests (`test_turntable_disc_art.py` new: found for disc 1 and 2 of a set,
+  the shared fallback, a one-disc album with no disc number, a set stored per disc, a `cd.jpg`
+  refused, every 404, the id only ever Navidrome's, a folder and a file linking out refused and
+  warned of, a folder gone since the last scan quiet and tombstoned, served as `/disc_art` serves
+  one; four new CSS tests), pyflakes, tsc, and all 26 sims (`turntable` new, 127 checks;
+  `settings`, `you`, `info` and `app-rules` extended); 51 mutations, one per rule pinned, each
+  caught and restored byte for byte - and after the review, 20 more for its fixes (the arm's slop
+  and its grab, the record's offset, the flag set on the move, the art asked for on opening, the
+  quiet tombstone, the overlaid failure line, the handle's cap, the look note, the arm's capture,
+  a second finger, the preview cleared on unmount, the press's box), all caught. The engine guard
+  is empty and `player.sim.cjs` untouched.
+  **NOT verified here**: the real page (the build workaround and a check against the stubs come
+  after this change) and everything on the iPhone - the drags under a real finger with the sheet
+  staying put, the spin's smoothness and its stopping while locked, whether VoiceOver drives the
+  arm, and whether Navidrome 0.64.2 sends the album's `musicBrainzId` for James's albums (Info >
+  Debug's Navidrome sent row answers that).
 
 ### Artists who have renamed (v0.6.18)
 
@@ -5561,7 +5736,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1833 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 1853 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -5592,13 +5767,14 @@ node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks 
 node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (WebKit, not Chromium), which songs, what the readout says
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
-node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player
+node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player, Now Playing opens as and its key
 node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history
 node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
 node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions
 node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Navidrome sent
 node ui/test/info.sim.cjs       # Info > About's rows, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape
+node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -5619,7 +5795,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1833 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1853 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

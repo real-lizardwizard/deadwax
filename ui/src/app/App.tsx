@@ -3,12 +3,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { TAB_LABELS, TABS, backLabel, currentRoute, formatRoute, type Nav, type Page, type Tab } from '../lib/appRoutes'
+import type { Look } from '../lib/turntable'
 import { AlbumPage } from '../player/AlbumPage'
 import { navidromeStatus, playedAlbum, sentFormat, type Album, type NavidromeStatus } from '../player/api'
 import { Library } from '../player/Library'
 import { MiniPlayer } from '../player/MiniPlayer'
 import { NowPlaying } from '../player/NowPlaying'
 import { usePlayer, type Player } from '../player/usePlayer'
+import { readPlayerOpensAs, writePlayerOpensAs } from '../state/persisted'
 import { ActionMenu } from './ActionMenu'
 import { ActionsContext, PlayerContext, pickActions } from './context'
 import { Home } from './Home'
@@ -57,6 +59,10 @@ const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
  * Each is its own sheet (useSheet.ts) - its own scroll lock, focus in and back, Escape - and the
  * one underneath is inert while another is over it. The menu and Info are never open together:
  * choosing Info closes the menu as it opens, and Info gives focus back to the ••• button.
+ *
+ * "Now Playing opens as" (2.0.0-player.11) is kept here - You sets it, Now Playing opens in it -
+ * and only the SETTING: which look is showing is Now Playing's own, so switching it never
+ * re-renders this component, let alone the engine.
  */
 export function App() {
   const player = usePlayer()
@@ -84,6 +90,12 @@ export function App() {
   //? what is over Now Playing: its ••• menu, or Info - never both
   const [over, setOver] = useState<'none' | 'menu' | 'info'>('none')
   const [youSeen, setYouSeen] = useState(nav.tab === 'you')
+  //? "Now Playing opens as", kept on this device
+  const [opensAs, setOpensAs] = useState<Look>(readPlayerOpensAs)
+  const chooseOpensAs = useCallback((look: Look) => {
+    writePlayerOpensAs(look)
+    setOpensAs(look)
+  }, [])
 
   const checkNavidrome = useCallback(() => {
     setStatus(null)
@@ -205,9 +217,9 @@ export function App() {
           what="Downloads in progress, and how the finished ones ended, are in the main page's Downloads panel until the app has them."
         />
       ),
-      you: <You shown={youSeen} />,
+      you: <You shown={youSeen} opensAs={opensAs} onOpensAs={chooseOpensAs} />,
     }),
-    [status, youSeen],
+    [status, youSeen, opensAs],
   )
 
   const pageView = (tab: Tab, page: Page, player: Player) => (
@@ -253,6 +265,7 @@ export function App() {
             onClose={closeSheet}
             onMore={openMenu}
             onAlbum={toAlbum ?? closeSheet}
+            openAs={opensAs}
           />
           {/* over Now Playing: its menu, then Info - the menu first, so where one closes as the
               other opens, focus ends in the one that opened */}

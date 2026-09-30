@@ -57,6 +57,40 @@ def disc_art_filename(disc: int | None, mime: str) -> str:
     return f"{DISC_ART_STEM}{disc or ''}.{EXTENSIONS.get(mime, 'jpg')}"
 
 
+#? A name of deadwax's own CD art, read back: the `disc` stem, and the disc it is for when it has
+#? a number ("disc2", "disc 02" - what find_disc_art counts as disc art, less the `cd` stem).
+OWN_STEM = re.compile(r"disc[\s._-]*(\d*)")
+
+
+def disc_face(folders: list[list[str]], disc: int | None) -> tuple[int, str] | None:
+    """
+    The picture that is the record's face on the player's turntable (2.0.0-player.11), for one
+    disc of a release: which folder it is in (an index into `folders`) and its name - or None.
+
+    `folders` holds, for each folder the store index has for the release (two or more for a set
+    stored one folder per disc), the names find_disc_art counts as disc art. Disc N's own
+    `disc<N>.*` from any of them first, then a `disc.*` that stands for every disc - Navidrome's
+    rule for the same files (core/artwork/disc.go). No disc number is disc 1.
+
+    Only deadwax's own `disc` stem, never a download's `cd.jpg`: that is whatever its sharer
+    scanned, and Get CD art is offered beside it (a `cd*` file doesn't hide the button), so the
+    face is what Get CD art gives and nothing else.
+    """
+    wanted = disc if disc and disc > 0 else 1
+    shared: tuple[int, str] | None = None
+    for index, names in enumerate(folders):
+        for name in sorted(names):
+            match = OWN_STEM.fullmatch(Path(name).stem.strip().lower())
+            if not match:
+                continue
+            if match.group(1):
+                if int(match.group(1)) == wanted:
+                    return index, name
+            elif shared is None:
+                shared = (index, name)
+    return shared
+
+
 def _caa_url(image: dict, size: str) -> str | None:
     """One CAA image at COVER_ART_SIZE - the same sizes a cover is saved at."""
     thumbnails = image.get("thumbnails") or {}

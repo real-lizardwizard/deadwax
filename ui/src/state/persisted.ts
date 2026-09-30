@@ -2,6 +2,7 @@ import { useCallback, useState } from 'preact/hooks'
 
 import type { FormatPreference } from '../api/types'
 import type { MaxRate } from '../lib/streamWrap'
+import type { Look } from '../lib/turntable'
 
 /**
  * localStorage-backed state.
@@ -40,6 +41,9 @@ export const STORAGE_KEYS = {
   /** The player's "Maximum quality": '48000' (the default, and anything unknown) or 'original'.
    *  The player's own, like its gapless switch. */
   playerMaxRate: 'deadwax-player-max-rate',
+  /** "Now Playing opens as" (2.0.0-player.11): 'turntable', or anything else for the cover (the
+   *  default). Per device, like the two above. */
+  playerOpensAs: 'deadwax-player-opens-as',
 } as const
 
 /*
@@ -250,6 +254,21 @@ export function readPlayerMaxRate(): MaxRate {
 
 export function writePlayerMaxRate(rate: MaxRate): void {
   writeRaw(STORAGE_KEYS.playerMaxRate, rate)
+}
+
+/* ===== deadwax-player-opens-as ===== */
+
+/**
+ * "Now Playing opens as" (2.0.0-player.11): the look Now Playing opens in, per device like the two
+ * above. The turntable only when it says exactly that: anything else - nothing stored, an unknown
+ * value, storage that can't be read - is the cover, which is what Now Playing always was.
+ */
+export function readPlayerOpensAs(): Look {
+  return readRaw(STORAGE_KEYS.playerOpensAs) === 'turntable' ? 'turntable' : 'cover'
+}
+
+export function writePlayerOpensAs(look: Look): void {
+  writeRaw(STORAGE_KEYS.playerOpensAs, look)
 }
 
 /* ===== deadwax-preferences ===== */

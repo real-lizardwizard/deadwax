@@ -627,4 +627,26 @@
     /* --- motion ------------------------------------------------------- */
     --dw-duration: var(--duration-fast);
     --dw-ease:     var(--ease-out);
+
+    /* --- the turntable (2.0.0-player.11), as its board draws it ------- */
+    --dw-tt-plinth:       #19171e;
+    --dw-tt-platter:      #2a2730;
+    --dw-tt-vinyl:        #141217;
+    --dw-tt-grooves:      repeating-radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.2) 3px, rgba(0, 0, 0, 0) 4px);
+    /* the light across the record: it stays where it is while the record turns under it */
+    --dw-tt-sheen:        conic-gradient(from 20deg, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, 0.07) 28deg, rgba(255, 255, 255, 0) 56deg, rgba(255, 255, 255, 0) 180deg, rgba(255, 255, 255, 0.05) 208deg, rgba(255, 255, 255, 0) 236deg);
+    --dw-tt-label:        #141414;   /* the label under a cover that hasn't come */
+    --dw-tt-label-edge:   rgba(255, 255, 255, 0.3);
+    --dw-tt-spindle:      #0e0c12;
+    --dw-tt-spindle-edge: rgba(255, 255, 255, 0.25);
+    --dw-tt-arm:          #c9c6d1;
+    --dw-tt-arm-head:     #d8d5de;
+    --dw-tt-arm-weight:   #8e8a96;
+    --dw-tt-pivot:        #3a3642;
+    --dw-tt-pivot-edge:   #56525f;
+    --dw-tt-handle-edge:  rgba(235, 235, 245, 0.18);
+    /* One turn at 33 1/3 rpm - SECONDS_PER_TURN in ui/src/lib/turntable.ts, which the sim holds
+       this to. Its own value, not a duration token above: reduced motion collapses those to 1ms,
+       which would spin the record 1800 times faster instead of stopping it. */
+    --dw-record-turn:     1.8s;
 }

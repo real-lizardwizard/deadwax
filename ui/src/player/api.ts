@@ -10,6 +10,7 @@ import { get, post, url } from '../api/http'
 import { createPlayedAlbums } from '../lib/playedAlbums'
 import type { QueueTrack } from '../lib/playQueue'
 import { asksForMp4, resamples, type MaxRate } from '../lib/streamWrap'
+import { discArtPath } from '../lib/turntable'
 
 export interface NavidromeStatus {
   configured: boolean
@@ -152,6 +153,16 @@ export function playedAlbum(id: string | null | undefined): AlbumWithSongs | nul
  */
 export function coverUrl(id: string | null | undefined, size: number): string | null {
   return id ? url(`/navidrome/cover/${encodeURIComponent(id)}?size=${size}`) : null
+}
+
+/**
+ * The turntable's record face (2.0.0-player.11): the CD art deadwax holds for a Navidrome album's
+ * disc - a library route, which finds the album's folder itself, not a Navidrome one. A 404 when
+ * there is none, and the turntable draws its plain record.
+ */
+export function discArtUrl(albumId: string | null | undefined, disc: number): string | null {
+  const path = discArtPath(albumId, disc)
+  return path ? url(path) : null
 }
 
 /**

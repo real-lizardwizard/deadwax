@@ -6,7 +6,9 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { navidromeStatus, type NavidromeStatus } from '../player/api'
 import { ChevronRightIcon } from '../player/icons'
 import { usePlayerActions, usePlayerState } from './context'
+import type { Look } from '../lib/turntable'
 import { GaplessChoice } from './GaplessChoice'
+import { LookChoice } from './LookChoice'
 import { QualityChoice } from './QualityChoice'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
@@ -45,10 +47,11 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * editing an album - is on the main page for now, and this says so and links there.
  *
  * - Playback: Gapless, a checkbox (GaplessChoice.tsx - moved here from the now-playing screen in
- *   2.0.0-player.10, where it was a switch), and Maximum quality, moved here from the player's
- *   settings sheet with its words unchanged. Both keep their storage keys, per device. Gapless is
- *   handed the player itself, whose `setGapless` it calls in the tap: this page names no playback
- *   action of its own (ui/test/app-rules.sim.cjs).
+ *   2.0.0-player.10, where it was a switch), "Now Playing opens as" (LookChoice.tsx,
+ *   2.0.0-player.11: the cover or the turntable - App keeps it, and hands it here), and Maximum
+ *   quality, moved here from the player's settings sheet with its words unchanged. All three are
+ *   kept per device. Gapless is handed the player itself, whose `setGapless` it calls in the tap:
+ *   this page names no playback action of its own (ui/test/app-rules.sim.cjs).
  * - Connections: the main page's three pings, asked the first time You shows (not at start-up: the
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
  *   row is its own live region, read whole ("slskd, Connected"): the three answers land in any
@@ -62,7 +65,16 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * It works with Navidrome unset or down: nothing here waits on it. A page, so it reads the player
  * from context; `shown` is App's word that the tab has been opened at least once.
  */
-export function You({ shown }: { shown: boolean }) {
+export function You({
+  shown,
+  opensAs,
+  onOpensAs,
+}: {
+  shown: boolean
+  /** "Now Playing opens as", and the way to change it - App's */
+  opensAs: Look
+  onOpensAs: (look: Look) => void
+}) {
   const player = usePlayerState()
   const actions = usePlayerActions()
   const [who, setWho] = useState<Me | null>(null)
@@ -135,9 +147,13 @@ export function You({ shown }: { shown: boolean }) {
           An experiment: it shortens the pause between songs, and FLAC songs played one after
           another can join in one stream, with none at all.
         </p>
+        <LookChoice look={opensAs} onChange={onOpensAs} />
+        <p id="app-look-note" class="app-footnote app-choice-gap">
+          The button at the top right of Now Playing switches between them until it closes.
+        </p>
         <QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />
         <p class="app-footnote">
-          Both are kept on this device. Maximum quality is used from the next song.
+          All three are kept on this device. Maximum quality is used from the next song.
         </p>
       </section>
 
