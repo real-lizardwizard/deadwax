@@ -1,12 +1,19 @@
 /*
-  The player at /player/ - a phone app's look, not the desktop interface's.
+  The player at /player/ - a phone app's layout, not the desktop interface's.
 
-  It borrows the brand from theme.css (the purple, the motion curves, the reduced-motion switch)
-  and nothing else: the desktop's type scale is set for fitting a release grid on a monitor at
-  13px, and an iPhone's is set for a thumb at 17. So the player has its own scale and spacing
-  here, on the same rule as theme.css - every value is a token at the top, and a raw value in a
-  rule below is a bug. The face is the phone's own (San Francisco on an iPhone), because a player
-  pretending to be a native one should not be the only thing on the phone set in Noto.
+  The desktop's type scale is set for fitting a release grid on a monitor at 13px, and a phone's
+  for a thumb at 17. So the player has its own scale and spacing here, on the same rule as
+  theme.css - every value is a token at the top, and a raw value in a rule below is a bug.
+
+  Two kinds of token, since the app's tabs (2.0.0-player.9). The MECHANICS are this file's own and
+  did not change: safe areas, the edges beside them, tap targets, the sheet's motion, the
+  scrubber's sizes, 100dvh. The LOOK points at theme.css section 10 (--dw-*), STYLE.md's "just a
+  touch of Windows 7" that the canvas boards use: Noto Sans (self-hosted) with monospace data
+  instead of the phone's own face, STYLE's palette instead of iOS's, 3/4/6px corners, no blur,
+  shadows no bigger than 0 1px 2px, the scrub track a thin sunken well, and no uppercase or
+  letter-spaced labels. Layout lives in the rules, not these tokens, so the restyle could not move
+  a hit area, and reverting it is a token change. The new chrome (the tab bar, Home, You) is
+  interface/player/app.css.
 
   Dark only, like the rest of deadwax.
 */
@@ -14,41 +21,66 @@
 @import url('../styles/theme.css');
 
 :root {
-    --pl-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Helvetica Neue', sans-serif;
-    --pl-font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    /* the look, from theme.css section 10: Noto Sans for words, monospace for data */
+    --pl-font: var(--dw-font);
+    --pl-font-display: var(--dw-font);
+    --pl-font-data: var(--dw-font-mono);
 
-    /* iOS's own dark palette, so the player sits among the phone's other apps */
-    --pl-bg: #000;
-    --pl-sheet-bg: #0b0a10;
-    --pl-bar: rgba(24, 22, 30, 0.78);
-    --pl-fill: rgba(118, 118, 128, 0.24);
-    --pl-fill-strong: rgba(118, 118, 128, 0.4);
-    --pl-separator: rgba(84, 84, 88, 0.55);
-    --pl-text: #fff;
-    --pl-text-2: rgba(235, 235, 245, 0.6);
-    --pl-text-3: rgba(235, 235, 245, 0.3);
-    --pl-scrub-done: rgba(255, 255, 255, 0.85);
-    --pl-scrub-left: rgba(255, 255, 255, 0.22);
+    /* STYLE.md's palette */
+    --pl-bg: var(--dw-bg);
+    --pl-sheet-bg: var(--dw-bg-now-playing);
+    --pl-bar: var(--dw-bg);                     /* the album page's bar: solid, since nothing blurs */
+    --pl-fill: var(--dw-empty-cover);           /* an empty cover, the spinner's ring */
+    --pl-fill-strong: var(--dw-border-cover);   /* the gapless switch when off */
+    --pl-pressed: var(--dw-pressed);            /* a row or a bare button under a finger */
+    --pl-pressed-cover: var(--dw-pressed-cover);  /* a cover's opacity under a finger */
+    --pl-separator: var(--dw-border);
+    --pl-text: var(--dw-text);
+    --pl-text-2: var(--dw-text-2);
+    --pl-text-3: var(--dw-text-3);
+    --pl-card: var(--dw-card);
+    --pl-card-edge: var(--dw-border);
+    --pl-highlight: var(--dw-highlight);
+    /* buttons: the primary purple for Play, the faint secondary gradient for the rest, and the
+       toggled tint for a chosen chip */
+    --pl-primary-bg: var(--dw-primary-bg);
+    --pl-primary-edge: var(--dw-primary-border);
+    --pl-primary-highlight: var(--dw-primary-highlight);
+    --pl-primary-pressed: var(--dw-primary-pressed);
+    --pl-secondary-bg: var(--dw-secondary-bg);
+    --pl-secondary-bg-active: var(--dw-secondary-bg-active);
+    --pl-secondary-edge: var(--dw-secondary-border);
+    --pl-secondary-text: var(--dw-text-on-secondary);
+    --pl-toggled-bg: var(--dw-toggled-bg);
+    --pl-toggled-edge: var(--dw-toggled-border);
+    --pl-toggled-text: var(--dw-accent-text);
+    --pl-hairline: var(--dw-hairline);
+    /* the scrub bar: a thin sunken well with a grey fill, and a round thumb (STYLE allows it) */
+    --pl-scrub-fill: var(--dw-bar-grey);
+    --pl-scrub-left: var(--dw-track);
+    --pl-scrub-edge: var(--dw-border);
+    --pl-scrub-inset: var(--dw-track-inset);
     --pl-scrub-track: 7px;
     --pl-scrub-track-held: 11px;
     --pl-scrub-thumb: 12px;
     --pl-scrub-thumb-held: 1.5;   /* the thumb grows by this while a finger holds the bar */
-    --pl-error: var(--red-text);
+    --pl-error: var(--dw-danger-text);
     /* the brand purple one step lighter, to read as text on black */
-    --pl-accent: var(--accent-hover);
+    --pl-accent: var(--dw-accent);
 
-    /* iOS's text styles, in points = CSS px */
-    --pl-text-large-title: 34px;
-    --pl-text-title: 22px;
-    --pl-text-title-2: 20px;
-    --pl-text-body: 17px;
-    --pl-text-subhead: 15px;
-    --pl-text-footnote: 13px;
-    --pl-text-caption: 12px;
-    --pl-weight-regular: 400;
-    --pl-weight-medium: 500;
-    --pl-weight-semibold: 600;
-    --pl-weight-bold: 700;
+    /* the phone's text sizes, in CSS px */
+    --pl-text-large-title: var(--dw-text-large-title);
+    --pl-text-title: var(--dw-text-title);
+    --pl-text-title-2: var(--dw-text-artist-hero);
+    --pl-text-body: var(--dw-text-body);
+    --pl-text-subhead: var(--dw-text-heading);
+    --pl-text-footnote: var(--dw-text-footnote);
+    --pl-text-caption: var(--dw-text-label);
+    --pl-weight-regular: var(--dw-weight-regular);
+    --pl-weight-medium: var(--dw-weight-medium);
+    --pl-weight-semibold: var(--dw-weight-semibold);
+    --pl-weight-bold: var(--dw-weight-bold);
+    --pl-tracking-title: var(--dw-tracking-title);
 
     --pl-gutter: 20px;
     --pl-gap: 16px;
@@ -57,6 +89,7 @@
     --pl-hit: 44px;            /* Apple's minimum tap target */
     --pl-row: 50px;
     --pl-pill-height: 48px;
+    --pl-chip-pad: 7px 14px;
     --pl-mini-height: 64px;
     --pl-mini-cover: 44px;
     --pl-mini-inset: 8px;
@@ -64,19 +97,26 @@
     --pl-hero-cover: min(70vw, 300px);
     --pl-sheet-cover: min(100%, 420px, 50vh);
 
-    --pl-radius-cover: 8px;
-    --pl-radius-small-cover: 6px;
-    --pl-radius-hero: 10px;
-    --pl-radius-sheet-cover: 12px;
-    --pl-radius-control: 12px;
-    --pl-radius-mini: 16px;
+    /* STYLE.md's corners: covers 3px, controls 4px, cards 6px */
+    --pl-radius-cover: var(--dw-radius-cover);
+    --pl-radius-small-cover: var(--dw-radius-cover);
+    --pl-radius-hero: var(--dw-radius-cover);
+    --pl-radius-sheet-cover: var(--dw-radius-cover);
+    --pl-radius-control: var(--dw-radius-control);
+    --pl-radius-mini: var(--dw-radius-card);
+    --pl-radius-track: var(--dw-radius-track);
+    --pl-radius-round: var(--dw-radius-round);   /* what stays round: the transport buttons */
 
-    --pl-shadow-cover: 0 8px 28px rgba(0, 0, 0, 0.45);
-    --pl-shadow-small: 0 2px 8px rgba(0, 0, 0, 0.35);
-    --pl-shadow-mini: 0 8px 28px rgba(0, 0, 0, 0.5);
-    --pl-shadow-sheet-cover: 0 22px 50px rgba(0, 0, 0, 0.55);
-    --pl-blur-bar: saturate(180%) blur(24px);
-    --pl-blur-backdrop: blur(60px) saturate(1.6) brightness(0.5);
+    /* nothing bigger than 0 1px 2px, and no blur anywhere */
+    --pl-shadow-cover: var(--dw-shadow);
+    --pl-shadow-small: none;
+    --pl-shadow-mini: none;
+    --pl-shadow-sheet-cover: var(--dw-shadow);
+    --pl-blur-bar: none;
+    --pl-blur-backdrop: none;
+    /* the now-playing sheet's backdrop was the cover blurred to a wash; with no blur it is not
+       drawn at all (a lazy image that isn't shown isn't fetched), and the sheet is its plain colour */
+    --pl-backdrop-display: none;
 
     --pl-safe-top: env(safe-area-inset-top, 0px);
     --pl-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -100,22 +140,8 @@
     --pl-switch-knob: 27px;
     --pl-switch-inset: 2px;
     --pl-switch-on: var(--accent);
-    --pl-switch-knob-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 3px 1px rgba(0, 0, 0, 0.06);
+    --pl-switch-knob-shadow: var(--dw-shadow);
     --pl-switch-duration: 240ms;
-
-    /* the settings sheet: over the mini player (10) and the now-playing sheet (20), in iOS's raised
-       grouped palette - a sheet a step lighter than the page, its rows a step lighter again */
-    --pl-settings-z: 30;
-    --pl-settings-max: 520px;
-    --pl-settings-radius: 14px;
-    --pl-settings-bg: #1c1c1e;
-    --pl-settings-row: #2c2c2e;
-    --pl-settings-scrim: rgba(0, 0, 0, 0.5);
-    --pl-settings-header: 56px;
-    --pl-settings-row-pad: 11px;
-    /* how much of the page stays in sight above the sheet at its tallest */
-    --pl-settings-room: 40px;
-    --pl-check: 22px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -136,9 +162,8 @@ html {
     -webkit-text-size-adjust: 100%;
 }
 
-/* the page behind the full player, or the settings, must not scroll under a finger on it */
-html.pl-sheet-open,
-html.pl-settings-open { overflow: hidden; }
+/* the page behind the full player must not scroll under a finger on it */
+html.pl-sheet-open { overflow: hidden; }
 
 body {
     margin: 0;
@@ -177,6 +202,7 @@ img { display: block; }
     font-size: var(--pl-text-large-title);
     font-weight: var(--pl-weight-bold);
     line-height: 1.2;
+    letter-spacing: var(--pl-tracking-title);
 }
 
 .pl-notice {
@@ -222,9 +248,6 @@ img { display: block; }
 
 .pl-large-header .pl-large-title { min-width: 0; }
 
-/* a bar button beside the large title, tinted like iOS's */
-.pl-header-button { color: var(--pl-accent); }
-
 .pl-orders {
     display: flex;
     gap: var(--pl-gap-sm);
@@ -237,14 +260,22 @@ img { display: block; }
 
 .pl-order {
     flex: none;
-    padding: 7px 14px;
-    border-radius: var(--radius-full);
-    background: var(--pl-fill);
+    padding: var(--pl-chip-pad);
+    border: var(--pl-hairline) solid var(--pl-secondary-edge);
+    border-radius: var(--pl-radius-control);
+    background: var(--pl-secondary-bg);
+    box-shadow: var(--pl-highlight);
+    color: var(--pl-secondary-text);
     font-size: var(--pl-text-subhead);
     font-weight: var(--pl-weight-medium);
 }
 
-.pl-order.is-active { background: var(--pl-text); color: var(--pl-bg); }
+.pl-order.is-active {
+    border-color: var(--pl-toggled-edge);
+    background: var(--pl-toggled-bg);
+    box-shadow: none;
+    color: var(--pl-toggled-text);
+}
 
 .pl-grid {
     display: grid;
@@ -269,7 +300,7 @@ img { display: block; }
     transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.pl-album:active .pl-album-cover { opacity: 0.7; }
+.pl-album:active .pl-album-cover { opacity: var(--pl-pressed-cover); }
 
 .pl-album-title,
 .pl-album-artist {
@@ -306,7 +337,11 @@ img { display: block; }
     font-size: var(--pl-text-body);
 }
 
-.pl-back-icon { width: 26px; height: 26px; }
+.pl-back-icon { flex: none; width: 26px; height: 26px; }
+
+/* the page below's name - an album's can be long, and the bar is one line */
+.pl-back { max-width: 100%; }
+.pl-back-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pl-album-hero {
     display: flex;
@@ -343,10 +378,8 @@ img { display: block; }
     min-height: 1em;
     margin: 6px 0 0;
     color: var(--pl-text-2);
-    font-size: var(--pl-text-caption);
-    font-weight: var(--pl-weight-semibold);
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
+    font-size: var(--pl-text-footnote);
+    font-weight: var(--pl-weight-regular);
 }
 
 .pl-hero-actions {
@@ -365,15 +398,26 @@ img { display: block; }
     gap: 6px;
     height: var(--pl-pill-height);
     padding: 0 var(--pl-gutter);
+    border: var(--pl-hairline) solid var(--pl-secondary-edge);
     border-radius: var(--pl-radius-control);
-    background: var(--pl-fill);
-    color: var(--pl-accent);
+    background: var(--pl-secondary-bg);
+    box-shadow: var(--pl-highlight);
+    color: var(--pl-secondary-text);
     font-size: var(--pl-text-body);
     font-weight: var(--pl-weight-semibold);
-    transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.pl-pill:active:not(:disabled) { background: var(--pl-fill-strong); }
+.pl-pill:active:not(:disabled) { background: var(--pl-secondary-bg-active); }
+
+/* the one main action on a page - Play */
+.pl-pill.is-primary {
+    border-color: var(--pl-primary-edge);
+    background: var(--pl-primary-bg);
+    box-shadow: var(--pl-primary-highlight);
+    color: var(--pl-text);
+}
+
+.pl-pill.is-primary:active:not(:disabled) { filter: var(--pl-primary-pressed); }
 .pl-pill-icon { width: 20px; height: 20px; }
 
 .pl-tracks {
@@ -382,12 +426,13 @@ img { display: block; }
     list-style: none;
 }
 
+/* "Disc 4 · <title>" - sentence case as written, and a long title wraps rather than runs off */
 .pl-disc {
     padding: 18px var(--pl-edge-right) 6px 0;
     color: var(--pl-text-2);
     font-size: var(--pl-text-footnote);
     font-weight: var(--pl-weight-semibold);
-    text-transform: uppercase;
+    overflow-wrap: anywhere;
 }
 
 .pl-track {
@@ -402,11 +447,12 @@ img { display: block; }
     text-align: left;
 }
 
-.pl-track:active { background: var(--pl-fill); }
+.pl-track:active { background: var(--pl-pressed); }
 
 .pl-track-number,
 .pl-track-time {
     color: var(--pl-text-2);
+    font-family: var(--pl-font-data);
     font-size: var(--pl-text-subhead);
     font-variant-numeric: tabular-nums;
 }
@@ -471,11 +517,12 @@ img { display: block; }
     margin: 0 auto;
     padding: 0 var(--pl-gap-xs) 0 10px;
     overflow: hidden;
+    border: var(--pl-hairline) solid var(--pl-card-edge);
     border-radius: var(--pl-radius-mini);
-    background: var(--pl-bar);
+    background: var(--pl-card);
     -webkit-backdrop-filter: var(--pl-blur-bar);
     backdrop-filter: var(--pl-blur-bar);
-    box-shadow: var(--pl-shadow-mini);
+    box-shadow: var(--pl-highlight);
 }
 
 .pl-mini-open {
@@ -527,10 +574,10 @@ img { display: block; }
     place-items: center;
     width: var(--pl-hit);
     height: var(--pl-hit);
-    border-radius: 50%;
+    border-radius: var(--pl-radius-control);
 }
 
-.pl-icon-button:active { background: var(--pl-fill); }
+.pl-icon-button:active { background: var(--pl-pressed); }
 .pl-icon { width: 24px; height: 24px; }
 .is-busy { opacity: 0.55; }
 
@@ -563,7 +610,8 @@ img { display: block; }
 
 .pl-sheet.is-dragging { transition: none; }
 
-/* the cover itself, blurred to a wash of its colours - what the real one does */
+/* the cover itself, blurred to a wash of its colours, as iOS's player does - not drawn since the
+   restyle (--pl-backdrop-display), which allows no blur; kept so it comes back with two tokens */
 .pl-sheet-backdrop {
     position: absolute;
     inset: -20%;
@@ -572,6 +620,7 @@ img { display: block; }
     height: 140%;
     object-fit: cover;
     filter: var(--pl-blur-backdrop);
+    display: var(--pl-backdrop-display);
 }
 
 .pl-sheet-grip {
@@ -685,8 +734,13 @@ img { display: block; }
     right: 0;
     left: 0;
     height: var(--pl-scrub-track);
-    border-radius: calc(var(--pl-scrub-track-held) / 2);
-    background: linear-gradient(to right, var(--pl-scrub-done) var(--done, 0%), var(--pl-scrub-left) var(--done, 0%));
+    border: var(--pl-hairline) solid var(--pl-scrub-edge);
+    border-radius: var(--pl-radius-track);
+    /* the grey fill up to where the song is, the sunken track after it */
+    background:
+        linear-gradient(to right, transparent var(--done, 0%), var(--pl-scrub-left) var(--done, 0%)),
+        var(--pl-scrub-fill);
+    box-shadow: var(--pl-scrub-inset);
     transform: translateY(-50%);
     transition: height var(--duration-fast) var(--ease-out);
 }
@@ -715,6 +769,7 @@ img { display: block; }
     pointer-events: none;
     justify-content: space-between;
     color: var(--pl-text-2);
+    font-family: var(--pl-font-data);
     font-size: var(--pl-text-caption);
     font-weight: var(--pl-weight-medium);
     font-variant-numeric: tabular-nums;
@@ -732,11 +787,12 @@ img { display: block; }
     place-items: center;
     width: 72px;
     height: 72px;
-    border-radius: 50%;
+    /* round, as STYLE.md keeps play and pause - the press shows a circle, not a card's corners */
+    border-radius: var(--pl-radius-round);
     transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
-.pl-transport-button:active { background: var(--pl-fill); transform: scale(0.92); }
+.pl-transport-button:active { background: var(--pl-pressed); transform: scale(0.92); }
 .pl-transport-icon { width: 36px; height: 36px; }
 .pl-transport-button.is-main .pl-transport-icon { width: 48px; height: 48px; }
 
@@ -821,160 +877,3 @@ img { display: block; }
 @media (max-height: 500px) {
     .pl-readouts { display: none; }
 }
-
-/* ===== settings ===== */
-
-/*
-  A sheet from the bottom over a dimmed page, as iOS's are (Settings.tsx). Hidden, it stays laid out
-  and slides away; visibility waits for the slide to finish, as the now-playing sheet's does. At its
-  tallest it leaves a strip of the page in sight, and past that it scrolls - on its side, in 390px of
-  height, it must - so overflow-y: auto, and overflow-x: hidden as well: auto on one axis alone
-  promotes the other to auto too. The header stays at the top while it scrolls, so Done is always
-  there. Every row is at least a tap target tall, and the words wrap; nothing is cut short.
-*/
-.pl-settings {
-    position: fixed;
-    inset: 0;
-    z-index: var(--pl-settings-z);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    visibility: hidden;
-    transition: visibility 0s linear var(--pl-sheet-duration);
-}
-
-.pl-settings.is-open { visibility: visible; transition: none; }
-
-.pl-settings-backdrop {
-    position: absolute;
-    inset: 0;
-    background: var(--pl-settings-scrim);
-    opacity: 0;
-    transition: opacity var(--pl-sheet-duration) var(--pl-sheet-ease);
-}
-
-.pl-settings.is-open .pl-settings-backdrop { opacity: 1; }
-
-.pl-settings-sheet {
-    position: relative;
-    width: 100%;
-    max-width: var(--pl-settings-max);
-    max-height: calc(100dvh - var(--pl-safe-top) - var(--pl-settings-room));
-    margin: 0 auto;
-    padding: 0 var(--pl-edge-right) calc(var(--pl-safe-bottom) + var(--pl-gutter)) var(--pl-edge-left);
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    border-radius: var(--pl-settings-radius) var(--pl-settings-radius) 0 0;
-    background: var(--pl-settings-bg);
-    outline: none;
-    transform: translateY(100%);
-    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
-}
-
-.pl-settings.is-open .pl-settings-sheet { transform: translateY(0); }
-
-/* the title in the middle and Done at the right, as a sheet's nav bar has them */
-.pl-settings-header {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: center;
-    min-height: var(--pl-settings-header);
-    background: var(--pl-settings-bg);
-}
-
-.pl-settings-title {
-    grid-column: 2;
-    margin: 0;
-    font-size: var(--pl-text-body);
-    font-weight: var(--pl-weight-semibold);
-}
-
-.pl-settings-done {
-    grid-column: 3;
-    justify-self: end;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    min-width: var(--pl-hit);
-    min-height: var(--pl-hit);
-    color: var(--pl-accent);
-    font-size: var(--pl-text-body);
-    font-weight: var(--pl-weight-semibold);
-}
-
-.pl-settings-section { padding-bottom: var(--pl-gap-sm); }
-
-.pl-settings-heading {
-    margin: var(--pl-gap-sm) 0 6px;
-    padding: 0 var(--pl-gap);
-    color: var(--pl-text-2);
-    font-size: var(--pl-text-footnote);
-    font-weight: var(--pl-weight-regular);
-    text-transform: uppercase;
-}
-
-.pl-settings-group {
-    overflow: hidden;
-    border-radius: var(--pl-radius-control);
-    background: var(--pl-settings-row);
-}
-
-.pl-settings-row {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: var(--pl-hit);
-    padding: var(--pl-settings-row-pad) var(--pl-gap);
-    text-align: left;
-    transition: background-color var(--duration-fast) var(--ease-out);
-}
-
-/* iOS's separator, inset to where the words begin */
-.pl-settings-row + .pl-settings-row::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: var(--pl-gap);
-    border-top: 0.5px solid var(--pl-separator);
-}
-
-.pl-settings-row:active { background: var(--pl-fill); }
-
-.pl-settings-row:focus-visible,
-.pl-settings-done:focus-visible {
-    outline: 2px solid var(--pl-accent);
-    outline-offset: -2px;
-    border-radius: var(--pl-radius-control);
-}
-
-.pl-settings-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
-.pl-settings-label { font-size: var(--pl-text-body); line-height: 1.3; }
-
-.pl-settings-note {
-    color: var(--pl-text-2);
-    font-size: var(--pl-text-footnote);
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-}
-
-.pl-settings-check { flex: none; width: var(--pl-check); height: var(--pl-check); color: var(--pl-accent); }
-.pl-settings-check.is-off { visibility: hidden; }
-
-/* ===== before there is anything to play ===== */
-
-.pl-setup {
-    max-width: var(--pl-content-max);
-    margin: 0 auto;
-    padding: calc(var(--pl-safe-top) + 48px) var(--pl-edge-right) var(--pl-gutter) var(--pl-edge-left);
-}
-
-.pl-setup p { color: var(--pl-text-2); font-size: var(--pl-text-subhead); line-height: 1.45; }
-.pl-setup a { color: var(--pl-accent); }
-.pl-setup .pl-pill { width: 100%; margin-top: var(--pl-gap); }

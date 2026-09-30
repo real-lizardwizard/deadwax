@@ -16,6 +16,7 @@ the how.
 | Library window | **done** — `LibraryView.tsx` + `src/library.py`. An Explorer-style tree (`LibraryTree.tsx`, `lib/libraryTree.ts`: artist → album → edition → track) beside a details pane (`LibraryDetails.tsx`) with a user-chosen set of track fields - reorderable and resizable by their headers since v0.6.9 (`lib/trackFields.ts`). Replaced the one-row-per-album list in v0.6.5. |
 | Candidates panel | **done** (v0.9.10) — `CandidatesPanel.tsx` + `lib/candidates.ts`. Opened by the vanilla Find buttons through the bridge (`openCandidates`); downloads go to the downloads panel through `lib/downloadRequests.ts`. |
 | Tag editor | **done** — `TrackTagEditor.tsx` (v0.6.9), born in Preact rather than ported. Edits tags by hand on one track or every ticked one; only the fields you change are sent (`lib/tagEdit.ts`), and the preview comes from the same planner the write recomputes (`src/track_tags.py`). |
+| The one app (`/player/`) | **begun** (2.0.0-player.9) — `ui/src/app/`: `App.tsx` (the root, and the one `usePlayer()` call), the tab bar (Home, Library, Search, Requests, You), Home's "Recently added", You (Maximum quality, the connection checks, the version from `/deadwax/me`), per-tab stacks in the hash (`lib/appRoutes.ts`, driven against the real history by `lib/appHistory.ts`), and the player's screens inside them. Search and Requests say they are on the main page for now. It grows in place at `/player/` until it covers the main page; see "The one app" in CLAUDE.md. |
 | Multi-stage Dockerfile | **done** — `ui` stage builds into `interface/dist`. |
 | Cache-header fix | **done** — hashed chunks immutable, entry bundle revalidates. |
 | Everything else | untouched. Vanilla still owns it. |
@@ -57,7 +58,8 @@ ui/
   index.html             # DEV HARNESS ONLY - not built, not served. See below.
   src/
     main.tsx             # mount table: element id -> component
-    player/              # the phone player at /player/ - its own entry, main.tsx (1.0.3)
+    player/              # the phone player at /player/ - its own entry, main.tsx (1.0.3); the engine and its screens
+    app/                 # the one app it grows into (2.0.0-player.9): App, the tabs, Home, You - main.tsx renders App
     bridge.ts            # window.deadwax - the seam with the vanilla app
     api/                 # types.ts + one wrapper module per backend module
     components/
@@ -80,7 +82,7 @@ entries, one per hand-written page:
 | entry | source | loaded by |
 | --- | --- | --- |
 | `deadwax-ui` | `src/main.tsx` | `interface/index.html`, the main page (as `/dist/deadwax-ui.js`) |
-| `deadwax-player` | `src/player/main.tsx` | `interface/player/index.html`, the phone player at `/player/` (as `/dist/deadwax-player.js`) |
+| `deadwax-player` | `src/player/main.tsx`, which renders `src/app/App.tsx` | `interface/player/index.html`, the app at `/player/` (as `/dist/deadwax-player.js`) |
 
 Both entry filenames are pinned unhashed (`entryFileNames: '[name].js'`) because a static HTML
 file has to name them. Code they share (Preact, the HTTP helpers) goes into a hashed chunk under
@@ -96,7 +98,10 @@ Two consequences worth knowing:
 - **An unhashed entry is a mutable URL**, so `src/api/app.py` must send `no-cache` for it.
   That's already wired; don't undo it.
 - **No CSS is imported by any component**, deliberately — the existing `main.css` still owns
-  everything. A JS-entry build does not auto-inject an emitted stylesheet, so the first
+  everything on the main page, and the app at `/player/` has hand-written stylesheets of its own
+  (`interface/player/player.css` and `app.css`, on `theme.css` section 10's `--dw-*` tokens).
+  `tests/test_pages.py` holds each page's bundle to a vite entry and its stylesheets to files that
+  are served. A JS-entry build does not auto-inject an emitted stylesheet, so the first
   component that imports CSS has to solve that. Don't discover it by accident.
 
 `ui/index.html` is a harness for building one component in isolation with HMR. It proxies

@@ -260,8 +260,9 @@ album to see where it stands.
 
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
-The [phone player](player.md) shows one of these in place of your albums, with the reason under
-it.
+The [phone player](player.md) shows one of these on Home and in the Library tab, in place of your
+albums, with the reason under it. The other tabs work without Navidrome, and You's **Connections**
+shows Navidrome as **Not set up** or **Can't reach it**, with the same reason under it.
 
 - **Connect Navidrome**: the three Navidrome settings aren't all set. Fill in `NAVIDROME_URL`,
   `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections, which marks the one

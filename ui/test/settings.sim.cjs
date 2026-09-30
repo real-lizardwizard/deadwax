@@ -1,18 +1,18 @@
 /**
- * The player's settings sheet (player/Settings.tsx) and the button that opens it (player/Library.tsx),
- * the components themselves, compiled with the repo's TypeScript and rendered by a small stand-in for
- * Preact into plain objects, with a document that knows which element has focus.
+ * "Maximum quality" in the app's You tab (app/QualityChoice.tsx, 2.0.0-player.9 - it was the
+ * player's settings sheet, player/Settings.tsx, opened by a gear beside the Library title, until
+ * the tabs), the component itself, compiled with the repo's TypeScript and rendered by a small
+ * stand-in for Preact into plain objects, with a document that knows which element has focus.
  *
  * What it pins:
  *
- *  - Focus goes back to the Settings button when the sheet closes, in WebKit too. WebKit - Safari, and
- *    every browser on an iPhone - doesn't focus a button that is clicked or tapped
- *    (HTMLFormControlElement::isMouseFocusable()), and the sheet gives focus back to whatever had it as
- *    it opened: so the button has to take focus itself before it opens the sheet, or focus falls to
- *    the page. A click here is WebKit's: it focuses nothing by itself.
- *  - The "Maximum quality" notes say only what the code does: resampling is of FLAC songs at 88.2 to
- *    384 kHz, it is as much quieter as src/resample.py's HEADROOM_DB says, and a song plays without a
- *    gap only with the Gapless switch on - named by the switch's own label in NowPlaying.tsx.
+ *  - The notes say only what the code does: resampling is of FLAC songs at 88.2 to 384 kHz, it is
+ *    as much quieter as src/resample.py's HEADROOM_DB says, and a song plays without a gap only with
+ *    the Gapless switch on - named by the switch's own label in NowPlaying.tsx. Word for word.
+ *  - It is a radio group as it was: a tap picks; the arrows move the choice and the focus with it,
+ *    round the group; only the chosen radio is a tab stop; other keys are left alone.
+ *  - Where it lives now: You's Playback section, on the same storage key, per device; and the gear
+ *    and the sheet are gone.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -27,7 +27,7 @@ const REPO = path.resolve(UI, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-settings-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/player/Settings.tsx', 'src/player/Library.tsx', '--rootDir', 'src', '--outDir', OUT,
+  'src/app/QualityChoice.tsx', '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -97,15 +97,11 @@ const define = (name, value) => Object.defineProperty(globalThis, name, { value,
 define('document', document)
 define('HTMLElement', FakeElement)
 define('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
-//? the library's first page is asked for and never answers: nothing here is about the albums
-define('fetch', () => new Promise(() => {}))
-define('IntersectionObserver', class { observe() {} unobserve() {} disconnect() {} })
 
 /* ===== rendering ===== */
 
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
-const { Settings, QUALITIES } = require(path.join(OUT, 'player/Settings.js'))
-const { Library } = require(path.join(OUT, 'player/Library.js'))
+const { QualityChoice, QUALITIES } = require(path.join(OUT, 'app/QualityChoice.js'))
 
 //? each element of a tree, found by where it sits, keeps one FakeElement across renders; a ref names it
 function mount(component, name) {
@@ -145,42 +141,73 @@ function mount(component, name) {
 
 /* ===== the checks ===== */
 
-console.log('\nfocus goes back to the Settings button, in WebKit too')
+//? a keydown on the group, as the browser sends it: its currentTarget is the group's element, whose
+//? querySelector finds the radio of that data-rate in the tree as rendered
+function keyOn(view, group, key) {
+  let prevented = false
+  const currentTarget = {
+    querySelector(selector) {
+      const rate = /\[data-rate="([^"]+)"\]/.exec(selector)?.[1]
+      const [radio] = view.find((node) => node.props?.role === 'radio' && node.props['data-rate'] === rate)
+      return radio?.element ?? null
+    },
+  }
+  group.props.onKeyDown({ key, currentTarget, preventDefault() { prevented = true } })
+  return prevented
+}
+
+console.log('\n"Maximum quality" is a radio group, keys and all')
 {
   const player = { maxRate: '48000', setMaxRate(rate) { this.maxRate = rate } }
-  let open = false
-  const settings = mount(Settings, 'settings')
-  const library = mount(Library, 'library')
-  const renderSettings = () => settings.render({ player, open, onClose: () => { open = false } })
-  let focusedAtOpen = null
-  library.render({ onOpen: () => {}, onSettings: () => { focusedAtOpen = document.activeElement; open = true } })
-  renderSettings()
-  const [gear] = library.find((node) => node.type === 'button' && node.props['aria-label'] === 'Settings')
-  check('the library\'s header has the Settings button', !!gear, true)
-  check('nothing focused yet', document.activeElement.name, 'body')
-  //? a tap: WebKit dispatches the click and focuses nothing
-  gear.props.onClick({ currentTarget: gear.element, preventDefault() {} })
-  check('a tap on it: the button has focus before the sheet is asked to open', focusedAtOpen === gear.element, true)
-  renderSettings()
-  check('the sheet open, and focus in it', [open, document.activeElement.name], [true, 'settings div pl-settings-sheet'])
-  const [done] = settings.find((node) => node.type === 'button' && node.props.class === 'pl-settings-done')
-  done.props.onClick()
-  renderSettings()
-  check('Done: the sheet closed, and focus back on the Settings button', [open, document.activeElement === gear.element], [false, true])
+  const view = mount(QualityChoice, 'quality')
+  const render = () => view.render({ player })
+  render()
+  const [group] = view.find((node) => node.props?.role === 'radiogroup')
+  const [title] = view.find((node) => node.type === 'h3')
+  const radios = () => view.find((node) => node.props?.role === 'radio')
+  check('a radio group labelled by its heading', [!!group, group?.props['aria-labelledby'] === title?.props.id, title?.props.children], [true, true, 'Maximum quality'])
+  check('two radios, 48 kHz chosen', radios().map((r) => [r.props['data-rate'], r.props['aria-checked']]), [['48000', true], ['original', false]])
+  check('only the chosen one is a tab stop', radios().map((r) => r.props.tabIndex), [0, -1])
 
-  gear.props.onClick({ currentTarget: gear.element, preventDefault() {} })
-  renderSettings()
-  for (const fn of listeners.get('keydown') ?? []) fn({ key: 'Escape' })
-  renderSettings()
-  check('Escape: closed, and focus back on the button again', [open, document.activeElement === gear.element], [false, true])
+  radios()[1].props.onClick()
+  render()
+  check('a tap on Original picks it', [player.maxRate, radios().map((r) => r.props['aria-checked'])], ['original', [false, true]])
+  check('...and the tab stop moves with it', radios().map((r) => r.props.tabIndex), [-1, 0])
 
   document.activeElement = document.body
-  gear.props.onClick({ currentTarget: gear.element, preventDefault() {} })
-  renderSettings()
-  const [backdrop] = settings.find((node) => node.type === 'div' && node.props.class === 'pl-settings-backdrop')
-  backdrop.props.onClick()
-  renderSettings()
-  check('a tap outside: closed, and focus back on the button', [open, document.activeElement === gear.element], [false, true])
+  let prevented = keyOn(view, group, 'ArrowDown')
+  render()
+  check('ArrowDown from the last wraps to the first', [prevented, player.maxRate], [true, '48000'])
+  check('...and takes the focus with it', document.activeElement === radios()[0].element, true)
+  prevented = keyOn(view, group, 'ArrowUp')
+  render()
+  check('ArrowUp wraps back', [prevented, player.maxRate, document.activeElement === radios()[1].element], [true, 'original', true])
+  keyOn(view, group, 'ArrowRight')
+  render()
+  check('ArrowRight moves on', player.maxRate, '48000')
+  keyOn(view, group, 'ArrowLeft')
+  render()
+  check('ArrowLeft moves back', player.maxRate, 'original')
+  const focused = document.activeElement
+  prevented = keyOn(view, group, 'a')
+  render()
+  check('any other key is left alone', [prevented, player.maxRate, document.activeElement === focused], [false, 'original', true])
+}
+
+console.log('\nwhere it lives now')
+{
+  const you = fs.readFileSync(path.join(UI, 'src/app/You.tsx'), 'utf8')
+  const library = fs.readFileSync(path.join(UI, 'src/player/Library.tsx'), 'utf8')
+  const persisted = fs.readFileSync(path.join(UI, 'src/state/persisted.ts'), 'utf8')
+  //? the Playback section: from its labelled <section> to the one after it closes
+  const at = you.indexOf('aria-labelledby="app-playback-title"')
+  const playback = at === -1 ? '' : you.slice(at, you.indexOf('</section>', at))
+  check('in You, in the Playback section, driving the player\'s own setting',
+    [/>\s*Playback\s*</.test(playback), playback.includes('<QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />')],
+    [true, true])
+  check('on the same storage key, per device', /playerMaxRate: 'deadwax-player-max-rate'/.test(persisted), true)
+  check('the gear is gone from the Library', [library.includes('aria-label="Settings"'), library.includes('onSettings')], [false, false])
+  check('and the sheet with it', fs.existsSync(path.join(UI, 'src/player/Settings.tsx')), false)
 }
 
 console.log('\nthe "Maximum quality" notes say what the code does')

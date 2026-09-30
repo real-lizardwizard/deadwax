@@ -65,7 +65,8 @@ as a sheet over the tree. A few gestures are phone-specific:
   keep them out of the way.
 
 For listening, there's also [the phone player](player.md) at `/player/`: a separate page that
-plays your library from Navidrome, made to be added to an iPhone's home screen.
+plays your library from Navidrome, made to be added to an iPhone's home screen. It has tabs of its
+own (Home, Library, Search, Requests and You), and is growing into the one app for all of deadwax.
 
 <p>
 <img src="../assets/images/mobile.png" width="280" alt="Searching on a phone">

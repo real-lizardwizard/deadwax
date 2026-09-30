@@ -1,11 +1,12 @@
 import { Fragment } from 'preact'
 import { useEffect, useMemo, useState } from 'preact/hooks'
 
+import { discHeadings } from '../lib/discTitles'
 import { formatDuration, trackTime } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
 import { album as fetchAlbum, toQueueTrack, type Album, type AlbumWithSongs, type Song } from './api'
 import { ChevronLeftIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
-import { Cover } from './Library'
+import { Cover } from './Cover'
 import type { Player } from './usePlayer'
 
 /** The one format every song is in - "FLAC" - or null when they differ or nobody said. */
@@ -21,17 +22,24 @@ function sharedFormat(songs: Song[]): string | null {
  * Drawn from the grid's copy of the album straight away, so the cover and title are on screen
  * while the song list is still on its way. Only the newest request counts (lib/latest.ts), and
  * leaving the album calls its request off rather than letting it run on beside the music.
+ *
+ * Pushed on whichever tab opened it (lib/appRoutes.ts), so the back button says where it goes:
+ * `backLabel` is the page below. For now that is always the tab ("Home", "Library"), since nothing
+ * on an album page opens another; the page below's own name once something does (artist pages).
+ * Disc headings come from Navidrome's own `discTitles` (lib/discTitles.ts): "Disc 4 · <title>".
  */
 export function AlbumPage({
   id,
   preview,
   player,
   onBack,
+  backLabel,
 }: {
   id: string
   preview: Album | null
   player: Player
   onBack: () => void
+  backLabel: string
 }) {
   const [album, setAlbum] = useState<AlbumWithSongs | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -56,7 +64,7 @@ export function AlbumPage({
   const shown: Album | null = album ?? (preview?.id === id ? preview : null)
   const songs = album?.song ?? []
   const tracks = useMemo(() => (album ? songs.map((song) => toQueueTrack(song, album)) : []), [album])
-  const discs = new Set(songs.map((song) => song.discNumber ?? 1)).size
+  const headings = discHeadings(songs, album?.discTitles)
   const format = sharedFormat(songs)
   const total = songs.reduce((sum, song) => sum + (song.duration ?? 0), 0)
 
@@ -69,7 +77,7 @@ export function AlbumPage({
       <header class="pl-nav-bar">
         <button type="button" class="pl-back" onClick={onBack}>
           <ChevronLeftIcon class="pl-back-icon" />
-          Library
+          <span class="pl-back-label">{backLabel}</span>
         </button>
       </header>
 
@@ -82,7 +90,7 @@ export function AlbumPage({
         </p>
 
         <div class="pl-hero-actions">
-          <button type="button" class="pl-pill" disabled={!tracks.length} onClick={() => play(0)}>
+          <button type="button" class="pl-pill is-primary" disabled={!tracks.length} onClick={() => play(0)}>
             <PlayIcon class="pl-pill-icon" />
             Play
           </button>
@@ -99,12 +107,11 @@ export function AlbumPage({
       <ol class="pl-tracks">
         {songs.map((song, index) => {
           const isCurrent = player.track?.id === song.id
-          const disc = song.discNumber ?? 1
-          const newDisc = discs > 1 && (index === 0 || (songs[index - 1]?.discNumber ?? 1) !== disc)
+          const heading = headings[index]
           const showArtist = song.artist && song.artist !== shown?.artist
           return (
             <Fragment key={song.id}>
-              {newDisc && <li class="pl-disc">Disc {disc}</li>}
+              {heading && <li class="pl-disc">{heading}</li>}
               <li>
                 <button
                   type="button"

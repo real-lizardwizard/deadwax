@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 
-from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome
+from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me
 from src.logger import logger, cleanup_logging
 from src.poller import run_download_poller
 from src.store import JobStore
@@ -239,6 +239,8 @@ def start() -> FastAPI:
     app.include_router(library.router, prefix="/deadwax/library", tags=["library"])
     app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"])
     app.include_router(navidrome.router, prefix="/deadwax/navidrome", tags=["navidrome"])
+    #? who the page is talking to - the implicit admin while logins are off (src/users.py)
+    app.include_router(me.router, prefix="/deadwax/me", tags=["me"])
 
     @app.get("/deadwax/health")
     async def health():

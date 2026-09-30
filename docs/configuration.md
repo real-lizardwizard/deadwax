@@ -153,3 +153,15 @@ These are stored in your browser, so each browser and device has its own. They'r
 | preference | default | what it does |
 | --- | --- | --- |
 | Open the log on start | off | show the event log when the page loads |
+
+## The phone player's settings (per device)
+
+[The phone player](player.md) at `/player/` keeps three settings of its own, on the device, in the
+app's own storage: a home-screen app keeps its storage apart from Safari's, so set them in the app
+itself. None of them is on the main page's Settings tab.
+
+| setting | default | where it is | what it does |
+| --- | --- | --- | --- |
+| Maximum quality | Up to 48 kHz | **You** → Playback | whether hi-res FLAC songs are resampled to 48 kHz (or 44.1 kHz) or sent as they are - see [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz). Before 2.0.0-player.9 it was behind a gear beside the Library title; it keeps the setting it had there. |
+| Gapless | off | the now-playing screen | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback-experimental) |
+| Library order | Recently added | **Library**, above the grid | Recently added, Recently played, Artist or Title |

@@ -24,7 +24,7 @@ confidently wrong deployment advice. Don't bring them back.
 | branch | what |
 | --- | --- |
 | `main` | **the one line that ships.** Every change that ships lands here, and since 1.0.5 only main takes version numbers. Each push is built as `:experimental`; a `v*` tag on it is a release. Until 1.0.0 it held the old Lidarr-based v0.2.1, still tag `v0.2.1`. |
-| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for), which builds its own `:player` image. It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code there than on main; its two fix commits came to main as 1.0.3 and 1.0.4, and some sections below dated 1.0.1-1.0.5 (the 1.0.1 fixes, the phone player's port) use its numbering. From here it follows the rules: `1.1.0-player.1` to `.6`, then `2.0.0-player.N` once James decided it ships as 2.0.0 (2026-09-29), when every step of the multi-user plan is done - `2.0.0-player.7` is step 2, `2.0.0-player.8` its merge of main's 1.1.7. |
+| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for), which builds its own `:player` image. It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code there than on main; its two fix commits came to main as 1.0.3 and 1.0.4, and some sections below dated 1.0.1-1.0.5 (the 1.0.1 fixes, the phone player's port) use its numbering. From here it follows the rules: `1.1.0-player.1` to `.6`, then `2.0.0-player.N` once James decided it ships as 2.0.0 (2026-09-29), when every step of the multi-user plan is done - `2.0.0-player.7` is step 2, `2.0.0-player.8` its merge of main's 1.1.7, `2.0.0-player.9` the first slice of the one app (see "The one app"). |
 | `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2), kept for step 1's port - done, onto player-spike's 1.0.2 as its 1.0.3 (see "The phone player"), so it is kept only for reference now. Everything after it on that branch shipped on experimental. |
 | ~~`experimental/slskdn-no-lidarr`~~ | **deleted after 1.0.4.** Where all the 0.x work happened: v0.3.0 to v0.9.2 were tagged from it, and every commit of it is in main's history. |
 
@@ -174,6 +174,8 @@ src/
                    writing is narrow - see "CD art and embedded pictures".
   tagkeys.py       tag names mutagen's Easy MP4 doesn't know (the disc title), registered once,
                    and easy_file() to open a file with them - see "Disc titles".
+  users.py         current_user(), a FastAPI dependency: the implicit admin `local` while logins
+                   are off - the seam step 3 fills in. routes/me.py answers GET /deadwax/me from it.
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
@@ -189,14 +191,17 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    value here restyles the vanilla and Preact sides together. Raw values in
                    main.css or in a component are a bug. NOTE it is @import-ed, so it caches
                    separately - hard-refresh when verifying a palette change.
-  player/          the phone player's page, manifest, icons and its own stylesheet.
+  player/          the app's page at /player/, manifest, icons, and two stylesheets: player.css
+                   (the player; mechanics its own, look on theme.css section 10) and app.css (the
+                   tab bar, Home, You) - see "The one app".
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one;
                    player/streamSource.ts is its one-stream gapless engine, with the pure
-                   lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC"; player/Settings.tsx
-                   is its settings sheet (Maximum quality).
-tests/             1801 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+                   lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". Since
+                   2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
+                   with the player inside them - see "The one app".
+tests/             1825 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2099,9 +2104,10 @@ The user guide's page is `docs/player.md`.
   changed in 1.0.3 (below). "Now playing" (`submission=false`) goes when playback actually
   starts. "Previous" restarts past 3 seconds - and since the review a restart, or play on an
   ended song, is a new listen that can count again, dated from its first `playing` (`Listen`).
-- **The album is in the hash** (`#/album/<id>`) so history and the back button work. Whether iOS's
-  edge swipe goes back in a HOME-SCREEN app is unverified - standalone web apps have historically
-  had none. The library stays mounted (hidden) under an open album, so pages loaded and scroll
+- **The album is in the hash** (`#/album/<id>`; since 2.0.0-player.9 `#/<tab>/album/<id>`, the old
+  form rewritten to the Library's - see "The one app") so history and the back button work.
+  Whether iOS's edge swipe goes back in a HOME-SCREEN app is unverified - standalone web apps have
+  historically had none. The library stays mounted (hidden) under an open album, so pages loaded and scroll
   position survive; the scroll is saved and restored by hand because it is document scroll (kept
   for the status-bar tap-to-top, which a scroll container would lose). A retag that changes the
   release id changes Navidrome's album id, so a saved `#/album/<id>` then answers "nothing by that
@@ -2109,7 +2115,9 @@ The user guide's page is `docs/player.md`.
 - **Its own stylesheet and scale** (`interface/player/player.css`): iOS's text styles (17px body,
   34px large title), iOS's dark palette, the phone's own face (SF), and theme.css imported only
   for the brand purple, the motion curves and the reduced-motion switch. Same rule as theme.css -
-  every value a token at the top.
+  every value a token at the top. **The look was re-pointed in 2.0.0-player.9** to theme.css
+  section 10 (STYLE.md: Noto Sans, 3/4/6px corners, no blur); the scale and the mechanics stayed -
+  see "The one app".
 - **A new app icon** (`interface/player/icon*.png`, drawn as `icon.svg` and rasterised with
   `sips`, which reads SVG): a record with the dead wax ring picked out in purple. The favicon in
   `interface/assets/icon.svg` is still LidBrainz's, inherited; the player doesn't use it.
@@ -3424,9 +3432,11 @@ review_confirmed.md); what matters is below.
 - **The setting**: `deadwax-player-max-rate` ('48000', the default and anything invalid, or
   'original'), per device like the Gapless switch, in a sheet from the gear beside the Library title
   (`ui/src/player/Settings.tsx`, `role="radiogroup"`, focus kept and returned - WebKit doesn't focus a
-  tapped button, so the gear focuses itself first). It applies from the next song started or got
-  ready; a stream keeps the setting it started with (its `urlOf`, `streamable` and format gate are
-  fixed at `startStream`), and `fitStandby()` lets go of a standby readied at an address that changed.
+  tapped button, so the gear focuses itself first). **Moved in 2.0.0-player.9** to You > Playback
+  (`app/QualityChoice.tsx`, the same words, key and keys); the sheet and the gear are gone - see
+  "The one app". It applies from the next song started or got ready; a stream keeps the setting
+  it started with (its `urlOf`, `streamable` and format gate are fixed at `startStream`), and
+  `fitStandby()` lets go of a standby readied at an address that changed.
 - **What is resampled, and the one rule both sides share**: FLAC at 88.2/176.4/352.8 kHz -> 44.1 and
   96/192/384 -> 48 (whole ratios 2, 4, 8 only), 16 or 24 bits (libsndfile 1.2.2 can't open 20- or
   32-bit FLAC), 1-2 channels. `RESAMPLED_TO` exists in `src/resample.py` AND `ui/src/lib/streamWrap.ts`
@@ -3835,6 +3845,201 @@ A second review, of those fixes (in the scratchpad's `verify2step/`), confirmed 
   where filing would go is the same folder, and the note says "separately" when it isn't.
 - With a RELATIVE `LIBRARY_PATH` (`music`), a library-relative path whose artist folder is named
   like the root (`music/...`) is read as root-joined. Absolute paths, the norm, are unaffected.
+
+### The one app (2.0.0-player.9)
+
+James decided (2026-09-29) that the player and the requester become ONE app: five tabs, You at the
+right end, Get showing sources by default, Home open. The plan that builds it slice by slice at
+`/player/` was synthesized from three designs (the session scratchpad's `uplan/plan.md` and
+`slices.md`). This is slice 1: the five tabs with the player inside them, the restyle to STYLE.md,
+the `/deadwax/me` seam, and disc titles on the album page.
+
+- **Where it lives: `/player/`, grown in place, for good.** The same page, `#player-root`, entry
+  (`deadwax-player`) and manifest (`start_url` and `scope` `/player/`), so James's home-screen icon
+  and its per-device settings (`deadwax-player-*`) carry on with nothing to add again.
+  `player/main.tsx` renders `<App/>` from `ui/src/app/App.tsx`. Nothing changed in vite, rolldown,
+  app.py's prefixes or the gzip exceptions: `/player/` was already revalidated. One new stylesheet,
+  `interface/player/app.css`, linked after player.css. `tests/test_pages.py` holds, through
+  `start()`: each hand-written page's `/dist/<name>.js` to a vite input (a mismatch was a silent
+  blank page), every linked stylesheet and what it `@import`s to something served, the manifest to
+  `/player/`, app.css to no-cache and gzip, and no page or stylesheet to a Google Fonts address
+  (the boards link one; deadwax self-hosts Noto and runs offline). The main page at `/` is
+  unchanged: it stays the desktop tool for searching, downloading, editing, the review queue,
+  server settings and the log until the app covers them.
+- **The route model** (`lib/appRoutes.ts`, pure, pinned by `routes.sim.cjs`). The hash, since
+  StaticFiles has no fallback for page routes: `#/home|library|search|requests|you`, and pages
+  pushed on a tab as `#/<tab>/album/<id>`. A legacy `#/album/<id>` is rewritten with replaceState to
+  `#/library/album/<id>`; an empty or unknown hash goes to `#/home`.
+  - **Per-tab stacks, as in iOS.** A page is pushed on the tab that opened it (pushState, so the edge
+    swipe and back work); switching tab replaces the entry with that tab's top page; re-tapping the
+    tab you are on pops it to its root, and again at the root scrolls to the top; a double tap opens
+    one page. Back labels name the page below: the tab, or the album under this one (`Page.label`,
+    never part of the address or of what makes two pages the same).
+  - **Going back is history's own back only when the entries below are exactly the pages below,
+    made in this session.** Each entry the app makes carries `{n, load}` in history.state - its
+    place, and which page load made it - and `HistoryNote.entries[n]` is the address it was given;
+    `stepsBack` compares. Otherwise the address is replaced. That is what makes a cold deep link
+    work, and what stops a back walking into another tab's page: open A in the Library, switch to
+    Home (replaced), open B (pushed), switch back (replaced) - the entry under A is now Home's.
+  - **The note survives a reload** (review): it is kept in sessionStorage under
+    `deadwax-player-history:<load>` (`saveNote`/`readNote`), and a reload on an entry the app
+    made reads its load's note back (`startHistory(place, address, saved)`). Without it, back
+    after a reload replaced the address and left a copy of the entry below behind: the next swipe
+    showed nothing and only the one after left the app. The LOAD is in the key because the n's are
+    only one load's own - a tab that opens /player/ twice has two sets counting from 0, and reading
+    the other's note would send `history.go(-n)` into the wrong entries. A load name is
+    `Date.now()` and `Math.random()` (not `crypto.randomUUID`, which needs a secure context and
+    deadwax is plain http on the LAN); a state from before loads were recorded, or storage
+    refused, means entries below unknown, as before.
+  - **The browser's own back or forward onto ANOTHER tab's entry is that tab chosen, as it was
+    left** (`browserMoved`, review). Switching tab replaces the entry, so the entries below one
+    tab's root are whichever tab showed when they were made: back from the Library's root lands
+    on an entry Home wrote. Followed literally (`followRoute`) it emptied Home's stack - the entry
+    names Home's root - and dropped the album opened there. Now the tab's stack is kept and the
+    entry is rewritten to its top page. A web page can't stop that back from leaving the tab; it
+    can stop it losing the tab it lands on. Within the tab showing, and for an address typed in
+    (no place: it says where to go), `followRoute` as before. popstate and hashchange for one move
+    are taken once (the address last shown).
+  - **`lib/appHistory.ts` drives it** (`createRouter`): the only thing that touches the history,
+    handed `window.history`, `location.hash` and sessionStorage by App, and heard back through
+    `show`. It takes nothing from `window` itself, so `routes.sim.cjs` drives it end to end
+    against a fake history that keeps entries and state across a reload, fires popstate then
+    hashchange, and runs `history.go()` later, as a browser does - the reviewers' scenarios as
+    they were reported. `app-rules.sim.cjs` holds App to it: no pushState, replaceState or
+    `history.go` of its own.
+  - **What stays mounted**: every tab's root, hidden while another shows (the document stays the
+    scroller, for the status bar's tap-to-top), and each tab's top page. Scroll is saved per route
+    as it is left and restored in a layout effect; a page opened afresh starts at its top. The
+    roots are memoised elements, so the music playing re-renders the player's parts and not the
+    grids. Sheets are state, not addresses.
+- **The gesture rule, and `app-rules.sim.cjs`.**
+  - `usePlayer()` is called once, in `App`, which never unmounts. `PlayerContext` carries the player
+    (a new object on every change of `playing` and the rest), `ActionsContext` the engine's actions,
+    which never change (`pickActions`). Only pages read the contexts; leaf components take props,
+    because the fake-Preact sims have no `useContext`.
+  - The playback actions (playTracks, toggle, next, previous, setGapless, showAirPlay) are reached
+    only from an allowlist: AlbumPage (playTracks), MiniPlayer (toggle, next), NowPlaying (all but
+    playTracks), and `app/context.ts`, which names them and calls none. Adding a file is a
+    deliberate edit to the sim, like the Navidrome route list.
+  - Nothing outside `app/` and `player/` imports usePlayer, the contexts or App.
+  - Only App imports usePlayer as a VALUE, under any name (review: `usePlayer as useEngine`
+    slipped past the call count), and `app/context.ts` calls none of the actions it names (a
+    helper there that fetched and then played would start playback outside the tap for any page).
+  - Nothing in `app/` contains setActionHandler, `new Audio`, `<audio`, `.src =`, srcObject or
+    `.load(` - comments included, so don't name them in a comment there.
+  - **A link out of the app opens beside it** (`target="_blank" rel="noopener"`, review): the
+    Search and Requests cards, You's Managing row and the gate's settings link. Followed in the
+    same page, `/` unloads the player - the audio element, any stream and the queue, which
+    nothing keeps. From the home-screen app it opens outside the app's scope either way (Safari
+    or a browser view over it; not seen on the phone). The sim fails on any `<a href>` in app/ or
+    player/ that isn't a `#` link and doesn't open beside.
+  - **While Now Playing is open, everything behind it is inert** (review): the panes, the mini
+    player and the tab bar sit in one `.app-behind` wrapper with `inert` and `aria-hidden` while
+    `sheetOpen`, so neither Tab nor VoiceOver reaches the five tabs under the sheet (activating one
+    switched tabs out of sight). NowPlaying moves focus to its close button as it opens (a layout
+    effect, before anything else can move it), and App gives it back to what had it (taken in the
+    tap, before the page behind turns inert and the browser drops focus from it) - on iOS a tapped
+    button never had focus, so nothing is given back there. No focus trap and no Escape: slice 2's
+    shared sheet does those.
+  - **Tiles navigate, never fetch-and-play.** Home's shelf and the Library grid open the album;
+    they `prefetchAlbum()` on pointerdown (called off on pointercancel - the press became a scroll;
+    taken once by `album()`, kept 30 s), so Play is usually live by the time the page opens, and
+    Play is pressed on the page, in the tap.
+- **The Navidrome gate narrowed** (`NeedsNavidrome`): drawn inside Home's shelf, the Library tab and
+  the album pages only. The tab bar, You, Search and Requests work with Navidrome unset or down.
+  App asks `/navidrome/status` once for every gate.
+- **You**: Maximum quality moved from the settings sheet (`player/Settings.tsx`, deleted with the
+  gear) to You > Playback as `app/QualityChoice.tsx`: the words, the storage key and the keyboard
+  handling unchanged, pinned by `settings.sim.cjs`, retargeted (it still reads the Gapless label
+  from NowPlaying.tsx). Connections: the main page's two pings and Navidrome's status, asked the
+  FIRST time You shows, not at start-up (the MusicBrainz ping is a real request to a rate-limited
+  service), and on "Check again". About: the version and "logins are off" from `/deadwax/me`,
+  asked WITH the pings, so "Check again" asks it again too (review: a first ask failing - deadwax
+  restarting under Komodo - left "unknown" there until the app was killed; a failure clears as the
+  next ask begins, and a failed ask after a good one keeps the version and says so). The identity
+  line says only what deadwax said: nothing when it hasn't answered. Each connection row is its own
+  polite, atomic live region (review: one region on the list read out a bare "Connected" with no
+  service name, in whatever order the answers came). A row links to `/` for server settings, the
+  review queue, the log and editing, in a new tab. Admin rows are gated on `me.admin` (true with
+  logins off); Sign out isn't drawn while logins are off. Gapless stays on Now Playing until slice
+  2 moves it here. `you.sim.cjs` renders You with deadwax faked and pins all of this.
+- **Search and Requests are honest placeholders** ("On the main page for now", with a link) until
+  slices .12 and .11. Home has only "Recently added" (getAlbumList2 `newest`, 20 albums): Arriving,
+  Pinned and Not played in a while come in later slices and are NOT faked meanwhile.
+- **`/deadwax/me` and `current_user`** (`src/users.py`, `src/routes/me.py`): a FastAPI DEPENDENCY
+  returning `local` - never `@app.middleware("http")`, which hides disconnects. The answer is
+  `{user, admin: true, auth: 'off', version}`. Step 3 changes `current_user`'s body and nothing
+  else; `test_me.py` overrides the dependency to prove the route reads it.
+- **The token section, theme.css section 10 (`--dw-*`)**: STYLE.md's "just a touch of Windows 7"
+  as tokens, aliasing what exists - `--font-family` (the self-hosted Noto), `--font-mono`,
+  `--accent-hover`, section 7's durations (so reduced motion still collapses them). Nothing in
+  main.css reads a `--dw-*`, so the main page doesn't change by a pixel.
+  - player.css keeps `--pl-*` for the MECHANICS (safe areas, edges, hit sizes, the sheet's motion,
+    the scrubber's sizes, `100dvh`) and points its LOOK at `--dw-*`: Noto instead of SF, STYLE's
+    palette, 3/4/6px corners (covers 3), the blur tokens `none` (the sheet's blurred-cover backdrop
+    isn't drawn: `--pl-backdrop-display`), shadows no bigger than 0 1px 2px, the scrub track a sunken
+    well (a hairline edge, an inset shadow, a grey gradient fill; the round thumb kept), and no
+    uppercase or letter-spaced labels (the hero's meta line, the disc headings). The order chips
+    are secondary and toggled, Play primary. Layout lives in the rules, so no hit area moved, and
+    reverting the look is a token change.
+  - The mini player keeps its 64px, its sides and its buttons, and moves up:
+    `.app-shell .pl-mini { bottom: <the tab bar> + inset }`, with `.app-shell` padding for both.
+    Stacking: the tab bar 8, the mini player 10, Now Playing 20.
+  - New chrome is `app-` classes in app.css, tokens only - line heights, the pressed opacity and
+    the primary button's pressed filter included (`--dw-leading-*`, `--dw-pressed-cover`,
+    `--dw-primary-pressed`, review). `tests/test_app_css.py` reads the rules and fails on a raw
+    length, time, line height, opacity or filter outside :root. The Gapless switch is still iOS's
+    pill until slice 2 makes it a checkbox in You.
+  - **Play and pause stay round** (`--pl-radius-round`, STYLE.md; the restyle had given the
+    transport buttons the card's 6px, so a press flashed a rounded square).
+  - **Focus rings**: one drawn outside what it marks only where there is room (a free button, a
+    shelf tile - the shelf keeps `--app-ring-room` above and below its tiles); one drawn INSIDE
+    (`--app-ring-inset`) for a row of a grouped list, the tab and the radio, since `.app-group`
+    clips with `overflow: hidden` and a ring outside a row there was clipped away entirely.
+  - **Keyboard focus scrolls clear of the fixed chrome**: `scroll-padding` on `html`, the tab bar
+    (and the mini player, `html:has(.app-shell.has-mini)`) at the bottom and the album page's
+    sticky bar at the top - the same room the shell's padding keeps (`--app-chrome-bottom*`). A
+    browser counts a control under fixed chrome as in view and wouldn't scroll to it at all.
+  - **A phone on its side gets iOS's compact tab bar** (`@media (max-height: 500px)`: the icon
+    beside the label, `--dw-tab-item-compact` 32px), since at 844x390 the full bar and the mini
+    player covered half the screen. Everything clearing the bar reads `--app-tabbar-height`, which
+    is built from `--app-tab-item`, so it follows. The mini player keeps its size.
+  - **Home as the board has it**: 12px from a heading to its shelf (`--app-shelf-heading-gap`;
+    You's cards keep 6px), and a tile's title and artist in one block with nothing between.
+- **The engine guard, on every slice**: `git diff --stat` is empty for `ui/src/player/usePlayer.ts`,
+  `streamSource.ts` and `ui/src/lib/{playQueue,gapless,scrub,streamWrap,streamPlan,fmp4}.ts`, and
+  `player.sim.cjs` and the engine sims pass untouched. `player/api.ts` may grow route wrappers (it
+  gained `prefetchAlbum`/`dropPrefetch`, a `size` for `albumPage`, a `signal` for `navidromeStatus`
+  and `discTitles` on the album type).
+- **Disc titles from Navidrome** (James: "make sure the disc titles get picked up from navidrome").
+  getAlbum's OpenSubsonic `discTitles: [{disc, title}]` - Navidrome's reading of the `discsubtitle`
+  deadwax writes, passed through untouched by `/deadwax/navidrome/albums/{id}` - goes through
+  `lib/discTitles.ts`: "Disc 4 · <title>", or "Disc 4" for a disc without one; headings show when
+  the album has more than one disc OR any of its discs has a title, so an ordinary one-disc album is
+  unchanged; no disc number is disc 1; a blank title, or one for a disc with no songs, is ignored.
+  `discs.sim.cjs` pins it, and that AlbumPage reads `album.discTitles`. **A one-disc album deadwax
+  filed shows no title** (review): Navidrome records a disc's title only for a disc number above 0
+  (`ToAlbum` in model/mediafile.go; a missing tag reads 0), and `tag_values` writes no disc number
+  for a one-disc release - so its `discsubtitle` never reaches `discTitles`. The guide says a
+  one-disc album shows its title only when its files carry a disc number (Picard's "1/1", or Disc
+  set with Disc title in the tag editor), and the sim holds the guide to it. Writing
+  `discnumber=1` beside a title on a one-disc release would be a change on MAIN (every titled
+  one-disc album gets a one-time disc-number diff) - James's call, not made here.
+- **Verified**: 1825 Python tests, pyflakes, tsc, and all 23 sims (routes, app-rules, discs and
+  you new); 33 mutations, one per rule pinned, each caught and restored byte for byte - and after
+  the review, 27 more, one per fix (each a test failing without it). **NOT verified here**: the
+  real page, which the build workaround and a check against the stubs cover after this change;
+  and everything on the iPhone - the tab bar (compact on its side), the mini player above it and
+  the safe areas under a real finger, a link to the main page from the home-screen app, whether
+  Navidrome 0.64.2 sends `discTitles` for James's albums, and the home-screen icon opening the new
+  app with its settings kept. The guide's "Not yet verified" list carries the same.
+- **After review**: seventeen findings, each confirmed by skeptics, fixed together - the links
+  opening beside the app, another tab's entry gone back onto, `/me` asked again, the one-disc
+  title in the guide, the reload's note, the clipped focus rings, the live regions, the scroll
+  padding, the inert page behind Now Playing, the compact tab bar, the round transport, Home's
+  spacing, raw values, the two gaps in `app-rules.sim.cjs`, the unverified claims in the guide,
+  the back label promise, and the troubleshooting wording (You shows **Not set up** or **Can't
+  reach it**).
 
 ### Artists who have renamed (v0.6.18)
 
@@ -5087,6 +5292,11 @@ the page, and ported panels mount into it via one extra module script.
 | --- | --- |
 | Downloads panel, tab shell, library explorer (tree + details pane), metadata editor, metadata queue, delete dialog, cover viewer, tag editor (v0.6.9 - born in Preact), candidates panel (v0.9.10) | search bar, releases grid, filter column, log |
 
+**Beside the port, the one app** (2.0.0-player.9): the page at `/player/` is growing into the app
+that will replace the main page - five tabs with the player inside them, born in Preact, with
+Search and Requests linking to the main page until they are built. See "The one app"; when it
+covers everything the main page does, the vanilla half retires in one commit.
+
 **How the two halves coexist:**
 
 - `interface/index.html` provides empty mount points (`#downloads-root`, `#tabs-root`,
@@ -5164,7 +5374,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1801 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 1825 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -5195,7 +5405,11 @@ node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks 
 node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (WebKit, not Chromium), which songs, what the readout says
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
-node ui/test/settings.sim.cjs   # the settings sheet - focus given back as WebKit needs, the two notes word for word
+node ui/test/settings.sim.cjs   # Maximum quality in You - the radio group's keys, the two notes word for word, where it lives
+node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history
+node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/
+node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
+node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -5216,7 +5430,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1801 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1825 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

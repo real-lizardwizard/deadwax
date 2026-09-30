@@ -1,4 +1,4 @@
-import { Cover } from './Library'
+import { Cover } from './Cover'
 import { NextIcon, PauseIcon, PlayIcon } from './icons'
 import { usePosition, type Player } from './usePlayer'
 

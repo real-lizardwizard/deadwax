@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { isAbort, latestOnly } from '../lib/latest'
 import { readPlayerOrder, writePlayerOrder } from '../state/persisted'
-import { PAGE_SIZE, albumPage, coverUrl, type Album, type AlbumOrder } from './api'
-import { SettingsIcon } from './icons'
+import { PAGE_SIZE, albumPage, dropPrefetch, prefetchAlbum, type Album, type AlbumOrder } from './api'
+import { Cover } from './Cover'
 
 const ORDERS: { id: AlbumOrder; label: string }[] = [
   { id: 'newest', label: 'Recently added' },
@@ -18,24 +18,6 @@ function savedOrder(): AlbumOrder {
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
-
-/**
- * A cover, or the empty square that stands in for one - never a broken image.
- *
- * It remembers WHICH address failed, not that one did: the mini player and the now-playing sheet
- * keep one Cover mounted from song to song, and a plain "failed" flag - set once by Navidrome
- * restarting, or a dropped connection - blanked their art for every song after it.
- */
-export function Cover({ id, size, class: cls }: { id: string | null | undefined; size: number; class: string }) {
-  const [failed, setFailed] = useState<string | null>(null)
-  const address = coverUrl(id, size)
-  const src = address !== failed ? address : null
-  return src ? (
-    <img class={cls} src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(src)} />
-  ) : (
-    <span class={`${cls} is-empty`} aria-hidden="true" />
-  )
-}
 
 /** A page added to the albums already shown, leaving out any already there. */
 function appendPage(shown: Album[], page: Album[]): Album[] {
@@ -56,7 +38,7 @@ function appendPage(shown: Album[], page: Album[]): Album[] {
  * shifts by one and repeats the album at the old page's edge - which is why a page leaves out
  * albums already shown, while the offset goes on following what the server handed out.
  */
-export function Library({ onOpen, onSettings }: { onOpen: (album: Album) => void; onSettings: () => void }) {
+export function Library({ onOpen }: { onOpen: (album: Album) => void }) {
   const [order, setOrder] = useState<AlbumOrder>(savedOrder)
   const [albums, setAlbums] = useState<Album[]>([])
   const [loading, setLoading] = useState(false)
@@ -139,21 +121,6 @@ export function Library({ onOpen, onSettings }: { onOpen: (album: Album) => void
     <section class="pl-library">
       <header class="pl-large-header">
         <h1 class="pl-large-title">Library</h1>
-        <button
-          type="button"
-          class="pl-icon-button pl-header-button"
-          //? WebKit - Safari, and every iPhone browser - doesn't focus a button that is clicked or
-          //? tapped, and the settings sheet gives focus back to whatever had it as it opened: so the
-          //? button takes it itself, first, or focus would fall to the page when the sheet closes
-          onClick={(event) => {
-            event.currentTarget.focus()
-            onSettings()
-          }}
-          aria-label="Settings"
-          aria-haspopup="dialog"
-        >
-          <SettingsIcon class="pl-icon" />
-        </button>
       </header>
 
       <div class="pl-orders" role="tablist" aria-label="Order">
@@ -173,7 +140,16 @@ export function Library({ onOpen, onSettings }: { onOpen: (album: Album) => void
 
       <div class="pl-grid">
         {albums.map((album) => (
-          <button key={album.id} type="button" class="pl-album" onClick={() => onOpen(album)}>
+          <button
+            key={album.id}
+            type="button"
+            class="pl-album"
+            //? the album's songs asked for as the finger lands, so Play is usually ready by the time
+            //? the page opens; a press that turns into a scroll lets go of the ask (api.ts)
+            onPointerDown={() => prefetchAlbum(album.id)}
+            onPointerCancel={() => dropPrefetch(album.id)}
+            onClick={() => onOpen(album)}
+          >
             <Cover id={album.coverArt} size={400} class="pl-album-cover" />
             <span class="pl-album-title">{album.name}</span>
             <span class="pl-album-artist">{album.artist}</span>

@@ -6,6 +6,10 @@ added to an iPhone's home screen and opened like an app. It plays from
 passes on the player's requests, so the phone never holds Navidrome's password and only ever
 needs to reach deadwax.
 
+It's growing into one app for everything deadwax does: five tabs along the bottom (**Home**,
+**Library**, **Search**, **Requests** and **You**), with the player inside them. Search and
+Requests are still on the main page for now; their tabs say so and link there.
+
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
 [The list is below](#not-yet-verified-on-a-real-iphone).
@@ -51,9 +55,10 @@ itself.
 - **The password stays in deadwax.** The settings tab only shows that it's set, and the phone is
   never sent it, or anything made from it.
 
-Then open `http://your-server:8080/player/`. If something's wrong, the page says what, in place
-of the albums: **Connect Navidrome** when the settings aren't all there, or **Can't reach
-Navidrome** with the reason and a **Try again** button. [Troubleshooting](troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome)
+Then open `http://your-server:8080/player/`. If something's wrong, Home and the Library tab say
+what, in place of the albums: **Connect Navidrome** when the settings aren't all there, or **Can't
+reach Navidrome** with the reason and a **Try again** button. The tab bar and You work without
+Navidrome, so You's **Connections** can say what deadwax can and can't reach. [Troubleshooting](troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome)
 goes through each one.
 
 Setting Navidrome up also changes one thing on the main page: applying a release in the
@@ -68,19 +73,47 @@ can't be reached. See [`RETAG_RENAME_WAIT`](configuration.md#organizing).
 3. It gets its own icon (a record, with the dead wax ring picked out in purple) and opens full
    screen, without Safari's toolbars.
 
+An icon added before the tabs came (2.0.0-player.9) should keep working: the app grew in place at
+`/player/`, so there's nothing to add again, and its settings stay under the same names. That
+hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone)).
+
 ## What it does
 
-- **Your albums**, in a grid, in one of four orders: **Recently added**, **Recently played**,
-  **Artist** or **Title**. The order you pick is remembered on that device. More albums load as
-  you scroll.
+- **Five tabs** along the bottom: **Home**, **Library**, **Search**, **Requests** and **You**.
+  Each keeps its own pages, as an iPhone app's tabs do: an album opened from Home stays under
+  Home while you look at the Library, and is there when you come back - the browser's back
+  button, or a swipe back, onto another tab brings that tab back as you left it too. Tapping the
+  tab you're on goes back to its first screen; tapping it again there scrolls to the top. With the
+  phone on its side the tab bar is shorter, each tab's icon beside its name.
+- **Home**: **Recently added**, Navidrome's 20 newest albums in a row you swipe along. Tap one to
+  open it. (What's on its way, pinned albums and what you haven't played in a while come later.)
+- **Library**: your albums, in a grid, in one of four orders: **Recently added**, **Recently
+  played**, **Artist** or **Title**. The order you pick is remembered on that device. More albums
+  load as you scroll.
 - **An album**: its cover, **Play** and **Shuffle**, and its songs, under "Disc 1", "Disc 2"
-  headings for a set. Tap a song to play the album from there. Shuffle plays the album's songs
-  in a random order.
-- **A mini player** along the bottom while something is playing, with play/pause and next. Tap
-  it to open the now-playing screen.
+  headings for a set. A disc with a title of its own shows it beside its number: "Disc 4 · Live at
+  Wembley". The titles are the ones deadwax writes into your files from MusicBrainz (or you set by
+  hand in the main page's tag editor), as Navidrome reads them. A one-disc album shows its title
+  only when its files carry a disc number: Navidrome keeps a disc's title only for a numbered
+  disc, and deadwax writes no disc number for a one-disc release. Files tagged by Picard ("1/1")
+  have one; for others, set **Disc** to 1 along with **Disc title** in the tag editor. Tap a song
+  to play the album from there. Shuffle plays the album's songs in a random order. The back button
+  names the tab it goes back to.
+- **A mini player** along the bottom, just above the tabs, while something is playing, with
+  play/pause and next. Tap it to open the now-playing screen, from any tab.
+- **You**: **Maximum quality** under **Playback** ([below](#maximum-quality-hi-res-at-48-khz));
+  **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
+  time you open You and again with **Check again** (which asks for the version again too); the
+  version, and that logins are off. Server settings, the albums that need a look, the log and
+  editing an album are on the main page for now, and **Open the main page** takes you there.
+- **Search** and **Requests** say they're on the main page for now, and link there. Every link to
+  the main page opens it beside the player, in a new tab, so the music keeps playing. From the
+  home-screen app it opens outside the app, in Safari or a browser view over it.
 - **Now playing**: a large cover (a grey square for an album without one), a scrubber, previous,
   play/pause and next, and an **AirPlay** button when there's a speaker on the network to send
-  to. Drag it down, or tap the arrow at its top, to close it.
+  to. Drag it down, or tap the arrow at its top, to close it. While it's open nothing behind it
+  can be reached by the keyboard or VoiceOver; opening it moves to its close arrow, and closing it
+  goes back to where you were.
 - **The scrubber** is the whole bar: tap anywhere along it to jump there, or drag from anywhere on
   it and it follows your finger, seeking when you let go. It works from the keyboard too (arrows
   move 5 seconds, Page Up and Page Down 30, Home and End to the ends), and VoiceOver's swipe up
@@ -97,7 +130,11 @@ can't be reached. See [`RETAG_RENAME_WAIT`](configuration.md#organizing).
   previous, next and a scrubber. There are no 10-second skip buttons: iOS shows either those or
   previous and next, never both.
 - **Back** works: an open album is in the page's address, so the browser's back goes back to
-  the grid, where you left it.
+  where you opened it from, scrolled where you left it. A saved link to an album from before the
+  tabs (`#/album/…`) still opens it, in the Library.
+- **The look** is deadwax's own, the same "touch of Windows 7" as its other screens: Noto Sans,
+  with monospace for track numbers and times, square-ish corners, no blur. It's drawn from the
+  same fonts deadwax serves itself, so it needs no internet.
 
 ## Gapless playback (experimental)
 
@@ -263,8 +300,8 @@ second player's song changes took about 98 ms there against about 145 ms with th
 
 ## Maximum quality: hi-res at 48 kHz
 
-The **Settings** button (the gear beside **Library** at the top of your albums) opens **Maximum
-quality**, with two choices. Like the Gapless switch, it's kept on the device.
+**Maximum quality** is in **You**, under **Playback**, with two choices. (Before 2.0.0-player.9 it
+was behind a gear beside the Library title.) Like the Gapless switch, it's kept on the device.
 
 - **Up to 48 kHz** (the default): FLAC songs at 88.2, 96, 176.4, 192, 352.8 or 384 kHz, 16 or 24
   bits, are resampled by deadwax to 48 kHz (44.1 kHz for the 88.2 kHz family) and sent as lossless
@@ -487,7 +524,8 @@ fixes that.
   [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened).
 - **CarPlay**: not something a web page can offer.
 - **Offline**: nothing is kept on the phone for listening without a connection.
-- **Search**: there isn't any yet. Browse the grid.
+- **Search**: not in the app yet. The Search tab links to the main page, which searches
+  MusicBrainz; to find something to play, browse the Library.
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
@@ -497,7 +535,7 @@ fixes that.
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata
   editor, since Navidrome may give it a new id. The page says Navidrome has nothing by that id;
-  go back to the grid and open it again.
+  go back to the Library and open it again.
 
 ## Not yet verified on a real iPhone
 
@@ -511,6 +549,15 @@ question the whole player existed to answer. Still to find out:
 - whether **AirPlay** works;
 - whether **the home-screen app works over plain `http`**, as it will over a VPN;
 - whether it keeps clear of the notch and the rounded corners **on its side**;
+- **the tab bar and the mini player above it** under a real finger, and whether they keep clear of
+  the home bar, upright and on its side (where the tab bar turns compact, the icon beside the
+  label);
+- whether **an icon added before the tabs** opens the new app with its settings (Maximum quality,
+  Gapless, the Library's order) as they were;
+- how the home-screen app opens **a link to the main page** - in Safari, or a browser view over
+  the app - and whether the music carries on underneath;
+- whether **Navidrome sends each disc's title** for your albums (the album page's "Disc 4 · ..."
+  headings);
 - how Safari handles a **transcoded** song, and which Ogg files it says it can play;
 - whether a song that won't load is **asked for again with the phone locked**: the second try
   comes a moment later, with nothing playing meanwhile, which is exactly when iOS may be holding

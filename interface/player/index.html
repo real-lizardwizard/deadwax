@@ -18,10 +18,12 @@
     <link rel="apple-touch-icon" href="/player/icon-180.png">
     <link rel="icon" href="/player/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/player/player.css">
+    <!-- the app's own chrome - the tab bar, Home, You - after the player's, whose mechanics it builds on -->
+    <link rel="stylesheet" href="/player/app.css">
 </head>
 <body>
     <div id="player-root"></div>
-    <!-- built from ui/src/player/ by `npm run build` - see ui/vite.config.ts -->
+    <!-- built from ui/src/player/main.tsx (the app, ui/src/app/) by `npm run build` - see ui/vite.config.ts -->
     <script type="module" src="/dist/deadwax-player.js"></script>
 </body>
 </html>

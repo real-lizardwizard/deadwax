@@ -51,8 +51,17 @@ export interface Song {
   channelCount?: number
 }
 
+/** One disc's own title - MusicBrainz's medium title, which deadwax writes as `discsubtitle` and
+ *  Navidrome hands back as OpenSubsonic's `discTitles` on getAlbum. Only the discs that have one. */
+export interface DiscTitle {
+  disc: number
+  title: string
+}
+
 export interface AlbumWithSongs extends Album {
   song?: Song[]
+  /** OpenSubsonic, passed through untouched by deadwax's route: "Disc 4 · <title>" on the album page */
+  discTitles?: DiscTitle[]
 }
 
 /** Subsonic's own orders for an album list, as the routes accept them. */
@@ -60,20 +69,64 @@ export type AlbumOrder = 'newest' | 'alphabeticalByName' | 'alphabeticalByArtist
 
 export const PAGE_SIZE = 60
 
-export function navidromeStatus(): Promise<NavidromeStatus> {
-  return get('/navidrome/status')
+export function navidromeStatus(signal?: AbortSignal): Promise<NavidromeStatus> {
+  return get('/navidrome/status', signal)
 }
 
-export async function albumPage(order: AlbumOrder, offset: number, signal?: AbortSignal): Promise<Album[]> {
+export async function albumPage(
+  order: AlbumOrder, offset: number, signal?: AbortSignal, size: number = PAGE_SIZE,
+): Promise<Album[]> {
   const page = await get<{ albums: Album[] }>(
-    `/navidrome/albums?order=${order}&size=${PAGE_SIZE}&offset=${offset}`,
+    `/navidrome/albums?order=${order}&size=${size}&offset=${offset}`,
     signal,
   )
   return page.albums
 }
 
+/** How long an album asked for ahead of its page opening is worth using. */
+export const PREFETCH_KEEP_MS = 30_000
+
+interface Prefetched {
+  at: number
+  answer: Promise<AlbumWithSongs>
+  controller: AbortController | null
+}
+
+const prefetched = new Map<string, Prefetched>()
+
+const albumPath = (id: string) => `/navidrome/albums/${encodeURIComponent(id)}`
+
+/**
+ * An album's songs asked for as a finger lands on its tile - before the tap has finished - so the
+ * album page usually has them, and Play is live, by the time it opens. A tile never plays anything
+ * itself: Play must be pressed on the page, in the same turn as the tap (see "The one app" in
+ * CLAUDE.md), and that needs the songs in hand. Asked for once however often it is pressed, and
+ * kept for PREFETCH_KEEP_MS.
+ */
+export function prefetchAlbum(id: string): void {
+  const now = Date.now()
+  for (const [key, held] of prefetched) if (now - held.at >= PREFETCH_KEEP_MS) prefetched.delete(key)
+  if (prefetched.has(id)) return
+  const controller = typeof AbortController === 'function' ? new AbortController() : null
+  const answer = get<AlbumWithSongs>(albumPath(id), controller?.signal)
+  //? an ask nobody takes must not report an unhandled rejection; album() hands the answer on as it is
+  answer.catch(() => {})
+  prefetched.set(id, { at: now, answer, controller })
+}
+
+/** The press turned into a scroll: the ask is called off, unless the page already took it. */
+export function dropPrefetch(id: string): void {
+  prefetched.get(id)?.controller?.abort()
+  prefetched.delete(id)
+}
+
+/** One album with its songs: the one asked for as the tile was pressed when there is one, taken
+ *  once, else asked for now. */
 export function album(id: string, signal?: AbortSignal): Promise<AlbumWithSongs> {
-  return get(`/navidrome/albums/${encodeURIComponent(id)}`, signal)
+  const held = prefetched.get(id)
+  prefetched.delete(id)
+  if (held && Date.now() - held.at < PREFETCH_KEEP_MS) return held.answer
+  return get(albumPath(id), signal)
 }
 
 /**

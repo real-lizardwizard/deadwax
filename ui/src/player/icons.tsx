@@ -1,6 +1,7 @@
 /**
- * The player's glyphs, drawn here rather than borrowed: SF Symbols can't be used on the web, and
- * a font of icons would be a download for ten shapes. All take their colour from the text.
+ * The app's glyphs, drawn here rather than borrowed: SF Symbols can't be used on the web, and a
+ * font of icons would be a download for a few shapes. All take their colour from the text. The tab
+ * bar's five are the canvas boards' own paths.
  */
 
 import type { ComponentChildren } from 'preact'
@@ -20,6 +21,22 @@ const line = (path: ComponentChildren) => ({ class: cls }: IconProps) => (
     fill="none"
     stroke="currentColor"
     stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    {path}
+  </svg>
+)
+
+/** The tab bar's strokes are finer, as the boards draw them. */
+const thin = (path: ComponentChildren) => ({ class: cls }: IconProps) => (
+  <svg
+    class={cls}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.8"
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true"
@@ -66,13 +83,37 @@ export const AirPlayIcon = line(
   </>,
 )
 
-/** A gear, eight teeth round a hole - the settings sheet's button. */
-export const SettingsIcon = line(
+/* ===== the tab bar's five, as the canvas boards draw them ===== */
+
+export const HomeIcon = thin(<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z" />)
+
+/** Two spines and a leaning one - albums on a shelf. */
+export const LibraryIcon = thin(<path d="M5 4v16M10 4v16M15 4.5l4.5 15" />)
+
+export const SearchIcon = thin(
   <>
-    <path d="M10.26 5.01L10.5 2.52L13.5 2.52L13.74 5.01A7.2 7.2 0 0 1 15.71 5.83L17.64 4.23L19.77 6.36L18.17 8.29A7.2 7.2 0 0 1 18.99 10.26L21.48 10.5L21.48 13.5L18.99 13.74A7.2 7.2 0 0 1 18.17 15.71L19.77 17.64L17.64 19.77L15.71 18.17A7.2 7.2 0 0 1 13.74 18.99L13.5 21.48L10.5 21.48L10.26 18.99A7.2 7.2 0 0 1 8.29 18.17L6.36 19.77L4.23 17.64L5.83 15.71A7.2 7.2 0 0 1 5.01 13.74L2.52 13.5L2.52 10.5L5.01 10.26A7.2 7.2 0 0 1 5.83 8.29L4.23 6.36L6.36 4.23L8.29 5.83A7.2 7.2 0 0 1 10.26 5.01Z" />
-    <circle cx="12" cy="12" r="3" />
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m20 20-4.2-4.2" />
   </>,
 )
+
+/** An arrow down into a tray - what's coming. */
+export const RequestsIcon = thin(
+  <>
+    <path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5" />
+    <path d="M4.5 16.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2.5" />
+  </>,
+)
+
+export const YouIcon = thin(
+  <>
+    <circle cx="12" cy="8.5" r="3.8" />
+    <path d="M4.5 20.5c1.2-3.8 4-5.8 7.5-5.8s6.3 2 7.5 5.8" />
+  </>,
+)
+
+/** A row's "goes somewhere" mark. */
+export const ChevronRightIcon = line(<path d="m9 6 6 6-6 6" />)
 
 /** The tick beside the chosen row of a list, as iOS's settings draw it. */
 export const CheckIcon = line(<path d="M4.5 12.5l5 5L19.5 6.5" />)

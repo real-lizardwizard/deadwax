@@ -1,0 +1,429 @@
+/*
+  The app's own chrome at /player/ (2.0.0-player.9): the tab bar, the mini player's new place above
+  it, Home's shelf, You's grouped lists, and the Navidrome gate and the placeholders drawn inside
+  tabs. Loaded after player.css, which draws the player itself (the library grid, the album page,
+  the mini player and Now Playing) and whose mechanics - safe areas, edges, tap targets - these
+  rules build on.
+
+  Classes are `app-`. Values are tokens: theme.css section 10's --dw-* for the look, player.css's
+  --pl-* for the mechanics, and the few this file adds below, each a token, for the rest. The look
+  is STYLE.md's "just a touch of Windows 7" - 4px controls, 6px cards, 3px covers, a faint gradient
+  on a button, a flat tab bar, sentence-case labels, no blur and no pills.
+*/
+
+:root {
+    /* the tab bar: its buttons, the strip above them, the line along its top, and the home bar's
+       inset under them - what the content and the mini player keep clear of */
+    --app-tab-side: 8px;
+    --app-tab-item: var(--dw-tab-item);
+    --app-tabbar-height: calc(var(--dw-tab-pad) + var(--app-tab-item) + var(--dw-hairline) + var(--pl-safe-bottom));
+    --app-tab-icon: 24px;
+    --app-tab-gap: 3px;
+    --app-tab-gap-compact: 6px;      /* the icon and the label side by side, on a phone on its side */
+    /* what sits over the top and bottom of the page: the album page's sticky bar (as player.css
+       draws it: the status bar, 4px, a tap target, 4px) and, at the bottom, the tab bar and the
+       mini player - what keyboard focus scrolls clear of */
+    --app-nav-clear: calc(var(--pl-safe-top) + var(--pl-gap-xs) + var(--pl-hit) + var(--pl-gap-xs));
+    --app-chrome-bottom: calc(var(--app-tabbar-height) + var(--pl-gutter));
+    --app-chrome-bottom-mini: calc(var(--app-tabbar-height) + var(--pl-mini-height) + var(--pl-mini-inset) + var(--pl-gutter));
+    /* stacking: the tab bar under the mini player (10), both under Now Playing (20) */
+    --app-z-tabbar: 8;
+    --app-top: 12px;                 /* under the status bar, above a tab's title - as .pl-large-header */
+    --app-section-gap: 22px;
+    --app-heading-gap: 6px;          /* You's headings to their card */
+    --app-shelf-heading-gap: 12px;   /* Home's headings to their shelf, as the Home board has them */
+    --app-shelf-gap: 14px;
+    --app-tile-gap: 6px;             /* a tile's cover to its two lines */
+    --app-row-pad: 10px;
+    --app-radio-pad: 11px;
+    --app-check: 22px;
+    --app-chevron: 14px;
+    --app-ring: 2px;                 /* a focus ring's width */
+    --app-ring-inset: calc(-1 * var(--app-ring));  /* drawn inside: for what sits in a clipping box */
+    --app-ring-room: calc(2 * var(--app-ring));    /* room for a ring drawn outside, width and gap */
+    --app-line-gap: 2px;             /* between a label and the line under it */
+    --app-edge-grouped-left: max(var(--dw-gutter-grouped), var(--pl-safe-left));
+    --app-edge-grouped-right: max(var(--dw-gutter-grouped), var(--pl-safe-right));
+}
+
+/* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
+
+.app-shell { padding-bottom: var(--app-chrome-bottom); }
+.app-shell.has-mini { padding-bottom: var(--app-chrome-bottom-mini); }
+
+/* The document is the scroller, and fixed chrome covers its top and bottom: a control focused from
+   the keyboard is scrolled clear of it, not left behind the tab bar or under the album page's bar.
+   (The browser counts a control under fixed chrome as in view, and wouldn't scroll at all.) */
+html {
+    scroll-padding-top: var(--app-nav-clear);
+    scroll-padding-bottom: var(--app-chrome-bottom);
+}
+
+html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-mini); }
+
+/* the mini player keeps its size, its sides and its tap targets; only its floor moves up */
+.app-shell .pl-mini { bottom: calc(var(--app-tabbar-height) + var(--pl-mini-inset)); }
+
+/* ===== the tab bar ===== */
+
+.app-tabbar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--app-z-tabbar);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    /* its buttons stay together over the content's width on a wide screen, and clear of the notch
+       and the rounded corners on a phone on its side */
+    padding: var(--dw-tab-pad)
+        max(var(--app-tab-side), var(--pl-safe-right), calc((100% - var(--pl-content-max)) / 2))
+        var(--pl-safe-bottom)
+        max(var(--app-tab-side), var(--pl-safe-left), calc((100% - var(--pl-content-max)) / 2));
+    border-top: var(--dw-hairline) solid var(--dw-border);
+    background: var(--dw-tab-bar);
+}
+
+.app-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-tab-gap);
+    min-width: 0;
+    height: var(--app-tab-item);
+    color: var(--dw-tab-inactive);
+    font-size: var(--dw-text-tab);
+    font-weight: var(--dw-weight-medium);
+}
+
+.app-tab.is-current { color: var(--dw-accent); }
+.app-tab-icon { width: var(--app-tab-icon); height: var(--app-tab-icon); }
+.app-tab-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.app-tab:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+/* A phone on its side is 390px tall: the tab bar goes compact, as iOS's does - the icon beside the
+   label on a shorter bar - so it and the mini player leave the page more than half the screen.
+   Everything that clears the tab bar reads --app-tabbar-height, so it all follows. */
+@media (max-height: 500px) {
+    :root { --app-tab-item: var(--dw-tab-item-compact); }
+    .app-tab { flex-direction: row; gap: var(--app-tab-gap-compact); }
+}
+
+/* ===== what every tab uses ===== */
+
+.app-section { margin-top: var(--app-section-gap); }
+
+.app-section-title {
+    margin: 0 0 var(--app-heading-gap);
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-heading);
+}
+
+.app-card {
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight);
+}
+
+/* STYLE.md's secondary button, a tap target tall */
+.app-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--dw-row);
+    padding: 0 var(--dw-gutter-grouped);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-medium);
+    text-decoration: none;
+}
+
+.app-button:active { background: var(--dw-secondary-bg-active); }
+
+.app-text-button {
+    min-height: var(--dw-row);
+    padding: 0 var(--dw-gutter-grouped);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-heading);
+}
+
+/* A ring drawn outside what it marks - for what stands free, with room around it (the shelf
+   keeps --app-ring-room above and below its tiles for theirs). */
+.app-button:focus-visible,
+.app-text-button:focus-visible,
+.app-tile:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+/* ...and one drawn inside, for a row of a grouped list: the card clips what runs past its edge,
+   and a ring outside the row would be clipped away entirely. The tab and the radio do the same. */
+.app-link-row:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+/* ===== Home: the "Recently added" shelf ===== */
+
+/* the shelf runs edge to edge and scrolls sideways; its title lines up with the tab's, the
+   board's 12px above the covers - less the room the shelf keeps over them for a focus ring */
+.app-shelf-title {
+    margin-bottom: calc(var(--app-shelf-heading-gap) - var(--app-ring-room));
+    padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left);
+}
+
+.app-shelf {
+    display: flex;
+    gap: var(--app-shelf-gap);
+    margin: 0;
+    padding: var(--app-ring-room) var(--pl-edge-right) var(--app-ring-room) var(--pl-edge-left);
+    list-style: none;
+    /* sideways only: overflow-x alone would make overflow-y auto too */
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--pl-edge-left) var(--pl-edge-right);
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+}
+
+.app-shelf::-webkit-scrollbar { display: none; }
+.app-shelf-item { flex: none; width: var(--dw-shelf-tile); scroll-snap-align: start; }
+
+.app-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-tile-gap);
+    width: 100%;
+    text-align: left;
+}
+
+.app-tile-cover {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+    transition: opacity var(--dw-duration) var(--dw-ease);
+}
+
+.app-tile:active .app-tile-cover { opacity: var(--dw-pressed-cover); }
+
+/* the title and the artist as the board sets them: one block, two lines, nothing between */
+.app-tile-text { display: flex; flex-direction: column; min-width: 0; }
+
+.app-tile-title,
+.app-tile-artist {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-tight);
+}
+
+.app-tile-title { font-weight: var(--dw-weight-medium); }
+.app-tile-artist { color: var(--dw-text-2); }
+
+/* ===== You ===== */
+
+.app-you { padding: 0 var(--app-edge-grouped-right) 0 var(--app-edge-grouped-left); }
+
+.app-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--app-shelf-gap);
+    padding: calc(var(--pl-safe-top) + var(--app-top)) var(--pl-gap-xs) 0;
+}
+
+.app-avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--dw-avatar-size);
+    height: var(--dw-avatar-size);
+    border-radius: var(--dw-radius-round);
+    background: var(--dw-avatar);
+    font-size: var(--dw-text-title);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-identity-text { min-width: 0; }
+
+.app-identity-name {
+    margin: 0;
+    font-size: var(--dw-text-title-2);
+    font-weight: var(--dw-weight-bold);
+    letter-spacing: var(--dw-tracking-title);
+    line-height: var(--dw-leading-title);
+}
+
+.app-identity-sub { margin: var(--app-line-gap) 0 0; color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+
+.app-you .app-section-title,
+.app-you .app-footnote,
+.app-choice-title { padding: 0 var(--dw-gutter-grouped); }
+
+.app-section-head { display: flex; align-items: center; justify-content: space-between; }
+.app-section-head .app-section-title { margin: 0; }
+
+/* a grouped list: rows in one card, divided by hairlines */
+.app-group {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight);
+    list-style: none;
+}
+
+.app-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pl-gap-xs) var(--app-row-pad);
+    min-height: var(--dw-row);
+    margin: 0;
+    padding: var(--app-row-pad) var(--dw-gutter-grouped);
+    color: var(--dw-text);
+    font-size: var(--dw-text-body);
+    text-decoration: none;
+}
+
+.app-row + .app-row { border-top: var(--dw-hairline) solid var(--dw-border); }
+.app-row-label { min-width: 0; margin: 0; }
+
+.app-row-value {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-heading-gap);
+    min-width: 0;
+    margin: 0;
+    color: var(--dw-text-2);
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+/* a failure's sentence, on its own line under the row */
+.app-row-detail {
+    flex-basis: 100%;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-mono { font-family: var(--dw-font-mono); font-size: var(--dw-text-data); }
+
+.app-link-row:active,
+.app-radio:active { background: var(--dw-pressed); }
+
+.app-chevron { flex: none; width: var(--app-chevron); height: var(--app-chevron); color: var(--dw-text-3); }
+
+.app-dot {
+    flex: none;
+    width: var(--dw-dot);
+    height: var(--dw-dot);
+    border-radius: var(--dw-radius-round);
+    background: var(--dw-text-3);
+}
+
+.app-dot.is-ok { background: var(--dw-green-icon); }
+.app-dot.is-failed { background: var(--dw-danger-text); }
+
+.app-footnote {
+    margin: var(--app-heading-gap) 0 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-error { color: var(--dw-danger-text); }
+
+/* "Maximum quality": a radio group in the Playback card */
+.app-choice-title {
+    margin: 0 0 var(--app-heading-gap);
+    color: var(--dw-text-label-color);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-regular);
+}
+
+.app-radio {
+    display: flex;
+    align-items: center;
+    gap: var(--app-row-pad);
+    width: 100%;
+    min-height: var(--dw-row);
+    padding: var(--app-radio-pad) var(--dw-gutter-grouped);
+    text-align: left;
+}
+
+.app-radio + .app-radio { border-top: var(--dw-hairline) solid var(--dw-border); }
+
+.app-radio:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-radio-text { display: flex; flex: 1; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+.app-radio-label { font-size: var(--dw-text-body); line-height: var(--dw-leading-label); }
+
+.app-radio-note {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-check { flex: none; width: var(--app-check); height: var(--app-check); color: var(--dw-accent); }
+.app-check.is-off { visibility: hidden; }
+
+/* ===== inside a tab: the Navidrome gate, and a tab that is on the main page for now ===== */
+
+.app-needs-body,
+.app-placeholder-body {
+    margin: var(--pl-gap-sm) var(--pl-edge-right) 0 var(--pl-edge-left);
+}
+
+.app-needs-title {
+    margin: 0 0 var(--pl-gap-xs);
+    font-size: var(--dw-text-title);
+    font-weight: var(--dw-weight-bold);
+    line-height: var(--dw-leading-tight);
+}
+
+.app-needs-text,
+.app-placeholder-text {
+    margin: var(--pl-gap-sm) 0 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-heading);
+    line-height: var(--dw-leading-body);
+    overflow-wrap: anywhere;
+}
+
+.app-needs a { color: var(--dw-accent); }
+.app-needs .app-button { width: 100%; margin-top: var(--pl-gap); }
+
+.app-placeholder-body { padding: var(--dw-gutter-grouped); }
+.app-placeholder-lead { margin: 0; font-size: var(--dw-text-body); font-weight: var(--dw-weight-semibold); }
+.app-placeholder .app-button { width: 100%; margin-top: var(--pl-gap); }

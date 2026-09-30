@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { describeGaps } from '../lib/gapless'
 import { clock, describeSeek, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
 import { describeWrap } from '../lib/streamWrap'
-import { Cover } from './Library'
+import { Cover } from './Cover'
 import { AirPlayIcon, ChevronDownIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
 import { usePosition, type Player } from './usePlayer'
 
@@ -149,10 +149,18 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
   const track = player.track
   const [dragY, setDragY] = useState(0)
   const drag = useRef<{ pointer: number; startY: number; captured: boolean } | null>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
 
   //? the page behind must not scroll under a finger on the sheet
   useEffect(() => {
     document.documentElement.classList.toggle('pl-sheet-open', open)
+  }, [open])
+
+  //? Focus goes into the sheet as it opens - to its close button, the first thing in it - since
+  //? everything behind it is inert now (App). Before the paint, while nothing else can have moved
+  //? it; App gives it back to what had it when the sheet closes.
+  useLayoutEffect(() => {
+    if (open) closeButton.current?.focus({ preventScroll: true })
   }, [open])
 
   if (!track) return null
@@ -207,7 +215,7 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
         //? with any picture, and cancel the pointer - the sheet stopped following it mid-drag.
         onDragStart={(event) => event.preventDefault()}
       >
-        <button type="button" class="pl-sheet-close" onClick={onClose} aria-label="Close">
+        <button ref={closeButton} type="button" class="pl-sheet-close" onClick={onClose} aria-label="Close">
           <ChevronDownIcon class="pl-icon" />
         </button>
         <div class={`pl-sheet-art${player.playing ? '' : ' is-paused'}`}>

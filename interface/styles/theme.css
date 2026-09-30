@@ -492,3 +492,134 @@
     --check-fill-hover: linear-gradient(to bottom, #2a2240 0%, #3a2f55 100%);
     --check-mark:       var(--main-hover-text);
 }
+
+
+/* ==========================================================================
+   10. THE ONE APP
+   ========================================================================== */
+
+:root {
+    /*
+      The app at /player/ (2.0.0-player.9 on): the five tabs with the player inside them, in
+      STYLE.md's "just a touch of Windows 7" - the canvas boards James picked for every screen.
+      Squarer and plainer than the player's first iOS look: Noto Sans with monospace data, 3/4/6px
+      corners, rectangular buttons with a faint gradient, thin sunken bars, sentence-case labels,
+      a flat tab bar, and nothing bigger than a 0 1px 2px shadow - no blur, no glow, no pills.
+
+      Everything is a --dw-* token here, and NOTHING in main.css reads one, so the main page does
+      not change by a pixel. What already exists above is aliased, not repeated: the face is the
+      self-hosted Noto Sans (never the boards' Google Fonts link - deadwax runs offline), the
+      accent is the brand's lighter purple, and the durations are section 7's, so reduced motion
+      still collapses them. player.css keeps its --pl-* layer for mechanics (safe areas, hit sizes,
+      the sheet's motion) and points its LOOK at these; interface/player/app.css draws the new
+      chrome from them. Reverting the look is a token change.
+    */
+
+    /* --- type --------------------------------------------------------- */
+    --dw-font:            var(--font-family);
+    --dw-font-mono:       var(--font-mono);
+    --dw-weight-regular:  var(--font-regular);
+    --dw-weight-medium:   var(--font-medium);
+    --dw-weight-semibold: var(--font-bold);
+    --dw-weight-bold:     var(--font-extrabold);
+    --dw-tracking-title:  -0.01em;  /* large titles only; labels are never tracked */
+
+    /* the phone's scale, in px as the boards give it (a phone's text isn't rescaled from the root) */
+    --dw-text-large-title: 34px;  /* a tab's title */
+    --dw-text-title-2:     28px;  /* the name at the top of You */
+    --dw-text-title:       22px;  /* an album's title, the song in Now Playing */
+    --dw-text-artist-hero: 20px;  /* the artist under an album's title */
+    --dw-text-body:        17px;  /* rows, back links, settings rows, text buttons */
+    --dw-text-heading:     15px;  /* section headings, card titles, the mini player's title */
+    --dw-text-data:        14px;  /* monospace track numbers and lengths */
+    --dw-text-footnote:    13px;  /* meta, secondary lines, chips */
+    --dw-text-label:       12px;  /* labels */
+    --dw-text-tab:         10px;  /* the tab bar's labels */
+
+    /* --- surfaces ----------------------------------------------------- */
+    --dw-bg:             #000;      /* the page on a phone */
+    --dw-bg-now-playing: #121016;
+    --dw-card:           #24222c;   /* cards, grouped lists, the mini player */
+    --dw-tab-bar:        #121117;
+    --dw-well:           rgba(0, 0, 0, 0.2);
+    --dw-track:          #121117;   /* the sunken track under a bar */
+    --dw-avatar:         #3b3547;
+    --dw-empty-cover:    #1c1b22;   /* the square that stands in for a missing cover */
+
+    /* --- lines -------------------------------------------------------- */
+    --dw-hairline:     1px;
+    --dw-border:       #2c2a36;     /* dividers, card edges, wells */
+    --dw-border-cover: #34323c;     /* the edge on a near-black cover */
+
+    /* --- text --------------------------------------------------------- */
+    --dw-text:              #fff;
+    --dw-text-heading-color: #e4e4ec;
+    --dw-text-on-secondary: #e8e8f0;
+    --dw-text-2:            #a3a3b8;  /* secondary */
+    --dw-text-label-color:  #9d9db2;
+    --dw-text-3:            #7d7d92;  /* tertiary */
+    --dw-tab-inactive:      #8a8a9c;
+    --dw-accent:            var(--accent-hover);  /* links, the chosen tab, ticks */
+    --dw-accent-text:       #d8b4fe;              /* toggled text, a link under the pointer */
+
+    /* --- meaning ------------------------------------------------------ */
+    --dw-green-icon:   #34d399;
+    --dw-amber-icon:   #fbbf24;
+    --dw-danger-text:  #fca5a5;   /* the boards' failure text; not in STYLE.md's palette */
+
+    /* --- buttons ------------------------------------------------------ */
+    --dw-primary-bg:          linear-gradient(to bottom, #a24ef2 0%, #8a2ee0 100%);
+    --dw-primary-border:      #7c3aed;
+    --dw-primary-highlight:   inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    --dw-secondary-bg:        linear-gradient(to bottom, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.05));
+    --dw-secondary-bg-active: linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.09));
+    --dw-secondary-border:    rgba(255, 255, 255, 0.1);
+    --dw-toggled-bg:          rgba(168, 85, 247, 0.18);
+    --dw-toggled-border:      rgba(192, 132, 252, 0.45);
+    --dw-pressed:             rgba(255, 255, 255, 0.06);  /* a row or bare icon under a finger */
+
+    /* --- bars --------------------------------------------------------- */
+    --dw-bar-grey:   linear-gradient(to bottom, #c8c8d4, #9a9aa8);
+    --dw-bar-purple: linear-gradient(to bottom, #b56af5, #9333ea);
+
+    /* --- shape -------------------------------------------------------- */
+    --dw-radius-sheet:   8px;   /* a phone sheet's top corners */
+    --dw-radius-card:    6px;   /* cards, panels, popovers, the mini player */
+    --dw-radius-control: 4px;   /* buttons, inputs, chips, badges, wells */
+    --dw-radius-tag:     3px;   /* small tags */
+    --dw-radius-cover:   3px;   /* album covers and artwork */
+    --dw-radius-track:   2px;   /* a bar's sunken track */
+    --dw-radius-round:   50%;   /* things meant to be round: avatars, dots, a scrubber's thumb */
+
+    /* --- depth: nothing bigger than 0 1px 2px ------------------------- */
+    --dw-highlight:   inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --dw-track-inset: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+    --dw-shadow:      0 1px 2px rgba(0, 0, 0, 0.5);
+
+    /* --- layout (phone) ----------------------------------------------- */
+    --dw-gutter:         20px;
+    --dw-gutter-grouped: 16px;   /* a grouped list's rows and headings */
+    --dw-row:            44px;   /* a settings row - also the smallest tap target */
+    --dw-tab-item:       49px;   /* a tab button's height */
+    --dw-tab-item-compact: 32px; /* ...on a phone on its side, the icon beside the label, as iOS does */
+    --dw-tab-pad:        4px;    /* above the tab buttons */
+    --dw-shelf-tile:     130px;  /* a "Recently added" cover */
+    --dw-avatar-size:    52px;
+    --dw-dot:            8px;    /* a connection's status dot */
+
+    /* --- rhythm: line heights, from the boards ------------------------ */
+    --dw-leading-title:   1.2;                    /* a large name - You's */
+    --dw-leading-tight:   var(--leading-tight);   /* 1.25: a tile's two lines, a gate's title */
+    --dw-leading-label:   1.3;                    /* a choice's label */
+    --dw-leading-heading: 1.35;                   /* a section heading */
+    --dw-leading-note:    1.4;                    /* a footnote, a row's detail, a choice's note */
+    --dw-leading-body:    var(--leading-normal);  /* 1.45: a paragraph */
+
+    /* --- under a finger ----------------------------------------------- */
+    --dw-pressed-cover:   0.7;                    /* a cover's opacity while pressed */
+    --dw-primary-pressed: brightness(0.92);       /* the primary button while pressed */
+
+    /* --- motion ------------------------------------------------------- */
+    --dw-duration: var(--duration-fast);
+    --dw-ease:     var(--ease-out);
+}
