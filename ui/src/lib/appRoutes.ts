@@ -22,6 +22,8 @@
  * this session) or has to replace the address, which is what makes a cold deep link work: there
  * is nothing below it to go back to, and back still lands on the tab's root. The browser's own
  * back or forward onto ANOTHER tab's entry is that tab chosen, as it was left (`browserMoved`).
+ * Within the tab showing, going back finds the page in the stack, and going FORWARD puts the pages
+ * passed back on top - never a search, since one page can be in a stack twice (`forwardTo`).
  * lib/appHistory.ts drives all of this against the real history.
  */
 
@@ -151,10 +153,11 @@ export function selectTab(nav: Nav, tab: Tab): { nav: Nav; action: TabAction } {
 }
 
 /**
- * The browser moved to `route` in the tab it names - back, forward, or an address typed in. Its tab
- * shows, and that tab's stack is brought to agree: back to the page if it is in the stack (going
- * back), the root if it is the root, and otherwise the page put on top (going forward to it).
- * A back or forward onto ANOTHER tab's entry doesn't come here - see `browserMoved`.
+ * The browser moved to `route` in the tab it names - back, or an address typed in. Its tab shows,
+ * and that tab's stack is brought to agree: back to the page if it is in the stack (the nearest the
+ * top, so with a page in it twice, the copy just under where it was), the root if it is the root,
+ * and otherwise the page put on top. A move onto ANOTHER tab's entry, and a move forward within the
+ * tab showing, don't come here - see `browserMoved`.
  */
 export function followRoute(nav: Nav, route: Route): Nav {
   const stack = nav.stacks[route.tab]
@@ -163,6 +166,29 @@ export function followRoute(nav: Nav, route: Route): Nav {
     if (samePage(stack[index], route.page)) return withStack(nav, route.tab, stack.slice(0, index + 1))
   }
   return withStack(nav, route.tab, [...stack, route.page])
+}
+
+/**
+ * The browser went FORWARD, in the tab showing, to `route` at `place`: the pages it passes - the
+ * note's entries between, those of this tab - are put back on top in the order they were opened,
+ * and the one it lands on last. Never a search down the stack, as `followRoute` does going back:
+ * a page can be in a stack twice (Go to album, from Now Playing, opens the song's album over
+ * whatever is showing - which can be the same album, lower down), and the lower copy taken for
+ * the one gone forward to cut every page above it, the stack and the history then disagreeing.
+ */
+export function forwardTo(nav: Nav, note: HistoryNote, place: number, route: Route): Nav {
+  let next = nav
+  const step = (page: Page | null) => {
+    next = page ? openPage(next, page) : withStack(next, route.tab, [])
+  }
+  for (let at = note.index + 1; at < place; at++) {
+    const entry = note.entries[at]
+    if (entry === undefined) continue
+    const passed = parseHash(entry).route
+    if (passed.tab === route.tab) step(passed.page)
+  }
+  step(route.page)
+  return next
 }
 
 /** What the back button on the top page of `tab` says: the page below's label, or the tab's name
@@ -270,12 +296,18 @@ export interface Moved {
  * names Home's root) and dropped the album opened there, which a tab never does. A web page can't
  * stop that back from leaving the tab; it can stop it losing the tab it lands on.
  *
- * Within the tab showing, and for an address typed in (which says where to go), `followRoute`.
+ * Within the tab showing: forward puts the pages passed back on top (`forwardTo`); back, and an
+ * address typed in (which says where to go), `followRoute`.
  */
 export function browserMoved(nav: Nav, note: HistoryNote, place: number | null, hash: string): Moved {
   const { route, canonical } = parseHash(hash)
   let noted = moved(note, place, canonical)
-  const next = place !== null && route.tab !== nav.tab ? { ...nav, tab: route.tab } : followRoute(nav, route)
+  const next =
+    place !== null && route.tab !== nav.tab
+      ? { ...nav, tab: route.tab }
+      : place !== null && place > note.index
+        ? forwardTo(nav, note, place, route)
+        : followRoute(nav, route)
   const address = formatRoute(currentRoute(next))
   if (address !== canonical) noted = replaced(noted, address)
   return { nav: next, note: noted, address, rewrite: place === null || address !== hash }

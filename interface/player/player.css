@@ -31,7 +31,6 @@
     --pl-sheet-bg: var(--dw-bg-now-playing);
     --pl-bar: var(--dw-bg);                     /* the album page's bar: solid, since nothing blurs */
     --pl-fill: var(--dw-empty-cover);           /* an empty cover, the spinner's ring */
-    --pl-fill-strong: var(--dw-border-cover);   /* the gapless switch when off */
     --pl-pressed: var(--dw-pressed);            /* a row or a bare button under a finger */
     --pl-pressed-cover: var(--dw-pressed-cover);  /* a cover's opacity under a finger */
     --pl-separator: var(--dw-border);
@@ -134,21 +133,24 @@
     --pl-settle-duration: 520ms;
     --pl-paused-scale: 0.82;
 
-    /* the gapless switch: iOS's own shape and size, on in the brand purple */
-    --pl-switch-width: 51px;
-    --pl-switch-height: 31px;
-    --pl-switch-knob: 27px;
-    --pl-switch-inset: 2px;
-    --pl-switch-on: var(--accent);
-    --pl-switch-knob-shadow: var(--dw-shadow);
-    --pl-switch-duration: 240ms;
+    /* Now Playing's title block (2.0.0-player.10): the "Artist — Album" line under the song, and
+       how far its tap target reaches past its own line - up over the lower half of the title,
+       which takes no taps, and down into the gap above the scrubber, short of the bar's own tap
+       target - to make it a full target tall without moving anything */
+    --pl-byline-gap: 3px;
+    --pl-byline-leading: 1.25;
+    --pl-byline-reach-up: 14px;
+    --pl-byline-reach-down: 9px;
+    --pl-scrub-gap: 14px;          /* the title block to the scrubber's tap target */
+    --pl-error-gap: 6px;           /* a failure's line to the title under it */
+    --pl-footer-gap: 12px;         /* between the icons under the transport */
+    --pl-ring: 2px;                /* a focus ring's width, and its gap from what it marks */
 }
 
 @media (prefers-reduced-motion: reduce) {
     :root {
         --pl-sheet-duration: 1ms;
         --pl-settle-duration: 1ms;
-        --pl-switch-duration: 1ms;
     }
 }
 
@@ -681,8 +683,7 @@ img { display: block; }
 }
 
 .pl-sheet-title,
-.pl-sheet-artist,
-.pl-sheet-album {
+.pl-sheet-byline {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -695,14 +696,56 @@ img { display: block; }
     line-height: 1.25;
 }
 
+/*
+  "Artist — Album" under the song, one line, as the Now Playing board has it. A plain line when the
+  song names no album to go to; otherwise a button that goes there (.is-link), in the accent. Both
+  are the same box, so which one it is never moves the bar below.
+
+  The words are one line tall and a tap target has to be 44px, so the button's target reaches past
+  its own box (::before): up over the lower half of the title - which takes no taps - and down
+  into the gap above the scrubber, stopping short of the bar's own target. The ellipsis is on the
+  span inside, because clipping the button itself would clip that reach away.
+*/
 .pl-sheet-artist {
-    margin: 2px 0 0;
+    display: block;
+    width: 100%;
+    margin: var(--pl-byline-gap) 0 0;
     color: var(--pl-text-2);
-    font-size: var(--pl-text-title-2);
-    line-height: 1.25;
+    font-size: var(--pl-text-body);
+    line-height: var(--pl-byline-leading);
+    text-align: left;
 }
 
-.pl-sheet-error { margin: 6px 0 0; color: var(--pl-error); font-size: var(--pl-text-footnote); }
+/* a line tall even with nothing to say, so a song with no artist or album doesn't move the title */
+.pl-sheet-byline { display: block; min-height: calc(1em * var(--pl-byline-leading)); }
+
+.pl-sheet-artist.is-link { position: relative; color: var(--pl-accent); }
+
+.pl-sheet-artist.is-link::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--pl-byline-reach-up));
+    right: 0;
+    bottom: calc(-1 * var(--pl-byline-reach-down));
+    left: 0;
+}
+
+.pl-sheet-artist.is-link:active { color: var(--pl-toggled-text); }
+
+.pl-sheet-artist.is-link:focus-visible {
+    outline: var(--pl-ring) solid var(--pl-accent);
+    outline-offset: var(--pl-ring);
+    border-radius: var(--pl-radius-control);
+}
+
+/* A song's failure, ABOVE the title (2.0.0-player.10): it comes and goes, and the body sits
+   against the bottom of the sheet, so up here it moves the cover and nothing a finger goes to. */
+.pl-sheet-error {
+    margin: 0 0 var(--pl-error-gap);
+    color: var(--pl-error);
+    font-size: var(--pl-text-footnote);
+    overflow-wrap: anywhere;
+}
 
 /*
   The scrubber is the whole bar, a full tap target tall with the track drawn across its middle: a
@@ -712,7 +755,7 @@ img { display: block; }
   and the callout and selection that a long press would otherwise bring up are turned off. The
   margins keep the track and the clocks where the old 28px range put them.
 */
-.pl-scrubber { margin-top: 14px; }
+.pl-scrubber { margin-top: var(--pl-scrub-gap); }
 
 .pl-scrub {
     position: relative;
@@ -796,84 +839,15 @@ img { display: block; }
 .pl-transport-icon { width: 36px; height: 36px; }
 .pl-transport-button.is-main .pl-transport-icon { width: 48px; height: 48px; }
 
+/* The icons under the transport, as the board draws them: AirPlay when there is a speaker to send
+   to, and ••• (Info, Go to album). Always one tap target tall, and ••• always at the right end, so
+   AirPlay coming and going moves nothing - the body sits against the bottom of the sheet, and a
+   row that changed height would move the bar and the buttons above it. */
 .pl-sheet-footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: var(--pl-hit);
-    color: var(--pl-text-2);
-    font-size: var(--pl-text-footnote);
-}
-
-/* The gapless switch, beside the album's name. The label is part of the tap target, as in iOS's
-   settings. */
-.pl-gapless {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: var(--pl-gap-sm);
-    cursor: pointer;
-}
-
-.pl-switch {
-    display: grid;
-    flex: none;
-    place-items: center;
+    justify-content: flex-end;
+    gap: var(--pl-footer-gap);
     height: var(--pl-hit);
-}
-
-.pl-switch-track {
-    position: relative;
-    width: var(--pl-switch-width);
-    height: var(--pl-switch-height);
-    border-radius: calc(var(--pl-switch-height) / 2);
-    background: var(--pl-fill-strong);
-    transition: background-color var(--pl-switch-duration) var(--ease-out);
-}
-
-.pl-switch-knob {
-    position: absolute;
-    top: var(--pl-switch-inset);
-    left: var(--pl-switch-inset);
-    width: var(--pl-switch-knob);
-    height: var(--pl-switch-knob);
-    border-radius: 50%;
-    background: var(--pl-text);
-    box-shadow: var(--pl-switch-knob-shadow);
-    transition: transform var(--pl-switch-duration) var(--pl-sheet-ease);
-}
-
-.pl-switch.is-on .pl-switch-track { background: var(--pl-switch-on); }
-
-.pl-switch.is-on .pl-switch-knob {
-    transform: translateX(calc(var(--pl-switch-width) - var(--pl-switch-knob) - 2 * var(--pl-switch-inset)));
-}
-
-.pl-switch:focus-visible { outline: 2px solid var(--pl-accent); outline-offset: 2px; border-radius: var(--pl-radius-control); }
-
-/*
-  What the last song changes took and where the last seek landed, at the TOP of the sheet's body,
-  above the title. The body is anchored to the bottom of the sheet, so a change in anything's
-  height moves what is above it and never what is below. These lines run from one to three as a
-  seek is asked for and then judged at its song's end (and as song changes pile up), and under the
-  footer that moved the scrubber and the buttons up to 32px at the moment of a tap - a second tap
-  landed where the bar had been. Up here only the cover moves, by half of it, and nothing a finger
-  goes to. The words wrap; nothing is cut short.
-*/
-.pl-readouts { margin-bottom: var(--pl-gap-sm); }
-
-.pl-gapless-readout {
-    margin: 0;
-    overflow-wrap: anywhere;
-    color: var(--pl-text-3);
-    font-size: var(--pl-text-caption);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.35;
-}
-
-/* On its side the cover already has little room, and the readouts give their lines back to it. (A
-   media query can't read a custom property, so the height is written here.) */
-@media (max-height: 500px) {
-    .pl-readouts { display: none; }
+    color: var(--pl-text-2);
 }

@@ -539,6 +539,8 @@
     /* --- surfaces ----------------------------------------------------- */
     --dw-bg:             #000;      /* the page on a phone */
     --dw-bg-now-playing: #121016;
+    --dw-bg-sheet:       #1c1b22;   /* a sheet over Now Playing: Info */
+    --dw-scrim:          rgba(10, 9, 13, 0.6);  /* what a sheet dims behind it */
     --dw-card:           #24222c;   /* cards, grouped lists, the mini player */
     --dw-tab-bar:        #121117;
     --dw-well:           rgba(0, 0, 0, 0.2);
@@ -594,6 +596,7 @@
     /* --- depth: nothing bigger than 0 1px 2px ------------------------- */
     --dw-highlight:   inset 0 1px 0 rgba(255, 255, 255, 0.06);
     --dw-track-inset: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+    --dw-well-inset:  inset 0 1px 1px rgba(0, 0, 0, 0.5);  /* a well: a segmented control, an empty checkbox */
     --dw-shadow:      0 1px 2px rgba(0, 0, 0, 0.5);
 
     /* --- layout (phone) ----------------------------------------------- */
@@ -606,6 +609,8 @@
     --dw-shelf-tile:     130px;  /* a "Recently added" cover */
     --dw-avatar-size:    52px;
     --dw-dot:            8px;    /* a connection's status dot */
+    --dw-segmented:      32px;   /* a segmented control's well */
+    --dw-checkbox:       20px;   /* a checkbox's box */
 
     /* --- rhythm: line heights, from the boards ------------------------ */
     --dw-leading-title:   1.2;                    /* a large name - You's */

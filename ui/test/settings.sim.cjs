@@ -1,18 +1,24 @@
 /**
- * "Maximum quality" in the app's You tab (app/QualityChoice.tsx, 2.0.0-player.9 - it was the
+ * You > Playback in the app: "Maximum quality" (app/QualityChoice.tsx, 2.0.0-player.9 - it was the
  * player's settings sheet, player/Settings.tsx, opened by a gear beside the Library title, until
- * the tabs), the component itself, compiled with the repo's TypeScript and rendered by a small
- * stand-in for Preact into plain objects, with a document that knows which element has focus.
+ * the tabs) and "Gapless" (app/GaplessChoice.tsx, 2.0.0-player.10 - it was a switch on the
+ * now-playing screen until then). The components themselves, compiled with the repo's TypeScript
+ * and rendered by a small stand-in for Preact into plain objects, with a document that knows which
+ * element has focus.
  *
  * What it pins:
  *
  *  - The notes say only what the code does: resampling is of FLAC songs at 88.2 to 384 kHz, it is
  *    as much quieter as src/resample.py's HEADROOM_DB says, and a song plays without a gap only with
- *    the Gapless switch on - named by the switch's own label in NowPlaying.tsx. Word for word.
+ *    Gapless on - named by the checkbox's own label in GaplessChoice.tsx, and never called a
+ *    switch now that it isn't one. Word for word.
  *  - It is a radio group as it was: a tap picks; the arrows move the choice and the focus with it,
  *    round the group; only the chosen radio is a tab stop; other keys are left alone.
- *  - Where it lives now: You's Playback section, on the same storage key, per device; and the gear
- *    and the sheet are gone.
+ *  - Gapless is a checkbox, and ITS TAP CALLS THE PLAYER IN THE SAME TURN: setGapless has been
+ *    called by the time the click handler returns (that tap unlocks the second audio element on
+ *    iOS), with the opposite of what it was.
+ *  - Where they live now: You's Playback section, Gapless first, each on the storage key it always
+ *    had, per device; the gear, the sheet and the switch are gone.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -27,7 +33,7 @@ const REPO = path.resolve(UI, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-settings-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/QualityChoice.tsx', '--rootDir', 'src', '--outDir', OUT,
+  'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -102,6 +108,7 @@ define('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () 
 
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { QualityChoice, QUALITIES } = require(path.join(OUT, 'app/QualityChoice.js'))
+const { GaplessChoice } = require(path.join(OUT, 'app/GaplessChoice.js'))
 
 //? each element of a tree, found by where it sits, keeps one FakeElement across renders; a ref names it
 function mount(component, name) {
@@ -194,7 +201,40 @@ console.log('\n"Maximum quality" is a radio group, keys and all')
   check('any other key is left alone', [prevented, player.maxRate, document.activeElement === focused], [false, 'original', true])
 }
 
-console.log('\nwhere it lives now')
+//? what an element says: its own words, not those of a component inside it (none is drawn here)
+function words(node) {
+  if (node === null || node === undefined || node === false || node === true) return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(words).join('')
+  return typeof node.type === 'string' ? words(node.props?.children) : ''
+}
+const hasClass = (node, name) => typeof node.props?.class === 'string' && node.props.class.split(' ').includes(name)
+
+console.log('\n"Gapless" is a checkbox, and its tap calls the player in the same turn')
+{
+  const calls = []
+  const player = { gapless: false, setGapless(on) { calls.push(on); this.gapless = on } }
+  const view = mount(GaplessChoice, 'gapless')
+  const render = () => view.render({ player })
+  render()
+  const box = () => view.find((node) => node.props?.role === 'checkbox')[0]
+  const drawn = () => view.find((node) => hasClass(node, 'app-checkbox'))[0]
+  check('one checkbox, a button, off to begin with', [view.find((node) => node.props?.role === 'checkbox').length, box()?.type, box()?.props['aria-checked']], [1, 'button', false])
+  check('no switch anywhere in it', view.find((node) => node.props?.role === 'switch').length, 0)
+  check('it says "Gapless"', words(box()), 'Gapless')
+  check('the box is drawn empty', hasClass(drawn(), 'is-on'), false)
+
+  const returned = box().props.onClick()
+  check('a tap has called setGapless(true) by the time the click returns', [calls, returned === undefined], [[true], true])
+  render()
+  check('...and it is drawn ticked', [box().props['aria-checked'], hasClass(drawn(), 'is-on')], [true, true])
+  box().props.onClick()
+  render()
+  check('a second tap turns it off, in the tap again', [calls, box().props['aria-checked']], [[true, false], false])
+  check('a click is the only thing it listens for', Object.keys(box().props).filter((name) => /^on[A-Z]/.test(name)), ['onClick'])
+}
+
+console.log('\nwhere they live now')
 {
   const you = fs.readFileSync(path.join(UI, 'src/app/You.tsx'), 'utf8')
   const library = fs.readFileSync(path.join(UI, 'src/player/Library.tsx'), 'utf8')
@@ -206,6 +246,12 @@ console.log('\nwhere it lives now')
     [/>\s*Playback\s*</.test(playback), playback.includes('<QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />')],
     [true, true])
   check('on the same storage key, per device', /playerMaxRate: 'deadwax-player-max-rate'/.test(persisted), true)
+  check('Gapless in the same section, above it, handed the player itself',
+    [playback.includes('<GaplessChoice player={player} />'), playback.indexOf('<GaplessChoice') < playback.indexOf('<QualityChoice')], [true, true])
+  check('...on the key it always had', /playerGapless: 'deadwax-player-gapless'/.test(persisted), true)
+  check('...and You no longer sends you to the now-playing screen for it', /now-playing screen/.test(playback), false)
+  const nowPlaying = fs.readFileSync(path.join(UI, 'src/player/NowPlaying.tsx'), 'utf8')
+  check('the switch is gone from Now Playing', [/role="switch"/.test(nowPlaying), /pl-gapless/.test(nowPlaying), /setGapless/.test(nowPlaying)], [false, false, false])
   check('the gear is gone from the Library', [library.includes('aria-label="Settings"'), library.includes('onSettings')], [false, false])
   check('and the sheet with it', fs.existsSync(path.join(UI, 'src/player/Settings.tsx')), false)
 }
@@ -214,23 +260,24 @@ console.log('\nthe "Maximum quality" notes say what the code does')
 {
   const resample = fs.readFileSync(path.join(REPO, 'src/resample.py'), 'utf8')
   const headroom = Number(/^HEADROOM_DB\s*=\s*([\d.]+)/m.exec(resample)?.[1])
-  const nowPlaying = fs.readFileSync(path.join(UI, 'src/player/NowPlaying.tsx'), 'utf8')
-  const switchLabel = /class="pl-gapless-label">([^<]+)</.exec(nowPlaying)?.[1]
+  const choice = fs.readFileSync(path.join(UI, 'src/app/GaplessChoice.tsx'), 'utf8')
+  const gaplessLabel = /class="app-check-label">([^<]+)</.exec(choice)?.[1]
   const [up, original] = QUALITIES
   check('two choices, 48 kHz first', QUALITIES.map((q) => [q.rate, q.label]), [['48000', 'Up to 48 kHz'], ['original', 'Original']])
   check('"Up to 48 kHz", word for word',
     up.note,
     'FLAC songs at 88.2 to 384 kHz are resampled by deadwax to 48 kHz, or 44.1 kHz, and sent as lossless 24-bit FLAC, ' +
-    'so with the Gapless switch on they play without a gap. Nothing below 20 kHz changes, except that they are 3 dB ' +
+    'so with Gapless on they play without a gap. Nothing below 20 kHz changes, except that they are 3 dB ' +
     'quieter, so nothing can clip.')
   check('"Original", word for word',
     original.note,
-    'Songs above 48 kHz are sent as they are. With the Gapless switch on, FLAC songs play without a gap too, but an ' +
+    'Songs above 48 kHz are sent as they are. With Gapless on, FLAC songs play without a gap too, but an ' +
     'iPhone can only hold a few seconds of them ahead, so a weak connection can make them stall. The iPhone converts ' +
     'them to 44.1 or 48 kHz itself, unless a USB DAC takes them at their own rate.')
   check('as much quieter as the server lowers them (HEADROOM_DB in src/resample.py)',
     [Number.isFinite(headroom), new RegExp(`\\b${headroom} dB quieter\\b`).test(up.note)], [true, true])
-  check('the switch named by its own label, in both', [switchLabel, QUALITIES.every((q) => q.note.includes(`the ${switchLabel} switch on`))], ['Gapless', true])
+  check('the checkbox named by its own label, in both', [gaplessLabel, QUALITIES.every((q) => q.note.includes(`ith ${gaplessLabel} on`))], ['Gapless', true])
+  check('...and never called a switch, now that it is a checkbox', QUALITIES.some((q) => /switch/i.test(q.note)), false)
   const emDash = String.fromCharCode(0x2014)
   check('no em dashes, and deadwax never sentence-cased', QUALITIES.some((q) => q.note.includes(emDash) || q.note.includes('Deadwax')), false)
 }

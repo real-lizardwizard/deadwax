@@ -2,19 +2,12 @@ import { Fragment } from 'preact'
 import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import { discHeadings } from '../lib/discTitles'
-import { formatDuration, trackTime } from '../lib/format'
+import { formatDuration, sharedFormat, trackTime } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
-import { album as fetchAlbum, toQueueTrack, type Album, type AlbumWithSongs, type Song } from './api'
+import { album as fetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
 import { ChevronLeftIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
 import type { Player } from './usePlayer'
-
-/** The one format every song is in - "FLAC" - or null when they differ or nobody said. */
-function sharedFormat(songs: Song[]): string | null {
-  const formats = new Set(songs.map((song) => (song.suffix ?? '').toUpperCase()))
-  const [only] = formats
-  return formats.size === 1 && only ? only : null
-}
 
 /**
  * One album: its cover, Play and Shuffle, and its songs.
@@ -24,9 +17,14 @@ function sharedFormat(songs: Song[]): string | null {
  * leaving the album calls its request off rather than letting it run on beside the music.
  *
  * Pushed on whichever tab opened it (lib/appRoutes.ts), so the back button says where it goes:
- * `backLabel` is the page below. For now that is always the tab ("Home", "Library"), since nothing
- * on an album page opens another; the page below's own name once something does (artist pages).
+ * `backLabel` is the page below: the tab ("Home", "Library") when it was opened from a tile, and
+ * the album below's own name when Go to album (Now Playing, since 2.0.0-player.10) opened this one
+ * over another album page - which can be this same album, lower down; the router keeps the two
+ * copies apart going back and forward (lib/appRoutes.ts, `forwardTo`).
  * Disc headings come from Navidrome's own `discTitles` (lib/discTitles.ts): "Disc 4 · <title>".
+ *
+ * Play remembers the album's answer for Info (rememberPlayed - the queue's songs carry only what
+ * playing needs) and then calls the player, both in the tap: nothing is awaited between them.
  */
 export function AlbumPage({
   id,
@@ -69,7 +67,9 @@ export function AlbumPage({
   const total = songs.reduce((sum, song) => sum + (song.duration ?? 0), 0)
 
   const play = (start: number | null, shuffle = false) => {
-    if (tracks.length) player.playTracks(tracks, start, shuffle)
+    if (!album || !tracks.length) return
+    rememberPlayed(album)
+    player.playTracks(tracks, start, shuffle)
   }
 
   return (

@@ -4,16 +4,19 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { TAB_LABELS, TABS, backLabel, currentRoute, formatRoute, type Nav, type Page, type Tab } from '../lib/appRoutes'
 import { AlbumPage } from '../player/AlbumPage'
-import { navidromeStatus, type Album, type NavidromeStatus } from '../player/api'
+import { navidromeStatus, playedAlbum, sentFormat, type Album, type NavidromeStatus } from '../player/api'
 import { Library } from '../player/Library'
 import { MiniPlayer } from '../player/MiniPlayer'
 import { NowPlaying } from '../player/NowPlaying'
 import { usePlayer, type Player } from '../player/usePlayer'
+import { ActionMenu } from './ActionMenu'
 import { ActionsContext, PlayerContext, pickActions } from './context'
 import { Home } from './Home'
+import { InfoSheet } from './InfoSheet'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { Placeholder } from './Placeholder'
 import { TabBar } from './TabBar'
+import { takeOpener } from './useSheet'
 import { You } from './You'
 
 /** How many albums opened this session are kept to draw a page's hero before its songs arrive. */
@@ -49,6 +52,11 @@ const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
  * a page pushes a history entry, so the edge swipe goes back; switching tab replaces it. Sheets are
  * state, not addresses. While Now Playing is open, everything behind it is inert - the tab bar and
  * the mini player included - so neither a keyboard nor VoiceOver can reach a control it covers.
+ *
+ * Three sheets, stacked (2.0.0-player.10): Now Playing, and over it either its ••• menu or Info.
+ * Each is its own sheet (useSheet.ts) - its own scroll lock, focus in and back, Escape - and the
+ * one underneath is inert while another is over it. The menu and Info are never open together:
+ * choosing Info closes the menu as it opens, and Info gives focus back to the ••• button.
  */
 export function App() {
   const player = usePlayer()
@@ -73,6 +81,8 @@ export function App() {
 
   const [status, setStatus] = useState<NavidromeStatus | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  //? what is over Now Playing: its ••• menu, or Info - never both
+  const [over, setOver] = useState<'none' | 'menu' | 'info'>('none')
   const [youSeen, setYouSeen] = useState(nav.tab === 'you')
 
   const checkNavidrome = useCallback(() => {
@@ -134,21 +144,44 @@ export function App() {
     }
   }, [])
 
-  //? Focus goes into Now Playing as it opens (NowPlaying moves it to its close button) and back to
-  //? what had it as it closes - the mini player, when a keyboard opened it. Taken at the tap, before
-  //? the page behind turns inert and the browser moves focus off an element it can no longer hold.
-  const opener = useRef<HTMLElement | null>(null)
-  const openSheet = useCallback(() => {
-    const active = document.activeElement
-    opener.current = active instanceof HTMLElement && active !== document.body ? active : null
+  //? What each sheet gives focus back to as it closes, taken in the tap that opened it: the button
+  //? focuses itself first (WebKit doesn't focus a tapped button), before the page behind turns
+  //? inert. The sheets do the rest themselves (useSheet.ts).
+  const sheetOpener = useRef<HTMLElement | null>(null)
+  const moreOpener = useRef<HTMLElement | null>(null)
+  const openSheet = useCallback((event: MouseEvent) => {
+    sheetOpener.current = takeOpener(event)
     setSheetOpen(true)
   }, [])
-  const closeSheet = useCallback(() => setSheetOpen(false), [])
-  useLayoutEffect(() => {
-    if (sheetOpen || !opener.current) return
-    opener.current.focus({ preventScroll: true })
-    opener.current = null
-  }, [sheetOpen])
+  const closeSheet = useCallback(() => {
+    setOver('none')
+    setSheetOpen(false)
+  }, [])
+  const openMenu = useCallback((event: MouseEvent) => {
+    moreOpener.current = takeOpener(event)
+    setOver('menu')
+  }, [])
+  const openInfo = useCallback(() => setOver('info'), [])
+  const closeOver = useCallback(() => setOver('none'), [])
+
+  /**
+   * "Go to album" - the menu's row, Now Playing's "Artist — Album" line, Info's album card: every
+   * sheet closes and the song's album opens on the tab showing, as a tile there would open it.
+   * Drawn from the answer it was played from when that is in hand, so the page has its cover and
+   * artist at once. The ••• button is in a sheet that is closing, so focus isn't sent back to it.
+   */
+  const goToAlbum = (track: NonNullable<Player['track']>) => {
+    if (!track.albumId) return
+    moreOpener.current = null
+    closeSheet()
+    openAlbum(
+      playedAlbum(track.albumId) ?? {
+        id: track.albumId,
+        name: track.album,
+        ...(track.coverArt ? { coverArt: track.coverArt } : {}),
+      },
+    )
+  }
 
   //? The tab roots, memoised: they read no player state, so the music playing leaves them alone.
   //? You reads the player from context, and re-renders with it by itself.
@@ -189,6 +222,9 @@ export function App() {
     </NeedsNavidrome>
   )
 
+  const playing = player.track
+  const toAlbum = playing?.albumId ? () => goToAlbum(playing) : null
+
   return (
     <PlayerContext.Provider value={player}>
       <ActionsContext.Provider value={actions}>
@@ -209,7 +245,33 @@ export function App() {
             <MiniPlayer player={player} onOpen={openSheet} />
             <TabBar current={nav.tab} onSelect={chooseTab} />
           </div>
-          <NowPlaying player={player} open={sheetOpen} onClose={closeSheet} />
+          <NowPlaying
+            player={player}
+            open={sheetOpen}
+            covered={over !== 'none'}
+            opener={sheetOpener}
+            onClose={closeSheet}
+            onMore={openMenu}
+            onAlbum={toAlbum ?? closeSheet}
+          />
+          {/* over Now Playing: its menu, then Info - the menu first, so where one closes as the
+              other opens, focus ends in the one that opened */}
+          <ActionMenu
+            open={sheetOpen && over === 'menu'}
+            opener={over === 'info' ? undefined : moreOpener}
+            onClose={closeOver}
+            onInfo={openInfo}
+            onAlbum={toAlbum}
+          />
+          <InfoSheet
+            open={sheetOpen && over === 'info'}
+            opener={moreOpener}
+            onClose={closeOver}
+            onAlbum={toAlbum}
+            player={player}
+            album={playing ? playedAlbum(playing.albumId) : null}
+            sentFormat={sentFormat}
+          />
         </div>
       </ActionsContext.Provider>
     </PlayerContext.Provider>

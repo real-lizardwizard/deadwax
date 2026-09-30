@@ -16,8 +16,10 @@
  *    tab's switch wrote over, is gone back from by replacing the address instead. After a reload
  *    the entries below are known again from the tab's sessionStorage (lib/appHistory.ts), so back
  *    is still history's own and leaves no copy of the entry below behind - never another load's.
- *  - What the browser's own back and forward do to the stacks: within a tab it follows them; onto
- *    another tab's entry it shows that tab AS IT WAS LEFT, pages kept, and rewrites the entry.
+ *  - What the browser's own back and forward do to the stacks: within a tab it follows them - back
+ *    to the page, forward by putting the pages passed back on top, never by searching the stack,
+ *    since Go to album can put one album in a stack twice; onto another tab's entry it shows that
+ *    tab AS IT WAS LEFT, pages kept, and rewrites the entry.
  *  - All of it end to end: lib/appHistory.ts's router driven against a fake browser history that
  *    keeps entries and their state across a reload, fires popstate and then hashchange on a
  *    traversal, and runs history.go() later, as a browser does.
@@ -207,6 +209,15 @@ console.log('\nthe browser\'s own back or forward onto another tab\'s entry: tha
   const same = R.browserMoved(nav, note, 1, '#/library/album/A')
   check('within the tab showing: back to the page, nothing rewritten', [stackIds(same.nav, 'library'), same.address, same.rewrite], [['A'], '#/library/album/A', false])
 
+  // Forward, within the tab showing, with the page gone forward to also lower in the stack (Go to
+  // album onto X, over X and Y): pushed, not searched for - the search took the lower X and cut Y.
+  nav = R.openPage(R.openPage(R.startNav({ tab: 'home', page: null }), album('X')), album('Y'))
+  note = { index: 2, entries: ['#/home', '#/home/album/X', '#/home/album/Y', '#/home/album/X'] }
+  const ahead = R.browserMoved(nav, note, 3, '#/home/album/X')
+  check('forward onto a page lower in the stack too: put on top, the pages between it kept', [stackIds(ahead.nav, 'home'), ahead.rewrite], [['X', 'Y', 'X'], false])
+  const skipped = R.browserMoved(R.startNav({ tab: 'library', page: null }), { index: 0, entries: ['#/library', '#/library/album/A', '#/home', '#/library/album/B'] }, 3, '#/library/album/B')
+  check('forward over several entries: each of this tab\'s put back in turn, another tab\'s passed over', stackIds(skipped.nav, 'library'), ['A', 'B'])
+
   // An address typed in says where to go, even another tab's root.
   const typed = R.browserMoved(R.openPage(R.startNav({ tab: 'home', page: null }), album('A')), R.startHistory(0, '#/home/album/A'), null, '#/library/album/Z')
   check('an address typed in is followed, onto its tab', [typed.nav.tab, stackIds(typed.nav, 'library'), typed.rewrite, typed.note.index], ['library', ['Z'], true, 1])
@@ -370,6 +381,37 @@ console.log('\nend to end: within a tab, back and forward follow the entries')
   b.settle()
   check('the tab you are on pops to its root by going back through history', [where(b), b.index, b.hashes()], [['library', []], 0, ['#/library', '#/library/album/A', '#/library/album/B']])
   check('...and tapped again, only scrolls', b.router.tab('library'), 'scroll-to-top')
+}
+
+console.log('\nend to end: one album twice in a stack (Go to album)')
+{
+  const b = makeBrowser('#/home')
+  b.load()
+  b.router.open(album('X', 'Dummy'))
+  b.router.open(album('Y', 'Third'))
+  //? Go to album for X, playing from the Library, while Home shows Y
+  b.router.open(album('X', 'Dummy'))
+  check('Home: X, Y, then X again on top', where(b), ['home', ['home:X+Y+X']])
+  b.router.back()
+  b.settle()
+  check('back: Y, by history\'s own back', [where(b), b.index], [['home', ['home:X+Y']], 2])
+  b.forward()
+  check('forward: X on top again, Y kept under it - not cut back to the first X', [where(b), R.backLabel(b.router.nav, 'home'), b.index], [['home', ['home:X+Y+X']], 'Third', 3])
+  b.router.back()
+  b.settle()
+  check('...and back from there is history\'s own back again, nothing replaced', [where(b), b.index, b.hashes()],
+    [['home', ['home:X+Y']], 2, ['#/home', '#/home/album/X', '#/home/album/Y', '#/home/album/X']])
+}
+{
+  const b = makeBrowser('#/library')
+  b.load()
+  b.router.open(album('A'))
+  b.router.open(album('B'))
+  b.router.tab('library')
+  b.settle()
+  b.traverse(2)
+  b.settle()
+  check('popped to the root, then forward two at once: both pages back, in order', where(b), ['library', ['library:A+B']])
 }
 
 console.log('\nend to end: a reload, and the swipe after it')

@@ -9,8 +9,12 @@ function Progress({ player }: { player: Player }) {
   return <span class="pl-mini-progress" style={{ transform: `scaleX(${done})` }} />
 }
 
-/** What's playing, kept at the bottom of every screen. Tapping it opens the full player. */
-export function MiniPlayer({ player, onOpen }: { player: Player; onOpen: () => void }) {
+/**
+ * What's playing, kept at the bottom of every screen. Tapping it opens the full player - and the
+ * tap's own event goes with it, so App can have the button focus itself and give focus back to it
+ * when the sheet closes (app/useSheet.ts's takeOpener).
+ */
+export function MiniPlayer({ player, onOpen }: { player: Player; onOpen: (event: MouseEvent) => void }) {
   const track = player.track
   if (!track) return null
 

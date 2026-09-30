@@ -1,10 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
-import { describeGaps } from '../lib/gapless'
-import { clock, describeSeek, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
-import { describeWrap } from '../lib/streamWrap'
+import { useSheet } from '../app/useSheet'
+import { clock, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
 import { Cover } from './Cover'
-import { AirPlayIcon, ChevronDownIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
+import { AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
 import { usePosition, type Player } from './usePlayer'
 
 /** How far a drag down has to go before letting go closes the sheet. */
@@ -115,53 +114,55 @@ function Scrubber({ player }: { player: Player }) {
 }
 
 /**
- * The gapless switch, iOS's shape. What the last song changes took is in the readouts at the top
- * of the sheet's body, timed with the switch off as well, so the two can be compared on the phone:
- * from one song's end to the next one's sound starting, and how the next one was started - see
- * clockStep() in lib/gapless.
- */
-function Gapless({ player }: { player: Player }) {
-  return (
-    <label class="pl-gapless">
-      <span class="pl-gapless-label">Gapless</span>
-      <button
-        type="button"
-        role="switch"
-        class={`pl-switch${player.gapless ? ' is-on' : ''}`}
-        aria-checked={player.gapless}
-        aria-label="Gapless"
-        //? a click, not a change event: this tap is what unlocks the second audio element on iOS
-        onClick={() => player.setGapless(!player.gapless)}
-      >
-        <span class="pl-switch-track">
-          <span class="pl-switch-knob" />
-        </span>
-      </button>
-    </label>
-  )
-}
-
-/**
  * The full player, as a sheet over everything. Dragged down by its top half to close, like the
  * one it copies; the bar and the buttons below are left to their own gestures.
+ *
+ * As the Now Playing board draws it (2.0.0-player.10): the cover, the song, "Artist — Album" as one
+ * line that goes to the album, the scrubber, the transport, and a row of icons - AirPlay when
+ * there is a speaker to send to, and ••• for Info and "Go to album". No readout and no Gapless
+ * control: how the song was sent and how the last changes and seek went are in Info > Debug
+ * (app/InfoSheet.tsx), and Gapless is a setting, in You > Playback (app/GaplessChoice.tsx). The
+ * board's Lyrics and Up next icons aren't drawn until there is something for them to open.
+ *
+ * THE BODY IS ANCHORED TO THE BOTTOM of the sheet, so a change in the height of anything in it
+ * moves what is above it and nothing below. Everything from the title down is therefore a fixed
+ * height - one line each, and the icon row a tap target tall with or without AirPlay in it - and
+ * the one thing that comes and goes, a song's failure, is ABOVE the title: it moves the cover and
+ * nothing a finger goes to. Anything added here whose height can change goes up there too.
+ *
+ * A sheet like the others (app/useSheet.ts): its own scroll lock, focus in to the close button and
+ * back to what opened it, Escape. It is inert while closed, and while Info or the menu is over it
+ * (`covered`).
  */
-export function NowPlaying({ player, open, onClose }: { player: Player; open: boolean; onClose: () => void }) {
+export function NowPlaying({
+  player,
+  open,
+  covered,
+  opener,
+  onClose,
+  onMore,
+  onAlbum,
+}: {
+  player: Player
+  open: boolean
+  /** Info or the ••• menu is over it */
+  covered: boolean
+  /** what opened it, given focus back as it closes */
+  opener: { current: HTMLElement | null }
+  onClose: () => void
+  /** the ••• button's tap - the event, so the button can be given focus back */
+  onMore: (event: MouseEvent) => void
+  /** close the sheet and open the song's album */
+  onAlbum: () => void
+}) {
   const track = player.track
   const [dragY, setDragY] = useState(0)
   const drag = useRef<{ pointer: number; startY: number; captured: boolean } | null>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
 
-  //? the page behind must not scroll under a finger on the sheet
-  useEffect(() => {
-    document.documentElement.classList.toggle('pl-sheet-open', open)
-  }, [open])
-
-  //? Focus goes into the sheet as it opens - to its close button, the first thing in it - since
-  //? everything behind it is inert now (App). Before the paint, while nothing else can have moved
-  //? it; App gives it back to what had it when the sheet closes.
-  useLayoutEffect(() => {
-    if (open) closeButton.current?.focus({ preventScroll: true })
-  }, [open])
+  //? the page behind must not scroll under a finger on the sheet; focus goes to the close button -
+  //? the first thing in it - as it opens, since everything behind it is inert now (App)
+  useSheet({ open, covered, onClose, lockClass: 'pl-sheet-open', first: closeButton, opener })
 
   if (!track) return null
 
@@ -196,12 +197,15 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
     setDragY(0)
   }
 
+  //? "Artist — Album", as the board has it; either alone when the other isn't known
+  const byline = [track.artist, track.album].filter(Boolean).join(' — ')
+
   return (
     <div
       class={`pl-sheet${open ? ' is-open' : ''}${dragY ? ' is-dragging' : ''}`}
       style={open && dragY ? { transform: `translateY(${dragY}px)` } : undefined}
-      aria-hidden={!open}
-      inert={!open}
+      aria-hidden={!open || covered}
+      inert={!open || covered}
     >
       <Cover id={track.coverArt} size={300} class="pl-sheet-backdrop" />
 
@@ -224,23 +228,23 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
       </div>
 
       <div class="pl-sheet-body">
-        {/* The readouts come FIRST, above everything a finger goes to. The body sits against the
-            bottom of the sheet, so a line that grows or shrinks moves whatever is above it and
-            nothing below: under the bar, their one to three lines (a seek asked, then judged at
-            its song's end) moved the scrubber and the buttons up and down the screen at the
-            moment of a tap. Up here the most that moves is the cover. */}
-        <div class="pl-readouts">
-          <p class="pl-gapless-readout">{describeGaps(player.gaps)}</p>
-          {/* ending "· FLAC in MP4" when the song was sent that way - how the phone shows it */}
-          <p class="pl-gapless-readout pl-seek-readout">
-            {describeSeek(player.lastSeek) + describeWrap(player.wrapped, track.id)}
-          </p>
-        </div>
-
         <div class="pl-sheet-titles">
-          <h2 class="pl-sheet-title">{track.title}</h2>
-          <p class="pl-sheet-artist">{track.artist}</p>
+          {/* A failure comes and goes, so it is ABOVE the title: the body sits against the bottom
+              of the sheet, and a line appearing here moves the cover - never the album line, the
+              bar or the buttons under a finger. */}
           {player.error && <p class="pl-sheet-error">{player.error}</p>}
+          <h2 class="pl-sheet-title">{track.title}</h2>
+          {/* one box either way, so which it is never moves the bar; the ellipsis is the span's,
+              since the link's tap target reaches past its own box (player.css) */}
+          {track.albumId ? (
+            <button type="button" class="pl-sheet-artist is-link" onClick={onAlbum} aria-label={`Go to the album: ${byline}`}>
+              <span class="pl-sheet-byline">{byline}</span>
+            </button>
+          ) : (
+            <p class="pl-sheet-artist">
+              <span class="pl-sheet-byline">{byline}</span>
+            </p>
+          )}
         </div>
 
         <Scrubber player={player} />
@@ -262,14 +266,25 @@ export function NowPlaying({ player, open, onClose }: { player: Player; open: bo
           </button>
         </div>
 
+        {/* The icon row, a tap target tall whatever is in it. ••• is always there, at the right
+            end; AirPlay comes and goes to its left, so nothing moves when a speaker does. */}
         <div class="pl-sheet-footer">
-          <span class="pl-sheet-album">{track.album}</span>
-          <Gapless player={player} />
           {player.airplay && (
             <button type="button" class="pl-icon-button" onClick={player.showAirPlay} aria-label="AirPlay">
               <AirPlayIcon class="pl-icon" />
             </button>
           )}
+          <button
+            type="button"
+            class="pl-icon-button"
+            onClick={onMore}
+            //? what the menu holds: "Go to album" only for a song that names its album
+            aria-label={track.albumId ? 'More: info, go to album' : 'More: info'}
+            aria-haspopup="dialog"
+            aria-expanded={covered}
+          >
+            <MoreIcon class="pl-icon" />
+          </button>
         </div>
       </div>
     </div>

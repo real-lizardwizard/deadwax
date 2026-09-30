@@ -101,7 +101,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   names the tab it goes back to.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
-- **You**: **Maximum quality** under **Playback** ([below](#maximum-quality-hi-res-at-48-khz));
+- **You**: **Gapless** ([below](#gapless-playback-experimental)) and **Maximum quality**
+  ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
   version, and that logins are off. Server settings, the albums that need a look, the log and
@@ -109,11 +110,27 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **Search** and **Requests** say they're on the main page for now, and link there. Every link to
   the main page opens it beside the player, in a new tab, so the music keeps playing. From the
   home-screen app it opens outside the app, in Safari or a browser view over it.
-- **Now playing**: a large cover (a grey square for an album without one), a scrubber, previous,
-  play/pause and next, and an **AirPlay** button when there's a speaker on the network to send
-  to. Drag it down, or tap the arrow at its top, to close it. While it's open nothing behind it
-  can be reached by the keyboard or VoiceOver; opening it moves to its close arrow, and closing it
-  goes back to where you were.
+- **Now playing**: a large cover (a grey square for an album without one), the song's title, and
+  under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
+  to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons, with
+  an **AirPlay** button when there's a speaker on the network to send to, and **•••**. Drag it
+  down, or tap the arrow at its top, to close it (Escape closes it too). While it's open nothing
+  behind it can be reached by the keyboard or VoiceOver; opening it moves to its close arrow, and
+  closing it goes back to where you were. Until 2.0.0-player.10 it also showed two lines about how
+  the song was sent and how the last song changes and seek went, and the Gapless switch: those are
+  in [Info → Debug](#info--debug) and in **You** now.
+- **•••** on the now-playing screen opens a short menu: **Info**, and **Go to album**, which closes
+  the now-playing screen and opens the song's album in the tab you're on, as if you'd tapped it
+  there.
+- **Info** is a sheet over the now-playing screen, with two tabs. **About** is the song, the album
+  and the artist, from what the player already has from Navidrome, asking nothing new: the song's
+  title and artist, "Track 3 of 6 · 5:08" (counted on its own disc), and its disc's title when the
+  album has disc titles ("Disc 2 · Unreleased Tracks", as the album page heads it); the album's
+  cover, title, year, format and number of songs (tap it to go to the album); and the artist, with
+  the album's own artist beside it when that's someone else, as on a compilation. Anything
+  Navidrome didn't send is left out, never guessed. **Debug** is how the song is being played, in
+  labelled rows: see [Info → Debug](#info--debug). **Done**, Escape or a tap above the sheet closes
+  it.
 - **The scrubber** is the whole bar: tap anywhere along it to jump there, or drag from anywhere on
   it and it follows your finger, seeking when you let go. It works from the keyboard too (arrows
   move 5 seconds, Page Up and Page Down 30, Home and End to the ends), and VoiceOver's swipe up
@@ -122,8 +139,9 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **Previous** restarts the song if you're more than three seconds in, and goes back a song if
   you're not, as Apple Music does.
 - **A song that won't play doesn't stop the album.** The player asks for it once more a moment
-  later, and if that fails too, moves on to the next song, saying **Skipped "…"** and why under
-  its title for a few seconds. At the end of the queue it stops, with the reason on screen.
+  later, and if that fails too, moves on to the next song, saying **Skipped "…"** and why for a
+  few seconds: in the mini player where the artist goes, and above the song's title on the
+  now-playing screen. At the end of the queue it stops, with the reason on screen.
   [Troubleshooting](troubleshooting.md#a-song-in-the-player-wont-start-or-cant-be-skipped-through)
   goes through the reasons.
 - **The lock screen and Control Center** show the song, its artist, album and cover, with
@@ -139,10 +157,10 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 ## Gapless playback (experimental)
 
 Between two songs there's normally a short pause, about a second on an iPhone over a VPN: when
-one song ends, the phone has to ask deadwax for the next one and start it from nothing. The
-**Gapless** switch on the now-playing screen, beside the album's name, closes that gap. It's
-**off** by default. Its setting is kept on the device, and a home-screen app keeps its settings
-apart from Safari's, so turn it on in the app itself.
+one song ends, the phone has to ask deadwax for the next one and start it from nothing. **Gapless**, a checkbox in **You** under **Playback**, closes that gap. It's **off** by default.
+It's kept on the device, and a home-screen app keeps its settings apart from Safari's, so turn it
+on in the app itself. (Until 2.0.0-player.10 it was a switch on the now-playing screen, beside the
+album's name; it keeps the setting it had there.)
 
 With it on, the player works one of two ways, song by song: FLAC songs played one after another
 go into **one stream**, and everything else is got ready on a **second player**.
@@ -213,7 +231,7 @@ leaves a short gap (the second player has to start), just a shorter one.
   every song change goes the ordinary way. Once AirPlay stops, the next song is got ready again.
 - **The music doesn't stop because of it.** If the next song can't be handed over when this one
   ends (nothing got ready, a song that wouldn't load, AirPlay in use, or iOS refusing to start the
-  second player), that change goes the ordinary way, exactly as with the switch off. A song that
+  second player), that change goes the ordinary way, exactly as with Gapless off. A song that
   won't play from memory is asked for from Navidrome straight away. The usual rules for songs
   that won't play still apply after that: one more try, then skip.
 - **A download that hasn't finished is streamed instead.** If this song ends before the next one
@@ -222,19 +240,36 @@ leaves a short gap (the second player has to start), just a shorter one.
 - **It uses more data.** Each next song is downloaded in full, even if you skip it. **On a slow
   connection** it can use more still and not help at all: when a whole song can't download while
   the one before plays, every download is dropped part-way and the song streamed afresh, so part
-  of every song is sent twice, for a change no quicker than with the switch off. If the readout
-  keeps saying `download unfinished`, turn the switch off.
+  of every song is sent twice, for a change no quicker than with Gapless off. If
+  [Info → Debug](#info--debug)'s **Gap** row keeps saying `download unfinished`, turn Gapless off.
 
-**Turning the switch off** takes effect at once: the song you're hearing carries on alone, from
+**Turning Gapless off** takes effect at once: the song you're hearing carries on alone, from
 where it was, and anything got ready is let go of.
 
-### The readout
+### Info → Debug
 
-Between the cover and the song's title, the player shows how long the last few song changes took,
-newest first, and how the change was made. It's timed with the switch off as well, the same way,
-so you can compare the two. (It sits above the title, not under the controls, because it grows
-and shrinks as it fills in: under the controls, that moved the bar and the buttons at the moment
-you went to tap them. Up there, only the cover moves.)
+How the song you're hearing was sent, and how the last song changes and your last seek went, are
+in **Info**: tap **•••** on the now-playing screen, then **Info**, then **Debug**. (Info opens on
+the tab you last left it on, scrolled to the top.) Until 2.0.0-player.10 the gap and seek parts
+were two lines on the now-playing screen, between the cover and the song's title; they moved here
+so that screen shows the song, and they say the same things as labelled rows. The **Gap** and
+**Last seek** rows keep the old lines' words, less their openings (`Last song change`,
+`Last seek:`), and the older changes are on an *Earlier* line. The end of the old seek line, how
+the song was sent (`· FLAC in MP4, 192 kHz resampled to 48 kHz`), is now the **Sent as** row, with
+the resampling on a **Resampled** row of its own. Debug has four parts:
+
+| part | row | what it says |
+| --- | --- | --- |
+| The file | **Format** | the file as Navidrome read it: `FLAC, 24-bit, 192 kHz, stereo`. A part Navidrome didn't give is left out |
+| What this device is sent | **Sent as** | how the song comes: `FLAC in MP4, 16-bit, 44.1 kHz`, `In one stream, 24-bit, 48 kHz`, `FLAC, as the file is`, `MP3, transcoded by Navidrome`. [Seeking](#seeking-and-where-safari-lands) says what the MP4s are for |
+| | **Resampled** | `192 kHz to 48 kHz, 3 dB quieter` when deadwax resampled the song for [Maximum quality](#maximum-quality-hi-res-at-48-khz), `Not known yet` while it hasn't said, otherwise `No` |
+| | **Why** | why it came that way: `Maximum quality: Up to 48 kHz`, `48 kHz and below is never resampled`, `Only FLAC is resampled`, `Maximum quality: Original`, and so on |
+| | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
+| Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
+| | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
+| Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
+
+The **Gap** row is timed with Gapless off as well, the same way, so you can compare the two.
 
 A change is timed from the moment one song ended to the moment the next one's **sound started**:
 when the player's clock for the new song is first seen moving. It isn't timed to the moment the
@@ -246,27 +281,51 @@ silence it really is.
 | it says | meaning |
 | --- | --- |
 | `in one stream` | the stream crossed from one song into the next. 0 ms when the next song's audio was already there; otherwise how long the stream waited for it |
-| `one element` | the switch is off: the ordinary way |
+| `one element` | Gapless is off: the ordinary way |
 | `handed over, from memory` | the second player started a song held in memory |
 | `handed over, streamed` | the second player started a song it had buffered from its address |
 | `handed over, streamed (download unfinished)` | the next song hadn't finished downloading, so the second player streamed it instead |
 | `…, had to load` | the second player didn't have enough of the song to start at once, so it loaded first: iOS may have thrown away what it had buffered |
 | `…, failed before playing` | the new song failed before it made a sound, and the time includes asking for it again (or skipping it) |
-| `one element (airplay)` | the switch is on but the change went the ordinary way; also `nothing ready`, `failed to get ready`, `another song ready`, `refused` |
+| `one element (airplay)` | Gapless is on but the change went the ordinary way; also `nothing ready`, `failed to get ready`, `another song ready`, `refused` |
 
-The **Last seek** line under it ends ` · in one stream` while the song is playing in a stream. For a
-hi-res song it also says what happened to its rate: ` · in one stream, 192 kHz resampled to 48 kHz`
-(or ` · FLAC in MP4, 192 kHz resampled to 48 kHz` when it played the other way), or
-` · in one stream, 192 kHz` when it streamed as it is under "Original".
+While the song is playing in a stream, **Sent as** starts `In one stream` and **Gapless** says `On,
+in one stream`. A hi-res song resampled for Maximum quality reads `In one stream, 24-bit, 48 kHz`
+(or `FLAC in MP4, 24-bit, 48 kHz` when it played the other way), with **Resampled** saying `192 kHz
+to 48 kHz, 3 dB quieter`; one streamed as it is under "Original" reads `In one stream, 24-bit,
+192 kHz`. deadwax resamples the whole song before it sends any of it, which takes a few seconds on a
+NAS, and until the start of the song has arrived nothing on the phone can say what deadwax did: then
+**Sent as** reads just `In one stream` (or `Asked for FLAC in MP4`), **Resampled** `Not known yet`
+and **Why** `Asked for resampled; deadwax hasn't answered yet`. They fill in by themselves while
+Info is open.
 
 Only songs ending by themselves are timed, and only when the next one went straight to sound.
 Changes you make yourself (**Next**, **Previous**, a new song, moving the scrubber, pressing play)
 aren't timed, and neither is a change where the music stopped: a pause, iOS stopping for a call or
 Siri, iOS refusing to start the next song, or a song that wouldn't play at the end of the queue.
-Anything longer than 30 seconds isn't counted either. The readout is hidden with the phone on its
-side, to leave room for the cover. If it says the switch isn't helping,
+Anything longer than 30 seconds isn't counted either. If it says Gapless isn't helping,
 [troubleshooting](troubleshooting.md#with-gapless-on-theres-still-a-pause-between-songs-or-the-player-reloads-by-itself)
 says what each answer means.
+
+**Navidrome sent** is there to check what your Navidrome really sends before later parts of the app
+rely on it: the field names only, such as `discTitles` on an album or `musicBrainzId`, `playCount`
+and `played` on a song, as Navidrome's answer had them. A name alone can mislead both ways, so two
+things more are said:
+
+- **Some fields Navidrome always sends, empty when the files have nothing for them**:
+  `musicBrainzId` as `""` on a song or an album with no MusicBrainz id tag (deadwax writes the
+  album's, not each recording's), `discTitles` as `[]`, `bpm` as `0`, and `bitDepth` as `0` for a
+  lossy file. Those are on the row's *Empty* line, not listed as if they held something. A name on
+  the main line has a value.
+- **Other fields Navidrome leaves out whenever they are zero or never set**: `playCount` and
+  `played` on a song nobody has played, and on a song `starred`, `userRating`, `year`, `track` and
+  `discNumber`. So a missing name doesn't mean Navidrome can't send it. **On other songs** lists
+  the fields other songs of the same album carry and this one doesn't, which is where `playCount`
+  shows up for a song never played when one beside it has been.
+
+What it shows is the album's answer as it was when you opened the album's page and played from it,
+so a song you've played since still has no `playCount` there: go back, open the album again, play
+from it, and look again. It says *Not known* when the player doesn't have the album the song was played from.
 
 ### What still needs trying on a real iPhone
 
@@ -274,14 +333,14 @@ The stream is built on the recipe a test page proved on an iPhone first: seamles
 Arc, with the screen locked, fetching over the network while locked. deadwax's own player has been
 checked in a desktop browser (Chromium): recorded as it played, the joins came out to the sample,
 the lock screen followed each song, and seeks, Next and Previous landed where they should. The
-second player's song changes took about 98 ms there against about 145 ms with the switch off, and
+second player's song changes took about 98 ms there against about 145 ms with Gapless off, and
 94 and 96 ms on an iPhone. To try the stream on the phone:
 
-1. Turn **Gapless** on and play an album of CD-quality FLAC from a tap, with the screen on. The
-   readout should say `in one stream` at 0 ms, and you shouldn't hear the joins.
+1. Tick **Gapless** in You and play an album of CD-quality FLAC from a tap, with the screen on.
+   Info → Debug's Gap row should say `0 ms, in one stream`, and you shouldn't hear the joins.
 2. **Lock the phone** and let at least ten songs change by themselves. The lock screen should show
-   each song's title and its own position as it comes. Unlock and open the now-playing screen: the
-   readout lists the last five changes.
+   each song's title and its own position as it comes. Unlock and open Info → Debug: the Gap row
+   shows the last change, and up to four before it on its *Earlier* line.
 3. From the app and from the lock screen, try **Next**, **Previous** and the scrubber, and seek
    back to near the start of a song that played a few minutes ago.
 4. Try **AirPlay** while a stream plays: the song should carry on and the list of speakers open.
@@ -292,22 +351,24 @@ second player's song changes took about 98 ms there against about 145 ms with th
    stream (see [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened)).
 7. Play a 24/192 album whose tracks run into each other, from a tap, with
    [Maximum quality](#maximum-quality-hi-res-at-48-khz) at **Up to 48 kHz**. The first song may
-   take a few seconds to start (that's deadwax resampling it). After that the Last seek line should
-   end `in one stream, 192 kHz resampled to 48 kHz`, the song changes read `in one stream`, and
-   you shouldn't hear the joins, locked or not. Then try **Original**: the line ends `in one
-   stream, 192 kHz`. Listen for the music stalling on a weaker connection, and match the volume
-   before comparing, since resampled songs are 3 dB quieter.
+   take a few seconds to start (that's deadwax resampling it). After that Info → Debug should read
+   `In one stream, 24-bit, 48 kHz` for Sent as and `192 kHz to 48 kHz, 3 dB quieter` for
+   Resampled, the song changes `in one stream`, and you shouldn't hear the joins, locked or not.
+   Then switch to **Original** and start the album again from a tap (a stream that is playing
+   carries on with the setting it began with): Sent as reads `In one stream, 24-bit, 192 kHz`.
+   Listen for the music stalling on a weaker connection, and match the volume before comparing,
+   since resampled songs are 3 dB quieter.
 
 ## Maximum quality: hi-res at 48 kHz
 
 **Maximum quality** is in **You**, under **Playback**, with two choices. (Before 2.0.0-player.9 it
-was behind a gear beside the Library title.) Like the Gapless switch, it's kept on the device.
+was behind a gear beside the Library title.) Like Gapless above it, it's kept on the device.
 
 - **Up to 48 kHz** (the default): FLAC songs at 88.2, 96, 176.4, 192, 352.8 or 384 kHz, 16 or 24
   bits, are resampled by deadwax to 48 kHz (44.1 kHz for the 88.2 kHz family) and sent as lossless
   24-bit FLAC. They then join the gapless stream like any CD-quality album, which a 24/192 album
   couldn't before. Every other song is sent exactly as before, bit for bit.
-- **Original**: songs above 48 kHz are sent as they are. With the Gapless switch on, FLAC ones join
+- **Original**: songs above 48 kHz are sent as they are. With Gapless on, FLAC ones join
   the stream too, as they are. An iPhone can only hold about 5 MB of a stream at a time, which is
   8 seconds or so of 24/192, so the stream runs only 4 or 5 seconds ahead of you: a weak connection
   can make these songs stall where 48 kHz ones wouldn't.
@@ -353,7 +414,7 @@ failing costs one wait, not one at every song change); a play after that tries a
 resamples it before sending anything. A 7-minute 24/192 song takes about 2.5 seconds on an M2 Mac,
 and a NAS will be several times slower. In a stream, the next song is got ready about a minute
 ahead, so only the first song you tap waits, and the stream gives it up to a minute before playing
-it the other way. With the Gapless switch off, or while AirPlaying, the player asks deadwax for the
+it the other way. With Gapless off, or while AirPlaying, the player asks deadwax for the
 next song's copy a few seconds into each song. Once made, a song is kept in the player's cache (see
 [`PLAYER_CACHE_MB`](configuration.md#paths)), and plays at once from then on.
 
@@ -420,27 +481,29 @@ out. Other browsers get the FLAC as it is, as before.
   constant 320 kbps MP3 landed within a hundredth of a second on every seek, and a V2 copy of the
   same song from a fraction of a second to 41 seconds out.
 
-**The readout shows it on your phone.** Between the cover and the song's title, below the gapless
-readout, the player shows the last seek you made, with the bar or from the lock screen: *Last
-seek: asked 2:10, seeking…* while it's on its way, then *Last seek: asked 2:10, the player said
-2:10*. If it never got there, because you pressed Previous or Next first or the song failed under
-it, the line says *Last seek: asked 2:10, interrupted*. It ends with how the song playing was sent,
-in Safari:
+**Info → Debug shows it on your phone** (tap **•••** on the now-playing screen, then **Info**, then
+**Debug**; until 2.0.0-player.10 it was a line between the cover and the song's title). Its **Last
+seek** row is the last seek you made, with the bar or from the lock screen: *Asked 2:10, seeking…*
+while it's on its way, then *Asked 2:10, the player said 2:10*. If it never got there, because you
+pressed Previous or Next first or the song failed under it, it says *Asked 2:10, interrupted*, and
+before your first seek, *No seek yet*. Its **Sent as** row says how the song playing was sent, in
+Safari:
 
-| it ends | meaning |
+| Sent as | meaning |
 | --- | --- |
-| `· FLAC in MP4` | the song came inside an MP4: seeks should land where you put them |
-| `· sent as FLAC, not in an MP4` | deadwax sent the FLAC as it is (see above); seeks may land off |
-| `· asked for FLAC in MP4` | for a moment, while the player checks what came |
+| `FLAC in MP4, …` | the song came inside an MP4: seeks should land where you put them |
+| `FLAC, not in an MP4, …` | deadwax sent the FLAC as it is (see above); seeks may land off |
+| `Asked for FLAC in MP4` | for a moment, while the player checks what came |
 
-In other browsers it ends with nothing, since they get every file as it is, and so it does in
-Safari for a song that isn't a FLAC (an MP3's seeks can still land off; see above). The line
-shows it before any seek too: *No seek yet · FLAC in MP4*.
+In other browsers a FLAC reads `FLAC, as the file is`, since they get every file as it is (a hi-res
+song resampled for Maximum quality comes in an MP4 in any browser). So does a FLAC in a Safari too
+old to play one in an MP4, and a song that isn't a FLAC reads the same way, `MP3, as the file is`
+(an MP3's seeks can still land off; see above).
 
 Safari says the time asked for wherever it lands, so "the player said" can't tell you where a seek
 really went, but the end of the song can: if the seek landed off, the song runs out before its
 clock reaches the end, or plays on after its clock has stopped at the end, by the same amount. If
-the song plays to its end with no other seek or pause, the line adds what that showed:
+the song plays to its end with no other seek or pause, the Last seek row adds what that showed:
 
 | it adds | meaning |
 | --- | --- |
@@ -448,10 +511,9 @@ the song plays to its end with no other seek or pause, the line adds what that s
 | `the song ran out 7 s before its clock did, so it really landed at about 2:17` | it landed 7 seconds later in the song than asked |
 | `the song played on 7 s after its clock ended, so it really landed at about 2:03` | it landed 7 seconds earlier |
 
-It's hidden with the phone on its side, like the gapless readout. To try it on the iPhone, play a
-FLAC and check the line ends `· FLAC in MP4`; then pick a song with a quiet opening and a loud
-middle, seek well into the loud part near the end, and let it finish. It should say `the song ended
-on time`. [Troubleshooting](troubleshooting.md#a-song-seeks-to-the-wrong-place) says more.
+To try it on the iPhone, play a FLAC and check Sent as reads `FLAC in MP4`; then pick a song with a
+quiet opening and a loud middle, seek well into the loud part near the end, and let it finish.
+Last seek should say `the song ended on time`. [Troubleshooting](troubleshooting.md#a-song-seeks-to-the-wrong-place) says more.
 
 ## How plays are counted
 
@@ -479,7 +541,7 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
 should cover FLAC, MP3, AAC and ALAC. That's the only kind of file Navidrome can send in pieces (byte ranges), which is
 what Safari needs to start a song quickly and to skip around in it. The one change is that Safari
 gets a FLAC inside an MP4 of the same audio, so that its seeks land
-([Seeking](#seeking-and-where-safari-lands)); that's sent in pieces too. With the Gapless switch
+([Seeking](#seeking-and-where-safari-lands)); that's sent in pieces too. With Gapless
 on, FLAC songs [in a stream](#one-stream-for-flac) come as a fragmented MP4 of the same audio, in
 any browser.
 
@@ -516,8 +578,8 @@ fixes that.
 
 ## Known gaps
 
-- **Gapless playback**: there's a short gap between songs, unless you try the
-  [experimental Gapless switch](#gapless-playback-experimental).
+- **Gapless playback**: there's a short gap between songs, unless you tick the
+  [experimental Gapless setting](#gapless-playback-experimental) in You.
 - **Hi-res through a USB DAC**: whether Safari ever runs a DAC at a song's own rate is unknown.
 - **Play from the lock screen after a long pause** may do nothing until the app is opened: iOS
   puts a web page that isn't playing to sleep. See
@@ -557,7 +619,13 @@ question the whole player existed to answer. Still to find out:
 - how the home-screen app opens **a link to the main page** - in Safari, or a browser view over
   the app - and whether the music carries on underneath;
 - whether **Navidrome sends each disc's title** for your albums (the album page's "Disc 4 · ..."
-  headings);
+  headings, and Info → About's disc line);
+- **what Navidrome sends** for a song and an album: [Info → Debug](#info--debug)'s **Navidrome
+  sent** lists the field names, and later parts of the app want `musicBrainzId`, `played` and
+  `playCount` from it;
+- **Info and the ••• menu** under a real finger: that Info's list scrolls and nothing behind it
+  does, that a tap above it closes it, and that the Gapless checkbox in You turns gapless on from
+  its tap as the switch did;
 - how Safari handles a **transcoded** song, and which Ogg files it says it can play;
 - whether a song that won't load is **asked for again with the phone locked**: the second try
   comes a moment later, with nothing playing meanwhile, which is exactly when iOS may be holding

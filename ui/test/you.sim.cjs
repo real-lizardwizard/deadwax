@@ -16,6 +16,9 @@
  *  - Each connection row is a live region of its own, read whole, so VoiceOver hears "slskd,
  *    NOT_LOGGED_IN", not a bare word with no service - and the list itself is not one.
  *  - The link to the main page opens beside the app.
+ *  - Playback holds Gapless and then Maximum quality (2.0.0-player.10): Gapless is handed the
+ *    player itself - the object whose setGapless its tap calls - and the notes say where the
+ *    settings are kept and when each applies, with no pointer to the now-playing screen.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -78,7 +81,7 @@ fs.writeFileSync(path.join(OUT, 'player/api.js'), `
 exports.navidromeStatus = () => globalThis.__you.ping('navidrome')
 `)
 fs.writeFileSync(path.join(OUT, 'app/context.js'), `
-exports.usePlayerState = () => ({ maxRate: '48000' })
+exports.usePlayerState = () => globalThis.__you.player
 exports.usePlayerActions = () => ({ setMaxRate() {} })
 `)
 const ANSWERS = {
@@ -87,6 +90,7 @@ const ANSWERS = {
   navidrome: { configured: true, ok: true, server: 'Navidrome 0.64.2', problem: null },
 }
 globalThis.__you = {
+  player: { maxRate: '48000', gapless: false, setGapless() {} },
   me() {
     asked.me += 1
     const next = meAnswers.shift()
@@ -194,6 +198,27 @@ async function main() {
     'slskdNOT_LOGGED_INslskd is not logged in to Soulseek',
     'NavidromeNavidrome 0.64.2',
   ])
+
+  console.log('\nPlayback: Gapless, then Maximum quality')
+  const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
+  const playback = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-playback-title')[0]
+  const inPlayback = []
+  const notes = []
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(visit); return }
+    if (typeof node.type === 'function') inPlayback.push(node.type.name)
+    if (node.type === 'p' && byClass('app-footnote')(node)) notes.push(text(node))
+    visit(node.props?.children)
+  }
+  visit(playback)
+  check('both in the Playback section, Gapless first', inPlayback, ['GaplessChoice', 'QualityChoice'])
+  check('Gapless is handed the player itself', named('GaplessChoice')[0]?.props.player === globalThis.__you.player, true)
+  check('the notes: what Gapless does, and where both are kept', notes, [
+    'An experiment: it shortens the pause between songs, and FLAC songs played one after another can join in one stream, with none at all.',
+    'Both are kept on this device. Maximum quality is used from the next song.',
+  ])
+  check('...the first is what the checkbox is described by', find((node) => node.props?.id === 'app-gapless-note').map(text).length, 1)
 
   console.log('\nthe main page opens beside the app')
   const link = find((node) => node.type === 'a')[0]

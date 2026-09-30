@@ -12,6 +12,18 @@ each held to the fix.
 - A phone on its side gets the compact tab bar.
 - Play and pause stay round (STYLE.md).
 - Home's headings sit the board's 12px above their shelf; a tile's two lines sit together.
+
+And for what opens over Now Playing (2.0.0-player.10):
+
+- Each sheet - Now Playing, its ••• menu, Info - has its own scroll lock on <html>.
+- Info's scroller says its touches pan: Now Playing, and the layer Info sits in, take every touch.
+- Info's top edge is where its board puts it, or just under the status bar where that is lower.
+- The menu and Info stack over Now Playing, and are placed clear of a notch, never padded by it.
+- Now Playing lost its readouts and its switch; its icon row is one fixed height, so AirPlay coming
+  and going moves nothing above it.
+- A control drawn smaller than a tap target (the album line, a segmented control's half) reaches
+  past its own box to 44px - without reaching the scrubber's own target.
+- Gapless is a checkbox: a square box, not a pill.
 """
 
 import re
@@ -175,3 +187,106 @@ def test_the_reader_reads_rules_as_the_browser_would():
                           ("@media (max-height: 500px)", ":root", {"--t": "1px"})]
     assert RAW_LENGTH.search("calc(100% - 4px)") and not RAW_LENGTH.search("0 var(--a)")
     assert not RAW_LENGTH.search("var(--dw-tab-item-2px)")
+
+
+def px(token: str) -> float:
+    """A token that is a plain px length, as a number."""
+    value = ALL_TOKENS[token]
+    assert value.endswith("px"), (token, value)
+    return float(value[:-2])
+
+
+def test_each_sheet_has_its_own_scroll_lock():
+    assert declarations(PLAYER_CSS, "html.pl-sheet-open")["overflow"] == "hidden"
+    for lock in ("html.app-menu-open", "html.app-info-open"):
+        assert declarations(APP, lock)["overflow"] == "hidden", lock
+    #? the classes the sheets put on <html> are exactly these three
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    sheets = {"player/NowPlaying.tsx": "pl-sheet-open", "app/ActionMenu.tsx": "app-menu-open", "app/InfoSheet.tsx": "app-info-open"}
+    for file, lock in sheets.items():
+        assert f"lockClass: '{lock}'" in (ui / file).read_text(), file
+
+
+def test_infos_scroller_opts_out_of_now_playings_touch_action():
+    assert declarations(PLAYER_CSS, ".pl-sheet")["touch-action"] == "none"
+    #? the layer Info and the menu sit in takes every touch too, so none pans the page behind...
+    assert declarations(APP, ".app-layer")["touch-action"] == "none"
+    #? ...and the one scroller in it opts out: a scroller starts its own count
+    scroller = declarations(APP, ".app-info-scroll")
+    assert scroller["touch-action"] == "pan-y"
+    assert scroller["overflow-y"] == "auto" and scroller["overflow-x"] == "hidden"
+    assert scroller["overscroll-behavior"] == "contain"
+    assert scroller["min-height"] == "0"  # a flex child that can shrink below its content, so it scrolls
+
+
+def test_info_starts_where_its_board_does_or_under_the_status_bar():
+    assert declarations(APP, ".app-info")["top"] == "max(var(--app-info-top), calc(var(--pl-safe-top) + var(--app-info-pad)))"
+    assert ALL_TOKENS["--app-info-top"] == "52px"  # from the top of the screen, as NowPlayingInfo's board draws it
+
+
+def test_the_menu_and_info_are_placed_clear_of_the_notch_not_padded_by_it():
+    #? capped and centred, a phone on its side has them well clear of the notch already: the
+    #? insets place them (as the mini player is placed), and their padding is the board's alone
+    for sheet in (".app-menu", ".app-info"):
+        found = declarations(APP, sheet)
+        assert (found["left"], found["right"]) == ("var(--pl-safe-left)", "var(--pl-safe-right)"), sheet
+        assert found["max-width"] == "var(--pl-content-max)" and found["margin"] == "0 auto", sheet
+        assert not re.search(r"--pl-safe-(left|right)|--app-edge-grouped", found["padding"]), (sheet, found["padding"])
+    assert declarations(APP, ".app-info")["padding"] == "var(--app-info-pad) var(--dw-gutter-grouped) 0"
+    assert declarations(APP, ".app-menu")["padding"].startswith("var(--app-info-pad) var(--app-info-pad) ")
+
+
+def test_the_menu_and_info_stack_over_now_playing():
+    assert declarations(APP, ".app-layer")["z-index"] == "var(--app-z-over)"
+    assert int(ALL_TOKENS["--app-z-over"]) > int(declarations(PLAYER_CSS, ".pl-sheet")["z-index"])
+    #? hidden while closed, and until the slide down has finished
+    assert declarations(APP, ".app-layer")["visibility"] == "hidden"
+    assert declarations(APP, ".app-layer.is-open")["visibility"] == "visible"
+
+
+def test_now_playing_has_no_readouts_or_switch_and_a_fixed_icon_row():
+    selectors = {selector for _, found, _ in rules(PLAYER_CSS) for selector in found.split(",")}
+    assert not [selector for selector in selectors if re.search(r"pl-readouts|pl-gapless|pl-switch", selector)]
+    assert not [token for token in ALL_TOKENS if token.startswith("--pl-switch")]
+    footer = declarations(PLAYER_CSS, ".pl-sheet-footer")
+    assert footer["height"] == "var(--pl-hit)" and "min-height" not in footer
+    assert footer["justify-content"] == "flex-end"  # ••• at the right end, AirPlay beside it
+
+
+def test_a_small_control_reaches_a_full_tap_target_without_reaching_the_scrubber():
+    hit = px("--pl-hit")
+    #? the album line: its reach up and down, and its own line (17px at the token's leading)
+    line = px("--dw-text-body") * float(ALL_TOKENS["--pl-byline-leading"])
+    assert px("--pl-byline-reach-up") + line + px("--pl-byline-reach-down") >= hit
+    assert px("--pl-byline-reach-down") < px("--pl-scrub-gap")
+    reach = declarations(PLAYER_CSS, ".pl-sheet-artist.is-link::before")
+    assert reach["top"] == "calc(-1 * var(--pl-byline-reach-up))" and reach["bottom"] == "calc(-1 * var(--pl-byline-reach-down))"
+    #? the ellipsis is on the span inside, so clipping can't cut the reach away
+    assert "overflow" not in declarations(PLAYER_CSS, ".pl-sheet-artist")
+    assert declarations(PLAYER_CSS, ".pl-sheet-byline")["overflow"] == "hidden"
+    #? a segmented control's half: 32px drawn, 44 to a finger, with room above it for the reach.
+    #? The reach is placed against the HALF'S padding box (every box is border-box), which sits
+    #? the well's border and padding and the half's own border inside the well's outside
+    well, half = declarations(APP, ".app-segmented"), declarations(APP, ".app-segment")
+    hairline = px("--dw-hairline")
+    assert well["padding"] == "var(--dw-hairline)" and well["border"].startswith("var(--dw-hairline) ")
+    assert half["border"].startswith("var(--dw-hairline) ")
+    assert "*, *::before, *::after" in PLAYER_CSS and "box-sizing: border-box" in PLAYER_CSS
+    padding_box = px("--dw-segmented") - 2 * (hairline + hairline) - 2 * hairline
+    assert ALL_TOKENS["--app-segment-edge"] == "calc(3 * var(--dw-hairline))"
+    edge = 3 * hairline
+    assert padding_box + 2 * edge == px("--dw-segmented")  # the edge is exactly the well's inset
+    reach = declarations(APP, ".app-segment::before")
+    out = "calc(-1 * (var(--app-segment-reach) + var(--app-segment-edge)))"
+    assert reach["top"] == out and reach["bottom"] == out
+    assert padding_box + 2 * (px("--app-segment-reach") + edge) >= hit
+    #? ...and past the well by the reach alone, which the margin above it leaves room for
+    assert well["margin-top"] == "var(--app-segment-reach)"
+
+
+def test_gapless_is_a_checkbox_not_a_switch():
+    box = declarations(APP, ".app-checkbox")
+    assert box["border-radius"] == "var(--dw-radius-tag)"
+    assert box["width"] == box["height"] == "var(--dw-checkbox)"
+    assert declarations(APP, ".app-check-row")["min-height"] == "var(--dw-row)"
+

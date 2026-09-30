@@ -83,6 +83,15 @@ export const AirPlayIcon = line(
   </>,
 )
 
+/** Three dots in a row - "more": Now Playing's menu, as the board draws it. */
+export const MoreIcon = solid(
+  <>
+    <circle cx="5" cy="12" r="2" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="19" cy="12" r="2" />
+  </>,
+)
+
 /* ===== the tab bar's five, as the canvas boards draw them ===== */
 
 export const HomeIcon = thin(<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z" />)

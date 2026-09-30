@@ -11,7 +11,7 @@ export interface Me {
   admin: boolean
   /** 'off' while deadwax has no logins */
   auth: 'off' | 'on'
-  /** src/__init__.py's __version__ - "2.0.0-player.9" */
+  /** src/__init__.py's __version__ - "2.0.0-player.10" */
   version: string
 }
 

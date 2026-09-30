@@ -1,9 +1,10 @@
 /*
   The app's own chrome at /player/ (2.0.0-player.9): the tab bar, the mini player's new place above
   it, Home's shelf, You's grouped lists, and the Navidrome gate and the placeholders drawn inside
-  tabs. Loaded after player.css, which draws the player itself (the library grid, the album page,
-  the mini player and Now Playing) and whose mechanics - safe areas, edges, tap targets - these
-  rules build on.
+  tabs - and, since 2.0.0-player.10, what opens over Now Playing (its ••• menu and Info) and You's
+  Gapless checkbox. Loaded after player.css, which draws the player itself (the library grid, the
+  album page, the mini player and Now Playing) and whose mechanics - safe areas, edges, tap targets
+  - these rules build on.
 
   Classes are `app-`. Values are tokens: theme.css section 10's --dw-* for the look, player.css's
   --pl-* for the mechanics, and the few this file adds below, each a token, for the rest. The look
@@ -44,6 +45,19 @@
     --app-line-gap: 2px;             /* between a label and the line under it */
     --app-edge-grouped-left: max(var(--dw-gutter-grouped), var(--pl-safe-left));
     --app-edge-grouped-right: max(var(--dw-gutter-grouped), var(--pl-safe-right));
+    /* what opens over Now Playing (20): its ••• menu and Info - never both at once */
+    --app-z-over: 30;
+    --app-info-top: 52px;            /* Info's top edge, from the top of the screen, as its board has it -
+                                        or just under the status bar, where that reaches further down */
+    --app-info-pad: 8px;             /* above Info's heading; around the menu's card */
+    --app-info-gap: 12px;            /* a card's cover to its words */
+    --app-segment-gap: 2px;          /* between a segmented control's halves */
+    --app-segment-reach: 6px;        /* a half's tap target past the 32px well, above and below: 44px in all */
+    --app-segment-edge: calc(3 * var(--dw-hairline));  /* from a half's padding box out to the well's
+                                        outside: the well's border and padding, and the half's own border */
+    --app-checkbox-tick: 14px;
+    --app-kv-row: 40px;              /* a row of Info > Debug, as its board has them */
+    --app-kv-pad: 8px;               /* above and below a row's words, when they run to more lines */
 }
 
 /* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
@@ -427,3 +441,326 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 .app-placeholder-body { padding: var(--dw-gutter-grouped); }
 .app-placeholder-lead { margin: 0; font-size: var(--dw-text-body); font-weight: var(--dw-weight-semibold); }
 .app-placeholder .app-button { width: 100%; margin-top: var(--pl-gap); }
+
+/* ===== You: the Gapless checkbox ===== */
+
+/* a whole row is the control, as a settings row is: the label, and the box at its end */
+.app-check-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-row-pad);
+    width: 100%;
+    min-height: var(--dw-row);
+    padding: 0 var(--dw-gutter-grouped);
+    font-size: var(--dw-text-body);
+    text-align: left;
+}
+
+.app-check-row:active { background: var(--dw-pressed); }
+
+.app-check-row:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+/* a sunken square when off, the primary purple with a tick when on - a checkbox, never a switch */
+.app-checkbox {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--dw-checkbox);
+    height: var(--dw-checkbox);
+    border: var(--dw-hairline) solid var(--dw-border-cover);
+    border-radius: var(--dw-radius-tag);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+}
+
+.app-checkbox.is-on {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+}
+
+.app-checkbox-tick { width: var(--app-checkbox-tick); height: var(--app-checkbox-tick); color: var(--dw-text); visibility: hidden; }
+.app-checkbox.is-on .app-checkbox-tick { visibility: visible; }
+
+/* the note under one choice, before the next choice's title */
+.app-choice-gap { margin-bottom: var(--app-shelf-gap); }
+
+/* ===== what opens over Now Playing: its menu, and Info ===== */
+
+/* Each sheet stops the page behind scrolling with a class of its own on <html> (useSheet.ts), as
+   Now Playing does with pl-sheet-open: whichever closes first takes only its own away. */
+html.app-menu-open,
+html.app-info-open { overflow: hidden; }
+
+/* the whole screen: a dimmed backdrop, which closes on a tap, and the sheet over it. Hidden - and
+   inert - while closed; visibility waits for the slide down to finish */
+.app-layer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--app-z-over);
+    /* no touch on it pans the page behind - as Now Playing's own sheet; Info's scroller opts out */
+    touch-action: none;
+    visibility: hidden;
+    transition: visibility 0s linear var(--pl-sheet-duration);
+}
+
+.app-layer.is-open { visibility: visible; transition: none; }
+
+.app-backdrop {
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    transition: background-color var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.app-layer.is-open .app-backdrop { background: var(--dw-scrim); }
+
+/* --- the ••• menu: a short sheet from the bottom --- */
+
+/* The menu and Info keep clear of the notch and the rounded corners of a phone on its side by
+   where they are placed - `left` and `right` at the insets, as the mini player does - and are
+   capped and centred inside that. The inset is never ALSO their padding: capped and centred, they
+   sit well clear of the notch already, and padding by it too put their contents 47px in from
+   their own edge where the board has 16 (or the menu's 8). */
+.app-menu {
+    position: absolute;
+    right: var(--pl-safe-right);
+    bottom: 0;
+    left: var(--pl-safe-left);
+    display: flex;
+    flex-direction: column;
+    gap: var(--pl-gap-sm);
+    max-width: var(--pl-content-max);
+    margin: 0 auto;
+    padding: var(--app-info-pad) var(--app-info-pad) calc(var(--pl-safe-bottom) + var(--app-info-pad));
+    transform: translateY(100%);
+    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.app-layer.is-open .app-menu { transform: translateY(0); }
+
+.app-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: var(--pl-row);
+    padding: 0 var(--dw-gutter-grouped);
+    font-size: var(--dw-text-body);
+    text-align: left;
+}
+
+.app-menu-item + .app-menu-item { border-top: var(--dw-hairline) solid var(--dw-border); }
+.app-menu-item:active { background: var(--dw-pressed); }
+
+.app-menu-item:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+/* an opaque card under the secondary button's faint gradient, so Now Playing doesn't show through */
+.app-menu-cancel { width: 100%; min-height: var(--pl-row); background: var(--dw-secondary-bg), var(--dw-card); }
+.app-menu-cancel:active { background: var(--dw-secondary-bg-active), var(--dw-card); }
+
+/* --- Info: a sheet from a little under the top, as its board draws it --- */
+
+.app-info {
+    position: absolute;
+    top: max(var(--app-info-top), calc(var(--pl-safe-top) + var(--app-info-pad)));
+    right: var(--pl-safe-right);
+    bottom: 0;
+    left: var(--pl-safe-left);
+    display: flex;
+    flex-direction: column;
+    max-width: var(--pl-content-max);
+    margin: 0 auto;
+    padding: var(--app-info-pad) var(--dw-gutter-grouped) 0;
+    border-radius: var(--dw-radius-sheet) var(--dw-radius-sheet) 0 0;
+    background: var(--dw-bg-sheet);
+    box-shadow: var(--dw-highlight);
+    transform: translateY(100%);
+    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.app-layer.is-open .app-info { transform: translateY(0); }
+
+/* the title in the middle, Done at the right end */
+.app-info-head {
+    display: grid;
+    flex: none;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    min-height: var(--dw-row);
+}
+
+.app-info-title {
+    grid-column: 2;
+    margin: 0;
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+    text-align: center;
+}
+
+.app-info-done {
+    grid-column: 3;
+    justify-self: end;
+    min-height: var(--dw-row);
+    padding-left: var(--dw-gutter-grouped);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-info-done:focus-visible,
+.app-segment:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+/* STYLE.md's segmented control: a well, the chosen half in the toggled tint */
+.app-segmented {
+    display: grid;
+    flex: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--app-segment-gap);
+    height: var(--dw-segmented);
+    margin-top: var(--app-segment-reach);
+    padding: var(--dw-hairline);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+}
+
+.app-segment {
+    position: relative;
+    border: var(--dw-hairline) solid transparent;
+    border-radius: var(--dw-radius-tag);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* the well is 32px, as the board and iOS draw one; each half's tap target reaches past it. Placed
+   against the half's padding box, which sits the well's edge inside the well, so the edge is added
+   back: without it a half was 38px to a finger, not 44 */
+.app-segment::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * (var(--app-segment-reach) + var(--app-segment-edge)));
+    right: 0;
+    bottom: calc(-1 * (var(--app-segment-reach) + var(--app-segment-edge)));
+    left: 0;
+}
+
+.app-segment.is-on {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    color: var(--dw-accent-text);
+}
+
+/* The one part of the player's sheets that scrolls. Now Playing takes every touch on it for its
+   own gestures (touch-action: none, player.css), and so does the layer Info sits in (above); a
+   scroller starts its own count, so this says its touches pan, and keeps the scroll from running
+   on into the page behind at either end. */
+.app-info-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: var(--app-shelf-gap);
+    padding-bottom: calc(var(--pl-safe-bottom) + var(--pl-gutter));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
+.app-info-scroll:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring-inset); }
+
+.app-info-section + .app-info-section { margin-top: var(--app-shelf-gap); }
+.app-info .app-section-title { padding: 0 var(--dw-gutter-grouped); }
+
+.app-info-card {
+    display: flex;
+    align-items: center;
+    gap: var(--app-info-gap);
+    width: 100%;
+    padding: var(--app-info-gap) var(--dw-gutter-grouped);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+/* a card that goes somewhere: pressed, the row tint over the card's own colour */
+.app-info-card.is-link:active { background: linear-gradient(var(--dw-pressed), var(--dw-pressed)), var(--dw-card); }
+
+.app-info-card.is-link:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+}
+
+.app-info-cover {
+    display: block;
+    flex: none;
+    width: var(--dw-avatar-size);
+    height: var(--dw-avatar-size);
+    object-fit: cover;
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+}
+
+.app-info-text { display: flex; flex: 1; flex-direction: column; gap: var(--app-tab-gap); min-width: 0; }
+
+.app-info-name {
+    margin: 0;
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-label);
+    overflow-wrap: anywhere;
+}
+
+.app-info-line {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+/* Debug's rows, as its board draws them: the label at the left, the value at the right end of the
+   same line. The values are sentences and lists of names as often as they are numbers, and one
+   too long to sit beside its label goes to the line under it, at the left, whole - nothing is cut
+   short. (The label takes the slack, not the value: a value on a line of its own then has no
+   margin pushing it right.) The note under a value is always a line of its own. */
+.app-kv-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    align-content: center;
+    gap: var(--app-line-gap) var(--app-info-gap);
+    min-height: var(--app-kv-row);
+    padding: var(--app-kv-pad) var(--dw-gutter-grouped);
+}
+
+.app-kv-row + .app-kv-row { border-top: var(--dw-hairline) solid var(--dw-border); }
+.app-kv-label { flex: none; margin: 0 auto 0 0; color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+.app-kv-value,
+.app-kv-note {
+    min-width: 0;
+    margin: 0;
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-kv-note { flex-basis: 100%; }
+
+.app-kv-value { font-size: var(--dw-text-heading); }
+.app-kv-value.app-mono,
+.app-kv-note { font-size: var(--dw-text-footnote); }
+.app-kv-note { color: var(--dw-text-2); }

@@ -1,5 +1,5 @@
 /**
- * The app's gesture rules (2.0.0-player.9), read off the source - the rules that keep the engine
+ * The app's gesture rules (2.0.0-player.9 on), read off the source - the rules that keep the engine
  * working now that the player lives inside five tabs. "The one app" in CLAUDE.md says why each one
  * exists; in short:
  *
@@ -19,6 +19,14 @@
  *  - A link out of the app opens BESIDE it (target="_blank" rel="noopener"): followed in the same
  *    page it would unload the player, the music and the queue with it.
  *  - While Now Playing is open everything behind it is inert, and focus goes into it.
+ *  - Each sheet - Now Playing, its ••• menu, Info (2.0.0-player.10) - is a sheet by the one hook
+ *    (app/useSheet.ts): a scroll lock of its own, inert while closed, focus in and back to an
+ *    opener that focused itself in the tap, Escape for the one on top, a tap on the backdrop.
+ *  - Gapless is a checkbox in You > Playback (app/GaplessChoice.tsx) since 2.0.0-player.10, and
+ *    its tap still calls setGapless in the same turn: that tap is what unlocks the second audio
+ *    element on iOS. It is the ONE new file on the list below, and Now Playing left it.
+ *  - Nothing in Now Playing's body that can change height sits below the song's title: no
+ *    readouts, the failure line above the title, the icon row a fixed height.
  *  - App moves the browser's history only through lib/appHistory.ts's router, which the routes
  *    sim drives end to end.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
@@ -86,7 +94,9 @@ const APP_SIDE = (file) => file.startsWith('app/') || file.startsWith('player/')
 const ALLOWED = {
   'player/AlbumPage.tsx': ['playTracks'],
   'player/MiniPlayer.tsx': ['toggle', 'next'],
-  'player/NowPlaying.tsx': ['toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
+  'player/NowPlaying.tsx': ['toggle', 'next', 'previous', 'showAirPlay'],
+  //? the Gapless checkbox in You > Playback, since 2.0.0-player.10: its click calls setGapless
+  'app/GaplessChoice.tsx': ['setGapless'],
   //? names them for ActionsContext and calls none (pickActions)
   'app/context.ts': ['playTracks', 'toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
 }
@@ -154,10 +164,11 @@ console.log('\nthe playback actions only from the files allowed')
   const outside = reached.filter(([file, found]) => found.some((name) => !(ALLOWED[file] ?? []).includes(name)))
   check('no file reaches one it isn\'t allowed', outside, [])
   check('where they are reached', Object.fromEntries(reached), {
+    'app/GaplessChoice.tsx': ['setGapless'],
     'app/context.ts': ['next', 'playTracks', 'previous', 'setGapless', 'showAirPlay', 'toggle'],
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
-    'player/NowPlaying.tsx': ['next', 'previous', 'setGapless', 'showAirPlay', 'toggle'],
+    'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
   })
   check('app/context.ts names them and calls none',
     [...code(read('app/context.ts')).matchAll(/\.(playTracks|toggle|next|previous|setGapless|showAirPlay)\s*\(/g)].map((m) => m[1]), [])
@@ -202,11 +213,101 @@ console.log('\nNow Playing covers everything behind it')
   const behind = /<div class="app-behind" aria-hidden=\{sheetOpen\} inert=\{sheetOpen\}>([\s\S]*?)<\/div>\s*<NowPlaying/.exec(app)
   check('the panes, the mini player and the tab bar are inside one inert wrapper',
     [!!behind, /TABS\.map/.test(behind?.[1] ?? ''), /<MiniPlayer\b/.test(behind?.[1] ?? ''), /<TabBar\b/.test(behind?.[1] ?? '')], [true, true, true, true])
-  check('...which Now Playing is not in', /<NowPlaying\b[^>]*\/>\s*<\/div>\s*<\/ActionsContext/.test(app), true)
-  check('focus given back to what opened it as it closes', /opener\.current\.focus\(/.test(app), true)
+  check('...which Now Playing, its menu and Info are not in',
+    /<\/div>\s*<NowPlaying\b[\s\S]*?\/>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<ActionMenu\b[\s\S]*?\/>\s*<InfoSheet\b[\s\S]*?\/>\s*<\/div>\s*<\/ActionsContext/.test(read('app/App.tsx')), true)
   const sheet = code(read('player/NowPlaying.tsx'))
-  check('Now Playing takes focus to its close button as it opens',
-    [/if \(open\) closeButton\.current\?\.focus\(/.test(sheet), /<button ref=\{closeButton\}[^>]*class="pl-sheet-close"/.test(sheet)], [true, true])
+  check('Now Playing takes focus to its close button as it opens, and gives it back to its opener',
+    [/useSheet\(\{ open, covered, onClose, lockClass: 'pl-sheet-open', first: closeButton, opener \}\)/.test(sheet),
+      /<button ref=\{closeButton\}[^>]*class="pl-sheet-close"/.test(sheet)], [true, true])
+  check('the opener is taken in the tap, focusing itself first',
+    [/const openSheet = useCallback\(\(event: MouseEvent\) => \{\s*sheetOpener\.current = takeOpener\(event\)\s*setSheetOpen\(true\)/.test(app),
+      /onClick=\{onOpen\}/.test(code(read('player/MiniPlayer.tsx')))], [true, true])
+}
+
+console.log('\nevery sheet is a sheet by the one hook')
+{
+  const hook = code(read('app/useSheet.ts'))
+  const SHEETS = { 'player/NowPlaying.tsx': 'pl-sheet-open', 'app/ActionMenu.tsx': 'app-menu-open', 'app/InfoSheet.tsx': 'app-info-open' }
+  const texts = Object.fromEntries(Object.keys(SHEETS).map((file) => [file, code(read(file))]))
+  check('each calls useSheet with a scroll lock of its own',
+    Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, /useSheet\(\{[^}]*lockClass: '([^']+)'/.exec(text)?.[1] ?? null])), SHEETS)
+  check('...and they are the only ones', files.filter((file) => /\buseSheet\(/.test(code(read(file))) && file !== 'app/useSheet.ts').sort(), Object.keys(SHEETS).sort())
+  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true])
+  check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
+  check('the menu and Info close on their backdrop',
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true])
+  check('the hook: the lock on <html>, focus in, focus back, Escape for the one on top',
+    [/document\.documentElement\.classList\.toggle\(lockClass, open\)/.test(hook),
+      /first\.current\?\.focus\(/.test(hook),
+      /opener\?\.current\?\.focus\(/.test(hook),
+      /if \(!open \|\| covered\) return/.test(hook) && /event\.key !== 'Escape'/.test(hook)], [true, true, true, true])
+  check('an opener focuses itself before it is taken (the WebKit rule)', /target\.focus\(\{ preventScroll: true \}\)\s*return target/.test(hook), true)
+  const app = code(read('app/App.tsx'))
+  //? each element's own props, up to its `/>`, so a check can't be answered by the NEXT element's
+  //? props (App's props for these hold no '>'; one that did would fail here, loudly)
+  const propsOf = (tag) => new RegExp(`<${tag}\\b([^>]*)/>`).exec(app)?.[1] ?? null
+  const sheets = { NowPlaying: propsOf('NowPlaying'), ActionMenu: propsOf('ActionMenu'), InfoSheet: propsOf('InfoSheet') }
+  check('each sheet\'s props are found, on their own', Object.values(sheets).map((props) => typeof props === 'string' && props.includes('onClose=')), [true, true, true])
+  const has = (tag, pattern) => pattern.test(sheets[tag] ?? '')
+  check('the ••• button is the menu\'s opener and Info\'s',
+    [/const openMenu = useCallback\(\(event: MouseEvent\) => \{\s*moreOpener\.current = takeOpener\(event\)/.test(app),
+      has('ActionMenu', /\bopener=\{over === 'info' \? undefined : moreOpener\}/),
+      has('InfoSheet', /\bopener=\{moreOpener\}/)], [true, true, true])
+  check('never both over Now Playing, and neither without it',
+    [has('ActionMenu', /\bopen=\{sheetOpen && over === 'menu'\}/), has('InfoSheet', /\bopen=\{sheetOpen && over === 'info'\}/),
+      has('NowPlaying', /\bcovered=\{over !== 'none'\}/)], [true, true, true])
+  //? "Go to album", from the menu, the album line and Info's card alike: every sheet closes (with no
+  //? focus sent back to ••• in a sheet that is going), and the album opens on the tab showing
+  const going = /const goToAlbum = \(track[^)]*\) => \{([\s\S]*?)\n  \}/.exec(app)?.[1] ?? ''
+  check('Go to album closes every sheet and opens the album the way a tile does',
+    [/moreOpener\.current = null\s*closeSheet\(\)\s*openAlbum\(/.test(going), /const closeSheet = useCallback\(\(\) => \{\s*setOver\('none'\)\s*setSheetOpen\(false\)/.test(app)],
+    [true, true])
+  check('...one handler for all three, each in its own props', ['NowPlaying', 'ActionMenu', 'InfoSheet'].map((tag) => has(tag, /\bonAlbum=\{toAlbum\b/)), [true, true, true])
+}
+
+console.log('\nGapless is a checkbox in You, and its tap is still the gesture')
+{
+  const choice = code(read('app/GaplessChoice.tsx'))
+  check('setGapless is called straight from the click', /onClick=\{\(\) => player\.setGapless\(!player\.gapless\)\}/.test(choice), true)
+  check('...with nothing awaited, and no change event', [/\bawait\b/.test(choice), /\.then\(/.test(choice), /onChange=/.test(choice)], [false, false, false])
+  check('a checkbox, not a switch', [/role="checkbox"/.test(choice), /role="switch"/.test(choice)], [true, false])
+  const you = code(read('app/You.tsx'))
+  check('You hands it the player, and names no playback action itself', [/<GaplessChoice player=\{player\} \/>/.test(you), actionsIn(you)], [true, []])
+  check('Now Playing has no Gapless control left', /[Gg]apless/.test(code(read('player/NowPlaying.tsx'))), false)
+}
+
+console.log('\nnothing below the title in Now Playing can change height')
+{
+  const sheet = code(read('player/NowPlaying.tsx'))
+  const body = sheet.slice(sheet.indexOf('<div class="pl-sheet-body">'))
+  const at = (needle) => body.indexOf(needle)
+  check('the readouts are gone from it', [/describe(Gaps|Seek|Wrap)/.test(sheet), /pl-readouts/.test(sheet)], [false, false])
+  check('the failure line is above the title', [at('class="pl-sheet-error"') !== -1, at('class="pl-sheet-error"') < at('class="pl-sheet-title"')], [true, true])
+  check('then the title, the album line, the bar, the transport, the icons',
+    ['class="pl-sheet-title"', 'pl-sheet-artist', '<Scrubber ', 'class="pl-transport"', 'class="pl-sheet-footer"'].map(at).every((place, index, all) => place !== -1 && (index === 0 || place > all[index - 1])), true)
+  check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline">\{byline\}<\/span>/g) ?? []).length, 2)
+  const footer = body.slice(at('class="pl-sheet-footer"'))
+  check('the icon row: AirPlay only with a speaker, ••• always, and no dead Lyrics or Up next',
+    [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /Lyrics|Up next/.test(footer)], [true, true, false])
+  const css = fs.readFileSync(path.resolve(SRC, '../../interface/player/player.css'), 'utf8')
+  check('...a fixed height, so AirPlay coming and going moves nothing', /\.pl-sheet-footer \{[^}]*(?<![-\w])height: var\(--pl-hit\);/.test(css), true)
+}
+
+console.log('\nwhat Info reads is taken in the tap, and asks the engine\'s element only')
+{
+  //? About needs the album answer the queue was played from; the album page keeps it as it plays,
+  //? in the same turn as playTracks - nothing awaited between, or the tap's gesture is lost
+  const page = code(read('player/AlbumPage.tsx'))
+  const play = /const play = \([^)]*\) => \{([\s\S]*?)\n  \}/.exec(page)?.[1] ?? ''
+  check('AlbumPage remembers the album, then plays, in the tap',
+    [/rememberPlayed\(album\)\s*player\.playTracks\(/.test(play), /\bawait\b|\.then\(/.test(play)], [true, false])
+  //? "Sent as" asks the engine's own element what it can play: never a new one (iOS unlocks audio
+  //? per element), and nothing set or started on it
+  const api = code(read('player/api.ts'))
+  const sent = /export function sentFormat\([\s\S]*?\n\}/.exec(api)?.[0] ?? ''
+  check('sentFormat asks the element that is there, and makes or touches nothing',
+    [/document\.querySelector\('audio'\)/.test(sent), /createElement|new Audio|\.src\b|srcObject|\.load\(|\.play\(|\.pause\(/.test(sent), /canPlayType\(/.test(sent)],
+    [true, false, true])
 }
 
 console.log('\nApp moves history only through the router')

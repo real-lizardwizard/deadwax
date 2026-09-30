@@ -6,6 +6,7 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { navidromeStatus, type NavidromeStatus } from '../player/api'
 import { ChevronRightIcon } from '../player/icons'
 import { usePlayerActions, usePlayerState } from './context'
+import { GaplessChoice } from './GaplessChoice'
 import { QualityChoice } from './QualityChoice'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
@@ -43,9 +44,11 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * is. The rest of looking after deadwax - server settings, the albums that need a look, the log,
  * editing an album - is on the main page for now, and this says so and links there.
  *
- * - Playback: Maximum quality, moved here from the player's settings sheet with its words and its
- *   storage key (per device) unchanged. (The Gapless switch stays on the now-playing screen until
- *   Now Playing is redesigned.)
+ * - Playback: Gapless, a checkbox (GaplessChoice.tsx - moved here from the now-playing screen in
+ *   2.0.0-player.10, where it was a switch), and Maximum quality, moved here from the player's
+ *   settings sheet with its words unchanged. Both keep their storage keys, per device. Gapless is
+ *   handed the player itself, whose `setGapless` it calls in the tap: this page names no playback
+ *   action of its own (ui/test/app-rules.sim.cjs).
  * - Connections: the main page's three pings, asked the first time You shows (not at start-up: the
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
  *   row is its own live region, read whole ("slskd, Connected"): the three answers land in any
@@ -127,9 +130,14 @@ export function You({ shown }: { shown: boolean }) {
         <h2 id="app-playback-title" class="app-section-title">
           Playback
         </h2>
+        <GaplessChoice player={player} />
+        <p id="app-gapless-note" class="app-footnote app-choice-gap">
+          An experiment: it shortens the pause between songs, and FLAC songs played one after
+          another can join in one stream, with none at all.
+        </p>
         <QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />
         <p class="app-footnote">
-          Kept on this device, and used from the next song. Gapless is on the now-playing screen.
+          Both are kept on this device. Maximum quality is used from the next song.
         </p>
       </section>
 

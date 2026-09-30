@@ -331,7 +331,8 @@ the same time. The Docker image builds it for you.
 
 A song that won't play while the music is meant to be playing doesn't stop the queue. The player
 asks for it once more a moment later, picking up where it stopped if it got part-way, and if it
-fails again it moves on to the next song and says so under that song's title for a few seconds:
+fails again it moves on to the next song and says so for a few seconds, in the mini player where
+the artist goes and above the song's title on the now-playing screen:
 **Skipped "…" - it wouldn't play**. A file that arrived but can't be decoded isn't asked for
 twice: **Skipped "…" - its file couldn't be decoded**. At the end of the queue there's nothing to
 move on to, so playing stops there with the reason on screen, and if nothing was playing (you
@@ -362,14 +363,29 @@ for it again.
   dropping, say), or deadwax lost Navidrome. The player asks again by itself; if it has stopped,
   tap play.
 
+## The now-playing screen no longer shows how the song was sent, or the last gap and seek
+
+They moved in 2.0.0-player.10, and nothing was taken away. The two lines that sat between the cover
+and the song's title (the last song changes, and *Last seek* ending with how the song came) are
+now in **Info → Debug**: tap **•••** on the now-playing screen, then **Info**, then **Debug**. They
+are labelled rows now rather than lines, so some of the wording moved. The last song change is the
+**Gap** row, in the old words less "Last song change" (up to four before it on an *Earlier* line,
+where the old line said "before:"), and the last seek the **Last seek** row, less "Last seek:". How
+the song came, which ended the old seek line (`· FLAC in MP4, 192 kHz resampled to 48 kHz`), is the
+**Sent as** row (`FLAC in MP4, 24-bit, 48 kHz`), with the resampling on a **Resampled** row of its
+own (`192 kHz to 48 kHz, 3 dB quieter`), and two rows that are new, **Why** and **Gapless**
+([the phone player](player.md#info--debug) lists them all). The **Gapless** switch that sat beside
+the album's name is a checkbox in **You**, under **Playback**, and keeps the setting it had.
+
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
-The [Gapless switch](player.md#gapless-playback-experimental) is an experiment, and the readout
-between the cover and the song's title says how each song change went. Compare it with the switch off on the
-same phone and connection: the difference is what the switch saves.
+[Gapless](player.md#gapless-playback-experimental) (in **You**, under **Playback**) is an
+experiment, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug**)
+says how each song change went, in its **Gap** row. Compare it with Gapless off on the same phone
+and connection: the difference is what Gapless saves.
 
-FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), reading `in one stream`
-at 0 ms:
+FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), the Gap row reading
+`0 ms, in one stream`:
 
 - **`in one stream` with a number above 0**: the stream had to wait for the next song's audio. The
   connection couldn't keep 30 seconds ahead, or deadwax was still making the next song (its first
@@ -383,7 +399,8 @@ at 0 ms:
   sound is on AirPlay, and after three failures in a row, or a cache deadwax can't use, it's off for
   10 minutes. A song deadwax won't repackage says why in deadwax's log, in a line starting
   `player: song`.
-- **The song carried on, but the readout went from `in one stream` to the other way mid-song**:
+- **The song carried on, but Sent as went from `In one stream` to something else mid-song** (and
+  Gapless from `On, in one stream` to `On`):
   the stream couldn't go on (the connection dropped for too long, deadwax couldn't send a song,
   or the browser couldn't play what it was sent), and the song carried on from where it had got
   to. In Safari a seek in that one song can land a little off. The next tap starts a stream again.
@@ -391,25 +408,25 @@ at 0 ms:
 For the second player, which gets everything else ready:
 
 - **`download unfinished`**: the next song hadn't finished downloading when this one ended, so it
-  was streamed, taking as long as with the switch off. On a connection that can't download a
-  whole song while the one before plays, this happens every time, and the switch only uses more
+  was streamed, taking as long as with Gapless off. On a connection that can't download a
+  whole song while the one before plays, this happens every time, and Gapless only uses more
   data: turn it off.
 - **`one element (airplay)`**: nothing is got ready while playing to an AirPlay speaker, on
   purpose. Song changes there go the ordinary way.
-- **`had to load`, or numbers as big as with the switch off**: the phone threw away what the
+- **`had to load`, or numbers as big as with Gapless off**: the phone threw away what the
   second player had buffered, most likely with the screen locked. It still plays; it just
   isn't gapless there.
 - **`failed before playing`**: the next song wouldn't play from what had been got ready, and was
   asked for again; the time includes that.
 - **`one element (refused)`**: iOS wouldn't start the second player, and the song went on the one
   that was playing.
-- **The AirPlay button disappears, or stays when the speaker has gone, with the switch on**:
+- **The AirPlay button disappears, or stays when the speaker has gone, with Gapless on**:
   Safari tells each of the two players separately whether a speaker is there, and a player it
   hasn't told yet says "none". So the button shows while either says there is one. If it still
   misbehaves, lock and unlock the phone, which (going by Safari's source) makes both ask again;
   AirPlay in Control Center works whatever the button does. Say so if it happens.
 - **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
-  held in memory ahead of time, and hi-res albums come close to that. Turn the switch off.
+  held in memory ahead of time, and hi-res albums come close to that. Turn Gapless off.
 
 ## A hi-res song takes a while to start, or sounds quieter
 
@@ -419,8 +436,8 @@ Both come from [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz)'s d
 - **A wait before the first play of a song**: deadwax downloads it from Navidrome and resamples it
   before sending anything, about 2.5 seconds for a 7-minute 24/192 song on an M2 Mac and several
   times that on a NAS. It's kept in the player's cache afterwards and starts at once. In the gapless
-  stream only the first song you tap waits: the rest are got ready a minute ahead. With the Gapless
-  switch off, or while AirPlaying, the next song is asked for a few seconds into each song. If
+  stream only the first song you tap waits: the rest are got ready a minute ahead. With Gapless
+  off, or while AirPlaying, the next song is asked for a few seconds into each song. If
   waits come back for songs you've played before, the cache is too small to keep them: raise
   [`PLAYER_CACHE_MB`](configuration.md#paths).
 - **Quieter than before, or than "Original"**: every resampled song is lowered by 3 dB, the same for
@@ -444,7 +461,7 @@ Both come from [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz)'s d
 A while after the music stops, iOS puts the player's page to sleep: once nothing is playing, Safari
 gives up the page's permission to run in the background, and the lock screen's buttons wait until
 the page wakes, which is when you open it. So play on the lock screen seems to do nothing, and when
-you open the app it starts at once. It happens with the Gapless switch on or off, and to any web
+you open the app it starts at once. It happens with Gapless on or off, and to any web
 page that plays music, and a short pause usually isn't long enough for it.
 
 There's no clean way round it from a web page. The only one would be never to stop, playing
@@ -474,22 +491,24 @@ land exactly where asked every time.
 that carries a table of where everything is, and its seeks land there exactly
 ([the phone player](player.md#seeking-and-where-safari-lands) says more). So a song that still
 seeks to the wrong place in Safari, or on the iPhone, but not in Chrome, is one that didn't come
-that way. **The readout says which**: the *Last seek* line, between the cover and the song's title,
-ends with how the song playing was sent.
+that way. **Info → Debug says which** (**•••** on the now-playing screen, then **Info**, then
+**Debug**): its **Sent as** row says how the song playing was sent. (Until 2.0.0-player.10 this was
+the end of the *Last seek* line between the cover and the song's title.)
 
-- **`· FLAC in MP4`**: it came inside an MP4. A seek that still lands off is worth reporting,
+- **`FLAC in MP4, …`**: it came inside an MP4. A seek that still lands off is worth reporting,
   with the song.
-- **`· sent as FLAC, not in an MP4`**: deadwax sent the FLAC as it is. It does that for a file
+- **`FLAC, not in an MP4, …`**: deadwax sent the FLAC as it is. It does that for a file
   over 512 MB, and for one it can't repackage with certainty (a file cut short, say, or with
   something after the audio it doesn't recognise); the song plays as before, and seeks may land
   off. deadwax's log names the song and the reason, in a line starting `player: song … is sent to
   Safari as FLAC, not in an MP4`. If the log says instead that Navidrome stopped sending the song,
   or that the song couldn't be put in an MP4 because of the disk (full, or not writable), that
   was one play: the next one tries again.
-- **`· asked for FLAC in MP4`** that never changes: the player couldn't find out what came. The
+- **`Asked for FLAC in MP4`** that never changes: the player couldn't find out what came. The
   song itself may still have come as an MP4.
-- **nothing at the end**: the song isn't a FLAC, or the browser isn't Safari, or it's a Safari too
-  old to play FLAC in an MP4. Anything but a FLAC is sent as it is. AAC and ALAC (`.m4a`) already
+- **`…, as the file is`** (`FLAC, as the file is`, `MP3, as the file is`): the song isn't a FLAC,
+  or the browser isn't Safari, or it's a Safari too old to play FLAC in an MP4. Anything but a FLAC
+  is sent as it is. AAC and ALAC (`.m4a`) already
   come in an MP4 and seek exactly, and so does an MP3 at a **constant** bit rate, but a
   **variable-bit-rate MP3** (LAME's V0 or V2, the most common kind) can land seconds off in Safari
   just as a FLAC did, and deadwax doesn't repackage it: on a test song, a V2 MP3 landed up to 41
@@ -531,12 +550,12 @@ A song whose MP4 was cleared out mid-song and can't be made again at once doesn'
 FLAC halfway through, since the two files' bytes differ: deadwax asks Safari to try again, and the
 player's own retry asks for the song afresh, from where it stopped.
 
-**The readout tells you when a seek landed off**, whichever way the song came. The line shows
-*Last seek: asked 2:10, the player said 2:10* (*interrupted* instead, if Previous, Next or a
+**Info → Debug's Last seek row tells you when a seek landed off**, whichever way the song came. It
+shows *Asked 2:10, the player said 2:10* (*interrupted* instead, if Previous, Next or a
 failure came before the seek got there). Safari says the time asked for either way, so that can't
 show it, but the end of the song can: if the seek landed off, the song runs out before its clock
 reaches the end, or plays on after the clock has stopped at the end, by the same amount. When the
-song gets to its end with no other seek or pause in between, the line adds how far off it was, for
+song gets to its end with no other seek or pause in between, the row adds how far off it was, for
 example *the song played on 7 s after its clock ended, so it really landed at about 2:03*. *The
 song ended on time* means that seek landed where you put it.
 

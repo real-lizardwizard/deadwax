@@ -201,7 +201,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". Since
                    2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
                    with the player inside them - see "The one app".
-tests/             1825 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1833 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2090,8 +2090,9 @@ The user guide's page is `docs/player.md`.
   called in the same turn as the tap - an `await` in between loses the gesture. The same goes for
   a song that fails: it is asked for again, then skipped, on that element from its `error`
   handler (see "After review (1.0.3)"), never left for the lock screen's next and then play.
-  The gapless switch (off by default) adds exactly one more, unlocked by the same tap - see
-  "Gapless (experimental, 1.1.0-player.2)"; with it off this is still the whole story.
+  The gapless switch (off by default; since 2.0.0-player.10 a checkbox in You > Playback) adds
+  exactly one more, unlocked by the same tap - see "Gapless (experimental, 1.1.0-player.2)"; with
+  it off this is still the whole story.
 - **No `seekbackward`/`seekforward` Media Session handlers, deliberately.** iOS shows EITHER
   track buttons or ±10s buttons on the lock screen, and setting those two replaces
   previous/next. Only play, pause, previoustrack, nexttrack and seekto are set.
@@ -2513,6 +2514,10 @@ serving an undecodable "Broken" song and a "Flaky" one that fails once:
 
 #### Gapless (experimental, 1.1.0-player.2)
 
+(Since 2.0.0-player.10 the switch below is a checkbox in You > Playback, and the readouts are
+Info > Debug's rows, off the now-playing sheet: see "Now Playing as designed, with Info". The
+engine it describes is unchanged.)
+
 James, after a week on the iPhone: the player works, locked included, "except for a pause between
 songs" - about a second on EVERY change, even between two songs both played before, so it is not a
 first-load cost. It is the one-element design's own cost: on `ended` the element gets a new `src`,
@@ -2619,7 +2624,8 @@ guide's section is `docs/player.md#gapless-playback-experimental`.
   off (whichever element is playing carries on alone: `activeAfter('switch off')`), and at a
   handover (the outgoing is emptied).
 - **The readout** (`describeGaps`, at the TOP of the sheet's body since the review - see "After
-  review" below - and hidden below 500px tall): each song
+  review" below - and hidden below 500px tall; since 2.0.0-player.10 it is off the sheet
+  altogether, Info > Debug's **Gap** row - see "Now Playing as designed, with Info"): each song
   change that happened by itself, with the switch on or off, the last `GAPS_KEPT` (5), and how it was
   made - including the incoming element's `readyState` at a handover of what it held, where below
   HAVE_FUTURE_DATA (3) reads "had to load" (pinned at 3 and 2 in the sim). **Timed on the incoming
@@ -2756,7 +2762,8 @@ one in the page, fixed; one in Safari's engine, which deadwax can't fix yet and 
   `m_lastSeekTime` synchronously in `seekWithTolerance`), so it changes nothing there today; it is
   the guarantee, and what the keys step from.
 - **The readout's "Last seek" line** (`seekStep()`, `describeSeek()`), under the gapless one (both
-  at the top of the sheet's body since the review):
+  at the top of the sheet's body since the review; Info > Debug's **Last seek** row since
+  2.0.0-player.10):
   asked, and what the element's clock said at 'seeked' - which in Safari is the time asked, so on
   its own it proves nothing. The END of the song is what can: WebKit clamps its clock to the
   duration (`MediaPlayerPrivateAVFoundationObjC::currentTime`, `std::min(..., m_cachedDuration)`),
@@ -2818,7 +2825,9 @@ An adversarial review of the two commits above confirmed seven findings, all fix
   title, with no overflow anywhere. The review's own sequence, for real: "ended on time" (2
   lines) then a tap, "seeking…" then "said" (1 line), bar at 642.00 throughout. At 844x390
   `.pl-readouts` is `display: none` and the bar stays 44px. **Anything added to the sheet's body
-  whose height can change goes above the title**, or reserves its height.
+  whose height can change goes above the title**, or reserves its height. (2.0.0-player.10 took
+  the readouts off the sheet, into Info > Debug, and moved the failure line above the title by
+  this rule.)
 - **A seek the listener didn't make filled in "the player said".** `seekStep`'s 'other seek' only
   stopped the judging, so "previous" during a pending seek to 2:00 (which restarts: `currentTime`
   answers the target while seeking) had its seek to 0 fill `said` - "asked 2:00, the player said
@@ -2982,7 +2991,10 @@ frames; Chromium, Arc included, keeps the file as it is. The guide's section is
   (`load` and `handOver`), reads the Content-Type, and drops an answer for a song no longer
   playing. The "Last seek" line ends ` · FLAC in MP4`, ` · sent as FLAC, not in an MP4`, or
   ` · asked for FLAC in MP4` until the answer lands; nothing in Chromium. It describes the song
-  PLAYING, so after a song change it sits beside a seek judged on the song before.
+  PLAYING, so after a song change it sits beside a seek judged on the song before. (Since
+  2.0.0-player.10 it is Info > Debug's **Sent as** row, off the now-playing sheet: built on the same
+  `describeWrap`, less "sent as" and its rate, with the depth and rate it was sent at on the end -
+  `FLAC in MP4, 24-bit, 48 kHz` - and the resampling on a **Resampled** row of its own.)
 - **First-request delay** (a cold `bytes=0-1` through deadwax on this Mac, the stub on
   localhost): 131-225 ms for a 4-minute CD-quality FLAC (29 MB, ~970 kbps; the repackage itself
   77-87 ms of it, the rest fetching from the Python stub), 91 ms for Varied (19 MB); a cached
@@ -3898,8 +3910,12 @@ the `/deadwax/me` seam, and disc titles on the album page.
     names Home's root - and dropped the album opened there. Now the tab's stack is kept and the
     entry is rewritten to its top page. A web page can't stop that back from leaving the tab; it
     can stop it losing the tab it lands on. Within the tab showing, and for an address typed in
-    (no place: it says where to go), `followRoute` as before. popstate and hashchange for one move
-    are taken once (the address last shown).
+    (no place: it says where to go), `followRoute` as before - except going FORWARD in the tab
+    showing (a place past the note's), which puts the pages passed back on top (`forwardTo`, the
+    note's entries between of this tab, then the one landed on) and never searches the stack.
+    Since 2.0.0-player.10's Go to album one album can be in a stack twice ([X, Y, X]), and the
+    search took the lower X going forward, cutting Y and leaving the stack and the history apart
+    (review). popstate and hashchange for one move are taken once (the address last shown).
   - **`lib/appHistory.ts` drives it** (`createRouter`): the only thing that touches the history,
     handed `window.history`, `location.hash` and sessionStorage by App, and heard back through
     `show`. It takes nothing from `window` itself, so `routes.sim.cjs` drives it end to end
@@ -3918,9 +3934,10 @@ the `/deadwax/me` seam, and disc titles on the album page.
     which never change (`pickActions`). Only pages read the contexts; leaf components take props,
     because the fake-Preact sims have no `useContext`.
   - The playback actions (playTracks, toggle, next, previous, setGapless, showAirPlay) are reached
-    only from an allowlist: AlbumPage (playTracks), MiniPlayer (toggle, next), NowPlaying (all but
-    playTracks), and `app/context.ts`, which names them and calls none. Adding a file is a
-    deliberate edit to the sim, like the Navidrome route list.
+    only from an allowlist: AlbumPage (playTracks), MiniPlayer (toggle, next), NowPlaying (toggle,
+    next, previous, showAirPlay), GaplessChoice (setGapless, since 2.0.0-player.10 moved Gapless to
+    You), and `app/context.ts`, which names them and calls none. Adding a file is a deliberate edit
+    to the sim, like the Navidrome route list.
   - Nothing outside `app/` and `player/` imports usePlayer, the contexts or App.
   - Only App imports usePlayer as a VALUE, under any name (review: `usePlayer as useEngine`
     slipped past the call count), and `app/context.ts` calls none of the actions it names (a
@@ -3940,7 +3957,9 @@ the `/deadwax/me` seam, and disc titles on the album page.
     effect, before anything else can move it), and App gives it back to what had it (taken in the
     tap, before the page behind turns inert and the browser drops focus from it) - on iOS a tapped
     button never had focus, so nothing is given back there. No focus trap and no Escape: slice 2's
-    shared sheet does those.
+    shared sheet does those. (**Done in 2.0.0-player.10**: every sheet is `app/useSheet.ts`, with
+    Escape, and the opener focuses itself in the tap, so there is something to give back on iOS
+    too - see "Now Playing as designed, with Info".)
   - **Tiles navigate, never fetch-and-play.** Home's shelf and the Library grid open the album;
     they `prefetchAlbum()` on pointerdown (called off on pointercancel - the press became a scroll;
     taken once by `album()`, kept 30 s), so Play is usually live by the time the page opens, and
@@ -3950,8 +3969,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
   App asks `/navidrome/status` once for every gate.
 - **You**: Maximum quality moved from the settings sheet (`player/Settings.tsx`, deleted with the
   gear) to You > Playback as `app/QualityChoice.tsx`: the words, the storage key and the keyboard
-  handling unchanged, pinned by `settings.sim.cjs`, retargeted (it still reads the Gapless label
-  from NowPlaying.tsx). Connections: the main page's two pings and Navidrome's status, asked the
+  handling unchanged, pinned by `settings.sim.cjs`, retargeted (it read the Gapless label from
+  NowPlaying.tsx; from GaplessChoice.tsx since 2.0.0-player.10). Connections: the main page's two pings and Navidrome's status, asked the
   FIRST time You shows, not at start-up (the MusicBrainz ping is a real request to a rate-limited
   service), and on "Check again". About: the version and "logins are off" from `/deadwax/me`,
   asked WITH the pings, so "Check again" asks it again too (review: a first ask failing - deadwax
@@ -3962,7 +3981,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
   service name, in whatever order the answers came). A row links to `/` for server settings, the
   review queue, the log and editing, in a new tab. Admin rows are gated on `me.admin` (true with
   logins off); Sign out isn't drawn while logins are off. Gapless stays on Now Playing until slice
-  2 moves it here. `you.sim.cjs` renders You with deadwax faked and pins all of this.
+  2 moves it here (it did, in 2.0.0-player.10: a checkbox above Maximum quality). `you.sim.cjs`
+  renders You with deadwax faked and pins all of this.
 - **Search and Requests are honest placeholders** ("On the main page for now", with a link) until
   slices .12 and .11. Home has only "Recently added" (getAlbumList2 `newest`, 20 albums): Arriving,
   Pinned and Not played in a while come in later slices and are NOT faked meanwhile.
@@ -3984,12 +4004,14 @@ the `/deadwax/me` seam, and disc titles on the album page.
     reverting the look is a token change.
   - The mini player keeps its 64px, its sides and its buttons, and moves up:
     `.app-shell .pl-mini { bottom: <the tab bar> + inset }`, with `.app-shell` padding for both.
-    Stacking: the tab bar 8, the mini player 10, Now Playing 20.
+    Stacking: the tab bar 8, the mini player 10, Now Playing 20 (and since 2.0.0-player.10 its •••
+    menu and Info, 30).
   - New chrome is `app-` classes in app.css, tokens only - line heights, the pressed opacity and
     the primary button's pressed filter included (`--dw-leading-*`, `--dw-pressed-cover`,
     `--dw-primary-pressed`, review). `tests/test_app_css.py` reads the rules and fails on a raw
     length, time, line height, opacity or filter outside :root. The Gapless switch is still iOS's
-    pill until slice 2 makes it a checkbox in You.
+    pill until slice 2 makes it a checkbox in You (2.0.0-player.10 did; the `--pl-switch-*` tokens
+    and rules went with it).
   - **Play and pause stay round** (`--pl-radius-round`, STYLE.md; the restyle had given the
     transport buttons the card's 6px, so a press flashed a rounded square).
   - **Focus rings**: one drawn outside what it marks only where there is room (a free button, a
@@ -4010,7 +4032,9 @@ the `/deadwax/me` seam, and disc titles on the album page.
   `streamSource.ts` and `ui/src/lib/{playQueue,gapless,scrub,streamWrap,streamPlan,fmp4}.ts`, and
   `player.sim.cjs` and the engine sims pass untouched. `player/api.ts` may grow route wrappers (it
   gained `prefetchAlbum`/`dropPrefetch`, a `size` for `albumPage`, a `signal` for `navidromeStatus`
-  and `discTitles` on the album type).
+  and `discTitles` on the album type; and in 2.0.0-player.10 `rememberPlayed`/`playedAlbum`, the
+  album answers Info reads, and `sentFormat`, streamFormat's question put to the engine's own
+  element - none of them a route).
 - **Disc titles from Navidrome** (James: "make sure the disc titles get picked up from navidrome").
   getAlbum's OpenSubsonic `discTitles: [{disc, title}]` - Navidrome's reading of the `discsubtitle`
   deadwax writes, passed through untouched by `/deadwax/navidrome/albums/{id}` - goes through
@@ -4040,6 +4064,169 @@ the `/deadwax/me` seam, and disc titles on the album page.
   spacing, raw values, the two gaps in `app-rules.sim.cjs`, the unverified claims in the guide,
   the back label promise, and the troubleshooting wording (You shows **Not set up** or **Can't
   reach it**).
+
+### Now Playing as designed, with Info (2.0.0-player.10)
+
+Slice 2 of the one app (`uplan/slices.md` S2). James: "the 'in one stream' and the quality
+shouldn't be displayed in the player, at least not by default, but I would like an 'info' tab in
+the menu in the player that would show you everything", "I'd like the info to be more about the
+song, album, and artist. with maybe a debug tab to show everything there now", and "gapless should
+be a switch in the global settings".
+
+- **Now Playing as its board draws it** (`NowPlaying.dc.html`): the cover, the title, "Artist —
+  Album" as ONE line in the accent that goes to the album (a button; the same box as a `<p>` for a
+  song with no album id, which nothing makes today), the scrubber, the transport, and a row of
+  icons: AirPlay while there is a speaker, and ••• always, at the right end. Only what does
+  something today: no Lyrics, Up next or turntable buttons, and no "Now Playing opens as" setting
+  (the turntable is the next slice). The two readouts and the Gapless switch left it.
+- **Nothing whose height can change sits below the title** - the rule from the 1.1.0-player.2
+  review, which put the readouts ABOVE the title. With them gone, the one line that comes and goes
+  is `player.error` (a failure, the skip notice), and it moved above the title too: it moves the
+  cover, never the album line, the bar or the buttons. The album line is one `nowrap` line, a line
+  tall even when empty; the icon row is `height: var(--pl-hit)` (not min-height) with or without
+  AirPlay, `justify-content: flex-end` so ••• holds its place when AirPlay comes and goes.
+  `app-rules.sim.cjs` pins the body's order, `test_app_css.py` the fixed row. The album line's tap
+  target reaches 44px through `::before`: up over the lower half of the title (which takes no
+  taps) and down into the gap above the scrubber, stopping short of the bar's own target
+  (`--pl-byline-reach-*` against `--pl-scrub-gap`, held by the test). The ellipsis is on the span
+  INSIDE the button, since clipping the button would clip that reach away.
+- **The ••• menu** (`app/ActionMenu.tsx`): the board draws the button, not the menu, so it is a short
+  sheet from the bottom over a dimmed Now Playing: Info, Go to album, Cancel. Pin joins it with
+  pins (slice .15). Go to album is left out, not greyed, for a song with no album id.
+- **Go to album** - the menu's row, the album line and Info's album card, one `toAlbum` in App:
+  every sheet closes and the album opens on the tab showing, through the `openAlbum` a tile uses,
+  drawn at once from the answer it was played from (`playedAlbum`) or the queue's name and cover.
+  Focus is not sent back to ••• (its sheet is going): Now Playing gives it to its own opener.
+- **Info** (`app/InfoSheet.tsx`, `NowPlayingInfo.dc.html`): a sheet whose top is
+  `max(52px, safe-top + 8px)` - the board's 52px is from the top of the SCREEN, status bar
+  included - with Done, a segmented control that is a real tab list (the arrows move the choice and
+  the focus, one tab stop), and one scrolling panel. The board's grabber isn't drawn: nothing drags
+  Info, and a grabber that doesn't is a dead control. Debug's rows follow the board, the label at
+  the left and the value at the right end of its line, and a value too long for that goes whole to
+  the line under it, at the left (flex-wrap, the LABEL taking the slack - `margin-right: auto` -
+  so a value alone on its line has no margin pushing it right). Info stays mounted, hidden while
+  closed, so its one scroller would keep its offset: a layout effect on `[open, tab]` puts it back
+  at the top as Info opens and as the tab changes, never as it closes (it is still sliding away in
+  sight); the tab itself is kept. The menu and Info are placed by the insets (`left`/`right` at
+  `--pl-safe-*`, as the mini player is) and capped and centred inside that, their padding the
+  board's alone (16px, the menu's 8) - padding by the inset as well put their contents 47px in
+  from their own edge on a phone on its side. Each half of the segmented control reaches 44px to a
+  finger: its `::before` sits against the half's PADDING box, `--app-segment-edge` (the well's
+  border and padding and the half's own border, three hairlines) inside the well, so the reach is
+  `--app-segment-reach` plus that edge (it was 38px).
+  - **About** (`lib/aboutRows.ts`, pure) asks NO server anything. The queue's `QueueTrack` carries
+    only what playing needs (and `lib/playQueue.ts` is the engine's, not to be touched), so the
+    album answer a queue is played from is REMEMBERED at the tap: AlbumPage's play calls
+    `rememberPlayed(album)` and then `playTracks`, in the same turn, nothing awaited
+    (`player/api.ts` over `lib/playedAlbums.ts`, the last `PLAYED_KEPT` (8)). The song: its title,
+    its artist, "Track n of N · length" (N counted on the song's OWN disc - numbers restart per
+    disc on a set deadwax filed; a number past its disc's count is counted against the album, and
+    past that N is left out), and its disc line, read off the album page's own `discHeadings()`
+    so the two can't disagree ("Disc 2 · Unreleased Tracks", only where the album page draws
+    headings). The album's card: cover, title, and "year · format · N songs" (`sharedFormat`
+    moved to `lib/format.ts` for both), going to the album. The artist: the song's, with "The
+    album is by X" when the album's own artist differs. **A field Navidrome didn't send is LEFT
+    OUT** - no year 0, no "Track 0", no placeholder. With the album answer not in hand, only what
+    the queue knows.
+  - **Debug** (`lib/debugRows.ts`, pure): the readouts as labelled rows, BUILT ON
+    `describeGaps`, `describeSeek` and `describeWrap`, so the phrases the guide explains and the
+    engine sims pin ("handed over, from memory", "in one stream", "FLAC in MP4") are still the
+    phrases shown - but not line for line: each row drops its line's opening words, and the seek
+    line's tail (how the song came) is the Sent as and Resampled rows. Format (OpenSubsonic's
+    samplingRate, bitDepth, channelCount; a part not given left out); Sent as (describeWrap's words
+    with the depth and rate the song was SENT at - 24-bit at the new rate when resampled, whatever
+    the source's depth); Resampled (`192 kHz to 48 kHz, 3 dB quieter`, `RESAMPLE_HEADROOM_DB` held
+    to src/resample.py's HEADROOM_DB). **Asked for resampled and not answered yet**
+    (`awaitingResample`): an MP4 before its headers (`got` null), or a stream song before its head
+    is in (`got` 'stream', `resampled` AND `hiRes` both null - once the head is in, one of them is
+    set for any song above 48 kHz) that `resamples()` under the setting - deadwax makes a
+    resampled song whole before sending any of it, seconds on a NAS, and Debug is likeliest opened
+    then. Sent as drops its depth and rate, Resampled says `Not known yet` and Why "Asked for
+    resampled; deadwax hasn't answered yet", where they read "No", the file's own 192 kHz and "or
+    deadwax sent it as it is". Why (the
+    first reason that holds whatever the setting - the rate, the kind, the ratio, the depth,
+    `resamples()`'s own tests, so the two can't disagree - and then the setting, by QualityChoice's
+    names, held by the sim: a 44.1 kHz song under "Original" says the rate, not the setting); Gapless (Off, On, On in one stream); Gap (describeGaps less its first
+    words, the changes before on an "Earlier" note); Last seek; and **Navidrome sent**: the sorted
+    field NAMES of the playing song and of its album, as deadwax's route passed them through
+    untouched - names, never values - so the fields slices .14 and .15 want (musicBrainzId,
+    played, playCount, composer) can be read off James's iPhone against 0.64.2 first. "Not known"
+    without the album answer. **A name alone misled both ways** (review, read in Navidrome
+    v0.64.2's responses.go and helpers.go): OpenSubsonic fields without omitempty are ALWAYS sent -
+    `musicBrainzId` (song and album), `discTitles`, `displayComposer`, `bpm`, `bitDepth`,
+    `channelCount`, `userRating` on an album - as "", [], 0 when the files have nothing; and
+    `playCount`, `played` (set only when PlayCount > 0), `starred`, `userRating` on a song, `year`,
+    `track`, `discNumber` are omitempty, gone whenever zero or unset. deadwax never writes a
+    recording id, so every song it filed sends `musicBrainzId: ""`. So each row puts the names sent
+    EMPTY ("", 0, null, [], {} - `isEmptyValue`; `false` is a value) on an "Empty: ..." note, and a
+    third row, **On other songs** (`otherSongsFields`), names the fields another song of the album
+    carries with a value and this one doesn't: where `playCount` shows for a song never played.
+    The answer is the tap-time snapshot (`rememberPlayed`), so a song played since still lacks
+    `playCount` until its album page is opened and played from again - the guide says so.
+  - **Sent as asks the engine's own element.** Whether a song is asked for as the file or as
+    Navidrome's MP3 (`streamFormat`) turns on `canPlayType`, which the engine doesn't expose and
+    can't be changed to. `sentFormat()` in player/api.ts puts streamFormat's question to
+    `document.querySelector('audio')`, the element the engine made - every element gives the same
+    answer - and NEVER makes one (iOS unlocks audio per element), sets nothing and starts nothing.
+    It is asked only while Debug is drawn.
+  - The rows are worked out only while Info is open; what it last drew stays drawn as it slides
+    away.
+- **Every sheet is a sheet by one hook** (`app/useSheet.ts` - a hook, not a wrapping component, so
+  the fake-Preact sims, which render one component and none inside it, run all of it): **its own
+  scroll-lock class on `<html>`** (`pl-sheet-open`, `app-menu-open`, `app-info-open`: one shared
+  class would be taken off by whichever closed first, with another still open), focus in to its
+  first control before the paint, **focus back to its opener as it closes**, **Escape for the sheet
+  on top only** (one with another over it - `covered` - doesn't listen, so one press closes one
+  sheet), and, in the markup, `inert` while closed and a backdrop tap. **The opener focuses itself
+  in the tap** (`takeOpener`): WebKit never focuses a tapped button, so without it there was
+  nothing to give focus back to on an iPhone or in Safari (2.0.0-player.9 gave nothing back
+  there). Now Playing is inert and hidden while the menu or Info is over it. The two are never open
+  together: choosing Info closes the menu with no focus given back (App leaves the menu's opener
+  out while Info is over), and Info gives focus to ••• itself when it closes. The mini player and
+  ••• pass their click's event up for this. Stacking: the menu and Info at `--app-z-over` (30),
+  over Now Playing's 20.
+- **Touch.** `.app-layer`, the menu's and Info's, is `touch-action: none` like `.pl-sheet`, so no
+  touch on them pans the page behind; Info's scroller opts out with `touch-action: pan-y` and
+  `overscroll-behavior: contain`. A scroller starts its own count (Pointer Events: the touch
+  behaviours are those of the elements from the one touched up to the nearest scroller; WebKit's
+  style adjuster resets them at an element with scrollable overflow), so the panning comes back
+  inside it and nowhere else. **Not seen under a real finger yet.**
+- **Gapless is a checkbox in You > Playback** (`app/GaplessChoice.tsx`): the You board draws a
+  checkbox, and the app's rule is "checkboxes, not switches". A `role="checkbox"` button, above
+  Maximum quality, with a note under it. **Its tap is the
+  gesture**: `setGapless` straight from the click, in the same turn - turning it on makes and
+  unlocks the second audio element, and iOS unlocks per element from a tap - and a click, never a
+  change event. It is the ONE new file on `app-rules.sim.cjs`'s allowlist; NowPlaying lost
+  setGapless. You hands it the player itself and names no action of its own. The storage key is
+  unchanged (`deadwax-player-gapless`), so an installed app keeps the setting. `settings.sim.cjs`
+  renders it and holds the call to the tap, reads the label from GaplessChoice.tsx now, and holds
+  Maximum quality's notes to "with Gapless on" (they said "the Gapless switch").
+- **Docs**: player.md's "The readout" became "Info → Debug", with every row, and every "switch"
+  went; troubleshooting has a new entry saying where the readouts went (and how the wording moved),
+  and its Gapless and seek entries name the rows; configuration's device table and the README say
+  where Gapless is. The skip notice is now said to sit above the title.
+- **After review**: twelve findings, each confirmed by skeptics, fixed together. The two in
+  Debug's words and the router's are above (Navidrome sent's empty and missing names, a stream
+  song not answered yet, forward onto a duplicate page). Also: Info's list reopening where it was
+  left; the segmented halves 38px to a finger, and a test whose arithmetic vouched for 44; the menu
+  and Info padded by the notch inside a sheet already clear of it; `app-rules.sim.cjs`'s "one
+  handler for all three" answered by the NEXT element's props (a lazy `[\s\S]*?` running past
+  `/>` - now each element's own props, `propsOf`, and the opener and open checks the same way);
+  debug.sim missing a 16-bit resampled source and an MP4 outside a stream with Gapless on; info.sim
+  missing a track number past the album's count, the album's cover over the song's, and a song
+  count with no songs; player.md's step 7 saying Original applies "from the next song" (a stream
+  keeps its setting - start again from a tap); and the docs saying the rows keep the old lines'
+  words, where they keep the phrases and moved the rest.
+- **Verified**: 1833 Python tests, pyflakes, tsc, and all 25 sims (debug and info new); 59
+  mutations, one per rule pinned here, each caught and restored byte for byte - four of them first
+  got past a test (Why's order, the menu's backdrop) or failed it only by a crash (Info's backdrop,
+  the checkbox's role), and the tests were tightened until each failed on a check - and after the
+  review, one or more per fix, each failing a test without it. The engine guard is empty and
+  `player.sim.cjs` untouched.
+  **NOT verified here**: the real page (the build workaround and a check against the stubs come
+  after this change) and everything on the iPhone - Info's scroll and the page not moving under a
+  finger, a tap above Info closing it, focus coming back with VoiceOver, the Gapless checkbox
+  unlocking the second element from its tap, and what the Navidrome sent row says against 0.64.2.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -5374,7 +5561,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1825 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 1833 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -5405,11 +5592,13 @@ node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks 
 node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (WebKit, not Chromium), which songs, what the readout says
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
-node ui/test/settings.sim.cjs   # Maximum quality in You - the radio group's keys, the two notes word for word, where it lives
+node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player
 node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history
 node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
 node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions
+node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Navidrome sent
+node ui/test/info.sim.cjs       # Info > About's rows, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -5430,7 +5619,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1825 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1833 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
@@ -5500,7 +5689,8 @@ A green suite here means the logic is sound, not that it works against real infr
     landscape insets, `timeupdate` while locked, which Ogg codecs it says it plays, whether a
     failed song's 1.5s retry fires on a locked phone (and whether WebKit sends `pause` after
     `error`, as Chromium does), how long the scan wait really takes against a real Navidrome, and
-    where seeks land in Safari on the phone (the readout's "Last seek" line), and now the one
+    where seeks land in Safari on the phone (Info > Debug's "Last seek" row, the readout's line
+    until 2.0.0-player.10), and now the one
     stream as deadwax builds it (the list under "One stream for FLAC"). **The week gates step 2 of the multi-user
     plan.** If the next song won't start with the screen locked, that is the answer to "can a web
     app do this", and native is back on the table.

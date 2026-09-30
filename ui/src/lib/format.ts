@@ -38,6 +38,16 @@ export function trackTime(seconds: number | null | undefined): string {
 }
 
 /**
+ * The one format every song of an album is in - "FLAC" - from Navidrome's `suffix`, or null when
+ * they differ or nobody said. The app's album page and Info > About both say it.
+ */
+export function sharedFormat(songs: readonly { suffix?: string | null }[]): string | null {
+  const formats = new Set(songs.map((song) => (song.suffix ?? '').toUpperCase()))
+  const [only] = formats
+  return formats.size === 1 && only ? only : null
+}
+
+/**
  * How long ago a unix timestamp (seconds) was, roughly. '' when unknown.
  *
  * Deliberately coarse. It labels a saved scan so you can judge whether to trust it, and "3 h

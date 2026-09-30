@@ -6,12 +6,14 @@ import type { Player } from '../player/usePlayer'
  * The "Maximum quality" choices, in the words You shows. Only what the code does: a FLAC at 88.2,
  * 96, 176.4, 192, 352.8 or 384 kHz is resampled (resamples() in lib/streamWrap - a 128 kHz FLAC, 20
  * or 32 bits, ALAC or WAV is sent as it is under both), lowered by src/resample.py's HEADROOM_DB,
- * and no song plays without a gap unless the Gapless switch is on - it is off until turned on, and
- * a stream never goes to AirPlay. ui/test/settings.sim.cjs holds the words to this.
+ * and no song plays without a gap unless Gapless is on (the checkbox above this in You,
+ * GaplessChoice.tsx) - it is off until turned on, and a stream never goes to AirPlay.
+ * ui/test/settings.sim.cjs holds the words to this, and the name to that checkbox's own label.
  *
  * Moved here from the player's settings sheet (player/Settings.tsx, deleted in 2.0.0-player.9)
  * word for word: the words, the storage key (usePlayer's deadwax-player-max-rate, per device) and
- * the keyboard handling are all as they were.
+ * the keyboard handling are all as they were - until 2.0.0-player.10, when Gapless stopped being a
+ * switch and the two notes stopped calling it one ("with Gapless on").
  */
 export const QUALITIES: { rate: MaxRate; label: string; note: string }[] = [
   {
@@ -19,14 +21,14 @@ export const QUALITIES: { rate: MaxRate; label: string; note: string }[] = [
     label: 'Up to 48 kHz',
     note:
       'FLAC songs at 88.2 to 384 kHz are resampled by deadwax to 48 kHz, or 44.1 kHz, and sent as lossless ' +
-      '24-bit FLAC, so with the Gapless switch on they play without a gap. Nothing below 20 kHz changes, except ' +
+      '24-bit FLAC, so with Gapless on they play without a gap. Nothing below 20 kHz changes, except ' +
       'that they are 3 dB quieter, so nothing can clip.',
   },
   {
     rate: 'original',
     label: 'Original',
     note:
-      'Songs above 48 kHz are sent as they are. With the Gapless switch on, FLAC songs play without a gap too, ' +
+      'Songs above 48 kHz are sent as they are. With Gapless on, FLAC songs play without a gap too, ' +
       'but an iPhone can only hold a few seconds of them ahead, so a weak connection can make them stall. The ' +
       'iPhone converts them to 44.1 or 48 kHz itself, unless a USB DAC takes them at their own rate.',
   },

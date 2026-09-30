@@ -1,0 +1,462 @@
+/**
+ * Info, the ••• menu and Now Playing as sheets (2.0.0-player.10): Info > About's rows
+ * (lib/aboutRows.ts), the store of albums played from (lib/playedAlbums.ts), and the three sheets
+ * themselves - app/InfoSheet.tsx, app/ActionMenu.tsx and player/NowPlaying.tsx - compiled with the
+ * repo's TypeScript and rendered by a small stand-in for Preact into plain objects, with a
+ * document that knows which element has focus and which keys it is listening for.
+ *
+ * What it pins:
+ *
+ *  - About says what Navidrome sent and nothing it didn't: "Track 3 of 6 · 5:08" counted on the
+ *    song's own disc, the disc's title as the album page heads it ("Disc 2 · Unreleased Tracks"),
+ *    the album's year, format and song count, the album's own artist when it isn't the song's -
+ *    and each left out when it wasn't sent, never guessed. An album not in hand leaves only what
+ *    the queue knows.
+ *  - The albums played from are kept, the newest last, and only PLAYED_KEPT of them.
+ *  - Every sheet is a sheet (app/useSheet.ts): its own class on <html> while open, focus in as it
+ *    opens, focus BACK to what opened it as it closes - by Done, Escape or the backdrop - Escape
+ *    for the sheet on top only, and inert while closed. The menu doesn't give focus back when it
+ *    closes because Info is opening; Info does, later.
+ *  - Info's tabs: About first, Debug beside it, a tab list the arrows move round; Debug asks how
+ *    the song was sent only when it is drawn; what was drawn stays drawn as the sheet slides away;
+ *    its list is back at the top as it opens and as the tab changes, and not as it closes.
+ *  - Now Playing is inert and deaf to Escape while the menu or Info is over it.
+ *
+ * Run it with:  node ui/test/info.sim.cjs
+ */
+
+const { execFileSync } = require('child_process')
+const fs = require('fs'), os = require('os'), path = require('path')
+
+const UI = path.resolve(__dirname, '..')
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-info-'))
+
+execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
+  'src/app/InfoSheet.tsx', 'src/app/ActionMenu.tsx', 'src/player/NowPlaying.tsx', 'src/lib/playedAlbums.ts',
+  '--rootDir', 'src', '--outDir', OUT,
+  '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
+  '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
+], { cwd: UI, stdio: 'inherit' })
+
+//? JSX as plain objects, and hooks with a cursor, as Preact's are - the same stand-in as
+//? settings.sim.cjs. Effects (layout ones too) run after a render whose deps changed.
+fs.mkdirSync(path.join(OUT, 'node_modules/preact'), { recursive: true })
+fs.writeFileSync(path.join(OUT, 'node_modules/preact/jsx-runtime.js'), `
+exports.jsx = exports.jsxs = (type, props, key) => ({ type, props: props || {}, key })
+exports.Fragment = 'fragment'
+`)
+fs.writeFileSync(path.join(OUT, 'node_modules/preact/hooks.js'), `
+let current = null
+function slot(init) { const i = current.cursor++; if (!(i in current.slots)) current.slots[i] = init(); return current.slots[i] }
+const changed = (a, b) => !a || !b || a.length !== b.length || a.some((v, i) => !Object.is(v, b[i]))
+exports.useState = (v) => { const s = slot(() => ({ v: typeof v === 'function' ? v() : v })); return [s.v, (x) => { s.v = typeof x === 'function' ? x(s.v) : x }] }
+exports.useMemo = (f, deps) => { const s = slot(() => ({})); if (changed(s.deps, deps)) { s.v = f(); s.deps = deps } return s.v }
+exports.useRef = (v) => slot(() => ({ current: v }))
+exports.useEffect = exports.useLayoutEffect = (f, deps) => {
+  const s = slot(() => ({}))
+  if (changed(s.deps, deps)) { s.deps = deps; current.effects.push(s); s.f = f }
+}
+exports.root = (component) => {
+  const root = { slots: [], cursor: 0, effects: [] }
+  const render = (props) => {
+    const outer = current; current = root; root.cursor = 0
+    try { return component(props) } finally { current = outer }
+  }
+  render.commit = () => { for (const s of root.effects.splice(0)) { if (typeof s.cleanup === 'function') s.cleanup(); s.cleanup = s.f() } }
+  return render
+}
+`)
+//? what the sheets draw inside them is not what is tested here: covers and glyphs stand in, and the
+//? engine's position hook reads 0
+fs.writeFileSync(path.join(OUT, 'player/Cover.js'), 'exports.Cover = function Cover() { return null }\n')
+fs.writeFileSync(path.join(OUT, 'player/icons.js'), `
+const glyph = (name) => { const f = function () { return null }; Object.defineProperty(f, 'name', { value: name }); return f }
+for (const name of ['ChevronRightIcon', 'ChevronDownIcon', 'AirPlayIcon', 'MoreIcon', 'NextIcon', 'PauseIcon', 'PlayIcon', 'PreviousIcon', 'CheckIcon']) exports[name] = glyph(name)
+`)
+fs.writeFileSync(path.join(OUT, 'player/usePlayer.js'), 'exports.usePosition = () => 0\n')
+
+let failures = 0
+function check(label, actual, expected) {
+  const ok = JSON.stringify(actual) === JSON.stringify(expected)
+  if (!ok) failures++
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}: ${JSON.stringify(actual)}` +
+              (ok ? '' : `  (expected ${JSON.stringify(expected)})`))
+}
+
+/* ===== a document that knows what has focus, and what listens for keys ===== */
+
+class FakeElement {
+  constructor(name) {
+    this.name = name
+    this.classes = new Set()
+    this.classList = { toggle: (c, on) => (on ? this.classes.add(c) : this.classes.delete(c)) }
+  }
+  //? focus moves only when asked for - a tap doesn't, as in WebKit
+  focus() { document.activeElement = this }
+  querySelector() { return null }
+}
+const listeners = new Map()
+const document = {
+  body: new FakeElement('body'),
+  documentElement: new FakeElement('html'),
+  activeElement: null,
+  addEventListener: (name, fn) => listeners.set(name, [...(listeners.get(name) ?? []), fn]),
+  removeEventListener: (name, fn) => listeners.set(name, (listeners.get(name) ?? []).filter((f) => f !== fn)),
+}
+document.activeElement = document.body
+const define = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true })
+define('document', document)
+define('HTMLElement', FakeElement)
+
+/** A key pressed, as the browser sends it to the document: every listener, in the order added. */
+function press(key, { prevented = false } = {}) {
+  const event = { key, defaultPrevented: prevented, preventDefault() { this.defaultPrevented = true } }
+  for (const listener of [...(listeners.get('keydown') ?? [])]) listener(event)
+  return event
+}
+const locks = () => [...document.documentElement.classes].sort()
+
+/* ===== rendering ===== */
+
+const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
+
+//? each element of a tree, found by where it sits, keeps one FakeElement across renders; a ref names it
+function mount(component, name) {
+  const render = hooks.root(component)
+  const elements = new Map()
+  let tree = null
+  const walk = (node, where) => {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach((child, i) => walk(child, `${where}.${i}`)); return }
+    if (typeof node.type === 'string') {
+      const key = `${where}:${node.type}`
+      if (!elements.has(key)) elements.set(key, new FakeElement(`${name} ${node.type} ${node.props.class ?? ''}`.trim()))
+      node.element = elements.get(key)
+      if (node.props.ref) node.props.ref.current = node.element
+    }
+    walk(node.props?.children, `${where}/`)
+  }
+  return {
+    render(props) {
+      tree = render(props)
+      walk(tree, '')
+      render.commit()
+      return tree
+    },
+    find(test) {
+      const hits = []
+      const visit = (node) => {
+        if (!node || typeof node !== 'object') return
+        if (Array.isArray(node)) { node.forEach(visit); return }
+        if (test(node)) hits.push(node)
+        visit(node.props?.children)
+      }
+      visit(tree)
+      return hits
+    },
+  }
+}
+function text(node) {
+  if (node === null || node === undefined || node === false || node === true) return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(text).join('')
+  if (typeof node.type !== 'string' && node.type !== 'fragment') return ''
+  return text(node.props?.children)
+}
+const byClass = (name) => (node) => typeof node.props?.class === 'string' && node.props.class.split(' ').includes(name)
+const one = (view, test) => view.find(test)[0]
+
+/* ===== the songs ===== */
+
+const DOT = String.fromCharCode(0xb7)
+const { aboutRows } = require(path.join(OUT, 'lib/aboutRows.js'))
+const { sharedFormat } = require(path.join(OUT, 'lib/format.js'))
+const { createPlayedAlbums, PLAYED_KEPT } = require(path.join(OUT, 'lib/playedAlbums.js'))
+
+function queueTrack(overrides = {}) {
+  return {
+    id: 'd2t3', title: 'Wish You Were Here (Live at Wembley)', artist: 'Pink Floyd', album: 'Wish You Were Here',
+    albumId: 'wywh', coverArt: 'cover-wywh', duration: 308, contentType: 'audio/flac', suffix: 'flac',
+    sampleRate: 44100, bitDepth: 16, channels: 2, ...overrides,
+  }
+}
+const song = (id, disc, track, extra = {}) => ({ id, discNumber: disc, track, duration: 300, suffix: 'flac', artist: 'Pink Floyd', ...extra })
+//? the Experience edition: five songs on disc 1, six on disc 2 - the second disc titled
+const EXPERIENCE = {
+  id: 'wywh', name: 'Wish You Were Here', artist: 'Pink Floyd', year: 1975, coverArt: 'cover-wywh',
+  song: [
+    ...[1, 2, 3, 4, 5].map((n) => song(`d1t${n}`, 1, n)),
+    ...[1, 2, 3, 4, 5, 6].map((n) => song(`d2t${n}`, 2, n, n === 3 ? { duration: 308 } : {})),
+  ],
+  discTitles: [{ disc: 2, title: 'Unreleased Tracks' }],
+}
+
+console.log('\nAbout: the song')
+{
+  const about = aboutRows(queueTrack(), EXPERIENCE)
+  check('title and artist', [about.song.title, about.song.artist], ['Wish You Were Here (Live at Wembley)', 'Pink Floyd'])
+  check('"Track 3 of 6" - of its own disc - with its length, then its disc\'s title', about.song.lines, [`Track 3 of 6 ${DOT} 5:08`, `Disc 2 ${DOT} Unreleased Tracks`])
+  check('a song on the untitled disc of a titled set is "Disc 1"', aboutRows(queueTrack({ id: 'd1t2' }), EXPERIENCE).song.lines, [`Track 2 of 5 ${DOT} 5:00`, 'Disc 1'])
+  const plain = { id: 'dummy', name: 'Dummy', artist: 'Portishead', year: 1994, song: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => song(`t${n}`, undefined, n)) }
+  check('an ordinary one-disc album: no disc line', aboutRows(queueTrack({ id: 't4', album: 'Dummy', albumId: 'dummy' }), plain).song.lines, [`Track 4 of 11 ${DOT} 5:00`])
+  const titledOne = { ...plain, song: plain.song.map((s) => ({ ...s, discNumber: 1 })), discTitles: [{ disc: 1, title: 'Live' }] }
+  check('a one-disc album with a title: its heading', aboutRows(queueTrack({ id: 't4' }), titledOne).song.lines, [`Track 4 of 11 ${DOT} 5:00`, `Disc 1 ${DOT} Live`])
+  const straight = { ...EXPERIENCE, song: EXPERIENCE.song.map((s, i) => ({ ...s, track: i + 1 })) }
+  check('numbered straight through the set: counted against the whole album', aboutRows(queueTrack({ id: 'd2t3' }), straight).song.lines[0], `Track 8 of 11 ${DOT} 5:08`)
+  //? a partly filed album keeps its real numbers: track 14 in an answer of three songs
+  const partial = { ...plain, song: [song('p1', undefined, 1), song('p5', undefined, 5), song('p14', undefined, 14)] }
+  check('a number past even the album\'s count: the count left out, not "of 3"', aboutRows(queueTrack({ id: 'p14' }), partial).song.lines, [`Track 14 ${DOT} 5:00`])
+  check('no track number: only the length', aboutRows(queueTrack({ id: 'x' }), { ...plain, song: [{ id: 'x', duration: 61 }] }).song.lines, ['1:01'])
+  check('no length either: nothing made up', aboutRows(queueTrack({ id: 'x', duration: 0 }), { ...plain, song: [{ id: 'x' }] }).song.lines, [])
+  check('the album not in hand: only what the queue knows', aboutRows(queueTrack(), null).song.lines, ['5:08'])
+}
+
+console.log('\nAbout: the album and the artist')
+{
+  const about = aboutRows(queueTrack(), EXPERIENCE)
+  check('the card: where it goes, its title, cover, and year, format and songs', about.album, { id: 'wywh', title: 'Wish You Were Here', coverArt: 'cover-wywh', line: `1975 ${DOT} FLAC ${DOT} 11 songs` })
+  check('no year sent: left out, not guessed', aboutRows(queueTrack(), { ...EXPERIENCE, year: undefined }).album.line, `FLAC ${DOT} 11 songs`)
+  check('...nor a year of 0', aboutRows(queueTrack(), { ...EXPERIENCE, year: 0 }).album.line, `FLAC ${DOT} 11 songs`)
+  check('mixed formats: no format', aboutRows(queueTrack(), { ...EXPERIENCE, song: [song('a', 1, 1), song('d2t3', 1, 2, { suffix: 'mp3' })] }).album.line, `1975 ${DOT} 2 songs`)
+  check('one song', aboutRows(queueTrack(), { ...EXPERIENCE, song: [song('d2t3', 1, 1)] }).album.line, `1975 ${DOT} FLAC ${DOT} 1 song`)
+  check('not in hand: the queue\'s title and cover, no line', aboutRows(queueTrack(), null).album, { id: 'wywh', title: 'Wish You Were Here', coverArt: 'cover-wywh', line: '' })
+  //? the queue carries the SONG's cover id (Navidrome ids them per file); the card is the album's
+  check('the album\'s own cover over the song\'s', aboutRows(queueTrack({ coverArt: 'mf-d2t3' }), { ...EXPERIENCE, coverArt: 'al-wywh' }).album.coverArt, 'al-wywh')
+  check('...and the song\'s only when the album sent none', aboutRows(queueTrack({ coverArt: 'mf-d2t3' }), { ...EXPERIENCE, coverArt: undefined }).album.coverArt, 'mf-d2t3')
+  check('a song count sent without the songs', aboutRows(queueTrack(), { id: 'wywh', name: 'Wish You Were Here', year: 1975, songCount: 10 }).album.line, `1975 ${DOT} 10 songs`)
+  check('no album id: a card that goes nowhere', aboutRows(queueTrack({ albumId: null }), null).album.id, null)
+  check('no album named at all: no card', aboutRows(queueTrack({ album: '', albumId: null }), null).album, null)
+  check('the artist, the same as the album\'s: no note', about.artist, { name: 'Pink Floyd', note: null })
+  const various = { ...EXPERIENCE, artist: 'Various Artists', song: EXPERIENCE.song.map((s) => (s.id === 'd2t3' ? { ...s, artist: 'Pink Floyd' } : s)) }
+  check('a compilation: the album\'s own artist noted', aboutRows(queueTrack(), various).artist, { name: 'Pink Floyd', note: 'The album is by Various Artists' })
+  check('...case and spaces are not a difference', aboutRows(queueTrack(), { ...EXPERIENCE, artist: ' pink floyd ' }).artist.note, null)
+  check('nobody named one: no artist', aboutRows(queueTrack({ artist: '' }), null).artist, null)
+  check('the one format every song is in, or none', [sharedFormat([{ suffix: 'flac' }, { suffix: 'FLAC' }]), sharedFormat([{ suffix: 'flac' }, {}]), sharedFormat([])], ['FLAC', null, null])
+}
+
+console.log('\nthe albums played from')
+{
+  const played = createPlayedAlbums()
+  for (let n = 1; n <= PLAYED_KEPT + 1; n++) played.remember({ id: `a${n}` })
+  check(`only the last ${PLAYED_KEPT} kept`, [played.get('a1'), played.get('a2')?.id, played.get(`a${PLAYED_KEPT + 1}`)?.id], [null, 'a2', `a${PLAYED_KEPT + 1}`])
+  played.remember({ id: 'a2', again: true })
+  played.remember({ id: 'b' })
+  check('played from again, it is the newest - the next one out is another', [played.get('a2')?.again, played.get('a3')], [true, null])
+  check('no id is no album', [played.get(null), played.get(undefined), played.get('')], [null, null, null])
+}
+
+/* ===== the sheets ===== */
+
+const { InfoSheet } = require(path.join(OUT, 'app/InfoSheet.js'))
+const { ActionMenu } = require(path.join(OUT, 'app/ActionMenu.js'))
+const { NowPlaying } = require(path.join(OUT, 'player/NowPlaying.js'))
+
+const player = {
+  track: queueTrack(), gapless: true, maxRate: '48000', gaps: [], lastSeek: null,
+  wrapped: { id: 'd2t3', got: 'stream', resampled: null, hiRes: null },
+  playing: true, buffering: false, duration: 308, error: null, airplay: false,
+  toggle() {}, previous() {}, showAirPlay() {}, seek() {}, position: () => 0, onPosition: () => () => {},
+}
+
+console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Done and the backdrop')
+{
+  const opener = new FakeElement('the ••• button')
+  const openerRef = { current: null }
+  let closes = 0
+  let formats = 0
+  const albumTaps = { count: 0, handler: () => { albumTaps.count += 1 } }
+  const view = mount(InfoSheet, 'info')
+  const draw = (open) => view.render({
+    open, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: EXPERIENCE,
+    sentFormat: () => { formats += 1; return 'raw' },
+  })
+  const layer = () => one(view, byClass('app-layer'))
+  const done = () => one(view, byClass('app-info-done'))
+  const reopen = () => {
+    //? what App does in the ••• tap: the button focuses itself first, then is kept to give focus back to
+    opener.focus()
+    openerRef.current = opener
+    draw(true)
+  }
+
+  document.activeElement = document.body
+  draw(false)
+  check('closed: inert and hidden, no scroll lock, focus left where it was',
+    [layer().props.inert, layer().props['aria-hidden'], locks(), document.activeElement === document.body], [true, true, [], true])
+  check('...and deaf to Escape', [press('Escape').defaultPrevented, closes], [false, 0])
+
+  reopen()
+  const dialog = one(view, (node) => node.props?.role === 'dialog')
+  check('open: its own lock on <html>, and focus on Done', [locks(), document.activeElement === done().element], [['app-info-open'], true])
+  check('a modal dialog named by its title', [dialog.props['aria-modal'], one(view, (node) => node.props?.id === dialog.props['aria-labelledby']) && text(one(view, (node) => node.props?.id === dialog.props['aria-labelledby']))], ['true', 'Info'])
+  check('not inert while open', [layer().props.inert, layer().props['aria-hidden']], [false, false])
+
+  const escape = press('Escape')
+  check('Escape closes it, once, and takes the key', [closes, escape.defaultPrevented], [1, true])
+  draw(false)
+  check('...and focus goes back to the ••• button, the lock comes off', [document.activeElement === opener, locks()], [true, []])
+  check('closed, it listens for Escape no longer', [press('Escape').defaultPrevented, closes], [false, 1])
+
+  reopen()
+  check('an Escape something else already took is left alone', [press('Escape', { prevented: true }).defaultPrevented, closes], [true, 1])
+  done().props.onClick()
+  check('Done closes it', closes, 2)
+  draw(false)
+  check('...focus back on •••', document.activeElement === opener, true)
+
+  reopen()
+  const backdrop = one(view, byClass('app-backdrop'))
+  check('the backdrop takes a tap', typeof backdrop?.props.onClick, 'function')
+  backdrop?.props.onClick?.()
+  check('a tap on the backdrop closes it', closes, 3)
+  draw(false)
+  check('...focus back on •••', document.activeElement === opener, true)
+
+  console.log('\nInfo: its two tabs')
+  formats = 0
+  reopen()
+  const tabs = () => view.find((node) => node.props?.role === 'tab')
+  const list = () => one(view, (node) => node.props?.role === 'tablist')
+  check('About, then Debug; About chosen, and the only tab stop', tabs().map((tab) => [text(tab), tab.props['aria-selected'], tab.props.tabIndex]), [['About', true, 0], ['Debug', false, -1]])
+  check('About draws the song, the album and the artist', view.find((node) => node.type === 'h3').map(text), ['The song', 'The album', 'The artist'])
+  check('...the song\'s lines as About worked them out', view.find(byClass('app-info-line')).map(text).slice(0, 3), ['Pink Floyd', `Track 3 of 6 ${DOT} 5:08`, `Disc 2 ${DOT} Unreleased Tracks`])
+  const card = one(view, (node) => node.type === 'button' && byClass('is-link')(node))
+  const closesBefore = closes
+  card.props.onClick()
+  check('...the album\'s card goes to the album (App closes the sheets as it opens it)', [card.props.onClick === albumTaps.handler, albumTaps.count, closes - closesBefore], [true, 1, 0])
+  check('About never asks how the song was sent', formats, 0)
+
+  tabs()[1].props.onClick()
+  reopen()
+  check('Debug chosen', tabs().map((tab) => [tab.props['aria-selected'], tab.props.tabIndex]), [[false, -1], [true, 0]])
+  check('Debug draws its four sections', view.find((node) => node.type === 'h3').map(text), ['The file', 'What this device is sent', 'Last song change and seek', 'Navidrome sent'])
+  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Why', 'Gapless', 'Gap', 'Last seek', 'Song', 'On other songs', 'Album'])
+  check('...Gapless on, in one stream', text(view.find(byClass('app-kv-value'))[4]), 'On, in one stream')
+  check('Debug asked how the song was sent', formats > 0, true)
+
+  //? the arrows, as the browser sends them to the tab list: its element finds the tab of that data-tab
+  const keyOn = (key) => {
+    let prevented = false
+    const currentTarget = {
+      querySelector(selector) {
+        const id = /\[data-tab="([^"]+)"\]/.exec(selector)?.[1]
+        return tabs().find((tab) => tab.props['data-tab'] === id)?.element ?? null
+      },
+    }
+    list().props.onKeyDown({ key, currentTarget, preventDefault() { prevented = true } })
+    draw(true)
+    return prevented
+  }
+  check('ArrowLeft goes back to About, and takes the focus with it', [keyOn('ArrowLeft'), tabs()[0].props['aria-selected'], document.activeElement === tabs()[0].element], [true, true, true])
+  check('ArrowRight to Debug', [keyOn('ArrowRight'), tabs()[1].props['aria-selected']], [true, true])
+  check('ArrowRight wraps round', [keyOn('ArrowRight'), tabs()[0].props['aria-selected']], [true, true])
+  check('another key is left alone', [keyOn('a'), tabs()[0].props['aria-selected']], [false, true])
+
+  console.log('\nInfo: its list starts at the top')
+  const scroller = () => one(view, byClass('app-info-scroll')).element
+  //? on About, scrolled down: the tab changing puts the list back at the top
+  scroller().scrollTop = 400
+  tabs()[1].props.onClick()
+  draw(true)
+  check('a change of tab starts the list at the top', scroller().scrollTop, 0)
+  scroller().scrollTop = 900
+  draw(false)
+  check('closing leaves it where it is, while it slides away in sight', scroller().scrollTop, 900)
+  reopen()
+  check('opening again, on the tab it was left on, starts at the top', [tabs()[1].props['aria-selected'], scroller().scrollTop], [true, 0])
+  scroller().scrollTop = 300
+  draw(true)
+  check('...and a render while open, nothing changed, leaves the scroll alone', scroller().scrollTop, 300)
+  draw(false)
+
+  reopen()
+  formats = 0
+  const before = view.find(byClass('app-kv-value')).map(text)
+  draw(false)
+  check('closing: what was drawn stays drawn as it slides away, and nothing is asked again',
+    [view.find(byClass('app-kv-value')).map(text), formats], [before, 0])
+  check('...the scroller is a tab panel named by the tab showing', [one(view, byClass('app-info-scroll')).props.role, one(view, byClass('app-info-scroll')).props['aria-labelledby']], ['tabpanel', 'app-info-tab-debug'])
+}
+
+console.log('\nthe ••• menu')
+{
+  const opener = new FakeElement('the ••• button')
+  const openerRef = { current: opener }
+  const calls = []
+  const view = mount(ActionMenu, 'menu')
+  const draw = (open, extra = {}) => view.render({
+    open, opener: openerRef, onClose: () => calls.push('close'), onInfo: () => calls.push('info'), onAlbum: () => calls.push('album'), ...extra,
+  })
+  const items = () => view.find(byClass('app-menu-item'))
+  draw(false)
+  check('closed: inert, no lock', [one(view, byClass('app-layer')).props.inert, locks()], [true, []])
+  opener.focus()
+  draw(true)
+  check('open: Info and Go to album, focus on the first, its own lock', [items().map(text), document.activeElement === items()[0].element, locks()], [['Info', 'Go to album'], true, ['app-menu-open']])
+  items()[0].props.onClick()
+  items()[1].props.onClick()
+  check('each row calls its own', calls, ['info', 'album'])
+  press('Escape')
+  check('Escape closes it', calls.slice(-1), ['close'])
+  draw(false)
+  check('...focus back on •••', document.activeElement === opener, true)
+  draw(true)
+  const upTo = calls.length
+  one(view, byClass('app-backdrop')).props.onClick?.()
+  check('a tap on the backdrop closes it', calls.slice(upTo), ['close'])
+  one(view, byClass('app-menu-cancel')).props.onClick?.()
+  check('...and so does Cancel', calls.slice(upTo), ['close', 'close'])
+  //? closing because Info is opening: App leaves the opener out, and Info gives focus back later
+  const done = new FakeElement("Info's Done")
+  done.focus()
+  draw(false, { opener: undefined })
+  check('closed for Info: focus is left to Info', document.activeElement === done, true)
+  draw(true, { onAlbum: null })
+  check('no album to go to: the row is left out, not greyed', items().map(text), ['Info'])
+  draw(false)
+  check('closed again: its lock off, and deaf to Escape', [locks(), press('Escape').defaultPrevented], [[], false])
+}
+
+console.log('\nNow Playing is a sheet too, and deaf under the others')
+{
+  const opener = new FakeElement('the mini player')
+  const openerRef = { current: opener }
+  let closes = 0
+  const view = mount(NowPlaying, 'now playing')
+  const draw = (open, covered = false) => view.render({
+    player, open, covered, opener: openerRef, onClose: () => { closes += 1 }, onMore: () => {}, onAlbum: () => {},
+  })
+  const sheet = () => one(view, byClass('pl-sheet'))
+  const close = () => one(view, byClass('pl-sheet-close'))
+  draw(false)
+  opener.focus()
+  draw(true)
+  check('open: focus on its close arrow, its own lock', [document.activeElement === close().element, locks()], [true, ['pl-sheet-open']])
+  draw(true, true)
+  check('the menu or Info over it: inert and hidden, still open', [sheet().props.inert, sheet().props['aria-hidden'], locks()], [true, true, ['pl-sheet-open']])
+  check('...and Escape is not for it', [press('Escape').defaultPrevented, closes], [false, 0])
+  draw(true, false)
+  check('uncovered, Escape closes it', [press('Escape').defaultPrevented, closes], [true, 1])
+  draw(false)
+  check('...and focus goes back to the mini player', [document.activeElement === opener, locks()], [true, []])
+  check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
+  check('the icon row: ••• only, with no speaker to send to', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['More: info, go to album'])
+  let albums = 0
+  view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 } })
+  one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
+  check('...and a tap on it asks App to go there', albums, 1)
+  //? a song whose album the queue has no id for: the same line, as words that go nowhere
+  const lone = { ...player, track: queueTrack({ albumId: null }), airplay: true }
+  view.render({ player: lone, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 } })
+  check('no album id: the line is words, not a button, in the same box',
+    [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
+    [0, 'Pink Floyd — Wish You Were Here'])
+  check('...••• says the menu holds only Info, and AirPlay sits before it with a speaker there',
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'More: info'])
+  view.render({ player: { ...player, error: 'Skipped "Shine On" - it wouldn\'t play' }, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {} })
+  const titles = one(view, byClass('pl-sheet-titles')).props.children.filter(Boolean)
+  check('a failure is drawn above the title, never under it', titles.map((node) => node.props.class.split(' ')[0]), ['pl-sheet-error', 'pl-sheet-title', 'pl-sheet-artist'])
+}
+
+console.log(failures ? `\n${failures} FAILED` : '\nall passed')
+process.exit(failures ? 1 : 0)

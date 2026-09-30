@@ -7,6 +7,7 @@
  */
 
 import { get, post, url } from '../api/http'
+import { createPlayedAlbums } from '../lib/playedAlbums'
 import type { QueueTrack } from '../lib/playQueue'
 import { asksForMp4, resamples, type MaxRate } from '../lib/streamWrap'
 
@@ -129,6 +130,22 @@ export function album(id: string, signal?: AbortSignal): Promise<AlbumWithSongs>
   return get(albumPath(id), signal)
 }
 
+const played = createPlayedAlbums<AlbumWithSongs>()
+
+/**
+ * The album answer a queue is about to be played from, kept for Info (lib/playedAlbums.ts): the
+ * queue's own songs carry only what playing needs. Called by the screen that starts playback, in
+ * the tap, before it calls the player - it asks nothing of anyone, so the tap loses nothing.
+ */
+export function rememberPlayed(album: AlbumWithSongs): void {
+  played.remember(album)
+}
+
+/** The answer a song's album was played from, exactly as Navidrome sent it; null when not in hand. */
+export function playedAlbum(id: string | null | undefined): AlbumWithSongs | null {
+  return played.get(id)
+}
+
 /**
  * A cover at a size Navidrome resizes to. Asked for at twice the size it is drawn, because every
  * phone this is for has a 2x or 3x screen and a 1x cover looks soft beside the text.
@@ -200,6 +217,19 @@ export function fragmentedUrl(track: QueueTrack, maxRate: MaxRate = 'original'):
 export function streamFormat(track: QueueTrack, canPlay: (type: string) => boolean): 'raw' | 'mp3' {
   const type = playableType(track)
   return !type || canPlay(type) ? 'raw' : 'mp3'
+}
+
+/**
+ * Which of the two a song is asked for as, for Info's "Sent as" row: streamFormat()'s question, put
+ * to the player's OWN audio element - the one the engine asks before it chooses an address. Never
+ * to a new one: iOS unlocks audio per element, and the app makes none (see "The one app" in
+ * CLAUDE.md). It only asks the element what it can play; nothing on it is set or started. Null
+ * where there is no element to ask.
+ */
+export function sentFormat(track: QueueTrack): 'raw' | 'mp3' | null {
+  const element = typeof document === 'undefined' ? null : document.querySelector('audio')
+  if (!element) return null
+  return streamFormat(track, (type) => element.canPlayType(type) !== '')
 }
 
 /** Fire and forget: a play that isn't counted is not worth interrupting the music over. */
