@@ -170,7 +170,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
-tests/             967 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             968 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -1875,7 +1875,11 @@ once the answer was in, "add the view and let's add grabbing cd art".
 - **Never replaces CD art**: the route refuses an album with deadwax's own `disc*`, and the
   writer only writes names matching `disc\d*.(jpg|png|...)`, re-checking containment.
 - **`disc_art` is in the scan (SCAN_FORMAT 4)** - listed from the directory the scan already
-  reads, no file opened. `/library/disc_art` serves only names that count as disc art.
+  reads, no file opened. `/library/disc_art` serves only names that count as disc art, and
+  **(v1.1.8) only a file that resolves inside its album's folder.** The listing's `is_file()`
+  follows a symlink, so a `disc.jpg` linking out of the library passed on its name alone and
+  was served; it is now the same 404 as a disc image that isn't there. Found building the
+  player's turntable route on player-spike, which had the check from the start.
 - **Not built: replacing or stripping embedded pictures.** That is the other real fix, and
   "embedding art" is still on the deliberately-not-built list - it writes into every audio file.
   The Navidrome settings in the README are the no-deadwax-change way to have songs always show
@@ -2728,7 +2732,10 @@ Each of these cost real time. Don't rediscover them.
   decoration — without it `?album=../../..` reads anything the container user can. It
   answers 404 identically for "outside the library" and "no such album" so a probe learns
   nothing. Covered by tests including a symlink pointing out of the library. **If you add
-  another endpoint taking a path, copy this pattern.**
+  another endpoint taking a path, copy this pattern.** And **a guard on the FOLDER is not a
+  guard on the FILE**: a file found in a contained folder's listing can itself be a symlink
+  out, which is how `/disc_art` served one until v1.1.8. A route serving a file's own bytes
+  checks the file resolves inside its folder too.
 
 ### Capturing screenshots
 
@@ -3266,7 +3273,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 967 tests
+.venv/bin/python -m pytest tests/ -q  # 968 tests
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -3310,7 +3317,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 967 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 968 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

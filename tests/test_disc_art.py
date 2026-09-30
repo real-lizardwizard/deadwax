@@ -319,3 +319,25 @@ def test_only_disc_images_are_served_as_disc_art(tmp_path, routes):
     for name in ("cover.jpg", "../disc.png", FIRST):
         with pytest.raises(HTTPException):
             run(routes.disc_art(ALBUM, name))
+
+
+def test_disc_art_that_is_a_symlink_out_of_its_album_is_refused(tmp_path, routes):
+    """
+    A name that counts as disc art can still point anywhere: the listing's is_file() follows the
+    link. Refused with the same 404 as a disc image that isn't there, so a probe learns nothing.
+    """
+    import os
+    outside = tmp_path.parent / "outside-the-library"
+    outside.mkdir(exist_ok=True)
+    (outside / "secret.png").write_bytes(PNG)
+
+    directory = seed(tmp_path)
+    os.symlink(outside / "secret.png", directory / "disc.png")
+
+    with pytest.raises(HTTPException) as escaped:
+        run(routes.disc_art(ALBUM, "disc.png"))
+    with pytest.raises(HTTPException) as missing:
+        run(routes.disc_art(ALBUM, "disc2.png"))
+
+    assert escaped.value.status_code == 404
+    assert (escaped.value.status_code, escaped.value.detail) == (missing.value.status_code, missing.value.detail)
