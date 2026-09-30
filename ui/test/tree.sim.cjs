@@ -103,6 +103,18 @@ check('a multi-disc album splits by disc', shape(tree.visibleRows(layout, floydO
   'group2:The Dark Side of the Moon', 'group2:The Wall',
   'disc3:1', 'track3:In the Flesh?', 'track3:Mother', 'disc3:2', 'track3:Hey You', 'track3:Vera',
 ]);
+{
+  //? a disc's own title rides on its divider (v1.1.0), from the scan's per-album map - keyed by
+  //? the disc as a string, as JSON hands it over; an untitled disc carries ''
+  const titled = { ...wall, disc_titles: { '2': 'Live at Wembley' } };
+  const titledGroups = [group([titled]), ...groups.slice(1)];
+  const titledLayout = { by: 'artist', artists: tree.groupArtists(titledGroups, never) };
+  const titledOpen = state({ expanded: new Set([tree.artistNodeId('Pink Floyd'), tree.groupNodeId(titledGroups[0])]) });
+  check('a titled disc carries its title, an untitled one none',
+        tree.visibleRows(titledLayout, titledOpen).filter((r) => r.kind === 'disc').map((r) => [r.disc, r.title]),
+        [[1, ''], [2, 'Live at Wembley']]);
+  check('an album the scan gave no titles to has none', [tree.discTitle(wall, 1), tree.discTitle(wall, 2)], ['', '']);
+}
 const tameOpen = state({ expanded: new Set([tree.artistNodeId('Tame Impala'), tree.groupNodeId(groups[2])]) });
 check('an album with several editions opens to its editions, not its tracks',
       shape(tree.visibleRows(layout, tameOpen)).filter((s) => !s.startsWith('artist')),
@@ -183,6 +195,14 @@ console.log('\nwhat an album\'s folders are called (v0.9.13)');
 {
   const ed = (split, count) => ({ split_discs: split, edition_count: count });
   check('ordinary editions', grouping.folderSummary([ed(false, 2), ed(false, 2)]).label, '2 editions');
+  const split = (over) => ({ edition: '', disc_label: 'Disc 4', discs: [4], ...over });
+  check('a folder of one titled disc says its title (v1.1.0)',
+    grouping.editionName(split({ disc_titles: { '4': 'Live at Wembley' } })), 'Disc 4 · Live at Wembley');
+  check('...after its edition, when it has one',
+    grouping.editionName(split({ edition: 'Deluxe', disc_titles: { '4': 'Live at Wembley' } })), 'Deluxe · Disc 4 · Live at Wembley');
+  check('an untitled disc is just its number', grouping.editionName(split({})), 'Disc 4');
+  check('a folder of several discs names none of their titles',
+    grouping.editionName(split({ disc_label: 'Discs 1, 2', discs: [1, 2], disc_titles: { '1': 'A', '2': 'B' } })), 'Discs 1, 2');
   check('the discs of one release are disc folders, not editions',
     grouping.folderSummary([ed(true, 1), ed(true, 1)]).label, '2 disc folders');
   check('a split release beside a real second edition',
@@ -204,6 +224,9 @@ console.log('\ntracks arrive compact and are put back together (v0.9.20, filled 
   check('but its OWN value wins where it differs', album.tracks[1].artist, 'A Guest');
   check('has_title_tag is true unless the track said otherwise', album.tracks.map((t) => t.has_title_tag), [true, true, false]);
   check('the defaults are gone once used', 'track_defaults' in album, false);
+  const titled = libraryApi.expandTracks({ albums: [{ ...response.albums[0], disc_titles: { '1': 'Side A' },
+    track_defaults: { artist: 'A' } }] }).albums[0];
+  check('an album\'s disc titles come through untouched (v1.1.0)', titled.disc_titles, { '1': 'Side A' });
 }
 
 console.log('\nonly the rows in view are drawn (v0.9.30)');

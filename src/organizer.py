@@ -25,6 +25,7 @@ from pathlib import Path
 from src.editions import edition_discriminator, resolve_edition_label
 from src.naming import DEFAULT_ALBUM_FOLDER, render_album_folder, validate_template
 from src.logger import logger
+from src.tagkeys import easy_file
 from src.matching import (AUDIO_EXTENSIONS, file_extension, match_tracks_to_files, normalize,
                           split_remote_path)
 
@@ -654,6 +655,15 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
         if not multi_disc and _disc_number((current or {}).get("discnumber")) not in (None, 1):
             values["discnumber"] = "1"
 
+        #? The disc's own title - MusicBrainz's medium title, Picard's DISCSUBTITLE, which
+        #? Navidrome shows too: "Live at Wembley 1974" on a box set's fourth disc (v1.1.0).
+        #? Written whenever MusicBrainz has one, one disc or several, unlike the disc NUMBER: the
+        #? rule above exists because "1" would land on every album, and a title lands only where
+        #? somebody gave the disc one. An untitled disc writes nothing, so a title a file already
+        #? carries stays - the rule below, for every tag here.
+        if track.get("disc_title"):
+            values["discsubtitle"] = track["disc_title"]
+
     #? empty values are dropped rather than written as blanks - clearing a tag the user
     #? already has because MusicBrainz didn't supply one would be destructive. A list is left
     #? as a list: several artist ids are several values, not one string with commas in it.
@@ -671,10 +681,8 @@ def write_tags(path: Path, release: dict, track: dict | None, drop_stale_release
     later instead of being a deadwax-only artifact. Tagging failures are logged and
     tolerated: a filed-but-untagged file is a far better outcome than a half-organized album.
     """
-    import mutagen
-
     try:
-        audio = mutagen.File(str(path), easy=True)
+        audio = easy_file(path)
     except Exception as e:
         logger.warning(f"could not read tags on {path.name}: {e}")
         return
@@ -724,7 +732,10 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
     if mode not in ORGANIZE_MODES:
         mode = "dry_run"
 
-    results = {"organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
+    #? `tracks_organized` is how many of `organized` were audio rather than a cover or sidecar: a
+    #? folder that ends up holding only a cover.jpg is not an album to the scan, so the poller
+    #? enrols a filed album for review only when a track reached it (v1.1.2)
+    results = {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
                "dry_run": mode == "dry_run", "mode": mode}
 
     if mode == "off":
@@ -749,6 +760,8 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
         if mode == "dry_run":
             logger.info(f"[dry run] would place {source.name} -> {target}")
             results["organized"] += 1
+            if not operation.get("companion"):
+                results["tracks_organized"] += 1
             continue
 
         #? never clobber. An existing destination is far more likely to be a real album the
@@ -768,6 +781,7 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
 
             if not operation.get("companion"):
                 write_tags(target, release, operation.get("track"), drop_stale_release_id=True)
+                results["tracks_organized"] += 1
 
             results["organized"] += 1
 
@@ -1024,7 +1038,7 @@ async def organize_job(job: dict, download_root: str, library_root: str, mode: s
 
     if not plan["operations"]:
         logger.error(f"nothing to organize for {label}", extra={"frontend": True, "src": "slskd"})
-        return {"organized": 0, "skipped": 0, "failed": 0,
+        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "failed": 0,
                 "dry_run": mode == "dry_run", "mode": mode, "plan": plan}
 
     if on_plan is not None:

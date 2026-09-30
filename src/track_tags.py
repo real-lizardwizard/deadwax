@@ -41,13 +41,16 @@ from src.library import named_tags
 from src.logger import logger
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import is_within
+from src.tagkeys import easy_file
 
 #? What can be edited, in mutagen's easy-interface names so one key means the same thing in
 #? FLAC, MP3 and M4A - and the names the track viewer reads, so a preview compares against
 #? exactly what was on screen. Kept in step with EDIT_FIELDS in ui/src/lib/tagEdit.ts; a test
 #? reads that file and says so when they drift.
+#? `discsubtitle` is the disc's own title (v1.1.0) - editable because MusicBrainz leaves most
+#? discs untitled, and a bootleg or a box set's own words may be the only place a title exists.
 EDITABLE_TAGS = (
-    "title", "artist", "album", "albumartist", "tracknumber", "discnumber",
+    "title", "artist", "album", "albumartist", "tracknumber", "discnumber", "discsubtitle",
     "date", "originaldate", "genre", "composer",
 )
 
@@ -96,10 +99,8 @@ def validate_tag(key: str, value: str) -> str | None:
 
 def _read_tags(path: Path) -> dict[str, str] | None:
     """The named tags a file carries now, exactly as the track viewer reads them. None if unreadable."""
-    import mutagen
-
     try:
-        audio = mutagen.File(str(path), easy=True)
+        audio = easy_file(path)
     except Exception:
         return None
 
@@ -208,8 +209,6 @@ def execute_tag_edits(plan: dict, mode: str = "dry_run") -> dict:
     than skipped in silence, because an edit that quietly didn't happen reads exactly like one
     that did.
     """
-    import mutagen
-
     results = {
         "mode": mode,
         "dry_run": mode != "apply",
@@ -235,7 +234,7 @@ def execute_tag_edits(plan: dict, mode: str = "dry_run") -> dict:
         refused: list[str] = []
 
         try:
-            audio = mutagen.File(str(directory / entry["filename"]), easy=True)
+            audio = easy_file(directory / entry["filename"])
             if audio is None:
                 raise ValueError("not a format deadwax can tag")
 

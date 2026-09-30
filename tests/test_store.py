@@ -346,6 +346,57 @@ def test_a_rename_onto_an_existing_row_replaces_it(tmp_path):
     assert reviews["a/new"]["ignored_issues"] == [], "the stale row's ignores went with it"
 
 
+def test_a_merge_keeps_the_row_of_the_folder_it_joined(tmp_path):
+    """
+    A disc folder merged into its release's folder (v0.9.13) lands in a folder that is still
+    there and is the album now - unlike a rename, whose destination row describes a folder that
+    has gone. Replacing that row lost when the album was first seen, whether deadwax filed it,
+    and every issue you'd accepted on it (v1.1.4).
+    """
+    store = review_store(tmp_path)
+    asyncio.run(store.record_albums_seen([{"path": "a/discs 1-2", "album": "One"}], source="import"))
+    asyncio.run(store.ignore_album_issues("a/discs 1-2", ["no_art"]))
+    kept = asyncio.run(store.album_reviews())["a/discs 1-2"]
+    asyncio.run(store.record_albums_seen([{"path": "a/disc 3"}], source="scan"))
+
+    asyncio.run(store.mark_album_reviewed("a/disc 3", "a/discs 1-2", merged=True))
+    reviews = asyncio.run(store.album_reviews())
+
+    assert "a/disc 3" not in reviews, "the merged-away folder's row goes with the folder"
+    merged = reviews["a/discs 1-2"]
+    assert merged["first_seen"] == kept["first_seen"]
+    assert (merged["source"], merged["album"]) == ("import", "One")
+    assert merged["ignored_issues"] == ["no_art"]
+    assert merged["reviewed_at"]
+
+
+def test_a_merge_into_a_folder_with_no_row_brings_the_moved_one(tmp_path):
+    """Nothing recorded where it landed, so the merged folder's history is the best there is."""
+    store = review_store(tmp_path)
+    asyncio.run(store.record_albums_seen([{"path": "a/disc 3"}], source="import"))
+    original = asyncio.run(store.album_reviews())["a/disc 3"]
+
+    asyncio.run(store.mark_album_reviewed("a/disc 3", "a/discs 1-2", merged=True))
+    reviews = asyncio.run(store.album_reviews())
+
+    assert list(reviews) == ["a/discs 1-2"]
+    assert reviews["a/discs 1-2"]["first_seen"] == original["first_seen"]
+    assert reviews["a/discs 1-2"]["reviewed_at"]
+
+
+def test_forgetting_a_deleted_album_drops_its_row_and_nothing_else(tmp_path):
+    store = review_store(tmp_path)
+    asyncio.run(store.record_albums_seen(
+        [{"path": "a/gone", "album": "Gone"}, {"path": "a/kept", "album": "Kept"}], source="import",
+    ))
+
+    assert asyncio.run(store.forget_album_review("a/gone")) is True
+    assert list(asyncio.run(store.album_reviews())) == ["a/kept"]
+    assert [a["album"] for a in asyncio.run(store.new_import_summary())["albums"]] == ["Kept"]
+    #? nothing recorded is nothing to forget, and says so
+    assert asyncio.run(store.forget_album_review("a/never")) is False
+
+
 def test_reviewing_an_unknown_album_records_it_where_it_is_now(tmp_path):
     """
     A retag can move an album the store never enrolled. Recording the source path would leave

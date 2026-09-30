@@ -8,7 +8,7 @@ import { useTrackFields, type TrackFieldsState } from '../hooks/useTrackFields'
 import { discArtUrl, formatAge, formatDuration, formatSize, trackPictureUrl, trackTime } from '../lib/format'
 import { editionName, folderSummary, type AlbumGroup } from '../lib/groupAlbums'
 import {
-  editionNodeId, groupAddedAt, nodeIdForAlbum, trackNodeId, type Selected,
+  discTitle, editionNodeId, groupAddedAt, nodeIdForAlbum, trackNodeId, type Selected,
 } from '../lib/libraryTree'
 import { isNewImport, outstandingIssues } from '../lib/metadataQueue'
 import { tickTracks } from '../lib/tagEdit'
@@ -811,10 +811,16 @@ function TrackTable(
           const disc = track.disc ?? 1
           const divider = split && disc !== lastDisc
           lastDisc = disc
+          const titled = divider ? discTitle(album, disc) : ''
 
           return (
             <Fragment key={track.filename}>
-              {divider && <div class="track-table-disc" role="row">Disc {disc}</div>}
+              {divider && (
+                <div class="track-table-disc" role="row">
+                  Disc {disc}
+                  {titled && <span class="disc-title"> · {titled}</span>}
+                </div>
+              )}
               <div
                 role="row"
                 aria-selected={isTicked}
@@ -999,9 +1005,12 @@ function TrackDetailsView(
   const previous = album.tracks[at - 1]
   const next = album.tracks[at + 1]
 
+  const titled = track.disc ? discTitle(album, track.disc) : ''
   const where = [
     track.position !== null ? `Track ${track.position}` : 'Unnumbered',
-    album.disc_count > 1 && track.disc ? `disc ${track.disc} of ${album.disc_count}` : '',
+    album.disc_count > 1 && track.disc
+      ? `disc ${track.disc} of ${album.disc_count}${titled ? ` · ${titled}` : ''}`
+      : '',
   ].filter(Boolean).join(', ')
 
   const shown = TRACK_FIELDS.filter((field) => visible.includes(field.id))

@@ -1093,6 +1093,9 @@ export function LibraryView({ active, onNavigate }: Props) {
           onCancel={() => setDeleting(null)}
           onDeleted={() => {
             setDeleting(null)
+            //? the server has already forgotten its review row (v1.1.5), so a new import deleted
+            //? unseen leaves the badge now rather than on the badge's own timer
+            recountBadge()
             //? the server already dropped it from the scan cache, so a plain reload is enough
             void reload(false)
           }}

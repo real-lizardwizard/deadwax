@@ -34,7 +34,7 @@ opens to one row per edition first.
 
 It stays quick on a big library: only the rows in view are ever drawn.
 
-![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience edition in the details pane](../assets/images/library.png)
+![The library tab: Pink Floyd open, Wish You Were Here's two editions under it, and the two-disc Experience edition in the details pane, its discs headed "2011 Remaster" and "Unreleased Tracks"](../assets/images/library.png)
 
 ### Arranging
 
@@ -85,6 +85,14 @@ length.
 A tag that's only in the file (not the saved scan) shows `·` until the files have been read. A
 disc number shown faded is a default: the file has no disc tag, so it counts as disc 1.
 
+A multi-disc set is split under **Disc 1**, **Disc 2** headings, here and in the tree. A disc
+that has its own title says it too: **Disc 4 · Live at Wembley 1974**, and so does a set kept
+one folder per disc, on each folder's row. The title is the
+`DISCSUBTITLE` tag (Picard's name for it; Navidrome shows it as well). deadwax writes it when a
+download or an applied release gives the disc a title, and you can set it by hand (below). The
+**Disc title** column shows what each file carries, including one that disagrees with the rest
+of its disc.
+
 ## What needs attention
 
 Each album is checked for these, fresh on every scan:
@@ -94,7 +102,7 @@ Each album is checked for these, fresh on every scan:
 | No release id | never matched to a MusicBrainz release, so nothing else can be checked | pick its release in the metadata editor |
 | No artist tag | no file names an artist, so the name shown came from the folder | apply a release |
 | Mixed tags | the files disagree about which album they're from, often two albums sharing a folder | sort the files out, or apply a release |
-| Split across folders | this folder holds only some discs of a release whose other discs are elsewhere | apply the release to each; the second merges into the first |
+| Split across folders | this folder holds only some discs of a release whose other discs are elsewhere | apply the release to each; the second merges into the first, which keeps anything you'd said was fine about it |
 | Artist under two names | the artist's albums are under two folder names, usually a rename | **Move albums to …** on the artist's page |
 | Folder off-convention | the folder isn't named the way its tags say it should be | apply its release, which re-files it |
 | No original year | no `originaldate` tag, which the folder name uses | apply a release |
@@ -154,7 +162,9 @@ and album tags. You:
 
 Tick tracks in the track table (Shift-click for a range, Ctrl/Cmd-click for one at a time), then
 **Edit N tracks…**, or **Edit all tracks…** with none ticked. You can edit title, artist, album,
-album artist, track, disc, date, original date, genre and composer:
+album artist, track, disc, disc title, date, original date, genre and composer. A disc title is
+the one to set for a box set or a bootleg whose discs MusicBrainz leaves untitled: tick that
+disc's tracks and type it once.
 
 - A field whose value differs between the ticked tracks starts empty and says **Several
   values**. Leave it alone and each track keeps its own.
@@ -231,4 +241,5 @@ each track's credited artist alone, and removes the old folder once it's empty.
 **Delete…** removes the album's folder and everything in it, **permanently**. The confirmation
 names the track count and size, and lists any files that aren't audio, in case one is the only
 copy of a rip log. It only ever deletes a folder that holds audio directly, inside your library,
-and never the library folder itself.
+and never the library folder itself. A deleted album leaves the **New** count and the review
+queue straight away.

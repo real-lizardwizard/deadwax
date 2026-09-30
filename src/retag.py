@@ -29,6 +29,7 @@ from src.editions import resolve_edition_label
 from src.logger import logger
 from src.library import find_cover_file
 from src.matching import AUDIO_EXTENSIONS, file_extension, match_tracks_to_files
+from src.tagkeys import easy_file
 from src.api.coverart_endpoint import extension_for
 from src.organizer import (build_album_dirname, country_in_folder, filed_artist, is_within,
                            read_album_mbid, sanitize_filename, tag_values, write_tags)
@@ -37,10 +38,8 @@ from src.organizer import (build_album_dirname, country_in_folder, filed_artist,
 
 def read_current_tags(path: Path) -> dict:
     """The tags a file carries now, limited to the keys a retag would touch."""
-    import mutagen
-
     try:
-        audio = mutagen.File(str(path), easy=True)
+        audio = easy_file(path)
     except Exception:
         return {}
 
@@ -49,7 +48,7 @@ def read_current_tags(path: Path) -> dict:
 
     current = {}
     for key in ("album", "albumartist", "artist", "date", "originaldate", "title", "tracknumber",
-                "discnumber", "musicbrainz_albumid", "musicbrainz_releasegroupid",
+                "discnumber", "discsubtitle", "musicbrainz_albumid", "musicbrainz_releasegroupid",
                 "musicbrainz_albumartistid", "musicbrainz_artistid",
                 "releasecountry", "media", "catalognumber"):
         try:
@@ -247,11 +246,13 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
             "matched": track is not None,
             "track_title": (track or {}).get("title", ""),
             "track_position": (track or {}).get("position"),
-            #? carried so execute_retag can rebuild the same track the plan was computed from -
-            #? without them it would write the running number and no disc, and the write would
-            #? disagree with the preview it is carrying out
             "track_disc": (track or {}).get("disc"),
             "track_disc_position": (track or {}).get("disc_position"),
+            #? the matched track WHOLE, which execute_retag writes: the tags above were computed
+            #? from all of it. Rebuilt from the fields above alone, the write lost the track's own
+            #? artist and ids, and a compilation previewed as Portishead and Björk was written as
+            #? "Various Artists" on both (fixed v1.0.10)
+            "track": track,
             "changes": differing,
         })
 
@@ -529,16 +530,8 @@ def execute_retag(
             continue
 
         try:
-            track = (
-                {
-                    "title": entry["track_title"],
-                    "position": entry["track_position"],
-                    "disc": entry.get("track_disc"),
-                    "disc_position": entry.get("track_disc_position"),
-                }
-                if entry["matched"] else None
-            )
-            write_tags(path, release, track)
+            #? the very track the plan's tags were computed from, so the write is the preview
+            write_tags(path, release, entry.get("track") if entry["matched"] else None)
             results["tagged"] += 1
 
         except Exception as e:

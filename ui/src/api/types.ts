@@ -45,6 +45,8 @@ export interface Track {
   /** The track's own credit, where it differs from the release's — a split, a compilation. */
   artist?: string | null
   artist_mbids?: string[]
+  /** Its DISC's title — MusicBrainz's medium title, written as DISCSUBTITLE. Null when untitled. */
+  disc_title?: string | null
   /** On a video medium, or a video recording: never an audio file (lib/release.ts isVideoTrack). */
   video?: boolean
 }
@@ -367,6 +369,12 @@ export interface ArtistCredit {
 export interface Medium {
   'track-count'?: number
   format?: string
+  /** Which disc of the release; the order they're listed in when absent. */
+  position?: number
+  /** The disc's own title — '' when MusicBrainz has none, which is most discs. */
+  title?: string
+  /** Only in a release fetched with its tracklist. */
+  tracks?: unknown[]
 }
 
 export interface ReleaseEvent {
@@ -491,6 +499,11 @@ export interface LibraryAlbum {
   disc_count: number
   /** Which discs, by number (v0.9.13). Empty when untagged. */
   discs?: number[]
+  /**
+   * Each disc's own title where its files carry one (DISCSUBTITLE, v1.1.0), keyed by the disc
+   * number AS A STRING - JSON keys always are. Untitled discs are left out; see discTitle().
+   */
+  disc_titles?: Record<string, string>
   /**
    * This folder holds only some discs of a release whose other discs are in another folder
    * (v0.9.13) - its `edition` then reads "Disc 2", and applying the release merges them.

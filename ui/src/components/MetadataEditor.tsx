@@ -664,393 +664,399 @@ export function MetadataEditor(
   }
 
   return (
-    <div id="metadata-window" onClick={(event) => event.stopPropagation()}>
-      <div id="metadata-panel">
-        <div id="metadata-header">
-          <h4 class="text white">
-            {album.album} <span class="text default-secondary">{album.artist}</span>
-          </h4>
-          <span class="text white-tertiary metadata-path">{album.path}</span>
+    <>
+      <div id="metadata-window" onClick={(event) => event.stopPropagation()}>
+        <div id="metadata-panel">
+          <div id="metadata-header">
+            <h4 class="text white">
+              {album.album} <span class="text default-secondary">{album.artist}</span>
+            </h4>
+            <span class="text white-tertiary metadata-path">{album.path}</span>
 
-          {queue && (
-            <span class="metadata-queue-position text default-muted">
-              {queue.position} of {queue.total}
-            </span>
-          )}
-
-          <button type="button" id="metadata-close-button" title="Close" onClick={onClose}>✕</button>
-        </div>
-
-        {/*
-          Why this album is in the queue, spelled out. The chips in the library row are two
-          words each because a row has no space; here there is room for the sentence that says
-          what actually fixes it, which is the difference between a warning and instructions.
-        */}
-        {(issues.length > 0 || album.ignored_issues.length > 0) && (
-          <div id="metadata-issues">
-            {issues.map((code) => (
-              <span class="metadata-issue" key={code} title={issueTypes[code]?.hint}>
-                <span class="library-issue-chip">{issueLabel(code, issueTypes)}</span>
-                <span class="text white-tertiary">{issueTypes[code]?.hint}</span>
+            {queue && (
+              <span class="metadata-queue-position text default-muted">
+                {queue.position} of {queue.total}
               </span>
-            ))}
+            )}
 
-            {album.ignored_issues.length > 0 && (
-              <span class="metadata-issue is-ignored">
-                <span class="text default-muted">
-                  {album.ignored_issues.length} issue(s) ignored on this album
+            <button type="button" id="metadata-close-button" title="Close" onClick={onClose}>✕</button>
+          </div>
+
+          {/*
+            Why this album is in the queue, spelled out. The chips in the library row are two
+            words each because a row has no space; here there is room for the sentence that says
+            what actually fixes it, which is the difference between a warning and instructions.
+          */}
+          {(issues.length > 0 || album.ignored_issues.length > 0) && (
+            <div id="metadata-issues">
+              {issues.map((code) => (
+                <span class="metadata-issue" key={code} title={issueTypes[code]?.hint}>
+                  <span class="library-issue-chip">{issueLabel(code, issueTypes)}</span>
+                  <span class="text white-tertiary">{issueTypes[code]?.hint}</span>
                 </span>
-                <button
-                  type="button"
-                  class="metadata-issue-undo"
-                  title="Put this album back in the queue"
-                  onClick={() => void onUnignore(album)}
-                >
-                  un-ignore
-                </button>
-              </span>
-            )}
-          </div>
-        )}
+              ))}
 
-        {/*
-          What the album currently claims to be. Without this you can't tell whether it's
-          tagged at all, let alone which release it points at.
-        */}
-        <div id="metadata-current" class="text default-muted">
-          <span>currently:</span>
-          <span class="text white-tertiary">{album.edition || 'no edition'}</span>
-          <span class="text white-tertiary">
-            {album.original_year && album.original_year !== album.year
-              ? `${album.original_year} (this press ${album.year})`
-              : album.year || 'no year'}
-          </span>
-          <span class="text white-tertiary">{album.track_count} tracks</span>
-          {album.disc_count > 1 && (
-            <span class="text white-tertiary">{album.disc_count} discs</span>
-          )}
-          <span class={taggedRelease ? 'metadata-mbid' : 'text yellow'}>
-            {taggedRelease
-              ? `${taggedRelease.slice(0, 8)}…`
-              : 'not tagged with a MusicBrainz release'}
-          </span>
-        </div>
-
-        <div id="metadata-search">
-          <input
-            type="text"
-            class="releases-filter-input"
-            value={query}
-            placeholder={fieldedAlbumQuery(fields.album, fields.artist)}
-            title="Leave blank to search on the artist and album fields below"
-            onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
-            onKeyDown={(event) => { if (event.key === 'Enter') void search() }}
-          />
-          <button type="button" class="columns-toggle-button" disabled={searching} onClick={() => void search()}>
-            {searching ? <Loading label="Searching" /> : 'Find releases'}
-          </button>
-        </div>
-
-        <div id="metadata-body">
-          <div class="scrollable metadata-releases">
-            {searchError && <h4 class="text yellow metadata-status">{searchError}</h4>}
-
-            {searching && !releases.length && <LoadingPanel label="Asking MusicBrainz…" />}
-
-            {!searchError && searched && !releases.length && !searching && (
-              <h4 class="text default-muted metadata-status">No releases found for that search</h4>
-            )}
-
-            {!searched && !searching && (
-              <h4 class="text default-muted metadata-status">
-                search to match this against a release, or just edit the fields
-              </h4>
-            )}
-
-            {/* the album names a release that isn't in these results - worth saying, since
-                the top result is otherwise indistinguishable from a confirmed match */}
-            {searched && releases.length > 0 && taggedRelease && !foundCurrent && (
-              <h5 class="text yellow metadata-status">
-                the release this album is tagged with isn't in these results
-              </h5>
-            )}
-
-            {releases.map((release) => {
-              const tracks = releaseTrackCount(release)
-              const current = isCurrentRelease(release, taggedRelease)
-
-              return (
-                <button
-                  key={release.id}
-                  type="button"
-                  class={`metadata-release${selectedId === release.id ? ' active' : ''}${current ? ' current' : ''}`}
-                  onClick={() => chooseRelease(release)}
-                >
-                  {current && <span class="metadata-current-badge" title="This album is tagged with this release">Current</span>}
-                  <span class="metadata-release-title">{release.title}</span>
-                  <span class="metadata-release-detail text default-muted">
-                    {[release.date?.substring(0, 4), describeRelease(release)].filter(Boolean).join(' · ')}
+              {album.ignored_issues.length > 0 && (
+                <span class="metadata-issue is-ignored">
+                  <span class="text default-muted">
+                    {album.ignored_issues.length} issue(s) ignored on this album
                   </span>
-                  <span
-                    class={`metadata-release-tracks${tracks && tracks !== album.track_count ? ' mismatch' : ''}`}
-                    title={(release.media ?? []).length > 1
-                      ? (release.media ?? []).map((m, i) => `disc ${i + 1}: ${m['track-count'] ?? '?'} tracks`).join(', ')
-                      : undefined}
+                  <button
+                    type="button"
+                    class="metadata-issue-undo"
+                    title="Put this album back in the queue"
+                    onClick={() => void onUnignore(album)}
                   >
-                    {(release.media ?? []).length > 1 ? `${(release.media ?? []).length} discs · ` : ''}
-                    {tracks || '?'} trk
-                  </span>
-                </button>
-              )
-            })}
+                    un-ignore
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/*
+            What the album currently claims to be. Without this you can't tell whether it's
+            tagged at all, let alone which release it points at.
+          */}
+          <div id="metadata-current" class="text default-muted">
+            <span>currently:</span>
+            <span class="text white-tertiary">{album.edition || 'no edition'}</span>
+            <span class="text white-tertiary">
+              {album.original_year && album.original_year !== album.year
+                ? `${album.original_year} (this press ${album.year})`
+                : album.year || 'no year'}
+            </span>
+            <span class="text white-tertiary">{album.track_count} tracks</span>
+            {album.disc_count > 1 && (
+              <span class="text white-tertiary">{album.disc_count} discs</span>
+            )}
+            <span class={taggedRelease ? 'metadata-mbid' : 'text yellow'}>
+              {taggedRelease
+                ? `${taggedRelease.slice(0, 8)}…`
+                : 'not tagged with a MusicBrainz release'}
+            </span>
           </div>
 
-          <div class="scrollable metadata-plan">
-            <div class="metadata-fields">
-              <label class="metadata-field">
-                <span class="text default-secondary">Artist</span>
-                <input class="releases-filter-input" value={fields.artist}
-                       onInput={(e) => setField('artist', (e.target as HTMLInputElement).value)} />
-              </label>
+          <div id="metadata-search">
+            <input
+              type="text"
+              class="releases-filter-input"
+              value={query}
+              placeholder={fieldedAlbumQuery(fields.album, fields.artist)}
+              title="Leave blank to search on the artist and album fields below"
+              onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
+              onKeyDown={(event) => { if (event.key === 'Enter') void search() }}
+            />
+            <button type="button" class="columns-toggle-button" disabled={searching} onClick={() => void search()}>
+              {searching ? <Loading label="Searching" /> : 'Find releases'}
+            </button>
+          </div>
 
-              <label class="metadata-field">
-                <span class="text default-secondary">Album</span>
-                <input class="releases-filter-input" value={fields.album}
-                       onInput={(e) => setField('album', (e.target as HTMLInputElement).value)} />
-              </label>
+          <div id="metadata-body">
+            <div class="scrollable metadata-releases">
+              {searchError && <h4 class="text yellow metadata-status">{searchError}</h4>}
 
-              <label class="metadata-field metadata-field-short">
-                <span class="text default-secondary">Year</span>
-                <input class="releases-filter-input" value={fields.year}
-                       title="This pressing's year, written to the date tag"
-                       onInput={(e) => setField('year', (e.target as HTMLInputElement).value)} />
-              </label>
+              {searching && !releases.length && <LoadingPanel label="Asking MusicBrainz…" />}
 
-              {/* the album's year rather than this pressing's - it names the folder, so a
-                  2011 remaster of a 1975 record still files under 1975 */}
-              <label class="metadata-field metadata-field-short">
-                <span class="text default-secondary">Original</span>
-                <input class="releases-filter-input" value={fields.originalYear}
-                       placeholder={fields.year || 'year'}
-                       title="The album's first release year — this is what names the folder"
-                       onInput={(e) => setField('originalYear', (e.target as HTMLInputElement).value)} />
-              </label>
+              {!searchError && searched && !releases.length && !searching && (
+                <h4 class="text default-muted metadata-status">No releases found for that search</h4>
+              )}
 
-              <label class="metadata-field">
-                <span class="text default-secondary">Edition</span>
-                <input class="releases-filter-input" value={fields.editionLabel}
-                       placeholder={plan?.edition_label || 'worked out from the release'}
-                       onInput={(e) => setField('editionLabel', (e.target as HTMLInputElement).value)} />
-              </label>
+              {!searched && !searching && (
+                <h4 class="text default-muted metadata-status">
+                  search to match this against a release, or just edit the fields
+                </h4>
+              )}
+
+              {/* the album names a release that isn't in these results - worth saying, since
+                  the top result is otherwise indistinguishable from a confirmed match */}
+              {searched && releases.length > 0 && taggedRelease && !foundCurrent && (
+                <h5 class="text yellow metadata-status">
+                  the release this album is tagged with isn't in these results
+                </h5>
+              )}
+
+              {releases.map((release) => {
+                const tracks = releaseTrackCount(release)
+                const current = isCurrentRelease(release, taggedRelease)
+
+                return (
+                  <button
+                    key={release.id}
+                    type="button"
+                    class={`metadata-release${selectedId === release.id ? ' active' : ''}${current ? ' current' : ''}`}
+                    onClick={() => chooseRelease(release)}
+                  >
+                    {current && <span class="metadata-current-badge" title="This album is tagged with this release">Current</span>}
+                    <span class="metadata-release-title">{release.title}</span>
+                    <span class="metadata-release-detail text default-muted">
+                      {[release.date?.substring(0, 4), describeRelease(release)].filter(Boolean).join(' · ')}
+                    </span>
+                    <span
+                      class={`metadata-release-tracks${tracks && tracks !== album.track_count ? ' mismatch' : ''}`}
+                      //? a line a disc, with its own title where MusicBrainz gives one (v1.1.0) -
+                      //? the title applying this release writes as the disc's
+                      title={(release.media ?? []).length > 1
+                        ? (release.media ?? []).map((m, i) =>
+                            `disc ${m.position ?? i + 1}${m.title ? ` · ${m.title}` : ''}: ${m['track-count'] ?? '?'} tracks`)
+                          .join('\n')
+                        : undefined}
+                    >
+                      {(release.media ?? []).length > 1 ? `${(release.media ?? []).length} discs · ` : ''}
+                      {tracks || '?'} trk
+                    </span>
+                  </button>
+                )
+              })}
             </div>
 
-            <span class="text white-tertiary metadata-hint">
-              Blank fields are left alone rather than cleared. The folder is named after the
-              original year and the edition, so a remaster files under the album's own year.
-            </span>
+            <div class="scrollable metadata-plan">
+              <div class="metadata-fields">
+                <label class="metadata-field">
+                  <span class="text default-secondary">Artist</span>
+                  <input class="releases-filter-input" value={fields.artist}
+                         onInput={(e) => setField('artist', (e.target as HTMLInputElement).value)} />
+                </label>
 
-            <ArtComparison album={album} releaseId={selectedId} onOpen={() => setComparingArt(true)} />
+                <label class="metadata-field">
+                  <span class="text default-secondary">Album</span>
+                  <input class="releases-filter-input" value={fields.album}
+                         onInput={(e) => setField('album', (e.target as HTMLInputElement).value)} />
+                </label>
+
+                <label class="metadata-field metadata-field-short">
+                  <span class="text default-secondary">Year</span>
+                  <input class="releases-filter-input" value={fields.year}
+                         title="This pressing's year, written to the date tag"
+                         onInput={(e) => setField('year', (e.target as HTMLInputElement).value)} />
+                </label>
+
+                {/* the album's year rather than this pressing's - it names the folder, so a
+                    2011 remaster of a 1975 record still files under 1975 */}
+                <label class="metadata-field metadata-field-short">
+                  <span class="text default-secondary">Original</span>
+                  <input class="releases-filter-input" value={fields.originalYear}
+                         placeholder={fields.year || 'year'}
+                         title="The album's first release year — this is what names the folder"
+                         onInput={(e) => setField('originalYear', (e.target as HTMLInputElement).value)} />
+                </label>
+
+                <label class="metadata-field">
+                  <span class="text default-secondary">Edition</span>
+                  <input class="releases-filter-input" value={fields.editionLabel}
+                         placeholder={plan?.edition_label || 'worked out from the release'}
+                         onInput={(e) => setField('editionLabel', (e.target as HTMLInputElement).value)} />
+                </label>
+              </div>
+
+              <span class="text white-tertiary metadata-hint">
+                Blank fields are left alone rather than cleared. The folder is named after the
+                original year and the edition, so a remaster files under the album's own year.
+              </span>
+
+              <ArtComparison album={album} releaseId={selectedId} onOpen={() => setComparingArt(true)} />
+
+              {/*
+                Just the cover, nothing else. The checkbox below rides along with an apply, which
+                also rewrites tags and can rename the folder - a lot to agree to when the sleeve
+                is the only thing you came to change.
+              */}
+              {(selectedId || album.release_mbid) && (
+                <div class="metadata-art-actions">
+                  <button
+                    type="button"
+                    class="columns-toggle-button"
+                    disabled={savingArt}
+                    title={
+                      album.art
+                        ? 'replace the cover on disk with this one, and change nothing else'
+                        : 'save this cover into the album folder, and change nothing else'
+                    }
+                    onClick={() => void saveArtOnly()}
+                  >
+                    {savingArt
+                      ? <Loading label="Saving" />
+                      : album.art ? 'replace cover only' : 'save cover only'}
+                  </button>
+
+                  {artResult && <span class="text white-tertiary metadata-hint">{artResult}</span>}
+                </div>
+              )}
+
+              <label class="metadata-checkbox">
+                <input type="checkbox" checked={fetchArt}
+                       onChange={(e) => setFetchArt((e.target as HTMLInputElement).checked)} />
+                <span class="text default-secondary">
+                  {plan?.art.existing ? `replace ${plan.art.existing}` : 'download cover art'}
+                </span>
+                <span class="text white-tertiary metadata-hint">
+                  {plan?.art.existing
+                    ? 'this album already has a cover; only overwrite it if the new one is better'
+                    : 'from the Cover Art Archive, saved into the album folder'}
+                  {/* the size is chosen in the settings tab, so say which one this will be */}
+                  {plan?.art.size
+                    ? ` — ${plan.art.size === 'full' ? 'at full size' : `at ${plan.art.size} × ${plan.art.size}`}`
+                    : ''}
+                </span>
+              </label>
+
+              {planning && (
+                <h5 class="metadata-status">
+                  {/* naming the actual wait: the tracklist arrives separately from the list of
+                      pressings, so "working out the changes" would be describing the wrong step */}
+                  <Loading label={loadingRelease ? 'fetching the tracklist' : 'working out the changes'} />
+                </h5>
+              )}
+
+              {/* what the last apply reported, kept on screen while the preview is redone under it */}
+              {appliedProblems.map((problem) => (
+                <h5 class="text yellow metadata-problem" key={`applied:${problem}`}>{problem}</h5>
+              ))}
+
+              {!planning && plan && (
+                <>
+                  {plan.problems.map((problem) => (
+                    <h5 class="text yellow metadata-problem" key={problem}>{problem}</h5>
+                  ))}
+
+                  {plan.moves && (
+                    <div class="metadata-move">
+                      <span class="text default-secondary">{plan.merge ? 'Merge' : 'Folder'}</span>
+                      <span class="text white-tertiary">{plan.album_path}</span>
+                      <span class="text default">→ {plan.target_path}</span>
+                    </div>
+                  )}
+
+                  {/* said before the click, so a paused Apply doesn't read as stuck (v1.0.1). Asking
+                      Navidrome (v1.0.3) has no fixed length, so it gets no number: the cap is a
+                      ceiling, and quoting it would make a few seconds' wait sound like ninety */}
+                  {plan.moves && Boolean(plan.rename_wait) && (
+                    <h5 class="text white-tertiary metadata-status">
+                      {plan.rename_by === 'navidrome'
+                        ? (plan.changed_file_count === 0
+                          //? a rename held back earlier: the tags are on disk already, and it still
+                          //? waits for Navidrome to have scanned them (1.0.3 review)
+                          ? 'The tags were written by an earlier apply. Renames the folder once Navidrome '
+                            + "has scanned them, so Navidrome keeps this album's plays, ratings and favourites."
+                          : 'Writes the tags first and renames the folder once Navidrome has scanned them '
+                            + "(usually a few seconds), so Navidrome keeps this album's plays, ratings and favourites.")
+                        : `Writes the tags first and renames ${plan.rename_wait}s later, so Navidrome keeps `
+                          + `this album's plays, ratings and favourites.`}
+                    </h5>
+                  )}
+
+                  {/* the discs of one release stored one folder per disc (v0.9.13) */}
+                  {plan.merge && plan.merge_detail && (
+                    <h5 class="text default metadata-status">
+                      {`Moves ${discWords(plan.merge_detail.discs_here)} in beside `
+                        + `${discWords(plan.merge_detail.discs_there)}, which ${plan.merge_detail.discs_there.length > 1 ? 'are' : 'is'} `
+                        + 'already there as the same release, and removes this folder once it is empty.'}
+                      {plan.merge_detail.kept_back.length > 0
+                        && ` ${plan.merge_detail.kept_back.join(', ')} stays behind - there's one of that name already.`}
+                    </h5>
+                  )}
+
+                  {plan.empty && (
+                    <h5 class="text default-muted metadata-status">Nothing to change</h5>
+                  )}
+
+                  {plan.files.filter((file) => Object.keys(file.changes).length).map((file) => (
+                    <div class="metadata-file" key={file.filename}>
+                      <div class="metadata-file-name text white">{file.filename}</div>
+                      {Object.entries(file.changes).map(([tag, change]) => (
+                        <div class="metadata-change" key={tag}>
+                          <span class="metadata-tag text default-secondary">{tag}</span>
+                          <span class="metadata-from text white-tertiary">{change.from || '—'}</span>
+                          <span class="metadata-to text default">{change.to}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+
+          <div id="metadata-footer">
+            {applied && <span class="text green metadata-result">{applied}</span>}
+            {applyError && <span class="text red metadata-result">{applyError}</span>}
+
+            {!applyError && plan && !plan.empty && (
+              <span class="text default-muted metadata-summary">
+                {plan.changed_file_count} of {plan.file_count} file(s) would change
+                {plan.art.action === 'download' ? ', cover art would be downloaded' : ''}
+                {plan.art.action === 'replace' ? ', the cover art would be replaced' : ''}
+                {plan.moves ? (plan.merge ? ', and the files would join the other disc' : ', and the folder would be renamed') : ''}
+              </span>
+            )}
 
             {/*
-              Just the cover, nothing else. The checkbox below rides along with an apply, which
-              also rewrites tags and can rename the folder - a lot to agree to when the sleeve
-              is the only thing you came to change.
+              Accepting an album as it is. Offered wherever the editor is opened from, not just
+              in queue mode: deciding a bootleg will never be in MusicBrainz is a thing you
+              realise while looking at it, and making you find a different button for that would
+              mean the queue keeps asking.
             */}
-            {(selectedId || album.release_mbid) && (
-              <div class="metadata-art-actions">
+            {issues.length > 0 && (
+              <button
+                type="button"
+                class="columns-toggle-button metadata-ignore-button"
+                disabled={ignoring}
+                title={`stop asking about: ${issues.map((c) => issueLabel(c, issueTypes)).join(', ')}`}
+                onClick={() => void ignore()}
+              >
+                {ignoring ? <Loading label="Ignoring" /> : "It's fine as it is"}
+              </button>
+            )}
+
+            {queue && (
+              <div class="metadata-queue-nav">
                 <button
                   type="button"
                   class="columns-toggle-button"
-                  disabled={savingArt}
-                  title={
-                    album.art
-                      ? 'replace the cover on disk with this one, and change nothing else'
-                      : 'save this cover into the album folder, and change nothing else'
-                  }
-                  onClick={() => void saveArtOnly()}
+                  disabled={queue.position <= 1}
+                  title="The previous album in the queue"
+                  onClick={queue.onPrevious}
                 >
-                  {savingArt
-                    ? <Loading label="Saving" />
-                    : album.art ? 'replace cover only' : 'save cover only'}
+                  ◁
                 </button>
-
-                {artResult && <span class="text white-tertiary metadata-hint">{artResult}</span>}
+                <button
+                  type="button"
+                  class="columns-toggle-button"
+                  disabled={queue.position >= queue.total}
+                  title="Leave this one for now and move on"
+                  onClick={queue.onNext}
+                >
+                  skip ▷
+                </button>
               </div>
             )}
 
-            <label class="metadata-checkbox">
-              <input type="checkbox" checked={fetchArt}
-                     onChange={(e) => setFetchArt((e.target as HTMLInputElement).checked)} />
-              <span class="text default-secondary">
-                {plan?.art.existing ? `replace ${plan.art.existing}` : 'download cover art'}
-              </span>
-              <span class="text white-tertiary metadata-hint">
-                {plan?.art.existing
-                  ? 'this album already has a cover; only overwrite it if the new one is better'
-                  : 'from the Cover Art Archive, saved into the album folder'}
-                {/* the size is chosen in the settings tab, so say which one this will be */}
-                {plan?.art.size
-                  ? ` — ${plan.art.size === 'full' ? 'at full size' : `at ${plan.art.size} × ${plan.art.size}`}`
-                  : ''}
-              </span>
-            </label>
+            <button type="button" class="columns-toggle-button" onClick={onClose}>
+              {applied ? 'Close' : 'Cancel'}
+            </button>
 
-            {planning && (
-              <h5 class="metadata-status">
-                {/* naming the actual wait: the tracklist arrives separately from the list of
-                    pressings, so "working out the changes" would be describing the wrong step */}
-                <Loading label={loadingRelease ? 'fetching the tracklist' : 'working out the changes'} />
-              </h5>
-            )}
-
-            {/* what the last apply reported, kept on screen while the preview is redone under it */}
-            {appliedProblems.map((problem) => (
-              <h5 class="text yellow metadata-problem" key={`applied:${problem}`}>{problem}</h5>
-            ))}
-
-            {!planning && plan && (
-              <>
-                {plan.problems.map((problem) => (
-                  <h5 class="text yellow metadata-problem" key={problem}>{problem}</h5>
-                ))}
-
-                {plan.moves && (
-                  <div class="metadata-move">
-                    <span class="text default-secondary">{plan.merge ? 'Merge' : 'Folder'}</span>
-                    <span class="text white-tertiary">{plan.album_path}</span>
-                    <span class="text default">→ {plan.target_path}</span>
-                  </div>
-                )}
-
-                {/* said before the click, so a paused Apply doesn't read as stuck (v1.0.1). Asking
-                    Navidrome (v1.0.3) has no fixed length, so it gets no number: the cap is a
-                    ceiling, and quoting it would make a few seconds' wait sound like ninety */}
-                {plan.moves && Boolean(plan.rename_wait) && (
-                  <h5 class="text white-tertiary metadata-status">
-                    {plan.rename_by === 'navidrome'
-                      ? (plan.changed_file_count === 0
-                        //? a rename held back earlier: the tags are on disk already, and it still
-                        //? waits for Navidrome to have scanned them (1.0.3 review)
-                        ? 'The tags were written by an earlier apply. Renames the folder once Navidrome '
-                          + "has scanned them, so Navidrome keeps this album's plays, ratings and favourites."
-                        : 'Writes the tags first and renames the folder once Navidrome has scanned them '
-                          + "(usually a few seconds), so Navidrome keeps this album's plays, ratings and favourites.")
-                      : `Writes the tags first and renames ${plan.rename_wait}s later, so Navidrome keeps `
-                        + `this album's plays, ratings and favourites.`}
-                  </h5>
-                )}
-
-                {/* the discs of one release stored one folder per disc (v0.9.13) */}
-                {plan.merge && plan.merge_detail && (
-                  <h5 class="text default metadata-status">
-                    {`Moves ${discWords(plan.merge_detail.discs_here)} in beside `
-                      + `${discWords(plan.merge_detail.discs_there)}, which ${plan.merge_detail.discs_there.length > 1 ? 'are' : 'is'} `
-                      + 'already there as the same release, and removes this folder once it is empty.'}
-                    {plan.merge_detail.kept_back.length > 0
-                      && ` ${plan.merge_detail.kept_back.join(', ')} stays behind - there's one of that name already.`}
-                  </h5>
-                )}
-
-                {plan.empty && (
-                  <h5 class="text default-muted metadata-status">Nothing to change</h5>
-                )}
-
-                {plan.files.filter((file) => Object.keys(file.changes).length).map((file) => (
-                  <div class="metadata-file" key={file.filename}>
-                    <div class="metadata-file-name text white">{file.filename}</div>
-                    {Object.entries(file.changes).map(([tag, change]) => (
-                      <div class="metadata-change" key={tag}>
-                        <span class="metadata-tag text default-secondary">{tag}</span>
-                        <span class="metadata-from text white-tertiary">{change.from || '—'}</span>
-                        <span class="metadata-to text default">{change.to}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </>
+            {/*
+              In queue mode a finished album hands you straight to the next one - going back to
+              the list and picking the next by hand is the busywork this whole thing exists to
+              remove. The last album has nowhere to go, so it keeps the plain close.
+            */}
+            {applied && queue && queue.position < queue.total ? (
+              <button type="button" id="metadata-apply-button" onClick={queue.onNext}>
+                Next album ▷
+              </button>
+            ) : (
+              <button
+                type="button"
+                id="metadata-apply-button"
+                disabled={!plan || plan.empty || planning || applying || loadingRelease}
+                onClick={() => void apply()}
+              >
+                {applying
+                  ? <Loading label={applyingLabel(plan)} />
+                  : 'Apply'}
+              </button>
             )}
           </div>
-        </div>
-
-        <div id="metadata-footer">
-          {applied && <span class="text green metadata-result">{applied}</span>}
-          {applyError && <span class="text red metadata-result">{applyError}</span>}
-
-          {!applyError && plan && !plan.empty && (
-            <span class="text default-muted metadata-summary">
-              {plan.changed_file_count} of {plan.file_count} file(s) would change
-              {plan.art.action === 'download' ? ', cover art would be downloaded' : ''}
-              {plan.art.action === 'replace' ? ', the cover art would be replaced' : ''}
-              {plan.moves ? (plan.merge ? ', and the files would join the other disc' : ', and the folder would be renamed') : ''}
-            </span>
-          )}
-
-          {/*
-            Accepting an album as it is. Offered wherever the editor is opened from, not just
-            in queue mode: deciding a bootleg will never be in MusicBrainz is a thing you
-            realise while looking at it, and making you find a different button for that would
-            mean the queue keeps asking.
-          */}
-          {issues.length > 0 && (
-            <button
-              type="button"
-              class="columns-toggle-button metadata-ignore-button"
-              disabled={ignoring}
-              title={`stop asking about: ${issues.map((c) => issueLabel(c, issueTypes)).join(', ')}`}
-              onClick={() => void ignore()}
-            >
-              {ignoring ? <Loading label="Ignoring" /> : "It's fine as it is"}
-            </button>
-          )}
-
-          {queue && (
-            <div class="metadata-queue-nav">
-              <button
-                type="button"
-                class="columns-toggle-button"
-                disabled={queue.position <= 1}
-                title="The previous album in the queue"
-                onClick={queue.onPrevious}
-              >
-                ◁
-              </button>
-              <button
-                type="button"
-                class="columns-toggle-button"
-                disabled={queue.position >= queue.total}
-                title="Leave this one for now and move on"
-                onClick={queue.onNext}
-              >
-                skip ▷
-              </button>
-            </div>
-          )}
-
-          <button type="button" class="columns-toggle-button" onClick={onClose}>
-            {applied ? 'Close' : 'Cancel'}
-          </button>
-
-          {/*
-            In queue mode a finished album hands you straight to the next one - going back to
-            the list and picking the next by hand is the busywork this whole thing exists to
-            remove. The last album has nowhere to go, so it keeps the plain close.
-          */}
-          {applied && queue && queue.position < queue.total ? (
-            <button type="button" id="metadata-apply-button" onClick={queue.onNext}>
-              Next album ▷
-            </button>
-          ) : (
-            <button
-              type="button"
-              id="metadata-apply-button"
-              disabled={!plan || plan.empty || planning || applying || loadingRelease}
-              onClick={() => void apply()}
-            >
-              {applying
-                ? <Loading label={applyingLabel(plan)} />
-                : 'Apply'}
-            </button>
-          )}
         </div>
       </div>
 
@@ -1058,6 +1064,12 @@ export function MetadataEditor(
         Both covers at full size. The incoming one is the release you have selected, or failing
         that the one the album is already tagged with - the same id "replace cover only" would
         fetch, so what the button saves is exactly what you were looking at.
+
+        BESIDE the editor's window, never inside it (v1.0.9). Inside, it belonged to the window
+        twice over: `position: fixed` measured from the window's centring transform, so "full
+        size" was the editor's box; and resize.js took a press on it for a press on the editor -
+        once the editor had been moved it covered the screen, and its ✕, above the editor, read
+        as the editor's top edge, so the press began a resize and the click never reached it.
       */}
       {comparingArt && (() => {
         const incomingId = selectedId ?? (album.release_mbid || null)
@@ -1095,7 +1107,7 @@ export function MetadataEditor(
           />
         )
       })()}
-    </div>
+    </>
   )
 }
 

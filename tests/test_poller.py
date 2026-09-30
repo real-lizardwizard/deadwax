@@ -334,6 +334,88 @@ def test_a_filed_album_is_enrolled_in_the_metadata_queue(tmp_path, monkeypatch):
     )
 
 
+def _copy_failing_for(names, monkeypatch):
+    """Let the organizer copy for real, except the named files, which fail as a full disk would."""
+    import shutil
+    from src import organizer
+    real_copy = shutil.copy2
+
+    def copy2(source, target, *args, **kwargs):
+        if Path(source).name in names:
+            raise OSError(28, "No space left on device")
+        return real_copy(source, target, *args, **kwargs)
+
+    monkeypatch.setattr(organizer.shutil, "copy2", copy2)
+
+
+def _organizing_into_a_library(tmp_path, monkeypatch, extra_files=()):
+    from src import library
+    from src.config import Config
+    downloads = tmp_path / "downloads" / "album"
+    downloads.mkdir(parents=True)
+    for name in ("01.flac", "02.flac", *extra_files):
+        (downloads / name).write_bytes(b"x")
+
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
+    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
+    monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
+    #? as a full scan leaves it, so only the filing can set it
+    monkeypatch.setattr(library, "_behind", False)
+
+
+def test_a_partly_filed_album_is_announced_like_a_filed_one(tmp_path, monkeypatch):
+    """
+    One track failed to copy, so the job ends `complete` with the failure on its row - but the
+    other track is in the library all the same (v1.1.2). Only a clean `organized` used to say
+    so: /library/owned went on answering from a snapshot without the album, and the new-import
+    badge never counted it.
+    """
+    from src.library import library_is_behind
+    _organizing_into_a_library(tmp_path, monkeypatch)
+    _copy_failing_for({"02.flac"}, monkeypatch)
+
+    store = make_store(tmp_path)
+    job_id = seed_job(store)
+    asyncio.run(poll_downloads_once(FakeSlskd(_all_done()), store, {}))
+
+    job = next(j for j in asyncio.run(store.list_jobs()) if j["id"] == job_id)
+    assert (job["status"], job["error"]) == ("complete", "1 file(s) failed to organize")
+    album = tmp_path / "music" / "Boards of Canada" / "Music Has the Right to Children (1998)"
+    #? no tracklist on the release, so the sharer's own name is kept
+    assert [p.name for p in album.iterdir()] == ["01.flac"]
+
+    assert library_is_behind()
+    summary = asyncio.run(store.new_import_summary())
+    assert summary["count"] == 1
+    assert summary["albums"][0]["album_path"] == (
+        "Boards of Canada/Music Has the Right to Children (1998)"
+    )
+
+
+def test_a_folder_left_holding_only_a_cover_is_not_enrolled(tmp_path, monkeypatch):
+    """
+    Every track failed and only the cover landed. The library did change - there is a folder
+    now - but it holds no audio, so no scan will ever list it as an album, and a badge counting
+    it would name something nobody can find or clear.
+    """
+    from src.library import library_is_behind
+    _organizing_into_a_library(tmp_path, monkeypatch, extra_files=("cover.jpg",))
+    _copy_failing_for({"01.flac", "02.flac"}, monkeypatch)
+
+    store = make_store(tmp_path)
+    job_id = seed_job(store)
+    asyncio.run(poll_downloads_once(FakeSlskd(_all_done()), store, {}))
+
+    job = next(j for j in asyncio.run(store.list_jobs()) if j["id"] == job_id)
+    assert (job["status"], job["error"]) == ("complete", "2 file(s) failed to organize")
+    album = tmp_path / "music" / "Boards of Canada" / "Music Has the Right to Children (1998)"
+    assert [p.name for p in album.iterdir()] == ["cover.jpg"]
+
+    assert library_is_behind()
+    assert asyncio.run(store.new_import_summary())["count"] == 0
+
+
 def test_a_dry_run_enrols_nothing(tmp_path, monkeypatch):
     """Nothing was filed, so there is nothing new to prompt about."""
     from src.config import Config
@@ -417,3 +499,58 @@ def test_a_download_still_in_progress_is_not_failed_by_one_rejection(tmp_path):
     )), store, {}))
 
     assert status_of(store, job_id) == "downloading"
+
+
+# ---------------------------------------------------------------- filing cut short by a stop
+
+def test_a_job_a_stop_caught_mid_filing_is_settled_on_start(tmp_path):
+    """
+    Stopping the container cancels the poller wherever it is, and a CancelledError isn't an
+    Exception, so a job being filed stayed `organizing` for ever: never polled again (not open),
+    never removed by "clear finished" (not clearable), and counted as active by the page (v1.1.3).
+    """
+    from src.poller import INTERRUPTED_FILING, settle_interrupted_filing
+    from src.store import CLEARABLE_STATUSES
+    store = make_store(tmp_path)
+    stuck, queued, filed = seed_job(store), seed_job(store), seed_job(store)
+    asyncio.run(store.update_status(stuck, "organizing"))
+    asyncio.run(store.update_status(filed, "organized"))
+
+    assert asyncio.run(settle_interrupted_filing(store)) == 1
+
+    jobs = {j["id"]: j for j in asyncio.run(store.list_jobs())}
+    assert (jobs[stuck]["status"], jobs[stuck]["error"]) == ("complete", INTERRUPTED_FILING)
+    assert (jobs[queued]["status"], jobs[filed]["status"]) == ("queued", "organized")
+
+    #? finished with a problem now, so it goes with the other finished rows
+    asyncio.run(store.delete_jobs(CLEARABLE_STATUSES))
+    assert [j["id"] for j in asyncio.run(store.list_jobs())] == [queued]
+
+
+def test_the_poller_settles_interrupted_filing_before_its_first_poll(tmp_path, monkeypatch):
+    from src import poller
+    from src.config import Config
+    monkeypatch.setattr(Config, "SLSKD_INCOMPLETE_PATH", "")
+    store = make_store(tmp_path)
+    job_id = seed_job(store)
+    asyncio.run(store.update_status(job_id, "organizing"))
+
+    async def stop(_seconds):
+        #? the first thing the loop does is wait for its first poll - stop it there
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(poller.asyncio, "sleep", stop)
+    try:
+        asyncio.run(poller.run_download_poller(FakeSlskd(), store))
+    except asyncio.CancelledError:
+        pass
+
+    assert status_of(store, job_id) == "complete"
+
+
+def test_nothing_to_settle_touches_nothing(tmp_path):
+    from src.poller import settle_interrupted_filing
+    store = make_store(tmp_path)
+    job_id = seed_job(store)
+    assert asyncio.run(settle_interrupted_filing(store)) == 0
+    assert status_of(store, job_id) == "queued"

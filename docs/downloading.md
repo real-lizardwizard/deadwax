@@ -148,7 +148,7 @@ files wanted, **queue #N** while waiting in the user's queue, and the live downl
 | --- | --- |
 | queued | slskd has it, and it's waiting for the user to start sending |
 | downloading | files are arriving |
-| complete | every file arrived, and organizing hasn't started yet |
+| complete | every file arrived, and organizing hasn't started yet, or it ran into a problem, which the line says |
 | organizing | being tagged and filed |
 | organized | filed into your library (or, in dry run, checked) |
 | failed | it stopped for good, and the line says why |

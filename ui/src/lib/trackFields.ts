@@ -127,7 +127,7 @@ export const TRACK_FIELDS: readonly TrackField[] = [
   { id: 'composer', label: 'Composer', group: 'Tags', width: 'minmax(7em, 0.5fr)', initial: false, fromScan: false, value: tag('composer') },
   { id: 'conductor', label: 'Conductor', group: 'Tags', width: 'minmax(7em, 0.5fr)', initial: false, fromScan: false, value: tag('conductor') },
   { id: 'lyricist', label: 'Lyricist', group: 'Tags', width: 'minmax(7em, 0.5fr)', initial: false, fromScan: false, value: tag('lyricist') },
-  { id: 'discsubtitle', label: 'Disc subtitle', group: 'Tags', width: 'minmax(7em, 0.5fr)', initial: false, fromScan: false, value: tag('discsubtitle') },
+  { id: 'discsubtitle', label: 'Disc title', group: 'Tags', width: 'minmax(7em, 0.5fr)', initial: false, fromScan: false, value: tag('discsubtitle') },
   {
     id: 'label', label: 'Label', group: 'Tags', width: 'minmax(7em, 0.5fr)', initial: false,
     fromScan: false,

@@ -37,6 +37,10 @@ class Track(BaseModel):
     #? nothing anywhere saying why.
     artist: str | None = None
     artist_mbids: list[str] = Field(default_factory=list)
+    #? The title of this track's DISC - MusicBrainz's medium title, written as DISCSUBTITLE
+    #? (v1.1.0). Declared for the same reason again: undeclared, it would vanish here and the
+    #? download would file with no disc titles while the editor's apply wrote them.
+    disc_title: str | None = None
     #? On a video medium (DVD-Video, Blu-ray) or a video recording: a track that never arrives as
     #? an audio file, so the "already have it" checks leave it out (store_index.audio_tracks).
     #? Declared for the reason everything above is - undeclared, a CD+DVD pressing held whole

@@ -24,6 +24,23 @@ In order of likelihood:
    never filed again, so a second copy of an album is left in slskd's folder, and the download
    reads *already in the store*. See [organizing](organizing.md).
 
+## A download says "N file(s) failed to organize"
+
+Some of its files couldn't be written into the library. The ones that could are there, and the
+album shows as **New** in the library like any other filed download. The rest are still in
+slskd's folder (a move never clears that folder out while anything failed). The container's own
+log names each file and why, most often permissions or a full disk. Fix that, then either copy
+the missing tracks across and apply the album's release in the metadata editor, or download the
+album again: a track the album's folder already has is never filed twice, so only the missing
+ones are added.
+
+## A download says "deadwax stopped while filing this"
+
+deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
+Look at the album in the library (**Rescan** first) and in slskd's downloads folder: in move mode,
+whatever hadn't been filed yet is still in slskd's folder, and in copy mode all of it is. Anything
+missing is dealt with as in the section above. **Clear finished** removes the row.
+
 ## Find says "Already downloading", but nothing is
 
 **Find** won't search for a pressing while a download of all of it is queued or arriving, and
@@ -33,8 +50,9 @@ folder, doesn't stop the search: it's a note above the results.
 
 "Already downloaded", with "being filed into your library now", means every file has arrived and
 it's being filed. That takes seconds. A download that finished while organizing was off is never
-filed later, and stops counting two minutes after it finished. One that stopped part-way through
-being filed, because deadwax was restarted mid-filing, stops counting an hour after filing began.
+filed later, and stops counting two minutes after it finished. One that deadwax was stopped or
+restarted part-way through filing stops counting as soon as deadwax starts again, which marks it
+"deadwax stopped while filing this" (above).
 
 ## Find says you have only some of a pressing you have all of
 

@@ -24,8 +24,8 @@ confidently wrong deployment advice. Don't bring them back.
 | branch | what |
 | --- | --- |
 | `main` | **the one line that ships.** Every change that ships lands here, and since 1.0.5 only main takes version numbers. Each push is built as `:experimental`; a `v*` tag on it is a release. Until 1.0.0 it held the old Lidarr-based v0.2.1, still tag `v0.2.1`. |
-| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for); step 1 of the multi-user plan, the phone player, is on it, and every push builds `:player` (asked for, for the iPhone week). It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code here than on main - its 1.0.1 and 1.0.2 went to main as 1.0.3 and 1.0.4, and sections below dated 1.0.1-1.0.5 use its own numbering. main was merged in after main's 1.0.5, and from then it was `1.1.0-player.N`. **From 2.0.0-player.7 (2026-09-29) it is `2.0.0-player.N`**: James decided everything stays on this branch until the whole multi-user plan ships, as 2.0.0 - so it merges into main only when every step is done. |
-| `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2). **Ported onto player-spike's 1.0.2 as its 1.0.3** (see "The phone player"), so it is kept only for reference now. Everything after it on that branch shipped on experimental. |
+| `player-spike` | the multi-user and phone-player work, begun from 1.0.0 (2026-09-27, asked for), which builds its own `:player` image. It numbered its commits 1.0.1-1.0.5 before the rules below, so those numbers mean different code there than on main; its two fix commits came to main as 1.0.3 and 1.0.4, and some sections below dated 1.0.1-1.0.5 (the 1.0.1 fixes, the phone player's port) use its numbering. From here it follows the rules: `1.1.0-player.1` to `.6`, then `2.0.0-player.N` once James decided it ships as 2.0.0 (2026-09-29), when every step of the multi-user plan is done - `2.0.0-player.7` is step 2, `2.0.0-player.8` its merge of main's 1.1.7. |
+| `player-spike-0.8` | the original player spike (`5f6711e`, 0.8.0, built on 0.7.2), kept for step 1's port - done, onto player-spike's 1.0.2 as its 1.0.3 (see "The phone player"), so it is kept only for reference now. Everything after it on that branch shipped on experimental. |
 | ~~`experimental/slskdn-no-lidarr`~~ | **deleted after 1.0.4.** Where all the 0.x work happened: v0.3.0 to v0.9.2 were tagged from it, and every commit of it is in main's history. |
 
 #### Branches and versions (v1.0.5, asked for)
@@ -38,14 +38,14 @@ on the spike that main needed had to be cherry-picked across.
 - **main is the one line that ships.** Don't start a second line that releases too.
 - **Only main takes version numbers.** A commit on any other branch leaves `__version__` alone.
   A branch that publishes its own image needs a version to show, and takes a PRE-RELEASE of the
-  version it will SHIP as - `2.0.0-player.7`, `2.0.0-player.8` - never a plain number. The publish
-  workflow never moves `:latest` for a version with a hyphen, so it can't pass for a release, and
-  a plain number always means one commit on main. (player-spike took `1.1.0-player.1` to `.6`
-  while it was thought to ship as the next minor; on 2026-09-29 James decided the player and the
-  multi-user work ship together as 2.0.0, and the pre-release moved to name that, keeping its
-  count: the next one after `1.1.0-player.6` was `2.0.0-player.7`.)
-- **player-spike merges into main once, as 2.0.0**, when every step of the multi-user plan is
-  done (James, 2026-09-29) - not step by step. Until then main is merged INTO it, as below.
+  version it will ship as - never a plain number, and always one that sorts AFTER main's latest
+  release. player-spike began as `1.1.0-player.1`, `1.1.0-player.2`...; once main released 1.1.0
+  itself (the disc titles, 2026-09-29) those sorted before a release they came after. James has
+  decided player-spike stays a branch until it ships as **2.0.0**, when every step of the
+  multi-user plan is done, so it numbers `2.0.0-player.N`, keeping the count: `2.0.0-player.7` is
+  step 2 (it followed `1.1.0-player.6`), and `2.0.0-player.8` its merge of main's 1.1.7. The
+  publish workflow never moves `:latest` for a version with a hyphen, so it can't pass for a
+  release, and a plain number always means one commit on main.
 - **A bug main has too is fixed ON MAIN first**, in its own commit with its own patch bump, and
   main is then merged into the branch. Fixing it only on the branch is what stranded 1.0.1 and
   1.0.2 on player-spike.
@@ -172,6 +172,8 @@ src/
                    network is passed in so none of it needs one to test - see "Lyrics".
   disc_art.py      CD art as disc.<ext> / disc<N>.<ext>. The SEVENTH writer - choosing is pure,
                    writing is narrow - see "CD art and embedded pictures".
+  tagkeys.py       tag names mutagen's Easy MP4 doesn't know (the disc title), registered once,
+                   and easy_file() to open a file with them - see "Disc titles".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
@@ -194,7 +196,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    player/streamSource.ts is its one-stream gapless engine, with the pure
                    lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC"; player/Settings.tsx
                    is its settings sheet (Maximum quality).
-tests/             1772 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1801 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -354,11 +356,28 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   drops them, but **only after a scan that actually found albums**: an empty library is far more
   often an unmounted volume than a deleted collection, and wiping every ignore the moment a
   mount goes missing would be a rotten trade.
+  **deadwax's OWN delete removes the row itself (v1.1.5)**, with `store.forget_album_review()`
+  once `delete_album` has succeeded, and the page's `onDeleted` recounts the tab badge, as
+  ignoring an album does. Left to the scan, it went only when a full scan next found albums -
+  the page's reload after a delete usually is one, but deleting the LAST album leaves a library
+  that never prunes, and the badge said "1" for an album that was gone, for good (reproduced in
+  the real page with the old route); and even when pruned, the badge kept the old count until
+  its own minute poll. A refused delete forgets nothing. Any future writer that REMOVES an album
+  should do the same.
 - **The new-import prompt is recorded at import time, not derived from a scan.** The library is
   deliberately not read until its tab is opened, so a badge that had to diff two scans would
   need a scan to exist — absent at exactly the moment it has something to say. The poller writes
   one row as it files each download, and `/queue/new_imports` is a single indexed count that
   touches no filesystem. This is the only reason the import source is recorded at all.
+  **A PARTLY filed download is announced too (v1.1.2).** Some files failing to file ends the job
+  `complete` with "N file(s) failed to organize", and until 1.1.2 only a clean `organized` called
+  `note_library_changed()` and enrolled the album - so the tracks that did land were in the
+  library, `/library/owned` answered from a snapshot without them, and the badge never counted
+  them. Both now happen whenever `organized` is non-zero outside a dry run, whatever the status,
+  and BEFORE the status is written (the page reacts to `organized` by re-asking both). Enrolling
+  also needs `tracks_organized` (execute_plan's count of audio files among `organized`): a folder
+  left holding only a cover is no album to the scan, and a badge naming it could never be
+  cleared. `tests/test_poller.py` fails a copy on purpose to cover both.
 - **A move-organize clears the slskd folder out, and the line it will not cross is AUDIO**
   (v0.6.20, asked for: "I'd like the album folder to be deleted when the songs are").
   `cleanup_source_dirs` used `rmdir`, which refuses a non-empty folder by construction - so
@@ -423,6 +442,16 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   transfers to a job again. Only CANCELLED jobs are consulted: an organized job names the same
   kind of files, and a finished download's history is the user's to clear. Removal is slskd's
   soft delete (`Removed = true`); the record stays in its database.
+- **A job a stop caught mid-filing is settled when the poller starts (v1.1.3).** `organizing` is
+  written as filing begins and only filing moves it on; stopping the container cancels the poller
+  task mid-organize, and a CancelledError is not an Exception, so `_organize_if_enabled`'s handler
+  never saw it. The job stayed `organizing` for ever: not in OPEN_STATUSES (never polled), not in
+  CLEARABLE_STATUSES ("clear finished" left it), and counted ACTIVE by the page, so the Downloads
+  badge stayed lit and the panel polled every second. `settle_interrupted_filing()` moves every
+  such job to `complete` with `INTERRUPTED_FILING` ("deadwax stopped while filing this - check the
+  library and slskd's folder") before the first poll; nothing else writes the status and one
+  process runs one poller, so at start-up every one was interrupted. It is NOT filed again: a move
+  may have taken half the tracks, and re-running the organizer over that unattended is a guess.
 - **The image's HEALTHCHECK judges deadwax ALONE (v0.9.7).** `GET /deadwax/health` is 200 while
   the download poller runs and 503 once it has stopped - it catches every error per pass, so it
   only ends if something is badly wrong, and without it nothing is tracked or filed while the
@@ -538,6 +567,23 @@ real tracklist → enqueue → poller watches transfers → organizer tags and f
   as well as boxes. **Verified in headless Brave**: a saved (1300, 820) now restores at exactly
   (836, 536) in 900 x 600, the 64px clamp above. **Not verified**: the metadata editor, which
   mounts only when opened and has no library in the scratch setup.
+- **A press outside a panel's box is on no edge of it (v1.0.9).** James: comparing covers in the
+  metadata editor, "the x highlights but doesn't do anything", while Close worked. The cover
+  viewer was drawn INSIDE `#metadata-window`, so `panelFor()` called a press on it a press on
+  the editor, and `edgeAt()` never asked whether the pointer was inside the box: "above the top"
+  passed as the top edge. Once the editor had been moved (no centring transform, so the fixed
+  viewer covered the screen) its ✕ sat above the editor; the press began a resize, the editor
+  took pointer capture, and the click landed on `#metadata-window`. Close, below the editor,
+  failed the bottom test's `>= scrollbar` half and escaped. Two fixes: `edgeAt` returns '' for
+  a pointer outside the box, and the viewer renders BESIDE the editor's window (a fragment),
+  which also makes it full screen when the editor is centred - inside the transform it had been
+  the editor's 900 x 680. **A script's click can't show this**: a synthetic pointer can't be
+  captured, so the click went through in every scripted test, in Arc too. **Verified with real
+  input in headless Brave**: before, the moved editor's ✕ logged pointerdown on the button and
+  then capture, pointerup and click on the editor; after, the ✕ closes the viewer centred or
+  moved, the viewer is 1440 x 900, Escape, the scrim and Close each close only the viewer, and
+  the editor still resizes from its top and left edges (60 and 50px) while a press just above
+  it does nothing.
 
 ### One tracklist per release group (v0.8.2)
 
@@ -703,6 +749,12 @@ without asking whether it still answered the question on screen.
   cancel by stopping and deleting every search it started (`_abandon`). **Verified live**
   against the slow fake slskd: hanging up 1.5s into an 8s search, slskd was told to stop and
   delete it at once. It needed the middleware fix below first - see the gotcha.
+  **A cancel mid-START lost the search until v1.1.7.** Each start runs in a thread, which a cancel
+  can't stop: the POST reached slskd, but the CancelledError came out of the await before the id
+  was recorded, so `_abandon` never stopped that search. CI's slower runner found it - the test
+  cancelled on a fixed 0.1s, during the second start. The start is now shielded, and a cancel waits
+  for it and records its id before re-raising. The tests wait for a condition, never a fixed time,
+  and one cancels on purpose while the second start is held in its thread.
 
 ### The candidates panel in Preact (v0.9.10)
 
@@ -904,6 +956,14 @@ folder name, and `_resolve_target` never merged into an existing folder.
   the tree said "2 disc folders", both were flagged, applying to discs 1-3 renamed them to
   `In Rainbows (2007) [Discbox]`, and applying to disc 4 previewed "Merge ... moves disc 4 in
   beside discs 1, 2, 3" and left one folder of 28 tracks with no issues.
+- **A merge keeps the review row of the folder it joined (v1.1.4).** The retag route passes the
+  existing folder as where the album went, and `mark_album_reviewed` used to clear the row there
+  first, as for a rename - where a row at the destination describes a folder that has gone. For
+  a merge that folder is still there and is the album now, so its first_seen, import source and
+  accepted issues were replaced by the disc folder's. The route now passes `merged=True`
+  (from `results["merged"]`), and the store keeps the destination's row, marks it reviewed and
+  deletes the merged-away folder's; with no row at the destination, the moved row still moves.
+  Only a merge: a plain rename's destination row is still stale and still replaced.
 
 ### One artist under two names (v0.9.14)
 
@@ -1525,6 +1585,60 @@ drawn whole: 12,720 rows for a song search on a thousand albums.
 - **The scan reads `discnumber` and orders disc-first**, so a two-disc set stops interleaving
   (1, 1, 2, 2...). `disc_count` counts distinct TAGGED discs - 0 when untagged, never a guessed
   1 - and only `disc_count > 1` is split under "Disc N" headings.
+
+### Disc titles (v1.1.0)
+
+James: "is it possible to save cd titles? ... the dark side of the moon 50th anniversary box set,
+it just says disc 1 2 3 4. I would like to make it where disc 4 actually says 'Live at Wembley -
+From Pre-FM Master Tape'".
+
+- **It is MusicBrainz's MEDIUM title, written as `discsubtitle`**: Picard's DISCSUBTITLE, ID3's
+  TSST (a v2.4 frame), an MP4 freeform atom. Navidrome reads all three (its mapping lists `tsst`,
+  `discsubtitle`, `----:com.apple.itunes:discsubtitle`) and returns them as OpenSubsonic
+  `discTitles`. Every medium MusicBrainz sends has a `title`, '' for most. James's exact words are
+  disc 4 of a 2018 GB BOOTLEG, "The High Resolution Remasters" (`74a781e4-...`), there as "TDSOTM -
+  Live at Wembley - From Pre-FM Master Tape"; the official 2023 box calls its live discs "The Dark
+  Side of the Moon Live at Wembley Empire Pool, London, 1974".
+- **Carried per TRACK, as `disc_title`**, by both builders (`buildExpectedFromRelease` in main.js,
+  `flattenTracks` in release.ts - the same trim-to-null rule; keep them in step) and declared on
+  the download `Track` (the pydantic trap, a sixth time). Per track because `tag_values` already
+  takes everything about the disc from the track. It reaches the file on both paths because the
+  organizer and, since v1.0.10, `execute_retag` both hand `write_tags` the matched track whole.
+- **Written whenever MusicBrainz has one, one disc or several**, unlike the disc NUMBER: that
+  rule exists because "1" would land on every album, and a title lands only where somebody gave
+  the disc one. An untitled disc writes nothing, so a title a file carries stays - the rule for
+  every tag - which also means only a hand edit clears a wrong one. `read_current_tags` reads it
+  back, or every titled disc would show a change for ever.
+- **Easy MP4 had no key for it**, so an m4a could neither show nor take one. `src/tagkeys.py`
+  registers the freeform atom `----:com.apple.iTunes:DISCSUBTITLE`, and the places that read or
+  write it open files through `easy_file()`, which registers first. Four keys `tag_values` already
+  wrote have the same m4a gap (originaldate, musicbrainz_releasegroupid, media, catalognumber: an
+  m4a album never reads "nothing to change") - known, and left alone: James isn't worried about
+  m4a for now.
+- **The scan carries ONE map per album, `disc_titles`, keyed by the disc as a STRING** - the
+  saved scan is JSON, which would hand number keys back as strings after a restart;
+  `discTitle()` in libraryTree.ts looks up `String(disc)`. The commonest title per disc, untitled
+  discs left out; the per-track `disc_title` is server-only on the wire. From the scan, not the
+  live details, because the tree never loads details, and the table's headings would appear late
+  and disagree with the tree's. The "Disc title" column (live, off by default) still shows what
+  each FILE carries. `SCAN_FORMAT` 8, so the first visit after upgrading waits for one full scan.
+- **Shown as "Disc 4 · <title>"** on the tree's disc rows, the track table's headings and a
+  track's "disc 4 of 4" line; the editor's release rows list each disc's title in their tooltip.
+  A folder holding ONE disc of a set kept one folder per disc has no headings (its `disc_count` is
+  1), so `editionName()` names it there instead: "Disc 4 · <title>" on its tree and editions rows
+  - found by the review, and the likelier shape of James's "it just says disc 1 2 3 4".
+  The title is a `.disc-title` span in its own case beside the uppercase label. **`.tree-disc` is
+  one line with an ellipsis**: the windowed tree measures one height per KIND of row, and a title
+  that wrapped would run over the rows below. The whole title is its tooltip.
+- **Hand-editable as "Disc title"** (`EDITABLE_TAGS` / `EDIT_FIELDS`), for the discs MusicBrainz
+  leaves untitled, and for trimming a bootleg's "TDSOTM - ".
+- **Verified in the real page** (headless Brave) on a scratch copy of the bootleg's 55 tracks
+  tagged with its release and no titles: the editor's release row listed the four disc titles,
+  the preview showed `discsubtitle - -> TDSOTM - Live at Wembley...` on disc 4's ten tracks, the
+  apply wrote them and then read "Nothing to change", and the tree and table read "Disc 4 · TDSOTM
+  - Live at Wembley - From Pre-FM Master Tape" at 1440 and 390px, no overflow, every disc row one
+  height. Ticking disc 4 and setting Disc title by hand made it "Disc 4 · Live at Wembley - From
+  Pre-FM Master Tape". A row's Find on that release sent all 55 tracks with their disc titles.
 
 ### Editing tags by hand (v0.6.9)
 
@@ -3488,7 +3602,10 @@ below).
   (`reconcile_scan`; never a snapshot - a snapshot is the last scan, not the disk); filing
   (`_organize_if_enabled`, whenever files were placed, the partial-failure branch included, and
   BEFORE the status leaves `organizing` - after it, the index has to say the album is here or a
-  second download slips into the gap); apply release (re-indexed in place right after the tags are
+  second download slips into the gap; since main's 1.1.2 came in at 2.0.0-player.8 it is one block
+  with `note_library_changed()` and the review enrolment, and
+  `test_filing_that_partly_failed_both_indexes_and_enrols` runs the real organizer with a copy
+  failing to hold both); apply release (re-indexed in place right after the tags are
   written, BEFORE the rename pause - up to 90s with Navidrome, long enough to Find and download the
   pressing just applied - then moved or merged after it); artist refile; delete (a `deleted`
   tombstone); hand tag edits (names change). Art, CD art and lyrics change nothing it holds.
@@ -3572,13 +3689,15 @@ below).
   (and `edition_label`, which nothing sends yet) so the folder resolves as the download's would -
   the builders always sent them and pydantic dropped them, as it dropped `release_group_mbid`.
 - **In flight** is a job with the release in `queued`/`downloading`; `organizing` updated in the
-  last `FILING_IN_FLIGHT_SECONDS` (3600) - bounded because a job stranded there by a restart
-  mid-filing (being fixed on main separately) must not block its release for ever; or `complete`
-  with no error updated in the last `COMPLETE_IN_FLIGHT_SECONDS` (120), and only while organizing is
-  on. `complete` is the moment between the last file and the poller starting to file it, the same
-  pass; one older than that finished while organizing was off, and nothing ever files it later -
-  the first cut counted it for an hour once organizing was turned on, with no cancel button to
-  free it. `idx_jobs_release` makes it one indexed read. **Only a job for the WHOLE pressing
+  last `FILING_IN_FLIGHT_SECONDS` (3600); or `complete` with no error updated in the last
+  `COMPLETE_IN_FLIGHT_SECONDS` (120), and only while organizing is on. A job a restart caught
+  mid-filing is settled when the poller starts (`settle_interrupted_filing`, main's 1.1.3, merged
+  in at 2.0.0-player.8): it becomes `complete` WITH an error, which never counts. The organizing
+  bound stays as the second guard, so a job stranded there any other way still can't block its
+  release for ever. `complete` is the moment between the last file and the poller starting to
+  file it, the same pass; one older than that finished while organizing was off, and nothing ever
+  files it later - the first cut counted it for an hour once organizing was turned on, with no
+  cancel button to free it. `idx_jobs_release` makes it one indexed read. **Only a job for the WHOLE pressing
   counts** (`covering`: at least as many files as the release has audio tracks - job files are
   audio only, `group_files_by_directory` drops the rest): a lone disc folder, or a 9-of-10 folder,
   will never bring the rest, so it neither stops Find (it is `downloading_part`, a note) nor
@@ -3927,6 +4046,11 @@ metadata as well".
 - **A track keeps its OWN artist.** `tag_values` gave every track the release's artist, so
   applying a release to a compilation rewrote eighteen artists into one. The track's credit wins
   where it has one; `albumartist` stays the release's, which is what the two tags are for.
+  **Until v1.0.10 that held for downloads only.** `execute_retag` rebuilt each track from its
+  plan entry's title, number and disc, so the editor PREVIEWED each track's own artist and then
+  wrote the release's on every one - Various Artists over a whole compilation. A plan entry now
+  carries the matched `track` whole and the apply writes that. `test_credits.py` had tested
+  `write_tags` alone, which is why it never showed; the new test goes through plan and apply.
 - **The artist ids are written at last**: `musicbrainz_albumartistid` and `musicbrainz_artistid`.
   Nothing deadwax filed had ever recorded WHO an artist was, only which release - which is why
   the artist page has to fall back to searching by name at all.
@@ -4525,6 +4649,11 @@ the same way, on the same generated library.** What it took beyond the above:
   phone library shot opens a single-edition album; and `glob` reads `[FLAC]` in a folder name as
   a character class (`glob.escape`).
 
+**v1.1.6 recaptured `library.png` for disc titles**, with the same harness and library. The generated
+Experience edition carried no disc titles, so MusicBrainz's for its release (`588ca0a5`, "2011
+Remaster" and "Unreleased Tracks") were written straight into its FLACs as `discsubtitle`, as an
+apply would. A library generated afresh needs the same, or the shot shows bare "Disc 1", "Disc 2".
+
 - **`--screenshot` and `--virtual-time-budget` cannot do this, and two attempts hung proving
   it.** The flag fires once load settles, which is before any driving has happened. Virtual
   time is the usual answer and it does not work here either: deadwax polls continuously, so
@@ -5018,7 +5147,8 @@ compile time.
   move `:latest` on every commit, which is exactly what `:experimental` exists to prevent —
   see the image-tag note below. Bump the version as you go; tag when you mean to ship.
 - Versions: `v0.x` tags until **1.0.0, released on 2026-09-27** when James called it polished,
-  as the first release on `main`. The patch bump per commit carries on from there.
+  as the first release on `main`. The patch bump per commit carries on from there; the MINOR
+  moves when James says so - 1.1.0 (2026-09-29, disc titles) was "push it as 1.1".
 - Image tags: `:experimental` = main, rebuilt on every push (the experimental branch's until
   1.0.5); `:latest` = the newest real release. `:latest` only ever moves for a real release, never a branch or prerelease —
   the workflow enforces this by skipping `:latest` for any version containing a hyphen.
@@ -5034,7 +5164,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1772 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 1801 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -5086,7 +5216,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1772 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1801 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -190,13 +190,25 @@ async def _organize_if_enabled(job: dict, store) -> None:
             job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, Config.ORGANIZE_MODE, on_plan=plan_made
         )
 
-        #? Whatever the status says below - organized, or complete with some files failed -
-        #? tracks were placed, so the store index learns the folder (step 2). BEFORE the status
-        #? moves on from `organizing`: until then a Find of this release sees the job in flight,
-        #? and after it the index has to be able to say the album is here, or there is a moment
-        #? where neither is true and a second download gets through.
+        #? Whatever status the job ends on - organized, or complete with some files failed - the
+        #? tracks that did land are in the library, and everything that has to know is told BEFORE
+        #? the status is written.
         if results.get("organized") and not results.get("dry_run"):
+            #? The store index learns the folder (step 2): until the status moves on from
+            #? `organizing` a Find of this release sees the job in flight, and after it the index has
+            #? to say the album is here, or there is a moment where neither is true and a second
+            #? download gets through.
             await index_folder(store, Config.LIBRARY_PATH, (results.get("plan") or {}).get("album_dir"))
+            #? Until 1.1.2 only a clean `organized` said so, so /owned went on answering from a
+            #? snapshot without the album and the new-import badge never counted it. The page reacts
+            #? to `organized` by asking /owned and the badge again, and must find both already
+            #? knowing. The cache doesn't know about this folder yet, so the next "what do I own"
+            #? asks the disk rather than the saved scan - see /library/owned.
+            note_library_changed()
+            #? a cover alone doesn't make the folder an album the scan would list, and a badge
+            #? naming an album it can't show you is worse than no badge
+            if results.get("tracks_organized"):
+                await _enrol_for_review(job, results, store)
         for key in filing:
             filing_finished(key)
         filing.clear()
@@ -236,10 +248,6 @@ async def _organize_if_enabled(job: dict, store) -> None:
 
         else:
             await store.update_status(job["id"], "organized")
-            #? the cache doesn't know about this folder yet, so the next "what do I own" asks the
-            #? disk rather than the saved scan - see /library/owned
-            note_library_changed()
-            await _enrol_for_review(job, results, store)
             _fetch_lyrics_later(results)
 
     except Exception as e:
@@ -316,9 +324,10 @@ async def _enrol_for_review(job: dict, results: dict, store) -> None:
     deliberately not scanned until you open its tab, so a badge that had to diff two scans
     would need a scan to exist. One row, written once, keyed on where the album landed.
 
-    Everything it needs is already in the plan the organizer just executed. It never raises -
-    the download succeeded and the album is filed, so failing to note it down is not a reason
-    to report the job as broken.
+    Everything it needs is already in the plan the organizer just executed. Called whenever a
+    track reached the library, including when others failed to (v1.1.2): the album is there
+    either way, and part of an album is exactly what wants looking at. It never raises - the
+    files are filed, so failing to note it down is not a reason to report the job as broken.
     """
     album_dir = (results.get("plan") or {}).get("album_dir")
 
@@ -638,6 +647,42 @@ async def tidy_cancelled_on_start(slskd_client, store) -> int:
         return 0
 
 
+#? what the row of a download a stop caught mid-filing says, instead of "organizing" for ever
+INTERRUPTED_FILING = "deadwax stopped while filing this - check the library and slskd's folder"
+
+
+async def settle_interrupted_filing(store) -> int:
+    """
+    Once, on start: downloads a stop caught mid-filing, moved on to `complete` with a reason
+    (v1.1.3). Returns how many.
+
+    `organizing` is written as filing starts and only filing itself moves it on. Stopping the
+    container cancels the poller task wherever it is, and a CancelledError is not an Exception,
+    so _organize_if_enabled's own handler never sees it. A job left there is in neither
+    OPEN_STATUSES (never polled again) nor CLEARABLE_STATUSES ("clear finished" leaves it), and
+    the downloads panel polls every second while any job reads `organizing`. Nothing else writes
+    the status and one process runs one poller, so at start-up every such job was interrupted.
+
+    Not filed again: how far it got is unknown - a move may already have taken half the tracks
+    out of slskd's folder - and re-running the organizer over that unattended is a guess. The
+    row says where to look instead. Never raises: a start-up nicety must not stop the poller.
+    """
+    try:
+        stuck = await store.jobs_with_status(("organizing",))
+        for job in stuck:
+            await store.update_status(job["id"], "complete", INTERRUPTED_FILING)
+        if stuck:
+            logger.warning(
+                f"{len(stuck)} download(s) were being filed when deadwax stopped, check them in "
+                f"the library",
+                extra={"frontend": True, "src": "slskd"},
+            )
+        return len(stuck)
+    except Exception as e:
+        logger.error(f"couldn't settle downloads interrupted while filing: {e}")
+        return 0
+
+
 #? every ten minutes at the poll interval - the empty-folder sweep is a walk of slskd's
 #? incomplete folder, cheap but not free, and nothing about it is urgent
 EMPTY_DIR_SWEEP_POLLS = 120
@@ -667,6 +712,7 @@ async def run_download_poller(slskd_client, store) -> None:
     missing_counts: dict[int, int] = {}
     rate_samples: dict[int, RateAccumulator] = {}
 
+    await settle_interrupted_filing(store)
     await tidy_cancelled_on_start(slskd_client, store)
     await sweep_empty_incomplete_dirs()
     polls = 0

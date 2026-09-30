@@ -630,11 +630,13 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
         #? Applying a release IS reviewing the album, so this clears it from the new-import
         #? prompt without a second click. It follows the rename because album_review is keyed
         #? on the path: leaving the row behind would orphan the history of an album that is
-        #? still very much there, and re-enrol it as brand new on the next scan.
+        #? still very much there, and re-enrol it as brand new on the next scan. A merge lands
+        #? in a folder that was already there, whose own row is kept instead (v1.1.4).
         if store is not None:
             await store.mark_album_reviewed(
                 body.album_path,
                 plan["target_path"] if results.get("moved_to") else None,
+                merged=bool(results.get("merged")),
             )
 
         logger.info(
@@ -1323,8 +1325,13 @@ async def delete(request: Request, body: DeleteRequest):
         #? would draw a deleted album until the next scan noticed it was gone
         await _persist_cache(request)
 
+        store = _store(request)
         #? its store index row stays, as a `deleted` tombstone - step 5's history keys on the id
-        await mark_deleted(_store(request), Config.LIBRARY_PATH or "", body.album_path)
+        await mark_deleted(store, Config.LIBRARY_PATH or "", body.album_path)
+        #? and its review row, which the next full scan would prune - until then an unreviewed
+        #? import was counted by the new-imports badge while naming nothing (v1.1.5)
+        if store is not None:
+            await store.forget_album_review(body.album_path)
 
         return result
 

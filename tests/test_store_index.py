@@ -661,13 +661,26 @@ def test_the_job_being_retried_is_not_in_flight_against_itself(store):
 
 
 def test_filing_is_in_flight_for_an_hour_and_no_longer(store):
-    """A job stranded in `organizing` by a restart must not block its release for ever."""
+    """A job stranded in `organizing` must not block its release for ever (the second guard,
+    behind poller.settle_interrupted_filing at start-up)."""
     job_in(store, "organizing", age=timedelta(minutes=10))
     assert run(store.in_flight_job("rel-1"))["status"] == "organizing"
 
     with sqlite3.connect(store.path) as connection:
         connection.execute("UPDATE jobs SET updated_at = ?",
                            ((datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(timespec="seconds"),))
+    assert run(store.in_flight_job("rel-1")) is None
+
+
+def test_a_job_a_restart_caught_mid_filing_frees_its_release_at_start_up(store):
+    """
+    settle_interrupted_filing (main's 1.1.3) moves it to `complete` WITH an error when the poller
+    starts, and that never counts as in flight - so its release is free at once, not after the hour.
+    """
+    job_in(store, "organizing", age=timedelta(minutes=10))
+    assert run(store.in_flight_job("rel-1"))["status"] == "organizing"
+
+    assert run(poller.settle_interrupted_filing(store)) == 1
     assert run(store.in_flight_job("rel-1")) is None
 
 
@@ -1222,6 +1235,36 @@ def test_filing_that_partly_failed_still_indexes_what_landed(tmp_path, store, mo
 
     assert run(store.get_job(job_id))["error"] == "1 file(s) failed to organize"
     assert [r["path"] for r in rows(store, state="present")] == [DUMMY]
+
+
+def test_filing_that_partly_failed_both_indexes_and_enrols(tmp_path, store, monkeypatch):
+    """
+    The real organizer this time, with one track's copy failing as a full disk would. The job ends
+    `complete` with the failure, and for the track that did land the folder is both indexed (step
+    2) and enrolled for review (main's 1.1.2) - one block before the status is written, since
+    main was merged in at 2.0.0-player.8.
+    """
+    from src import organizer
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(downloads_with_flacs(tmp_path)))
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
+    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
+    monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
+    real_copy = shutil.copy2
+
+    def copy2(source, target, *args, **kwargs):
+        if str(source).endswith("02.flac"):
+            raise OSError(28, "No space left on device")
+        return real_copy(source, target, *args, **kwargs)
+
+    monkeypatch.setattr(organizer.shutil, "copy2", copy2)
+    job_id = filed_job(store)
+    run(poll_downloads_once(FakeSlskd(transfers=ALL_DONE), store, {}))
+
+    assert run(store.get_job(job_id))["error"] == "1 file(s) failed to organize"
+    folder = "Boards of Canada/Music Has the Right to Children (1998)"
+    [row] = rows(store, state="present")
+    assert (row["path"], row["release_mbid"], row["track_count"]) == (folder, "mb-1", 1)
+    assert [a["album_path"] for a in run(store.new_import_summary())["albums"]] == [folder]
 
 
 def client_for(tmp_path, store, monkeypatch):

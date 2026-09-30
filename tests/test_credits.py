@@ -114,3 +114,36 @@ def test_applying_a_release_to_a_compilation_keeps_every_artist(tmp_path):
     assert [w["musicbrainz_artistid"] for w in written] == ["id-p", "id-b"]
     #? and every one of them still knows which album it belongs to
     assert {w["albumartist"] for w in written} == {"Various Artists"}
+
+
+def test_applying_a_release_through_the_editor_writes_each_tracks_own_artist(tmp_path):
+    """
+    The same, through the metadata editor's plan and apply rather than write_tags alone.
+
+    execute_retag rebuilt each track from the plan entry with only its title, number and disc,
+    so the preview showed Portishead and Björk and the apply wrote "Various Artists" on both - a
+    preview disagreeing with the write it previews. Found while carrying disc titles (v1.0.10).
+    """
+    from src.retag import execute_retag, plan_retag
+
+    album = tmp_path / "Various Artists" / "A Compilation (2000)"
+    album.mkdir(parents=True)
+    for index, title in enumerate(("One", "Two"), start=1):
+        write_flac(album / f"0{index} - {title}.flac", title=title, album="A Compilation",
+                   artist="whoever", albumartist="Various Artists", tracknumber=str(index))
+    release = {"album": "A Compilation", "artist": "Various Artists", "year": "2000",
+               "artist_mbids": ["id-va"], "release_mbid": "rel-2",
+               "tracks": [
+                   {"position": 1, "title": "One", "artist": "Portishead", "artist_mbids": ["id-p"]},
+                   {"position": 2, "title": "Two", "artist": "Björk", "artist_mbids": ["id-b"]}]}
+
+    plan = plan_retag("Various Artists/A Compilation (2000)", release, str(tmp_path))
+    assert [f["changes"]["artist"]["to"] for f in plan["files"]] == ["Portishead", "Björk"]
+
+    result = execute_retag(plan, release, mode="apply")
+    assert result["failed"] == 0
+
+    written = [read_current_tags(path) for path in sorted(album.glob("*.flac"))]
+    assert [w["artist"] for w in written] == ["Portishead", "Björk"]
+    assert [w["musicbrainz_artistid"] for w in written] == ["id-p", "id-b"]
+    assert plan_retag("Various Artists/A Compilation (2000)", release, str(tmp_path))["empty"]

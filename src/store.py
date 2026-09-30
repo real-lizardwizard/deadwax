@@ -217,9 +217,10 @@ CLEARABLE_STATUSES = ("complete", "organized", "failed", "cancelled")
 #? what "try the next peer" can start again - anything still moving is left to finish
 RETRYABLE_STATUSES = ("failed", "cancelled")
 
-#? How long a job in `organizing` still counts as on its way into the library (step 2). Bounded
-#? because a job can be STRANDED there - deadwax stopped mid-filing never comes back to it - and
-#? a stranded job must not block its release for ever. An hour is far longer than any filing takes.
+#? How long a job in `organizing` still counts as on its way into the library (step 2). A job a
+#? stop caught mid-filing is settled when the poller starts (poller.settle_interrupted_filing,
+#? 1.1.3), so this bound is the SECOND guard: should that ever miss one, a job stranded there must
+#? not block its release for ever. An hour is far longer than any filing takes.
 FILING_IN_FLIGHT_SECONDS = 3600
 
 #? ...and a job `complete` with no error, which is the moment between the last file arriving and
@@ -822,7 +823,8 @@ class JobStore:
             logger.error(f"failed to un-ignore {album_path}: {e}")
             return False
 
-    async def mark_album_reviewed(self, album_path: str, new_path: str | None = None) -> bool:
+    async def mark_album_reviewed(self, album_path: str, new_path: str | None = None,
+                                  merged: bool = False) -> bool:
         """
         Record that this album has been looked at, following it if the folder just moved.
 
@@ -831,6 +833,13 @@ class JobStore:
         history of an album that is still very much there. The destination row is cleared
         first because the primary key would otherwise reject the move - and if something *is*
         already recorded there, it describes a folder that no longer exists.
+
+        Except after a MERGE (`merged`): a disc folder moved into its release's folder, which is
+        still there and is the album now (v0.9.13). Its row - first seen, filed by deadwax or
+        found, the issues you'd accepted - is that album's history, so it stays and is marked
+        reviewed, and the merged-away folder's row goes with the folder (v1.1.4). Until then
+        the merge replaced it with the disc folder's. With no row there, the moved row is the
+        best history there is, and it moves as for a rename.
         """
         if not self.available or not album_path:
             return False
@@ -839,7 +848,18 @@ class JobStore:
 
         def write():
             with self._connect() as connection:
-                if target != album_path:
+                if target != album_path and merged:
+                    kept = connection.execute(
+                        "UPDATE album_review SET reviewed_at = ? WHERE album_path = ?",
+                        (_now(), target),
+                    )
+                    if kept.rowcount:
+                        connection.execute(
+                            "DELETE FROM album_review WHERE album_path = ?", (album_path,)
+                        )
+                        return True
+
+                elif target != album_path:
                     connection.execute("DELETE FROM album_review WHERE album_path = ?", (target,))
 
                 #? Written as move-then-insert rather than as one upsert because the two cases
@@ -906,6 +926,33 @@ class JobStore:
         except Exception as e:
             logger.error(f"failed to forget missing albums: {e}")
             return 0
+
+    async def forget_album_review(self, album_path: str) -> bool:
+        """
+        Drop one album's review row, for an album deadwax has just deleted (v1.1.5).
+
+        forget_missing_albums() would get to it, but only on the next full scan - and until then
+        an `import` row for it went on being counted by the new-imports badge while naming an
+        album that no longer exists, the exact state that method is there to end. The delete is
+        the moment it is known to be gone, so it goes then. Never raises: the album is deleted
+        either way, and failing to tidy its row is not a reason to report the delete as failed.
+        """
+        if not self.available or not album_path:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                cursor = connection.execute(
+                    "DELETE FROM album_review WHERE album_path = ?", (album_path,)
+                )
+                return cursor.rowcount > 0
+
+        try:
+            return await asyncio.to_thread(write)
+
+        except Exception as e:
+            logger.error(f"failed to forget the review record for {album_path}: {e}")
+            return False
 
     async def new_import_summary(self, limit: int = 8) -> dict:
         """

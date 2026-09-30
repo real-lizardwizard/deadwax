@@ -97,7 +97,8 @@ already there, and nothing would be filed.
 ## What's written into each file
 
 From the release you picked: title, artist (the track's own credit, so a compilation keeps its
-eighteen artists), album, album artist, track number, disc number (on multi-disc releases), date,
+eighteen artists), album, album artist, track number, disc number (on multi-disc releases), the
+disc's own title where MusicBrainz gives it one (a box set's "Live at Wembley 1974"), date,
 original date, catalogue number, release country, media, and the MusicBrainz release,
 release-group and artist ids.
 
