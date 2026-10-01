@@ -1,7 +1,7 @@
 /**
- * A tab that isn't built into the app yet, saying so plainly: Search and Requests are on the main
- * page for now, and this is the way there. They arrive in later steps, Requests and then Search;
- * nothing here pretends to be them meanwhile.
+ * A tab that isn't built into the app yet, saying so plainly: Search is on the main page for now,
+ * and this is the way there. It arrives in a later step (Requests did in 2.0.0-player.12); nothing
+ * here pretends to be it meanwhile.
  *
  * The link opens the main page BESIDE the app - a new tab in a browser - so music playing here
  * carries on: followed in the same page it would unload the player, and the queue with it. From

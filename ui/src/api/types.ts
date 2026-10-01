@@ -105,7 +105,29 @@ export interface DownloadJob {
   alternatives_left?: number
   /** Which attempt this is: 1 for the peer first picked, 2 after one retry, and so on. */
   attempt?: number
+
+  /*
+   * For the app's Requests tab (2.0.0-player.12). Optional only because the main page's own
+   * fixtures predate them: deadwax sends every one on every row.
+   */
+  /** The pressing it is for - the cover comes from the Cover Art Archive by it. */
+  release_mbid?: string | null
+  release_group_mbid?: string | null
+  /** The edition set by hand, else MusicBrainz's disambiguation ("2014 vinyl"); null for none. */
+  edition?: string | null
+  /** When its status last changed - "12 minutes ago" on a finished one. ISO 8601, UTC. */
+  updated_at?: string
+  /** How it ended, from the status and deadwax's named messages; null while it's still going. */
+  outcome?: JobOutcome | null
 }
+
+/**
+ * How a download ended (src/poller.py job_outcome). null for one still going, and for one that
+ * finished without filing for another reason - a dry run, organizing off (ORGANIZE_MODE 'off', or
+ * LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set), nothing that could be filed, no track filed -
+ * which its `error` states (and organizing off leaves it none).
+ */
+export type JobOutcome = 'filed' | 'already_there' | 'partly_filed' | 'interrupted' | 'failed'
 
 export interface JobsResponse {
   jobs: DownloadJob[]

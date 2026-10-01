@@ -24,6 +24,18 @@ And for what opens over Now Playing (2.0.0-player.10):
 - A control drawn smaller than a tap target (the album line, a segmented control's half) reaches
   past its own box to 44px - without reaching the scrubber's own target.
 - Gapless is a checkbox: a square box, not a pill.
+
+And for the Requests tab and Home's Arriving (2.0.0-player.12):
+
+- Every control is a tap target to a finger, drawn at the board's size inside it: the ✕ (a 32px
+  box in 44px), Next peer and Ask again (36px, reaching 44 - which nothing may clip), Clear done.
+- Next peer and Ask again stack where a pair wouldn't hold their words whole (a 320px phone).
+- The bar is STYLE.md's thin sunken track with the purple fill.
+- The tab's count is opaque over the icon it sits on - and beside it on a phone on its side,
+  where the label is beside the icon too.
+- A retry button waiting on its retry stays legible; it is aria-disabled, not disabled.
+- A row being cancelled fades its cover, title and bar, never the words saying "cancelling…".
+- An Arriving card's state word gives way before the album's name.
 """
 
 import re
@@ -349,3 +361,106 @@ def test_the_look_button_is_a_tap_target_and_the_time_line_one_line():
     time = declarations(APP, ".app-tt-time")
     assert time["white-space"] == "nowrap" and time["overflow"] == "hidden"
     assert time["font-family"] == "var(--dw-font-mono)"
+
+
+# ------------------------------------------------- the Requests tab and Arriving (2.0.0-player.12)
+
+def test_the_requests_tabs_controls_are_a_tap_target_to_a_finger():
+    cancel = declarations(APP, ".app-job-cancel")
+    assert cancel["width"] == cancel["height"] == "var(--pl-hit)"
+    #? the board's 32px box inside it, the target reaching into the card's padding
+    assert declarations(APP, ".app-job-cancel-face")["width"] == "var(--app-job-cancel-face)"
+    assert ALL_TOKENS["--app-job-cancel-face"] == "32px"
+    assert cancel["margin-right"] == "var(--app-job-cancel-bleed)"
+    assert ALL_TOKENS["--app-job-cancel-bleed"] == "calc((var(--app-job-cancel-face) - var(--pl-hit)) / 2)"
+    #? Next peer and Ask again are drawn 36px, as the board has them, and reach 44 above and below:
+    #? the ::before sits against the button's padding box, inside its border, so the reach is half
+    #? the difference plus that border
+    action = declarations(APP, ".app-job-action")
+    assert action["height"] == "var(--app-job-action)" and action["position"] == "relative"
+    reach = declarations(APP, ".app-job-action::before")
+    assert reach["top"] == reach["bottom"] == "calc(-1 * var(--app-job-action-reach))"
+    assert ALL_TOKENS["--app-job-action-reach"] == "calc((var(--pl-hit) - var(--app-job-action)) / 2 + var(--dw-hairline))"
+    assert action["border"].startswith("var(--dw-hairline) ")
+    assert ALL_TOKENS["--app-job-action"] == "36px"
+    #? ...and nothing clips that reach: the button is its ::before's containing block, so an
+    #? overflow of its own cut the 44px back to 36. The ellipsis is on the label inside it.
+    assert "overflow" not in action and "text-overflow" not in action
+    label = declarations(APP, ".app-job-action-label")
+    assert (label["overflow"], label["text-overflow"], label["white-space"]) == ("hidden", "ellipsis", "nowrap")
+    #? Clear done and See all are text buttons a target tall, with no padding pushing them in
+    assert declarations(APP, ".app-text-button")["min-height"] == "var(--dw-row)"
+    assert declarations(APP, ".app-clear-done")["padding"] == declarations(APP, ".app-see-all")["padding"] == "0"
+    assert declarations(APP, ".app-arriving-card")["width"] == "100%"
+
+
+def test_the_bar_is_styles_thin_sunken_track_with_the_purple_fill():
+    bar = declarations(APP, ".app-bar")
+    assert bar["height"] == "var(--dw-bar)" and ALL_TOKENS["--dw-bar"] == "6px"
+    assert (bar["background"], bar["box-shadow"], bar["border-radius"]) == (
+        "var(--dw-track)", "var(--dw-track-inset)", "var(--dw-radius-track)")
+    fill = declarations(APP, ".app-bar-fill")
+    assert (fill["background"], fill["border-radius"]) == ("var(--dw-bar-purple)", "var(--dw-radius-fill)")
+
+
+def test_the_tabs_count_is_opaque_over_its_icon():
+    badge = declarations(APP, ".app-tab-badge")
+    assert badge["position"] == "absolute" and declarations(APP, ".app-tab-art")["position"] == "relative"
+    #? STYLE.md's translucent purple badge, laid over the tab bar's own colour
+    assert badge["background"] == "linear-gradient(var(--dw-badge-purple-bg), var(--dw-badge-purple-bg)), var(--dw-tab-bar)"
+    assert badge["border-radius"] == "var(--dw-radius-control)"
+
+
+def test_a_retry_button_waiting_on_its_retry_stays_legible():
+    #? its words say what it is doing, so it fades less than player.css's 0.4 for a disabled button -
+    #? and it is aria-disabled, not disabled (a disabled button drops the focus on it), so its rule
+    #? can't hang off :disabled
+    assert declarations(PLAYER_CSS, "button:disabled")["opacity"] == "0.4"
+    assert declarations(APP, ".app-job-action.is-busy")["opacity"] == "var(--app-job-busy)"
+    assert declarations(APP, ".app-job-action.is-busy:disabled") == {}
+    assert float(ALL_TOKENS["--app-job-busy"]) > 0.4
+    #? a pressed look only while the button takes taps
+    assert "filter" in declarations(APP, ".app-job-action.is-primary:active:not([aria-disabled='true'])")
+    #? and the screen's one solid purple button is the primary class alone
+    assert declarations(APP, ".app-job-action.is-primary")["background"] == "var(--dw-primary-bg)"
+    assert declarations(APP, ".app-job-action.is-tinted")["background"] == "var(--dw-toggled-bg)"
+
+
+def test_next_peer_and_ask_again_stack_where_a_pair_wouldnt_hold_their_words():
+    #? at 320px a column was 105px of text, and "Next peer · 2 left" (121px of 15px Noto Sans 600)
+    #? lost its count to the ellipsis; a column narrower than "Next peer · 10 left" whole stacks
+    actions = declarations(APP, ".app-job-actions")
+    assert actions["grid-template-columns"] == "repeat(auto-fit, minmax(min(var(--app-job-action-min), 100%), 1fr))"
+    assert ALL_TOKENS["--app-job-action-min"] == "150px"
+    #? stacked, the two reaches don't overlap
+    assert actions["gap"] == "var(--app-job-actions-row-gap) var(--app-job-gap)"
+    assert ALL_TOKENS["--app-job-actions-row-gap"] == "calc(2 * var(--app-job-action-reach))"
+
+
+def test_a_row_being_cancelled_keeps_its_words_legible():
+    #? the whole card at 0.55 put "cancelling…" (--dw-text-2 on the card) at 2.7:1
+    assert "opacity" not in declarations(APP, ".app-job.is-dimmed")
+    faded = [selector for _context, selector, values in rules(APP) if "is-dimmed" in selector and "opacity" in values]
+    parts = {part.strip() for selector in faded for part in selector.split(",")}
+    assert parts == {".app-job.is-dimmed .app-job-cover", ".app-job.is-dimmed .app-job-title",
+                     ".app-job.is-dimmed .app-bar", ".app-job.is-downloading.is-dimmed .app-job-line"}
+    #? a Waiting card's line, and a Downloading card's data, are where "cancelling…" is said
+
+
+def test_the_tabs_count_goes_beside_the_icon_on_a_phone_on_its_side():
+    #? the label is beside the icon there, and a count over the icon's corner ran over its first letters
+    short = "@media (max-height: 500px)"
+    assert declarations(APP, ".app-tab-badge", short)["position"] == "static"
+    assert declarations(APP, ".app-tab-art", short)["display"] == "flex"
+    assert declarations(APP, ".app-tab-art", short)["gap"] == "var(--app-tab-badge-gap)"
+
+
+def test_an_arriving_cards_state_word_gives_way_before_the_albums_name():
+    brief = declarations(APP, ".app-job-brief")
+    assert brief["flex"] == "0 1 auto" and brief["min-width"] == "0" and brief["text-overflow"] == "ellipsis"
+    assert declarations(APP, ".app-arriving-card .app-job-body")["min-width"] == "var(--app-arriving-body-min)"
+
+
+def test_the_requests_tabs_live_region_is_read_and_not_drawn():
+    hidden = declarations(APP, ".app-visually-hidden")
+    assert (hidden["position"], hidden["overflow"], hidden["clip-path"]) == ("absolute", "hidden", "inset(50%)")

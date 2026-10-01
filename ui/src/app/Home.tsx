@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import { isAbort, latestOnly } from '../lib/latest'
+import type { RequestRow } from '../lib/requestsView'
 import { albumPage, dropPrefetch, prefetchAlbum, type Album, type NavidromeStatus } from '../player/api'
 import { Cover } from '../player/Cover'
+import { Arriving } from './Arriving'
 import { NeedsNavidrome } from './NeedsNavidrome'
 
 /** How many albums the shelf shows. */
@@ -82,28 +84,48 @@ function RecentlyAdded({ onOpen }: { onOpen: (album: Album) => void }) {
 }
 
 /**
- * Home, the first tab: for now, what was added recently. What's arriving, pinned albums and
- * artists, and what hasn't been played in a while come in later steps - none of them is faked
- * meanwhile. The shelf needs Navidrome and is gated on it; the title is drawn whatever Navidrome
- * says.
+ * Home, the first tab: what's arriving - only while something is (2.0.0-player.12) - and what was
+ * added recently. Pinned albums and artists, and what hasn't been played in a while, come in later
+ * steps; none of them is faked meanwhile.
+ *
+ * Arriving is deadwax's, not Navidrome's, so it draws whatever Navidrome says; the shelf needs
+ * Navidrome and is gated on it. The shelf is memoised on what it reads: App re-renders Home as the
+ * downloads move, and that must not re-render twenty tiles each time.
  */
 export function Home({
   status,
   onRetry,
   onOpen,
+  arriving,
+  onSeeAll,
+  arrivingTrouble = false,
 }: {
   status: NavidromeStatus | null
   onRetry: () => void
   onOpen: (album: Album) => void
+  /** the downloads on their way, up to three - none, and there is no Arriving section at all */
+  arriving: readonly RequestRow[]
+  /** "See all", and a tap on an Arriving card: the Requests tab's list, at its root */
+  onSeeAll: () => void
+  /** deadwax didn't answer the last look: Arriving says its cards are the last answer */
+  arrivingTrouble?: boolean
 }) {
+  const shelf = useMemo(
+    () => (
+      <NeedsNavidrome status={status} onRetry={onRetry}>
+        <RecentlyAdded onOpen={onOpen} />
+      </NeedsNavidrome>
+    ),
+    [status, onRetry, onOpen],
+  )
+
   return (
     <section class="app-home">
       <header class="pl-large-header">
         <h1 class="pl-large-title">Home</h1>
       </header>
-      <NeedsNavidrome status={status} onRetry={onRetry}>
-        <RecentlyAdded onOpen={onOpen} />
-      </NeedsNavidrome>
+      <Arriving rows={arriving} onSeeAll={onSeeAll} trouble={arrivingTrouble} />
+      {shelf}
     </section>
   )
 }

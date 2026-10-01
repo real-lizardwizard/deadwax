@@ -386,6 +386,12 @@ class JobStore:
         them (v0.9.24). Fifty jobs used to decode 1.4 MB of JSON a poll, nearly all of it the
         runners-up's file lists; even having SQLite pull out just the usernames cost 3ms, for
         rows that mostly finished long ago. get_job() has the whole row.
+
+        The app's Requests tab (2.0.0-player.12) also wants the release GROUP and the edition a
+        row names ("Dummy · 2014 vinyl"). Both are read out of the stored release by SQLite, as
+        the usernames are - never decoded here: the edition is the one set by hand, else
+        MusicBrainz's disambiguation, a blank being none. A row whose release isn't valid JSON
+        gives neither, rather than failing the whole poll.
         """
         if not self.available:
             return []
@@ -396,6 +402,13 @@ class JobStore:
                     """
                     SELECT id, release_mbid, artist, album, year, username, directory, files_json,
                            status, error, created_at, updated_at, tried_json,
+                           CASE WHEN json_valid(release_json) THEN
+                               json_extract(release_json, '$.release_group_mbid')
+                           END AS release_group_mbid,
+                           CASE WHEN json_valid(release_json) THEN
+                               COALESCE(NULLIF(TRIM(json_extract(release_json, '$.edition_label')), ''),
+                                        NULLIF(TRIM(json_extract(release_json, '$.disambiguation')), ''))
+                           END AS edition,
                            CASE WHEN status IN ({retryable}) THEN
                                (SELECT json_group_array(json_object('username', json_extract(value, '$.username')))
                                   FROM json_each(alternatives_json))

@@ -184,6 +184,62 @@ otherwise slskd keeps it, which is its normal behaviour.
 
 **Clear finished** removes finished, failed and cancelled downloads from the list.
 
+## On the phone: the Requests tab
+
+[The phone app](player.md) at `/player/` shows the same downloads in its **Requests** tab, with
+the same buttons. Starting a download is still on the main page for now; watching it, and dealing
+with one that failed, works from the phone.
+
+- **Downloading**: the album, who it's coming from, a progress bar and files done out of files
+  wanted with the live speed ("6 of 10 files · 1.8 MB/s"). **✕** cancels it. It asks first, in
+  the card itself - "Cancel this download? You'll lose your place in this peer's queue.", with
+  **Keep it** and **Cancel download** (tap the ✕ again to close the question) - unless **Confirm
+  before cancelling** is off on that device; the home-screen app keeps its own storage and always
+  asks. It never puts up a pop-up dialog, which would hold up the music playing in the same app.
+  Once you cancel, the row reads "cancelling…" at once, its cover and title faded. A download
+  being filed into your library reads "organizing", with nothing left to cancel.
+- **Waiting**: queued in the user's queue, with its place there when slskd says ("#4 in their
+  queue"), or "starting" before it does, with a **✕** too. If the user has already refused some of
+  its files while the rest wait, it says so in amber ("#4 in their queue · 3 failed"): those files
+  won't come, and the download will end as failed unless you move it to another user.
+- **Needs attention**: a failed or cancelled download, with why in red. **Next peer · 2 left** moves
+  it to the next user from the list it was picked from, and **Ask again** asks the same user for
+  the files that didn't arrive - the main page's **↻ next peer** and **↻ retry**, below
+  [When a download fails](#when-a-download-fails). While one runs the button says so ("Trying next
+  peer…", "Asking again…") and both wait, and if nobody would take it, why is shown under the
+  reason. A download moved to another user says "try 2", "try 3" and so on. On a narrow phone the
+  two buttons stack, so neither loses its words.
+- **Done**: how it ended, and how long ago ("In your library · 12 minutes ago"). The other endings:
+  **Already in your library, nothing filed** (every track was already in the album's folder; the
+  download itself is still in slskd's folder), **Partly filed** (some files couldn't be written into
+  the library and some tracks were; see
+  [troubleshooting](troubleshooting.md#a-download-says-n-files-failed-to-organize)), **Interrupted
+  while filing** (deadwax stopped part-way; see
+  [troubleshooting](troubleshooting.md#a-download-says-deadwax-stopped-while-filing-this)), **Not
+  filed** with the reason (organizing in dry run, say, or "no track was filed"), and **Downloaded,
+  not filed** when organizing is off - `ORGANIZE_MODE` set to `off`, or `LIBRARY_PATH` or
+  `SLSKD_DOWNLOAD_PATH` not set (Settings → Library names which; see
+  [troubleshooting](troubleshooting.md#downloads-finish-but-nothing-appears-in-my-library)).
+- **Clear done**, at the top, does what **Clear finished** does: it removes every finished, failed
+  and cancelled download, the ones under Needs attention included.
+
+Each album shows its cover from the Cover Art Archive (the pressing's front cover), or a plain
+square when there's none, or no internet to fetch it from.
+
+Once albums can be got in the app itself (a later step), a download asked for there will show from
+the tap, under Waiting as "asking slskd…" until slskd answers, or under Needs attention in slskd's
+own words if it refuses - as the main page's Downloads panel shows one asked for on the main page.
+
+The **Requests** tab carries a count of the downloads on their way, and **Home** shows up to three of
+them under **Arriving**, above Recently added, with **See all** (or a tap on one) going to the list
+on Requests - even if you'd left an album open on that tab. When nothing is on its way, Home has no
+Arriving section at all. The app looks at the downloads every half second while Requests is open,
+keeps looking every few seconds while anything is on its way, and otherwise stops; it looks again
+whenever Home comes into view and whenever you come back to the app, so a download started on the
+main page shows up without anything left running. If deadwax stops answering while something is on
+its way (restarting, or the phone off your network for a moment), the app keeps asking every half
+second until it answers, and Arriving says that what it shows is deadwax's last answer.
+
 ## The event log
 
 The **Log** button shows what's happening behind the scenes: searches, how many answers came

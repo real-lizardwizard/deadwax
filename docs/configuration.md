@@ -145,7 +145,7 @@ These are stored in your browser, so each browser and device has its own. They'r
 | --- | --- | --- |
 | Format | Prefer lossless | **Any format**: format doesn't count. **Prefer lossless**: FLAC and other lossless formats score higher, MP3 still eligible. **Lossless only**: lossy candidates are left out. |
 | Auto-grab best match | off | on a new **Find**, download the top candidate straight away if it scores 75 or more. The panel says it did. It never happens on a re-search. |
-| Ask before cancelling | on | a confirmation before a download is cancelled. Cancelling loses your place in the peer's queue. |
+| Confirm before cancelling | on | a confirmation before a download is cancelled, by the Downloads panel's ✕ and, in the same browser, the phone app's ✕ in its Requests tab. Cancelling loses your place in the peer's queue. |
 | Candidate filters | all off | what the candidates panel starts with: a minimum score, free slot only, complete albums only, a minimum bitrate and bit depth, and the sort. |
 
 **Interface**
@@ -166,3 +166,7 @@ itself. None of them is on the main page's Settings tab.
 | Gapless | off | **You** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback-experimental). A checkbox; until 2.0.0-player.10 it was a switch on the now-playing screen, and it keeps the setting it had there. |
 | Now Playing opens as | Cover | **You** → Playback | whether the now-playing screen opens as the cover or as [the turntable](player.md#the-turntable). The button at the screen's top right switches between them for as long as it's open, without changing this. |
 | Library order | Recently added | **Library**, above the grid | Recently added, Recently played, Artist or Title |
+
+The Requests tab's **✕** asks before cancelling, by **Confirm before cancelling** above - in the
+card itself (**Keep it** or **Cancel download**), never as a pop-up, which would hold up the music.
+A home-screen app keeps its own storage and has no Settings tab, so there it always asks.

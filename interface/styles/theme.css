@@ -568,6 +568,11 @@
     --dw-green-icon:   #34d399;
     --dw-amber-icon:   #fbbf24;
     --dw-danger-text:  #fca5a5;   /* the boards' failure text; not in STYLE.md's palette */
+    --dw-amber-text:   #fcd34d;   /* a warning's words: STYLE.md's amber badge text */
+
+    /* --- badges: STYLE.md's purple one (the Requests tab's count, 2.0.0-player.12) --- */
+    --dw-badge-purple-bg:     rgba(168, 85, 247, 0.16);
+    --dw-badge-purple-border: rgba(192, 132, 252, 0.4);
 
     /* --- buttons ------------------------------------------------------ */
     --dw-primary-bg:          linear-gradient(to bottom, #a24ef2 0%, #8a2ee0 100%);
@@ -583,6 +588,7 @@
     /* --- bars --------------------------------------------------------- */
     --dw-bar-grey:   linear-gradient(to bottom, #c8c8d4, #9a9aa8);
     --dw-bar-purple: linear-gradient(to bottom, #b56af5, #9333ea);
+    --dw-bar:        6px;   /* a progress bar's thin sunken track, as the Requests board draws it */
 
     /* --- shape -------------------------------------------------------- */
     --dw-radius-sheet:   8px;   /* a phone sheet's top corners */
@@ -591,6 +597,7 @@
     --dw-radius-tag:     3px;   /* small tags */
     --dw-radius-cover:   3px;   /* album covers and artwork */
     --dw-radius-track:   2px;   /* a bar's sunken track */
+    --dw-radius-fill:    1px;   /* the fill inside it */
     --dw-radius-round:   50%;   /* things meant to be round: avatars, dots, a scrubber's thumb */
 
     /* --- depth: nothing bigger than 0 1px 2px ------------------------- */

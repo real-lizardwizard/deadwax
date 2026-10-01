@@ -106,6 +106,13 @@ export interface Router {
   back(): void
   /** a tap on a tab; 'scroll-to-top' is the caller's to do */
   tab(tab: Tab): TabAction
+  /**
+   * A link to a tab's ROOT from another tab (Home's Arriving: "See all" and its cards go to the
+   * list of downloads), whatever page was left on top of it - Go to album can leave an album on
+   * the Requests tab. Two taps on the tab, as one: the switch, then back to its root, so the
+   * history is what tapping it twice would make.
+   */
+  root(tab: Tab): void
   /** the browser moved by itself - popstate and hashchange both call this; one move is taken once */
   moved(): void
 }
@@ -154,6 +161,14 @@ export function createRouter(host: RouterHost): Router {
     change(next, address)
   }
 
+  /** A tap on a tab: show it as it was left, or back to its root when it is showing. */
+  function choose(tab: Tab): TabAction {
+    const { nav: next, action } = selectTab(nav, tab)
+    if (action === 'switch') commit(next, 'replace')
+    else if (action === 'pop-to-root') goDown(next, addressesBelow(nav))
+    return action
+  }
+
   return {
     get nav() {
       return nav
@@ -183,10 +198,11 @@ export function createRouter(host: RouterHost): Router {
     },
 
     tab(tab) {
-      const { nav: next, action } = selectTab(nav, tab)
-      if (action === 'switch') commit(next, 'replace')
-      else if (action === 'pop-to-root') goDown(next, addressesBelow(nav))
-      return action
+      return choose(tab)
+    },
+
+    root(tab) {
+      if (choose(tab) === 'switch' && nav.stacks[tab].length) choose(tab)
     },
 
     moved() {

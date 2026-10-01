@@ -32,6 +32,15 @@
  *    go or a key steps, never on the way. Its record and arm are OUTSIDE Now Playing's grip, so
  *    neither starts the sheet's drag; the look is chosen in Now Playing, below App, and App keeps
  *    only the setting; the time line takes the bar's place at one fixed height.
+ *  - The downloads are watched ONCE, in App (2.0.0-player.12): useDownloadJobs is called there and
+ *    in no other file of the app, polling fast only while the Requests tab's root shows (watchingOf)
+ *    or a failed look left something arriving (stallsOn), so the tab, Home's Arriving and the badge
+ *    are one poll; App takes this page's download requests, and asks again as Home comes into view
+ *    or the app comes back - never on a timer of its own.
+ *  - No blocking dialog anywhere in the app (confirm, alert, prompt): it holds the page's
+ *    JavaScript, and this page plays the music - the next song would wait for it.
+ *  - Each tab's top page is memoised on what AlbumPage reads of the player, and AlbumPage reads no
+ *    more than that, so a poll of the downloads never re-renders an album page.
  *  - App moves the browser's history only through lib/appHistory.ts's router, which the routes
  *    sim drives end to end.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
@@ -187,6 +196,48 @@ console.log('\nnothing outside app/ and player/ can reach the player')
   const reaching = files.filter((file) => !APP_SIDE(file)).filter((file) =>
     /from\s+['"][^'"]*(player\/usePlayer|app\/context|app\/App)['"]/.test(code(read(file))))
   check('no import of usePlayer, the contexts or App', reaching, [])
+}
+
+console.log('\nthe downloads are watched once, in App')
+{
+  const calls = files.filter(APP_SIDE).flatMap((file) => {
+    const count = (code(read(file)).match(/\buseDownloadJobs\(/g) ?? []).length
+    return count ? [[file, count]] : []
+  })
+  check('useDownloadJobs( only in App, and once there', calls, [['app/App.tsx', 1]])
+  const app = code(read('app/App.tsx'))
+  check('...fast only while the Requests tab\'s root shows, or a failed look left something arriving; and taking this page\'s download requests',
+    [/useDownloadJobs\(watching === 'requests' \|\| stalled\)/.test(app), /useEffect\(\(\) => handleDownloadRequests\(enqueue\), \[enqueue\]\)/.test(app)], [true, true])
+  check('...what it watches worked out by watchingOf, from the tab, its stack, Now Playing and the page being shown',
+    /const watching = watchingOf\(\{ shown: pageShown, tab: nav\.tab, depth: nav\.stacks\[nav\.tab\]\.length, sheetOpen \}\)/.test(app), true)
+  check('...a failed look keeps it asking while something is arriving (stallsOn), turned off by the next answer',
+    [/const stalls = stallsOn\(watching, downloadsError, view\.arriving\.length\)/.test(app), /useEffect\(\(\) => setStalled\(stalls\), \[stalls\]\)/.test(app)], [true, true])
+  check('...asked again as Home comes into view or the app comes back - the last look moved on each time - never on a timer of its own',
+    [/const before = watched\.current\s*watched\.current = watching\s*if \(asksAgain\(before, watching\)\) refresh\(\)/.test(app), /setInterval|setTimeout/.test(app)], [true, false])
+  check('...and Requests told when deadwax has first answered, so it never says "nothing" before it knows',
+    /answered=\{answered\.current\}/.test(app), true)
+}
+
+console.log('\nno blocking dialog in the app')
+{
+  //? confirm(), alert() and prompt() hold the page's JavaScript until answered, and this page plays
+  //? the music: a song ending under one waits for it, and a stream stops being fed
+  const dialogs = files.filter(APP_SIDE).flatMap((file) =>
+    [...code(read(file)).matchAll(/(?<![\w.])(?:window\.)?(confirm|alert|prompt)\s*\(/g)].map((match) => `${file}: ${match[1]}`))
+  check('none of confirm(), alert() or prompt() in app/ or player/', dialogs, [])
+  check('...found where it is (the check sees one)', [...code('if (!window.confirm(x)) return').matchAll(/(?<![\w.])(?:window\.)?(confirm|alert|prompt)\s*\(/g)].length, 1)
+}
+
+console.log('\nan album page is memoised on what it reads of the player')
+{
+  const app = code(read('app/App.tsx'))
+  //? usePlayer returns a new object on every render, so a memo keyed on `player` held for no poll
+  check('the pages are memoised on the playing song and whether it plays - never the whole player',
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+  const page = code(read('player/AlbumPage.tsx'))
+  check('...which is all an album page reads of it (read more there, and key the memo on it too)',
+    [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
+  check('...the playing song only by its id', [...page.matchAll(/\bplayer\.track\b(\?\.\w+)?/g)].map((match) => match[1]), ['?.id'])
 }
 
 console.log('\nnothing in app/ touches audio itself')

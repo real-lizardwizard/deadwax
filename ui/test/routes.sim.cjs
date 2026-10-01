@@ -361,6 +361,30 @@ console.log('\nend to end: another tab\'s entry, gone back onto')
   check('Home: A then B; the Library; back lands on A\'s entry - Home keeps B on top', [where(b), b.entries[b.index].hash], [['home', ['home:A+B']], '#/home/album/B'])
 }
 
+console.log('\nend to end: a link to a tab\'s root (Home\'s Arriving, "See all")')
+{
+  const b = makeBrowser('#/requests')
+  b.load()
+  //? Go to album from Now Playing, on the Requests tab, leaves an album on it
+  b.router.open(album('A', 'Dummy'))
+  b.router.tab('home')
+  b.router.root('requests')
+  b.settle()
+  check('See all from Home: the list of downloads, not the album left on the Requests tab', where(b), ['requests', []])
+  check('...as tapping the tab twice leaves the history: its root, the album ahead of it', [b.entries[b.index].hash, b.index, b.hashes()],
+    ['#/requests', 0, ['#/requests', '#/requests/album/A']])
+}
+{
+  const b = makeBrowser('#/home')
+  b.load()
+  b.router.root('requests')
+  b.settle()
+  check('with nothing on it, only the switch: one entry, replaced', [where(b), b.hashes()], [['requests', []], ['#/requests']])
+  b.router.root('requests')
+  b.settle()
+  check('...and asked again there, nothing moves', [where(b), b.hashes()], [['requests', []], ['#/requests']])
+}
+
 console.log('\nend to end: within a tab, back and forward follow the entries')
 {
   const b = makeBrowser('#/library')

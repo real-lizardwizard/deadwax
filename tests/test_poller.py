@@ -408,7 +408,11 @@ def test_a_folder_left_holding_only_a_cover_is_not_enrolled(tmp_path, monkeypatc
     asyncio.run(poll_downloads_once(FakeSlskd(_all_done()), store, {}))
 
     job = next(j for j in asyncio.run(store.list_jobs()) if j["id"] == job_id)
-    assert (job["status"], job["error"]) == ("complete", "2 file(s) failed to organize")
+    #? and its row says no track was filed (2.0.0-player.12), so the app's Requests tab doesn't call
+    #? a folder holding only a cover "partly filed" - `organized` counts the cover, the tracks don't
+    assert (job["status"], job["error"]) == ("complete", "2 file(s) failed to organize, no track was filed")
+    from src.poller import job_outcome
+    assert job_outcome(job["status"], job["error"]) is None
     album = tmp_path / "music" / "Boards of Canada" / "Music Has the Right to Children (1998)"
     assert [p.name for p in album.iterdir()] == ["cover.jpg"]
 

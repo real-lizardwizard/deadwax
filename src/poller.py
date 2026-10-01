@@ -164,6 +164,21 @@ async def _settle_peer_speed(
         logger.debug(f"could not record the speed measured from {job['username']}: {e}")
 
 
+#? What a filed download's row says when it didn't file cleanly - NAMED, so the Requests tab's
+#? `outcome` (job_outcome, below) is read from them and never parsed out of free text
+#? (2.0.0-player.12). Each is part of a message written here; changing one changes the outcome.
+#? Every track was already in the album folder: "already in the store: all 10 track(s) ..."
+ALREADY_THERE = "already in the store"
+#? Some files didn't file: "2 file(s) failed to organize" - and the rest did
+FAILED_TO_ORGANIZE = "file(s) failed to organize"
+#? ...said after it when no TRACK landed, so a download whose music never reached the library
+#? doesn't read as partly filed - a cover alone makes a folder, never an album (the poller
+#? enrols nothing for one either). True whether a cover landed or nothing did.
+NO_TRACK_FILED = "no track was filed"
+#? the end of the all-duplicates and all-skipped messages
+NOTHING_FILED = "nothing was filed"
+
+
 async def _organize_if_enabled(job: dict, store) -> None:
     """
     Hand a finished download to the organizer.
@@ -218,9 +233,14 @@ async def _organize_if_enabled(job: dict, store) -> None:
             await store.update_status(job["id"], "complete", "dry run - not organized")
 
         elif results["failed"]:
-            await store.update_status(
-                job["id"], "complete", f"{results['failed']} file(s) failed to organize"
-            )
+            #? `organized` counts whatever landed, a cover included, so it is the TRACKS that say
+            #? whether any of the album is in the library - the test the enrolment above makes.
+            #? With none, the row says so rather than letting it read as partly filed. (A result
+            #? without the count is taken as all audio: execute_plan always gives it.)
+            message = f"{results['failed']} {FAILED_TO_ORGANIZE}"
+            if not results.get("tracks_organized", results["organized"]):
+                message = f"{message}, {NO_TRACK_FILED}"
+            await store.update_status(job["id"], "complete", message)
 
         elif not results["organized"] and not results.get("skipped"):
             #? nothing was placed and nothing was already there - usually the download path
@@ -240,10 +260,10 @@ async def _organize_if_enabled(job: dict, store) -> None:
                 #? every track was already in that album folder, perhaps in another format - the
                 #? organizer wouldn't file a second copy beside the first (v1.0.1). Counted from
                 #? the duplicates, not everything skipped: a cover.jpg already there is skipped too
-                message = (f"already in the store: all {results['duplicates']} track(s) were already "
-                           f"there, nothing was filed")
+                message = (f"{ALREADY_THERE}: all {results['duplicates']} track(s) were already "
+                           f"there, {NOTHING_FILED}")
             else:
-                message = f"all {results['skipped']} file(s) already existed, nothing was filed"
+                message = f"all {results['skipped']} file(s) already existed, {NOTHING_FILED}"
             await store.update_status(job["id"], "complete", message)
 
         else:
@@ -649,6 +669,40 @@ async def tidy_cancelled_on_start(slskd_client, store) -> int:
 
 #? what the row of a download a stop caught mid-filing says, instead of "organizing" for ever
 INTERRUPTED_FILING = "deadwax stopped while filing this - check the library and slskd's folder"
+
+
+def job_outcome(status: str | None, error: str | None) -> str | None:
+    """
+    How a download ended, for the app's Requests tab (2.0.0-player.12), from its status and the
+    named messages this module writes - never parsed out of free text:
+
+    - `filed`: organized - filed into the library, nothing failing (a dry run ends `complete`).
+    - `already_there`: every track was already in the album folder, so nothing new was filed
+      (ALREADY_THERE). The download itself did happen: its files are still in slskd's folder.
+    - `partly_filed`: some files failed to file and some tracks landed (FAILED_TO_ORGANIZE, with
+      nothing after it - NO_TRACK_FILED after it is a filing none of whose music landed). A row
+      written before NO_TRACK_FILED existed, where nothing at all landed, can't be told apart and
+      reads as partly filed.
+    - `interrupted`: deadwax stopped while filing it (INTERRUPTED_FILING).
+    - `failed`: failed or cancelled - the two "try the next peer" and "ask again" can restart.
+    - None while it is still going (queued, downloading, organizing), and for a download that
+      finished without filing for another reason its row states: a dry run, organizing off (or
+      no library or slskd folder set), nothing that could be filed, filing that raised, or no
+      track filing.
+    """
+    if status == "organized":
+        return "filed"
+    if status in RETRYABLE_STATUSES:
+        return "failed"
+    if status != "complete" or not error:
+        return None
+    if error == INTERRUPTED_FILING:
+        return "interrupted"
+    if error.startswith(f"{ALREADY_THERE}:"):
+        return "already_there"
+    if error.endswith(f" {FAILED_TO_ORGANIZE}"):
+        return "partly_filed"
+    return None
 
 
 async def settle_interrupted_filing(store) -> int:

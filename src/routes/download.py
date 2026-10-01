@@ -10,8 +10,8 @@ from src.config import Config, search_timeout_seconds
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
-from src.poller import (retry_next_peer, retry_same_peer, tidy_cancelled_later, tidy_cancelled_transfers,
-                        untried_alternatives)
+from src.poller import (job_outcome, retry_next_peer, retry_same_peer, tidy_cancelled_later,
+                        tidy_cancelled_transfers, untried_alternatives)
 from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
 from src.store_index import (already_have, describe_job, filing_folder, held_copy, in_flight,
@@ -627,6 +627,14 @@ async def jobs(request: Request):
                 "status": job["status"],
                 "error": job["error"],
                 "created_at": job["created_at"],
+                #? for the app's Requests tab (2.0.0-player.12): the cover and the "12 minutes ago"
+                #? (list_jobs reads them, the group and edition by SQLite out of the stored release)
+                "updated_at": job.get("updated_at"),
+                "release_mbid": job.get("release_mbid"),
+                "release_group_mbid": job.get("release_group_mbid"),
+                "edition": job.get("edition"),
+                #? how it ended, from the status and poller.py's named messages - None while going
+                "outcome": job_outcome(job["status"], job["error"]),
                 "queue_position": queue_position,
                 **summary,
                 #? how many other peers "try next peer" could still move it to - only where it can

@@ -2,7 +2,8 @@
   The app's own chrome at /player/ (2.0.0-player.9): the tab bar, the mini player's new place above
   it, Home's shelf, You's grouped lists, and the Navidrome gate and the placeholders drawn inside
   tabs - and, since 2.0.0-player.10, what opens over Now Playing (its ••• menu and Info) and You's
-  Gapless checkbox; since 2.0.0-player.11, Now Playing's look button and the turntable. Loaded
+  Gapless checkbox; since 2.0.0-player.11, Now Playing's look button and the turntable; since
+  2.0.0-player.12, the Requests tab, Home's Arriving and the Requests tab's badge. Loaded
   after player.css, which draws the player itself (the library grid, the
   album page, the mini player and Now Playing) and whose mechanics - safe areas, edges, tap targets
   - these rules build on.
@@ -73,6 +74,36 @@
                                         too small for a tap target (a phone on its side) it must
                                         not cover the record, whose taps it would take */
     --app-tt-time-gap: 6px;          /* the album line to the time line */
+    /* the Requests tab and Home's Arriving (2.0.0-player.12), as their boards draw them */
+    --app-requests-gap: 18px;        /* between the Requests tab's sections */
+    --app-job-gap: 8px;              /* a heading to its cards, and card to card */
+    --app-job-pad: 12px;             /* inside a card */
+    --app-job-pad-short: 10px;       /* ...above and below a Waiting card's one line */
+    --app-job-inner: 12px;           /* a cover to its words */
+    --app-job-lines: 4px;            /* between a Downloading card's lines */
+    --app-job-cover: 44px;
+    --app-job-cover-large: 52px;     /* a Downloading card's */
+    --app-job-cancel-face: 32px;     /* the ✕'s drawn box, in a tap target */
+    --app-job-cancel-bleed: calc((var(--app-job-cancel-face) - var(--pl-hit)) / 2);
+    --app-job-cancel-icon: 14px;
+    --app-job-action: 36px;          /* Next peer and Ask again, as the board draws them... */
+    /* ...44px to a finger: the reach starts at the button's padding box, inside its border */
+    --app-job-action-reach: calc((var(--pl-hit) - var(--app-job-action)) / 2 + var(--dw-hairline));
+    --app-job-action-min: 150px;     /* narrower than this, the pair stack: "Next peer · 10 left" whole */
+    --app-job-actions-row-gap: calc(2 * var(--app-job-action-reach));  /* stacked, the reaches don't overlap */
+    --app-job-attention-gap: 10px;   /* a Needs attention card's words to its buttons */
+    --app-job-dimmed: 0.55;          /* a download being cancelled, until the server agrees: its cover, title
+                                        and bar - never the words saying "cancelling…" */
+    --app-job-busy: 0.75;            /* a button waiting on its retry: faded, and still legible */
+    --app-done-row: 56px;
+    --app-arriving-pad-y: 9px;       /* an Arriving card, as the Home board has it */
+    --app-arriving-pad-x: 11px;
+    --app-arriving-body-min: 96px;   /* the album's name keeps this much; the state word gives way first */
+    --app-tab-badge: 16px;           /* the Requests tab's count */
+    --app-tab-badge-pad: 4px;
+    --app-tab-badge-top: -5px;       /* over the icon's top right corner */
+    --app-tab-badge-left: 14px;
+    --app-tab-badge-gap: 2px;        /* a phone on its side: the count beside the icon, in the row */
 }
 
 /* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
@@ -1032,5 +1063,350 @@ html.app-info-open { overflow: hidden; }
     line-height: var(--dw-leading-note);
     text-align: center;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ===== the Requests tab's badge (2.0.0-player.12) ===== */
+
+/* The count sits over the icon's corner, so the icon is its frame. STYLE.md's purple badge laid over
+   the tab bar's own colour, so it is opaque and no stroke of the icon shows through it. */
+.app-tab-art { position: relative; display: grid; place-items: center; }
+
+.app-tab-badge {
+    position: absolute;
+    top: var(--app-tab-badge-top);
+    left: var(--app-tab-badge-left);
+    display: grid;
+    place-items: center;
+    min-width: var(--app-tab-badge);
+    height: var(--app-tab-badge);
+    padding: 0 var(--app-tab-badge-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-purple-border);
+    border-radius: var(--dw-radius-control);
+    background: linear-gradient(var(--dw-badge-purple-bg), var(--dw-badge-purple-bg)), var(--dw-tab-bar);
+    color: var(--dw-accent-text);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-tab);
+    font-weight: var(--dw-weight-bold);
+}
+
+/* A phone on its side: the label sits beside the icon, so a count over the icon's corner ran over
+   the label's first letters ("12" covered the top of the R). The count goes into the row instead,
+   between the icon and the label, where no count of any length can reach the label. */
+@media (max-height: 500px) {
+    .app-tab-art { display: flex; align-items: center; gap: var(--app-tab-badge-gap); }
+    .app-tab-badge { position: static; }
+}
+
+/* ===== the Requests tab, and Home's Arriving (2.0.0-player.12) ===== */
+
+/* "Clear done", at the title's right end in the board's 17px; its tap target is its own height */
+.app-clear-done { padding: 0; font-size: var(--dw-text-body); }
+
+.app-requests-section {
+    margin-top: var(--app-requests-gap);
+    padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left);
+}
+
+.app-requests-section .app-section-title { margin-bottom: var(--app-job-gap); }
+
+.app-jobs,
+.app-done-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-jobs { gap: var(--app-job-gap); }
+.app-done-list > li + li { border-top: var(--dw-hairline) solid var(--dw-border); }
+
+/* a card: a cover, its words, and a ✕ at the end */
+.app-job {
+    display: flex;
+    align-items: center;
+    gap: var(--app-job-inner);
+    padding: var(--app-job-pad-short) var(--app-job-pad);
+}
+
+.app-job.is-downloading,
+.app-job.is-attention { padding: var(--app-job-pad); }
+
+/* faded until the server agrees - the cover, the title, the bar and who it's from, never the words
+   saying "cancelling…", which are the one thing on the card that says what is happening */
+.app-job.is-dimmed .app-job-cover,
+.app-job.is-dimmed .app-job-title,
+.app-job.is-dimmed .app-bar,
+.app-job.is-downloading.is-dimmed .app-job-line { opacity: var(--app-job-dimmed); }
+
+/* asking "cancel it?": the question takes a line of its own under the card's words */
+.app-job.is-asking { flex-wrap: wrap; }
+
+/* Needs attention: the words, then the two buttons under them */
+.app-job.is-attention { flex-direction: column; align-items: stretch; gap: var(--app-job-attention-gap); }
+.app-job-top { display: flex; align-items: center; gap: var(--app-job-inner); }
+
+.app-job-cover {
+    display: block;
+    flex: none;
+    width: var(--app-job-cover);
+    height: var(--app-job-cover);
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+    object-fit: cover;
+}
+
+.app-job-cover.is-large { width: var(--app-job-cover-large); height: var(--app-job-cover-large); }
+
+/* the plain tile: a near-black square with the board's edge, never a broken image */
+.app-job-cover.is-empty { border: var(--dw-hairline) solid var(--dw-border-cover); }
+
+.app-job-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--app-line-gap);
+    min-width: 0;
+}
+
+.app-job.is-downloading .app-job-body,
+.app-arriving-card .app-job-body { gap: var(--app-job-lines); }
+
+.app-job-title {
+    overflow: hidden;
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-heading);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-job-line,
+.app-job-reason {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-job-line.is-warning { color: var(--dw-amber-text); }
+.app-job-line.is-danger,
+.app-job-reason { color: var(--dw-danger-text); }
+
+/* the data: "6 of 10 files · 1.8 MB/s", and an Arriving card's "6 of 10" */
+.app-job-data,
+.app-job-brief {
+    color: var(--dw-text-2);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-footnote);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--dw-leading-note);
+}
+
+/* an Arriving card's state word gives way before the album's name does */
+.app-job-brief { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-arriving-card .app-job-body { min-width: var(--app-arriving-body-min); }
+
+/* STYLE.md's thin sunken track, and the purple fill */
+.app-bar {
+    display: flex;
+    height: var(--dw-bar);
+    overflow: hidden;
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-track);
+    background: var(--dw-track);
+    box-shadow: var(--dw-track-inset);
+}
+
+.app-bar-fill {
+    display: block;
+    border-radius: var(--dw-radius-fill);
+    background: var(--dw-bar-purple);
+    transition: width var(--dw-duration) var(--dw-ease);
+}
+
+/* ✕: a tap target tall, the board's 32px secondary box inside it, at the card's padding from its
+   edge as the board places it (the target reaches into the padding) */
+.app-job-cancel {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    margin-right: var(--app-job-cancel-bleed);
+    color: var(--dw-text-on-secondary);
+}
+
+.app-job-cancel-face {
+    display: grid;
+    place-items: center;
+    width: var(--app-job-cancel-face);
+    height: var(--app-job-cancel-face);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+}
+
+.app-job-cancel:active:not([aria-disabled='true']) .app-job-cancel-face { background: var(--dw-secondary-bg-active); }
+
+/* its cancel on the way: faded, still in the tab order (aria-disabled, the tap refused) */
+.app-job-cancel[aria-disabled='true'] { opacity: var(--app-job-dimmed); }
+.app-job-cancel-icon { width: var(--app-job-cancel-icon); height: var(--app-job-cancel-icon); }
+
+.app-job-cancel:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+/* Next peer and Ask again, side by side - stacked when a pair wouldn't hold "Next peer · 10 left"
+   whole (a 320px phone) - and one alone takes the width */
+.app-job-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--app-job-action-min), 100%), 1fr));
+    gap: var(--app-job-actions-row-gap) var(--app-job-gap);
+}
+
+.app-job-actions.is-single { grid-template-columns: minmax(0, 1fr); }
+
+/* No overflow of its own: clipping the button would clip its reach (::before) too. The label is a
+   span inside, and the ellipsis is on that. */
+.app-job-action {
+    position: relative;
+    height: var(--app-job-action);
+    padding: 0 var(--app-job-gap);
+    border: var(--dw-hairline) solid transparent;
+    border-radius: var(--dw-radius-control);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-job-action-label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* drawn 36px, as the board has them; a finger gets 44 */
+.app-job-action::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--app-job-action-reach));
+    right: 0;
+    bottom: calc(-1 * var(--app-job-action-reach));
+    left: 0;
+}
+
+/* the screen's ONE solid purple button: the first Next peer */
+.app-job-action.is-primary {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+}
+
+.app-job-action.is-primary:active:not([aria-disabled='true']) { filter: var(--dw-primary-pressed); }
+
+/* any other Next peer: tinted, so the primary stays one */
+.app-job-action.is-tinted {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    color: var(--dw-accent-text);
+}
+
+.app-job-action.is-secondary {
+    border-color: var(--dw-secondary-border);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+}
+
+.app-job-action.is-secondary:active:not([aria-disabled='true']) { background: var(--dw-secondary-bg-active); }
+
+/* "Cancel download", in the card's question: secondary, its words in the failure red */
+.app-job-action.is-danger { color: var(--dw-danger-text); }
+
+/* waiting on its retry (aria-disabled, so focus stays on it): the words say what it's doing, so
+   they stay legible */
+.app-job-action.is-busy { opacity: var(--app-job-busy); }
+
+/* the card's question: what a cancel costs, and the two answers */
+.app-job-confirm {
+    display: flex;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: var(--app-job-attention-gap);
+}
+
+.app-job-confirm-text {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-job-action:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+/* Done: plain rows with a line between, the board's 56px */
+.app-done-row {
+    display: flex;
+    align-items: center;
+    gap: var(--app-job-inner);
+    min-height: var(--app-done-row);
+}
+
+/* --- Home's Arriving --- */
+
+.app-arriving { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+
+/* deadwax didn't answer the last look: the cards are its last answer, and say so */
+.app-arriving-note {
+    margin: 0 0 var(--app-job-gap);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+/* "See all" at the heading's right end, a tap target tall - and so is the heading's row, which
+   leaves about the board's 12px between the heading's words and the first card */
+.app-see-all { padding: 0; }
+
+/* a whole card goes to Requests */
+.app-arriving-card {
+    width: 100%;
+    padding: var(--app-arriving-pad-y) var(--app-arriving-pad-x);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+.app-arriving-card:active { background: linear-gradient(var(--dw-pressed), var(--dw-pressed)), var(--dw-card); }
+.app-arriving-card .app-job-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.app-arriving-card:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-card);
+}
+
+/* A card focus moved to (it went to another heading): the ring round the whole card */
+.app-jobs > li:focus-visible,
+.app-done-list > li:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-card);
+}
+
+/* read out, never drawn: the Requests tab's live region */
+.app-visually-hidden {
+    position: absolute;
+    width: var(--dw-hairline);
+    height: var(--dw-hairline);
+    overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
 }

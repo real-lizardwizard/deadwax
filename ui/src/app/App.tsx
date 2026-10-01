@@ -1,8 +1,11 @@
 import type { JSX } from 'preact'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
+import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { TAB_LABELS, TABS, backLabel, currentRoute, formatRoute, type Nav, type Page, type Tab } from '../lib/appRoutes'
+import { handleDownloadRequests } from '../lib/downloadRequests'
+import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import type { Look } from '../lib/turntable'
 import { AlbumPage } from '../player/AlbumPage'
 import { navidromeStatus, playedAlbum, sentFormat, type Album, type NavidromeStatus } from '../player/api'
@@ -17,6 +20,7 @@ import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { Placeholder } from './Placeholder'
+import { Requests } from './Requests'
 import { TabBar } from './TabBar'
 import { takeOpener } from './useSheet'
 import { You } from './You'
@@ -34,6 +38,20 @@ function sessionStore(): StorageLike | null {
 }
 
 const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
+
+/** Nothing arriving: one array for every render, so Home's element holds still while it stays so. */
+const NOTHING_ARRIVING: readonly RequestRow[] = []
+
+/** Whether the page is showing: false on a locked phone, or with the app in the background. */
+function usePageShown(): boolean {
+  const [shown, setShown] = useState(() => document.visibilityState !== 'hidden')
+  useEffect(() => {
+    const onChange = () => setShown(document.visibilityState !== 'hidden')
+    document.addEventListener('visibilitychange', onChange)
+    return () => document.removeEventListener('visibilitychange', onChange)
+  }, [])
+  return shown
+}
 
 /**
  * The app at /player/: five tabs - Home, Library, Search, Requests and You - with the player
@@ -63,6 +81,20 @@ const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
  * "Now Playing opens as" (2.0.0-player.11) is kept here - You sets it, Now Playing opens in it -
  * and only the SETTING: which look is showing is Now Playing's own, so switching it never
  * re-renders this component, let alone the engine.
+ *
+ * The downloads (2.0.0-player.12) are watched HERE, once, for the whole app: useDownloadJobs is
+ * called in this component and nowhere else in it, so the Requests tab, Home's Arriving and the
+ * tab's badge are one poll and one set of overlays, and this page's downloads go through it
+ * (handleDownloadRequests, for a later slice's Get). It polls fast only while the Requests tab's
+ * root shows (its `open`; lib/requestsView.ts's watchingOf), keeps going slowly by itself while
+ * something is on its way, and otherwise stops - and is asked once more as Home comes into view
+ * and as the app comes back from the background (asksAgain), so a download started on another
+ * device shows without a poll left running. A look that FAILED while something was on its way
+ * keeps it asking (stallsOn): the hook would otherwise stop there for good, and Home's Arriving
+ * and the badge would freeze on the last answer. The badge counts Home's own list
+ * (view.arriving), so the two can never count different things. Each tab's top page is memoised on
+ * what an album page reads (the playing song and whether it plays), so a poll re-renders Requests
+ * and Home's Arriving and not an album page.
  */
 export function App() {
   const player = usePlayer()
@@ -133,6 +165,41 @@ export function App() {
     if (nav.tab === 'you') setYouSeen(true)
   }, [nav.tab])
 
+  //? What's showing, as far as the downloads go: a tab's ROOT, with Now Playing not over it
+  const pageShown = usePageShown()
+  const watching = watchingOf({ shown: pageShown, tab: nav.tab, depth: nav.stacks[nav.tab].length, sheetOpen })
+  //? a failed look while something was on its way: keep asking until deadwax answers (stallsOn)
+  const [stalled, setStalled] = useState(false)
+  const downloads = useDownloadJobs(watching === 'requests' || stalled)
+  const { jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems } = downloads
+  const { refresh, enqueue, cancel, retry, clearFinished, trackingEnabled, error: downloadsError } = downloads
+
+  //? Whether deadwax has answered yet, or failed to: until then Requests knows nothing, empty or
+  //? not. The hook's jobs are one array until its first answer replaces them.
+  const firstJobs = useRef(jobs)
+  const answered = useRef(false)
+  if (!answered.current && (jobs !== firstJobs.current || downloadsError !== null || !trackingEnabled)) answered.current = true
+
+  //? every download asked for on this page goes through the one hook, so its row is up from the tap
+  useEffect(() => handleDownloadRequests(enqueue), [enqueue])
+
+  //? Home coming into view, or the app back from the background, asks again (Requests asks by itself)
+  const watched = useRef(watching)
+  useEffect(() => {
+    const before = watched.current
+    watched.current = watching
+    if (asksAgain(before, watching)) refresh()
+  }, [watching])
+
+  const view = useMemo(
+    () => requestsView({ jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems }, Date.now()),
+    [jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems],
+  )
+  const arriving = view.arriving.length ? arrivingCards(view) : NOTHING_ARRIVING
+
+  const stalls = stallsOn(watching, downloadsError, view.arriving.length)
+  useEffect(() => setStalled(stalls), [stalls])
+
   const openAlbum = useCallback((album: Album) => {
     previews.current.delete(album.id)
     previews.current.set(album.id, album)
@@ -155,6 +222,9 @@ export function App() {
       window.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' })
     }
   }, [])
+
+  //? Arriving's "See all", and a tap on one of its cards: the list of downloads, at Requests' root
+  const seeRequests = useCallback(() => router.root('requests'), [])
 
   //? What each sheet gives focus back to as it closes, taken in the tap that opened it: the button
   //? focuses itself first (WebKit doesn't focus a tapped button), before the page behind turns
@@ -196,10 +266,38 @@ export function App() {
   }
 
   //? The tab roots, memoised: they read no player state, so the music playing leaves them alone.
-  //? You reads the player from context, and re-renders with it by itself.
-  const roots = useMemo<Record<Tab, JSX.Element>>(
+  //? You reads the player from context, and re-renders with it by itself. Home and Requests are
+  //? memoised apiece, on the downloads they draw, so a poll re-renders only them.
+  const arrivingTrouble = downloadsError !== null
+  const home = useMemo(
+    () => (
+      <Home
+        status={status}
+        onRetry={checkNavidrome}
+        onOpen={openAlbum}
+        arriving={arriving}
+        onSeeAll={seeRequests}
+        arrivingTrouble={arrivingTrouble}
+      />
+    ),
+    [status, arriving, arrivingTrouble],
+  )
+  const requests = useMemo(
+    () => (
+      <Requests
+        view={view}
+        answered={answered.current}
+        trackingEnabled={trackingEnabled}
+        error={downloadsError}
+        onCancel={cancel}
+        onRetry={retry}
+        onClear={clearFinished}
+      />
+    ),
+    [view, answered.current, trackingEnabled, downloadsError, cancel, retry, clearFinished],
+  )
+  const others = useMemo<Record<'library' | 'search' | 'you', JSX.Element>>(
     () => ({
-      home: <Home status={status} onRetry={checkNavidrome} onOpen={openAlbum} />,
       library: (
         <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
           <Library onOpen={openAlbum} />
@@ -211,16 +309,11 @@ export function App() {
           what="Searching MusicBrainz, choosing a pressing and getting it from Soulseek are on the main page until the app has them."
         />
       ),
-      requests: (
-        <Placeholder
-          title={TAB_LABELS.requests}
-          what="Downloads in progress, and how the finished ones ended, are in the main page's Downloads panel until the app has them."
-        />
-      ),
       you: <You shown={youSeen} opensAs={opensAs} onOpensAs={chooseOpensAs} />,
     }),
     [status, youSeen, opensAs],
   )
+  const roots: Record<Tab, JSX.Element> = { ...others, home, requests }
 
   const pageView = (tab: Tab, page: Page, player: Player) => (
     <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
@@ -232,6 +325,24 @@ export function App() {
         backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
       />
     </NeedsNavidrome>
+  )
+
+  //? Each tab's top page, memoised on what it reads, so a poll of the downloads never re-renders
+  //? one. `player` is a new object on every render of this component, so it can't be what the
+  //? memo is keyed on: an album page reads only the playing song's id, whether it plays, and
+  //? playTracks (one function for the page's life) - app-rules.sim.cjs holds AlbumPage to those,
+  //? so reading more of the player there fails until it is added here too.
+  const playingId = player.track?.id ?? null
+  const pages = useMemo(
+    () =>
+      Object.fromEntries(
+        TABS.map((tab) => {
+          const stack = nav.stacks[tab]
+          const top = stack[stack.length - 1] ?? null
+          return [tab, top ? pageView(tab, top, player) : null]
+        }),
+      ) as Record<Tab, JSX.Element | null>,
+    [nav, status, playingId, player.playing],
   )
 
   const playing = player.track
@@ -249,13 +360,13 @@ export function App() {
               return (
                 <div key={tab} class="app-pane" data-tab={tab} hidden={nav.tab !== tab}>
                   <div hidden={top !== null}>{roots[tab]}</div>
-                  {top && <div key={pageKey(tab, top)}>{pageView(tab, top, player)}</div>}
+                  {top && <div key={pageKey(tab, top)}>{pages[tab]}</div>}
                 </div>
               )
             })}
 
             <MiniPlayer player={player} onOpen={openSheet} />
-            <TabBar current={nav.tab} onSelect={chooseTab} />
+            <TabBar current={nav.tab} onSelect={chooseTab} arriving={view.arriving.length} />
           </div>
           <NowPlaying
             player={player}

@@ -34,19 +34,28 @@ the missing tracks across and apply the album's release in the metadata editor, 
 album again: a track the album's folder already has is never filed twice, so only the missing
 ones are added.
 
+When it goes on **", no track was filed"**, none of its music reached the library (a cover may
+have: that makes a folder, but no album, and nothing is marked **New**), which usually means the
+library folder can't be written (see [Downloads finish, but nothing appears in my
+library](#downloads-finish-but-nothing-appears-in-my-library)). The app's Requests tab says
+**Partly filed** for the first and **Not filed** for the second. A row from before deadwax
+2.0.0-player.12, where nothing landed, has no such ending and reads **Partly filed**; **Clear
+done** removes it.
+
 ## A download says "deadwax stopped while filing this"
 
 deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
 Look at the album in the library (**Rescan** first) and in slskd's downloads folder: in move mode,
 whatever hadn't been filed yet is still in slskd's folder, and in copy mode all of it is. Anything
-missing is dealt with as in the section above. **Clear finished** removes the row.
+missing is dealt with as in the section above. **Clear finished** removes the row (**Clear done**
+in the app's Requests tab, where it reads **Interrupted while filing**).
 
 ## Find says "Already downloading", but nothing is
 
 **Find** won't search for a pressing while a download of all of it is queued or arriving, and
-names the user it's coming from. Open **Downloads**: the download is there, and cancelling it (or
-letting it fail) lets **Find** search again. A download of only part of it, such as one disc's
-folder, doesn't stop the search: it's a note above the results.
+names the user it's coming from. Open **Downloads** (or the app's **Requests** tab): the download
+is there, and cancelling it (or letting it fail) lets **Find** search again. A download of only
+part of it, such as one disc's folder, doesn't stop the search: it's a note above the results.
 
 "Already downloaded", with "being filed into your library now", means every file has arrived and
 it's being filed. That takes seconds. A download that finished while organizing was off is never
@@ -115,6 +124,35 @@ It's waiting in the user's upload queue: **queue #N** says how far back you are.
 **free slot** starts straight away. If slskd stops reporting the transfers altogether, the
 download fails after about two minutes. Use **↻ retry** to ask the same user again, or **↻ next
 peer** to move it to someone else.
+
+## The app's Requests tab shows nothing moving, or "Can't get your requests from deadwax"
+
+The Requests tab (and Home's Arriving, and the count on the tab) shows what deadwax knows of each
+download, and the progress as slskd reports it.
+
+- **slskd can't be reached** (it refuses the connection, or isn't there): every download is still
+  listed, but nothing moves - "0 of 10 files", no speed, queued ones "starting". After about two
+  minutes of slskd reporting nothing,
+  deadwax gives up on them and they move to **Needs attention** as "no transfers reported by
+  slskd". **Next peer** and **Ask again** can't get anywhere until slskd is back, and the row says
+  why, in red. A download slskd still lists but can't move - slskd signed out of Soulseek, or
+  waiting for its VPN - just stops where it is until slskd is back. You's **Connections** says
+  whether slskd answers, and [The slskd pill is red](#the-slskd-pill-is-red) goes through the
+  reasons. **slskd up but not answering** (it takes the connection and then says nothing) is
+  slower to show: deadwax waits on it, so the tab keeps its spinner, or the last answer, until the
+  phone gives up on the request, and then says it can't get your requests.
+- **"Can't get your requests from deadwax"**, with the reason under it: deadwax itself didn't
+  answer (restarting under Komodo, say, or the phone off your network or VPN). What's below is
+  from the last answer, and it keeps asking while the tab is open. Home's Arriving says the same
+  ("Can't reach deadwax just now") and keeps asking while something is on its way.
+- **A spinner, and nothing else**: the app hasn't had deadwax's first answer yet. It never says
+  "Nothing requested yet" before it knows.
+- **"Downloads aren't being kept track of"**: deadwax can't write its database, so it can't list
+  or file downloads. They still arrive in slskd's folder. Check `DB_PATH` and that the folder it's
+  in can be written as `PUID`/`PGID`.
+- **A download started on the main page doesn't show**: the app looks again when Home or Requests
+  comes into view and when you come back to it. Switch to Requests, or pull it back up from the
+  background.
 
 ## MusicBrainz is slow, or searches fail
 

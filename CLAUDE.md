@@ -193,7 +193,7 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   player/          the app's page at /player/, manifest, icons, and two stylesheets: player.css
                    (the player; mechanics its own, look on theme.css section 10) and app.css (the
-                   tab bar, Home, You) - see "The one app".
+                   tab bar, Home, Requests, You) - see "The one app".
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one;
@@ -201,7 +201,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". Since
                    2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
                    with the player inside them - see "The one app".
-tests/             1853 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1878 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -3946,7 +3946,7 @@ the `/deadwax/me` seam, and disc titles on the album page.
   - Nothing in `app/` contains setActionHandler, `new Audio`, `<audio`, `.src =`, srcObject or
     `.load(` - comments included, so don't name them in a comment there.
   - **A link out of the app opens beside it** (`target="_blank" rel="noopener"`, review): the
-    Search and Requests cards, You's Managing row and the gate's settings link. Followed in the
+    Search card (and Requests' until 2.0.0-player.12), You's Managing row and the gate's settings link. Followed in the
     same page, `/` unloads the player - the audio element, any stream and the queue, which
     nothing keeps. From the home-screen app it opens outside the app's scope either way (Safari
     or a browser view over it; not seen on the phone). The sim fails on any `<a href>` in app/ or
@@ -3984,9 +3984,14 @@ the `/deadwax/me` seam, and disc titles on the album page.
   logins off); Sign out isn't drawn while logins are off. Gapless stays on Now Playing until slice
   2 moves it here (it did, in 2.0.0-player.10: a checkbox above Maximum quality). `you.sim.cjs`
   renders You with deadwax faked and pins all of this.
-- **Search and Requests are honest placeholders** ("On the main page for now", with a link) until
-  slices .12 and .11. Home has only "Recently added" (getAlbumList2 `newest`, 20 albums): Arriving,
-  Pinned and Not played in a while come in later slices and are NOT faked meanwhile.
+- **Search and Requests were honest placeholders** ("On the main page for now", with a link),
+  Search until slices.md's S4 and Requests until S3. Home had only "Recently added"
+  (getAlbumList2 `newest`, 20 albums): Arriving, Pinned and Not played in a while come in later
+  slices and are NOT faked meanwhile. Requests and Arriving came in 2.0.0-player.12 (S3) - see
+  "Requests, and what's arriving". **Future slices are named by their slices.md id (S4 Search, S5
+  Sources and Get, S6 Artists and the id bridge, S7 Pins, S8 the desktop frame), never a version
+  number**: the turntable went in as .11 outside the plan, so every slice after it took the next
+  number up, and slices.md's own numbers no longer say which version a slice ships as.
 - **`/deadwax/me` and `current_user`** (`src/users.py`, `src/routes/me.py`): a FastAPI DEPENDENCY
   returning `local` - never `@app.middleware("http")`, which hides disconnects. The answer is
   `{user, admin: true, auth: 'off', version}`. Step 3 changes `current_user`'s body and nothing
@@ -4094,7 +4099,7 @@ be a switch in the global settings".
   INSIDE the button, since clipping the button would clip that reach away.
 - **The ••• menu** (`app/ActionMenu.tsx`): the board draws the button, not the menu, so it is a short
   sheet from the bottom over a dimmed Now Playing: Info, Go to album, Cancel. Pin joins it with
-  pins (slice .15). Go to album is left out, not greyed, for a song with no album id.
+  pins (slices.md S7). Go to album is left out, not greyed, for a song with no album id.
 - **Go to album** - the menu's row, the album line and Info's album card, one `toAlbum` in App:
   every sheet closes and the album opens on the tab showing, through the `openAlbum` a tile uses,
   drawn at once from the answer it was played from (`playedAlbum`) or the queue's name and cover.
@@ -4151,7 +4156,7 @@ be a switch in the global settings".
     names, held by the sim: a 44.1 kHz song under "Original" says the rate, not the setting); Gapless (Off, On, On in one stream); Gap (describeGaps less its first
     words, the changes before on an "Earlier" note); Last seek; and **Navidrome sent**: the sorted
     field NAMES of the playing song and of its album, as deadwax's route passed them through
-    untouched - names, never values - so the fields slices .14 and .15 want (musicBrainzId,
+    untouched - names, never values - so the fields slices.md's S6 and S7 want (musicBrainzId,
     played, playCount, composer) can be read off James's iPhone against 0.64.2 first. "Not known"
     without the album answer. **A name alone misled both ways** (review, read in Navidrome
     v0.64.2's responses.go and helpers.go): OpenSubsonic fields without omitempty are ALWAYS sent -
@@ -4402,6 +4407,210 @@ instructions for how to use it are a little annoying". The boards are `NowPlayin
   staying put, the spin's smoothness and its stopping while locked, whether VoiceOver drives the
   arm, and whether Navidrome 0.64.2 sends the album's `musicBrainzId` for James's albums (Info >
   Debug's Navidrome sent row answers that).
+
+### Requests, and what's arriving (2.0.0-player.12)
+
+Slice 3 of the one app (`uplan/slices.md` S3, numbered .12 because the turntable went in first).
+The boards are `Requests.dc.html` and `Home.dc.html`'s Arriving card. James, of Arriving: "is it
+possible to hide arriving when there isn't anything arriving? ... I don't know that I want it to be
+persistent all the time".
+
+- **`useDownloadJobs` is called ONCE, in App** - the hook the main page's downloads panel uses,
+  unchanged, as is `downloads.sim.cjs`; the old page keeps its own instance (another page, another
+  module instance). So the Requests tab, Home's Arriving and the tab's badge are one poll and one
+  set of overlays. `app-rules.sim.cjs` holds it to one call there and in no other app file. Its
+  `open` is `watching === 'requests' || stalled`. `watchingOf()` (requestsView.ts, pure, pinned)
+  makes `watching` from the tab, the depth of its stack, Now Playing and the page being shown: the
+  Requests tab's ROOT showing (`nav.stacks.requests` empty - Go to album can push an album on it),
+  Now Playing not over it, and the page shown (App's own `usePageShown`, on `visibilitychange`;
+  Turntable keeps its own `useVisible`, which app-rules reads there). So it polls every 500ms only
+  then, every 5s (1s while filing) while something is active, and otherwise stops, as the hook
+  always did.
+- **A failed look while something is arriving keeps it asking** (`stallsOn`, review). The hook
+  stops for good after one failed poll with `open` off - `hasActive` is false in its catch - so a
+  Komodo redeploy or the phone off the VPN for a moment froze Home's Arriving and the badge on the
+  last answer until a tab switch. App can't run a timer (app-rules), so `stallsOn(watching, error,
+  view.arriving.length)` - on Home or another tab, the last look failed, something on its way - is
+  put in state by an effect and ORed into `open`: the hook polls every 500ms until an answer clears
+  the error, then the next render turns it off. Arriving says so meanwhile (`trouble`: "Can't reach
+  deadwax just now: this is its last answer, and it keeps asking."). **The root fix belongs in the
+  hook, on main first** (keep polling after an error when the last good answer had active jobs):
+  main's Downloads badge freezes the same way; this is the app's side of it until that lands.
+- **Asked again without a poll left running** (`asksAgain` in `lib/requestsView.ts`, pinned): App
+  tracks what it shows as `Watching` - requests, home, other, hidden - and calls the hook's
+  `refresh()` as Home comes into view (a tab switch, back to its root, Now Playing closing over it)
+  and as the page comes back from hidden on any tab but Requests. Never for Requests itself, coming
+  or going: `open` changing re-runs the hook's effect, which polls at once - a `refresh()` beside it
+  would be a second request, throwing the first's answer away. Nothing on mount: the hook's own first
+  poll is there. So a download started on another device shows when you look, which is what the
+  plan's "refresh on visibility" was for.
+- **App registers `handleDownloadRequests(enqueue)`**, so a later slice's Get hands its pending row
+  to the one hook. Until Get exists nothing in the app enqueues, so "asking slskd…" and refused rows
+  can't appear there yet; the words are pinned for when they do, and the docs say so.
+- **The grouping and every word are `lib/requestsView.ts`** (pure; `requests.sim.cjs`, 149 checks):
+  Downloading (downloading, organizing, and queued with progress - bytes moving before the poller's
+  next look), Waiting (asking slskd first, then queued: "#4 in their queue", or "starting" as the
+  board says, with "N failed" in amber when the peer has already refused some files - as the old
+  panel's `jobDetailText` says it, or it reads as an ordinary wait right up until it fails), Needs
+  attention (refusals, then failed and cancelled: the reason in red, "Next peer · N left" from
+  `alternatives_left`, "Ask again" always, "Trying next peer…"/"Asking again…" on the button tapped
+  with both aria-disabled, the retry's refusal as a second red line), Done (everything
+  else, sorted by `updated_at`, newest first, so the ages read in order: "In your library · 12
+  minutes ago"). "try N" from `attempt`. Each section only with rows; the page draws none empty.
+  - **ONE solid purple button on the screen** (STYLE.md): only the first Next peer is `primary`;
+    any after it is tinted. Two failed jobs with runners-up would otherwise be two primaries.
+  - **Arriving is exactly what the badge counts, by construction**: App gives TabBar
+    `view.arriving.length`, the list Home draws - one list read twice (review: it was the hook's
+    `activeCount`, and nothing checked which number App passed). The sim holds `view.arriving.length`
+    to downloadOverlay's `activeCount` across six scenarios, and pins where the two part: a retry's
+    overlay left on a job that has since finished (`reconcile` drops `retrying` only once the job is
+    active or gone, and no TTL covers it), which activeCount counts for good and the view draws under
+    Done - the metadata queue's lesson ("the tab badge and the queue must never count different
+    things"). Home shows the first three (`ARRIVING_MAX`), and NOTHING when there are none -
+    `Arriving` returns null, no heading. The sim renders Home with Navidrome unset, down and unknown
+    to hold Arriving outside the gate (a text check of Home.tsx passed with it inside).
+  - **An Arriving card's state word gives way before the album's name**: the brief shrinks with an
+    ellipsis and the body keeps `--app-arriving-body-min`; a retry's brief is "retrying…" either
+    way (it was "trying next peer…", 133px at 320, leaving "The D…").
+  - **Organizing has no ✕** (nothing in slskd is left to cancel, and filing can't be stopped; the
+    old row offered one). **Waiting jobs have one** although the board draws none: giving up on a
+    job at #40 in a queue is the commonest cancel, and the old panel allows it.
+  - **"Already in your library, nothing filed"** for `already_there`, where the board says "nothing
+    downloaded": the download DID happen - its files are in slskd's folder, which a move's clean-up
+    keeps because duplicates count as skipped. The other Done words: "Partly filed: <the row's
+    error>", "Interrupted while filing: check the library and slskd's folder", "Not filed: <error>"
+    for an ending with no outcome (a dry run, nothing that could be filed, filing that raised, no
+    track filed), "Downloaded, not filed" for one with no error (organizing off: `ORGANIZE_MODE`
+    'off', or `LIBRARY_PATH` or `SLSKD_DOWNLOAD_PATH` unset - `organizing_enabled()` is all three).
+    Warnings amber.
+- **The server** (`/download/jobs`): each row gains `updated_at` and `release_mbid` (list_jobs
+  always read them; the route dropped them), `release_group_mbid` and `edition`, and `outcome`.
+  - The two read out of the stored release BY SQLITE in `list_jobs`' SELECT (`json_extract`, as the
+    runners-up's usernames are), never decoded in Python - the v0.9.24 cost. `edition` is
+    `COALESCE(NULLIF(TRIM($.edition_label), ''), NULLIF(TRIM($.disambiguation), ''))`: a blank label
+    falls through. Both behind `json_valid`, so one bad row gives nulls instead of failing the poll
+    (list_jobs answers [] on any error). Measured: fifty jobs with 4.7 KB releases, 1.14ms a poll
+    before and 1.25ms after, on this Mac.
+  - **`outcome`** is `poller.job_outcome(status, error)`: `filed` (organized), `failed` (failed AND
+    cancelled - the two retries restart), `already_there` (complete, error starting
+    `f"{ALREADY_THERE}:"`), `interrupted` (complete, error == `INTERRUPTED_FILING`), `partly_filed`
+    (complete, error ending `f" {FAILED_TO_ORGANIZE}"`), and null for anything still going or any
+    other ending - the client shows those in the row's own words. The constants are NAMED in
+    poller.py and the poller builds its messages FROM them (the all-duplicates message is
+    byte-identical to before: `ALREADY_THERE` is its old prefix), so the two can't drift; a test runs
+    the real `_organize_if_enabled` with a faked organizer and reads each message back as its
+    outcome. Free text that merely mentions one ("the peer said: already in the store") is not it.
+  - **One message changed, on this branch only**: a filing where files failed and NO TRACK landed
+    now says "N file(s) failed to organize, no track was filed" (`NO_TRACK_FILED`), so it isn't read
+    as partly filed. Judged by `results["tracks_organized"]` - the test the enrolment makes - not
+    `organized`, which counts a cover (review: a folder left with only a cover read "Partly filed"
+    with none of the album in the library; troubleshooting.md promised it showed as New). A result
+    without the count is taken as all audio (`.get("tracks_organized", organized)`; execute_plan
+    always gives it, test fakes don't). `test_a_folder_left_holding_only_a_cover_is_not_enrolled` -
+    main's test - now reads the new words and an outcome of None. Main's message isn't wrong there -
+    nothing on main reads it as an outcome - so this isn't a main fix; a merge touching those lines
+    will conflict, and should keep this. A row written before it, where nothing landed, can't be
+    told apart and reads as partly filed (troubleshooting.md says so).
+  - `tests/test_jobs_route.py` (16) through `TestClient(start())` with a real store and a fake slskd:
+    every field, the edition's order and blanks, a row with broken JSON, `list_jobs` never handing
+    the release to `json.loads` (the loads are watched for a marker only the release holds), each
+    outcome from status and constant, free text refused, the poller's own messages end to end, a
+    queued row's position, and the runners-up still counted only for a retryable job.
+- **Re-rendering**: a poll re-renders App (the hook's state lives there). Home and Requests are
+  memoised apiece on what they draw; the other roots as before; Home's shelf is memoised inside
+  Home, and `NOTHING_ARRIVING` keeps Home's element still while nothing is arriving. **Each tab's
+  top page is memoised on `[nav, status, playingId, player.playing]`** - what AlbumPage reads of the
+  player (the playing song's id, whether it plays, and `playTracks`, one function for the page's
+  life). Not on `player`: usePlayer returns a new object every render, so a memo keyed on it (the
+  first cut's) held for no poll, and every mounted album page re-rendered twice a second while
+  Requests showed (review). `app-rules.sim.cjs` holds AlbumPage to reading only `player.track?.id`,
+  `player.playing` and `player.playTracks`, so reading more there fails until the memo has it too.
+  The mini player, Now Playing, its menu and Info still re-render with App - at most 2 Hz, while
+  Requests shows - since app-rules pins their JSX in App as it is.
+- **Covers**: `https://coverartarchive.org/release/<release_mbid>/front-250` (`jobCoverUrl`, the id
+  encoded), the phone fetching it itself; `JobCover` remembers which address failed, as `Cover`
+  does, so offline or no picture is the plain tile (`--dw-empty-cover` with the board's edge), and
+  the next pressing is still asked. Lazy: a hidden pane fetches nothing. Pending rows have none.
+- **The ✕ asks first, IN the card - never `window.confirm()`** (review). This page plays the music,
+  and a blocking dialog holds its JavaScript: a song ending while it was up waited for the answer
+  (the engine starts the next one from `ended`), a stream stopped being fed, and on a locked phone
+  the music stopped at the end of the song - the engine's first rule broken by a cancel. The main
+  page could use confirm() because it never hosted the player. Now the ✕ (by the main page's
+  `confirmCancel` preference, read at the tap - which a home-screen app, own storage and no
+  Settings tab, always has on) opens a question in the card: "Cancel this download? You'll lose
+  your place in this peer's queue.", **Keep it** (secondary) and **Cancel download** (secondary,
+  red words - the one solid purple stays Next peer). The ✕ is `aria-expanded` with
+  `aria-controls`, and a second tap on it closes the question; one card asks at a time (Requests'
+  `asking`, by row key); a row whose cancel isn't `ready` any more draws no question.
+  `app-rules.sim.cjs` fails on any confirm(), alert() or prompt() in app/ or player/. The docs say
+  so, and configuration.md's label for the preference is fixed ("Confirm before cancelling", as the
+  tab says; it read "Ask before cancelling").
+- **Until deadwax first answers, a spinner** (review): the hook starts with `jobs = []` and no
+  error, so a cold open on #requests (iOS reloads a tab it put aside) said "Nothing requested yet"
+  for a round trip - longer with slskd slow to answer deadwax (no timeout on SlskdClient). App
+  notes the first answer without touching the hook: `answered` turns true once `jobs` is no longer
+  the hook's first array, or there is an error, or tracking is off, and Requests draws
+  `pl-spinner` while the view is empty and nothing is known.
+- **Taps answered for a screen reader** (review): busy buttons and the cancelling ✕ are
+  `aria-disabled` with the tap refused in the handler, never `disabled`, which dropped the focus a
+  keyboard or VoiceOver had on the button tapped. One polite, atomic live region, always in the
+  page (iOS reads only a region already there), says what `changes(before, now)` found: a row under
+  another heading ("Heligoland: waiting", "...: needs attention: <why>", "...: In your library ·
+  just now"), a retry's refusal, a tap's answer starting ("trying next peer…", "asking again…",
+  "cancelling…") - pure, pinned. A card that moved is drawn afresh in another list, so each `<li>`
+  carries `data-row` and `tabIndex={-1}`, and a layout effect puts focus on the moved card when the
+  focus was in it and fell to the page (only then: a deliberate tap elsewhere is left alone).
+- **Clear done is the clear route**: it forgets every finished, failed and cancelled job (and the
+  refused pending rows), the Needs attention ones included, exactly as "Clear finished" does. The
+  label is the board's; the docs say what it clears. Disabled (`button:disabled`'s 0.4) with
+  nothing to clear, rather than hidden, so the title row doesn't move.
+- **The tab's badge**: `badgeText` (none at 0, "99+" past 99), drawn over the icon's corner,
+  `aria-hidden`, with the button's `aria-label` "Requests, 2 arriving"; STYLE.md's purple badge laid
+  over the tab bar's colour so no icon stroke shows through. **On a phone on its side it goes into
+  the row**, between the icon and the label (`position: static` in the max-height block): the label
+  is beside the icon there, and "12" over the corner covered the top of the R (review).
+- **"See all" and the Arriving cards go to Requests' ROOT** (`router.root`, appHistory.ts; review):
+  a tab tap shows a tab as it was left, so after Go to album on the Requests tab, See all showed the
+  album. `root()` is the switch and then the pop-to-root, so the history is what tapping the tab
+  twice makes; `routes.sim.cjs` drives it.
+- **Style**: cards are `.app-card` (#24222c, 6px, inset highlight), the bar STYLE.md's sunken track
+  (`--dw-bar` 6px, `--dw-radius-fill`), data monospace, tokens only (`--dw-amber-text`,
+  `--dw-badge-purple-*` new in theme.css section 10; the layout's `--app-job-*`, `--app-done-row`,
+  `--app-arriving-*`, `--app-tab-badge*` in app.css). Every control a tap target: the ✕ a 32px box
+  in 44px (its bleed into the card's padding keeps the box where the board puts it), Next peer and
+  Ask again 36px reaching 44 through `::before`, Clear done and See all text buttons 44px tall.
+  **The buttons have no overflow of their own** (review): the button is its `::before`'s containing
+  block, so `overflow: hidden` for the ellipsis clipped the reach back to 36px; the label is a
+  `.app-job-action-label` span holding the ellipsis, as Now Playing's album line does, and the reach
+  counts the button's 1px border (`+ var(--dw-hairline)`). **The pair stacks below
+  `--app-job-action-min` (150px a column)**, `repeat(auto-fit, minmax(...))`: at 320px a column held
+  105px of text and "Next peer · 2 left" (121px) lost its count; stacked, the row gap is twice the
+  reach so the reaches don't overlap. **A row being cancelled fades its cover, title, bar and (on a
+  Downloading card) who it's from**, never the words saying "cancelling…" (the whole card at 0.55
+  put them at 2.7:1). `test_app_css.py` holds all of these, the bar, the opaque badge and its row
+  on its side, a busy button's opacity, and the live region's hidden box.
+- **Not built, on purpose**: the board's "Missing from artists you have" and "Only as MP3" (after
+  step 4, per the plan); per-user requests (step 4); tapping a Done row to play its album (the id
+  bridge, slices.md's S6 - Done rows are not links); Get (S5).
+- **After review**: nineteen findings, each confirmed by skeptics, fixed together - the blocking
+  confirm, the album-page memo that never held, "Nothing requested yet" before the first answer,
+  Arriving and the badge freezing after one failed look (the app's side; the hook's is main's),
+  See all landing on an album page, Waiting rows dropping "N failed", "Partly filed" for a cover
+  alone, the clipped 44px reach, the badge over the label on a phone on its side, the primary
+  button's count lost at 320px, taps silent to VoiceOver, the Arriving title squeezed by a long
+  state word, the cancelling row's 2.7:1 words, the gate check that passed with Arriving inside it,
+  the badge's unpinned wiring, the unpinned watching derivation, the drawn states unpinned at the
+  component, "organizing off" naming one of its three causes, and the slice numbers above.
+- **Verified**: 1878 Python tests (`test_jobs_route.py` new, nine new in `test_app_css.py`),
+  pyflakes, tsc, and all 27 sims (`requests` new, 149 checks; `app-rules` and `routes` extended);
+  50 mutations for the first cut, one per rule pinned, and 38 for the review, one or more per fix,
+  each caught and restored byte for byte. The engine guard is empty, and the hook,
+  `downloads.sim.cjs`, `player.sim.cjs` and the old downloads panel are untouched.
+  **NOT verified here**: the real page (the build workaround and a check against the stubs and a
+  fake slskd come after this change), and everything on the iPhone - the tab and its badge under a
+  real finger (and beside the icon on its side), the ✕'s question in the home-screen app, Arriving
+  coming and going, a download started elsewhere showing on coming back, VoiceOver reading the live
+  region, and the Archive's covers over WireGuard.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -5736,7 +5945,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1853 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 1878 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -5775,6 +5984,7 @@ node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me a
 node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Navidrome sent
 node ui/test/info.sim.cjs       # Info > About's rows, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape
 node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button
+node ui/test/requests.sim.cjs   # the Requests tab and Home's Arriving - grouping, every row's words, one primary, Arriving = the badge, asking again, the ✕'s question, what a screen reader hears
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -5795,7 +6005,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1853 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1878 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

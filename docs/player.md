@@ -7,8 +7,9 @@ passes on the player's requests, so the phone never holds Navidrome's password a
 needs to reach deadwax.
 
 It's growing into one app for everything deadwax does: five tabs along the bottom (**Home**,
-**Library**, **Search**, **Requests** and **You**), with the player inside them. Search and
-Requests are still on the main page for now; their tabs say so and link there.
+**Library**, **Search**, **Requests** and **You**), with the player inside them. **Requests** shows
+your downloads as they arrive (since 2.0.0-player.12). Search is still on the main page for now;
+its tab says so and links there.
 
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
@@ -84,9 +85,14 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   Home while you look at the Library, and is there when you come back - the browser's back
   button, or a swipe back, onto another tab brings that tab back as you left it too. Tapping the
   tab you're on goes back to its first screen; tapping it again there scrolls to the top. With the
-  phone on its side the tab bar is shorter, each tab's icon beside its name.
-- **Home**: **Recently added**, Navidrome's 20 newest albums in a row you swipe along. Tap one to
-  open it. (What's on its way, pinned albums and what you haven't played in a while come later.)
+  phone on its side the tab bar is shorter, each tab's icon beside its name (and Requests' count
+  beside its icon, before the name).
+- **Home**: **Arriving**, up to three downloads on their way, with **See all** going to the list
+  on Requests - only while something is on its way: otherwise Home has no Arriving at all. If
+  deadwax stops answering meanwhile, Arriving says what it shows is deadwax's last answer, and the
+  app keeps asking until it answers. Then **Recently
+  added**, Navidrome's 20 newest albums in a row you swipe along. Tap one to open it. (Pinned
+  albums and what you haven't played in a while come later.)
 - **Library**: your albums, in a grid, in one of four orders: **Recently added**, **Recently
   played**, **Artist** or **Title**. The order you pick is remembered on that device. More albums
   load as you scroll.
@@ -108,9 +114,21 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   time you open You and again with **Check again** (which asks for the version again too); the
   version, and that logins are off. Server settings, the albums that need a look, the log and
   editing an album are on the main page for now, and **Open the main page** takes you there.
-- **Search** and **Requests** say they're on the main page for now, and link there. Every link to
-  the main page opens it beside the player, in a new tab, so the music keeps playing. From the
-  home-screen app it opens outside the app, in Safari or a browser view over it.
+- **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
+  from, and **✕** to cancel, which asks in the card first: **Keep it** or **Cancel download**),
+  **Waiting** (its place in the user's queue, or "starting"), **Needs attention** (why it stopped,
+  in red, with **Next peer · N left** and **Ask again**) and **Done** (how it ended and how long
+  ago: "In your library · 12 minutes ago"), each heading only when it has something under it, and
+  **Clear done** at the top. Until deadwax first answers it shows a spinner, never "Nothing
+  requested yet". With VoiceOver, what changes is read out: a retry starting or refused, a
+  download moving to another heading. The tab carries a count of what's on its way. Covers come
+  from the Cover Art Archive, so a phone with no internet shows plain squares. Starting a download
+  is still on the main page.
+  [Downloading](downloading.md#on-the-phone-the-requests-tab) has every state and what each button
+  does.
+- **Search** says it's on the main page for now, and links there. Every link to the main page
+  opens it beside the player, in a new tab, so the music keeps playing. From the home-screen app it
+  opens outside the app, in Safari or a browser view over it.
 - **Now playing**: a large cover (a grey square for an album without one), the song's title, and
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
   to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons, with
@@ -646,8 +664,9 @@ fixes that.
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
-- **The rest of deadwax**: searching MusicBrainz and downloading are on the main page, which
-  also works on a phone.
+- **The rest of deadwax**: searching MusicBrainz and starting a download are on the main page,
+  which also works on a phone; the Requests tab follows the download from there. Tapping a
+  finished download doesn't open its album yet.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata
@@ -681,6 +700,11 @@ question the whole player existed to answer. Still to find out:
 - **the turntable** under a real finger: turning the record and dragging the arm without the
   screen moving or closing, a tap on the record pausing, and whether it turns smoothly and stops
   while the phone is locked;
+- **Requests** on the phone: the ✕ asking in the card (a home-screen app always asks: it has its
+  own storage, and no Settings tab to turn that off), the count on the tab, Home's Arriving coming
+  and going, a download started on the main page showing up when you come back to the app, what
+  VoiceOver reads out as downloads change, and the covers fetched from the Cover Art Archive over
+  your VPN;
 - **Info and the ••• menu** under a real finger: that Info's list scrolls and nothing behind it
   does, that a tap above it closes it, and that the Gapless checkbox in You turns gapless on from
   its tap as the switch did;
