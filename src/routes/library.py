@@ -32,7 +32,7 @@ from src.api.lrclib_endpoint import lrclib
 from src.lyrics import fetch_album_lyrics, read_track_lyrics
 from src.retag import (changes_player_ids, execute_retag, hold_back_rename, move_retagged, plan_cover_art,
                        plan_retag, save_cover_art)
-from src.api.navidrome_endpoint import NavidromeError, navidrome
+from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, client_for, navidrome
 from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_SECONDS,
                            SCAN_WAIT_CAP_SECONDS, ScanStatus, WaitState, begin, read_status,
                            scanned_since_hold, step)
@@ -1062,7 +1062,7 @@ async def disc_art(album: str, file: str):
     return await _disc_art_answer(entry)
 
 
-async def _navidrome_release(album_id: str) -> str | None:
+async def _navidrome_release(album_id: str, client: NavidromeClient) -> str | None:
     """
     The release a Navidrome album is, by Navidrome's own reading of its files: getAlbum's
     `musicBrainzId` (the `musicbrainz_albumid` tag). None when Navidrome can't be asked, doesn't
@@ -1070,9 +1070,11 @@ async def _navidrome_release(album_id: str) -> str | None:
 
     An internal call, as album_context.py makes one: nothing of Navidrome's answer goes back to
     the page, and the id is never joined onto a path - it is only ever Navidrome's `id` parameter.
+    Asked through the client for the request's user (client_for, 2.0.0-player.13): it reads that
+    user's library.
     """
     try:
-        body = await navidrome.call("getAlbum", {"id": album_id})
+        body = await client.call("getAlbum", {"id": album_id})
     except NavidromeError as e:
         logger.debug(f"no release for Navidrome album {album_id!r}: {e}")
         return None
@@ -1137,7 +1139,7 @@ async def navidrome_disc_art(request: Request, album: str = Query(..., min_lengt
     answer (GuardMedia's headers, never gzipped - MEDIA_PATHS in app.py), kept 5 minutes.
     """
     root = Config.LIBRARY_PATH or ""
-    release = await _navidrome_release(album) if root else None
+    release = await _navidrome_release(album, client_for(request)) if root else None
     store = _store(request)
     rows = await store.index_present(root, release) if release and store is not None else []
     entry, gone = await asyncio.to_thread(_disc_face_entry, root, [row["path"] for row in rows], disc) if rows else (None, [])

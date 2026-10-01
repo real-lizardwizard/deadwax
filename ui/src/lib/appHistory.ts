@@ -15,7 +15,7 @@
 
 import {
   addressesBelow, browserMoved, currentRoute, formatRoute, openPage, parseHash, popPage, pushed,
-  replaced, selectTab, startHistory, startNav, stepsBack,
+  replaced, replaceTop, selectTab, startHistory, startNav, stepsBack,
   type HistoryNote, type Nav, type Page, type Tab, type TabAction,
 } from './appRoutes'
 
@@ -102,6 +102,12 @@ export interface Router {
   start(): void
   /** a page opened from the tab showing; false when it was already on top (a double tap) */
   open(page: Page): boolean
+  /**
+   * The page on top, in another state - a group page showing another pressing (2.0.0-player.13):
+   * its address REPLACED, never a new entry, so back still leaves the page. Nothing when the top is
+   * another page or nothing changed.
+   */
+  update(page: Page): void
   /** the in-app back button */
   back(): void
   /** a tap on a tab; 'scroll-to-top' is the caller's to do */
@@ -190,6 +196,11 @@ export function createRouter(host: RouterHost): Router {
       if (next === nav) return false
       commit(next, 'push')
       return true
+    },
+
+    update(page) {
+      const next = replaceTop(nav, page)
+      if (next !== nav) commit(next, 'replace')
     },
 
     back() {

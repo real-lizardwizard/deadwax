@@ -1,0 +1,3879 @@
+{
+ "about": "Dummy by Portishead, release group 48140466-cff6-3222-bd55-63c27e43190d, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Twenty pressings: twelve with the eleven-track tracklist, the ten-track CDs without \"It's a Fire\", the vinyl ~10s short on every track (Biscuit 30s - another version), and two with a twelfth track. 'expected' is what interface/scripts/tracklistDiff.mjs answered; ui/test/tracklist.sim.cjs holds it and the TypeScript port (ui/src/lib/tracklistDiff.ts) to it.",
+ "group": {
+  "id": "48140466-cff6-3222-bd55-63c27e43190d",
+  "title": "Dummy",
+  "artist": "Portishead"
+ },
+ "releases": [
+  {
+   "id": "00163fb1-5ab7-4fec-b0dd-a915e2722340",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994",
+   "country": "AU",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 553-2",
+     "label": {
+      "name": "Go! Beat"
+     }
+    },
+    {
+     "catalog-number": "828 553-2",
+     "label": {
+      "name": "Polydor"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994",
+     "area": {
+      "iso-3166-1-codes": [
+       "AU"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306973,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254066,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259959,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 296440,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 227733,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 309600,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 220973,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304066,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 308626,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1d6b086a-aca2-4511-8dfc-789b560ae3fb",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994",
+   "country": "CA",
+   "disambiguation": "Columbia House",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "422 828 553-2",
+     "label": {
+      "name": "Go! Discs"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994",
+     "area": {
+      "iso-3166-1-codes": [
+       "CA"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259973,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293960,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 229306,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 305173,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304093,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 305573,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "29a14c78-74ad-44d0-9d51-1613701248cb",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "2008-03-24",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 522 - 1",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-03-24",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    },
+    {
+     "date": "2008-03-24",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 10,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 296000,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 245000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 229000,
+       "recording": {
+        "title": "Strangers",
+        "length": 229000
+       }
+      },
+      {
+       "number": "A4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 250000,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "A5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 286000,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "B1",
+       "position": 6,
+       "title": "Numb",
+       "length": 223000,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "B2",
+       "position": 7,
+       "title": "Roads",
+       "length": 296000,
+       "recording": {
+        "title": "Roads",
+        "length": 296000
+       }
+      },
+      {
+       "number": "B3",
+       "position": 8,
+       "title": "Pedestal",
+       "length": 210000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "B4",
+       "position": 9,
+       "title": "Biscuit",
+       "length": 274000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "B5",
+       "position": 10,
+       "title": "Glory Box",
+       "length": 289000,
+       "recording": {
+        "title": "Glory Box",
+        "length": 289000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "2fc65e09-61ce-4609-8d74-22e073849240",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "",
+   "country": "XE",
+   "disambiguation": "Reissue MADE IN GERMANY BY EDC",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 553-2",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306973,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254066,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259959,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 296440,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 227733,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 309600,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 220973,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304066,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 308626,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4891dfe3-14d5-43d1-8401-2fbcf9163dbf",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "2009",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "0600753187326",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2009",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 10,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306893,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 253973,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238066,
+       "recording": {
+        "title": "Strangers",
+        "length": 229000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259866,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 296533,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Numb",
+       "length": 237933,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Roads",
+       "length": 309533,
+       "recording": {
+        "title": "Roads",
+        "length": 296000
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Biscuit",
+       "length": 304026,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Glory Box",
+       "length": 306600,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "7570ec55-15fd-4cb8-9f54-91f15a787b49",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994",
+   "country": "CA",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "422 828 553-2",
+     "label": {
+      "name": "Go! Discs"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994",
+     "area": {
+      "iso-3166-1-codes": [
+       "CA"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306973,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254066,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259959,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 296440,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 227733,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 309600,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 220973,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304066,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 308626,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "76df3287-6cda-33eb-8e9a-044b5e15ffdd",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994-08-22",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 553-2",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994-08-22",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259973,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293960,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 229306,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 305173,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304093,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 305573,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "84ee55c7-a600-47d2-a90c-0c18797b8640",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "2017",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 522 - 1",
+     "label": {
+      "name": "Go! Beat"
+     }
+    },
+    {
+     "catalog-number": "828 522-1",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2017",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 10,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 296000,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 245000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 229000,
+       "recording": {
+        "title": "Strangers",
+        "length": 229000
+       }
+      },
+      {
+       "number": "A4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 250000,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "A5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 286000,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "B1",
+       "position": 6,
+       "title": "Numb",
+       "length": 223000,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "B2",
+       "position": 7,
+       "title": "Roads",
+       "length": 296000,
+       "recording": {
+        "title": "Roads",
+        "length": 296000
+       }
+      },
+      {
+       "number": "B3",
+       "position": 8,
+       "title": "Pedestal",
+       "length": 210000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "B4",
+       "position": 9,
+       "title": "Biscuit",
+       "length": 274000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "B5",
+       "position": 10,
+       "title": "Glory Box",
+       "length": 289000,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "87888070-1b25-4830-aebc-dee490058b74",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994-10-17",
+   "country": "GB",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 522-2",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994-10-17",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 10,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306906,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 253960,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238066,
+       "recording": {
+        "title": "Strangers",
+        "length": 229000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259866,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 296533,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Numb",
+       "length": 237933,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Roads",
+       "length": 309533,
+       "recording": {
+        "title": "Roads",
+        "length": 296000
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Biscuit",
+       "length": 304040,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Glory Box",
+       "length": 306600,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "8f468f36-8c7e-4fc1-9166-50664d267127",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994-10-17",
+   "country": "US",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "422-828 553-2",
+     "label": {
+      "name": "Go! Beat"
+     }
+    },
+    {
+     "catalog-number": "422-828 553-2",
+     "label": {
+      "name": "Go! Discs"
+     }
+    },
+    {
+     "catalog-number": "422-828 553-2",
+     "label": {
+      "name": "London Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994-10-17",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259973,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293960,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 229306,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 305173,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304093,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 305573,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "c969636e-b2e6-41a7-8abd-1263ae9bc916",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1995",
+   "country": "PL",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 553-4",
+     "label": {
+      "name": "Go! Beat"
+     }
+    },
+    {
+     "catalog-number": "828 553-4",
+     "label": {
+      "name": "PolyGram Polska"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1995",
+     "area": {
+      "iso-3166-1-codes": [
+       "PL"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Cassette",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "A4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259973,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "A5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293960,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "A6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 229306,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "B1",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "B2",
+       "position": 8,
+       "title": "Roads",
+       "length": 305173,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "B3",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "B4",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304093,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "B5",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 305573,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cac64a87-42f9-4c1c-a5ef-1e6824e20678",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1995-02-09",
+   "country": "GB",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "422-828-600-2",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1995-02-09",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306026,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254200,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 237906,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259933,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293893,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 229333,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237933,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 305200,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221040,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 307893,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "Sour Sour Times / To Kill a Dead Man",
+       "length": 510306,
+       "recording": {
+        "title": "Sour Sour Times / To Kill a Dead Man",
+        "length": 510306
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dd0756cd-d7c9-4720-bb60-c904146ce885",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "2011-09-07",
+   "country": "JP",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "UICY-20164",
+     "label": {
+      "name": "Go! Beat"
+     }
+    },
+    {
+     "catalog-number": "UICY-20164",
+     "label": {
+      "name": "Polydor"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2011-09-07",
+     "area": {
+      "iso-3166-1-codes": [
+       "JP"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "SHM-CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306000,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 260000,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 296000,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 228000,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 238000,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 310000,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 306000,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "e9a123bd-711f-4e19-a06f-5aff5330daa8",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994-11-26",
+   "country": "JP",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "POCD-1153",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994-11-26",
+     "area": {
+      "iso-3166-1-codes": [
+       "JP"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254040,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259959,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 296440,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It's a Fire",
+       "length": 227733,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 309573,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304093,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 306266,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "eca6d001-35bb-4a1a-9bcb-8efd15814cc0",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "",
+   "country": "XW",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "",
+     "area": {
+      "iso-3166-1-codes": [
+       "XW"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 252000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 237000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 257000,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293000,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 226000,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 235000,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 303000,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 220000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 302000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 308000,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f006c24d-4336-4e18-b753-e2a561f1c774",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 553 - 2",
+     "label": {
+      "name": "Go! Discs"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259973,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293960,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 229306,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 305173,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304093,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 305573,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f3f1fbda-df20-4ee3-af8b-b64ebf9605cf",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "1994-10-17",
+   "country": "GB",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "828 522-1",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994-10-17",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    },
+    {
+     "date": "1994-10",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 10,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 296000,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 245000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 229000,
+       "recording": {
+        "title": "Strangers",
+        "length": 229000
+       }
+      },
+      {
+       "number": "A4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 250000,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "A5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 286000,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "B1",
+       "position": 6,
+       "title": "Numb",
+       "length": 223000,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "B2",
+       "position": 7,
+       "title": "Roads",
+       "length": 296000,
+       "recording": {
+        "title": "Roads",
+        "length": 296000
+       }
+      },
+      {
+       "number": "B3",
+       "position": 8,
+       "title": "Pedestal",
+       "length": 210000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "B4",
+       "position": 9,
+       "title": "Biscuit",
+       "length": 274000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "B5",
+       "position": 10,
+       "title": "Glory Box",
+       "length": 289000,
+       "recording": {
+        "title": "Glory Box",
+        "length": 289000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f4cc1eae-7916-4661-b4ff-f3b555fafdc6",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "2012-10-09",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "533 912-0",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2012-10-09",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306200,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 259973,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 293960,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It's a Fire",
+       "length": 229306,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 237960,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 305173,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304093,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 305573,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f5804905-6e8d-45dc-bae9-b36c64ccc99b",
+   "title": "Dummy",
+   "status": "Official",
+   "date": "2014-08-25",
+   "country": "GB",
+   "disambiguation": "20th Anniversary Reissue 180gram",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "3797205",
+     "label": {
+      "name": "Go! Beat"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2014-08-25",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 10,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 296000,
+       "recording": {
+        "title": "Mysterons",
+        "length": 296000
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 245000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 245000
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 229000,
+       "recording": {
+        "title": "Strangers",
+        "length": 229000
+       }
+      },
+      {
+       "number": "A4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 250000,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 250000
+       }
+      },
+      {
+       "number": "A5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 286000,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 286000
+       }
+      },
+      {
+       "number": "B1",
+       "position": 6,
+       "title": "Numb",
+       "length": 223000,
+       "recording": {
+        "title": "Numb",
+        "length": 223000
+       }
+      },
+      {
+       "number": "B2",
+       "position": 7,
+       "title": "Roads",
+       "length": 296000,
+       "recording": {
+        "title": "Roads",
+        "length": 296000
+       }
+      },
+      {
+       "number": "B3",
+       "position": 8,
+       "title": "Pedestal",
+       "length": 210000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 210000
+       }
+      },
+      {
+       "number": "B4",
+       "position": 9,
+       "title": "Biscuit",
+       "length": 274000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 274000
+       }
+      },
+      {
+       "number": "B5",
+       "position": 10,
+       "title": "Glory Box",
+       "length": 289000,
+       "recording": {
+        "title": "Glory Box",
+        "length": 289000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f88d6d9b-9664-4c54-887c-2bd83248bc2c",
+   "title": "Dummy",
+   "status": "Promotion",
+   "date": "1994",
+   "country": "US",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "PRCD 6871-2",
+     "label": {
+      "name": "Go! Discs"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "1994",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Mysterons",
+       "length": 306000,
+       "recording": {
+        "title": "Mysterons",
+        "length": 306200
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Sour Times",
+       "length": 254000,
+       "recording": {
+        "title": "Sour Times",
+        "length": 253760
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Strangers",
+       "length": 238000,
+       "recording": {
+        "title": "Strangers",
+        "length": 238000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "It Could Be Sweet",
+       "length": 260000,
+       "recording": {
+        "title": "It Could Be Sweet",
+        "length": 259959
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Wandering Star",
+       "length": 294000,
+       "recording": {
+        "title": "Wandering Star",
+        "length": 293960
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "It’s a Fire",
+       "length": 229000,
+       "recording": {
+        "title": "It’s a Fire",
+        "length": 228000
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Numb",
+       "length": 238000,
+       "recording": {
+        "title": "Numb",
+        "length": 237866
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Roads",
+       "length": 305000,
+       "recording": {
+        "title": "Roads",
+        "length": 305173
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Pedestal",
+       "length": 221000,
+       "recording": {
+        "title": "Pedestal",
+        "length": 221000
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Biscuit",
+       "length": 304000,
+       "recording": {
+        "title": "Biscuit",
+        "length": 304026
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glory Box",
+       "length": 306000,
+       "recording": {
+        "title": "Glory Box",
+        "length": 305573
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "Sour Times (Airbus Reconstruction)",
+       "length": 309000,
+       "recording": {
+        "title": "Sour Times (Airbus Reconstruction)",
+        "length": 309066
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "expected": {
+  "base": {
+   "index": 0,
+   "id": "00163fb1-5ab7-4fec-b0dd-a915e2722340",
+   "count": 12,
+   "total": 20
+  },
+  "representative": "76df3287-6cda-33eb-8e9a-044b5e15ffdd",
+  "diffs": {
+   "00163fb1-5ab7-4fec-b0dd-a915e2722340": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "1d6b086a-aca2-4511-8dfc-789b560ae3fb": {
+    "chips": [
+     "2 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     },
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 9
+   },
+   "29a14c78-74ad-44d0-9d51-1613701248cb": {
+    "chips": [
+     "−1 track",
+     "1 other version",
+     "9 lengths"
+    ],
+    "added": [],
+    "removed": [
+     {
+      "position": 6,
+      "title": "It’s a Fire",
+      "length": 228
+     }
+    ],
+    "renamed": [],
+    "versions": [
+     {
+      "position": 9,
+      "title": "Biscuit",
+      "from": 304,
+      "to": 274,
+      "delta": -30
+     }
+    ],
+    "lengths": [
+     {
+      "position": 1,
+      "title": "Mysterons",
+      "from": 307,
+      "to": 296,
+      "delta": -11
+     },
+     {
+      "position": 2,
+      "title": "Sour Times",
+      "from": 254,
+      "to": 245,
+      "delta": -9
+     },
+     {
+      "position": 3,
+      "title": "Strangers",
+      "from": 238,
+      "to": 229,
+      "delta": -9
+     },
+     {
+      "position": 4,
+      "title": "It Could Be Sweet",
+      "from": 260,
+      "to": 250,
+      "delta": -10
+     },
+     {
+      "position": 5,
+      "title": "Wandering Star",
+      "from": 296,
+      "to": 286,
+      "delta": -10
+     },
+     {
+      "position": 6,
+      "title": "Numb",
+      "from": 238,
+      "to": 223,
+      "delta": -15
+     },
+     {
+      "position": 7,
+      "title": "Roads",
+      "from": 310,
+      "to": 296,
+      "delta": -14
+     },
+     {
+      "position": 8,
+      "title": "Pedestal",
+      "from": 221,
+      "to": 210,
+      "delta": -11
+     },
+     {
+      "position": 10,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 289,
+      "delta": -20
+     }
+    ],
+    "same": 0
+   },
+   "2fc65e09-61ce-4609-8d74-22e073849240": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "4891dfe3-14d5-43d1-8401-2fbcf9163dbf": {
+    "chips": [
+     "−1 track"
+    ],
+    "added": [],
+    "removed": [
+     {
+      "position": 6,
+      "title": "It’s a Fire",
+      "length": 228
+     }
+    ],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 10
+   },
+   "7570ec55-15fd-4cb8-9f54-91f15a787b49": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "76df3287-6cda-33eb-8e9a-044b5e15ffdd": {
+    "chips": [
+     "2 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     },
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 9
+   },
+   "84ee55c7-a600-47d2-a90c-0c18797b8640": {
+    "chips": [
+     "−1 track",
+     "1 other version",
+     "9 lengths"
+    ],
+    "added": [],
+    "removed": [
+     {
+      "position": 6,
+      "title": "It’s a Fire",
+      "length": 228
+     }
+    ],
+    "renamed": [],
+    "versions": [
+     {
+      "position": 9,
+      "title": "Biscuit",
+      "from": 304,
+      "to": 274,
+      "delta": -30
+     }
+    ],
+    "lengths": [
+     {
+      "position": 1,
+      "title": "Mysterons",
+      "from": 307,
+      "to": 296,
+      "delta": -11
+     },
+     {
+      "position": 2,
+      "title": "Sour Times",
+      "from": 254,
+      "to": 245,
+      "delta": -9
+     },
+     {
+      "position": 3,
+      "title": "Strangers",
+      "from": 238,
+      "to": 229,
+      "delta": -9
+     },
+     {
+      "position": 4,
+      "title": "It Could Be Sweet",
+      "from": 260,
+      "to": 250,
+      "delta": -10
+     },
+     {
+      "position": 5,
+      "title": "Wandering Star",
+      "from": 296,
+      "to": 286,
+      "delta": -10
+     },
+     {
+      "position": 6,
+      "title": "Numb",
+      "from": 238,
+      "to": 223,
+      "delta": -15
+     },
+     {
+      "position": 7,
+      "title": "Roads",
+      "from": 310,
+      "to": 296,
+      "delta": -14
+     },
+     {
+      "position": 8,
+      "title": "Pedestal",
+      "from": 221,
+      "to": 210,
+      "delta": -11
+     },
+     {
+      "position": 10,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 289,
+      "delta": -20
+     }
+    ],
+    "same": 0
+   },
+   "87888070-1b25-4830-aebc-dee490058b74": {
+    "chips": [
+     "−1 track"
+    ],
+    "added": [],
+    "removed": [
+     {
+      "position": 6,
+      "title": "It’s a Fire",
+      "length": 228
+     }
+    ],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 10
+   },
+   "8f468f36-8c7e-4fc1-9166-50664d267127": {
+    "chips": [
+     "2 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     },
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 9
+   },
+   "c969636e-b2e6-41a7-8abd-1263ae9bc916": {
+    "chips": [
+     "2 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     },
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 9
+   },
+   "cac64a87-42f9-4c1c-a5ef-1e6824e20678": {
+    "chips": [
+     "+1 track",
+     "1 length"
+    ],
+    "added": [
+     {
+      "position": 12,
+      "title": "Sour Sour Times / To Kill a Dead Man",
+      "length": 510,
+      "after": "Glory Box"
+     }
+    ],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     }
+    ],
+    "same": 10
+   },
+   "dd0756cd-d7c9-4720-bb60-c904146ce885": {
+    "chips": [
+     "1 length"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 10
+   },
+   "e9a123bd-711f-4e19-a06f-5aff5330daa8": {
+    "chips": [
+     "1 length"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 10
+   },
+   "eca6d001-35bb-4a1a-9bcb-8efd15814cc0": {
+    "chips": [
+     "4 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 4,
+      "title": "It Could Be Sweet",
+      "from": 260,
+      "to": 257,
+      "delta": -3
+     },
+     {
+      "position": 5,
+      "title": "Wandering Star",
+      "from": 296,
+      "to": 293,
+      "delta": -3
+     },
+     {
+      "position": 7,
+      "title": "Numb",
+      "from": 238,
+      "to": 235,
+      "delta": -3
+     },
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 303,
+      "delta": -7
+     }
+    ],
+    "same": 7
+   },
+   "f006c24d-4336-4e18-b753-e2a561f1c774": {
+    "chips": [
+     "2 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     },
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 9
+   },
+   "f3f1fbda-df20-4ee3-af8b-b64ebf9605cf": {
+    "chips": [
+     "−1 track",
+     "1 other version",
+     "9 lengths"
+    ],
+    "added": [],
+    "removed": [
+     {
+      "position": 6,
+      "title": "It’s a Fire",
+      "length": 228
+     }
+    ],
+    "renamed": [],
+    "versions": [
+     {
+      "position": 9,
+      "title": "Biscuit",
+      "from": 304,
+      "to": 274,
+      "delta": -30
+     }
+    ],
+    "lengths": [
+     {
+      "position": 1,
+      "title": "Mysterons",
+      "from": 307,
+      "to": 296,
+      "delta": -11
+     },
+     {
+      "position": 2,
+      "title": "Sour Times",
+      "from": 254,
+      "to": 245,
+      "delta": -9
+     },
+     {
+      "position": 3,
+      "title": "Strangers",
+      "from": 238,
+      "to": 229,
+      "delta": -9
+     },
+     {
+      "position": 4,
+      "title": "It Could Be Sweet",
+      "from": 260,
+      "to": 250,
+      "delta": -10
+     },
+     {
+      "position": 5,
+      "title": "Wandering Star",
+      "from": 296,
+      "to": 286,
+      "delta": -10
+     },
+     {
+      "position": 6,
+      "title": "Numb",
+      "from": 238,
+      "to": 223,
+      "delta": -15
+     },
+     {
+      "position": 7,
+      "title": "Roads",
+      "from": 310,
+      "to": 296,
+      "delta": -14
+     },
+     {
+      "position": 8,
+      "title": "Pedestal",
+      "from": 221,
+      "to": 210,
+      "delta": -11
+     },
+     {
+      "position": 10,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 289,
+      "delta": -20
+     }
+    ],
+    "same": 0
+   },
+   "f4cc1eae-7916-4661-b4ff-f3b555fafdc6": {
+    "chips": [
+     "2 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     },
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 9
+   },
+   "f5804905-6e8d-45dc-bae9-b36c64ccc99b": {
+    "chips": [
+     "−1 track",
+     "1 other version",
+     "9 lengths"
+    ],
+    "added": [],
+    "removed": [
+     {
+      "position": 6,
+      "title": "It’s a Fire",
+      "length": 228
+     }
+    ],
+    "renamed": [],
+    "versions": [
+     {
+      "position": 9,
+      "title": "Biscuit",
+      "from": 304,
+      "to": 274,
+      "delta": -30
+     }
+    ],
+    "lengths": [
+     {
+      "position": 1,
+      "title": "Mysterons",
+      "from": 307,
+      "to": 296,
+      "delta": -11
+     },
+     {
+      "position": 2,
+      "title": "Sour Times",
+      "from": 254,
+      "to": 245,
+      "delta": -9
+     },
+     {
+      "position": 3,
+      "title": "Strangers",
+      "from": 238,
+      "to": 229,
+      "delta": -9
+     },
+     {
+      "position": 4,
+      "title": "It Could Be Sweet",
+      "from": 260,
+      "to": 250,
+      "delta": -10
+     },
+     {
+      "position": 5,
+      "title": "Wandering Star",
+      "from": 296,
+      "to": 286,
+      "delta": -10
+     },
+     {
+      "position": 6,
+      "title": "Numb",
+      "from": 238,
+      "to": 223,
+      "delta": -15
+     },
+     {
+      "position": 7,
+      "title": "Roads",
+      "from": 310,
+      "to": 296,
+      "delta": -14
+     },
+     {
+      "position": 8,
+      "title": "Pedestal",
+      "from": 221,
+      "to": 210,
+      "delta": -11
+     },
+     {
+      "position": 10,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 289,
+      "delta": -20
+     }
+    ],
+    "same": 0
+   },
+   "f88d6d9b-9664-4c54-887c-2bd83248bc2c": {
+    "chips": [
+     "+1 track",
+     "2 lengths"
+    ],
+    "added": [
+     {
+      "position": 12,
+      "title": "Sour Times (Airbus Reconstruction)",
+      "length": 309,
+      "after": "Glory Box"
+     }
+    ],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 8,
+      "title": "Roads",
+      "from": 310,
+      "to": 305,
+      "delta": -5
+     },
+     {
+      "position": 11,
+      "title": "Glory Box",
+      "from": 309,
+      "to": 306,
+      "delta": -3
+     }
+    ],
+    "same": 9
+   }
+  }
+ }
+}

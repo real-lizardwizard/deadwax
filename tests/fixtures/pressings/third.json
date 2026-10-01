@@ -1,0 +1,3230 @@
+{
+ "about": "Third by Portishead, release group 163339ab-813b-3d29-bba8-e1d5acf63cab, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Seventeen pressings, thirteen alike - the board's \"every pressing alike\" as it really is - with three digital releases adding a track and a USB-and-vinyl box listing the album twice. 'expected' is what interface/scripts/tracklistDiff.mjs answered; ui/test/tracklist.sim.cjs holds it and the TypeScript port (ui/src/lib/tracklistDiff.ts) to it.",
+ "group": {
+  "id": "163339ab-813b-3d29-bba8-e1d5acf63cab",
+  "title": "Third",
+  "artist": "Portishead"
+ },
+ "releases": [
+  {
+   "id": "064fa38d-810d-4a8a-a6a4-55d6fd1da34b",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008",
+   "country": "XE",
+   "disambiguation": "Made in Germany by EDC",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1764013",
+     "label": {
+      "name": "Go! Discs"
+     }
+    },
+    {
+     "catalog-number": "1764013",
+     "label": {
+      "name": "Island"
+     }
+    },
+    {
+     "catalog-number": "1764013",
+     "label": {
+      "name": "Island Records Group"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "0c12545e-5040-3f2e-b4c9-80f982b14254",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-28",
+   "country": "NZ",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1766400",
+     "label": {
+      "name": "Universal Island Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-28",
+     "area": {
+      "iso-3166-1-codes": [
+       "NZ"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "18256dad-c3fe-4d39-beb7-ec33421c250b",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1766390",
+     "label": {
+      "name": "Universal Island Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "USB Flash Drive",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    },
+    {
+     "position": 2,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 6,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300000,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238000,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199000,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "B1",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270000,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "B2",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210000,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "B3",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387000,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      }
+     ]
+    },
+    {
+     "position": 3,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 5,
+     "tracks": [
+      {
+       "number": "C1",
+       "position": 1,
+       "title": "Deep Water",
+       "length": 93000,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "C2",
+       "position": 2,
+       "title": "Machine Gun",
+       "length": 286000,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "C3",
+       "position": 3,
+       "title": "Small",
+       "length": 407000,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "D1",
+       "position": 4,
+       "title": "Magic Doors",
+       "length": 211000,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "D2",
+       "position": 5,
+       "title": "Threads",
+       "length": 347000,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    },
+    {
+     "position": 4,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 1,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Machine Gun",
+       "length": 286000,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5a085d49-e955-3e7f-888a-955cce6b7890",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-25",
+   "country": "DE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1766401",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-25",
+     "area": {
+      "iso-3166-1-codes": [
+       "DE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5add188d-8cf4-4864-ae76-629f618eae16",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-28",
+   "country": "US",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-28",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 299653,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 237470,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 196649,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 271000,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 207632,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387842,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 90929,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 283492,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 405791,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211998,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347834,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "Machine Gun",
+       "length": 274158,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 274158
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "78f3870c-dee3-4566-8bd9-ac4fe32fc393",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-28",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1764104",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-28",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 6,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Silence",
+       "length": 301000,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 239000,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 200000,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "B1",
+       "position": 4,
+       "title": "The Rip",
+       "length": 271000,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "B2",
+       "position": 5,
+       "title": "Plastic",
+       "length": 211000,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "B3",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 388000,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      }
+     ]
+    },
+    {
+     "position": 2,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 5,
+     "tracks": [
+      {
+       "number": "C1",
+       "position": 1,
+       "title": "Deep Water",
+       "length": 93000,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "C2",
+       "position": 2,
+       "title": "Machine Gun",
+       "length": 286000,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "C3",
+       "position": 3,
+       "title": "Small",
+       "length": 407000,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "D1",
+       "position": 4,
+       "title": "Magic Doors",
+       "length": 212000,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "D2",
+       "position": 5,
+       "title": "Threads",
+       "length": 348000,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "7da10d5d-4021-4bc5-bd30-0436b0307aa8",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-27",
+   "country": "GB",
+   "disambiguation": "Bonus track version - Magic Doors",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Universal Island Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-27",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 301000,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 239000,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199000,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 271000,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210000,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 388000,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93000,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286000,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407000,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 212000,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 348000,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "Magic Doors (live)",
+       "length": 162000,
+       "recording": {
+        "title": "Magic Doors (live)",
+        "length": 162000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "7da5c6a7-bd8b-3f85-89a7-577283388083",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-29",
+   "country": "US",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "B0011141-02",
+     "label": {
+      "name": "Mercury Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-29",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "930345b1-a970-3495-a1dd-55147bea7741",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-24",
+   "country": "AU",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1764013",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-24",
+     "area": {
+      "iso-3166-1-codes": [
+       "AU"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "9f05d3c7-d1b1-4e2e-9130-f66a9df43997",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-25",
+   "country": "GB",
+   "disambiguation": "Bonus track version - We Carry On",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Universal Island Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-25",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300800,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238760,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93266,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286480,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "We Carry On (live)",
+       "length": 375466,
+       "recording": {
+        "title": "We Carry On (live)",
+        "length": 375466
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bc18c59d-6131-4e18-aff5-4600ea7f3d7d",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-28",
+   "country": "CA",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-28",
+     "area": {
+      "iso-3166-1-codes": [
+       "CA"
+      ]
+     }
+    },
+    {
+     "date": "2008-04-28",
+     "area": {
+      "iso-3166-1-codes": [
+       "MX"
+      ]
+     }
+    },
+    {
+     "date": "2008-04-28",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 299000,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 237000,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 196000,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270000,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 207000,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387000,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 90000,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 283000,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 405000,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211000,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347000,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cae2ac10-057f-3d29-9e9d-1ba58e67ab9f",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-30",
+   "country": "JP",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "UICI-1069",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-30",
+     "area": {
+      "iso-3166-1-codes": [
+       "JP"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Enhanced CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 301044,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238959,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199262,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 271631,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210248,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 388452,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93115,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286106,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407493,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 212599,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 348452,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "d68e178c-4c97-4a03-98df-d9faf26e2236",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008",
+   "country": "CA",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "0251766400",
+     "label": {
+      "name": "Mercury Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008",
+     "area": {
+      "iso-3166-1-codes": [
+       "CA"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "daa9710c-2e71-497f-8a02-10d9b611c370",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-25",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1766401",
+     "label": {
+      "name": "Island"
+     }
+    },
+    {
+     "catalog-number": "1766401",
+     "label": {
+      "name": "Island Records Group"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-25",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286000
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "e1e5386a-5616-460b-bb79-0d366537b7fb",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-28",
+   "country": "GB",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1764013",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-28",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "e4f5a41f-b8b6-4d30-8baf-0db1478dc487",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008",
+   "country": "HK",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "1766400",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008",
+     "area": {
+      "iso-3166-1-codes": [
+       "HK"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 11,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Silence",
+       "length": 300773,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 238733,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 199600,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "The Rip",
+       "length": 270960,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Plastic",
+       "length": 210573,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 387786,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "Deep Water",
+       "length": 93226,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Machine Gun",
+       "length": 286440,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Small",
+       "length": 407373,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "Magic Doors",
+       "length": 211933,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Threads",
+       "length": 347786,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f5bfccaf-1816-427a-b03d-b41c8ac155c5",
+   "title": "Third",
+   "status": "Official",
+   "date": "2008-04-08",
+   "country": "US",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "B0011141-01 JK02",
+     "label": {
+      "name": "Mercury Records"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2008-04-08",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 6,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "Silence",
+       "length": 301000,
+       "recording": {
+        "title": "Silence",
+        "length": 300773
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Hunter",
+       "length": 239000,
+       "recording": {
+        "title": "Hunter",
+        "length": 238733
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Nylon Smile",
+       "length": 200000,
+       "recording": {
+        "title": "Nylon Smile",
+        "length": 199600
+       }
+      },
+      {
+       "number": "B1",
+       "position": 4,
+       "title": "The Rip",
+       "length": 271000,
+       "recording": {
+        "title": "The Rip",
+        "length": 270960
+       }
+      },
+      {
+       "number": "B2",
+       "position": 5,
+       "title": "Plastic",
+       "length": 211000,
+       "recording": {
+        "title": "Plastic",
+        "length": 210573
+       }
+      },
+      {
+       "number": "B3",
+       "position": 6,
+       "title": "We Carry On",
+       "length": 388000,
+       "recording": {
+        "title": "We Carry On",
+        "length": 387786
+       }
+      }
+     ]
+    },
+    {
+     "position": 2,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 5,
+     "tracks": [
+      {
+       "number": "C1",
+       "position": 1,
+       "title": "Deep Water",
+       "length": 93000,
+       "recording": {
+        "title": "Deep Water",
+        "length": 93226
+       }
+      },
+      {
+       "number": "C2",
+       "position": 2,
+       "title": "Machine Gun",
+       "length": 286000,
+       "recording": {
+        "title": "Machine Gun",
+        "length": 286440
+       }
+      },
+      {
+       "number": "C3",
+       "position": 3,
+       "title": "Small",
+       "length": 407000,
+       "recording": {
+        "title": "Small",
+        "length": 407373
+       }
+      },
+      {
+       "number": "D1",
+       "position": 4,
+       "title": "Magic Doors",
+       "length": 212000,
+       "recording": {
+        "title": "Magic Doors",
+        "length": 211933
+       }
+      },
+      {
+       "number": "D2",
+       "position": 5,
+       "title": "Threads",
+       "length": 348000,
+       "recording": {
+        "title": "Threads",
+        "length": 347786
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "expected": {
+  "base": {
+   "index": 0,
+   "id": "064fa38d-810d-4a8a-a6a4-55d6fd1da34b",
+   "count": 13,
+   "total": 17
+  },
+  "representative": "930345b1-a970-3495-a1dd-55147bea7741",
+  "diffs": {
+   "064fa38d-810d-4a8a-a6a4-55d6fd1da34b": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "0c12545e-5040-3f2e-b4c9-80f982b14254": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "18256dad-c3fe-4d39-beb7-ec33421c250b": {
+    "chips": [
+     "+12 tracks"
+    ],
+    "added": [
+     {
+      "position": 12,
+      "title": "Silence",
+      "length": 300,
+      "after": "Threads"
+     },
+     {
+      "position": 13,
+      "title": "Hunter",
+      "length": 238,
+      "after": "Silence"
+     },
+     {
+      "position": 14,
+      "title": "Nylon Smile",
+      "length": 199,
+      "after": "Hunter"
+     },
+     {
+      "position": 15,
+      "title": "The Rip",
+      "length": 270,
+      "after": "Nylon Smile"
+     },
+     {
+      "position": 16,
+      "title": "Plastic",
+      "length": 210,
+      "after": "The Rip"
+     },
+     {
+      "position": 17,
+      "title": "We Carry On",
+      "length": 387,
+      "after": "Plastic"
+     },
+     {
+      "position": 18,
+      "title": "Deep Water",
+      "length": 93,
+      "after": "We Carry On"
+     },
+     {
+      "position": 19,
+      "title": "Machine Gun",
+      "length": 286,
+      "after": "Deep Water"
+     },
+     {
+      "position": 20,
+      "title": "Small",
+      "length": 407,
+      "after": "Machine Gun"
+     },
+     {
+      "position": 21,
+      "title": "Magic Doors",
+      "length": 211,
+      "after": "Small"
+     },
+     {
+      "position": 22,
+      "title": "Threads",
+      "length": 347,
+      "after": "Magic Doors"
+     },
+     {
+      "position": 23,
+      "title": "Machine Gun",
+      "length": 286,
+      "after": "Threads"
+     }
+    ],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "5a085d49-e955-3e7f-888a-955cce6b7890": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "5add188d-8cf4-4864-ae76-629f618eae16": {
+    "chips": [
+     "+1 track",
+     "3 lengths"
+    ],
+    "added": [
+     {
+      "position": 12,
+      "title": "Machine Gun",
+      "length": 274,
+      "after": "Threads"
+     }
+    ],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 3,
+      "title": "Nylon Smile",
+      "from": 200,
+      "to": 197,
+      "delta": -3
+     },
+     {
+      "position": 5,
+      "title": "Plastic",
+      "from": 211,
+      "to": 208,
+      "delta": -3
+     },
+     {
+      "position": 8,
+      "title": "Machine Gun",
+      "from": 286,
+      "to": 283,
+      "delta": -3
+     }
+    ],
+    "same": 8
+   },
+   "78f3870c-dee3-4566-8bd9-ac4fe32fc393": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "7da10d5d-4021-4bc5-bd30-0436b0307aa8": {
+    "chips": [
+     "+1 track"
+    ],
+    "added": [
+     {
+      "position": 12,
+      "title": "Magic Doors (live)",
+      "length": 162,
+      "after": "Threads"
+     }
+    ],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "7da5c6a7-bd8b-3f85-89a7-577283388083": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "930345b1-a970-3495-a1dd-55147bea7741": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "9f05d3c7-d1b1-4e2e-9130-f66a9df43997": {
+    "chips": [
+     "+1 track"
+    ],
+    "added": [
+     {
+      "position": 12,
+      "title": "We Carry On (live)",
+      "length": 375,
+      "after": "Threads"
+     }
+    ],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "bc18c59d-6131-4e18-aff5-4600ea7f3d7d": {
+    "chips": [
+     "4 lengths"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [
+     {
+      "position": 3,
+      "title": "Nylon Smile",
+      "from": 200,
+      "to": 196,
+      "delta": -4
+     },
+     {
+      "position": 5,
+      "title": "Plastic",
+      "from": 211,
+      "to": 207,
+      "delta": -4
+     },
+     {
+      "position": 7,
+      "title": "Deep Water",
+      "from": 93,
+      "to": 90,
+      "delta": -3
+     },
+     {
+      "position": 8,
+      "title": "Machine Gun",
+      "from": 286,
+      "to": 283,
+      "delta": -3
+     }
+    ],
+    "same": 7
+   },
+   "cae2ac10-057f-3d29-9e9d-1ba58e67ab9f": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "d68e178c-4c97-4a03-98df-d9faf26e2236": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "daa9710c-2e71-497f-8a02-10d9b611c370": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "e1e5386a-5616-460b-bb79-0d366537b7fb": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "e4f5a41f-b8b6-4d30-8baf-0db1478dc487": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   },
+   "f5bfccaf-1816-427a-b03d-b41c8ac155c5": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 11
+   }
+  }
+ }
+}

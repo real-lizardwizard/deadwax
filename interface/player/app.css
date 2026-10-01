@@ -3,7 +3,8 @@
   it, Home's shelf, You's grouped lists, and the Navidrome gate and the placeholders drawn inside
   tabs - and, since 2.0.0-player.10, what opens over Now Playing (its ••• menu and Info) and You's
   Gapless checkbox; since 2.0.0-player.11, Now Playing's look button and the turntable; since
-  2.0.0-player.12, the Requests tab, Home's Arriving and the Requests tab's badge. Loaded
+  2.0.0-player.12, the Requests tab, Home's Arriving and the Requests tab's badge; since
+  2.0.0-player.13, the Search tab and the album you don't have, with its pressing dropdown. Loaded
   after player.css, which draws the player itself (the library grid, the
   album page, the mini player and Now Playing) and whose mechanics - safe areas, edges, tap targets
   - these rules build on.
@@ -104,6 +105,57 @@
     --app-tab-badge-top: -5px;       /* over the icon's top right corner */
     --app-tab-badge-left: 14px;
     --app-tab-badge-gap: 2px;        /* a phone on its side: the count beside the icon, in the row */
+    /* the Search tab (2.0.0-player.13), as Search.dc.html draws it */
+    --app-search-gap: 16px;          /* the title to the field */
+    --app-field: 38px;               /* the field's well */
+    --app-field-pad: 10px;
+    --app-field-icon: 18px;
+    --app-field-gap: 6px;
+    --app-search-heading-gap: 4px;   /* round a heading, as the board has it */
+    --app-result: 64px;              /* a result's row */
+    --app-result-artist: 68px;       /* ...the top result's, an artist */
+    --app-result-cover: 48px;
+    --app-result-avatar: 56px;
+    --app-result-gap: 12px;
+    --app-result-lines: 3px;
+    --app-result-play: 20px;
+    /* "Asking MusicBrainz…": a part of the bar's track going along it */
+    --app-sweep-width: 40%;
+    --app-sweep-duration: 1.2s;
+    --app-asking-gap: 10px;
+    /* the album you don't have (2.0.0-player.13), as Request.dc.html draws it */
+    --app-rg-actions-gap: 18px;      /* the meta line to the pressing - the album page's to Play */
+    --app-rg-actions-max: 420px;     /* as wide as the album page's Play and Shuffle */
+    --app-picker: 52px;              /* the pressing button, and each pressing in its list */
+    --app-picker-pad-y: 6px;
+    --app-picker-pad-x: 14px;
+    --app-picker-gap: 10px;
+    --app-picker-drop: 6px;          /* the button to its list */
+    --app-picker-inset: 6px;         /* inside the list */
+    --app-picker-option-pad-x: 10px;
+    --app-picker-tick: 18px;
+    --app-picker-chevron: 16px;
+    --app-picker-max: min(60vh, 440px);  /* the list's height before it scrolls... */
+    /* ...and never taller than the band between the page's bars - the album page's sticky bar and
+       the tab bar (and the mini player) - so brought into view it is ALL in view: it opens
+       downward, and on a short phone it sat mostly under the mini player (review). The band is
+       what the page's scroll-padding leaves, which is what scrollIntoView keeps clear. */
+    --app-picker-band: calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom));
+    --app-picker-band-mini: calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom-mini));
+    --app-picker-more-indent: 38px;  /* "N more" under the pressings' words, past the tick */
+    --app-z-popover: 4;              /* the list: over the tracklist, under the album page's bar (5) */
+    --app-rg-row: 44px;
+    --app-rg-number: 18px;
+    --app-rg-gap: 14px;
+    --app-rg-mark-pad: 5px;          /* a marked row grows 5px above and below... */
+    --app-rg-mark-bleed: 8px;        /* ...and its tint reaches 8px past the column, so its number and
+                                        length stay in line with the plain rows' */
+    --app-rg-chip: 22px;
+    --app-rg-chip-pad: 8px;
+    --app-rg-lines: 2px;
+    --app-rg-summary-gap: 6px;
+    --app-rg-disc-top: 18px;
+    --app-rg-disc-bottom: 6px;
 }
 
 /* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
@@ -458,7 +510,8 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 .app-check { flex: none; width: var(--app-check); height: var(--app-check); color: var(--dw-accent); }
 .app-check.is-off { visibility: hidden; }
 
-/* ===== inside a tab: the Navidrome gate, and a tab that is on the main page for now ===== */
+/* ===== inside a tab: the Navidrome gate, and a card saying why a tab has nothing to show (Requests'
+   - the card the placeholder tabs used, until Search came in 2.0.0-player.13) ===== */
 
 .app-needs-body,
 .app-placeholder-body {
@@ -486,7 +539,6 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 
 .app-placeholder-body { padding: var(--dw-gutter-grouped); }
 .app-placeholder-lead { margin: 0; font-size: var(--dw-text-body); font-weight: var(--dw-weight-semibold); }
-.app-placeholder .app-button { width: 100%; margin-top: var(--pl-gap); }
 
 /* ===== You: the Gapless checkbox ===== */
 
@@ -1410,3 +1462,350 @@ html.app-info-open { overflow: hidden; }
     clip-path: inset(50%);
     white-space: nowrap;
 }
+
+/* ===== the Search tab (2.0.0-player.13) ===== */
+
+.app-search-form { padding: var(--app-search-gap) var(--pl-edge-right) 0 var(--pl-edge-left); }
+
+/* the field: STYLE.md's well, the board's darker one */
+.app-search-field {
+    display: flex;
+    align-items: center;
+    gap: var(--app-field-gap);
+    height: var(--app-field);
+    padding: 0 var(--app-field-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-field);
+    box-shadow: var(--dw-well-inset);
+}
+
+.app-search-field:focus-within { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring); }
+.app-search-icon { flex: none; width: var(--app-field-icon); height: var(--app-field-icon); color: var(--dw-field-icon); }
+
+/* 17px: anything under 16 and iOS zooms the page as it is tapped (v0.9.31) */
+.app-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--dw-text-body);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.app-search-input::placeholder { color: var(--dw-text-2); }
+
+.app-search-hint,
+.app-search-empty,
+.app-search-from,
+.app-asking-text {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-search-hint { padding: var(--pl-gap) var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-search-section { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-search-title { margin: var(--app-search-heading-gap) 0; }
+.app-search-title-tight { margin-bottom: 0; }
+.app-search-from { padding-bottom: var(--app-search-heading-gap); }
+.app-search-empty { padding: var(--pl-gap-sm) 0; }
+.app-search-problem .app-button { width: 100%; }
+
+.app-results { margin: 0; padding: 0; list-style: none; }
+.app-results > li + li { border-top: var(--dw-hairline) solid var(--dw-border); }
+
+/* a result: a row the whole width, the cover, the two lines, and on a song the play mark */
+.app-result {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--app-result-gap);
+    width: 100%;
+    min-height: var(--app-result);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+.app-result.is-artist { min-height: var(--app-result-artist); }
+button.app-result:active { background: var(--dw-pressed); }
+
+.app-result:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-result-cover {
+    flex: none;
+    width: var(--app-result-cover);
+    height: var(--app-result-cover);
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+    object-fit: cover;
+}
+
+.app-result-cover.is-round { width: var(--app-result-avatar); height: var(--app-result-avatar); border-radius: var(--dw-radius-round); }
+.app-result-text { display: flex; flex: 1; flex-direction: column; gap: var(--app-result-lines); min-width: 0; }
+
+.app-result-title,
+.app-result-line {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-result-title { font-size: var(--dw-text-body); line-height: var(--dw-leading-tight); }
+.app-result-line { color: var(--dw-text-2); font-size: var(--dw-text-footnote); line-height: var(--dw-leading-tight); }
+.app-result-play { flex: none; width: var(--app-result-play); height: var(--app-result-play); color: var(--dw-accent); }
+
+/* "Asking MusicBrainz…": STYLE.md's sunken track with a part of the purple fill going along it.
+   Reduced motion stops it - the whole track filled grey, still saying "busy" in its words. */
+.app-asking { display: flex; flex-direction: column; gap: var(--app-asking-gap); padding: var(--pl-gap-sm) 0; }
+
+.app-sweep {
+    position: relative;
+    display: block;
+    height: var(--dw-bar);
+    overflow: hidden;
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-track);
+    background: var(--dw-track);
+    box-shadow: var(--dw-track-inset);
+}
+
+.app-sweep::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--app-sweep-width);
+    border-radius: var(--dw-radius-fill);
+    background: var(--dw-bar-purple);
+    animation: app-sweep var(--app-sweep-duration) var(--dw-ease) infinite;
+}
+
+@keyframes app-sweep {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(250%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-sweep::before { width: 100%; background: var(--dw-bar-grey); animation: none; }
+}
+
+/* ===== the album you don't have (2.0.0-player.13): the album page's header, the pressing, the
+   chosen pressing's tracklist and what differs in it ===== */
+
+.app-rg-actions { width: 100%; max-width: var(--app-rg-actions-max); margin-top: var(--app-rg-actions-gap); }
+.app-rg-asking { padding: var(--pl-gap-sm) var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-rg-trouble .app-button { width: 100%; margin-top: var(--pl-gap-sm); }
+
+/* the pressing: STYLE.md's secondary button, "Pressing" over the one shown */
+.app-picker { position: relative; text-align: left; }
+
+.app-picker-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-picker-gap);
+    width: 100%;
+    min-height: var(--app-picker);
+    padding: var(--app-picker-pad-y) var(--app-picker-pad-x);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    text-align: left;
+}
+
+.app-picker-button:active { background: var(--dw-secondary-bg-active); }
+
+.app-picker-button:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+.app-picker-text { display: flex; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+.app-picker-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); line-height: var(--dw-leading-label); }
+
+.app-picker-value {
+    overflow: hidden;
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-label);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-picker-chevron { flex: none; width: var(--app-picker-chevron); height: var(--app-picker-chevron); }
+
+/* the list: a popover over the tracklist, scrolling itself when the album has many pressings */
+.app-picker-popover {
+    position: absolute;
+    top: calc(100% + var(--app-picker-drop));
+    right: 0;
+    left: 0;
+    z-index: var(--app-z-popover);
+    max-height: max(var(--app-picker), min(var(--app-picker-max), var(--app-picker-band)));
+    padding: var(--app-picker-inset);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: var(--dw-hairline) solid var(--dw-popover-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-popover);
+    box-shadow: var(--dw-highlight), var(--dw-shadow);
+}
+
+.app-shell.has-mini .app-picker-popover {
+    max-height: max(var(--app-picker), min(var(--app-picker-max), var(--app-picker-band-mini)));
+}
+
+.app-picker-option {
+    display: flex;
+    align-items: center;
+    gap: var(--app-picker-gap);
+    width: 100%;
+    min-height: var(--app-picker);
+    padding: var(--app-picker-pad-y) var(--app-picker-option-pad-x);
+    border-radius: var(--dw-radius-control);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+.app-picker-option.is-selected { background: var(--dw-selected-row); }
+.app-picker-option:active { background: var(--dw-pressed); }
+
+.app-picker-option:focus-visible,
+.app-picker-more:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+}
+
+.app-picker-tick { flex: none; width: var(--app-picker-tick); height: var(--app-picker-tick); color: var(--dw-accent); }
+.app-picker-tick.is-off { visibility: hidden; }
+.app-picker-option-label { font-size: var(--dw-text-body); line-height: var(--dw-leading-label); overflow-wrap: anywhere; }
+
+.app-picker-note {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-picker-note.is-differs { color: var(--dw-amber-text); }
+
+.app-picker-more {
+    width: 100%;
+    min-height: var(--pl-hit);
+    padding: 0 var(--app-picker-option-pad-x) 0 var(--app-picker-more-indent);
+    border-radius: var(--dw-radius-control);
+    /* a control, so drawn as the app's text buttons are - the accent, which says it can be tapped
+       (and is 5.5:1 on the popover, where the board's tertiary grey was 3.6:1 at 12px) */
+    color: var(--dw-accent);
+    font-size: var(--dw-text-label);
+    text-align: left;
+}
+
+/* the tracklist, as the board draws it: the line above it, numbers and lengths monospace */
+.app-rg-tracks { padding: var(--pl-gap-sm) var(--pl-edge-right) 0 var(--pl-edge-left); }
+
+.app-rg-summary {
+    margin: 0;
+    padding-bottom: var(--app-rg-summary-gap);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-rg-summary.is-differs { color: var(--dw-amber-text); }
+.app-rg-list { margin: 0; padding: 0; list-style: none; }
+
+/* "Disc 2 · Unreleased Tracks" - the album page's disc heading */
+.app-rg-disc {
+    padding: var(--app-rg-disc-top) 0 var(--app-rg-disc-bottom);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-semibold);
+    overflow-wrap: anywhere;
+}
+
+.app-rg-track {
+    display: flex;
+    align-items: center;
+    gap: var(--app-rg-gap);
+    min-height: var(--app-rg-row);
+    border-bottom: var(--dw-hairline) solid var(--dw-border);
+}
+
+/* a track that differs from the usual tracklist: tinted, a little taller, the tint reaching past
+   the column so its number and length stay in line with the plain rows */
+.app-rg-track.is-marked {
+    margin: 0 calc(-1 * var(--app-rg-mark-bleed));
+    padding: var(--app-rg-mark-pad) var(--app-rg-mark-bleed);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-rg-track.is-bonus { background: var(--dw-tint-green); }
+.app-rg-track.is-version,
+.app-rg-track.is-renamed { background: var(--dw-tint-amber); }
+
+.app-rg-number,
+.app-rg-length {
+    flex: none;
+    color: var(--dw-text-2);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-data);
+    font-variant-numeric: tabular-nums;
+}
+
+.app-rg-number { min-width: var(--app-rg-number); text-align: right; }
+.app-rg-text { display: flex; flex: 1; flex-direction: column; gap: var(--app-rg-lines); min-width: 0; }
+
+.app-rg-title {
+    overflow: hidden;
+    font-size: var(--dw-text-body);
+    line-height: var(--dw-leading-tight);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-rg-note { color: var(--dw-text-2); font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+
+/* STYLE.md's badges: green for a Bonus track, amber for another version or a rename */
+.app-rg-chip {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: var(--app-rg-chip);
+    padding: 0 var(--app-rg-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-badge-amber-bg);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+    white-space: nowrap;
+}
+
+.app-rg-track.is-bonus .app-rg-chip {
+    border-color: var(--dw-badge-green-border);
+    background: var(--dw-badge-green-bg);
+    color: var(--dw-badge-green-text);
+}
+
+/* what the pressing leaves out: after its tracklist, its words quieter */
+.app-rg-left { margin-top: var(--app-section-gap); }
+.app-rg-left-title { margin: 0; color: var(--dw-text-heading-color); font-size: var(--dw-text-heading); font-weight: var(--dw-weight-semibold); }
+.app-rg-track.is-left .app-rg-title { color: var(--dw-text-3); }

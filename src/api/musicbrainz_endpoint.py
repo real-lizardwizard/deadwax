@@ -364,7 +364,8 @@ class MusicBrainzClient:
             f"artist/{artist_mbid}", {"inc": self.ARTIST_INC, "fmt": "json"}
         )
 
-    async def get_releases(self, release_group_id: str, log=True, with_tracks: bool = True) -> dict:
+    async def get_releases(self, release_group_id: str, log=True, with_tracks: bool = True,
+                           with_group: bool = False) -> dict:
         """
         Every release in a group.
 
@@ -373,6 +374,10 @@ class MusicBrainzClient:
         False: it is choosing BETWEEN pressings, which needs their format, country, catalogue
         number and track count but not their contents - and then fetches the tracklist of the one
         you pick. See get_release for what that saves.
+
+        `with_group` adds each release's `release-group` (`inc=release-groups`): the app's album
+        page reads the group's title, type and first year from it when nothing handed them over (a
+        reload, a link), at no extra request. Its own cache key, as every inc is.
         """
         if log:
             logger.info(
@@ -387,7 +392,8 @@ class MusicBrainzClient:
         while True:
             params = {
                 "release-group": release_group_id,
-                "inc": self.RELEASE_FULL_INC if with_tracks else self.RELEASE_LIST_INC,
+                "inc": (self.RELEASE_FULL_INC if with_tracks else self.RELEASE_LIST_INC)
+                + ("+release-groups" if with_group else ""),
                 "fmt": "json",
                 "limit": limit,
                 "offset": offset,

@@ -1,0 +1,36 @@
+{
+ "about": "A library as /deadwax/library/owned answers it (OWNED_FIELDS), and what holds what. ui/test/owned.sim.cjs runs interface/scripts/owned.mjs and its TypeScript port, ui/src/lib/owned.ts, against every case here, so the main page's marks and the app's Search can never disagree about whether an album is in the library. Albums in an answer are written as their paths.",
+ "albums": [
+  {"path": "Portishead/Dummy (1994)", "artist": "Portishead", "album": "Dummy", "year": "1994", "edition": "", "release_mbid": "76df3287-6cda-33eb-8e9a-044b5e15ffdd", "release_group_mbid": "48140466-cff6-3222-bd55-63c27e43190d", "formats": ["flac"], "track_count": 11},
+  {"path": "Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]", "artist": "Portishead", "album": "Dummy", "year": "1994", "edition": "20th Anniversary Reissue 180gram", "release_mbid": "f5804905-6e8d-45dc-bae9-b36c64ccc99b", "release_group_mbid": "48140466-cff6-3222-bd55-63c27e43190d", "formats": ["flac"], "track_count": 10},
+  {"path": "Tame Impala/Currents (2015)", "artist": "Tame Impala", "album": "Currents", "year": "2015", "edition": "", "release_mbid": "currents-cd", "release_group_mbid": "", "formats": ["m4a"], "track_count": 13},
+  {"path": "Old Rips/Pink Floyd - Wish You Were Here", "artist": "Pink Floyd", "album": "Wish You Were Here (Remastered)", "year": "", "edition": "", "release_mbid": "", "release_group_mbid": "", "formats": ["flac"], "track_count": 5},
+  {"path": "Kanye West/Donda", "artist": "Kanye West", "album": "Donda", "year": "", "edition": "", "release_mbid": "", "release_group_mbid": "", "formats": ["flac"], "track_count": 27},
+  {"path": "Somebody Else/Third", "artist": "Portishead", "album": "Third", "year": "2008", "edition": "", "release_mbid": "not-this-group", "release_group_mbid": "other", "formats": ["flac"], "track_count": 11},
+  {"path": "The Motörhead & Friends/Ace of Spades", "artist": "The Motörhead & Friends", "album": "Ace of Spades", "year": "", "edition": "", "release_mbid": "", "release_group_mbid": "", "formats": ["mp3"], "track_count": 12},
+  {"path": "Radiohead/OK Computer (1997)", "artist": "Radiohead", "album": "OK Computer", "year": "1997", "edition": "", "release_mbid": "", "release_group_mbid": "b1392450-e666-3926-a536-22c65f834433", "formats": ["m4a"], "track_count": 12}
+ ],
+ "cases": [
+  {"label": "bracketed asides, a leading The, accents and & fold away", "fn": "foldName", "args": ["Wish You Were Here (Remastered)"], "expected": "wish you were here"},
+  {"label": "...and an accent, a leading The and &", "fn": "foldName", "args": ["The Motörhead & Friends"], "expected": "motorhead and friends"},
+  {"label": "curly and straight apostrophes are one", "fn": "foldName", "args": ["Tomorrow’s Dust"], "expected": "tomorrow s dust"},
+  {"label": "a pressing you hold", "fn": "ownedForRelease", "args": ["f5804905-6e8d-45dc-bae9-b36c64ccc99b"], "expected": ["Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]"]},
+  {"label": "a pressing you do not", "fn": "ownedForRelease", "args": ["e9a123bd-711f-4e19-a06f-5aff5330daa8"], "expected": []},
+  {"label": "no release id holds nothing", "fn": "ownedForRelease", "args": [""], "expected": []},
+  {"label": "both editions of Dummy, by group id", "fn": "ownedForGroup", "args": [{"groupId": "48140466-cff6-3222-bd55-63c27e43190d", "title": "Dummy", "artists": ["Portishead"]}], "expected": {"held": ["Portishead/Dummy (1994)", "Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]"], "guessed": []}},
+  {"label": "the card says how many", "fn": "describeGroupOwnership", "args": [{"groupId": "48140466-cff6-3222-bd55-63c27e43190d", "title": "Dummy", "artists": ["Portishead"]}], "expected": {"kind": "held", "label": "In your library · 2 editions"}},
+  {"label": "an m4a album with no group id is found through its pressing", "fn": "ownedForGroup", "args": [{"groupId": "currents", "releaseIds": ["currents-cd", "currents-lp"], "title": "Currents", "artists": ["Tame Impala"]}], "expected": {"held": ["Tame Impala/Currents (2015)"], "guessed": []}},
+  {"label": "...once the group's pressings are known - by group id alone it isn't", "fn": "ownedForGroup", "args": [{"groupId": "currents", "title": "Currents", "artists": ["Tame Impala"]}], "expected": {"held": [], "guessed": []}},
+  {"label": "an untagged rip is a \"maybe\"", "fn": "ownedForGroup", "args": [{"groupId": "1a272023-10d3-38ee-bab3-317b55fcc21d", "title": "Wish You Were Here", "artists": ["Pink Floyd"]}], "expected": {"held": [], "guessed": ["Old Rips/Pink Floyd - Wish You Were Here"]}},
+  {"label": "...and its chip says so", "fn": "describeGroupOwnership", "args": [{"groupId": "1a272023-10d3-38ee-bab3-317b55fcc21d", "title": "Wish You Were Here", "artists": ["Pink Floyd"]}], "expected": {"kind": "maybe", "label": "Maybe in your library"}},
+  {"label": "a folder named for the credit, not the artist's current name", "fn": "ownedForGroup", "args": [{"groupId": "donda", "title": "Donda", "artists": ["Kanye West", "Ye"]}], "expected": {"held": [], "guessed": ["Kanye West/Donda"]}},
+  {"label": "a TAGGED folder of another album is never claimed by its name", "fn": "ownedForGroup", "args": [{"groupId": "163339ab-813b-3d29-bba8-e1d5acf63cab", "title": "Third", "artists": ["Portishead"]}], "expected": {"held": [], "guessed": []}},
+  {"label": "nothing held, no chip", "fn": "describeGroupOwnership", "args": [{"groupId": "163339ab-813b-3d29-bba8-e1d5acf63cab", "title": "Third", "artists": ["Portishead"]}], "expected": null},
+  {"label": "a name held by id is never also a guess", "fn": "ownedForGroup", "args": [{"groupId": "48140466-cff6-3222-bd55-63c27e43190d", "title": "Wish You Were Here", "artists": ["Pink Floyd"]}], "expected": {"held": ["Portishead/Dummy (1994)", "Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]"], "guessed": []}},
+  {"label": "an edition the folder name already carries is not said twice", "fn": "describeFolders", "args": [["Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]"]], "expected": "Portishead/Dummy (1994) [20th Anniversary Reissue 180gram] (FLAC)"},
+  {"label": "one it does not carry is", "fn": "describeFolders", "args": [[{"path": "Rips/Dummy", "edition": "Standard", "formats": ["mp3"]}]], "expected": "Rips/Dummy (Standard, MP3)"},
+  {"label": "a folder tagged with only a group id is held by it...", "fn": "ownedForGroup", "args": [{"groupId": "b1392450-e666-3926-a536-22c65f834433", "title": "OK Computer", "artists": ["Radiohead"]}], "expected": {"held": ["Radiohead/OK Computer (1997)"], "guessed": []}},
+  {"label": "...and, tagged, never claimed by its name for another group", "fn": "ownedForGroup", "args": [{"groupId": "ok-computer-oknotok", "title": "OK Computer", "artists": ["Radiohead"]}], "expected": {"held": [], "guessed": []}},
+  {"label": "the index counts every album", "fn": "total", "args": [], "expected": 8}
+ ]
+}

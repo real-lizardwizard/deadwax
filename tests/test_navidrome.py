@@ -230,12 +230,16 @@ def test_there_is_no_general_proxy():
     """
     Each Subsonic call the player may make is its own route. The account may be Navidrome's
     admin and deadwax has no login, so a catch-all would hand out user management.
+
+    `/search` (search3) joined the list in 2.0.0-player.13, deliberately: the app's Search tab
+    shows what you have first. It only reads the library, with declared, bounded parameters -
+    see test_navidrome_search.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 
     assert paths == [
         "/albums", "/albums/{album_id}", "/cover/{cover_id}", "/scrobble/{song_id}",
-        "/status", "/stream/{song_id}",
+        "/search", "/status", "/stream/{song_id}",
     ]
 
 

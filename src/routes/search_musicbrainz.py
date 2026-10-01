@@ -1,5 +1,5 @@
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from src.logger import logger
 
 router = APIRouter()
@@ -102,11 +102,48 @@ async def get_releases(
     try:
         mb_client = request.app.state.musicbrainz_client
         releases = await mb_client.get_releases(release_group_mbid, with_tracks=tracks)
-        return {"id": release_group_mbid, "releases": releases["releases"]}
+        #? `problem` passed on (2.0.0-player.13): get_releases sets it when MusicBrainz failed part
+        #? way, and dropping it handed the page a short or empty list that read as the album's whole
+        #? set of pressings - exactly the confusion get_releases' own note is about
+        return {"id": release_group_mbid, "releases": releases["releases"], "problem": releases.get("problem")}
 
     except Exception as e:
         logger.error(f"Exception in /releases endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving releases from MusicBrainz: {e}")
+
+
+#? A MusicBrainz id as MusicBrainz writes one. A cold link the app opens carries it in the
+#? address, and anything else is refused here rather than spent on a request MusicBrainz rejects.
+MBID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
+@router.get("/release_group")
+async def release_group(
+    request: Request,
+    release_group_mbid: str = Query(..., pattern=MBID_PATTERN),
+):
+    """
+    Every pressing of one album WITH its tracklist, for the app's album-you-don't-have page
+    (2.0.0-player.13): the pressing dropdown defaults to the group's most common tracklist and
+    shows what each pressing changes about it, which needs every pressing's tracks - the costly
+    listing (`with_tracks`), up to five requests and 1.4 MB for a big group.
+
+    Successes are cached for the process like every MusicBrainz answer (ResponseCache), so a
+    second look costs nothing; a failure never is. `problem` says MusicBrainz failed - part way
+    through a long list, or before the first page - and the page then offers to ask again rather
+    than drawing a partial list as the album's pressings.
+
+    Each release carries its `release-group` too (`with_group`), so a page opened from a link or a
+    reload - with no group handed over by Search - still says the album's title, kind and year.
+    """
+    try:
+        mb_client = request.app.state.musicbrainz_client
+        releases = await mb_client.get_releases(release_group_mbid, log=False, with_tracks=True, with_group=True)
+        return {"id": release_group_mbid, "releases": releases["releases"], "problem": releases.get("problem")}
+
+    except Exception as e:
+        logger.error(f"Exception in /release_group endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving pressings from MusicBrainz: {e}")
 
 
 @router.get("/release")

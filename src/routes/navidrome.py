@@ -14,7 +14,7 @@ from fastapi.responses import Response, StreamingResponse
 from starlette.background import BackgroundTask
 
 from src import player_cache
-from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, navidrome
+from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, client_for
 from src.config import Config
 from src.logger import logger
 from src.routes.download import ClientGone, unless_abandoned
@@ -170,13 +170,13 @@ def _relay(upstream: httpx.Response, what: str, content_type: str, cache_control
 
 
 @router.get("/status")
-async def status():
+async def status(request: Request):
     """Whether the player has a Navidrome to play from, and if not, why not."""
     if not Config.navidrome_configured():
         return {"configured": False, "ok": False, "server": None, "problem": NOT_CONFIGURED}
 
     try:
-        body = await navidrome.call("ping")
+        body = await client_for(request).call("ping")
     except NavidromeError as e:
         return {"configured": True, "ok": False, "server": None, "problem": str(e)}
 
@@ -192,13 +192,14 @@ async def status():
 
 @router.get("/albums")
 async def albums(
+    request: Request,
     order: AlbumList = "newest",
     size: int = Query(60, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
     """A page of albums. 500 is Subsonic's own ceiling on one page."""
     try:
-        body = await navidrome.call(
+        body = await client_for(request).call(
             "getAlbumList2", {"type": order, "size": size, "offset": offset}
         )
     except NavidromeError as e:
@@ -208,14 +209,62 @@ async def albums(
 
 
 @router.get("/albums/{album_id}")
-async def album(album_id: str):
+async def album(album_id: str, request: Request):
     """One album with its songs, in Navidrome's order - disc, then track."""
     try:
-        body = await navidrome.call("getAlbum", {"id": album_id})
+        body = await client_for(request).call("getAlbum", {"id": album_id})
     except NavidromeError as e:
         raise _fail(e)
 
     return body.get("album") or {}
+
+
+#? The most of each the Search tab may ask for in one go: a screenful of artists and albums, and
+#? songs enough to page through. Subsonic's own default is 20 of each.
+SEARCH_MAX_ARTISTS = 50
+SEARCH_MAX_ALBUMS = 50
+SEARCH_MAX_SONGS = 500
+
+
+@router.get("/search")
+async def search(
+    request: Request,
+    #? DECLARED, every one: what isn't declared is never passed on (a forged `u`, a `musicFolderId`,
+    #? `f=xml`) - the call is built from these alone, and the login laid over them last
+    q: str = Query(..., max_length=200),
+    artist_count: int = Query(20, alias="artistCount", ge=0, le=SEARCH_MAX_ARTISTS),
+    artist_offset: int = Query(0, alias="artistOffset", ge=0),
+    album_count: int = Query(20, alias="albumCount", ge=0, le=SEARCH_MAX_ALBUMS),
+    album_offset: int = Query(0, alias="albumOffset", ge=0),
+    song_count: int = Query(20, alias="songCount", ge=0, le=SEARCH_MAX_SONGS),
+    song_offset: int = Query(0, alias="songOffset", ge=0),
+):
+    """
+    Artists, albums and songs in the library matching `q` - Subsonic's search3, for the app's
+    Search tab (2.0.0-player.13), which shows what you have before what MusicBrainz has.
+
+    Safe to hand the page for the reason the other routes are: it READS the library the account
+    can see, as every Subsonic app does, and changes nothing - and only these parameters reach it,
+    each bounded. Navidrome's answer is passed on as it is (the page reads what it needs and plays
+    a song from its album's own answer). An empty `q` is allowed: Navidrome answers it with
+    everything, a page at a time, which a later slice's Songs list wants.
+    """
+    try:
+        body = await client_for(request).call("search3", {
+            "query": q,
+            "artistCount": artist_count, "artistOffset": artist_offset,
+            "albumCount": album_count, "albumOffset": album_offset,
+            "songCount": song_count, "songOffset": song_offset,
+        })
+    except NavidromeError as e:
+        raise _fail(e)
+
+    found = body.get("searchResult3") or {}
+    return {
+        "artists": found.get("artist") or [],
+        "albums": found.get("album") or [],
+        "songs": found.get("song") or [],
+    }
 
 
 @router.get("/cover/{cover_id}")
@@ -230,7 +279,7 @@ async def cover(cover_id: str, request: Request, size: int | None = Query(None, 
     So a phone scrolling a grid of hundreds still doesn't fetch each of them again.
     """
     try:
-        upstream = await navidrome.open(
+        upstream = await client_for(request).open(
             "getCoverArt", {"id": cover_id, "size": size}, _conditions(request, COVER_CONDITIONS)
         )
     except NavidromeError as e:
@@ -330,7 +379,7 @@ async def stream(
         params["estimateContentLength"] = "true"
 
     try:
-        upstream = await navidrome.open("stream", params, _conditions(request, STREAM_CONDITIONS))
+        upstream = await client_for(request).open("stream", params, _conditions(request, STREAM_CONDITIONS))
     except NavidromeError as e:
         raise _fail(e)
 
@@ -338,7 +387,7 @@ async def stream(
 
 
 @router.post("/scrobble/{song_id}")
-async def scrobble(song_id: str, submission: bool = False, time: int | None = Query(None, ge=0)):
+async def scrobble(song_id: str, request: Request, submission: bool = False, time: int | None = Query(None, ge=0)):
     """
     Tell Navidrome what is playing (`submission=false`) or that it was played (`true`).
 
@@ -346,7 +395,7 @@ async def scrobble(song_id: str, submission: bool = False, time: int | None = Qu
     if they are set up there; the first is what shows under "now playing".
     """
     try:
-        await navidrome.call("scrobble", {
+        await client_for(request).call("scrobble", {
             "id": song_id, "submission": "true" if submission else "false", "time": time,
         })
     except NavidromeError as e:

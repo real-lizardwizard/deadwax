@@ -7,6 +7,9 @@
  *
  *   #/home  #/library  #/search  #/requests  #/you     a tab's root
  *   #/<tab>/album/<id>                                 an album pushed on that tab
+ *   #/<tab>/group/<rgid>?release=<mbid>                an album you don't have (2.0.0-player.13):
+ *                                                      a MusicBrainz release group, and the pressing
+ *                                                      shown when it isn't the default
  *
  * The player's old `#/album/<id>` links still open: they are the Library's album, and the address
  * is rewritten to `#/library/album/<id>` in place. An empty hash is Home.
@@ -40,12 +43,22 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
   you: 'You',
 }
 
+/** What a page can be: an album in the library (Navidrome's id), or a MusicBrainz release group -
+ *  the album you don't have (2.0.0-player.13). */
+export type PageKind = 'album' | 'group'
+
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group']
+
 /** A page pushed on a tab. `label` names it on the back button of a page pushed over it - never
- *  part of the address, and never part of what makes two pages the same one. */
+ *  part of the address, and never part of what makes two pages the same one. `release` is a group
+ *  page's pressing - in the address (`?release=`), so a reload or a link shows the same one, but
+ *  NOT part of what makes two pages the same: choosing another pressing is the same page, its
+ *  address replaced (`replaceTop`), never a page pushed over it. */
 export interface Page {
-  kind: 'album'
+  kind: PageKind
   id: string
   label?: string
+  release?: string
 }
 
 export interface Route {
@@ -66,7 +79,27 @@ function decode(part: string): string {
 
 export function formatRoute(route: Route): string {
   const root = `#/${route.tab}`
-  return route.page ? `${root}/${route.page.kind}/${encodeURIComponent(route.page.id)}` : root
+  if (!route.page) return root
+  const path = `${root}/${route.page.kind}/${encodeURIComponent(route.page.id)}`
+  return route.page.kind === 'group' && route.page.release ? `${path}?release=${encodeURIComponent(route.page.release)}` : path
+}
+
+/** What a page's scroll is kept under: its address without the pressing - choosing another
+ *  pressing is the same page, and must not jump it back to the top. */
+export function scrollKey(route: Route): string {
+  if (!route.page) return formatRoute(route)
+  const { release: _release, ...page } = route.page
+  return formatRoute({ tab: route.tab, page })
+}
+
+/** A page of a kind, from the parts of an address after its tab. */
+function pageFrom(parts: readonly string[], query: string): Page | null {
+  const kind = parts[0] as PageKind
+  if (!PAGE_KINDS.includes(kind) || !parts[1]) return null
+  const id = decode(parts.slice(1).join('/'))
+  if (kind !== 'group') return { kind, id }
+  const release = new URLSearchParams(query).get('release')?.trim()
+  return release ? { kind, id, release } : { kind, id }
 }
 
 /**
@@ -76,17 +109,17 @@ export function formatRoute(route: Route): string {
  * A caller rewrites the address with replaceState whenever `canonical` differs from what it gave.
  */
 export function parseHash(hash: string): { route: Route; canonical: string } {
-  const path = hash.replace(/^#/, '').replace(/\?.*$/, '')
+  const address = hash.replace(/^#/, '')
+  const mark = address.indexOf('?')
+  const path = mark === -1 ? address : address.slice(0, mark)
+  const query = mark === -1 ? '' : address.slice(mark + 1)
   const parts = path.split('/').filter((part, index) => index > 0 || part !== '')
   let route: Route
 
   if (parts[0] === 'album' && parts[1]) {
     route = { tab: 'library', page: { kind: 'album', id: decode(parts.slice(1).join('/')) } }
   } else if (isTab(parts[0])) {
-    const tab = parts[0]
-    route = parts[1] === 'album' && parts[2]
-      ? { tab, page: { kind: 'album', id: decode(parts.slice(2).join('/')) } }
-      : { tab, page: null }
+    route = { tab: parts[0], page: pageFrom(parts.slice(1), query) }
   } else {
     route = { tab: 'home', page: null }
   }
@@ -134,6 +167,19 @@ export function openPage(nav: Nav, page: Page): Nav {
   return withStack(nav, nav.tab, [...nav.stacks[nav.tab], page])
 }
 
+/**
+ * The page on top of the tab showing, made `page` - the same page (kind and id) in another state:
+ * a group page showing another pressing. The same nav when the top is another page, or nothing
+ * changed. Pushed nothing, so back still leaves the page, as it does after a pick in a list.
+ */
+export function replaceTop(nav: Nav, page: Page): Nav {
+  const stack = nav.stacks[nav.tab]
+  const top = stack[stack.length - 1]
+  if (!samePage(top, page) || (top!.release ?? null) === (page.release ?? null)) return nav
+  const { release: _release, ...kept } = top!
+  return withStack(nav, nav.tab, [...stack.slice(0, -1), page.release ? { ...kept, release: page.release } : kept])
+}
+
 /** The page on top taken off; the same nav at the root. */
 export function popPage(nav: Nav): Nav {
   const stack = nav.stacks[nav.tab]
@@ -163,7 +209,11 @@ export function followRoute(nav: Nav, route: Route): Nav {
   const stack = nav.stacks[route.tab]
   if (!route.page) return withStack(nav, route.tab, [])
   for (let index = stack.length - 1; index >= 0; index--) {
-    if (samePage(stack[index], route.page)) return withStack(nav, route.tab, stack.slice(0, index + 1))
+    if (samePage(stack[index], route.page)) {
+      //? the page as the stack had it (its label), showing the pressing the address names
+      const kept = withStack(nav, route.tab, stack.slice(0, index + 1))
+      return replaceTop({ ...kept, tab: route.tab }, route.page)
+    }
   }
   return withStack(nav, route.tab, [...stack, route.page])
 }
@@ -179,7 +229,7 @@ export function followRoute(nav: Nav, route: Route): Nav {
 export function forwardTo(nav: Nav, note: HistoryNote, place: number, route: Route): Nav {
   let next = nav
   const step = (page: Page | null) => {
-    next = page ? openPage(next, page) : withStack(next, route.tab, [])
+    next = page ? replaceTop(openPage(next, page), page) : withStack(next, route.tab, [])
   }
   for (let at = note.index + 1; at < place; at++) {
     const entry = note.entries[at]

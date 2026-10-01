@@ -85,6 +85,34 @@ export async function albumPage(
   return page.albums
 }
 
+/** An artist as search3 answers: what the Search tab's top result shows. */
+export interface Artist {
+  id: string
+  name: string
+  albumCount?: number
+  coverArt?: string
+}
+
+/** The library half of the Search tab: Navidrome's search3, as deadwax's route passes it on. */
+export interface LibraryResults {
+  artists: Artist[]
+  albums: Album[]
+  songs: Song[]
+}
+
+/** How much of each the Search tab asks for: a screenful of each, songs enough to choose from. */
+export const SEARCH_COUNTS = { artistCount: 5, albumCount: 8, songCount: 12 } as const
+
+/**
+ * The library's artists, albums and songs matching `query` (2.0.0-player.13) - Navidrome's search3,
+ * through deadwax's route, which declares and bounds every parameter (src/routes/navidrome.py).
+ */
+export function searchLibrary(query: string, signal?: AbortSignal): Promise<LibraryResults> {
+  const params = new URLSearchParams({ q: query })
+  for (const [name, count] of Object.entries(SEARCH_COUNTS)) params.set(name, String(count))
+  return get<LibraryResults>(`/navidrome/search?${params}`, signal)
+}
+
 /** How long an album asked for ahead of its page opening is worth using. */
 export const PREFETCH_KEEP_MS = 30_000
 
@@ -92,6 +120,8 @@ interface Prefetched {
   at: number
   answer: Promise<AlbumWithSongs>
   controller: AbortController | null
+  /** someone keeps this answer (Search): a press that turned into a scroll must not call it off */
+  kept: boolean
 }
 
 const prefetched = new Map<string, Prefetched>()
@@ -104,21 +134,37 @@ const albumPath = (id: string) => `/navidrome/albums/${encodeURIComponent(id)}`
  * itself: Play must be pressed on the page, in the same turn as the tap (see "The one app" in
  * CLAUDE.md), and that needs the songs in hand. Asked for once however often it is pressed, and
  * kept for PREFETCH_KEEP_MS.
+ *
+ * `keep`: the caller holds on to the answer - Search (2.0.0-player.13), whose song rows play once
+ * their album is in hand. A tile's press shares the one ask, and a press that turns into a scroll
+ * calls it off (dropPrefetch) - which, on an ask Search was waiting for, would have left that
+ * album's songs opening the album instead of playing, with nothing asking again (review). So a
+ * kept ask is never called off, whoever asked first.
  */
-export function prefetchAlbum(id: string): void {
+export function prefetchAlbum(id: string, keep = false): Promise<AlbumWithSongs> {
   const now = Date.now()
   for (const [key, held] of prefetched) if (now - held.at >= PREFETCH_KEEP_MS) prefetched.delete(key)
-  if (prefetched.has(id)) return
+  const held = prefetched.get(id)
+  if (held) {
+    if (keep) held.kept = true
+    return held.answer
+  }
   const controller = typeof AbortController === 'function' ? new AbortController() : null
   const answer = get<AlbumWithSongs>(albumPath(id), controller?.signal)
   //? an ask nobody takes must not report an unhandled rejection; album() hands the answer on as it is
   answer.catch(() => {})
-  prefetched.set(id, { at: now, answer, controller })
+  prefetched.set(id, { at: now, answer, controller, kept: keep })
+  //? Search keeps the answer it is handed (2.0.0-player.13), so a song's tap plays with its album in
+  //? hand; the album page still takes the ask here once, as it opens
+  return answer
 }
 
-/** The press turned into a scroll: the ask is called off, unless the page already took it. */
+/** The press turned into a scroll: the ask is called off, unless the page already took it - or
+ *  someone keeps it (`keep`), and then it stays, for the page to take as well. */
 export function dropPrefetch(id: string): void {
-  prefetched.get(id)?.controller?.abort()
+  const held = prefetched.get(id)
+  if (!held || held.kept) return
+  held.controller?.abort()
   prefetched.delete(id)
 }
 

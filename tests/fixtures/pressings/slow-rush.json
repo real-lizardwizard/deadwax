@@ -1,0 +1,2862 @@
+{
+ "about": "The Slow Rush by Tame Impala, release group c6fc678e-e987-45c5-811c-e2bd09c8b902, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Ten pressings, nine sharing one tracklist: the Japanese CD adds \"Patience\", and one digital release has the single mix of \"Borderline\" (4:34, against the album's 3:58). 'expected' is what interface/scripts/tracklistDiff.mjs answered; ui/test/tracklist.sim.cjs holds it and the TypeScript port (ui/src/lib/tracklistDiff.ts) to it.",
+ "group": {
+  "id": "c6fc678e-e987-45c5-811c-e2bd09c8b902",
+  "title": "The Slow Rush",
+  "artist": "Tame Impala"
+ },
+ "releases": [
+  {
+   "id": "1cf564b9-4e24-4362-89fb-1aa702ff60f2",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "AU",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "7757960",
+     "label": {
+      "name": "Caroline International"
+     }
+    },
+    {
+     "catalog-number": "7757960",
+     "label": {
+      "name": "Fiction"
+     }
+    },
+    {
+     "catalog-number": "7757960",
+     "label": {
+      "name": "Interscope Records"
+     }
+    },
+    {
+     "catalog-number": "7757960",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AU"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 322373,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 193693,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237800,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366066,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372653,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326840,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301786,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249586,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 238146,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 272960,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128826,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 433133,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "2912c9db-eacb-4207-93a6-7696615be302",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "XW",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Universal Music Australia Pty Ltd."
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "XW"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 322000,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 193000,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237000,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366000,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372000,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326000,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301000,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249000,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 238000,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 272000,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128000,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 433000,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3a12923d-97cd-4e87-8cfd-fb67be970974",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "AI",
+   "disambiguation": "Borderline “single mix” version",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Island Records Australia"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AI"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AR"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AM"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AU"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AT"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BS"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BH"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BB"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BY"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BM"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BO"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BW"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BR"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "VG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BN"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "BF"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "KH"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CV"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "KY"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CL"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CN"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CO"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CR"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CY"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "DK"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "DM"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "DO"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "EC"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "EG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "SV"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "EE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "SZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "FM"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "FJ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "FI"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "FR"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "GM"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "DE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "GH"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "GR"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "GD"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "GT"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "GW"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "HN"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "HK"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "HU"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "IN"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "ID"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "IE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "IL"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "IT"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "JP"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "JO"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "KZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "KE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "KG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "LA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "LV"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "LB"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "LT"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "LU"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MO"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MY"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MT"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MU"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MX"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MD"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MN"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NP"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NL"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NI"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "NO"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "OM"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "PA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "PG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "PY"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "PE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "PH"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "PL"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "PT"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "QA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "RO"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "RU"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "KN"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "SA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "SG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "SK"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "SI"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "ZA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "KR"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "ES"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "LK"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "SE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "CH"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "TW"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "TJ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "TH"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "TT"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "TR"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "TM"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "UG"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "UA"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "AE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "GB"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "UZ"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "VE"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "VN"
+      ]
+     }
+    },
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "ZW"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 324000,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 195000,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 274294,
+       "recording": {
+        "title": "Borderline",
+        "length": 274000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366000,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 373000,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 327000,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 302000,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 250000,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 239000,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 273016,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 129000,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 433000,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "452ccdb4-d6f5-4ac2-9eea-3eb2df8e5bb6",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "JP",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "UICB-1004",
+     "label": {
+      "name": "Caroline International"
+     }
+    },
+    {
+     "catalog-number": "UICB-1004",
+     "label": {
+      "name": "Fiction"
+     }
+    },
+    {
+     "catalog-number": "UICB-1004",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "JP"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 13,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 322373,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 193693,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237800,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366066,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372653,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326840,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301786,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249586,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 238146,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 272960,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128826,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 432973,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      },
+      {
+       "number": "13",
+       "position": 13,
+       "title": "Patience",
+       "length": 293413,
+       "recording": {
+        "title": "Patience",
+        "length": 292267
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5db93cc1-9f8b-4a82-a09a-d47a7bf5e499",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "XE",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "00602577579608",
+     "label": {
+      "name": "Caroline International"
+     }
+    },
+    {
+     "catalog-number": "7757960",
+     "label": {
+      "name": "Fiction"
+     }
+    },
+    {
+     "catalog-number": "7757960",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 322373,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 193693,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237800,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366066,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372653,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326840,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301786,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249586,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 238146,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 272960,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128826,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 433133,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "c51e3d19-8080-4faa-9f5d-3e8714343543",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "XW",
+   "disambiguation": "Borderline “album mix” version",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Island Records Australia"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "XW"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 322373,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 193693,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237800,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366067,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372653,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326840,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301787,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249587,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 238147,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 273016,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128827,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 433133,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dac7d702-d0eb-4b1e-ad0b-f604c624731e",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "MX",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "7757960",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "MX"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 322000,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 193000,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237000,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366000,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372000,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326000,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301000,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249000,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 238000,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 272000,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128000,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 433000,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "e20385dc-7631-4fb3-bd87-7c4463f8d1fa",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "XW",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "7757956",
+     "label": {
+      "name": "Caroline International"
+     }
+    },
+    {
+     "catalog-number": "7757956",
+     "label": {
+      "name": "Fiction"
+     }
+    },
+    {
+     "catalog-number": "7757956",
+     "label": {
+      "name": "Interscope Records"
+     }
+    },
+    {
+     "catalog-number": "7757956",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "XW"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 6,
+     "tracks": [
+      {
+       "number": "A1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 324013,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "A2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 194706,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "A3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237800,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "B4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366066,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "B5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372866,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "B6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326840,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      }
+     ]
+    },
+    {
+     "position": 2,
+     "format": "12\" Vinyl",
+     "title": "",
+     "track-count": 6,
+     "tracks": [
+      {
+       "number": "C1",
+       "position": 1,
+       "title": "On Track",
+       "length": 301787,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "C2",
+       "position": 2,
+       "title": "Lost in Yesterday",
+       "length": 249587,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "C3",
+       "position": 3,
+       "title": "Is It True",
+       "length": 238147,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "D4",
+       "position": 4,
+       "title": "It Might Be Time",
+       "length": 273016,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "D5",
+       "position": 5,
+       "title": "Glimmer",
+       "length": 128827,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "D6",
+       "position": 6,
+       "title": "One More Hour",
+       "length": 433133,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "e7dee9e8-cb87-48d3-87b5-03550f094919",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "XW",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": null,
+     "label": {
+      "name": "Island Records Australia"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "XW"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "Digital Media",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 324013,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 194706,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237800,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366066,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372866,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326840,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301786,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249586,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 239266,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 273026,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128826,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 432560,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ffa6a32b-103f-4ed6-89dd-5745f39a6045",
+   "title": "The Slow Rush",
+   "status": "Official",
+   "date": "2020-02-14",
+   "country": "US",
+   "disambiguation": "",
+   "artist-credit": [
+    {
+     "name": "Tame Impala",
+     "joinphrase": "",
+     "artist": {
+      "id": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "name": "Tame Impala"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "B0031485-02",
+     "label": {
+      "name": "Caroline International"
+     }
+    },
+    {
+     "catalog-number": "B0031485-02",
+     "label": {
+      "name": "Fiction"
+     }
+    },
+    {
+     "catalog-number": "B0031485-02",
+     "label": {
+      "name": "Interscope Records"
+     }
+    },
+    {
+     "catalog-number": "B0031485-02",
+     "label": {
+      "name": "Island"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2020-02-14",
+     "area": {
+      "iso-3166-1-codes": [
+       "US"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "",
+     "track-count": 12,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "One More Year",
+       "length": 322373,
+       "recording": {
+        "title": "One More Year",
+        "length": 322373
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Instant Destiny",
+       "length": 193693,
+       "recording": {
+        "title": "Instant Destiny",
+        "length": 193693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Borderline",
+       "length": 237800,
+       "recording": {
+        "title": "Borderline",
+        "length": 237800
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Posthumous Forgiveness",
+       "length": 366066,
+       "recording": {
+        "title": "Posthumous Forgiveness",
+        "length": 366066
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Breathe Deeper",
+       "length": 372653,
+       "recording": {
+        "title": "Breathe Deeper",
+        "length": 372653
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Tomorrow’s Dust",
+       "length": 326840,
+       "recording": {
+        "title": "Tomorrow’s Dust",
+        "length": 326840
+       }
+      },
+      {
+       "number": "7",
+       "position": 7,
+       "title": "On Track",
+       "length": 301786,
+       "recording": {
+        "title": "On Track",
+        "length": 301786
+       }
+      },
+      {
+       "number": "8",
+       "position": 8,
+       "title": "Lost in Yesterday",
+       "length": 249586,
+       "recording": {
+        "title": "Lost in Yesterday",
+        "length": 249586
+       }
+      },
+      {
+       "number": "9",
+       "position": 9,
+       "title": "Is It True",
+       "length": 238146,
+       "recording": {
+        "title": "Is It True",
+        "length": 238146
+       }
+      },
+      {
+       "number": "10",
+       "position": 10,
+       "title": "It Might Be Time",
+       "length": 272960,
+       "recording": {
+        "title": "It Might Be Time",
+        "length": 272960
+       }
+      },
+      {
+       "number": "11",
+       "position": 11,
+       "title": "Glimmer",
+       "length": 128826,
+       "recording": {
+        "title": "Glimmer",
+        "length": 128826
+       }
+      },
+      {
+       "number": "12",
+       "position": 12,
+       "title": "One More Hour",
+       "length": 433133,
+       "recording": {
+        "title": "One More Hour",
+        "length": 433000
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "expected": {
+  "base": {
+   "index": 0,
+   "id": "1cf564b9-4e24-4362-89fb-1aa702ff60f2",
+   "count": 9,
+   "total": 10
+  },
+  "representative": "1cf564b9-4e24-4362-89fb-1aa702ff60f2",
+  "diffs": {
+   "1cf564b9-4e24-4362-89fb-1aa702ff60f2": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "2912c9db-eacb-4207-93a6-7696615be302": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "3a12923d-97cd-4e87-8cfd-fb67be970974": {
+    "chips": [
+     "1 other version"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [
+     {
+      "position": 3,
+      "title": "Borderline",
+      "from": 238,
+      "to": 274,
+      "delta": 36
+     }
+    ],
+    "lengths": [],
+    "same": 11
+   },
+   "452ccdb4-d6f5-4ac2-9eea-3eb2df8e5bb6": {
+    "chips": [
+     "+1 track"
+    ],
+    "added": [
+     {
+      "position": 13,
+      "title": "Patience",
+      "length": 293,
+      "after": "One More Hour"
+     }
+    ],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "5db93cc1-9f8b-4a82-a09a-d47a7bf5e499": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "c51e3d19-8080-4faa-9f5d-3e8714343543": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "dac7d702-d0eb-4b1e-ad0b-f604c624731e": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "e20385dc-7631-4fb3-bd87-7c4463f8d1fa": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "e7dee9e8-cb87-48d3-87b5-03550f094919": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   },
+   "ffa6a32b-103f-4ed6-89dd-5745f39a6045": {
+    "chips": [
+     "Same tracklist"
+    ],
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "versions": [],
+    "lengths": [],
+    "same": 12
+   }
+  }
+ }
+}

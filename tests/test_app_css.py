@@ -36,6 +36,19 @@ And for the Requests tab and Home's Arriving (2.0.0-player.12):
 - A retry button waiting on its retry stays legible; it is aria-disabled, not disabled.
 - A row being cancelled fades its cover, title and bar, never the words saying "cancelling…".
 - An Arriving card's state word gives way before the album's name.
+
+And for the Search tab and the album you don't have (2.0.0-player.13):
+
+- The search field's text is never under 16px, or iOS zooms the page as it is tapped.
+- The pressing list scrolls inside itself, over the tracklist and under the album page's bar, and
+  `hidden` still hides it; it is never taller than the band between the page's bars (with the mini
+  player up too), so brought into view it is all in view.
+- The "N more" fold is drawn as a control (the accent), legible on the popover.
+- Every pressing, the button and the "N more" fold are a tap target; so is a result's row, and its
+  words give way with an ellipsis.
+- A track that differs is tinted past the column without moving its number or length - green for a
+  Bonus track, amber for another version or a rename.
+- "Asking MusicBrainz…" stops moving for reduced motion.
 """
 
 import re
@@ -464,3 +477,76 @@ def test_an_arriving_cards_state_word_gives_way_before_the_albums_name():
 def test_the_requests_tabs_live_region_is_read_and_not_drawn():
     hidden = declarations(APP, ".app-visually-hidden")
     assert (hidden["position"], hidden["overflow"], hidden["clip-path"]) == ("absolute", "hidden", "inset(50%)")
+
+
+# ---------------------------------------------------------------- Search and the album you don't have
+
+def test_the_search_field_is_never_small_enough_for_ios_to_zoom():
+    field = declarations(APP, ".app-search-input")
+    assert field["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    #? the well is STYLE.md's; nothing native is drawn over it
+    assert field["appearance"] == "none"
+
+
+def test_the_pressing_list_scrolls_inside_itself_over_the_tracklist():
+    popover = declarations(APP, ".app-picker-popover")
+    assert (popover["position"], popover["overflow-y"], popover["overflow-x"], popover["overscroll-behavior"]) == (
+        "absolute", "auto", "hidden", "contain")
+    assert popover["max-height"] == "max(var(--app-picker), min(var(--app-picker-max), var(--app-picker-band)))"
+    #? over the tracklist, under the album page's sticky bar
+    assert int(ALL_TOKENS["--app-z-popover"]) < int(declarations(PLAYER_CSS, ".pl-nav-bar")["z-index"])
+    #? `hidden` must still hide it: nothing gives it a display of its own
+    assert "display" not in popover
+
+
+def test_the_pressing_list_fits_between_the_pages_bars():
+    """It opens downward; brought into view (scrollIntoView, which keeps the page's scroll-padding
+    clear) it must fit the band that padding leaves, or part of it stays under the mini player."""
+    page = declarations(APP, "html")
+    assert (page["scroll-padding-top"], page["scroll-padding-bottom"]) == ("var(--app-nav-clear)", "var(--app-chrome-bottom)")
+    assert ALL_TOKENS["--app-picker-band"] == "calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom))"
+    assert declarations(APP, "html:has(.app-shell.has-mini)")["scroll-padding-bottom"] == "var(--app-chrome-bottom-mini)"
+    assert ALL_TOKENS["--app-picker-band-mini"] == "calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom-mini))"
+    assert declarations(APP, ".app-shell.has-mini .app-picker-popover")["max-height"] == (
+        "max(var(--app-picker), min(var(--app-picker-max), var(--app-picker-band-mini)))")
+
+
+def test_the_fold_is_drawn_as_a_control_and_legible():
+    assert declarations(APP, ".app-picker-more")["color"] == "var(--dw-accent)"
+    #? the app's text buttons are the accent too
+    assert declarations(APP, ".app-text-button")["color"] == "var(--dw-accent)"
+
+
+def test_every_pressing_and_the_fold_are_a_tap_target():
+    assert px("--app-picker") >= px("--pl-hit")
+    assert declarations(APP, ".app-picker-option")["min-height"] == "var(--app-picker)"
+    assert declarations(APP, ".app-picker-button")["min-height"] == "var(--app-picker)"
+    assert declarations(APP, ".app-picker-more")["min-height"] == "var(--pl-hit)"
+
+
+def test_a_row_of_search_results_is_a_tap_target_and_its_words_give_way():
+    assert px("--app-result") >= px("--pl-hit") and px("--app-rg-row") >= px("--pl-hit")
+    assert declarations(APP, ".app-result")["min-height"] == "var(--app-result)"
+    assert declarations(APP, ".app-result-text")["min-width"] == "0"
+    for selector in (".app-result-title", ".app-result-line", ".app-rg-title", ".app-picker-value"):
+        found = declarations(APP, selector)
+        assert found["text-overflow"] == "ellipsis" and found["white-space"] == "nowrap", selector
+
+
+def test_a_marked_tracks_tint_reaches_past_the_column_without_moving_it():
+    marked = declarations(APP, ".app-rg-track.is-marked")
+    assert marked["margin"] == "0 calc(-1 * var(--app-rg-mark-bleed))"
+    assert marked["padding"] == "var(--app-rg-mark-pad) var(--app-rg-mark-bleed)"
+    #? green for a Bonus track, amber for another version or a rename - STYLE.md's badges
+    assert declarations(APP, ".app-rg-track.is-bonus")["background"] == "var(--dw-tint-green)"
+    assert declarations(APP, ".app-rg-track.is-version")["background"] == "var(--dw-tint-amber)"
+    assert declarations(APP, ".app-rg-track.is-renamed")["background"] == "var(--dw-tint-amber)"
+    assert declarations(APP, ".app-rg-track.is-bonus .app-rg-chip")["color"] == "var(--dw-badge-green-text)"
+    assert declarations(APP, ".app-rg-chip")["color"] == "var(--dw-amber-text)"
+    assert declarations(APP, ".app-rg-number")["text-align"] == "right"
+
+
+def test_asking_musicbrainz_stops_moving_for_reduced_motion():
+    assert "app-sweep" in declarations(APP, ".app-sweep::before")["animation"]
+    assert declarations(APP, ".app-sweep::before", "@media (prefers-reduced-motion: reduce)")["animation"] == "none"
+    assert declarations(APP, ".app-sweep")["overflow"] == "hidden"

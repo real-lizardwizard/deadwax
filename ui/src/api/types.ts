@@ -451,6 +451,22 @@ export interface FullySearchResponse {
 export interface ReleasesResponse {
   id: string
   releases: Release[]
+  /** MusicBrainz failed part way (or before the first page): the list is short, not the album's
+   *  whole set of pressings. Passed on since 2.0.0-player.13; absent from an older server. */
+  problem?: string | null
+}
+
+/** GET /search_musicbrainz/release_group: every pressing, each WITH its tracklist. */
+export interface ReleaseGroupResponse {
+  id: string
+  releases: Release[]
+  problem: string | null
+}
+
+/** GET /library/owned: every album, reduced to what says which album and edition it is. */
+export interface OwnedResponse {
+  albums: import('../lib/owned').OwnedAlbum[]
+  problem: string | null
 }
 
 /* ===== library ===== */

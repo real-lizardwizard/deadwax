@@ -2,8 +2,9 @@ import type { JSX } from 'preact'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
+import type { ReleaseGroup } from '../api/types'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
-import { TAB_LABELS, TABS, backLabel, currentRoute, formatRoute, type Nav, type Page, type Tab } from '../lib/appRoutes'
+import { TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import type { Look } from '../lib/turntable'
@@ -19,8 +20,9 @@ import { ActionsContext, PlayerContext, pickActions } from './context'
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
 import { NeedsNavidrome } from './NeedsNavidrome'
-import { Placeholder } from './Placeholder'
+import { ReleaseGroupPage } from './ReleaseGroupPage'
 import { Requests } from './Requests'
+import { Search } from './Search'
 import { TabBar } from './TabBar'
 import { takeOpener } from './useSheet'
 import { You } from './You'
@@ -95,6 +97,11 @@ function usePageShown(): boolean {
  * (view.arriving), so the two can never count different things. Each tab's top page is memoised on
  * what an album page reads (the playing song and whether it plays), so a poll re-renders Requests
  * and Home's Arriving and not an album page.
+ *
+ * Search (2.0.0-player.13) opens two kinds of page: an album you have (openAlbum, as a tile does)
+ * and an album you don't (openGroup: a MusicBrainz release group, drawn outside the Navidrome gate,
+ * since nothing on it is Navidrome's). A pressing chosen there replaces the page's own address
+ * (pickPressing, router.update), so scroll is kept by scrollKey, which leaves the pressing out.
  */
 export function App() {
   const player = usePlayer()
@@ -103,14 +110,17 @@ export function App() {
 
   const scrolls = useRef(new Map<string, number>())
   const previews = useRef(new Map<string, Album>())
+  //? the albums you don't have, as Search showed them: a group page's header before its pressings
+  const groupPreviews = useRef(new Map<string, ReleaseGroup>())
   const router: Router = useMemo(
     () =>
       createRouter({
         history: window.history,
         hash: () => location.hash,
         storage: sessionStore,
-        //? the scroll of the route being left, read before the router moves on from it
-        leaving: () => scrolls.current.set(formatRoute(currentRoute(router.nav)), window.scrollY),
+        //? the scroll of the route being left, read before the router moves on from it - kept by
+        //? scrollKey, which leaves a group page's pressing out: choosing one is the same page
+        leaving: () => scrolls.current.set(scrollKey(currentRoute(router.nav)), window.scrollY),
         show: (next) => setNav(next),
       }),
     [],
@@ -122,6 +132,7 @@ export function App() {
   //? what is over Now Playing: its ••• menu, or Info - never both
   const [over, setOver] = useState<'none' | 'menu' | 'info'>('none')
   const [youSeen, setYouSeen] = useState(nav.tab === 'you')
+  const [searchSeen, setSearchSeen] = useState(nav.tab === 'search')
   //? "Now Playing opens as", kept on this device
   const [opensAs, setOpensAs] = useState<Look>(readPlayerOpensAs)
   const chooseOpensAs = useCallback((look: Look) => {
@@ -156,13 +167,14 @@ export function App() {
     }
   }, [])
 
-  const routeKey = formatRoute(currentRoute(nav))
+  const routeKey = scrollKey(currentRoute(nav))
   useLayoutEffect(() => {
     window.scrollTo(0, scrolls.current.get(routeKey) ?? 0)
   }, [routeKey])
 
   useEffect(() => {
     if (nav.tab === 'you') setYouSeen(true)
+    if (nav.tab === 'search') setSearchSeen(true)
   }, [nav.tab])
 
   //? What's showing, as far as the downloads go: a tab's ROOT, with Now Playing not over it
@@ -208,10 +220,29 @@ export function App() {
       if (oldest !== undefined) previews.current.delete(oldest)
     }
     const page: Page = { kind: 'album', id: album.id, label: album.name }
-    const address = formatRoute({ tab: router.nav.tab, page })
+    const address = scrollKey({ tab: router.nav.tab, page })
     //? a page opened afresh starts at its top, even one visited before - not the one showing (a double tap)
-    if (address !== formatRoute(currentRoute(router.nav))) scrolls.current.delete(address)
+    if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
     router.open(page)
+  }, [])
+
+  /** An album you don't have (2.0.0-player.13), from Search: its group page, on the tab showing. */
+  const openGroup = useCallback((group: ReleaseGroup) => {
+    groupPreviews.current.delete(group.id)
+    groupPreviews.current.set(group.id, group)
+    if (groupPreviews.current.size > PREVIEWS_KEPT) {
+      const [oldest] = groupPreviews.current.keys()
+      if (oldest !== undefined) groupPreviews.current.delete(oldest)
+    }
+    const page: Page = { kind: 'group', id: group.id, ...(group.title ? { label: group.title } : {}) }
+    const address = scrollKey({ tab: router.nav.tab, page })
+    if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
+    router.open(page)
+  }, [])
+
+  /** A pressing chosen on a group page: the page's address replaced - the default takes it out. */
+  const pickPressing = useCallback((groupId: string, release: string | null) => {
+    router.update({ kind: 'group', id: groupId, ...(release ? { release } : {}) })
   }, [])
 
   const back = useCallback(() => router.back(), [])
@@ -303,29 +334,35 @@ export function App() {
           <Library onOpen={openAlbum} />
         </NeedsNavidrome>
       ),
-      search: (
-        <Placeholder
-          title={TAB_LABELS.search}
-          what="Searching MusicBrainz, choosing a pressing and getting it from Soulseek are on the main page until the app has them."
-        />
-      ),
+      search: <Search shown={searchSeen} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} />,
       you: <You shown={youSeen} opensAs={opensAs} onOpensAs={chooseOpensAs} />,
     }),
-    [status, youSeen, opensAs],
+    [status, youSeen, searchSeen, opensAs],
   )
   const roots: Record<Tab, JSX.Element> = { ...others, home, requests }
 
-  const pageView = (tab: Tab, page: Page, player: Player) => (
-    <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
-      <AlbumPage
+  //? an album you don't have needs no Navidrome, so it is drawn outside the gate
+  const pageView = (tab: Tab, page: Page, player: Player) =>
+    page.kind === 'group' ? (
+      <ReleaseGroupPage
         id={page.id}
-        preview={previews.current.get(page.id) ?? null}
-        player={player}
+        release={page.release ?? null}
+        preview={groupPreviews.current.get(page.id) ?? null}
         onBack={back}
         backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
+        onPick={pickPressing}
       />
-    </NeedsNavidrome>
-  )
+    ) : (
+      <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
+        <AlbumPage
+          id={page.id}
+          preview={previews.current.get(page.id) ?? null}
+          player={player}
+          onBack={back}
+          backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
+        />
+      </NeedsNavidrome>
+    )
 
   //? Each tab's top page, memoised on what it reads, so a poll of the downloads never re-renders
   //? one. `player` is a new object on every render of this component, so it can't be what the

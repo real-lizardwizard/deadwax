@@ -21,6 +21,7 @@ import hashlib
 import secrets
 
 import httpx
+from starlette.requests import Request
 
 from src import __version__
 #? without_login lives in config.py since 1.0.5, shared with the settings payload; it is
@@ -255,3 +256,22 @@ class NavidromeClient:
 #? One client for the process, like LRCLIB's. The app's lifespan closes it, and the settings
 #? route drops it when NAVIDROME_URL changes.
 navidrome = NavidromeClient()
+
+
+def client_for(request: Request | None) -> NavidromeClient:
+    """
+    The Navidrome client to ask on behalf of whoever made `request` (2.0.0-player.13).
+
+    THE SEAM for per-user Navidrome logins (step 6 of the multi-user plan): every player route,
+    and every internal call made while answering one (the turntable's getAlbum), asks through
+    this, so step 6 changes this function's body - the user's own credential, from the session
+    current_user() reads - and no route. With logins off there is one account, and this is the
+    one shared client, whatever the request.
+
+    What does NOT come through here, on purpose: the stream cache's make and the album context
+    (player_cache.py, album_context.py), which fetch a file ONCE for every phone that asks for it
+    and so have no one request to answer for - step 6 checks a user's access at the route before
+    handing them the cached answer; and the apply's getScanStatus (routes/library.py), a question
+    about the server, not about anybody's library.
+    """
+    return navidrome

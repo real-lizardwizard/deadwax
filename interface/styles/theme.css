@@ -635,6 +635,20 @@
     --dw-duration: var(--duration-fast);
     --dw-ease:     var(--ease-out);
 
+    /* --- Search and the album you don't have (2.0.0-player.13), as their boards draw them --- */
+    --dw-field:              #15141b;                    /* the search field's well (STYLE.md's darker one) */
+    --dw-field-icon:         rgba(235, 235, 245, 0.6);   /* the magnifier in it */
+    --dw-popover:            #2a2833;                    /* the pressing dropdown's list */
+    --dw-popover-border:     #3d3a48;
+    --dw-selected-row:       rgba(192, 132, 252, 0.14);  /* the chosen pressing in it */
+    --dw-badge-green-bg:     rgba(52, 211, 153, 0.14);   /* STYLE.md's green badge: a Bonus track's chip */
+    --dw-badge-green-border: rgba(110, 231, 183, 0.28);
+    --dw-badge-green-text:   #6ee7b7;
+    --dw-badge-amber-bg:     rgba(251, 191, 36, 0.14);   /* ...its amber one: Other version, Renamed */
+    --dw-badge-amber-border: rgba(252, 211, 77, 0.3);
+    --dw-tint-green:         rgba(52, 211, 153, 0.1);    /* a Bonus track's row */
+    --dw-tint-amber:         rgba(251, 191, 36, 0.08);   /* an Other version's or a Renamed track's row */
+
     /* --- the turntable (2.0.0-player.11), as its board draws it ------- */
     --dw-tt-plinth:       #19171e;
     --dw-tt-platter:      #2a2730;

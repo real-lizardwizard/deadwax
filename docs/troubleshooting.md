@@ -164,6 +164,37 @@ may throttle or refuse requests, and the log says so.
 A search MusicBrainz rejects as invalid (odd punctuation in a fielded search) says so at once,
 rather than retrying.
 
+## The app's Search says MusicBrainz isn't answering, or keeps asking
+
+The phone app's [Search tab](finding-music.md#on-the-phone-the-apps-search-tab) and its album pages
+ask MusicBrainz through deadwax, so the same slow minutes reach them.
+
+- **"MusicBrainz isn't answering just now - it often goes away for a few minutes."** under **Not in
+  your library yet** - or, on an album you don't have, **"MusicBrainz isn't answering just now, so
+  this album's pressings couldn't be loaded - it often goes away for a few minutes."**: deadwax
+  couldn't get an answer (it retries for a while first). That's not the same as **Nothing on
+  MusicBrainz for "…"**, which is an answer.
+  Tap **Try again** in a minute; the album page never shows part of a pressing list as if it were
+  all of it. You's **Connections** says whether deadwax can reach MusicBrainz at all, and [The
+  MusicBrainz pill is red](#the-musicbrainz-pill-is-red) goes through why it might not.
+- **"Asking MusicBrainz…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
+  request. An album page fetches every pressing's tracklist, which for an album with hundreds of
+  pressings is several requests one after another. Once it has them it keeps them while the app is
+  open (the last 20 albums), so going back to the album is instant.
+- **The library half shows nothing, or "Can't reach Navidrome"**: that half is Navidrome's search,
+  and needs Navidrome as Home does ([below](#the-player-says-connect-navidrome-or-cant-reach-navidrome));
+  MusicBrainz is still searched under it.
+- **An album you have is listed under Not in your library yet**: only albums whose files carry
+  MusicBrainz's id for the ALBUM (the release group) are recognised there.
+  - With no MusicBrainz ids at all: match it to its release in the main page's metadata editor,
+    which writes them, then search again.
+  - **An .m4a album deadwax filed** carries the pressing's id but not the album's - deadwax can't
+    write that one into an .m4a yet, and the metadata editor can't either - so it stays listed. Its
+    own page (tap it) does say "in your library", since that checks every pressing's id. Tagging it
+    with Picard, which writes the album's id into .m4a files, makes the list leave it out too.
+  - The first search after deadwax restarts can show one for a moment and then mark it "· in your
+    library" in place: deadwax looks through the whole library before it first answers.
+
 ## The library tab is empty, or doesn't show a change
 
 - **"LIBRARY_PATH is not set"**: set it (Settings → Library → Paths) and mount the folder.
@@ -299,8 +330,9 @@ album to see where it stands.
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
 The [phone player](player.md) shows one of these on Home and in the Library tab, in place of your
-albums, with the reason under it. The other tabs work without Navidrome, and You's **Connections**
-shows Navidrome as **Not set up** or **Can't reach it**, with the same reason under it.
+albums, and in Search in place of what's in your library, with the reason under it. The other tabs
+(and Search's MusicBrainz half, and an album you don't have) work without Navidrome, and You's
+**Connections** shows Navidrome as **Not set up** or **Can't reach it**, with the same reason under it.
 
 - **Connect Navidrome**: the three Navidrome settings aren't all set. Fill in `NAVIDROME_URL`,
   `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections, which marks the one

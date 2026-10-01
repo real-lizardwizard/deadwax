@@ -43,6 +43,14 @@
  *    more than that, so a poll of the downloads never re-renders an album page.
  *  - App moves the browser's history only through lib/appHistory.ts's router, which the routes
  *    sim drives end to end.
+ *  - Search (2.0.0-player.13) plays a song within its album from the tap - the one more file on the
+ *    list below - and only with that album's songs already in hand (prefetched, KEPT, as the answer
+ *    landed); its rows otherwise navigate. Both its halves, and the album-you-don't-have page, draw
+ *    only the newest answer (latestOnly). That page needs no Navidrome, so it is outside the gate,
+ *    and has no solid purple button until Get comes (S5). What the library holds is asked when
+ *    Search first shows, when the page opens, and beside each MusicBrainz search - never as the
+ *    app starts - and a filing asks again once anything has; search.sim.cjs drives the store
+ *    itself (one ask out, "ask again", what a refresh waits for).
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -113,6 +121,8 @@ const ALLOWED = {
   'app/GaplessChoice.tsx': ['setGapless'],
   //? the turntable's record, since 2.0.0-player.11: its click plays or pauses (a tap)
   'player/Turntable.tsx': ['toggle'],
+  //? a song found by Search, since 2.0.0-player.13: its tap plays its album from it, the album in hand
+  'app/Search.tsx': ['playTracks'],
   //? names them for ActionsContext and calls none (pickActions)
   'app/context.ts': ['playTracks', 'toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
 }
@@ -181,6 +191,7 @@ console.log('\nthe playback actions only from the files allowed')
   check('no file reaches one it isn\'t allowed', outside, [])
   check('where they are reached', Object.fromEntries(reached), {
     'app/GaplessChoice.tsx': ['setGapless'],
+    'app/Search.tsx': ['playTracks'],
     'app/context.ts': ['next', 'playTracks', 'previous', 'setGapless', 'showAirPlay', 'toggle'],
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
@@ -262,8 +273,9 @@ console.log('\na link out of the app opens beside it')
 {
   const out = files.filter(APP_SIDE).flatMap((file) => linksOut(code(read(file))).map((tag) => [file, tag]))
   check('every one opens in a new tab, rel="noopener"', out.filter(([, tag]) => !opensBeside(tag)), [])
-  check('...and there are links to look at (You, Search and Requests, the gate)',
-    [...new Set(out.map(([file]) => file))].sort(), ['app/NeedsNavidrome.tsx', 'app/Placeholder.tsx', 'app/You.tsx'])
+  //? the Search placeholder's link went with it in 2.0.0-player.13 (Requests' in .12)
+  check('...and there are links to look at (You, the gate)',
+    [...new Set(out.map(([file]) => file))].sort(), ['app/NeedsNavidrome.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -398,6 +410,65 @@ console.log('\nwhat Info reads is taken in the tap, and asks the engine\'s eleme
   check('sentFormat asks the element that is there, and makes or touches nothing',
     [/document\.querySelector\('audio'\)/.test(sent), /createElement|new Audio|\.src\b|srcObject|\.load\(|\.play\(|\.pause\(/.test(sent), /canPlayType\(/.test(sent)],
     [true, false, true])
+}
+
+console.log('\nSearch: a song plays from the tap, with its album in hand; the newest answer only')
+{
+  const search = code(read('app/Search.tsx'))
+  const play = /const playSong = \([^)]*\) => \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  check('a song\'s tap plays its album from that song only when the album\'s songs are in hand',
+    [/const album = song\.albumId \? ready\.get\(song\.albumId\) : undefined/.test(play), /if \(album && at >= 0\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(album\.song!\.map\(\(each\) => toQueueTrack\(each, album\)\), at\)/.test(play)],
+    [true, true])
+  check('...nothing fetched or awaited in the tap - otherwise the album opens instead',
+    [/\bawait\b|\.then\(|fetch|prefetchAlbum|searchLibrary/.test(play), /onOpenAlbum\(/.test(play)], [false, true])
+  check('...and the albums are asked for as the answer lands, KEPT (a scroll can\'t call them off), kept only for the newest search',
+    /for \(const id of albumsToPrefetch\(results\.songs\)\) \{\s*prefetchAlbum\(id, true\)\.then\(\s*\(album\) => \{\s*if \(request\.current\(\)\) setReady/.test(search), true)
+  check('the song row\'s click is that tap, and its play mark only when it will play',
+    [/onClick=\{\(\) => playSong\(song\)\}/.test(search), /\{plays \? <PlayIcon class="app-result-play" \/> : null\}/.test(search)], [true, true])
+  check('album rows navigate, asking for the songs as the finger lands, as a tile does',
+    /onPointerDown=\{\(\) => void prefetchAlbum\(album\.id\)\}\s*onPointerCancel=\{\(\) => dropPrefetch\(album\.id\)\}\s*onClick=\{\(\) => onOpenAlbum\(album\)\}/.test(search), true)
+  const askLibrary = /function askLibrary\(term: string\) \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  const askMusicBrainz = /async function askMusicBrainz\(term: string\) \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  check('each half through its own latestOnly(), drawing only the newest answer',
+    [/const libraryRequests = useMemo\(latestOnly, \[\]\)/.test(search), /const musicRequests = useMemo\(latestOnly, \[\]\)/.test(search),
+      /const request = libraryRequests\.begin\(\)[\s\S]*if \(!request\.current\(\)\) return\s*setLibrary\(/.test(askLibrary),
+      /const request = musicRequests\.begin\(\)[\s\S]*if \(!request\.current\(\)\) return\s*setMusicbrainz\(\{ state: 'done'/.test(askMusicBrainz),
+      /catch \(reason\) \{\s*if \(!request\.current\(\) \|\| isAbort\(reason\)\) return/.test(askMusicBrainz)],
+    [true, true, true, true, true])
+  check('...with the fetch called off when superseded', [/searchLibrary\(term, request\.signal\)/.test(askLibrary), /fullySearch\(plan\.query, MUSICBRAINZ_LIMIT, false, request\.signal\)/.test(askMusicBrainz)], [true, true])
+  const page = code(read('app/ReleaseGroupPage.tsx'))
+  const load = /function load\(\) \{([\s\S]*?)\n  \}/.exec(page)?.[1] ?? ''
+  check('the album you don\'t have: its pressings through latestOnly(), a problem never drawn as the pressings',
+    [/const requests = useMemo\(latestOnly, \[\]\)/.test(page), /getReleaseGroup\(mbid, request\.signal\)/.test(load),
+      /if \(!request\.current\(\)\) return\s*if \(found\.problem\) \{\s*setTrouble\([^)]*\)\s*return\s*\}/.test(load), /keep\(mbid, found\)\s*setAnswer\(found\)/.test(load),
+      (load.match(/keep\(/g) ?? []).length],
+    [true, true, true, true, 1])
+  const app = code(read('app/App.tsx'))
+  check('...drawn outside the Navidrome gate, the album you have inside it',
+    /page\.kind === 'group' \? \(\s*<ReleaseGroupPage\b[\s\S]*?\) : \(\s*<NeedsNavidrome\b[\s\S]*?<AlbumPage\b/.test(app), true)
+  check('...and a pressing chosen is the page\'s address replaced, through the router',
+    /const pickPressing = useCallback\(\(groupId: string, release: string \| null\) => \{\s*router\.update\(/.test(app), true)
+  //? the first /library/owned after a restart walks the whole library: never asked as the app starts
+  const owned = code(read('app/useOwned.ts'))
+  check('what the library holds is asked when Search first shows, never as the app starts',
+    [/const owned = useOwned\(shown\)/.test(search), /<Search shown=\{searchSeen\}/.test(app), /if \(nav\.tab === 'search'\) setSearchSeen\(true\)/.test(app),
+      /useEffect\(\(\) => \{\s*if \(ask && !held && !asking\) void refreshOwned\(\)\s*\}, \[ask\]\)/.test(owned),
+      /onAlbumsFiled\(\(\) => \{\s*if \(wanted\) void refreshOwned\(\)/.test(owned)],
+    [true, true, true, true, true])
+  check('...when the album page opens, and beside each MusicBrainz search, which waits a moment for its answer',
+    [/const owned = useOwned\(true\)/.test(page), /const ownedAnswered = refreshOwned\(\)/.test(askMusicBrainz),
+      /await Promise\.race\(\[ownedAnswered, wait\(OWNED_WAIT_MS\)\]\)/.test(askMusicBrainz)],
+    [true, true, true])
+  check('...and what MusicBrainz found is left out once, as drawn - never filtered again as the library\'s answer changes',
+    [/shown: notInLibrary\(groups, ownedNow\(\)\?\.index \?\? null\)/.test(askMusicBrainz), /const found = musicbrainz\.state === 'done' \? musicbrainz\.shown : \[\]/.test(search)],
+    [true, true])
+  const picker = code(read('app/PressingPicker.tsx'))
+  check('the pressing list is brought into view as it opens, and focus going nowhere doesn\'t close it',
+    [/target\?\.focus\(\{ preventScroll: true \}\)\s*reveal\(target\)/.test(picker), /box\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(picker),
+      /if \(to && !root\.current\?\.contains\(to\)\) close\(false\)/.test(picker)],
+    [true, true, true])
+  check('no solid purple button on the page, its picker or Search until Get comes',
+    ['app/ReleaseGroupPage.tsx', 'app/PressingPicker.tsx', 'app/Search.tsx'].filter((file) => /is-primary|app-primary/.test(code(read(file)))), [])
 }
 
 console.log('\nApp moves history only through the router')

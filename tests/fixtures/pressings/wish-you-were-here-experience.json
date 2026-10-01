@@ -1,0 +1,186 @@
+{
+ "about": "Wish You Were Here by Pink Floyd, the 2011 Experience edition (release 588ca0a5-6662-40b2-b298-56bff5c7bd28, group 1a272023-10d3-38ee-bab3-317b55fcc21d), as MusicBrainz answered /release/<id>?inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Its two discs carry MusicBrainz medium titles, '2011 Remaster' and 'Unreleased Tracks': ui/test/pressings.sim.cjs holds the album-you-don't-have page's disc headings to them.",
+ "group": {
+  "id": "1a272023-10d3-38ee-bab3-317b55fcc21d",
+  "title": "Wish You Were Here",
+  "artist": "Pink Floyd"
+ },
+ "releases": [
+  {
+   "id": "588ca0a5-6662-40b2-b298-56bff5c7bd28",
+   "title": "Wish You Were Here",
+   "status": "Official",
+   "date": "2011-11-04",
+   "country": "XE",
+   "disambiguation": "Experience edition",
+   "artist-credit": [
+    {
+     "name": "Pink Floyd",
+     "joinphrase": "",
+     "artist": {
+      "id": "83d91898-7763-47d7-b03b-b92132375c47",
+      "name": "Pink Floyd"
+     }
+    }
+   ],
+   "label-info": [
+    {
+     "catalog-number": "50999 029450 2 6",
+     "label": {
+      "name": "EMI"
+     }
+    },
+    {
+     "catalog-number": "50999 029451 2 5",
+     "label": {
+      "name": "EMI"
+     }
+    },
+    {
+     "catalog-number": "50999 029452 2 4",
+     "label": {
+      "name": "EMI"
+     }
+    }
+   ],
+   "release-events": [
+    {
+     "date": "2011-11-04",
+     "area": {
+      "iso-3166-1-codes": [
+       "XE"
+      ]
+     }
+    }
+   ],
+   "media": [
+    {
+     "position": 1,
+     "format": "CD",
+     "title": "2011 Remaster",
+     "track-count": 5,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Shine On You Crazy Diamond, Parts 1–5",
+       "length": 812786,
+       "recording": {
+        "title": "Shine On You Crazy Diamond, Parts I–V",
+        "length": 811000
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Welcome to the Machine",
+       "length": 451560,
+       "recording": {
+        "title": "Welcome to the Machine",
+        "length": 446693
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "Have a Cigar",
+       "length": 307853,
+       "recording": {
+        "title": "Have a Cigar",
+        "length": 308000
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Wish You Were Here",
+       "length": 334746,
+       "recording": {
+        "title": "Wish You Were Here",
+        "length": 340000
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Shine On You Crazy Diamond, Parts 6–9",
+       "length": 749853,
+       "recording": {
+        "title": "Shine On You Crazy Diamond, Parts VI–IX",
+        "length": 743000
+       }
+      }
+     ]
+    },
+    {
+     "position": 2,
+     "format": "CD",
+     "title": "Unreleased Tracks",
+     "track-count": 6,
+     "tracks": [
+      {
+       "number": "1",
+       "position": 1,
+       "title": "Shine On You Crazy Diamond (live at Wembley 1974)",
+       "length": 1222680,
+       "recording": {
+        "title": "Shine On You Crazy Diamond (live at Wembley 1974)",
+        "length": 1221849
+       }
+      },
+      {
+       "number": "2",
+       "position": 2,
+       "title": "Raving and Drooling (live at Wembley 1974)",
+       "length": 755226,
+       "recording": {
+        "title": "Raving and Drooling",
+        "length": 755226
+       }
+      },
+      {
+       "number": "3",
+       "position": 3,
+       "title": "You’ve Got to Be Crazy (live at Wembley 1974)",
+       "length": 1092560,
+       "recording": {
+        "title": "You’ve Got to Be Crazy",
+        "length": 1092559
+       }
+      },
+      {
+       "number": "4",
+       "position": 4,
+       "title": "Wine Glasses (from ‘Household Objects’ project)",
+       "length": 136520,
+       "recording": {
+        "title": "Wine Glasses",
+        "length": 136000
+       }
+      },
+      {
+       "number": "5",
+       "position": 5,
+       "title": "Have a Cigar (alternative version)",
+       "length": 431680,
+       "recording": {
+        "title": "Have a Cigar (alternate version)",
+        "length": 431000
+       }
+      },
+      {
+       "number": "6",
+       "position": 6,
+       "title": "Wish You Were Here",
+       "length": 373573,
+       "recording": {
+        "title": "Wish You Were Here",
+        "length": 372000
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

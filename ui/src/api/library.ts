@@ -2,7 +2,7 @@ import { fetchOk, get, post } from './http'
 import type {
   ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
   DeletionSummary,
-  LibraryAlbum, LibraryResponse, LyricsSummary, NewImportsResponse, RetagPlan,
+  LibraryAlbum, LibraryResponse, LyricsSummary, NewImportsResponse, OwnedResponse, RetagPlan,
   RetagRelease, RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackLyrics,
   TrackTagEdit,
 } from './types'
@@ -151,6 +151,21 @@ export function previewTagEdits(albumPath: string, edits: TrackTagEdit[]): Promi
  */
 export function applyTagEdits(albumPath: string, edits: TrackTagEdit[]): Promise<TagEditResponse> {
   return post<TagEditResponse>('/library/tags/apply', { album_path: albumPath, edits })
+}
+
+/**
+ * Every album in the library, reduced to which album and edition it is (2.0.0-player.13 gave the
+ * app this call; the main page's search has always made it). The app's Search leaves the albums
+ * the library holds out of "Not in your library yet" with it (lib/owned.ts).
+ *
+ * NOT cheap the first time after deadwax restarts: that answer is a real scan, which walks the whole
+ * library (`library_is_behind`) - so never ask it as a page loads (app/useOwned.ts asks when Search
+ * first shows). Answered with an ETag and `Cache-Control: no-cache`, so the browser asks again each
+ * time and an unchanged library comes back as a 304 the browser fills in from its own copy - nothing
+ * to do here.
+ */
+export function owned(signal?: AbortSignal): Promise<OwnedResponse> {
+  return get<OwnedResponse>('/library/owned', signal)
 }
 
 /* ===== the metadata queue ===== */

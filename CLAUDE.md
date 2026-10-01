@@ -179,7 +179,8 @@ src/
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
-                   the player - holds the login), app.py, same_origin.py (refuses
+                   the player - holds the login; client_for(request), the per-user seam),
+                   app.py, same_origin.py (refuses
                    writes another website asks for - see "The 1.0.1 fixes")
   routes/          search_musicbrainz, download, monitor_slskd, interface_logs, library,
                    settings (editable since v0.5.1 - see "The settings tab"), navidrome
@@ -201,7 +202,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". Since
                    2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
                    with the player inside them - see "The one app".
-tests/             1878 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             1922 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2047,9 +2048,12 @@ The user guide's page is `docs/player.md`.
   only ever needs to reach deadwax.
 - **A FIXED list of calls, never a general proxy.** `routes/navidrome.py` is one route per
   Subsonic call with its own parameters: status (ping), albums (getAlbumList2), one album,
-  cover, stream, scrobble. The configured account MAY be Navidrome's admin and deadwax has no
+  cover, stream, scrobble - and since 2.0.0-player.13 search (search3), for the app's Search tab:
+  it only reads the library, every parameter declared and bounded (artistCount and albumCount at
+  most 50, songCount 500, offsets from 0, q at most 200 characters; anything undeclared is never
+  passed on). The configured account MAY be Navidrome's admin and deadwax has no
   login, so a catch-all would hand out user management to anyone on the network - though the
-  docs and the settings tab now say to use a non-admin account of your own: none of the six calls
+  docs and the settings tab now say to use a non-admin account of your own: none of the seven calls
   needs admin, nor does `getScanStatus` (only `startScan` is adminOnly, server/subsonic/api.go).
   `test_there_is_no_general_proxy` pins the list - adding a call means changing that test on
   purpose. The login is laid over the params LAST, so nothing sent can stand in for it.
@@ -3880,7 +3884,12 @@ the `/deadwax/me` seam, and disc titles on the album page.
   server settings and the log until the app covers them.
 - **The route model** (`lib/appRoutes.ts`, pure, pinned by `routes.sim.cjs`). The hash, since
   StaticFiles has no fallback for page routes: `#/home|library|search|requests|you`, and pages
-  pushed on a tab as `#/<tab>/album/<id>`. A legacy `#/album/<id>` is rewritten with replaceState to
+  pushed on a tab as `#/<tab>/album/<id>` - and, since 2.0.0-player.13, as
+  `#/<tab>/group/<rgid>?release=<mbid>`, the album you don't have (`PageKind` 'album' | 'group').
+  A group page's `release` (the pressing shown) is in the address but is NOT part of the page's
+  identity (`samePage` compares kind and id) nor of where its scroll is kept (`scrollKey`), and a
+  pick REPLACES the entry (`router.update` -> `replaceTop`), never pushes one - see "Search, and
+  albums you don't have". A legacy `#/album/<id>` is rewritten with replaceState to
   `#/library/album/<id>`; an empty or unknown hash goes to `#/home`.
   - **Per-tab stacks, as in iOS.** A page is pushed on the tab that opened it (pushState, so the edge
     swipe and back work); switching tab replaces the entry with that tab's top page; re-tapping the
@@ -3936,8 +3945,9 @@ the `/deadwax/me` seam, and disc titles on the album page.
   - The playback actions (playTracks, toggle, next, previous, setGapless, showAirPlay) are reached
     only from an allowlist: AlbumPage (playTracks), MiniPlayer (toggle, next), NowPlaying (toggle,
     next, previous, showAirPlay), GaplessChoice (setGapless, since 2.0.0-player.10 moved Gapless to
-    You), Turntable (toggle, the record's tap, since 2.0.0-player.11), and `app/context.ts`, which
-    names them and calls none. Adding a file is a deliberate edit to the sim, like the Navidrome
+    You), Turntable (toggle, the record's tap, since 2.0.0-player.11), Search (playTracks, a song
+    found, its album in hand, since 2.0.0-player.13), and `app/context.ts`, which names them and
+    calls none. Adding a file is a deliberate edit to the sim, like the Navidrome
     route list.
   - Nothing outside `app/` and `player/` imports usePlayer, the contexts or App.
   - Only App imports usePlayer as a VALUE, under any name (review: `usePlayer as useEngine`
@@ -3946,7 +3956,7 @@ the `/deadwax/me` seam, and disc titles on the album page.
   - Nothing in `app/` contains setActionHandler, `new Audio`, `<audio`, `.src =`, srcObject or
     `.load(` - comments included, so don't name them in a comment there.
   - **A link out of the app opens beside it** (`target="_blank" rel="noopener"`, review): the
-    Search card (and Requests' until 2.0.0-player.12), You's Managing row and the gate's settings link. Followed in the
+    Search card (until 2.0.0-player.13, and Requests' until .12), You's Managing row and the gate's settings link. Followed in the
     same page, `/` unloads the player - the audio element, any stream and the queue, which
     nothing keeps. From the home-screen app it opens outside the app's scope either way (Safari
     or a browser view over it; not seen on the phone). The sim fails on any `<a href>` in app/ or
@@ -3966,8 +3976,9 @@ the `/deadwax/me` seam, and disc titles on the album page.
     taken once by `album()`, kept 30 s), so Play is usually live by the time the page opens, and
     Play is pressed on the page, in the tap.
 - **The Navidrome gate narrowed** (`NeedsNavidrome`): drawn inside Home's shelf, the Library tab and
-  the album pages only. The tab bar, You, Search and Requests work with Navidrome unset or down.
-  App asks `/navidrome/status` once for every gate.
+  the album pages only - and since 2.0.0-player.13 Search's library half. The tab bar, You,
+  Requests, Search's MusicBrainz half and the album you don't have work with Navidrome unset or
+  down. App asks `/navidrome/status` once for every gate.
 - **You**: Maximum quality moved from the settings sheet (`player/Settings.tsx`, deleted with the
   gear) to You > Playback as `app/QualityChoice.tsx`: the words, the storage key and the keyboard
   handling unchanged, pinned by `settings.sim.cjs`, retargeted (it read the Gapless label from
@@ -3985,7 +3996,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
   2 moves it here (it did, in 2.0.0-player.10: a checkbox above Maximum quality). `you.sim.cjs`
   renders You with deadwax faked and pins all of this.
 - **Search and Requests were honest placeholders** ("On the main page for now", with a link),
-  Search until slices.md's S4 and Requests until S3. Home had only "Recently added"
+  Search until slices.md's S4 (2.0.0-player.13, which deleted `app/Placeholder.tsx`; Requests keeps
+  its `app-placeholder-*` card classes for its own empty and failed states) and Requests until S3. Home had only "Recently added"
   (getAlbumList2 `newest`, 20 albums): Arriving, Pinned and Not played in a while come in later
   slices and are NOT faked meanwhile. Requests and Arriving came in 2.0.0-player.12 (S3) - see
   "Requests, and what's arriving". **Future slices are named by their slices.md id (S4 Search, S5
@@ -4611,6 +4623,263 @@ persistent all the time".
   real finger (and beside the icon on its side), the ✕'s question in the home-screen app, Arriving
   coming and going, a download started elsewhere showing on coming back, VoiceOver reading the live
   region, and the Archive's covers over WireGuard.
+
+### Search, and albums you don't have (2.0.0-player.13)
+
+Slice 4 of the one app (`uplan/slices.md` S4, numbered .13). The boards are `Search.dc.html` and
+`Request.dc.html` (its `album` tweak: Third with every pressing alike, The Slow Rush, and The Slow
+Rush with the Japanese CD picked; RequestBonus merged into it). James: "One search box: library
+first, then MusicBrainz; an album you don't have opens like one you do" - the canvas gives it the
+SAME header as an album you have: back, centred cover, title, artist, meta line, then the Pressing
+dropdown where the album page has its chips and "Get the album" where it has Play/Shuffle; "for
+both, I'd like the album page to show the tracklist instead of the release list. Then there should
+be a dropdown somewhere to pick which release you're viewing, with the most common as default";
+and "show the bonus track differences on an album that has them".
+
+- **The Search tab** (`app/Search.tsx`) replaced its placeholder: one box (17px, so iOS doesn't zoom
+  as it is tapped; `role="search"`, `enterKeyHint="search"`, and Search on the keyboard blurs the
+  field so the answers have the screen).
+  - **The library half**: Navidrome's search3 through the new `/navidrome/search`
+    (`searchLibrary` in player/api.ts, `SEARCH_COUNTS` 5 artists, 8 albums, 12 songs),
+    `LIBRARY_SETTLE_MS` (200) after typing stops, inside the Navidrome gate. The **Top result** is an
+    artist whose folded name IS what was typed (`topArtist`), drawn as a plain row - NOT a link:
+    there is no artist page until S6, and a row going somewhere else would be a lie. Album rows open
+    the album (prefetching on pointerdown, as a tile does); song rows, below.
+  - **A song plays within its album once that album is in hand**: as the answer lands, the first
+    `SONG_ALBUMS_PREFETCHED` (5) distinct albums of the songs (`albumsToPrefetch`) go through the
+    album page's own `prefetchAlbum`, which now RETURNS its held promise (callers that ignored the
+    void are unchanged; the album page still takes the ask once), and each landing album is kept in
+    `ready` - only for the newest library search. **Asked with `keep`** (review): a tile's or an
+    album row's press shares the one ask, and a press that turned into a scroll (`dropPrefetch`)
+    aborted it - so a scroll starting on the Dummy row while Search's ask of Dummy was out left
+    every Dummy song opening the album instead of playing, with nothing asking again. A kept
+    entry (`Prefetched.kept`, set by whichever asked with `keep`, first or second) is never called
+    off; a tile's own ask still is. `search.sim.cjs` runs the real api.ts for it. The tap: `rememberPlayed(album)` then
+    `actions.playTracks(album.song.map(toQueueTrack), at)`, from `ActionsContext`, in the click,
+    nothing awaited - the gesture rule; `app/Search.tsx: playTracks` is the one new file on
+    `app-rules.sim.cjs`'s allowlist. Not in hand: the tap opens the album, where Play is. A ▶ on the
+    row says which it will do.
+  - **The MusicBrainz half, "Not in your library yet" / "From MusicBrainz"**: `lib/searchQuery.ts`
+    (pure, `searchQuery.sim.cjs`) reads the box against the library's artist names (/library/owned's
+    album artists plus the library half's artists, folded by owned's `foldName`): a leading or
+    trailing artist is `fieldedAlbumQuery` (`releasegroup:"rest" AND (artist:"A" OR
+    artistname:"A")`, the longest name first, the start before the end, separators like " - "
+    dropped), an artist alone `artist:"A"`, `va`/"various artists" Various Artists, anything else
+    the words as typed. `withTypeFilter` ALWAYS brackets the query before a type filter
+    (`typeFilter` builds main.js's clauses; the sim reads main.js's NOISY_SECONDARY_TYPES to keep the
+    lists one). **The app sends no type filter**: the board draws none, and a filter silently on (the
+    main page's `searchStudioOnly` preference) is the search that quietly returns less. Asked on
+    Enter, or `MUSICBRAINZ_SETTLE_MS` (700) after typing stops with `MUSICBRAINZ_MIN_CHARS` (3)
+    or more, as `fully_search?releases=false&limit=12` (`MUSICBRAINZ_LIMIT`); `asked`/`libraryAsked`
+    refs stop Enter and the pause after it asking twice. A fielded read that finds nothing is asked
+    again as free text (the metadata editor's fallback: an artist's name starting a title).
+    `notInLibrary` drops a group the library holds BY GROUP ID only - a "maybe" (an untagged folder of
+    that name) stays on offer. **Worked out ONCE, as the answer is drawn** (`shown` in the state,
+    review): the answer waits up to `OWNED_WAIT_MS` (1500) for the library's, asked beside it
+    (`refreshOwned()` resolves once an ask made after it has landed), so a held album is left out
+    BEFORE drawing; an answer landing later never takes a row away - the rows under the finger moved
+    up and the tap opened another album - and marks it in place instead (`groupLine(group, held)`:
+    "Album · 2008 · in your library"). **A box cut back below 3 characters** to anything not asked
+    (`musicBrainzOnTyping`, pure: clear | settle | drop | keep) supersedes the MusicBrainz search,
+    clears `asked` (or 'por' -> 'po' -> 'por' would keep an idle half saying nothing) and goes back
+    to idle, which says how to ask: before, the longer text's albums stayed under a box reading
+    "po" for good, and a search still out drew there. The box takes `maxLength` `SEARCH_MAX_CHARS`
+    (200, the route's bound: a longer paste was a 422 shown as a URL, with a Try again that could
+    never work). States: the sweep and "Asking MusicBrainz…"; MusicBrainzUnavailable ->
+    "MusicBrainz isn't answering just now - it often goes away for a few minutes." with Try again;
+    "Nothing on MusicBrainz for …"; "Everything MusicBrainz found is in your library already".
+    The library half's failure is drawn the same way (`.app-search-problem`, a full-width 44px
+    `.app-button` Try again; it was a bare 20px text button beside MusicBrainz's).
+  - **Only the newest answer draws** in each half (`libraryRequests`, `musicRequests`, latestOnly;
+    app-rules holds both, and the prefetch landing too). `/fully_search` still runs to its end on
+    the server when the page gives up (no `unless_abandoned` there), which is why the page paces it.
+- **`/library/owned` in the app** (`app/useOwned.ts`, a module store over `owned()` in
+  api/library.ts and `lib/owned.ts`): one request in flight and one "ask again", so the newest
+  answer lands last; `refreshOwned()` returns a promise resolved once an ask made AFTER it has
+  landed (answered or not - what Search waits on), and `ownedNow()` is the store's answer for code
+  that has awaited. **Never asked as the app starts** - Search is mounted, hidden, from the start,
+  and the first /owned after a restart walks the whole library (`library_is_behind`); it is asked
+  when Search first SHOWS (`searchSeen` in App, as You's `youSeen`), when an album page opens,
+  beside each MusicBrainz search (a 304 when nothing changed), and on a filing once anything has
+  asked (`wanted`) - even an ask that failed (review: `held || asking` never asked again after a
+  failed first ask). `search.sim.cjs` drives the store itself against a faked /library/owned (one
+  ask out, ask again, what a refresh waits for, filing before and after a failed ask); app-rules
+  holds where it is asked from (Search's `shown`, App's `searchSeen`, the page's `useOwned(true)`,
+  beside each search) - the first cut claimed app-rules pinned it all, and it pinned neither
+  `again` nor the ask beside a search. A failed ask keeps the last answer, or none: nothing is
+  dropped from the MusicBrainz half without an answer, and the album page says neither "in" nor
+  "not in your library".
+- **The album you don't have** (`app/ReleaseGroupPage.tsx`, at `#/<tab>/group/<rgid>?release=<mbid>`):
+  `pl-album-page`'s header (back, `ArchiveCover` - the Cover Art Archive's front for the pressing
+  shown, then the group's, remembering which addresses failed as `Cover` does - title, artist as a
+  plain `pl-hero-artist` like the album page's, and `metaLine`: "2008 · Album · not in your
+  library", "in your library" when the group is held by its id OR any pressing's (`releaseIds`: an
+  .m4a deadwax filed has a release id and no group id - Easy MP4 has no key for it - and the main
+  page's card counts it through `registerGroupReleases`), nothing about the library until it has
+  answered (`held` null: the first cut said "not in your library" for an album you have while the
+  first /owned walked the library), and nothing at all on a cold link until something is known).
+  The id in the address goes through `groupMbid()` (lowercased, MusicBrainz's pattern): anything
+  else is `NOT_AN_ALBUM_LINK`, "That isn't a link to an album on MusicBrainz.", with no Try again
+  and nothing asked - it was a 422 drawn as a URL with a Try again that could never work. `app-rg-actions` holds the `PressingPicker` where the album page has Play
+  and Shuffle; **Get is left out entirely until S5** (an unusable button is worse than none), the
+  column being where it goes under the picker - so the page has no solid purple button yet
+  (app-rules pins that). Outside the Navidrome gate (App's `pageView` branches on `page.kind`).
+  - Its pressings: NEW `GET /search_musicbrainz/release_group?release_group_mbid=` (an MBID or a
+    422) = `get_releases(with_tracks=True)` - every pressing's tracklist, which the base and the
+    differences need - cached by ResponseCache like every success. `getReleaseGroup` in
+    api/musicbrainz.ts, through latestOnly; a `problem` (MusicBrainz failed, before or part way) is
+    drawn as the problem with Try again, never as a short list. A module `Map` keeps the last
+    `PRESSINGS_KEPT` (20) complete answers for the session, so Back (the page re-mounts: only a
+    tab's top page is mounted) and a tab switch ask nothing; only complete answers - a broken-off
+    list is never kept, so Try again and the page opened again ask afresh (group.sim). A cold link
+    has no preview, so the header comes from the group the pressings carry (`release-group`,
+    review: `/release_group` asks `inc=...+release-groups` - `get_releases(with_group=True)`, no
+    extra request - so a reload or a link says "Album" and the group's own title), else from the
+    pressings themselves (`pageHeader`: the chosen one's title and credit, the earliest year -
+    MusicBrainz's first-release-date).
+  - **`lib/pressings.ts`** (pure, `pressings.sim.cjs` on the real fixtures): `pressingsView` - the
+    default is `representativeRelease` (the most common tracklist, Official, CD/Digital, no
+    disambiguation, earliest, the id: the pressing a card's Find downloads as, and the one S5's Get
+    will get); a pressing's kind is `usual` (chooseBase's titles in order, with nothing added, left
+    out, renamed or another version - a length a few seconds off is not a difference, and never
+    marked, where the main page shows an "N lengths" chip), `differs` or `none` (no tracks).
+    **Every pressing is compared with the usual titles at the DEFAULT pressing's lengths**
+    (`reference`, review): chooseBase lends the lengths of whichever pressing holding the usual
+    titles MusicBrainz listed FIRST, so with the single mix first the default read "another version
+    of Borderline" against itself and every other pressing differed. The default always holds the
+    usual titles (representativeRelease picks from chooseBase's pool), so no order changes a word -
+    pressings.sim puts every real pressing first in turn. Left-out lengths and "The usual version
+    is …" are the default's: Dummy's It's a Fire is 3:49 here, where the main page's base row says
+    3:48. The dropdown shows the default, ONE usual pressing of each other format,
+    the chosen one if it was folded, every one that differs, then folds the rest of the usual ones
+    under "N more pressings with the usual tracklist" - which EXPANDS (decisions.md left that open;
+    a pressing you can't reach can't be got). Labels: formats in runs ('2×12" Vinyl', "Digital" for
+    Digital Media), year, country (XW left out, XE "Europe"), then the disambiguation else the first
+    label. Notes: "The usual tracklist · shared by 9 of 10 pressings" ("all N"), "Same tracklist as
+    the usual one", "+1 bonus track: Patience", "Without It’s a Fire", "1 other version: Borderline,
+    4:34", "N tracks renamed", "No tracklist on MusicBrainz". `summaryLine`: the default's "The usual
+    tracklist, shared by …", "Same tracklist as the usual one", amber "This pressing adds 1 track"
+    (leaves out / renames / has another version of, joined), "The only pressing MusicBrainz lists".
+    `trackRows`: the pressing's own titles and lengths, numbered per disc, a Bonus mark ("Only on
+    this pressing"), Other version ("The usual version is 3:58"), Renamed ('Usually "…"');
+    `leftOut` lists what it leaves out after the list. Disc headings by `lib/discTitles.ts`'s rule
+    (more than one disc, or any titled): "Disc 2 · Unreleased Tracks" from the medium's title.
+  - **The pick is the address**: `onPick(group, release | null)` -> App's `pickPressing` ->
+    `router.update` (appHistory.ts) -> `replaceTop` (appRoutes.ts) REPLACES the entry, so a reload or
+    a link shows the same pressing and back leaves the page in one step; the default takes
+    `?release=` out. `Page.release` is in the address but NOT the page's identity (`samePage` is kind
+    and id) and not where its scroll is kept (`scrollKey`, which App now uses for every saved scroll,
+    so a pick never jumps the page to the top). Back and forward land on the pressing their entry
+    names (`followRoute` and `forwardTo` go through `replaceTop`). `routes.sim.cjs` drives it end to
+    end.
+  - **`app/PressingPicker.tsx`**, a listbox: the button (`aria-haspopup="listbox"`, `aria-expanded`,
+    `aria-controls` an id of its own - a page stays mounted on every tab it was opened on), options
+    `role="option"` with `aria-selected`, opening focuses the chosen one, arrows/Home/End move.
+    Escape and a pick close it with focus back on the button; a tap outside (`useDismiss`) or Tab
+    out just closes it, focus left where it went. The fold is a button OUTSIDE the listbox (only
+    options belong in one), and expanding moves focus to the first pressing it revealed.
+    **Focus going NOWHERE is not focus leaving** (review): WebKit - Safari, every iPhone browser -
+    focuses no tapped button without a tabindex, so a press on "N more" or on the Pressing button
+    blurred the focused option with no relatedTarget, the focusout closed the list and Preact hid it
+    before the click: "N more" could never expand on the iPhone, and the Pressing button closed
+    the list on its press and reopened it on its click (reproduced in a WKWebView). A focusout
+    with no relatedTarget is ignored (a tap outside is useDismiss's), and the fold takes
+    `tabIndex={-1}` like the options (WebKit focuses those since Safari 17), so a tap on it keeps
+    focus inside. Chromium blurs a removed focused element with no relatedTarget too - the fold
+    going as it expands. **Opening brings the list into view** (review): it opens downward, and at
+    375x667 with something playing about 20px of it showed above the mini player, the chosen option
+    focused out of sight (`preventScroll`). It is capped to the band between the page's bars
+    (`--app-picker-band`, `-mini` with the mini player: 100dvh less the scroll-padding), the chosen
+    option is scrolled into the list's own view, then the list into the page's
+    (`scrollIntoView({block: 'nearest'})`, which honours html's scroll-padding). The list is a
+    popover that scrolls itself (`overflow-x: hidden` - the overflow gotcha), under the album page's
+    sticky bar (z 4 < 5); the fold is drawn in the accent as the app's text buttons are (it was
+    tertiary grey, 3.6:1 at 12px). `group.sim.cjs` renders the page and the picker with the
+    fake-Preact harness.
+- **Two copies of tracklistDiff and owned, held to one answer.** The Docker UI stage copies only
+  `ui/`, so the app can't import `interface/scripts/*.mjs`: `lib/tracklistDiff.ts` and
+  `lib/owned.ts` are PORTS (same functions, same thresholds, same answers), and the `.mjs` stay for
+  the main page until it retires. `tracklist.sim.cjs` and `owned.sim.cjs` run BOTH copies against
+  shared fixtures in `tests/fixtures/pressings/`: The Slow Rush, Dummy and Third as MusicBrainz
+  answered on 2026-09-30 (`/release?release-group=…&inc=media+recordings+labels+artist-credits`,
+  trimmed to the fields read), each with what the `.mjs` answered recorded beside it (the base, the
+  representative, every pressing's diff and chips), the Experience edition of Wish You Were Here
+  for medium titles, and `owned.json`'s library and cases; tracklist also diffs every pair of real
+  pressings through both copies (789 pairs), and holds the two to the same base and pressing with
+  every real pressing put first in turn (47 orders), and on the two rules the real groups never
+  test, in the hand-made suite both copies run: a tie for the most common tracklist goes to the one
+  given first, and a CD with a disambiguation beats a plain vinyl (review: a drift in either passed
+  every sim). A change to one copy that the other doesn't share fails by name. A Python port, if a native client ever wants pressings from the server, is pinned
+  by the same files. Real data corrected the board in two places: Third has 17 pressings, 13 alike
+  (not 4), and the Japanese CD's "Patience" is 4:53.
+- **The server**:
+  - `GET /deadwax/navidrome/search` (search3): declared `q` (at most 200 characters, empty allowed -
+    Navidrome answers an empty search with everything, for S6's Songs), `artistCount`/
+    `albumCount` (0-50), `songCount` (0-500), offsets (0+), defaults 20; answers `{artists, albums,
+    songs}` as Navidrome sent them. `test_there_is_no_general_proxy` (and the turntable test's copy
+    of the list) edited on purpose. `tests/test_navidrome_search.py` through `start()`: what reaches
+    search3, a forged login, folder, format or client name never passed on, an encoded `&u=` kept
+    inside the query, every bound a 422 with Navidrome asked nothing, the bounds themselves allowed.
+  - **`client_for(request)`** (navidrome_endpoint.py): the seam for step 6's per-user Navidrome
+    logins - every route in routes/navidrome.py and the turntable's internal getAlbum
+    (`_navidrome_release(album, client)`) ask through it, so step 6 changes its body and no route.
+    With logins off it returns the one shared client (the settings route still drops that one on a
+    URL change). NOT through it, on purpose: the stream cache's make and the album context
+    (player_cache.py, album_context.py) - one make serves every phone that asks, so step 6 must check
+    a user's access at the route before handing them the cached answer - and the apply's
+    getScanStatus, a question about the server. The test records every route's call.
+  - `/search_musicbrainz/releases` passes `problem` through (it dropped it, so a broken-off list
+    read as the album's pressings); `/release_group` also asks each pressing's group
+    (`with_group`, `inc=...+release-groups`, its own cache key; `/releases` doesn't);
+    `tests/test_musicbrainz_routes.py` runs a real MusicBrainzClient over a counting fake through
+    `start()`: problem passed on, with_tracks and release-groups asked, paging, the cache (a second
+    look asks nothing), a failure never cached (Try again asks), a part-way failure, and the MBID
+    pattern (anchored both ends; uppercase, a suffix, a prefix, `&inc=` refused).
+- **Style**: tokens only - `--dw-field`, `--dw-field-icon`, `--dw-popover*`, `--dw-selected-row`,
+  STYLE.md's green and amber badges and row tints (`--dw-badge-green-*`, `--dw-badge-amber-*`,
+  `--dw-tint-*`) new in theme.css section 10; the layout's `--app-search-*`, `--app-field*`,
+  `--app-result*`, `--app-sweep-*`, `--app-picker*`, `--app-rg-*` in app.css. The page's classes are
+  `app-rg-*` (`.app-group` was already the grouped list). The loading sweep (`.app-sweep`, STYLE's
+  sunken track with a part of the purple fill going along it) stops for reduced motion. A marked
+  row's tint reaches `--app-rg-mark-bleed` past the column with matching padding, so its number and
+  length stay in line. `test_app_css.py` holds the field's 16px floor, the popover (scrolls itself,
+  under the bar, no display of its own so `hidden` hides it, never taller than the band between the
+  page's bars, mini player or not), the fold's accent, tap targets, ellipses, the tint and the
+  sweep.
+- **Not built, on purpose**: Get on the page and Get chips on rows (S5: an unusable button is worse
+  than none); artist pages and the top result as a link (S6); a held MusicBrainz group opening the
+  album you have (S6's id bridge); `#/search?q=` in the address (the root stays mounted, so the box
+  keeps its text across tabs; a reload empties it); a visible type filter (none on the board, and
+  never silently on); trimming `/release_group`'s payload on the server (the API keeps
+  MusicBrainz's raw data, gzipped; a group of hundreds of pressings is several requests and a
+  large answer, kept for the session).
+- **After review**: twenty-one findings (two pairs the same), each confirmed by skeptics, fixed
+  together, each with a test that fails without it: a scroll calling off Search's own album ask
+  (`keep`); the pressing list closing under a tap in WebKit, and the Pressing button unable to close
+  it (focus going nowhere); the page read backwards when MusicBrainz listed a single mix first (the
+  default's lengths); the MusicBrainz half keeping a longer text's albums under a shorter box; a 422
+  drawn as a URL (`maxLength`, `groupMbid`); a cold link without its kind, and "not in your library"
+  before the library answered; the list opening under the mini player with its chosen option out of
+  sight; rows vanishing from under a finger as the library answered; the library half's 20px Try
+  again; the fold at 3.6:1; an .m4a deadwax filed called "not in your library" on its own page; the
+  two tracklistDiff copies free to pick different pressings on a tie or a disambiguated CD; Search's
+  and useOwned's wiring unpinned (and a filing never asking again after a failed first ask); a
+  broken-off list free to be cached; `owned()` stealing `newImports()`'s doc comment; and five in the
+  docs (troubleshooting's album-page wording, this file's route model and picker focus, "always
+  agree" with the main page, and the m4a advice). `search.sim.cjs` is new for them.
+- **Verified**: 1922 Python tests (44 new: `test_navidrome_search.py` 21, `test_musicbrainz_routes.py`
+  15, eight in `test_app_css.py`), pyflakes, tsc, and all 31 sims (`searchQuery` 47 checks, `pressings`
+  58, `group` 41, `search` 47 new; `tracklist` 94 and `owned` 49 on both copies; `routes` 140 and
+  `app-rules` 95 extended); 78 mutations, one per rule pinned, each caught and restored byte for byte
+  - four first got past (the MBID pattern's start anchor, the rename window, a group-only folder
+  named as a guess, a stray trailing separator) and gained the tests that catch them - and after
+  the review 38 more, one or more per fix, all caught (two first failed only to compile, and were
+  made type-valid). The engine guard is empty and `player.sim.cjs` untouched.
+  **NOT verified here**: the real page (the build workaround and a check against the stubs come
+  after this change); search3 on a real Navidrome 0.64.2 (what it finds for "portishead third", an
+  empty query); MusicBrainz live from the phone; and everything on the iPhone - a Search row's tap
+  starting its album, the pressing list scrolling under a finger, the keyboard's Search key, and
+  the Archive's covers over WireGuard.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -5945,7 +6214,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1878 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 1922 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -5965,8 +6234,8 @@ node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and re
 node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices, compact tracks, windowing
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
 node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
-node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes about it
-node ui/test/owned.sim.cjs      # which search results the library already holds - by pressing, by album, and "maybe" by name
+node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes - the .mjs and its TS port, on real groups
+node ui/test/owned.sim.cjs      # which search results the library already holds - by pressing, by album, "maybe" by name - both copies
 node ui/test/latest.sim.cjs     # only the newest answer counts - both copies of the guard, answers arriving out of order
 node ui/test/candidates.sim.cjs # the candidates panel's filters, the edited-query rule, and what a row says
 node ui/test/playqueue.sim.cjs  # the phone player's queue - what previous does, shuffle's first song, what counts as a play
@@ -5985,6 +6254,10 @@ node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampl
 node ui/test/info.sim.cjs       # Info > About's rows, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape
 node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button
 node ui/test/requests.sim.cjs   # the Requests tab and Home's Arriving - grouping, every row's words, one primary, Arriving = the badge, asking again, the ✕'s question, what a screen reader hears
+node ui/test/searchQuery.sim.cjs # the app's one search box - an artist at either end, an artist alone, va, the brackets before a type filter, what's left out
+node ui/test/pressings.sim.cjs  # the album you don't have - the default pressing, the dropdown's list and fold, the line above the tracklist, Bonus rows, disc titles
+node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, Try again, the session's cache, a pick, the listbox, focus going nowhere
+node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -6005,7 +6278,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1878 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1922 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

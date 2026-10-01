@@ -20,6 +20,10 @@
  *    to the page, forward by putting the pages passed back on top, never by searching the stack,
  *    since Go to album can put one album in a stack twice; onto another tab's entry it shows that
  *    tab AS IT WAS LEFT, pages kept, and rewrites the entry.
+ *  - The album you don't have (2.0.0-player.13): `#/<tab>/group/<rgid>?release=<mbid>` read and
+ *    written; the pressing is in the address but not part of the page's identity, so choosing
+ *    another REPLACES the entry (never a page pushed over it), keeps the page's scroll, and back
+ *    still leaves the page; back and forward land on the pressing the entry names.
  *  - All of it end to end: lib/appHistory.ts's router driven against a fake browser history that
  *    keeps entries and their state across a reload, fires popstate and then hashchange on a
  *    traversal, and runs history.go() later, as a browser does.
@@ -73,6 +77,36 @@ check('an album pushed on Home', R.parseHash('#/home/album/al-1').route, { tab: 
 }
 check('a stray % that isn\'t an escape is taken as it is', R.parseHash('#/library/album/100%').route.page.id, '100%')
 check('a label is never part of the address', R.formatRoute({ tab: 'home', page: album('x', 'Dummy') }), '#/home/album/x')
+
+console.log('\nthe album you don\'t have: a group, and the pressing shown')
+const group = (id, release, label) => ({ kind: 'group', id, ...(label ? { label } : {}), ...(release ? { release } : {}) })
+check('a group pushed on Search', R.parseHash('#/search/group/rg-1'), { route: { tab: 'search', page: group('rg-1') }, canonical: '#/search/group/rg-1' })
+check('...with the pressing shown', R.parseHash('#/search/group/rg-1?release=r-2'),
+  { route: { tab: 'search', page: group('rg-1', 'r-2') }, canonical: '#/search/group/rg-1?release=r-2' })
+check('a group page on any tab', R.parseHash('#/home/group/rg-1').route, { tab: 'home', page: group('rg-1') })
+check('the pressing is written only for a group, and escaped', [
+  R.formatRoute({ tab: 'search', page: group('rg 1', 'r/2') }),
+  R.formatRoute({ tab: 'library', page: { kind: 'album', id: 'al-1', release: 'r-2' } }),
+], ['#/search/group/rg%201?release=r%2F2', '#/library/album/al-1'])
+check('...and read back as itself', R.parseHash(R.formatRoute({ tab: 'search', page: group('rg 1', 'r/2?&x') })).route.page, group('rg 1', 'r/2?&x'))
+check('an empty pressing is none', [R.parseHash('#/search/group/rg-1?release=').canonical, R.parseHash('#/search/group/rg-1?release=%20').canonical], ['#/search/group/rg-1', '#/search/group/rg-1'])
+check('another query on an album is dropped', R.parseHash('#/library/album/x?release=r-2').route.page, album('x'))
+check('a group with no id is its tab\'s root', R.parseHash('#/search/group/').canonical, '#/search')
+check('the pressing is not who the page is', [R.samePage(group('rg-1', 'r-1'), group('rg-1', 'r-2')), R.samePage(group('al-1'), album('al-1'))], [true, false])
+check('...and not where its scroll is kept', [R.scrollKey({ tab: 'search', page: group('rg-1', 'r-2', 'Third') }), R.scrollKey({ tab: 'search', page: null })], ['#/search/group/rg-1', '#/search'])
+{
+  let nav = R.openPage(R.startNav({ tab: 'search', page: null }), group('rg-1', null, 'Third'))
+  const picked = R.replaceTop(nav, group('rg-1', 'r-2'))
+  check('choosing a pressing replaces the page on top, its label kept', [picked.stacks.search, R.formatRoute(R.currentRoute(picked))],
+    [[group('rg-1', 'r-2', 'Third')], '#/search/group/rg-1?release=r-2'])
+  check('...the same pressing again changes nothing', R.replaceTop(picked, group('rg-1', 'r-2')) === picked, true)
+  check('...the default again takes the pressing out of the address', R.formatRoute(R.currentRoute(R.replaceTop(picked, group('rg-1')))), '#/search/group/rg-1')
+  check('...another page is never replaced by it', R.replaceTop(nav, group('rg-9', 'r-2')) === nav, true)
+  check('opening the same group again is the same page, whatever the pressing', R.openPage(picked, group('rg-1', 'r-3')) === picked, true)
+  nav = R.openPage(picked, album('al-1', 'Dummy'))
+  const back = R.followRoute(nav, R.parseHash('#/search/group/rg-1?release=r-4').route)
+  check('back onto it shows the pressing its entry names, label kept', back.stacks.search, [group('rg-1', 'r-4', 'Third')])
+}
 
 console.log('\nthe player\'s old links, and an empty hash')
 check('#/album/<id> opens in Library', R.parseHash('#/album/al-9'),
@@ -500,6 +534,39 @@ console.log('\nend to end: cold links')
   check('an empty hash: Home, written in', [where(b), b.hashes()], [['home', []], ['#/home']])
   b.type('#/you')
   check('an address typed in: followed, and given a place', [where(b), b.index, b.entries[1].state?.n], [['you', []], 1, 1])
+}
+
+console.log('\nend to end: choosing a pressing on the album you don\'t have')
+{
+  const b = makeBrowser('#/search')
+  b.load()
+  b.router.open({ kind: 'group', id: 'rg-1', label: 'Third' })
+  check('the group is pushed', [b.hashes(), b.index], [['#/search', '#/search/group/rg-1'], 1])
+  b.router.update({ kind: 'group', id: 'rg-1', release: 'r-2' })
+  check('a pressing chosen REPLACES its entry - no new one', [b.hashes(), b.index], [['#/search', '#/search/group/rg-1?release=r-2'], 1])
+  b.router.update({ kind: 'group', id: 'rg-1', release: 'r-3' })
+  check('...each time', b.hashes(), ['#/search', '#/search/group/rg-1?release=r-3'])
+  b.router.back()
+  b.settle()
+  check('back leaves the page, in one step, by history\'s own back', [where(b), b.index, b.left], [['search', []], 0, false])
+  b.forward()
+  check('forward lands on the pressing last chosen', [b.router.nav.stacks.search, b.entries[b.index].hash],
+    [[{ kind: 'group', id: 'rg-1', release: 'r-3' }], '#/search/group/rg-1?release=r-3'])
+
+  const c = makeBrowser('#/search/group/rg-7?release=r-9')
+  c.load()
+  check('a cold link opens the group on the pressing it names', c.router.nav.stacks.search, [{ kind: 'group', id: 'rg-7', release: 'r-9' }])
+  c.router.update({ kind: 'group', id: 'rg-7', release: 'r-1' })
+  c.router.back()
+  c.settle()
+  check('...and back from it is the tab\'s root, its address replaced', [where(c), c.hashes()], [['search', []], ['#/search']])
+
+  const d = makeBrowser('#/search')
+  d.load()
+  d.router.open({ kind: 'group', id: 'rg-1', label: 'Third' })
+  d.router.update({ kind: 'album', id: 'rg-1', release: 'r-2' })
+  d.router.update({ kind: 'group', id: 'rg-other', release: 'r-2' })
+  check('an update for another page does nothing', d.hashes(), ['#/search', '#/search/group/rg-1'])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

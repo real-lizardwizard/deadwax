@@ -1,87 +1,83 @@
 /**
- * Which search results are already in the library.
+ * Which search results are already in the library - BOTH copies of the rules, held to one answer.
  *
- * Loads interface/scripts/owned.mjs straight into Node, like sort.sim.cjs. The cases that
- * matter are the ones a wrong answer would hide: a pressing claimed by the wrong id, an untagged
- * folder claimed over a tagged one, a folder named the way the sleeve credited the artist.
+ * interface/scripts/owned.mjs marks the main page's search; ui/src/lib/owned.ts (2.0.0-player.13)
+ * leaves held albums out of the app's "Not in your library yet". The image's UI stage copies only
+ * ui/, so the app can't import the .mjs, and the two live side by side until the main page
+ * retires. Every case is in tests/fixtures/pressings/owned.json and is run against each copy, so
+ * an edit to one that the other doesn't share fails here, by name.
  *
- * Run it with:  node ui/test/owned.sim.cjs
+ * The cases that matter are the ones a wrong answer would hide: a pressing claimed by the wrong id,
+ * an untagged folder claimed over a tagged one, a folder named the way the sleeve credited the
+ * artist.
+ *
+ * Run it with:  node ui/test/owned.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
-const path = require('path');
-const { pathToFileURL } = require('url');
+const { execFileSync } = require('child_process')
+const fs = require('fs'), os = require('os'), path = require('path')
+const { pathToFileURL } = require('url')
 
-const MODULE = pathToFileURL(
-  path.resolve(__dirname, '../../interface/scripts/owned.mjs')
-).href;
+const UI = path.resolve(__dirname, '..')
+const FIXTURE = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../tests/fixtures/pressings/owned.json'), 'utf8'))
+const MJS = pathToFileURL(path.resolve(__dirname, '../../interface/scripts/owned.mjs')).href
+const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-owned-'))
 
-let failures = 0;
+execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
+  'src/lib/owned.ts', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022',
+  '--skipLibCheck', '--moduleResolution', 'node',
+], { cwd: UI, stdio: 'inherit' })
+
+let failures = 0
 function check(label, actual, expected) {
-  const ok = JSON.stringify(actual) === JSON.stringify(expected);
-  if (!ok) failures++;
+  const ok = JSON.stringify(actual) === JSON.stringify(expected)
+  if (!ok) failures++
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}: ${JSON.stringify(actual)}` +
-              (ok ? '' : `  (expected ${JSON.stringify(expected)})`));
+              (ok ? '' : `  (expected ${JSON.stringify(expected)})`))
 }
 
-const album = (path, fields = {}) => ({
-  path, artist: '', album: '', year: '', edition: '', release_mbid: '', release_group_mbid: '',
-  formats: ['flac'], track_count: 10, ...fields,
-});
+const paths = (albums) => albums.map((album) => album.path).sort()
 
-const LIBRARY = [
-  album('Portishead/Dummy (1994)', { artist: 'Portishead', album: 'Dummy', release_mbid: 'gb-cd', release_group_mbid: 'dummy' }),
-  album('Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]', {
-    artist: 'Portishead', album: 'Dummy', edition: '20th Anniversary Reissue 180gram',
-    release_mbid: 'vinyl-2014', release_group_mbid: 'dummy', formats: ['flac'],
-  }),
-  album('Tame Impala/Currents (2015)', { artist: 'Tame Impala', album: 'Currents', release_mbid: 'currents-cd', formats: ['m4a'] }),
-  album('Old Rips/Pink Floyd - Wish You Were Here', { artist: 'Pink Floyd', album: 'Wish You Were Here (Remastered)' }),
-  album('Kanye West/Donda', { artist: 'Kanye West', album: 'Donda' }),
-  album('Somebody Else/Third', { artist: 'Portishead', album: 'Third', release_mbid: 'not-this-group', release_group_mbid: 'other' }),
-];
+/** One case of the fixture, through one copy - albums in an answer written as their paths. */
+function run(O, index, { fn, args }) {
+  const byPath = (entry) => (typeof entry === 'string' ? FIXTURE.albums.find((album) => album.path === entry) : entry)
+  switch (fn) {
+    case 'foldName': return O.foldName(...args)
+    case 'ownedForRelease': return paths(O.ownedForRelease(index, ...args))
+    case 'ownedForGroup': {
+      const { held, guessed } = O.ownedForGroup(index, ...args)
+      return { held: paths(held), guessed: paths(guessed) }
+    }
+    case 'describeGroupOwnership': {
+      const chip = O.describeGroupOwnership(O.ownedForGroup(index, ...args))
+      return chip && { kind: chip.kind, label: chip.label }
+    }
+    case 'describeFolders': return O.describeFolders(args[0].map(byPath))
+    case 'total': return index.total
+    default: throw new Error(`no such case: ${fn}`)
+  }
+}
 
-(async () => {
-  const O = await import(MODULE);
-  const index = O.buildOwnedIndex(LIBRARY);
+;(async () => {
+  const copies = [['owned.mjs', await import(MJS)], ['owned.ts', require(path.join(OUT, 'owned.js'))]]
 
-  console.log('names');
-  check('bracketed asides, a leading The, accents and & fold away',
-    [O.foldName('Wish You Were Here (Remastered)'), O.foldName('The Motörhead & Friends')],
-    ['wish you were here', 'motorhead and friends']);
+  for (const [name, O] of copies) {
+    console.log(`\n${name}`)
+    const index = O.buildOwnedIndex(FIXTURE.albums)
+    for (const item of FIXTURE.cases) check(item.label, run(O, index, item), item.expected)
+    check('no index answers nothing', O.ownedForGroup(null, { groupId: 'dummy' }), { held: [], guessed: [] })
+    check('...and holds no pressing', O.ownedForRelease(null, 'x'), [])
+  }
 
-  console.log('\nby pressing');
-  check('a pressing you hold', O.ownedForRelease(index, 'vinyl-2014').map((a) => a.edition), ['20th Anniversary Reissue 180gram']);
-  check('a pressing you do not', O.ownedForRelease(index, 'jp-cd'), []);
+  console.log('\nthe two copies')
+  const exported = (O) => Object.keys(O).filter((key) => typeof O[key] === 'function').sort()
+  check('export the same functions', exported(copies[1][1]), exported(copies[0][1]))
+  //? one more pass over names nobody wrote a case for: every album's own name, both ways
+  const names = FIXTURE.albums.flatMap((album) => [album.artist, album.album, album.path])
+  check('fold every name in the fixture alike', names.map(copies[1][1].foldName), names.map(copies[0][1].foldName))
+  const tooltip = (O) => O.describeGroupOwnership(O.ownedForGroup(O.buildOwnedIndex(FIXTURE.albums), FIXTURE.cases[6].args[0])).title
+  check('word a tooltip alike', tooltip(copies[1][1]), tooltip(copies[0][1]))
 
-  console.log('\nby album');
-  const dummy = O.ownedForGroup(index, { groupId: 'dummy', title: 'Dummy', artists: ['Portishead'] });
-  check('both editions of Dummy, by group id', dummy.held.map((a) => a.path).sort(), [
-    'Portishead/Dummy (1994)', 'Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]']);
-  check('the card says how many', O.describeGroupOwnership(dummy).label, 'In your library · 2 editions');
-  const currents = O.ownedForGroup(index, { groupId: 'currents', releaseIds: ['currents-cd', 'currents-lp'], title: 'Currents', artists: ['Tame Impala'] });
-  check('an m4a album with no group id is found through its pressing', currents.held.map((a) => a.path), ['Tame Impala/Currents (2015)']);
-  check('...once the group\'s pressings are known', O.ownedForGroup(index, { groupId: 'currents', title: 'Currents', artists: ['Tame Impala'] }).held.length, 0);
-
-  console.log('\nby name, only for untagged folders');
-  const wywh = O.ownedForGroup(index, { groupId: 'wywh', title: 'Wish You Were Here', artists: ['Pink Floyd'] });
-  check('an untagged rip is a "maybe"', [wywh.held.length, wywh.guessed.map((a) => a.path), O.describeGroupOwnership(wywh).kind],
-    [0, ['Old Rips/Pink Floyd - Wish You Were Here'], 'maybe']);
-  const donda = O.ownedForGroup(index, { groupId: 'donda', title: 'Donda', artists: ['Kanye West', 'Ye'] });
-  check('a folder named for the credit, not the artist\'s current name', donda.guessed.map((a) => a.path), ['Kanye West/Donda']);
-  const third = O.ownedForGroup(index, { groupId: 'third', title: 'Third', artists: ['Portishead'] });
-  check('a TAGGED folder of another album is never claimed by its name', [third.held.length, third.guessed.length], [0, 0]);
-  check('nothing held, no chip', O.describeGroupOwnership(third), null);
-
-  console.log('\ntooltips');
-  check('an edition the folder name already carries is not said twice',
-    O.describeFolders(O.ownedForRelease(index, 'vinyl-2014')),
-    'Portishead/Dummy (1994) [20th Anniversary Reissue 180gram] (FLAC)');
-  check('one it does not carry is', O.describeFolders([album('Rips/Dummy', { edition: 'Standard', formats: ['mp3'] })]),
-    'Rips/Dummy (Standard, MP3)');
-
-  console.log('\nwithout a library');
-  check('no index answers nothing', O.ownedForGroup(null, { groupId: 'dummy' }), { held: [], guessed: [] });
-
-  console.log(failures ? `\n${failures} FAILED` : '\nall passed');
-  process.exit(failures ? 1 : 0);
-})();
+  console.log(failures ? `\n${failures} FAILED` : '\nall passed')
+  process.exit(failures ? 1 : 0)
+})()

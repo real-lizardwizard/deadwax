@@ -1,5 +1,5 @@
 import { ApiError, MusicBrainzUnavailable, get } from './http'
-import type { FullySearchResponse, PingResponse, Release, ReleasesResponse } from './types'
+import type { FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse } from './types'
 
 /**
  * Search release groups, plus the releases of the best match.
@@ -23,12 +23,14 @@ export async function fullySearch(
    * allows roughly one request a second.
    */
   includeReleases = true,
+  /** lib/latest.ts aborts a search a newer one has superseded (2.0.0-player.13) */
+  signal?: AbortSignal,
 ): Promise<FullySearchResponse> {
   const params = new URLSearchParams({ query, limit: String(limit) })
   if (!includeReleases) params.set('releases', 'false')
 
   try {
-    return await get<FullySearchResponse>(`/search_musicbrainz/fully_search?${params}`)
+    return await get<FullySearchResponse>(`/search_musicbrainz/fully_search?${params}`, signal)
   } catch (error) {
     throw asUnavailable(error)
   }
@@ -45,23 +47,40 @@ export async function fullySearch(
 export async function getReleases(
   releaseGroupMbid: string,
   withTracks = true,
+  signal?: AbortSignal,
 ): Promise<ReleasesResponse> {
   const params = new URLSearchParams({ release_group_mbid: releaseGroupMbid })
   if (!withTracks) params.set('tracks', 'false')
 
   try {
-    return await get<ReleasesResponse>(`/search_musicbrainz/releases?${params}`)
+    return await get<ReleasesResponse>(`/search_musicbrainz/releases?${params}`, signal)
   } catch (error) {
     throw asUnavailable(error)
   }
 }
 
 /** One release, with its tracklist. The other half of `getReleases(id, false)`. */
-export async function getRelease(releaseMbid: string): Promise<Release> {
+export async function getRelease(releaseMbid: string, signal?: AbortSignal): Promise<Release> {
   const params = new URLSearchParams({ release_mbid: releaseMbid })
 
   try {
-    return await get<Release>(`/search_musicbrainz/release?${params}`)
+    return await get<Release>(`/search_musicbrainz/release?${params}`, signal)
+  } catch (error) {
+    throw asUnavailable(error)
+  }
+}
+
+/**
+ * Every pressing of one album WITH its tracklist (2.0.0-player.13), for the app's album-you-don't-
+ * have page - every one is needed to find the most common tracklist and show what each changes.
+ * Cached on the server like every MusicBrainz answer. `problem` set means MusicBrainz failed (part
+ * way, or before the first page): the list is not the album's pressings, and the page says so.
+ */
+export async function getReleaseGroup(releaseGroupMbid: string, signal?: AbortSignal): Promise<ReleaseGroupResponse> {
+  const params = new URLSearchParams({ release_group_mbid: releaseGroupMbid })
+
+  try {
+    return await get<ReleaseGroupResponse>(`/search_musicbrainz/release_group?${params}`, signal)
   } catch (error) {
     throw asUnavailable(error)
   }

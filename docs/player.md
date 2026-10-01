@@ -8,8 +8,9 @@ needs to reach deadwax.
 
 It's growing into one app for everything deadwax does: five tabs along the bottom (**Home**,
 **Library**, **Search**, **Requests** and **You**), with the player inside them. **Requests** shows
-your downloads as they arrive (since 2.0.0-player.12). Search is still on the main page for now;
-its tab says so and links there.
+your downloads as they arrive (since 2.0.0-player.12), and **Search** looks in your library and
+then on MusicBrainz, and shows an album you don't have with each of its pressings' tracklists
+(since 2.0.0-player.13). Starting a download is still on the main page for now.
 
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
@@ -126,9 +127,20 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   is still on the main page.
   [Downloading](downloading.md#on-the-phone-the-requests-tab) has every state and what each button
   does.
-- **Search** says it's on the main page for now, and links there. Every link to the main page
-  opens it beside the player, in a new tab, so the music keeps playing. From the home-screen app it
-  opens outside the app, in Safari or a browser view over it.
+- **Search**: one box, your library first, then MusicBrainz. **In your library** lists the
+  artist you typed (as the **Top result**), albums and songs; an album opens it, and a song plays
+  from there through its album once that album has been fetched (a ▶ at its right says so - the
+  first five albums of the songs found are fetched as the answer arrives), and otherwise opens its
+  album. **Not in your library yet** is MusicBrainz's albums, less the ones you have, asked when
+  you press Search on the keyboard or a moment after you stop typing. Tap one for **the album you
+  don't have**: laid out like an album you have, with a **Pressing** button where Play would be,
+  starting on the usual pressing, and that pressing's tracklist, with its bonus tracks, other
+  versions and renamed or missing tracks marked. MusicBrainz isn't asked for anything until you
+  search, and the album page works with Navidrome down. [Finding music](finding-music.md#on-the-phone-the-apps-search-tab)
+  has how the box is read and what every note means. Getting the album comes in a later version.
+- **Links to the main page** (You's, and the Navidrome message's) open it beside the player, in a
+  new tab, so the music keeps playing. From the home-screen app it opens outside the app, in Safari
+  or a browser view over it.
 - **Now playing**: a large cover (a grey square for an album without one), the song's title, and
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
   to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons, with
@@ -659,14 +671,15 @@ fixes that.
   [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened).
 - **CarPlay**: not something a web page can offer.
 - **Offline**: nothing is kept on the phone for listening without a connection.
-- **Search**: not in the app yet. The Search tab links to the main page, which searches
-  MusicBrainz; to find something to play, browse the Library.
+- **Getting an album**: the app's Search finds albums you don't have and shows their pressings,
+  but starting the download is on the main page (**Find**) until a later version adds **Get**.
+- **Artist pages**: an artist in Search, or on an album, isn't a link yet.
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
-- **The rest of deadwax**: searching MusicBrainz and starting a download are on the main page,
-  which also works on a phone; the Requests tab follows the download from there. Tapping a
-  finished download doesn't open its album yet.
+- **The rest of deadwax**: starting a download, editing, the albums that need a look and the
+  settings are on the main page, which also works on a phone; the Requests tab follows a download
+  from there. Tapping a finished download doesn't open its album yet.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata
@@ -705,6 +718,10 @@ question the whole player existed to answer. Still to find out:
   and going, a download started on the main page showing up when you come back to the app, what
   VoiceOver reads out as downloads change, and the covers fetched from the Cover Art Archive over
   your VPN;
+- **Search** against your Navidrome: what its search finds for an artist, an album and a song
+  (it hasn't been tried against a real Navidrome yet), a song's tap starting its album, the
+  pressing list scrolling under a finger without the page moving, and the Cover Art Archive's
+  covers over your VPN;
 - **Info and the ••• menu** under a real finger: that Info's list scrolls and nothing behind it
   does, that a tap above it closes it, and that the Gapless checkbox in You turns gapless on from
   its tap as the switch did;
