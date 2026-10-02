@@ -32,6 +32,14 @@
  *    go or a key steps, never on the way. Its record and arm are OUTSIDE Now Playing's grip, so
  *    neither starts the sheet's drag; the look is chosen in Now Playing, below App, and App keeps
  *    only the setting; the time line takes the bar's place at one fixed height.
+ *  - The turntable's momentum and its own sound (2.0.0-player.14, player/deck.ts): the deck reaches
+ *    the song only through Turntable's two named functions (holdSong, resumeSong - the player's own
+ *    toggle: pause as a hand takes the record, play at speed after a coast) and the seeks Turntable
+ *    makes of what a release or a pause returns; it calls no playback action itself. Its audio context
+ *    is made or resumed ONLY from gestures WebKit counts - the record's click and release, Now
+ *    Playing's transport and look button, the mini player's tap (App) - never a pointerdown. And none
+ *    of it - deck.ts, lib/deckVoice.ts, Turntable.tsx - touches the player's own audio element: no
+ *    createMediaElementSource, no element looked up, nothing set, loaded, played or paused on one.
  *  - The downloads are watched ONCE, in App (2.0.0-player.12): useDownloadJobs is called there and
  *    in no other file of the app, polling fast only while the Requests tab's root shows (watchingOf)
  *    or a failed look left something arriving (stallsOn), so the tab, Home's Arriving and the badge
@@ -334,6 +342,11 @@ console.log('\nevery sheet is a sheet by the one hook')
     [/moreOpener\.current = null\s*closeSheet\(\)\s*openAlbum\(/.test(going), /const closeSheet = useCallback\(\(\) => \{\s*setOver\('none'\)\s*setSheetOpen\(false\)/.test(app)],
     [true, true])
   check('...one handler for all three, each in its own props', ['NowPlaying', 'ActionMenu', 'InfoSheet'].map((tag) => has(tag, /\bonAlbum=\{toAlbum\b/)), [true, true, true])
+  //? 2.0.0-player.14: Info's "Turntable sound" from the deck's report, which App is told of as it
+  //? changes; and Now Playing handed "Pause winds the record down"
+  check('Info is handed the turntable\'s sound, App told of it as it changes; Now Playing the wind-down setting',
+    [has('InfoSheet', /\bturntable=\{turntableSound\}/), /useEffect\(\(\) => onDeckReport\(setTurntableSound\), \[\]\)/.test(app),
+      has('NowPlaying', /\bwindDown=\{windDown\}/)], [true, true, true])
 }
 
 console.log('\nGapless is a checkbox in You, and its tap is still the gesture')
@@ -374,13 +387,26 @@ console.log('\nthe turntable: a tap in the click, a seek as it lets go, and none
   const click = /const onRecordClick = \(\) => \{([\s\S]*?)\n  \}/.exec(table)?.[1] ?? ''
   check('the record plays or pauses from its click, nothing awaited before it',
     [/<button\b[^>]*class="app-tt-record"[\s\S]*?onClick=\{onRecordClick\}/.test(table), /player\.toggle\(\)/.test(click), /\bawait\b|\.then\(/.test(click)], [true, true, false])
-  //? every player.seek in the file, by the handler it is in: the release and the arm's keys, never a move
+  //? every player.seek in the file, by the handler it is in: the release, the arm's keys and - since
+  //? 2.0.0-player.14 - the tap's pause, to where its wind-down stops; never a move
   const handlers = [...table.matchAll(/const (\w+) = [^\n]*=> \{?[\s\S]*?\n  \}/g)].map((match) => [match[1], match[0]])
-  check('it seeks only as a finger lets go or a key steps',
-    handlers.filter(([, body]) => /player\.seek\(/.test(body)).map(([name]) => name).sort(), ['onArmKey', 'onRelease'])
+  check('it seeks only as a finger lets go, a key steps, or its tap pauses (to where the wind-down stops)',
+    handlers.filter(([, body]) => /player\.seek\(/.test(body)).map(([name]) => name).sort(), ['onArmKey', 'onRecordClick', 'onRelease'])
   check('...and moving reaches the player not at all', /player\./.test(handlers.find(([name]) => name === 'onMove')?.[1] ?? 'player.'), false)
-  check('no frame loop and nothing from the engine\'s clock: the spin is CSS, the arm usePosition',
-    [/requestAnimationFrame|setInterval|setTimeout/.test(table), /usePosition\(player\)/.test(table), /visibilitychange/.test(table)], [false, true, true])
+  //? 2.0.0-player.14: the toggle reached from the tap, from a release with no coast to wait for (its own
+  //? gesture), and from the deck's two moves of the song - pause as a hand takes the record, play at
+  //? speed after a coast - each a named function, each only when the song is the other way
+  check('the toggle is reached from the tap, a release, and the deck\'s two named moves - nowhere else',
+    handlers.filter(([, body]) => /\.toggle\(\)/.test(body)).map(([name]) => name).sort(), ['holdSong', 'onRecordClick', 'onRelease', 'resumeSong'])
+  check('...the deck\'s, only when the song is playing (hold) or paused (resume)',
+    [/const holdSong = \(\) => \{\s*if \(latest\.current\.playing\) latest\.current\.toggle\(\)\s*\}/.test(table),
+      /const resumeSong = \(\) => \{\s*if \(!latest\.current\.playing\) latest\.current\.toggle\(\)\s*\}/.test(table),
+      /hold: \(\) => holdSong\(\),\s*resume: \(\) => resumeSong\(\),/.test(table)], [true, true, true])
+  check('...and a release plays only when the deck says there is no coast to wait for',
+    /if \(play && !player\.playing\) player\.toggle\(\)/.test(handlers.find(([name]) => name === 'onRelease')?.[1] ?? ''), true)
+  check('no frame loop of its own and nothing from the engine\'s clock: the platter is the deck\'s, the arm usePosition',
+    [/requestAnimationFrame|setInterval|setTimeout/.test(table), /usePosition\(player\)/.test(table), /visibilitychange/.test(table),
+      /requestAnimationFrame/.test(code(read('player/deck.ts')))], [false, true, true, true])
   const sheet = code(read('player/NowPlaying.tsx'))
   //? the element, not the type TurntablePreview or TurntableTime
   const drawn = sheet.search(/<Turntable\s/)
@@ -393,6 +419,61 @@ console.log('\nthe turntable: a tap in the click, a seek as it lets go, and none
     [/const \[look, setLook\] = useState<Look>\(openAs\)/.test(sheet), /useLayoutEffect\(\(\) => \{\s*if \(open\) setLook\(openAs\)\s*\}, \[open\]\)/.test(sheet)], [true, true])
   const app = code(read('app/App.tsx'))
   check('...App keeps only the setting, and never draws the turntable', [/<Turntable\b/.test(app), /setLook|otherLook/.test(app), /openAs=\{opensAs\}/.test(app)], [false, false, true])
+}
+
+console.log('\nthe turntable\'s sound: its audio context only from a gesture, and never the player\'s element')
+{
+  //? every call of the two outside the deck itself, by the handler it is in: the `const name = ... => {`
+  //? block, closed at its own indent, that holds it
+  const enclosing = (text, at) => {
+    const blocks = [...text.matchAll(/\n( *)const (\w+) = [^\n]*=> \{[\s\S]*?\n\1\}/g)]
+    const holding = blocks.filter((block) => block.index <= at && at < block.index + block[0].length)
+    return holding.at(-1)?.[2] ?? null
+  }
+  const wakes = files.filter((file) => APP_SIDE(file) && file !== 'player/deck.ts').flatMap((file) => {
+    const text = code(read(file))
+    return [...text.matchAll(/\b(wakeDeckAudio|resumeDeckAudio)\(\)/g)].map((match) => `${file}: ${enclosing(text, match.index)}: ${match[1]}`)
+  })
+  check('made or resumed only from gestures WebKit counts: the record\'s click and release, the transport, the look button, the mini player\'s tap', wakes.sort(), [
+    'app/App.tsx: openSheet: resumeDeckAudio',
+    'player/NowPlaying.tsx: onLook: wakeDeckAudio',
+    'player/NowPlaying.tsx: onNext: wakeDeckAudio',
+    'player/NowPlaying.tsx: onPrevious: wakeDeckAudio',
+    'player/NowPlaying.tsx: onToggle: wakeDeckAudio',
+    'player/Turntable.tsx: onRecordClick: wakeDeckAudio',
+    'player/Turntable.tsx: onRelease: wakeDeckAudio',
+  ])
+  const made = files.filter((file) => /\bnew\s+(?:Context|AudioContext|webkitAudioContext)\b/.test(code(read(file))))
+  check('...and made in one place, the deck', made, ['player/deck.ts'])
+  const deck = code(read('player/deck.ts'))
+  const inDeck = [...deck.matchAll(/\n(export )?function (\w+)\([^)]*\)[^{]*\{[\s\S]*?\n\}/g)]
+  const madeIn = inDeck.filter((fn) => /\bnew Context\(/.test(fn[0])).map((fn) => fn[2])
+  const resumedIn = inDeck.filter((fn) => /\.resume\(\)/.test(fn[0])).map((fn) => fn[2])
+  check('...inside wakeDeckAudio, which resumes it through resumeDeckAudio - the only two that start it',
+    [madeIn, resumedIn, inDeck.filter((fn) => /\bresumeDeckAudio\(\)/.test(fn[0]) && fn[2] !== 'resumeDeckAudio').map((fn) => fn[2])],
+    [['wakeDeckAudio'], ['resumeDeckAudio'], ['wakeDeckAudio']])
+  check('the deck reaches no playback action of its own - only the host Turntable hands it', actionsIn(deck), [])
+  const TOUCHES = [
+    ['createMediaElementSource', /createMediaElementSource|createMediaStreamSource/],
+    ['an element looked up', /querySelector\(\s*['"]audio|getElementsByTagName/],
+    ['a media element', /HTMLMediaElement|HTMLAudioElement|new\s+Audio\b|<audio\b/],
+    ['.src =', /\.src\s*=(?!=)/],
+    ['srcObject', /srcObject/],
+    ['.load(', /\.load\s*\(/],
+    ['.play(', /\.play\s*\(/],
+    ['.pause(', /\.pause\s*\(/],
+  ]
+  const touched = ['player/deck.ts', 'lib/deckVoice.ts', 'player/Turntable.tsx'].flatMap((file) =>
+    TOUCHES.filter(([, pattern]) => pattern.test(code(read(file)))).map(([name]) => `${file}: ${name}`))
+  check('nothing of it touches the player\'s own audio element', touched, [])
+  const nowPlaying = code(read('player/NowPlaying.tsx'))
+  check('the cover\'s pause is the plain toggle, as ever; only the turntable\'s asks the deck',
+    /const onToggle = \(\) => \{\s*if \(!turntable\) \{\s*player\.toggle\(\)\s*return\s*\}/.test(nowPlaying), true)
+  //? and the cover's previous and next wake nothing: with no turntable mounted, a context made there
+  //? would run on unsuspended and unclosed - nothing of the deck runs while the cover shows
+  check('...the cover\'s previous and next wake no audio context: only on the turntable',
+    ['onPrevious', 'onNext'].map((name) => new RegExp(`const ${name} = \\(\\) => \\{\\s*if \\(turntable\\) wakeDeckAudio\\(\\)\\s*player\\.\\w+\\(\\)\\s*\\}`).test(nowPlaying)),
+    [true, true])
 }
 
 console.log('\nwhat Info reads is taken in the tap, and asks the engine\'s element only')

@@ -155,10 +155,14 @@ src/
   flac_mp4.py      PURE. A FLAC file as an MP4 of the very same frames, no ffmpeg - what makes
                    Safari's seeks land. See "FLAC in an MP4, for Safari". And as a FRAGMENTED
                    MP4, `fmp4_layout()`, for the gapless stream - see "One stream for FLAC".
+  flac_window.py   PURE. A stretch of a song as a FLAC file of its own, cut from deadwax's own
+                   MP4s, frames renumbered from 0 - the turntable's sound. See "The turntable,
+                   part two".
   player_cache.py  those MP4s made from Navidrome's file and kept on disk (PLAYER_CACHE_PATH or
                    temp space, PLAYER_CACHE_MB), served with byte ranges; the stream route's
                    `wrap=mp4`, and `wrap=fmp4` for the gapless stream. One URL stays one
-                   container - see "After review (the cache)".
+                   container - see "After review (the cache)". And the turntable's windows,
+                   cut from them (`answer_window()`, the scrub route).
   track_tags.py    tags edited BY HAND, on one track or a selection at once. The fourth
                    writer, and the same plan/execute split again - see "Editing tags by hand".
   artists.py       PURE. What an artist page shows, and where artist pictures come from -
@@ -201,8 +205,10 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    player/streamSource.ts is its one-stream gapless engine, with the pure
                    lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". Since
                    2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
-                   with the player inside them - see "The one app".
-tests/             1922 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+                   with the player inside them - see "The one app". player/deck.ts is the
+                   turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts) - see
+                   "The turntable, part two".
+tests/             1998 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -2051,9 +2057,12 @@ The user guide's page is `docs/player.md`.
   cover, stream, scrobble - and since 2.0.0-player.13 search (search3), for the app's Search tab:
   it only reads the library, every parameter declared and bounded (artistCount and albumCount at
   most 50, songCount 500, offsets from 0, q at most 200 characters; anything undeclared is never
-  passed on). The configured account MAY be Navidrome's admin and deadwax has no
-  login, so a catch-all would hand out user management to anyone on the network - though the
-  docs and the settings tab now say to use a non-admin account of your own: none of the seven calls
+  passed on) - and since 2.0.0-player.14 scrub, the turntable's window of a song: cut from
+  deadwax's own MP4 cache, `at`, `seconds` and `max_rate` only and bounded, Navidrome asked nothing but the
+  version check every MP4 answer makes (see "The turntable, part two"). The configured account MAY
+  be Navidrome's admin and deadwax has no login, so a catch-all would hand out user management to
+  anyone on the network - though the docs and the settings tab now say to use a non-admin account
+  of your own: none of the eight calls
   needs admin, nor does `getScanStatus` (only `startScan` is adminOnly, server/subsonic/api.go).
   `test_there_is_no_general_proxy` pins the list - adding a call means changing that test on
   purpose. The login is laid over the params LAST, so nothing sent can stand in for it.
@@ -3945,7 +3954,10 @@ the `/deadwax/me` seam, and disc titles on the album page.
   - The playback actions (playTracks, toggle, next, previous, setGapless, showAirPlay) are reached
     only from an allowlist: AlbumPage (playTracks), MiniPlayer (toggle, next), NowPlaying (toggle,
     next, previous, showAirPlay), GaplessChoice (setGapless, since 2.0.0-player.10 moved Gapless to
-    You), Turntable (toggle, the record's tap, since 2.0.0-player.11), Search (playTracks, a song
+    You), Turntable (toggle, the record's tap, since 2.0.0-player.11 - and since 2.0.0-player.14 a
+    release with no coast to wait for, and the deck's two named moves, `holdSong` and `resumeSong`:
+    pause as a hand takes the record, play at speed after a coast; app-rules pins those four by
+    name, and the deck calls no action itself), Search (playTracks, a song
     found, its album in hand, since 2.0.0-player.13), and `app/context.ts`, which names them and
     calls none. Adding a file is a deliberate edit to the sim, like the Navidrome
     route list.
@@ -4249,6 +4261,12 @@ be a switch in the global settings".
 
 ### The turntable (2.0.0-player.11)
 
+(Part of this is superseded by 2.0.0-player.14 - see "The turntable, part two": the CSS spin and
+`--dw-record-turn` are gone, the platter turned frame by frame by player/deck.ts; once the deck's
+audio context runs, a press pauses the song and its turn counts from where the record was taken, the
+release lands where the platter's momentum says, and the record has its own sound; a pause from the
+turntable winds down. Until the context runs, a press is exactly what is written below.)
+
 James: "I would like to definitely build the turntable" - on the phone ("I don't think it makes a
 lot of sense on desktop") - "as long as it has the disc art on the 'record'"; earlier, "the playhead
 moved toward the center of the disc as the song plays, tapping on the disc and rotating it is how
@@ -4348,7 +4366,7 @@ instructions for how to use it are a little annoying". The boards are `NowPlayin
   (`drawnAt`, the render's usePosition). A record turned by nothing (round the spindle, or dragged
   straight out) seeks nowhere. **A drag is measured in the stage's box as the press found it**
   (`pressBox`): anything that moves the layout under a still finger moves nothing.
-- **Seek on RELEASE only**, through the player's own `seek` (the scrubber's path): the drag previews
+- **Seek on RELEASE only** (and, since 2.0.0-player.14, as a tap's pause winds down - to where it stops), through the player's own `seek` (the scrubber's path): the drag previews
   the time (the time line, "Scrubbing · 2:31 of 7:05" or "Needle up · ...") and turns the record,
   and the audio does not scrub - that is a later slice. Keys on the arm step as the scrubber's
   (`keyTarget`). A cancel seeks nowhere and a drag begun on a song that has since changed is
@@ -4366,7 +4384,8 @@ instructions for how to use it are a little annoying". The boards are `NowPlayin
   primary press**, because not every drag has a click after it (WebKit synthesises none after a
   moved touch): cleared only by a click, it would swallow the next real tap. A second finger is no
   press, and doesn't clear it.
-- **No per-frame work while the page is hidden.** The spin is a CSS animation on `.app-tt-face`,
+- **No per-frame work while the page is hidden.** (2.0.0-player.14 turned the platter frame by frame
+  in player/deck.ts instead, under the same rule - no frame while closed or hidden.) The spin is a CSS animation on `.app-tt-face`,
   `animation-play-state: paused` unless `is-spinning`, which is `spinning()`: playing AND Now
   Playing open AND the page showing (`useVisible`, on `visibilitychange` - a locked phone) AND no
   finger holding the record. Paused, it stays where it is. Nothing runs from the engine's clock and
@@ -4400,7 +4419,7 @@ instructions for how to use it are a little annoying". The boards are `NowPlayin
   as Gapless is by its own.
 - **No hint and no coach mark** (James, above): the board's `firstTime` tweak is not built, and the
   sim fails on its words.
-- **Deliberately left out**: audible scrubbing (a later slice); the desktop (James: phone only - the
+- **Deliberately left out**: audible scrubbing (a later slice - built in 2.0.0-player.14); the desktop (James: phone only - the
   app has one layout until slice 8's desktop frame, which is where the button stays out); the
   board's Lyrics and Up next icons, as on the cover.
 - **Verified**: 1853 Python tests (`test_turntable_disc_art.py` new: found for disc 1 and 2 of a set,
@@ -4880,6 +4899,262 @@ and "show the bonus track differences on an album that has them".
   empty query); MusicBrainz live from the phone; and everything on the iPhone - a Search row's tap
   starting its album, the pressing list scrolling under a finger, the keyboard's Search key, and
   the Archive's covers over WireGuard.
+
+### The turntable, part two: momentum and its own sound (2.0.0-player.14)
+
+James, on the turntable of 2.0.0-player.11: "can we add momentum to the disc as well?", then "And the
+audio will speed up and slow down with it?". Agreed with him: a flick keeps the record turning and it
+coasts; the platter spins up and down on play and pause like a real deck; the sound follows the hand
+and the coast, backwards too; a pause on the turntable winds the sound down over about a second, with
+a switch in You to turn that off. The cover look is unchanged - its pause instant, nothing of this
+running while it shows. PHONE ONLY, like the turntable. The spec is the session scratchpad's
+`uplan/slice-turntable2.md`.
+
+- **A SEPARATE SOUND PATH, and why.** The player's own audio element is NEVER connected to Web Audio
+  and never touched by any of this but through the player's own actions: Turntable's `holdSong` and
+  `resumeSong` (the player's toggle) and its seeks of what the deck returns. `createMediaElementSource`
+  is what breaks locked playback on an iPhone (the audio-fidelity memory note), and normal playback
+  had to stay exactly what it was. So the record's sound is its own: a decoded WINDOW of the song
+  round the playhead, read by an AudioWorklet (`lib/deckVoice.ts`) on an AudioContext of its own
+  (`player/deck.ts`), and used only while the record is not at its own speed - under the hand, coasting,
+  winding down. `app-rules.sim.cjs` holds `deck.ts`, `deckVoice.ts` and `Turntable.tsx` to touching no
+  media element at all (no createMediaElementSource, no element looked up, nothing set, loaded, played
+  or paused on one) and the deck to calling no playback action.
+- **The voice** (`lib/deckVoice.ts`, pure): reads the window at a SIGNED, fractional rate with
+  four-point (Catmull-Rom) interpolation - 1 the song, 0 silence, negative backwards - steering towards
+  a position and a rate the deck posts each frame (`drive`: where the record is, how fast, and for a
+  coast how fast that changes, `accel`, so it follows a curve between frames). The rate is smoothed per
+  sample (SMOOTH_S 10 ms) and the steering is FOLLOW_S 40 ms, critically damped together, so what is
+  heard stays within about a millisecond of real time of where the platter is (the sim measures it at
+  four speeds). A drive runs out by itself (`until`, DRIVE_FOR_S 0.12 s): a stalled page never leaves
+  a record whirring. A DC blocker at 10 Hz makes a record held still silent (it reads one sample over
+  and over), fades at the window's edges and on take/fade/stop keep it from clicking. Its three
+  functions are SELF-CONTAINED - no imports, no module constants - because the worklet module is made
+  from their own `toString()` (`voiceWorkletSource()`, loaded from a Blob URL): a worklet runs in a scope
+  of its own. A minified rolldown build of it was run in a fake worklet scope and plays (checked once,
+  not in CI); `deck.sim.cjs` runs the module as the browser would and holds it sample for sample to the
+  functions. It reports where it is 30 times a second (exactly: the count carries its remainder), and the
+  needle and time line show that - extrapolated - while it sounds.
+- **The physics** (`lib/platter.ts`, pure): speeds in the platter's own (1 = 33 1/3 rpm = the rate the
+  voice reads at, `voiceRate`), positions in song seconds. Free: friction, a constant part and a part
+  that grows with the speed (FRICTION_DRY, FRICTION_VISCOUS), set so speed 1 stops in SPIN_DOWN_S
+  (1 s, the wind-down) and a flick of 9 (five turns a second) coasts about 1.8 s. The motor: a constant
+  pull from still up to speed (MOTOR_PULL, still to speed in SPIN_UP_S 0.4 s), braking above it (the
+  pull and friction's speed part), and BACKWARDS the pull and the whole of friction together, a decay
+  to still before the pull up - so a hard flick back (-9) is stopped in 0.86 s, as a forward one is
+  braked in 0.84 (until review it had the pull alone: 3.6 s backwards, 16 s of the song rewound, longer
+  than the same flick coasts with the motor off). Each phase has an exact answer, so where a coast lands and where a playing song is when the
+  motor has it back at speed are known AT THE RELEASE (`coast`, `motor`); `deck.sim.cjs` integrates the
+  same equations (`acceleration`) step by step for 54 flicks and holds every landing and every time to
+  within a millisecond. A coast back past the start stops there; on past the end stops END_MARGIN_S
+  (0.25 s) short and the song ends from there; a motor run back to the start spins up from it. The
+  hand's speed is over its last VELOCITY_WINDOW_MS (90) ending at the RELEASE, so a finger that rested
+  has none (`handSpeed`), held to MAX_SPEED (24).
+- **The window, and where it comes from** - option (a) of the spec, a server route:
+  `GET /deadwax/navidrome/scrub/{song_id}?at=&seconds=` (`answer_window()` in player_cache.py, cut by the
+  new pure `src/flac_window.py`). A STANDALONE FLAC of the frames covering the stretch: 'fLaC', STREAMINFO
+  alone and rewritten (total samples, its frames' smallest and largest sizes, MD5 zeroed; the song's block
+  sizes, rate, channels, depth), the frames untouched and RENUMBERED from 0 - frame numbers, or sample
+  numbers in a variable-block stream - each header's CRC-8 and each frame's CRC-16 made again. The CRC-16
+  is carried over by arithmetic, not summed again: FLAC's is linear (zero start, nothing reflected), so a
+  new header changes it by an amount that depends only on the two headers and the length after them
+  (`_crc16_after`, multiplication by x^(8n) mod the polynomial) - 4 ms for 330 frames where re-summing in
+  Python would be a quarter of a second. Renumbered because deadwax's own `find_frames()` refuses a first
+  frame that isn't 0 and Apple's decoder wasn't known; macOS's AudioToolbox (afconvert - the family an
+  iPhone's decodeAudioData is) turned out to decode both the renumbered window and one with the song's
+  own numbers bit-exactly, as did libFLAC and ffmpeg (measured, not in CI; libFLAC is in the tests where
+  `flac` is installed). It is cut from the copy of the song the PAGE PLAYS, from whichever MP4 of it the
+  cache holds - Safari's plain one (its sample tables give every frame) or the gapless player's
+  fragmented one (its sidx gives every fragment, a fragment's trun its frames): with `max_rate=48000` -
+  which the page sends exactly when streamUrl() and fragmentedUrl() would (`resamples()`, Turntable's
+  host `maxRate`) - the RESAMPLED copy, under the plan's key, the plan a neighbour-less make was kept
+  under (`_lost_side`), or a fragmented MP4 this URL was served (`_pinned`), so its frames are what the
+  phone hears: 48 kHz and HEADROOM_DB lower, the same level as the song; with none of those, the
+  resampled plain MP4 made as Safari's would be; refused resampled (the page then plays it as it is),
+  the song as it is. Without `max_rate` (or no audio libraries), the song as it is the same way. So an
+  iPhone's songs cost nothing to make again. (Review: the first cut looked only for the song as it is,
+  so under the default "Up to 48 kHz" every hi-res window downloaded the whole original again, kept a
+  second full-size copy beside the phone's, and sounded 3 dB louder than the song.)
+  `X-Deadwax-Window: <first sample>/<samples>/<rate>` says exactly where it sits (it starts on a frame or
+  fragment at or before `at`). WINDOW_MAX_BYTES (8 MiB) bar the frame `at` falls in: 40 s of CD audio
+  whole, about 13 s of 24/192 as it is. Only `at` (0 to a day), `seconds` (1-60, default 30) and
+  `max_rate` (48000 or nothing, as the stream's) - anything else a 422, as out of bounds is; 415 for a
+  song that isn't a FLAC ("it isn't a FLAC file", the cache's own words), too big to hold
+  (WRAP_MAX_BYTES, judged before anything is fetched - `_mp4()` holds no cap itself, each caller does)
+  or whose MP4 was refused; 416 past the end; 503 with `scope` when the cache can't. A media path (`MEDIA_PREFIXES`): never
+  gzipped, under GuardMedia. On the fixed route list ON PURPOSE (`test_there_is_no_general_proxy` and its
+  copy in test_turntable_disc_art.py edited); like the stream's wrap paths it asks Navidrome through the
+  cache's own client, so step 6 checks a user's access at the route (`test_every_navidrome_route_asks_
+  through_client_for` counts it). MP3 is NOT given a window (the spec's "can"): its time can't be placed
+  without an ID3 size and a Xing table - a VBR MP3 lands seconds off - so non-FLAC songs are silent on the
+  turntable and Debug says why. No server setting.
+- **Kept ready while the turntable shows and the song plays** - once a tap has started the sound: no window
+  is asked for without an audio context and its worklet to put it in (`keep()`), since a window that can't
+  be decoded is only fetched again (review: with no context - Now Playing opened onto the turntable from
+  the mini player - it fetched a fresh 40 s window every 2 s; with the worklet failed it did the same and
+  decoded each). `onAudio` asks once there is somewhere to put it. WINDOW_S (40) from WINDOW_BACK_S (4)
+  before the playhead, on a WINDOW_GRID_S (2) grid so the phone's cache (`private, max-age=300`) answers a
+  window asked again, refreshed once the playhead is within REFRESH_AHEAD_S (6) of its end, and fetched on
+  demand when a hand or a coast goes outside it - and AT THE RELEASE over the whole of where a coast will go
+  (`keepPath`: a backwards flick runs back past the window's start, and a sounding coast used to go silent
+  there). ONE window is on its way at a time, from the ask until it is in the worklet (`pending`, 'fetch'
+  then 'held' while it decodes), so nothing asks for it again meanwhile; only the newest decode is handed
+  on (`decodes`, a latestOnly); a hide lets go of a window still being fetched and keeps one in hand. A
+  window deadwax cut short (a hi-res song as it is, at WINDOW_MAX_BYTES) shrinks the margins in proportion
+  (`windowMargins`: 1.3 and 1.95 s for a 13 s window), so each new one still moves on by about three
+  quarters of its length; a refresh ahead of a playhead the window still covers must start further on than
+  it, and comes no more often than REFRESH_MIN_MS (3 s - a backstop: the move-on rule stops every loop
+  first, so no check can show the floor alone). **Cost**: a window is fetched whole, so 40 s over the 30
+  the playhead crosses before the next - a third more than the song's own stream while the turntable shows
+  and plays; for a hi-res song played as it is about half as much again (13 s windows: about 7 a minute,
+  where the first cut asked 29). **Measured** with the deck's own rules over the server's real cuts of a generated 4-minute
+  CD-quality FLAC (pink noise and a tone, 500 kbps): 6 windows of 2.5 MB in 3 minutes, 5.0 MB a minute
+  against the song's own 3.75 (1.33x; 1.36x cut from the fragmented MP4, whose cuts are whole fragments).
+  A typical 900 kbps CD FLAC would be about 9 MB a minute. Info > Debug's row says what windows have cost
+  since the turntable showed - how to read it off the phone. A failure is asked again after RETRY_MS (10 s); a 415 or a window the
+  browser couldn't decode is never asked again for that song.
+- **The audio context, only from a gesture** (WebKit counts click, pointerup and keyup - not pointerdown):
+  `wakeDeckAudio()` makes it (once) and resumes it, from the record's click and release, the transport's
+  three buttons and the look button switching TO the turntable; `resumeDeckAudio()` resumes one that
+  exists, from the mini player's tap opening Now Playing (App's openSheet). `app-rules.sim.cjs` pins
+  exactly those call sites by the handler each is in, and that the context is constructed only inside
+  wakeDeckAudio. Suspended when the screen closes or the page hides - nothing of it runs on a locked
+  phone - and closed when the turntable unmounts (the look switched to the cover). Never resumed without
+  a gesture, so after a hide the next tap brings it back. Until it runs, a press is EXACTLY 2.0.0-player.11's
+  (`deck.live()` false at the press: silent, the song playing on under the finger, moved where it lets go,
+  no momentum - and the record STOPPED under the finger, `deck.holdStill()`, as .11's paused CSS spin was;
+  review: the first cut left the deck turning the face under a still finger) - the spec's "until it is
+  running a press scrubs silently, exactly as .11 does".
+- **What the hand does, live** (`Deck`): a press lets the song play on for a moment, so a tap is still a
+  tap (play/pause from the click). The record is TAKEN as the press moves past TAP_SLOP_PX or rests longer
+  than HOLD_MS (250): a playing song pauses (`holdSong`), the record's sound takes over at its position at
+  speed 1 (or 0 if paused) and follows the hand - silent when it rests; the hand's turn counts from where
+  it was taken (`anchor`), the click after it is no tap. A press on a coasting or winding-down record is
+  also a possible tap (a quick double-tap pause-play works); taken, it is caught where the platter is.
+  RELEASE (`release()`): the hand's speed becomes the platter's. A song that was playing: the motor plan;
+  Turntable SEEKS AT THE RELEASE to where the platter will be at speed; at speed (a timer, not the frame
+  loop, so a hidden page still gets there) `resumeSong` plays it, and the voice holds speed 1 until the
+  song's own position has moved past that point (`onPosition`), then fades over HANDOVER_FADE_S (40 ms) -
+  HANDOVER_MAX_S (3 s) at most. **Expect a short repeat at the handover**: the element starts where it was
+  sought, while the record's sound has run on by the element's start-up latency; the spec accepts it. A
+  coast back to speed of RESUME_IN_GESTURE_S (50 ms) or less plays in the release's own gesture. A song that
+  was paused: the coast plan, sought at the release to where it stops, staying paused. A cancel drops it and
+  seeks nowhere - a song it paused plays on (`resumeSong`, outside a gesture). A song change drops a press,
+  a coast and the window, seeking nothing - and when the hand had taken the song from PLAYING (a press, or a
+  coast back to speed: `meantToPlay`), the next song is played (`resumeSong`): usePlayer loads it paused,
+  since the hand's pause cleared intendsToPlay, and the hand only scrubbed. Played SONG_CHANGE_SETTLE_MS
+  (300 ms) later, and only if nothing has played it meanwhile: a song started some other way in that
+  moment (a tap in Search) has its own play under way, and the player's `playing` follows the element's
+  'play' a moment after - an immediate toggle would have paused it. A tap in that moment owns the play
+  (`resuming()` and `pausing()` cancel the timer), and a press takes the song as meant to play. The turntable going mid-coast
+  (the look switched to the cover: `destroy`) plays the song on from where the release sought it, the same
+  way. The turntable mounting on the song already playing is no change (`songChanged` compares ids), so the
+  window it began asking for isn't superseded and asked again. The arm, or the song sought by anything
+  else meanwhile (a position more than SOUGHT_ELSEWHERE_S, 0.75 s, from where the deck had it sought:
+  Previous restarting it, a key on the arm), makes the rest of a coast, run back to speed or wind-down
+  QUIET (`quieten`): no sound, nothing shown, the arm's preview the time line's while it is held - and the
+  handover's sound never holds speed 1 over a song playing from somewhere else (review: Previous mid-coast
+  played two parts of the song together for 3 s). A coast back to speed still plays the song when it gets
+  there, from wherever that put it.
+- **That play() comes after the tap**, on an element a tap already started; usePlayer.ts's header says iOS
+  allows it. If WebKit refuses, usePlayer's own refusal path says "Tap play to start" and the song stays
+  paused where it was sought - and HANDOVER_MAX_S after it the platter spins down (planEnded's timer),
+  rather than turning on beside a paused song - the fallback, unverified until James's iPhone says.
+- **Pause on the turntable** (`pausing()`, from the record's tap and the transport's pause on this look) with
+  "Pause winds the record down" on, the window covering the playhead and the voice ready: the song pauses in
+  the tap as ever, the record's sound starts there at the SONG's own speed - what was heard, whatever the
+  platter's 0.4 s spin-up had reached (review: it started at the platter's, an octave down mid spin-up) -
+  and winds down with it over about a second (friction's braking curve - exponential with a constant part,
+  not linear), and the song is SOUGHT to where the wind-down stops, so play carries on from there rather
+  than repeating 0.3 s. A play in the tap while the record still coasts or winds down with its sound is
+  sought first to where the record is (`resuming()`, from the record's tap and the transport's play), so
+  nothing heard is skipped (review: it skipped up to 0.3 s, seconds after a hard coast). Otherwise a plain
+  pause: nothing sought, never a wait - the platter still spins down visually. The lock screen's pause, the
+  cover's and a song ending never wind down (only those two callers ask). Play: the toggle in the tap as
+  ever; the platter spins up over 0.4 s - the sound starts as it always has (an audible spin-up would need
+  play() after the tap; not in this slice).
+- **The platter is turned by the deck**, frame by frame (requestAnimationFrame), writing the face's
+  transform straight onto the element (never a render, never a style in Turntable's JSX): 33 1/3 rpm
+  (DEGREES_PER_SECOND 200) while playing, the plans' angles while coasting, held while a hand has it (the
+  hand's own turn stays on the wrapper as in .11). It stops when nothing moves, when Now Playing closes and
+  when the page hides; a pause the deck didn't ask for (a song ending, the lock screen) spins it down only
+  after PAUSE_SETTLE_MS (300), since a song change pauses for a moment. The CSS spin and `--dw-record-turn`
+  are gone (test_app_css holds both gone). Reduced motion (`matchMedia`, read by the deck): it doesn't turn
+  at all, a release lands at once - a playing song played in the release's own gesture - and nothing winds
+  down; scrubbing under the hand still sounds.
+- **The setting**: You > Playback's "Pause winds the record down" (`app/WindDownChoice.tsx`), a checkbox,
+  on by default, beside "Now Playing opens as", with a note saying it is the turntable's only. App keeps it
+  (`deadwax-player-wind-down`, `readPlayerWindDown`: off only when it says exactly 'off') and hands it to You
+  and Now Playing. It governs the SOUND; the platter's visual spin-down is the deck's either way.
+- **Info > Debug's "Turntable sound"** (`turntableRow` in debugRows.ts, a new section "The turntable"): ready,
+  "0:42-1:22, FLAC, decoded at 48 kHz", or off and why - the turntable isn't showing; no Web Audio; no
+  AudioWorklet; the sound couldn't start (the browser's words); "it isn't a FLAC file (it is MP3)" or
+  deadwax's 415; "this browser couldn't decode its window - <its words>"; waiting for a tap to start the
+  sound; deadwax didn't send it; past the end; loading; no window yet. A note with what windows have cost
+  since the turntable showed, and when the last of them came (`lastFetchAt`: the report is made as things
+  change, not as time passes, so that is the time the bytes are measured to - review: it read "fetched in
+  0:00" for the first half minute). App is told of report changes (`onDeckReport`), never a frame at a
+  time. This row is how James tells us what WebKit does.
+- **NOT verified - until James's iPhone says**: that WebKit decodes the window (decodeAudioData on iOS -
+  AudioToolbox on a Mac does); that an AudioWorklet from a Blob URL loads in the home-screen app; the
+  out-of-tap play() at speed (and the "Tap play to start" fallback if refused); that the record's sound is
+  heard with the ringer switch on silent (iOS has muted Web Audio there unless a media element plays - it
+  is paused under the hand); that suspending the context leaves locked playback, the lock screen's
+  controls and AirPods as they were; the feel of the physics under a real finger; and the bytes a minute
+  over WireGuard. Nor the real page, which the orchestrator checks after this change.
+- **Verified**: 1998 Python tests (76 in `test_scrub_window.py`: the coding of numbers, the carried
+  CRC-16 against a re-sum, renumbering by frame and by sample, STREAMINFO rewritten, windows from both
+  kinds of MP4 covering what was asked from a boundary, the budget, past the end, a foreign layout refused,
+  libFLAC decoding a window to the song's own samples, and through `start()`: audio/flac never gzipped
+  under the media headers, Safari's and the gapless player's MP4s cut from with nothing made, the plain one
+  made once, a resampled song's window cut from the phone's resampled copy - either kind, or the one kept
+  without a neighbour - with nothing downloaded, made resampled when there is none, the song as it is when
+  that is refused or there are no audio libraries, the cap's 415 with nothing fetched, a refused MP4's
+  415, 416/422/503); pyflakes; tsc; all 32 sims (`deck` new, 159 checks; `turntable` 167, `app-rules` 106,
+  `settings` 61, `debug` 79, `info` 85, `you` 23 extended). Mutations, each restored byte for byte - one per
+  rule the build made (79: 74 caught at once, four gained tests, one backed up by another) and one per rule
+  the review's fixes made (41, server and page: 35 caught at once; four first got past and gained checks -
+  a resampled make refused as it is tried falling back, a refresh that must move on (windows of 2 s),
+  `resuming()` claiming its own seek, and a paused coast's window asked at the release; two are backed up
+  by another layer: the refresh floor behind the move-on rule, and Turntable's arm-wins preview behind the
+  deck going quiet as the arm is taken).
+  Not every documented rule has its own check - the 3 s floor above has none that could show it alone. The
+  engine guard is empty and `player.sim.cjs` untouched.
+
+#### After review (2.0.0-player.14)
+
+A review of the build found these, each confirmed by reproducing it against the real code, and each
+fixed with a check that fails without the fix (the bullets above say the rules as they now are):
+
+- **Windows fetched over and over** - with no audio context (the common first open, from the mini
+  player, onto the turntable), with the worklet failed, and while a decode ran: the keeper counted a
+  window only once it was IN the worklet. Now one is on its way from the ask to the worklet, nothing is
+  asked without a worklet to put it in, and only the newest decode counts.
+- **A hi-res song**: the server ignored the phone's resampled copy, downloaded the whole original again
+  for the first window and kept a second full-size copy, cut 192 kHz windows 3 dB louder than the song,
+  and the page re-fetched its 13 s windows 29 times a minute (about 230 MB). Now `max_rate` and the copy
+  the page plays, and margins that shrink with a short window.
+- **A sounding coast never asked for the window it ran into**, so backwards flicks went silent: now
+  asked at the release, over the whole coast.
+- **The motor ran a backwards flick back for seconds** (the pull alone, no friction): now both.
+- **Outside the deck during a coast back to speed**: Next loaded the next song paused, switching to the
+  cover left the song paused, Previous (restart) or a key on the arm played two parts at once for 3 s,
+  and a refused play() left the platter turning beside a paused song.
+- **The record turned under a still finger** before the sound ran: .11 stopped it.
+- **The arm during a coast**: the needle and the time line followed the coast, not the finger.
+- **The wind-down** started at the platter's spin-up speed, and a play mid wind-down skipped what was
+  heard.
+- **Debug's cost** read a time frozen at the last report: now named as the last window's.
+- **Tests that could not fail**: the switch-off check (a zero-length wind-down made it pass whatever the
+  setting) and the rested release's value (compared with itself) - both now hold a real value, with a
+  control; and the deck's documented rules that no check held (the 10 s retry, a decode refused in three
+  ways, nothing fetched for a paused song, a coast caught on its way back to speed, a pause near the
+  window's end, RESUME_IN_GESTURE_S, PAUSE_SETTLE_MS), the route's cap and refused-MP4 415s, and the
+  cover's previous and next waking nothing.
+- **Not changed**: an outside PAUSE during a coast back to speed (a headset sending 'pause' to an element
+  already paused) is invisible to the deck - no event fires, and seeing it would need the engine - so the
+  coast still plays the song at speed. Rare: the lock screen and AirPods offer play then, as the Media
+  Session says paused.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -5826,6 +6101,12 @@ apply would. A library generated afresh needs the same, or the shot shows bare "
   somewhere writable.** They compile TypeScript into `os.tmpdir()`, which the sandbox refuses,
   and every sim - including ones nothing touched - dies identically, with only Node's version
   footer on its last line. `TMPDIR=<scratchpad> node ui/test/tags.sim.cjs` and they all pass.
+  **Don't give pytest that TMPDIR, though** (nor run it with TMPDIR unset, which falls back to
+  `/tmp`): `test_player_cache.py::test_a_setgid_bit_is_no_bar` then fails every time. The scratchpad
+  and `/tmp` belong to group wheel, a new folder takes its parent's group on macOS, and chmod by a
+  user outside that group silently drops the setgid bit, so the test's own `chmod(0o2700)` never
+  holds. Under the shell's own TMPDIR (`/var/folders/...`, group staff) it passes. Found in the
+  2.0.0-player.14 review, after it had read as "fails 3 runs in 22, cause unknown".
 - **Installing Xcode breaks `git` until its licence is accepted.** `/usr/bin/git` is a shim that
   defers to the selected developer directory, and once `xcode-select -p` points into
   `/Applications/Xcode.app` it refuses with "You have not agreed to the Xcode license
@@ -6214,7 +6495,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1922 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 1998 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -6245,19 +6526,20 @@ node ui/test/player.sim.cjs     # the REAL usePlayer through a fake DOM - seeks 
 node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (WebKit, not Chromium), which songs, what the readout says
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
-node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player, Now Playing opens as and its key
+node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player, Now Playing opens as and its key, Pause winds the record down and its key
 node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history
-node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/
+node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
 node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions
-node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Navidrome sent
+node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Navidrome sent
 node ui/test/info.sim.cjs       # Info > About's rows, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape
-node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button
+node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button; with the deck's sound, the press, release, wind-down and the arm during a coast
 node ui/test/requests.sim.cjs   # the Requests tab and Home's Arriving - grouping, every row's words, one primary, Arriving = the badge, asking again, the ✕'s question, what a screen reader hears
 node ui/test/searchQuery.sim.cjs # the app's one search box - an artist at either end, an artist alone, va, the brackets before a type filter, what's left out
 node ui/test/pressings.sim.cjs  # the album you don't have - the default pressing, the dropdown's list and fold, the line above the tracklist, Bonus rows, disc titles
 node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, Try again, the session's cache, a pick, the listbox, focus going nowhere
 node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch
+node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the deck against fakes (its windows, coasts, handovers, wind-downs)
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -6278,7 +6560,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1922 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 1998 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

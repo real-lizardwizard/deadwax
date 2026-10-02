@@ -79,13 +79,52 @@ const sent = (overrides) => {
   return [all['Sent as'], all.Resampled, all.Why, all.Gapless]
 }
 
-console.log('\nthe layout: four sections, their rows in order')
+console.log('\nthe layout: five sections, their rows in order')
 {
   const sections = rows.debugSections(input())
-  check('sections', sections.map((section) => section.title), ['The file', 'What this device is sent', 'Last song change and seek', 'Navidrome sent'])
+  check('sections', sections.map((section) => section.title), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
   check('rows', sections.map((section) => section.rows.map((row) => row.label)), [
-    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless'], ['Gap', 'Last seek'], ['Song', 'On other songs', 'Album'],
+    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless'], ['Gap', 'Last seek'], ['Turntable sound'], ['Song', 'On other songs', 'Album'],
   ])
+}
+
+console.log('\nTurntable sound (2.0.0-player.14): ready, or off and why - how an iPhone says what WebKit made of it')
+{
+  const turntable = (report) => rows.turntableRow(report)
+  const ready = {
+    context: 'running', problem: null, window: { start: 42, end: 72.4, kind: 'FLAC', decodedAt: 48000, bytes: 3_400_000 },
+    loading: false, refused: null, failed: null, fetched: 6_800_000, lastFetchAt: 61_000,
+  }
+  check('ready: the stretch of the song, its kind, the rate it was decoded at; what windows have cost on a line under it',
+    [turntable(ready).value, turntable(ready).note, turntable(ready).mono],
+    ['Ready: 0:42-1:12, FLAC, decoded at 48 kHz', '3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in', true])
+  check('...and the row in the debug sections, from what Info is handed',
+    table(rows.debugSections(input({ turntable: ready })))['Turntable sound'], ['Ready: 0:42-1:12, FLAC, decoded at 48 kHz', '3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in'])
+  check('no turntable showing', [turntable(null).value, table(rows.debugSections(input()))['Turntable sound']],
+    ["Off: the turntable isn't showing", "Off: the turntable isn't showing"])
+  check('no Web Audio, no AudioWorklet: said as such',
+    [turntable({ ...ready, context: 'unsupported', window: null }).value, turntable({ ...ready, context: 'no-worklet', window: null }).value],
+    ['Off: this browser has no Web Audio', 'Off: this browser has no AudioWorklet'])
+  check('the sound couldn\'t start: the browser\'s own words',
+    turntable({ ...ready, context: 'failed', problem: "the sound's worklet wouldn't load - SyntaxError: Unexpected token", window: null }).value,
+    "Off: the sound's worklet wouldn't load - SyntaxError: Unexpected token")
+  check('not a FLAC, and a window this browser couldn\'t decode - its words - before anything else',
+    [turntable({ ...ready, refused: "it isn't a FLAC file (it is MP3)" }).value,
+      turntable({ ...ready, refused: "this browser couldn't decode its window - EncodingError: Decoding failed" }).value],
+    ["Off: it isn't a FLAC file (it is MP3)", "Off: this browser couldn't decode its window - EncodingError: Decoding failed"])
+  check('waiting for a tap: the audio context starts only from one - and a window ready meanwhile is said under it',
+    [turntable({ ...ready, context: 'none', window: null, fetched: 0 }), turntable({ ...ready, context: 'none' }).note],
+    [{ label: 'Turntable sound', value: 'Off: waiting for a tap to start the sound' },
+      `Its window is ready: 0:42-1:12, FLAC, decoded at 48 kHz ${DOT} 3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in`])
+  check('starting: the worklet still on its way', turntable({ ...ready, context: 'starting' }).value, 'Starting: 0:42-1:12, FLAC, decoded at 48 kHz')
+  check('deadwax didn\'t send a window, loading, and none asked for yet',
+    [turntable({ ...ready, window: null, failed: "deadwax didn't send it - its MP4 couldn't be made just now", fetched: 0 }).value,
+      turntable({ ...ready, window: null, loading: true, fetched: 0 }).value, turntable({ ...ready, window: null, fetched: 0 }).value],
+    ["Off: deadwax didn't send it - its MP4 couldn't be made just now", 'Loading the sound',
+      'No window yet: one is fetched while the song plays, or as the record is turned'])
+  check('...the cost said only once something was fetched', turntable({ ...ready, window: null, loading: true, fetched: 0 }).note, undefined)
+  check('...and measured to the moment the last window came - the report is made as things change, not as time passes - never a running clock it hasn\'t got',
+    turntable({ ...ready, fetched: 2_500_000, lastFetchAt: 1_200 }).note, '3.4 MB a window; 2.5 MB fetched since the turntable showed, the last window 0:01 in')
 }
 
 console.log('\nFormat: what Navidrome said of the file')
@@ -199,7 +238,7 @@ console.log('\n"Navidrome sent": the names of the fields, as they came')
   check('the song\'s, sorted as plain strings', all.Song, 'bitDepth, discNumber, id, musicBrainzId, playCount, played, title')
   check('the album\'s, its song list and disc titles included', all.Album, 'discTitles, id, name, song, year')
   check('only the names - no value leaks into the row', /2026|Time|Moon|12|Side/.test(JSON.stringify([all.Song, all.Album])), false)
-  check('the names in the data face', rows.debugSections(input({ song, album }))[3].rows.map((row) => [row.label, row.mono ?? false]), [['Song', true], ['On other songs', false], ['Album', true]])
+  check('the names in the data face', rows.debugSections(input({ song, album }))[4].rows.map((row) => [row.label, row.mono ?? false]), [['Song', true], ['On other songs', false], ['Album', true]])
   check('one song on the album: nothing on others it lacks', all['On other songs'], 'Nothing this song lacks')
   const none = table(rows.debugSections(input()))
   check('not in hand: said so, nothing invented', [none.Song, none['On other songs'], none.Album], ['Not known', 'Not known', 'Not known'])
@@ -220,14 +259,14 @@ console.log('\n"Navidrome sent": the names of the fields, as they came')
     all.Album, ['id, isCompilation, name, song', 'Empty: discTitles, musicBrainzId, releaseDate, userRating'])
   check('the fields another song carries and this one doesn\'t: a song never played has no playCount',
     all['On other songs'], 'playCount, played, starred')
-  check('...names only, in the data face', [/2026|Money|3/.test(all['On other songs']), sections[3].rows[1].mono], [false, true])
+  check('...names only, in the data face', [/2026|Money|3/.test(all['On other songs']), sections[4].rows[1].mono], [false, true])
   check('a field empty here and filled on another song counts as one this song lacks',
     rows.otherSongsFields({ id: 'x', musicBrainzId: '' }, { song: [{ id: 'x', musicBrainzId: '' }, { id: 'y', musicBrainzId: 'abc' }] }), ['musicBrainzId'])
   check('the song itself, found again by id in the album\'s list, is not "another song"',
     rows.otherSongsFields({ id: 'x', a: 1 }, { song: [{ id: 'x', a: 1, b: 2 }] }), [])
   check('what counts as empty', [rows.isEmptyValue(''), rows.isEmptyValue(0), rows.isEmptyValue([]), rows.isEmptyValue({}), rows.isEmptyValue(null),
     rows.isEmptyValue(false), rows.isEmptyValue('x'), rows.isEmptyValue([0]), rows.isEmptyValue({ a: 0 })], [true, true, true, true, true, false, false, false, false])
-  check('an answer of empty fields only', table([{ title: 't', rows: [rows.debugSections(input({ song: { a: '' }, album: null }))[3].rows[0]] }]).Song,
+  check('an answer of empty fields only', table([{ title: 't', rows: [rows.debugSections(input({ song: { a: '' }, album: null }))[4].rows[0]] }]).Song,
     ['Nothing with a value', 'Empty: a'])
 }
 

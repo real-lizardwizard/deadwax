@@ -5,6 +5,7 @@ import { clock, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, tim
 import { lookButtonLabel, otherLook, playingDisc, type Look } from '../lib/turntable'
 import { discArtUrl, playedAlbum } from './api'
 import { Cover } from './Cover'
+import { wakeDeckAudio, type Deck } from './deck'
 import {
   AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, RecordIcon, SquareIcon,
 } from './icons'
@@ -146,6 +147,13 @@ function Scrubber({ player }: { player: Player }) {
  * switching it re-renders this sheet and never the engine. The sheet still closes only from its
  * grip - the top row alone on the turntable, whose record and arm sit OUTSIDE the grip, so neither
  * starts the sheet's drag and the sheet's drag never starts from them.
+ *
+ * THE TURNTABLE'S SOUND (2.0.0-player.14, player/deck.ts): every tap on the turntable's look - the
+ * transport's three buttons, the look button switching to it - wakes the deck's audio context, which
+ * may only start in a gesture. The transport's pause on the turntable winds the record down as the
+ * record's own tap does (`windDown`, You's "Pause winds the record down"), and its play starts from
+ * where a coasting or winding-down record is; the cover's pause is always instant, and nothing of
+ * the deck runs while the cover shows - its previous and next wake nothing.
  */
 export function NowPlaying({
   player,
@@ -156,6 +164,7 @@ export function NowPlaying({
   onMore,
   onAlbum,
   openAs,
+  windDown = true,
 }: {
   player: Player
   open: boolean
@@ -170,6 +179,8 @@ export function NowPlaying({
   onAlbum: () => void
   /** You > Playback's "Now Playing opens as": the look it opens in, every time */
   openAs: Look
+  /** You > Playback's "Pause winds the record down" - the turntable's pause only */
+  windDown?: boolean
 }) {
   const track = player.track
   const [dragY, setDragY] = useState(0)
@@ -178,6 +189,8 @@ export function NowPlaying({
   //? the look showing: the setting's as it opens, switched by the button while it stays open
   const [look, setLook] = useState<Look>(openAs)
   const [previewing, setPreviewing] = useState<TurntablePreview>(null)
+  //? the turntable's deck while it shows: the transport's pause winds it down too
+  const deck = useRef<Deck | null>(null)
 
   //? the page behind must not scroll under a finger on the sheet; focus goes to the close button -
   //? the first thing in it - as it opens, since everything behind it is inert now (App)
@@ -225,6 +238,40 @@ export function NowPlaying({
   //? "Artist — Album", as the board has it; either alone when the other isn't known
   const byline = [track.artist, track.album].filter(Boolean).join(' — ')
 
+  //? On the turntable, a tap on the transport is a gesture the deck's sound may start from; and its
+  //? pause winds the record down, as the record's tap does - the song sought to where that stops.
+  //? On the cover, exactly as ever.
+  const onPrevious = () => {
+    if (turntable) wakeDeckAudio()
+    player.previous()
+  }
+  const onToggle = () => {
+    if (!turntable) {
+      player.toggle()
+      return
+    }
+    wakeDeckAudio()
+    if (player.playing) {
+      const landing = deck.current?.pausing() ?? null
+      player.toggle()
+      if (landing !== null) player.seek(landing)
+      return
+    }
+    //? a play while the record coasts or winds down with its sound: from where the record is
+    const from = deck.current?.resuming() ?? null
+    if (from !== null) player.seek(from)
+    player.toggle()
+  }
+  const onNext = () => {
+    if (turntable) wakeDeckAudio()
+    player.next()
+  }
+  //? switching TO the turntable is a gesture too: its deck's sound can start as it appears
+  const onLook = () => {
+    if (look === 'cover') wakeDeckAudio()
+    setLook(otherLook(look))
+  }
+
   return (
     <div
       class={`pl-sheet${open ? ' is-open' : ''}${dragY ? ' is-dragging' : ''}${turntable ? ' app-is-turntable' : ''}`}
@@ -251,7 +298,7 @@ export function NowPlaying({
             <ChevronDownIcon class="pl-icon" />
           </button>
           {/* the other look, for as long as this stays open - the setting is You's */}
-          <button type="button" class="app-look-button" onClick={() => setLook(otherLook(look))} aria-label={lookButtonLabel(look)}>
+          <button type="button" class="app-look-button" onClick={onLook} aria-label={lookButtonLabel(look)}>
             <span class="app-look-face">
               {turntable ? <SquareIcon class="app-look-icon" /> : <RecordIcon class="app-look-icon" />}
             </span>
@@ -270,6 +317,8 @@ export function NowPlaying({
           open={open}
           discArt={discArtUrl(track.albumId, playingDisc(playedAlbum(track.albumId)?.song, track.id))}
           onPreview={setPreviewing}
+          windDown={windDown}
+          deck={deck}
         />
       )}
 
@@ -297,18 +346,18 @@ export function NowPlaying({
         {turntable ? <TurntableTime player={player} previewing={previewing} /> : <Scrubber player={player} />}
 
         <div class="pl-transport">
-          <button type="button" class="pl-transport-button" onClick={player.previous} aria-label="Previous">
+          <button type="button" class="pl-transport-button" onClick={onPrevious} aria-label="Previous">
             <PreviousIcon class="pl-transport-icon" />
           </button>
           <button
             type="button"
             class={`pl-transport-button is-main${player.buffering ? ' is-busy' : ''}`}
-            onClick={player.toggle}
+            onClick={onToggle}
             aria-label={player.playing ? 'Pause' : 'Play'}
           >
             {player.playing ? <PauseIcon class="pl-transport-icon" /> : <PlayIcon class="pl-transport-icon" />}
           </button>
-          <button type="button" class="pl-transport-button" onClick={player.next} aria-label="Next">
+          <button type="button" class="pl-transport-button" onClick={onNext} aria-label="Next">
             <NextIcon class="pl-transport-icon" />
           </button>
         </div>

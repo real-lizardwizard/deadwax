@@ -471,6 +471,39 @@ shows when it can't find one. In the order to check:
   button at the top right. (A picture replaced by hand can take up to five minutes to change: the
   phone keeps one that long.)
 
+## The turntable makes no sound when you turn the record
+
+Since 2.0.0-player.14 [the turntable](player.md#the-turntable) has its own sound: turning the record
+plays the song at the speed of your hand, a flick coasts audibly, and a pause winds down. When it's
+silent, **Info → Debug**'s **Turntable sound** row (**•••** on the now-playing screen, then **Info**,
+then **Debug**) says why, in the order to check:
+
+- **`Off: waiting for a tap to start the sound`**: a phone only lets a page start sound from a tap,
+  so the record's sound starts at the first tap on the record, the play/pause or skip buttons, or
+  the button that switches to the turntable (once it has started, the mini player's tap opening the
+  screen brings it back too) - and a turn of the record before any of those is silent, with the
+  song playing on under your finger as before. No stretch of the song is fetched for it until then.
+  It stops again whenever the screen closes or the phone locks, and the next tap starts it.
+- **`Off: it isn't a FLAC file (…)`**: only FLAC songs have it. Anything else turns silently, with
+  the same momentum.
+- **`Off: this browser couldn't decode its window - …`**: the phone refused the stretch of the song
+  deadwax sent. The words after the dash are the browser's own: they are what to report.
+- **`Off: deadwax didn't send it - …`**: deadwax cuts the stretch from the copy of the song the phone
+  plays (the one it keeps in the player's cache), and couldn't just then - the cache unusable or its
+  disk short of space (see
+  [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which covers the cache), or
+  Navidrome not answering. It asks again after ten seconds.
+- **`Off: this browser has no AudioWorklet`**, **`no Web Audio`**, **`the sound couldn't start - …`**
+  or **`the sound's worklet wouldn't load - …`**: the browser can't play it - the words after the
+  dash are its own.
+- **`Ready: …`** and still silent: if the phone's ringer switch is on silent, try it off - iOS has
+  silenced this kind of sound on silent before (not yet checked on a phone). The song's own playback
+  isn't affected either way.
+- **`Off: the turntable isn't showing`**: the now-playing screen is on the cover, or closed.
+
+Turning the record never touches the song's own playback: if it's silent, the music still plays
+exactly as it did when you let go.
+
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
 [Gapless](player.md#gapless-playback-experimental) (in **You**, under **Playback**) is an

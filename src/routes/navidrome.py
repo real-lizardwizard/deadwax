@@ -386,6 +386,54 @@ async def stream(
     return _relay(upstream, f"song {song_id}", audio_type(upstream.headers.get("content-type")), "no-cache")
 
 
+#? The turntable's windows (2.0.0-player.14): from 0 to a day into a song, 1 to 60 seconds long.
+SCRUB_MAX_AT = 86400.0
+SCRUB_SECONDS = 30.0
+SCRUB_MIN_SECONDS = 1.0
+SCRUB_MAX_SECONDS = 60.0
+#? the only parameters it takes - anything else is refused, not ignored
+SCRUB_PARAMETERS = frozenset({"at", "seconds", "max_rate"})
+
+
+@router.get("/scrub/{song_id}")
+async def scrub(
+    song_id: str,
+    request: Request,
+    at: float = Query(..., ge=0, le=SCRUB_MAX_AT),
+    seconds: float = Query(SCRUB_SECONDS, ge=SCRUB_MIN_SECONDS, le=SCRUB_MAX_SECONDS),
+    max_rate: Literal["48000"] | None = None,
+):
+    """
+    A stretch of a FLAC song - from `at` seconds, for `seconds` - as a FLAC file of its own, which the
+    phone's turntable decodes and plays while a hand turns the record, a flick coasts or a pause winds
+    it down (2.0.0-player.14). Its sound is its own, apart from the player's: nothing here touches
+    what the song is playing on.
+
+    Cut by deadwax from the MP4 its cache keeps of the song (src/player_cache.py, src/flac_window.py),
+    so it needs nothing from Navidrome but the version check every MP4 answer makes: the frames that
+    cover the stretch, untouched, renumbered from 0 under a STREAMINFO of their own. `max_rate=48000`,
+    as the stream route takes it, when the page plays the song resampled: the window is cut from that
+    very copy, so it sounds as the song does - its rate, its level - and nothing more is made. The answer says
+    exactly where in the song it sits, `X-Deadwax-Window: <first sample>/<samples>/<rate>`, since it
+    starts on a frame (or a fragment of about a second) at or before `at` and a hi-res song's window
+    is shorter than asked (WINDOW_MAX_BYTES). A song that isn't a FLAC is a 415 saying so - the
+    turntable is silent for it - a start past the end a 416, and a cache that can't be used a 503.
+
+    Only `at`, `seconds` and `max_rate`: anything else is refused (422), as everything out of their
+    bounds is, and any cap but 48000.
+    """
+    unknown = set(request.query_params) - SCRUB_PARAMETERS
+    if unknown:
+        raise HTTPException(status_code=422, detail="the turntable's window takes only at, seconds and max_rate")
+    try:
+        rate = int(max_rate) if max_rate else None
+        return await unless_abandoned(request, player_cache.cache.answer_window(song_id, at, seconds, rate))
+    except ClientGone:
+        return Response(status_code=204)
+    except NavidromeError as e:
+        raise _fail(e)
+
+
 @router.post("/scrobble/{song_id}")
 async def scrobble(song_id: str, request: Request, submission: bool = False, time: int | None = Query(None, ge=0)):
     """

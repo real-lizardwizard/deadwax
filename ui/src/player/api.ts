@@ -6,7 +6,7 @@
  * Every field is optional in the API and treated that way here.
  */
 
-import { get, post, url } from '../api/http'
+import { fetchOk, get, post, url } from '../api/http'
 import { createPlayedAlbums } from '../lib/playedAlbums'
 import type { QueueTrack } from '../lib/playQueue'
 import { asksForMp4, resamples, type MaxRate } from '../lib/streamWrap'
@@ -287,6 +287,34 @@ export function sentFormat(track: QueueTrack): 'raw' | 'mp3' | null {
   const element = typeof document === 'undefined' ? null : document.querySelector('audio')
   if (!element) return null
   return streamFormat(track, (type) => element.canPlayType(type) !== '')
+}
+
+/** The turntable's window of a song, as deadwax answered it: the FLAC's bytes, and exactly where in
+ *  the song it sits - its first sample, how many, at what rate (X-Deadwax-Window). */
+export interface ScrubWindow {
+  bytes: ArrayBuffer
+  first: number
+  samples: number
+  rate: number
+}
+
+/**
+ * A stretch of a song as a FLAC file of its own, for the turntable's sound (2.0.0-player.14): from
+ * `at` seconds, `seconds` long, cut by deadwax from its own MP4 of the song (src/flac_window.py) -
+ * starting on a frame at or before `at`, and shorter than asked for a hi-res song. `maxRate` (48000)
+ * when the song is played resampled, so the window is cut from that very copy - its rate, its level -
+ * as streamUrl() and fragmentedUrl() ask for it. Throws ApiError: a 415 for a song that isn't a FLAC
+ * (its detail says so), a 416 past the end, a 503 when deadwax can't just now. Never touches the
+ * player's own audio.
+ */
+export async function scrubWindow(
+  id: string, at: number, seconds: number, signal?: AbortSignal, maxRate: number | null = null,
+): Promise<ScrubWindow> {
+  const cap = maxRate ? `&max_rate=${maxRate}` : ''
+  const response = await fetchOk(`/navidrome/scrub/${encodeURIComponent(id)}?at=${at}&seconds=${seconds}${cap}`, signal ? { signal } : undefined)
+  const [first, samples, rate] = (response.headers.get('x-deadwax-window') ?? '').split('/').map(Number)
+  if (!(Number.isFinite(first) && Number.isFinite(samples) && (rate ?? 0) > 0)) throw new Error("deadwax didn't say where the window is")
+  return { bytes: await response.arrayBuffer(), first: first!, samples: samples!, rate: rate! }
 }
 
 /** Fire and forget: a play that isn't counted is not worth interrupting the music over. */

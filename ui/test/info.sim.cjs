@@ -329,10 +329,25 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   tabs()[1].props.onClick()
   reopen()
   check('Debug chosen', tabs().map((tab) => [tab.props['aria-selected'], tab.props.tabIndex]), [[false, -1], [true, 0]])
-  check('Debug draws its four sections', view.find((node) => node.type === 'h3').map(text), ['The file', 'What this device is sent', 'Last song change and seek', 'Navidrome sent'])
-  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Why', 'Gapless', 'Gap', 'Last seek', 'Song', 'On other songs', 'Album'])
+  check('Debug draws its five sections - the turntable\'s sound among them since 2.0.0-player.14', view.find((node) => node.type === 'h3').map(text), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
+  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Why', 'Gapless', 'Gap', 'Last seek', 'Turntable sound', 'Song', 'On other songs', 'Album'])
   check('...Gapless on, in one stream', text(view.find(byClass('app-kv-value'))[4]), 'On, in one stream')
   check('Debug asked how the song was sent', formats > 0, true)
+
+  //? the turntable's sound (2.0.0-player.14), as App hands it from the deck's report
+  const deckView = mount(InfoSheet, 'info with the turntable')
+  const drawDeck = () => deckView.render({
+    open: true, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw',
+    turntable: { context: 'running', problem: null, window: { start: 42, end: 72, kind: 'FLAC', decodedAt: 48000, bytes: 3_400_000 },
+      loading: false, refused: null, failed: null, fetched: 0, lastFetchAt: 0 },
+  })
+  drawDeck()
+  deckView.find((node) => node.props?.role === 'tab')[1].props.onClick()
+  drawDeck()
+  const deckRow = deckView.find(byClass('app-kv-label')).findIndex((node) => text(node) === 'Turntable sound')
+  check('Debug says the turntable\'s sound from what it is handed', text(deckView.find(byClass('app-kv-value'))[deckRow]), 'Ready: 0:42-1:12, FLAC, decoded at 48 kHz')
+  //? closed, so its lock and its Escape are no part of the checks after this
+  deckView.render({ open: false, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw' })
 
   //? the arrows, as the browser sends them to the tab list: its element finds the tab of that data-tab
   const keyOn = (key) => {

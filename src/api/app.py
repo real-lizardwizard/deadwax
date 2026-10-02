@@ -29,8 +29,9 @@ MEDIA_PATHS = frozenset({
     #? the player's turntable face (2.0.0-player.11): CD art found by a Navidrome album id
     "/deadwax/library/disc_art/navidrome",
 })
-#? The player's, whose ids are in the path.
-MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/")
+#? The player's, whose ids are in the path - the turntable's windows of a song (2.0.0-player.14)
+#? among them: FLAC, which gzip would only waste time on and take the length off
+MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/", "/deadwax/navidrome/scrub/")
 
 
 def serves_media(path: str) -> bool:

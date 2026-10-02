@@ -13,10 +13,13 @@
  * - The record turns at 33 1/3 rpm - SECONDS_PER_TURN a turn - while the song plays, and turning it
  *   by hand moves the song by the same, true vinyl speed: a whole turn is 1.8 seconds, backwards
  *   too. The song moves on RELEASE, never on the way (a seek per move would ask for every part of
- *   it) - the drag only turns the record and previews the time. The song PLAYS ON under a finger
- *   (only the record stops), so a turn is an OFFSET from wherever the song is when it lets go,
- *   never a time fixed at the press: a finger that rests a moment, or turns slower than the record
- *   would, would otherwise seek back behind what is playing.
+ *   it) - the drag only turns the record and previews the time. Until the turntable's sound runs
+ *   (2.0.0-player.14, player/deck.ts), the song PLAYS ON under a finger (only the record stops), so
+ *   a turn is an OFFSET from wherever the song is when it lets go, never a time fixed at the press:
+ *   a finger that rests a moment, or turns slower than the record would, would otherwise seek back
+ *   behind what is playing. Once the sound runs the deck pauses the song as the hand takes the
+ *   record, the offset counts from where it was taken (the deck's anchor), and the platter's
+ *   momentum and the motor decide where letting go lands (lib/platter.ts).
  * - The arm goes anywhere in the song: dragged, the needle's groove says the time. It too seeks
  *   on release. Until the finger has travelled TAP_SLOP_PX it follows the song, and it is taken
  *   hold of where the song is at that moment - so what it shows is always where letting go goes,
@@ -44,8 +47,8 @@ export function lookButtonLabel(showing: Look): string {
   return showing === 'turntable' ? 'Show the cover' : 'Show as a turntable'
 }
 
-/** One turn of the record, in seconds: 60 seconds over 33 1/3 turns. The CSS spin is the same
- *  (--dw-record-turn in theme.css; the sim holds the two together). */
+/** One turn of the record, in seconds: 60 seconds over 33 1/3 turns. The platter turns at the same
+ *  (lib/platter.ts's DEGREES_PER_SECOND; the sim holds the two together). */
 export const SECONDS_PER_TURN = 1.8
 
 /** A press that travels less than this, in CSS px, is a tap - it plays or pauses, and seeks nothing. */
@@ -219,8 +222,13 @@ export interface ArmDrag extends Press {
 export type Drag = RecordDrag | ArmDrag
 
 /** What a drag shows in place of the song's position: the record's turn as an offset from the song
- *  (it plays on), or the time the arm's needle is over (null: the song's, as it hasn't moved yet). */
-export type Preview = { how: 'record'; offset: number } | { how: 'arm'; time: number | null }
+ *  (it plays on), or the time the arm's needle is over (null: the song's, as it hasn't moved yet) - or,
+ *  while the deck has the record (2.0.0-player.14: under a hand, coasting, winding down), the time it
+ *  is at, and whether a hand or a flick moves it (`scrubbing`: the time line says so). */
+export type Preview =
+  | { how: 'record'; offset: number }
+  | { how: 'arm'; time: number | null }
+  | { how: 'deck'; at: number; scrubbing: boolean }
 
 function travelled(press: Press, x: number, y: number): number {
   return Math.max(press.travel, Math.hypot(x - press.x0, y - press.y0))
@@ -316,8 +324,25 @@ export function preview(drag: Drag | null): Preview | null {
 export function shownTime(previewing: Preview | null, position: number, length: number): number {
   const song = songAt(position, length)
   if (!previewing) return song
-  const at = previewing.how === 'record' ? song + previewing.offset : previewing.time ?? song
+  const at = previewing.how === 'record' ? song + previewing.offset : previewing.how === 'deck' ? previewing.at : previewing.time ?? song
   return songAt(at, length)
+}
+
+/** Which words the time line puts before the time for a preview: "Scrubbing" for a turn and for the
+ *  deck while a hand or a flick moves the record, "Needle up" for the arm - none for a wind-down. */
+export function previewWords(previewing: Preview | null): Drag['kind'] | null {
+  if (!previewing) return null
+  if (previewing.how === 'deck') return previewing.scrubbing ? 'record' : null
+  return previewing.how
+}
+
+/** Whether two previews say the same - so the time line is only told of a change. */
+export function samePreview(a: Preview | null, b: Preview | null): boolean {
+  if (a === b) return true
+  if (!a || !b || a.how !== b.how) return false
+  if (a.how === 'record' && b.how === 'record') return a.offset === b.offset
+  if (a.how === 'arm' && b.how === 'arm') return a.time === b.time
+  return a.how === 'deck' && b.how === 'deck' && a.at === b.at && a.scrubbing === b.scrubbing
 }
 
 /**
@@ -347,15 +372,6 @@ export function dragFor(drag: Drag | null, track: string): Drag | null {
 export function timeLine(time: number, length: number, how: Drag['kind'] | null): string {
   const at = length > 0 ? `${clock(time)} of ${clock(length)}` : clock(time)
   return how === 'arm' ? `Needle up · ${at}` : how === 'record' ? `Scrubbing · ${at}` : at
-}
-
-/**
- * Whether the record turns: while the song plays and Now Playing is open, and not while a finger
- * holds it still - and NEVER while the page is hidden (a locked phone), so nothing is drawn frame
- * by frame for nobody. The CSS spin is paused then, where it is; reduced motion stops it in CSS.
- */
-export function spinning(state: { playing: boolean; open: boolean; visible: boolean; held: boolean }): boolean {
-  return state.playing && state.open && state.visible && !state.held
 }
 
 /** The disc the playing song is on, by the album answer it was played from - 1 when that isn't

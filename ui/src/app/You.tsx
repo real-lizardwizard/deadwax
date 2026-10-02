@@ -10,6 +10,7 @@ import type { Look } from '../lib/turntable'
 import { GaplessChoice } from './GaplessChoice'
 import { LookChoice } from './LookChoice'
 import { QualityChoice } from './QualityChoice'
+import { WindDownChoice } from './WindDownChoice'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
 
@@ -48,9 +49,10 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *
  * - Playback: Gapless, a checkbox (GaplessChoice.tsx - moved here from the now-playing screen in
  *   2.0.0-player.10, where it was a switch), "Now Playing opens as" (LookChoice.tsx,
- *   2.0.0-player.11: the cover or the turntable - App keeps it, and hands it here), and Maximum
- *   quality, moved here from the player's settings sheet with its words unchanged. All three are
- *   kept per device. Gapless is handed the player itself, whose `setGapless` it calls in the tap:
+ *   2.0.0-player.11: the cover or the turntable - App keeps it, and hands it here), "Pause winds the
+ *   record down" (WindDownChoice.tsx, 2.0.0-player.14: the turntable's pause - App keeps it too),
+ *   and Maximum quality, moved here from the player's settings sheet with its words unchanged. All
+ *   four are kept per device. Gapless is handed the player itself, whose `setGapless` it calls in the tap:
  *   this page names no playback action of its own (ui/test/app-rules.sim.cjs).
  * - Connections: the main page's three pings, asked the first time You shows (not at start-up: the
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
@@ -69,11 +71,16 @@ export function You({
   shown,
   opensAs,
   onOpensAs,
+  windDown,
+  onWindDown,
 }: {
   shown: boolean
   /** "Now Playing opens as", and the way to change it - App's */
   opensAs: Look
   onOpensAs: (look: Look) => void
+  /** "Pause winds the record down", and the way to change it - App's */
+  windDown: boolean
+  onWindDown: (on: boolean) => void
 }) {
   const player = usePlayerState()
   const actions = usePlayerActions()
@@ -151,9 +158,14 @@ export function You({
         <p id="app-look-note" class="app-footnote app-choice-gap">
           The button at the top right of Now Playing switches between them until it closes.
         </p>
+        <WindDownChoice on={windDown} onChange={onWindDown} />
+        <p id="app-wind-down-note" class="app-footnote app-choice-gap">
+          The turntable only: pausing from it slows the record's sound to a stop over about a second,
+          as a real deck does. Off, it stops at once. The cover's pause is always instant.
+        </p>
         <QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />
         <p class="app-footnote">
-          All three are kept on this device. Maximum quality is used from the next song.
+          All four are kept on this device. Maximum quality is used from the next song.
         </p>
       </section>
 

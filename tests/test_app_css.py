@@ -319,20 +319,15 @@ def test_gapless_is_a_checkbox_not_a_switch():
 
 # ---------------------------------------------------------------- the turntable (2.0.0-player.11)
 
-def test_the_record_turns_at_33_and_a_third_and_only_when_told():
+def test_the_record_is_turned_by_the_deck_not_by_an_animation():
+    """2.0.0-player.14: momentum, the motor, spin-up and spin-down need the platter turned frame by
+    frame (player/deck.ts writes the face's transform, at lib/platter.ts's DEGREES_PER_SECOND), so the
+    CSS spin of 2.0.0-player.11 went, its token with it - and nothing in the CSS may turn it too."""
     face = declarations(APP, ".app-tt-face")
-    #? one turn in --dw-record-turn, forever - but paused, where it is, until the page says spin
-    assert face["animation"] == "app-tt-spin var(--dw-record-turn) linear infinite"
-    assert face["animation-play-state"] == "paused"
-    assert declarations(APP, ".app-tt-face.is-spinning")["animation-play-state"] == "running"
-    assert declarations(APP, "to", "@keyframes app-tt-spin")["transform"] == "rotate(360deg)"
-    #? stopped for good under reduced motion
-    assert declarations(APP, ".app-tt-face", "@media (prefers-reduced-motion: reduce)")["animation"] == "none"
-    #? its own value, never a duration reduced motion collapses to 1ms - that would spin it 1800
-    #? times faster instead of stopping it
-    assert ALL_TOKENS["--dw-record-turn"] == "1.8s"
-    collapsed = declarations(THEME_CSS, ":root", "@media (prefers-reduced-motion: reduce)")
-    assert "--dw-record-turn" not in collapsed and "--duration" not in ALL_TOKENS["--dw-record-turn"]
+    assert "animation" not in face and "transform" not in face
+    assert face["will-change"] == "transform"
+    assert not re.search(r"app-tt-spin(?![\w-])", APP) and ".is-spinning" not in APP
+    assert "--dw-record-turn" not in ALL_TOKENS
 
 
 def test_the_record_and_the_arm_take_every_touch_and_the_grip_only_the_top_row():

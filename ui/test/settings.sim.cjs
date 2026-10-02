@@ -2,8 +2,9 @@
  * You > Playback in the app: "Maximum quality" (app/QualityChoice.tsx, 2.0.0-player.9 - it was the
  * player's settings sheet, player/Settings.tsx, opened by a gear beside the Library title, until
  * the tabs), "Gapless" (app/GaplessChoice.tsx, 2.0.0-player.10 - it was a switch on the
- * now-playing screen until then) and "Now Playing opens as" (app/LookChoice.tsx, 2.0.0-player.11:
- * the cover or the turntable). The components themselves, compiled with the repo's TypeScript
+ * now-playing screen until then), "Now Playing opens as" (app/LookChoice.tsx, 2.0.0-player.11:
+ * the cover or the turntable) and "Pause winds the record down" (app/WindDownChoice.tsx,
+ * 2.0.0-player.14: the turntable's pause). The components themselves, compiled with the repo's TypeScript
  * and rendered by a small stand-in for Preact into plain objects, with a document that knows which
  * element has focus.
  *
@@ -21,9 +22,11 @@
  *  - "Now Playing opens as" is a radio group the same way - Cover, then Turntable - and is kept on
  *    its own key, per device, read back as the turntable only when it says exactly that: anything
  *    else, or storage that can't be read, is the cover.
- *  - Where they live now: You's Playback section - Gapless, then Now Playing opens as, then Maximum
- *    quality - each on the storage key it always had, per device; the gear, the sheet and the
- *    switch are gone.
+ *  - "Pause winds the record down" is a checkbox, on by default, kept on its own key, per device,
+ *    read back as off only when it says exactly that; its tap tells App, and calls no player action.
+ *  - Where they live now: You's Playback section - Gapless, then Now Playing opens as, then Pause
+ *    winds the record down beside it, then Maximum quality - each on the storage key it always had,
+ *    per device; the gear, the sheet and the switch are gone.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -38,7 +41,7 @@ const REPO = path.resolve(UI, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-settings-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', 'src/app/LookChoice.tsx', 'src/state/persisted.ts',
+  'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', 'src/app/LookChoice.tsx', 'src/app/WindDownChoice.tsx', 'src/state/persisted.ts',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -123,6 +126,7 @@ const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { QualityChoice, QUALITIES } = require(path.join(OUT, 'app/QualityChoice.js'))
 const { GaplessChoice } = require(path.join(OUT, 'app/GaplessChoice.js'))
 const { LookChoice, LOOKS } = require(path.join(OUT, 'app/LookChoice.js'))
+const { WindDownChoice } = require(path.join(OUT, 'app/WindDownChoice.js'))
 const persisted = require(path.join(OUT, 'state/persisted.js'))
 
 //? each element of a tree, found by where it sits, keeps one FakeElement across renders; a ref names it
@@ -292,6 +296,43 @@ console.log('\n"Now Playing opens as" is a radio group too, kept on its own key'
   refusing = false
 }
 
+console.log('\n"Pause winds the record down" is a checkbox, on until turned off, kept on its own key')
+{
+  let on = true
+  const chosen = []
+  const view = mount(WindDownChoice, 'wind down')
+  const render = () => view.render({ on, onChange: (next) => { chosen.push(next); on = next } })
+  render()
+  const box = () => view.find((node) => node.props?.role === 'checkbox')[0]
+  const drawn = () => view.find((node) => hasClass(node, 'app-checkbox'))[0]
+  check('a checkbox, not a switch, named for what it does, described by its note in You',
+    [box()?.type, words(box()), box()?.props['aria-describedby'], view.find((node) => node.props?.role === 'switch').length],
+    ['button', 'Pause winds the record down', 'app-wind-down-note', 0])
+  check('on, as it ships: ticked', [box().props['aria-checked'], hasClass(drawn(), 'is-on')], [true, true])
+  box().props.onClick()
+  render()
+  check('a tap turns it off - App is told, in the tap', [chosen, box().props['aria-checked'], hasClass(drawn(), 'is-on')], [[false], false, false])
+  box().props.onClick()
+  render()
+  check('...and back on', [chosen, box().props['aria-checked']], [[false, true], true])
+  check('a click is the only thing it listens for', Object.keys(box().props).filter((name) => /^on[A-Z]/.test(name)), ['onClick'])
+
+  check('its key, per device', persisted.STORAGE_KEYS.playerWindDown, 'deadwax-player-wind-down')
+  stored.clear()
+  check('nothing kept: on, as it ships', persisted.readPlayerWindDown(), true)
+  persisted.writePlayerWindDown(false)
+  check('turned off, kept, and read back', [stored.get('deadwax-player-wind-down'), persisted.readPlayerWindDown()], ['off', false])
+  persisted.writePlayerWindDown(true)
+  check('...and on', [stored.get('deadwax-player-wind-down'), persisted.readPlayerWindDown()], ['on', true])
+  const readsAs = (value) => { stored.set('deadwax-player-wind-down', value); return persisted.readPlayerWindDown() }
+  check('off only when it says exactly that: anything else is on', ['off', 'Off', 'false', '0', '', 'no', ' off'].map(readsAs), [false, true, true, true, true, true, true])
+  refusing = true
+  let threw = false
+  try { persisted.writePlayerWindDown(false) } catch { threw = true }
+  check('storage refused: on, and nothing thrown either way', [persisted.readPlayerWindDown(), threw], [true, false])
+  refusing = false
+}
+
 console.log('\nwhere they live now')
 {
   const you = fs.readFileSync(path.join(UI, 'src/app/You.tsx'), 'utf8')
@@ -309,6 +350,10 @@ console.log('\nwhere they live now')
   check('Now Playing opens as between them, handed the setting App keeps',
     [playback.includes('<LookChoice look={opensAs} onChange={onOpensAs} />'),
       playback.indexOf('<GaplessChoice') < playback.indexOf('<LookChoice'), playback.indexOf('<LookChoice') < playback.indexOf('<QualityChoice')],
+    [true, true, true])
+  check('Pause winds the record down beside Now Playing opens as - after it, before Maximum quality - handed the setting App keeps',
+    [playback.includes('<WindDownChoice on={windDown} onChange={onWindDown} />'),
+      playback.indexOf('<LookChoice') < playback.indexOf('<WindDownChoice'), playback.indexOf('<WindDownChoice') < playback.indexOf('<QualityChoice')],
     [true, true, true])
   check('...on the key it always had', /playerGapless: 'deadwax-player-gapless'/.test(persisted), true)
   check('...and You no longer sends you to the now-playing screen for it', /now-playing screen/.test(playback), false)

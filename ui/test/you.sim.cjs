@@ -106,7 +106,8 @@ globalThis.__you = {
 const ME = { user: 'local', admin: true, auth: 'off', version: '2.0.0-player.9' }
 //? "Now Playing opens as", as App hands it to You: the setting, and the way to change it
 const chosenLooks = []
-const LOOK = { opensAs: 'turntable', onOpensAs: (look) => chosenLooks.push(look) }
+const chosenWindDowns = []
+const LOOK = { opensAs: 'turntable', onOpensAs: (look) => chosenLooks.push(look), windDown: true, onWindDown: (on) => chosenWindDowns.push(on) }
 const answersWith = (value) => () => Promise.resolve(value)
 const failsWith = (words) => () => Promise.reject(new Error(words))
 
@@ -204,7 +205,7 @@ async function main() {
     'NavidromeNavidrome 0.64.2',
   ])
 
-  console.log('\nPlayback: Gapless, then Now Playing opens as, then Maximum quality')
+  console.log('\nPlayback: Gapless, then Now Playing opens as, then Pause winds the record down, then Maximum quality')
   const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
   const playback = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-playback-title')[0]
   const inPlayback = []
@@ -217,16 +218,23 @@ async function main() {
     visit(node.props?.children)
   }
   visit(playback)
-  check('all three in the Playback section: Gapless, then Now Playing opens as, then Maximum quality', inPlayback, ['GaplessChoice', 'LookChoice', 'QualityChoice'])
+  check('all four in the Playback section: Gapless, then Now Playing opens as, then Pause winds the record down - beside it - then Maximum quality',
+    inPlayback, ['GaplessChoice', 'LookChoice', 'WindDownChoice', 'QualityChoice'])
   check('Gapless is handed the player itself', named('GaplessChoice')[0]?.props.player === globalThis.__you.player, true)
   const look = named('LookChoice')[0]
   look?.props.onChange('cover')
   check('Now Playing opens as is handed App\'s setting, and App\'s way to change it', [look?.props.look, chosenLooks], ['turntable', ['cover']])
-  check('the notes: what Gapless does, where the button is, and where all three are kept', notes, [
+  const winds = named('WindDownChoice')[0]
+  winds?.props.onChange(false)
+  check('Pause winds the record down is handed App\'s setting, and App\'s way to change it', [winds?.props.on, chosenWindDowns], [true, [false]])
+  check('the notes: what Gapless does, where the button is, what winding down does, and where all four are kept', notes, [
     'An experiment: it shortens the pause between songs, and FLAC songs played one after another can join in one stream, with none at all.',
     'The button at the top right of Now Playing switches between them until it closes.',
-    'All three are kept on this device. Maximum quality is used from the next song.',
+    "The turntable only: pausing from it slows the record's sound to a stop over about a second, as a real deck does. Off, it stops at once. The cover's pause is always instant.",
+    'All four are kept on this device. Maximum quality is used from the next song.',
   ])
+  check('...the wind-down\'s note is what its checkbox is described by: the one note by that id',
+    find((node) => node.props?.id === 'app-wind-down-note').map(text).length, 1)
   check('...the first is what the checkbox is described by', find((node) => node.props?.id === 'app-gapless-note').map(text).length, 1)
   check('...the second what the looks are: the one note by that id, the button\'s',
     find((node) => node.props?.id === 'app-look-note').map(text), ['The button at the top right of Now Playing switches between them until it closes.'])

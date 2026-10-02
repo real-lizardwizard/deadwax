@@ -666,8 +666,7 @@
     --dw-tt-pivot:        #3a3642;
     --dw-tt-pivot-edge:   #56525f;
     --dw-tt-handle-edge:  rgba(235, 235, 245, 0.18);
-    /* One turn at 33 1/3 rpm - SECONDS_PER_TURN in ui/src/lib/turntable.ts, which the sim holds
-       this to. Its own value, not a duration token above: reduced motion collapses those to 1ms,
-       which would spin the record 1800 times faster instead of stopping it. */
-    --dw-record-turn:     1.8s;
+    /* (--dw-record-turn, the CSS spin's 1.8 s, went in 2.0.0-player.14: the platter is turned frame
+       by frame by player/deck.ts now, at lib/platter.ts's DEGREES_PER_SECOND - one turn in
+       SECONDS_PER_TURN - and stopped under reduced motion there.) */
 }

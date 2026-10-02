@@ -78,6 +78,21 @@ If-Range. The MP4 of a song the gapless stream has resampled is made from the st
 with no download and no resample, for the page leaving the stream in the middle of it - or the
 ordinary way, when that copy isn't whole.
 
+THE TURNTABLE'S WINDOWS (`answer_window()`, GET /deadwax/navidrome/scrub/{song_id}, 2.0.0-player.14):
+a stretch of a FLAC song as a FLAC file of its own, which the phone's turntable decodes for its own
+sound - src/flac_window.py cuts it. It is cut from the copy of the song the page PLAYS: with
+`max_rate` (the page asks at the cap it plays the song at, so for a hi-res song under "Up to 48 kHz"),
+whichever resampled MP4 of this version the cache holds - the gapless player's fragmented one or
+Safari's plain one, under the plan's key, the plan a make without a neighbour was kept under, or one
+this URL was served - so its frames are what the phone hears, 48 kHz and HEADROOM_DB lower, and no
+second copy of the original is downloaded or kept beside it (review: the first cut looked only for the
+song as it is, and made a full-rate MP4 for every hi-res window); with neither, the resampled plain MP4
+is made as Safari's would be. Without `max_rate`, or with the resampled copy refused (the page plays the
+song as it is then), whichever MP4 of the song as it is the cache holds, or the plain one made. Either
+way an iPhone's songs are in the cache already - it asks for them in one of those MP4s to play them.
+A window is read from the file a box at a time and then only the audio it covers, and never kept: the
+page asks on a grid, and the phone keeps each answer a few minutes (WINDOW_CACHE).
+
 WHERE: PLAYER_CACHE_PATH (asked for, so the cache can live on an SSD), or the container's
 temporary space when that is empty - never the config volume, which is what people back up. Either way deadwax keeps to a folder of its own inside it, `deadwax-player`,
 which it makes private (0700) and checks is still its own (a real folder, not a link, its owner,
@@ -137,6 +152,7 @@ from src.album_context import AlbumContexts, CannotPlan
 from src.api.navidrome_endpoint import NavidromeError, navidrome
 from src.config import Config, player_cache_bytes
 from src.flac_mp4 import CannotRepackage, fmp4_layout, mp4_layout
+from src.flac_window import CannotCut, PastTheEnd, Window, cut_window
 from src.logger import logger
 
 #? The cache's own folder, inside PLAYER_CACHE_PATH or the temporary space. deadwax makes it, and
@@ -239,6 +255,15 @@ MP4, FLAC = "mp4", "flac"
 #? What the gapless player is told a 503 is about: this song - ask again in a moment - or the whole
 #? cache, which it takes as a reason to stop streaming for a while.
 SONG, SERVER = "song", "server"
+
+#? The most audio one turntable window carries (2.0.0-player.14), bar the frame its start falls in:
+#? about 70 s of CD audio, so the page's 40 s windows are whole, and about 13 s of 24/192 - the page
+#? reads how long the window it got really is from the answer, and asks again sooner.
+WINDOW_MAX_BYTES = 8 << 20
+
+#? How long the phone may keep a window. The frames of one version of a song never change, and the
+#? page asks on a grid, so the same window asked again is answered from the phone's own copy.
+WINDOW_CACHE = "private, max-age=300"
 
 
 @dataclass(frozen=True)
@@ -554,6 +579,19 @@ def _repackage(part: Path, target: Path, pieces: Callable[[bytes], list]) -> int
     finally:
         temporary.unlink(missing_ok=True)
     return sum(len(piece) for piece in parts)
+
+
+def _window_of(path: Path, at: float, seconds: float) -> Window:
+    """A window cut from a cached MP4 (flac_window.cut_window), read a box at a time and then only the
+    audio it covers - never the whole file. Runs in a worker thread."""
+    with _open_cached(path) as handle:
+        size = os.fstat(handle.fileno()).st_size
+
+        def read(offset: int, length: int) -> bytes:
+            handle.seek(offset)
+            return handle.read(length)
+
+        return cut_window(read, size, at, seconds, WINDOW_MAX_BYTES)
 
 
 def _etag(key: str) -> str:
@@ -1011,6 +1049,120 @@ class Mp4Cache:
             return _unavailable(SONG, "the player's cache has no room for it until the songs being played or "
                                       "made are done")
         return _unavailable(SONG, "its fragmented MP4 couldn't be made just now")
+
+    async def answer_window(self, song_id: str, at: float, seconds: float, max_rate: int | None = None) -> Response:
+        """
+        A stretch of the song - from `at` seconds, for `seconds` - as a FLAC file of its own, for the
+        phone turntable's sound (2.0.0-player.14; src/flac_window.py cuts it). Cut from the MP4 of the
+        copy the page plays - resampled under `max_rate` (48000) as the stream route's would be, or the
+        song as it is - that the cache already keeps (_window_source): so the iPhone's songs, already
+        made for it, cost nothing to make again, and the record sounds as the song does. When there is
+        none, that plain MP4 is made as Safari's would be (single flight, the cap, the refusals all its
+        own) and the window cut from that.
+
+        Always an answer of its own, never the song: the window as audio/flac, with
+        `X-Deadwax-Window: <first sample>/<samples>/<rate>` saying exactly where in the song it sits;
+        a 415 saying why for a song that isn't a FLAC this can repackage; a 416 for a start past the
+        end of the song; a 503 saying whether to ask again (`scope`, as the gapless player's). No
+        body names a folder. NavidromeError is raised as for the song itself.
+        """
+        if max_rate is not None and not self._resampling():
+            max_rate = None
+        folder = await self._folder()
+        if folder is None:
+            return _unavailable(SERVER, "the player's cache can't be used on this server just now")
+        try:
+            version = await self._version(song_id)
+        except httpx.TransportError:
+            return _unavailable(SONG, "Navidrome broke off saying which file it has")
+        if version is None:
+            return _refusal(self._why_not.get(song_id) or "it isn't a FLAC file")
+        plan = None
+        if max_rate is not None:
+            try:
+                plan = await self.albums.plan(version, max_rate)
+            except CannotPlan:
+                return _unavailable(SONG, "its file couldn't be looked at just now")
+        for _ in range(2):
+            source = await self._window_source(version, folder, plan, _answer_key(song_id, max_rate))
+            if not isinstance(source, Path):
+                if version.key in self._refused:
+                    return _refusal(self._refused[version.key])
+                if source is Room.DISK:
+                    return _unavailable(SERVER, "the disk holding the player's cache is short of space")
+                return _unavailable(SONG, "its MP4 couldn't be made just now")
+            try:
+                window = await asyncio.to_thread(_window_of, source, at, seconds)
+            except FileNotFoundError:
+                #? cleared out between being found and being read: made again, and cut from that
+                continue
+            except PastTheEnd as e:
+                return JSONResponse({"detail": f"that is past the end of the song: {e}"}, status_code=416,
+                                    headers={"cache-control": "no-store"})
+            except CannotCut as e:
+                logger.warning(f"player: a window of song {song_id} couldn't be cut from its MP4 ({e})")
+                return _unavailable(SONG, "its window couldn't be cut just now")
+            except OSError as e:
+                logger.warning(f"player: the MP4 of song {song_id} couldn't be read for a window ({e})")
+                return _unavailable(SONG, "its MP4 couldn't be read just now")
+            self._used[source.name] = self.wall_clock()
+            return Response(window.data, media_type="audio/flac", headers={
+                "x-deadwax-window": f"{window.first}/{window.samples}/{window.rate}",
+                "cache-control": WINDOW_CACHE,
+            })
+        return _unavailable(SONG, "its MP4 couldn't be made just now")
+
+    async def _window_source(self, version: Version, folder: Path, plan: resample.ResamplePlan | None,
+                             url) -> Path | Room | None:
+        """
+        The MP4 of this version a window is cut from - the copy the page plays the song from.
+
+        Resampled (`plan`): one the cache holds of it (_resampled_copies) - or else the plain one made,
+        resampled, as Safari's would be (normally made already, or being made: the page plays it). Its
+        frames are the song as the phone hears it. When that copy is refused - too big to resample in
+        memory, a stream the resampler won't take - the page plays the song as it is, and so is the
+        window.
+
+        As it is: Safari's plain MP4 or the gapless player's fragmented one, whichever the cache holds,
+        or else the plain one made. As _mp4() answers otherwise.
+        """
+        if plan is not None:
+            for path in self._resampled_copies(version, folder, plan, url):
+                if await asyncio.to_thread(_is_cached, path):
+                    self._used[path.name] = self.wall_clock()
+                    return path
+            key = version.key_for(MP4_WRAP, plan)
+            if self._held_size(version, plan) > self.wrap_max_bytes:
+                self._refuse(version, self._too_big(version, plan), warn=False, plan=plan)
+            if key not in self._refused:
+                got = await self._mp4(version, folder, MP4_WRAP, plan)
+                if isinstance(got, Path) or key not in self._refused:
+                    return got
+        for wrap in (MP4_WRAP, FMP4_WRAP):
+            path = folder / f"{version.key_for(wrap)[:40]}{wrap.suffix}"
+            if await asyncio.to_thread(_is_cached, path):
+                return path
+        if self._held_size(version, None) > self.wrap_max_bytes:
+            self._refuse(version, self._too_big(version), warn=False)
+            return None
+        return await self._mp4(version, folder, MP4_WRAP)
+
+    def _resampled_copies(self, version: Version, folder: Path, plan: resample.ResamplePlan, url) -> list[Path]:
+        """Where a resampled copy of this version may be kept: the gapless player's fragmented MP4 and
+        Safari's plain one under the plan's key, or under the plan a make that lost a neighbour was kept
+        by (_lost_side) - and the fragmented MP4s this URL (the song and its cap) was served of this
+        version (_pinned), which the phone is still playing should the plan have changed under it."""
+        keys: list[tuple[str, Wrap]] = []
+        for wrap in (FMP4_WRAP, MP4_WRAP):
+            key = version.key_for(wrap, plan)
+            keys.append((key, wrap))
+            lost = self._lost_side(key)
+            if lost is not None:
+                keys.append((version.key_for(wrap, lost), wrap))
+        held = self._pinned.get(url)
+        if held is not None and held[0] == version:
+            keys += [(key, FMP4_WRAP) for key in reversed(list(held[1]))]
+        return [folder / f"{key[:40]}{wrap.suffix}" for key, wrap in keys]
 
     async def _pinned_answer(self, url, folder: Path, request: Request) -> Response | None:
         """

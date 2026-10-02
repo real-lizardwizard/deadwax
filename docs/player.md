@@ -108,8 +108,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   names the tab it goes back to.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
-- **You**: **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as**
-  ([the turntable](#the-turntable)) and **Maximum quality**
+- **You**: **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as** and
+  **Pause winds the record down** ([the turntable](#the-turntable)) and **Maximum quality**
   ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
@@ -192,8 +192,12 @@ The now-playing screen has a second look, made for the phone: the song on a reco
 turntable. **The button at its top right** switches between the two, for as long as the screen
 stays open - a round record on the cover, a square (the cover) on the turntable. Which one it
 opens as is **Now Playing opens as**, in **You** under **Playback**: **Cover**, the default, or
-**Turntable**. Like the other two there, it's kept on that device. The button never changes the
+**Turntable**. Like the others there, it's kept on that device. The button never changes the
 setting: close the screen and open it again, and it's back to what You says.
+
+Since 2.0.0-player.14 the record has **momentum** and **its own sound**: flick it and it keeps
+turning; the sound follows your hand, faster and slower and backwards; and pausing from the turntable
+winds the sound down with the record. All of it is described below.
 
 - **The record's face is the album's CD art**: the `disc.jpg` (or `.png`) that the main page's
   **Get CD art** saves beside the tracks - see [the library](library.md#covers-cd-art-and-lyrics).
@@ -209,33 +213,86 @@ setting: close the screen and open it again, and it's back to what You says.
   opens (or when you switch to the cover and back); a picture replaced by hand can take up to five
   minutes to change, as the phone keeps one that long. [Troubleshooting](troubleshooting.md#the-turntable-shows-a-plain-black-record-not-the-albums-cd-art)
   goes through why it might show the plain record.
-- **The record turns at 33⅓ rpm** while the song plays, and stops where it is when you pause.
-  It also stops while the phone is locked or the app is in the background, so nothing is drawn for
-  nobody. With **Reduce Motion** on (the iPhone's Settings → Accessibility → Motion), it doesn't
-  turn at all.
+- **The record turns at 33⅓ rpm** while the song plays. Press play and the platter spins up over
+  about 0.4 seconds; pause and it slows to a stop over about a second, as a real deck's does (the
+  song itself starts and stops as it always has). It doesn't turn while the now-playing screen is
+  closed, the phone is locked or the app is in the background, so nothing is drawn for nobody.
+  With **Reduce Motion** on (the iPhone's Settings → Accessibility → Motion), it doesn't turn at
+  all.
 - **The arm moves in from the edge of the record towards the middle** as the song plays, so where
   it is says how far through the song you are. The line under the song's name says the time:
   "2:31 of 7:05".
-- **Tap the record** to pause, or to play.
+- **Tap the record** to pause, or to play. A pause from the record winds its sound down with it
+  (see **Pause winds the record down** below).
 - **Turn the record** to move through the song: a whole turn is 1.8 seconds, as a real record at
-  33⅓ turns, and turning it back goes back. The song keeps playing while you hold the record, and
-  moves when you let go (you don't hear it as you turn, yet): on or back by as much as you turned
-  it, from wherever it has got to. While you turn, the time line says **Scrubbing** and where
-  letting go will go.
+  33⅓ turns, and turning it back goes back. While you turn, the time line says **Scrubbing** and
+  where the record is.
+  - **With its sound**: take hold of the record and the song pauses under your finger; turn it and
+    you hear it, faster or slower as your hand goes, backwards when you turn it back, and nothing
+    while your finger rests. A press that stays put for a moment takes hold too, and a quick tap is
+    still a tap. Let go and the record carries on at the speed your hand gave it. If the song was
+    playing, the motor brings the platter back to its own speed - a backwards flick is stopped
+    about as quickly as a forward one is slowed (under a second for a hard one), then the platter
+    spins back up - and the song carries on from there, the record's own sound handing over to it.
+    If the song was paused, the record coasts to a stop under its own weight (a hard flick coasts
+    for a second or two) and the song stays paused where it stopped. Either way the song is moved as
+    you let go, to where the record will end up, so it's ready when the record gets there. A coast
+    back past the start stops at the start; one past the end stops just short of it, and the song
+    ends from there.
+  - **While it coasts back to speed**, the song is still meant to be playing: tap **Next** or
+    **Previous** and the next song plays; switch to the cover and the song plays on from where the
+    record was going. Drag the arm, or tap Previous to start the song again, and the record goes
+    quiet - the song plays from wherever that put it once the platter is back at speed. Tap play
+    while a paused record coasts, or while a pause winds down, and the song starts from where the
+    record had got to - what you heard - not from where it was going to stop.
+  - **Before its sound has started**: the record's sound can only start from a tap - a tap on the
+    record, the play/pause or skip buttons, or the button that switches to the turntable (and, once
+    it has started before, tapping the mini player to open the screen). It stops whenever the screen
+    closes or the phone locks. Until one of those taps, turning the record works as it did
+    before 2.0.0-player.14: silently, the song playing on while you hold it (the record itself stops
+    turning under your finger), moved on or back by as much as you turned it when you let go, and no
+    momentum. Letting go of the record counts as a tap, so the next turn has its sound.
+  - **The sound** comes from FLAC songs only - a stretch of about 40 seconds of the song round
+    where it's playing (less for a hi-res song played as it is), which deadwax cuts from the very copy
+    of the song the phone plays - for a hi-res song under **Maximum quality**'s **Up to 48 kHz**, the
+    48 kHz copy, so the record sounds just as loud as the song - and sends as a small FLAC file of its
+    own while the turntable shows and the song plays, once a tap has started the sound. An iPhone has
+    asked for that copy already, to play the song; otherwise deadwax makes it the first time. That
+    costs about a third more data than the song itself while the turntable shows and the song plays
+    (about half as much again for a hi-res song played as it is, whose stretches are shorter), and
+    nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns
+    silently, with the same momentum.
+    [Info → Debug](#info--debug)'s **Turntable sound** row says whether it's ready, and if not, why.
+    It never touches the song's own playback: what you hear when the record is at its own speed is
+    the song, exactly as it always was.
+- **Pause winds the record down**, a checkbox in **You** under **Playback**, beside **Now Playing
+  opens as**: on (the default), pausing from the turntable - a tap on the record, or the pause button
+  while the turntable shows - slows the song's sound to a stop with the record over about a second,
+  from the song's own speed, and the song stays paused where the sound stopped (tap play before it
+  has, and the song starts from where the sound had got to). Off, the sound stops at once (the record
+  still spins down). It's only ever the turntable's: the cover's pause, the lock screen's and a song
+  ending are always instant. Kept on the device, like the others.
 - **Drag the arm** to jump anywhere in the song: to the middle of the record is the end, to its
   edge the start. It starts to move once your finger has gone a few pixels, from where the song
   is, so a small wobble moves nothing. The song jumps when you let go; while you hold the arm, the
-  time line says **Needle up** and the time letting go will go to.
+  time line says **Needle up** and the time letting go will go to - even while the record is still
+  coasting from a flick, which goes quiet as you take the arm (the arm then moves on from where the
+  record was going to land).
 - **From the keyboard, and with VoiceOver**, the arm is a slider like the scrubber (arrows move 5
   seconds, Page Up and Page Down 30, Home and End to the ends), and the record is a button that
   says whether a tap pauses or plays.
-- **Everything else is the same as on the cover**: previous, play/pause and next, and the row of
-  buttons under them. The screen still closes only by a drag down from its top row, the arrow, or
+- **Everything else is the same as on the cover**: previous, play/pause and next - except that on
+  the turntable they also start the record's sound, its pause winds the record down as a tap on the
+  record does, and its play starts from where a coasting record has got to - and the row of buttons
+  under them. The screen still closes only by a drag down from its top row, the arrow, or
   Escape: a drag on the record or the arm never closes it. A note that a song was skipped or
   couldn't be played sits over the foot of the turntable, so the record and the arm never move or
   change size when it comes and goes.
 - **On a phone on its side** the turntable is small (there's no landscape layout yet); the arm's
   handle shrinks with it rather than covering the record.
+- **With Reduce Motion on**, a flick still lands where its momentum says - the record jumps there
+  rather than coasting, and a playing song plays on from there at once - and pausing doesn't wind
+  down. Turning the record still has its sound.
 
 There's no hint on how to use it: the record and the arm are the instructions.
 
@@ -341,7 +398,7 @@ so that screen shows the song, and they say the same things as labelled rows. Th
 **Last seek** rows keep the old lines' words, less their openings (`Last song change`,
 `Last seek:`), and the older changes are on an *Earlier* line. The end of the old seek line, how
 the song was sent (`· FLAC in MP4, 192 kHz resampled to 48 kHz`), is now the **Sent as** row, with
-the resampling on a **Resampled** row of its own. Debug has four parts:
+the resampling on a **Resampled** row of its own. Debug has five parts:
 
 | part | row | what it says |
 | --- | --- | --- |
@@ -352,6 +409,7 @@ the resampling on a **Resampled** row of its own. Debug has four parts:
 | | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
 | Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
 | | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
+| The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
 | Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
 
 The **Gap** row is timed with Gapless off as well, the same way, so you can compare the two.
@@ -391,6 +449,24 @@ Siri, iOS refusing to start the next song, or a song that wouldn't play at the e
 Anything longer than 30 seconds isn't counted either. If it says Gapless isn't helping,
 [troubleshooting](troubleshooting.md#with-gapless-on-theres-still-a-pause-between-songs-or-the-player-reloads-by-itself)
 says what each answer means.
+
+**Turntable sound** says what your phone made of the record's own sound - which only your phone can
+say, since an iPhone decodes it its own way:
+
+| it says | meaning |
+| --- | --- |
+| `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` | the stretch of the song the record can play, and the rate your phone decoded it at |
+| `Starting: …` | the stretch is there, and the part that plays it is still loading |
+| `Off: the turntable isn't showing` | the now-playing screen is on the cover, or closed |
+| `Off: waiting for a tap to start the sound` | the sound can only start from a tap: tap the record, a transport button or the look button. Nothing is fetched for it before the first one |
+| `Off: it isn't a FLAC file (it is MP3)` | only FLAC songs have the record's sound |
+| `Off: this browser couldn't decode its window - …` | your phone refused the stretch deadwax sent, in its own words: tell us what it says |
+| `Off: this browser has no AudioWorklet` (or `no Web Audio`) | the browser can't play it at all |
+| `Off: the sound couldn't start - …` (or `the sound's worklet wouldn't load - …`) | the browser's own reason |
+| `Off: deadwax didn't send it - …` | deadwax couldn't make the stretch just then; it asks again after ten seconds |
+| `Off: deadwax said that is past the end of the song` | the phone asked for a stretch beyond the file's end (the song's length as Navidrome gave it is longer than the file); it asks again after ten seconds |
+| `Loading the sound` | the stretch is on its way |
+| `No window yet: …` | the song is paused and the record hasn't been turned: nothing is fetched until it plays |
 
 **Navidrome sent** is there to check what your Navidrome really sends before later parts of the app
 rely on it: the field names only, such as `discTitles` on an album or `musicBrainzId`, `playCount`
@@ -713,6 +789,18 @@ question the whole player existed to answer. Still to find out:
 - **the turntable** under a real finger: turning the record and dragging the arm without the
   screen moving or closing, a tap on the record pausing, and whether it turns smoothly and stops
   while the phone is locked;
+- **the turntable's own sound** (2.0.0-player.14): turning the record and hearing it, forwards and
+  backwards; holding it still (silent); flicking it while the song plays (it whirs, comes back to
+  speed, and the song carries on from there - the song is started again after your tap, which iOS is
+  expected to allow; if it says "Tap play to start" instead, it didn't, and the record should then
+  slow to a stop rather than keep turning); flicking it back hard (it should be back at speed within a
+  second or so); flicking it while paused (it coasts and lands); tapping Next while a flicked record
+  comes back to speed (the next song should play); pausing from the record (it winds down) and with
+  **Pause winds the record down** off (instant); a hi-res song (its sound as loud as the song); with
+  the ringer switch on silent as well as off (iOS has silenced this kind of sound
+  on silent before); then locking the phone mid-song after turning the record - the music should keep
+  playing and the lock screen's next should work - and all of it on AirPods. If anything is silent,
+  [Info → Debug](#info--debug)'s **Turntable sound** row says why;
 - **Requests** on the phone: the ✕ asking in the card (a home-screen app always asks: it has its
   own storage, and no Settings tab to turn that off), the count on the tab, Home's Arriving coming
   and going, a download started on the main page showing up when you come back to the app, what

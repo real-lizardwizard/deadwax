@@ -211,8 +211,12 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
 
     asked_routes = sorted(set(asked))
     assert asked_routes == sorted({path.split("?")[0] for path in paths} | {"/deadwax/navidrome/scrobble/so-1"})
-    #? and the routes are exactly these: a new one must be added here, asking through the seam too
-    assert len({route.path for route in navidrome_routes.router.routes}) == 7
+    #? and the routes are exactly these and /scrub: a new one must be added here, asking through the
+    #? seam too. /scrub (2.0.0-player.14, the turntable's window) answers from the shared MP4 cache,
+    #? as the stream's wrap=mp4 does - one MP4 serves every phone - so like that path it asks Navidrome
+    #? through the cache's own client, and step 6 checks a user's access at the route
+    assert "/scrub/{song_id}" in {route.path for route in navidrome_routes.router.routes}
+    assert len({route.path for route in navidrome_routes.router.routes}) == 8
 
 
 def test_the_turntables_internal_call_asks_through_client_for(monkeypatch, tmp_path, configured):

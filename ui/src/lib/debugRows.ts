@@ -26,9 +26,10 @@
  * Pure, like the rest of lib/, so ui/test/debug.sim.cjs holds every row to its words.
  */
 
+import type { DeckReport } from './deckVoice'
 import { describeGaps, type GapReading } from './gapless'
 import type { QueueTrack } from './playQueue'
-import { describeSeek, type SeekReading } from './scrub'
+import { clock, describeSeek, type SeekReading } from './scrub'
 import { RESAMPLED_TO, describeWrap, isFlac, resamples, type MaxRate, type Wrapped } from './streamWrap'
 
 /** How much quieter deadwax sends a resampled song, in dB - src/resample.py's HEADROOM_DB, which
@@ -75,6 +76,8 @@ export interface DebugInput {
   /** the playing song and its album exactly as Navidrome's answer gave them; null when not in hand */
   song: Readonly<Record<string, unknown>> | null
   album: Readonly<Record<string, unknown>> | null
+  /** the turntable's sound (2.0.0-player.14, player/deck.ts): null while no turntable shows */
+  turntable?: DeckReport | null
 }
 
 /** A rate as every row says it: 192 kHz, 44.1 kHz. */
@@ -241,6 +244,43 @@ export function seekRow(lastSeek: SeekReading | null): DebugRow {
   return { label: 'Last seek', value: upperFirst(describeSeek(lastSeek).replace(SEEK_PREFIX, '')) }
 }
 
+/** Bytes as the turntable row says them: "3.4 MB". */
+function megabytes(bytes: number): string {
+  return `${(bytes / 1_000_000).toFixed(1)} MB`
+}
+
+/**
+ * "Turntable sound" (2.0.0-player.14): whether the turntable's own sound is ready - the window of the
+ * song it has, "0:42-1:12, FLAC, decoded at 48 kHz" - or off, and why: the turntable isn't showing; no
+ * Web Audio, or no AudioWorklet, in this browser; the sound couldn't start (the browser's words);
+ * not a FLAC; a window this browser couldn't decode (its words); waiting for a tap to start the sound
+ * (an audio context starts only from one); deadwax not sending a window. This is how an iPhone tells
+ * what WebKit made of it. The note says what windows have cost since the turntable showed - and when,
+ * after it showed, the last of them came: the deck reports as things change, not as time passes, so
+ * that is the time the bytes are measured to (divide one by the other for a rate).
+ */
+export function turntableRow(report: DeckReport | null | undefined): DebugRow {
+  const label = 'Turntable sound'
+  if (!report) return { label, value: "Off: the turntable isn't showing" }
+  const cost = report.fetched > 0
+    ? `${report.window ? `${megabytes(report.window.bytes)} a window; ` : ''}${megabytes(report.fetched)} fetched since the turntable showed, the last window ${clock(report.lastFetchAt / 1000)} in`
+    : undefined
+  const withCost = (row: DebugRow): DebugRow => (cost ? { ...row, note: row.note ? `${row.note} · ${cost}` : cost } : row)
+  const window = report.window
+  const stretch = window ? `${clock(window.start)}-${clock(window.end)}, ${window.kind}, decoded at ${khz(window.decodedAt)}` : ''
+  if (report.context === 'unsupported') return { label, value: 'Off: this browser has no Web Audio' }
+  if (report.context === 'no-worklet') return { label, value: 'Off: this browser has no AudioWorklet' }
+  if (report.context === 'failed') return withCost({ label, value: upperFirst(`off: ${report.problem ?? "the sound couldn't start"}`) })
+  if (report.refused) return withCost({ label, value: `Off: ${report.refused}` })
+  if (report.context === 'none') {
+    return withCost({ label, value: 'Off: waiting for a tap to start the sound', ...(window ? { note: `Its window is ready: ${stretch}` } : {}) })
+  }
+  if (window) return withCost({ label, value: `${report.context === 'starting' ? 'Starting' : 'Ready'}: ${stretch}`, mono: true })
+  if (report.failed) return withCost({ label, value: `Off: ${report.failed}` })
+  if (report.loading) return withCost({ label, value: 'Loading the sound' })
+  return withCost({ label, value: 'No window yet: one is fetched while the song plays, or as the record is turned' })
+}
+
 type Answer = Readonly<Record<string, unknown>>
 
 /** The names of the fields an answer carries, sorted as plain strings - the same order on every
@@ -311,6 +351,7 @@ export function debugSections(input: DebugInput): DebugSection[] {
     { title: 'The file', rows: [formatRow(input.track)] },
     { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), whyRow(input), gaplessRow(input)] },
     { title: 'Last song change and seek', rows: [gapRow(input.gaps), seekRow(input.lastSeek)] },
+    { title: 'The turntable', rows: [turntableRow(input.turntable)] },
     {
       title: 'Navidrome sent',
       rows: [sentRow('Song', input.song), otherSongsRow(input.song, input.album), sentRow('Album', input.album)],

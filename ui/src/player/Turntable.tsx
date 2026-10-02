@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { clock, keyTarget } from '../lib/scrub'
+import { isFlac, resamples } from '../lib/streamWrap'
 import {
   ARM, ARM_PARTS, PLATTER, RECORD, STAGE, across, armAngle, armMove, armStart, dragEnd, dragFor, moved, needleAt,
-  placeCircle, placePoint, preview, recordMove, recordStart, shownTime, spinning, timeLine, type Box, type Drag,
-  type Preview,
+  placeCircle, placePoint, preview, previewWords, recordMove, recordStart, samePreview, shownTime, timeLine,
+  type Box, type Drag, type Preview,
 } from '../lib/turntable'
 import { Cover } from './Cover'
+import { Deck, wakeDeckAudio, type DeckHost } from './deck'
 import { usePosition, type Player } from './usePlayer'
 
 /** What the drag says in place of the song's position - the time line under the song shows it. */
@@ -25,40 +27,62 @@ function useVisible(): boolean {
   return visible
 }
 
+/** A song's kind in capitals, for Debug's "Turntable sound": FLAC, MP3. */
+function kindOf(track: { suffix?: string | null | undefined; contentType?: string | null | undefined }): string {
+  if (track.suffix) return track.suffix.toUpperCase()
+  const type = (track.contentType ?? '').split(';')[0]!.trim().toLowerCase()
+  return type.startsWith('audio/') ? type.slice('audio/'.length).replace(/^x-/, '').toUpperCase() : ''
+}
+
 /**
  * Now Playing as a turntable (2.0.0-player.11), on the phone: a record on a platter and a tonearm,
  * drawn from the Turntable board's geometry (lib/turntable.ts - the drawing and the finger's maths
- * are one set of numbers). James asked for it, "as long as it has the disc art on the 'record'".
+ * are one set of numbers). James asked for it, "as long as it has the disc art on the 'record'" - and
+ * then (2.0.0-player.14) "can we add momentum to the disc as well?" and "And the audio will speed up
+ * and slow down with it?": the deck (player/deck.ts) is the platter's movement and the record's own
+ * sound, and this tells it what the hand does.
  *
  * - THE RECORD's face is the album's CD art - deadwax's own disc.<ext>, or disc<N>.<ext> for the
  *   playing song's disc of a set, found by /deadwax/library/disc_art/navidrome - and, when there
- *   is none (a 404, or while it loads), plain black vinyl with the album's cover as the label. It
- *   turns at 33 1/3 rpm while the song plays: a CSS animation, paused where it is when the song
- *   pauses, while a finger holds the record, while Now Playing is closed and whenever the page is
- *   hidden (a locked phone) - so nothing is drawn frame by frame for nobody - and stopped for good
- *   under reduced motion. Nothing here runs from the engine's clock.
- * - A TAP on it plays or pauses: the click, in the tap, as the transport's button does. TURNING it
- *   moves the song 1.8 s a turn, backwards too, from wherever the song has got to when it lets go
- *   (it plays on under the finger); the song moves where it lets go, and the click after a turn is
- *   not a tap - however the turn ends.
+ *   is none (a 404, or while it loads), plain black vinyl with the album's cover as the label. The
+ *   deck turns it, frame by frame: 33 1/3 rpm while the song plays, spinning up on play and down on
+ *   pause, coasting after a flick - and not at all while Now Playing is closed or the page is hidden
+ *   (a locked phone), nor under reduced motion. It writes the face's angle straight onto it.
+ * - A TAP on it plays or pauses: the click, in the tap, as the transport's button does. A pause from
+ *   it winds the record's sound down with the platter (You > Playback's "Pause winds the record
+ *   down"), and the song is sought to where that stops; a play while the record coasts or winds down
+ *   with its sound is sought first to where the record is (`resuming`), so nothing heard is skipped.
+ * - TURNING it moves the song 1.8 s a turn, backwards too. Until the deck's sound runs (an audio
+ *   context made in a tap: `live`), exactly as 2.0.0-player.11 did: silent, the song playing on under
+ *   the finger, moved where it lets go - and the record stopped under the finger (the deck's
+ *   `holdStill`, where .11's CSS spin paused). Once it runs, the press is the deck's: the record is taken as
+ *   the press moves past a tap or rests longer than one, the song pauses, the record's sound follows
+ *   the hand, and letting go hands the platter the hand's speed - the deck says where the song lands,
+ *   which this seeks to as the finger lets go, and plays it from there when there is no coast to wait
+ *   for. The click after a turn - or after the record was taken - is not a tap.
  * - THE ARM moves in from the outer groove as the song plays, following the song's position
- *   (usePosition, like the scrubber - no timer of its own). Dragged, it goes anywhere in the song,
- *   seeking where it lets go; to the keyboard and VoiceOver it is a slider, stepping as the
- *   scrubber does. Pointer capture on both drags; a cancel seeks nowhere; a second finger starts
- *   nothing.
+ *   (usePosition, like the scrubber - no timer of its own) or, while the deck has the record, the
+ *   time the deck shows. Dragged, it goes anywhere in the song, seeking where it lets go - and while
+ *   it is held, it and the time line follow the finger, whatever the deck is doing; to the
+ *   keyboard and VoiceOver it is a slider, stepping as the scrubber does. Pointer capture on both
+ *   drags; a cancel seeks nowhere; a second finger starts nothing.
  * - A drag is measured in the stage's box as the press found it, so nothing that moves the layout
  *   under a still finger moves the song.
  * - Neither starts the sheet's drag to close: they are not inside its grip (NowPlaying.tsx).
+ * - Every release, and every tap, wakes the deck's audio context - "the first release resumes it".
  * - No hint and no coach mark (James: "the instructions for how to use it are a little annoying").
  *
  * A leaf: the player and the disc art's address come as props. `onPreview` tells Now Playing what
- * the drag says, for the time line under the song's name.
+ * the drag says, for the time line under the song's name; `deck` hands Now Playing this turntable's
+ * deck, for the transport's pause to wind down too.
  */
 export function Turntable({
   player,
   open,
   discArt,
   onPreview,
+  windDown = true,
+  deck: deckRef,
 }: {
   player: Player
   /** Now Playing is open - closed, the record stops */
@@ -66,14 +90,23 @@ export function Turntable({
   /** the CD art to draw on the record, or null for the plain one */
   discArt: string | null
   onPreview: (next: TurntablePreview) => void
+  /** You > Playback's "Pause winds the record down" */
+  windDown?: boolean
+  /** where Now Playing finds this turntable's deck */
+  deck?: { current: Deck | null }
 }) {
   const position = usePosition(player)
   //? the song's position as last drawn: a release seeks from it, so it lands where the time line said
   const drawnAt = useRef(position)
   drawnAt.current = position
+  //? the player as last rendered, for the deck, whose callbacks outlive a render
+  const latest = useRef(player)
+  latest.current = player
   const visible = useVisible()
   //? the stage's own box, where every point of the drawing is placed from
   const frame = useRef<SVGSVGElement>(null)
+  //? the face the deck turns, frame by frame
+  const face = useRef<HTMLSpanElement>(null)
   //? the drag in a ref as well as in state: a move and the release can both come before the render
   //? between them, and the release must seek where the last move put it (the scrubber's rule)
   const held = useRef<Drag | null>(null)
@@ -84,8 +117,80 @@ export function Turntable({
   const [turn, setTurn] = useState(0)
   //? the click after a turn is not a tap; reset by the next press, since not every turn has a click
   const turned = useRef(false)
+  //? whether the press under way is the deck's - its audio context ran when it began - or .11's
+  const live = useRef(false)
+  //? what the deck shows while it has the record, and what Now Playing was last told
+  const [deckShown, setDeckShown] = useState<{ at: number; scrubbing: boolean } | null>(null)
+  const deckShownRef = useRef(deckShown)
+  const said = useRef<TurntablePreview>(null)
   const [failedArt, setFailedArt] = useState<string | null>(null)
   const [loadedArt, setLoadedArt] = useState<string | null>(null)
+
+  const length = player.duration || 0
+  const track = player.track?.id ?? ''
+
+  const say = (next: TurntablePreview) => {
+    if (samePreview(said.current, next)) return
+    said.current = next
+    onPreview(next)
+  }
+
+  //? what the time line is told: an arm held shows where the finger has it, whatever the deck is doing
+  //? (the deck stops showing as the arm is taken - armTaken); otherwise what the deck shows, if anything
+  const setDrag = (next: Drag | null) => {
+    held.current = next
+    setDragShown(next)
+    if (!deckShownRef.current || next?.kind === 'arm') say(preview(next))
+  }
+
+  //? The deck's two moves of the song, by the player's own toggle - the only ones made outside a tap
+  //? or a release (deck.ts says why each is allowed): pause the song as a hand takes the record, and
+  //? play it as the motor has the platter back at speed after a coast.
+  const holdSong = () => {
+    if (latest.current.playing) latest.current.toggle()
+  }
+  const resumeSong = () => {
+    if (!latest.current.playing) latest.current.toggle()
+  }
+
+  const deck = useMemo(() => {
+    const host: DeckHost = {
+      song: () => {
+        const now = latest.current
+        const playing = now.track
+        if (!playing) return null
+        //? the cap the player asks for this song at, so its window is cut from the very copy it plays
+        const maxRate = resamples(playing, now.maxRate ?? 'original', 'raw') ? 48000 : null
+        return { id: playing.id, length: now.duration || 0, flac: isFlac(playing), kind: kindOf(playing), maxRate }
+      },
+      playing: () => latest.current.playing,
+      position: () => latest.current.position(),
+      onPosition: (listener) => latest.current.onPosition(listener),
+      hold: () => holdSong(),
+      resume: () => resumeSong(),
+      turnFace: (degrees) => {
+        if (face.current) face.current.style.transform = `rotate(${+degrees.toFixed(2)}deg)`
+      },
+      show: (at, scrubbing) => {
+        //? to a fiftieth of a second: the time line says whole seconds, and the arm moves less than a
+        //? pixel in that - no render a frame for nobody
+        const next = at === null ? null : { at: Math.round(at * 50) / 50, scrubbing }
+        const before = deckShownRef.current
+        if (before === next || (before && next && before.at === next.at && before.scrubbing === next.scrubbing)) return
+        deckShownRef.current = next
+        setDeckShown(next)
+        say(next && held.current?.kind !== 'arm' ? { how: 'deck', at: next.at, scrubbing: next.scrubbing } : preview(held.current))
+      },
+      grabbed: () => {
+        //? the record taken - by a press resting, or caught coasting: the click after it is no tap,
+        //? and the hand's turn counts from here
+        turned.current = true
+        const now = held.current
+        if (now?.kind === 'record') setDrag(Object.assign({}, now, { offset: 0 }))
+      },
+    }
+    return new Deck(host)
+  }, [])
 
   //? every opening looks for the CD art again: a failure is remembered only while Now Playing stays
   //? open, so art saved since (Get CD art), or a Navidrome that was down, is found by the next one -
@@ -94,24 +199,31 @@ export function Turntable({
     if (open) setFailedArt(null)
   }, [open])
 
-  const length = player.duration || 0
-  const track = player.track?.id ?? ''
+  //? the deck shows while Now Playing is open and the page in sight; hidden, its sound is suspended
+  useEffect(() => deck.setShowing(open && visible), [open, visible])
+  useEffect(() => deck.playingChanged(player.playing), [player.playing])
+  useEffect(() => deck.setWindDown(windDown), [windDown])
 
-  const setDrag = (next: Drag | null) => {
-    held.current = next
-    setDragShown(next)
-    onPreview(preview(next))
-  }
-
-  //? the song changed under the finger: the drag was for the song before, and seeks nowhere
+  //? the song changed under the finger: the drag was for the song before, and seeks nowhere - nor
+  //? does anything the deck had of it
   useEffect(() => {
     if (held.current && !dragFor(held.current, track)) setDrag(null)
+    deck.songChanged(track)
   }, [track])
 
-  //? gone (the look switched, the song ended with nothing after it): nothing is previewed any more
-  useEffect(() => () => onPreview(null), [])
+  //? the deck for Now Playing while this shows; gone (the look switched, the song ended with nothing
+  //? after it): nothing is previewed any more, and the deck's audio context is closed
+  useEffect(() => {
+    if (deckRef) deckRef.current = deck
+    return () => {
+      if (deckRef && deckRef.current === deck) deckRef.current = null
+      deck.destroy()
+      onPreview(null)
+    }
+  }, [])
 
-  const previewing = preview(drag)
+  //? the arm held wins: it shows where the finger has it, and is where letting go will go
+  const previewing = deckShown && drag?.kind !== 'arm' ? ({ how: 'deck', at: deckShown.at, scrubbing: deckShown.scrubbing } as const) : preview(drag)
   const shown = shownTime(previewing, position, length)
 
   const box = (): Box => {
@@ -127,18 +239,38 @@ export function Turntable({
     turned.current = false
     ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
     pressBox.current = box()
+    live.current = deck.live()
     setDrag(recordStart(event.pointerId, track, event.clientX, event.clientY, pressBox.current))
+    //? the deck's press - or .11's, under which the record stops under the finger, as .11's spin did
+    if (live.current) deck.pressed(performance.now())
+    else deck.holdStill(true)
   }
   const onArmDown = (event: PointerEvent) => {
     if (!length || !pressable(event)) return
     ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
     pressBox.current = box()
+    deck.armTaken()
     setDrag(armStart(event.pointerId, track, event.clientX, event.clientY))
   }
   const onMove = (event: PointerEvent) => {
     const now = held.current
     if (!now) return
     const within = pressBox.current ?? box()
+    if (now.kind === 'record' && live.current) {
+      //? the deck's press: the turn counts from where the record was taken, the song paused there
+      const step = recordMove(now, event.pointerId, event.clientX, event.clientY, within, length, deck.taken() ? deck.anchor() : drawnAt.current)
+      if (step === now || step?.kind !== 'record') return
+      let turning = step
+      if (!deck.taken() && moved(turning)) {
+        //? past a tap: the record is taken here, and its turn counts from here
+        deck.takeOver()
+        turning = Object.assign({}, turning, { offset: 0 })
+      }
+      if (deck.taken()) deck.hand(performance.now(), turning.turned, deck.anchor() + turning.offset)
+      if (moved(turning)) turned.current = true
+      setDrag(turning)
+      return
+    }
     const next = now.kind === 'record'
       ? recordMove(now, event.pointerId, event.clientX, event.clientY, within, length, drawnAt.current)
       : armMove(now, event.pointerId, event.clientX, event.clientY, within, length, drawnAt.current)
@@ -150,6 +282,28 @@ export function Turntable({
   }
   const onRelease = (how: 'up' | 'cancel') => (event: PointerEvent) => {
     const now = held.current
+    //? a release is a gesture WebKit counts: the deck's sound may start from it
+    if (how === 'up' && now && now.pointer === event.pointerId) wakeDeckAudio()
+    if (now?.kind === 'record' && live.current && now.pointer === event.pointerId) {
+      const taken = deck.taken()
+      //? the page's clock, as the deck's frames are on - never the event's own stamp, which some
+      //? WebKit has given on another clock
+      const { seek, play } = deck.release(performance.now(), how)
+      //? the record stays where the hand left it - a record held still and then nudged a few pixels
+      //? included - and the click that may follow isn't a tap
+      if (how === 'up' && (moved(now) || taken)) {
+        setTurn((before) => before + now.turned * DEG)
+        turned.current = true
+      }
+      setDrag(null)
+      //? where the platter will stop, or be back at speed - sought now, while it coasts there; and a
+      //? song with no coast to wait for plays from there in this very release
+      if (seek !== null && length) player.seek(seek)
+      if (play && !player.playing) player.toggle()
+      return
+    }
+    //? .11's press let go: the record turns on from where the finger held it
+    if (now?.kind === 'record' && now.pointer === event.pointerId) deck.holdStill(false)
     const { drag: next, seek, wasDrag } = dragEnd(now, event.pointerId, how, drawnAt.current, length)
     if (next === now) return
     //? a turn let go: the record stays turned, and the click that may follow isn't a tap
@@ -160,13 +314,25 @@ export function Turntable({
     setDrag(next)
     if (seek !== null && length) player.seek(seek)
   }
-  //? THE TAP: play or pause, straight from the click - nothing awaited before it
+  //? THE TAP: play or pause, straight from the click - nothing awaited before it. A pause winds the
+  //? record down when the deck can (it returns where that stops, and the song is sought there); a play
+  //? while the record coasts or winds down with its sound starts from where the record is (the deck
+  //? says where, and the song is sought there first)
   const onRecordClick = () => {
+    wakeDeckAudio()
     if (turned.current) {
       turned.current = false
       return
     }
-    player.toggle()
+    if (player.playing) {
+      const landing = deck.pausing()
+      player.toggle()
+      if (landing !== null && length) player.seek(landing)
+    } else {
+      const from = deck.resuming()
+      if (from !== null && length) player.seek(from)
+      player.toggle()
+    }
   }
   const onArmKey = (event: KeyboardEvent) => {
     const target = keyTarget(event.key, shown, length)
@@ -175,8 +341,9 @@ export function Turntable({
     player.seek(target)
   }
 
-  const spin = spinning({ playing: player.playing, open, visible, held: drag?.kind === 'record' })
-  const handTurn = turn + (drag?.kind === 'record' && moved(drag) ? drag.turned * DEG : 0)
+  //? the hand's turn, once the press is a drag - or the deck has taken the record, by a press that
+  //? rested, when every pixel of the hand turns it
+  const handTurn = turn + (drag?.kind === 'record' && (moved(drag) || (live.current && deck.taken())) ? drag.turned * DEG : 0)
   const needle = needleAt(shown, length)
   const lifted = drag?.kind === 'arm'
   const art = discArt && discArt !== failedArt ? discArt : null
@@ -205,7 +372,8 @@ export function Turntable({
           onDragStart={(event) => event.preventDefault()}
         >
           <span class="app-tt-turn" style={{ transform: `rotate(${+handTurn.toFixed(2)}deg)` }}>
-            <span class={`app-tt-face${spin ? ' is-spinning' : ''}${art && art === loadedArt ? ' has-art' : ''}`}>
+            {/* turned by the deck, straight onto the element - never a style here, which a render would undo */}
+            <span ref={face} class={`app-tt-face${art && art === loadedArt ? ' has-art' : ''}`}>
               <Cover id={player.track?.coverArt} size={300} class="app-tt-label" />
               {art && (
                 <img
@@ -269,8 +437,9 @@ export function Turntable({
 
 /**
  * The line under the song's name in the turntable's Now Playing, in place of the scrubber: "2:31 of
- * 7:05", and while the record is turned or the arm held, where letting go will go. One line, a
- * fixed height, so nothing under it moves (see NowPlaying).
+ * 7:05", and while the record is turned or the arm held, where letting go will go - and while the
+ * deck has the record, where it is ("Scrubbing" while a hand or a flick moves it). One line, a fixed
+ * height, so nothing under it moves (see NowPlaying).
  */
 export function TurntableTime({
   player,
@@ -281,5 +450,5 @@ export function TurntableTime({
 }) {
   const position = usePosition(player)
   const length = player.duration || 0
-  return <p class="app-tt-time">{timeLine(shownTime(previewing, position, length), length, previewing?.how ?? null)}</p>
+  return <p class="app-tt-time">{timeLine(shownTime(previewing, position, length), length, previewWords(previewing))}</p>
 }

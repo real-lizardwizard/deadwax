@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { aboutRows, type About, type AboutAlbumFields } from '../lib/aboutRows'
+import type { DeckReport } from '../lib/deckVoice'
 import { debugSections, type DebugSection } from '../lib/debugRows'
 import type { QueueTrack } from '../lib/playQueue'
 import { Cover } from '../player/Cover'
@@ -28,8 +29,9 @@ interface Drawn {
  *   the queue's copy of the song and the album answer it was played from. A field Navidrome didn't
  *   send is left out, never invented. The album's card goes to the album, like "Go to album".
  * - DEBUG: what used to be two lines on the now-playing screen - how the song was sent, how the
- *   last song changes and the last seek went - as labelled rows (lib/debugRows.ts), and the names
- *   of the fields Navidrome sent for the song and its album, to read off a phone.
+ *   last song changes and the last seek went - as labelled rows (lib/debugRows.ts), the turntable's
+ *   own sound (2.0.0-player.14: ready, or off and why), and the names of the fields Navidrome sent
+ *   for the song and its album, to read off a phone.
  *
  * A sheet like the others (useSheet.ts): its own scroll lock, focus in to Done and back to the •••
  * button, Escape, a tap on the backdrop above it; inert while closed. Its body is the one part of
@@ -53,6 +55,7 @@ export function InfoSheet({
   player,
   album,
   sentFormat,
+  turntable = null,
 }: {
   open: boolean
   opener?: { current: HTMLElement | null } | undefined
@@ -63,6 +66,8 @@ export function InfoSheet({
   /** the album answer the queue was played from, as Navidrome sent it; null when not in hand */
   album: AboutAlbumFields | null
   sentFormat: (track: QueueTrack) => 'raw' | 'mp3' | null
+  /** the turntable's sound (2.0.0-player.14), for Debug's "Turntable sound": null while none shows */
+  turntable?: DeckReport | null
 }) {
   const done = useRef<HTMLButtonElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -94,6 +99,7 @@ export function InfoSheet({
           format: sentFormat(track),
           song: song as Readonly<Record<string, unknown>> | null,
           album: answer,
+          turntable,
         }),
       }
     }

@@ -358,10 +358,11 @@ def test_a_picture_that_is_a_link_out_of_its_folder_is_refused(root, store, albu
 
 def test_it_is_a_library_route_and_the_navidrome_list_is_unchanged():
     assert serves_media(ROUTE)
-    #? the player's own list - search3 joined it in 2.0.0-player.13, on purpose; this route never did
+    #? the player's own list - search3 joined it in 2.0.0-player.13, on purpose, and the turntable's
+    #? window of a song in 2.0.0-player.14 (test_scrub_window.py); this route never did
     assert sorted(route.path for route in navidrome_routes.router.routes) == [
         "/albums", "/albums/{album_id}", "/cover/{cover_id}", "/scrobble/{song_id}",
-        "/search", "/status", "/stream/{song_id}",
+        "/scrub/{song_id}", "/search", "/status", "/stream/{song_id}",
     ]
     assert "/disc_art/navidrome" in {route.path for route in library_routes.router.routes}
 

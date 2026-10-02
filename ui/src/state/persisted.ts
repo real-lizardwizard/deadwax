@@ -44,6 +44,9 @@ export const STORAGE_KEYS = {
   /** "Now Playing opens as" (2.0.0-player.11): 'turntable', or anything else for the cover (the
    *  default). Per device, like the two above. */
   playerOpensAs: 'deadwax-player-opens-as',
+  /** "Pause winds the record down" (2.0.0-player.14): 'off', or anything else for on (the default).
+   *  Per device, like the three above. */
+  playerWindDown: 'deadwax-player-wind-down',
 } as const
 
 /*
@@ -269,6 +272,21 @@ export function readPlayerOpensAs(): Look {
 
 export function writePlayerOpensAs(look: Look): void {
   writeRaw(STORAGE_KEYS.playerOpensAs, look)
+}
+
+/* ===== deadwax-player-wind-down ===== */
+
+/**
+ * "Pause winds the record down" (2.0.0-player.14): whether a pause on the turntable slows the
+ * record's sound to a stop over about a second, per device like the three above. On unless it says
+ * exactly 'off': nothing stored, an unknown value, storage that can't be read - all on, as it ships.
+ */
+export function readPlayerWindDown(): boolean {
+  return readRaw(STORAGE_KEYS.playerWindDown) !== 'off'
+}
+
+export function writePlayerWindDown(on: boolean): void {
+  writeRaw(STORAGE_KEYS.playerWindDown, on ? 'on' : 'off')
 }
 
 /* ===== deadwax-preferences ===== */

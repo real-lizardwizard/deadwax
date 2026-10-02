@@ -993,7 +993,10 @@ html.app-info-open { overflow: hidden; }
 
 .app-tt-record:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring); }
 
-/* the turn a hand gives it (inline), and inside that the turn it makes playing (the animation) */
+/* the turn a hand gives it (inline), and inside that the turn the platter makes (written frame by
+   frame by player/deck.ts, 2.0.0-player.14: 33 1/3 rpm playing, a coast after a flick, the spin-up
+   and spin-down of play and pause - never while the screen is closed or the page hidden, and not at
+   all under reduced motion, which the deck reads itself) */
 .app-tt-turn,
 .app-tt-face {
     position: absolute;
@@ -1002,24 +1005,10 @@ html.app-info-open { overflow: hidden; }
     border-radius: var(--dw-radius-round);
 }
 
-/* 33 1/3 rpm while the song plays. Paused - where it is - when the song pauses, while a finger
-   holds it, while Now Playing is closed and while the page is hidden (Turntable.tsx's spinning());
-   stopped under reduced motion. */
 .app-tt-face {
     overflow: hidden;
     background: var(--dw-tt-vinyl);
-    animation: app-tt-spin var(--dw-record-turn) linear infinite;
-    animation-play-state: paused;
-}
-
-.app-tt-face.is-spinning { animation-play-state: running; }
-
-@keyframes app-tt-spin {
-    to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .app-tt-face { animation: none; }
+    will-change: transform;
 }
 
 /* the plain record's label: the album's cover, round, in the middle */

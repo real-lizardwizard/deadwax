@@ -23,8 +23,19 @@
  *    cancel seeks nowhere; a drag begun on a song that has since changed is dropped. Both drags
  *    capture the pointer; the preview goes with the turntable when it unmounts.
  *  - The time line: "2:31 of 7:05", and what the drag says while there is one.
- *  - The record turns only while the song plays, Now Playing is open, the page is showing and no
- *    finger holds it - never while the page is hidden - and the CSS spin is SECONDS_PER_TURN.
+ *  - The record turns - the deck's frame loop (player/deck.ts, 2.0.0-player.14), a turn in
+ *    SECONDS_PER_TURN - while the song plays and Now Playing is open and the page is showing, and
+ *    spins down when it pauses; never while closed or hidden; Turntable itself has no frame loop.
+ *  - With the deck's sound running (an audio context made in a tap): a press is taken past a tap or
+ *    after resting longer than one, pausing the song through the player's own toggle; letting go
+ *    seeks where the motor will have the platter back at speed - or where a paused one stops - and
+ *    the song plays at speed after the coast; a cancel plays on what it paused; a tap still plays or
+ *    pauses, and a pause from it winds down, the song sought where that stops (and, with "Pause winds
+ *    the record down" off, the same tap on a platter at speed doesn't - the control beside it); a play
+ *    mid wind-down starts from where the record is; the arm stops the record's sound, and while held it
+ *    and the time line follow the finger, not the coast; a hi-res song's window is asked at the cap the
+ *    song plays at. Until the sound runs, every press is exactly 2.0.0-player.11's - the checks above
+ *    it are those, the record stopped under a resting finger included.
  *  - The record's face: the playing song's disc's CD art, from the library route, the plain record
  *    with the cover as its label when that fails or there is no album - asked for again each time
  *    Now Playing opens, a turntable left mounted across the close included.
@@ -103,6 +114,7 @@ const BOX = { left: 0, top: 0, width: 372, height: 368 }
 class FakeElement {
   constructor(name) {
     this.name = name
+    this.style = {}
     this.classes = new Set()
     this.classList = { toggle: (c, on) => (on ? this.classes.add(c) : this.classes.delete(c)) }
   }
@@ -125,6 +137,37 @@ define('document', document)
 define('HTMLElement', FakeElement)
 define('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
 const fire = (name) => { for (const fn of [...(listeners.get(name) ?? [])]) fn({}) }
+
+//? a clock, timers and frames the checks move on themselves - the deck's (player/deck.ts)
+let clock = 1000
+let timers = []
+let frames = []
+let nextId = 1
+function advance(ms) {
+  const until = clock + ms
+  for (;;) {
+    timers.sort((a, b) => a.at - b.at)
+    const due = timers.find((timer) => timer.at <= until)
+    if (!due) break
+    clock = due.at
+    timers = timers.filter((timer) => timer !== due)
+    due.run()
+  }
+  clock = until
+}
+function runFrames(count) {
+  for (let i = 0; i < count; i++) {
+    advance(16)
+    const now = frames
+    frames = []
+    for (const frame of now) frame.run(clock)
+  }
+}
+define('performance', { now: () => clock })
+define('setTimeout', (run, ms = 0) => { const id = nextId++; timers.push({ id, at: clock + ms, run }); return id })
+define('clearTimeout', (id) => { timers = timers.filter((timer) => timer.id !== id) })
+define('requestAnimationFrame', (run) => { const id = nextId++; frames.push({ id, run }); return id })
+define('cancelAnimationFrame', (id) => { frames = frames.filter((frame) => frame.id !== id) })
 
 /* ===== rendering ===== */
 
@@ -360,15 +403,12 @@ console.log('\nwhat the time line says')
     [tt.shownTime({ how: 'record', offset: 2 }, 151, LENGTH), tt.shownTime({ how: 'record', offset: 2 }, 160, LENGTH), tt.shownTime({ how: 'record', offset: -500 }, 151, LENGTH)], [153, 162, 0])
 }
 
-console.log('\nwhen the record turns')
+console.log('\nhow fast the record turns')
 {
-  const all = { playing: true, open: true, visible: true, held: false }
-  check('playing, open, showing and not held: it turns', tt.spinning(all), true)
-  check('...and not with any one of them otherwise',
-    [tt.spinning({ ...all, playing: false }), tt.spinning({ ...all, open: false }), tt.spinning({ ...all, visible: false }), tt.spinning({ ...all, held: true })],
-    [false, false, false, false])
+  const platter = require(path.join(OUT, 'lib/platter.js'))
+  check('the platter at its own speed: one turn in SECONDS_PER_TURN, 33 1/3 rpm', platter.DEGREES_PER_SECOND, 360 / SECONDS_PER_TURN)
   const theme = fs.readFileSync(path.join(REPO, 'interface/styles/theme.css'), 'utf8')
-  check('the CSS spin is one turn in SECONDS_PER_TURN', /--dw-record-turn:\s*([\d.]+)s;/.exec(theme)?.[1], String(SECONDS_PER_TURN))
+  check('...and no CSS spin of its own beside it any more', /--dw-record-turn:/.test(theme), false)
 }
 
 console.log('\nthe record\'s face, and the words')
@@ -400,7 +440,7 @@ function fakePlayer(overrides = {}) {
   return player
 }
 const pointer = (point, extra = {}) => ({
-  pointerId: 1, isPrimary: true, pointerType: 'touch', button: 0, clientX: point.x, clientY: point.y,
+  pointerId: 1, isPrimary: true, pointerType: 'touch', button: 0, clientX: point.x, clientY: point.y, timeStamp: clock,
   currentTarget: { captured: null, setPointerCapture(id) { this.captured = id } }, ...extra,
 })
 
@@ -430,14 +470,14 @@ console.log('\nthe record: a tap plays or pauses, in the click; a turn seeks whe
   record().props.onPointerDown(pointer(at))
   for (let degrees = 30; degrees <= 90; degrees += 30) record().props.onPointerMove(pointer(onRecord(degrees)))
   draw()
-  check('turned a quarter: the record turned with the hand, and still under it', [turnStyle(), hasClass(face(), 'is-spinning')], ['rotate(90deg)', false])
+  check('turned a quarter: the record turned with the hand', turnStyle(), 'rotate(90deg)')
   check('...the time previewed, for the line under the song', [previews.at(-1).how, near(previews.at(-1).offset, 0.45)], ['record', true])
   check('...and no seek on the way', player.seeks, [])
   record().props.onPointerUp(pointer(onRecord(90)))
   record().props.onLostPointerCapture(pointer(onRecord(90)))
   draw()
   check('let go: one seek, to where it was turned', player.seeks, [151.45])
-  check('...the record stays where the hand left it, turning again', [turnStyle(), hasClass(face(), 'is-spinning'), previews.at(-1)], ['rotate(90deg)', true, null])
+  check('...the record stays where the hand left it, nothing previewed', [turnStyle(), previews.at(-1)], ['rotate(90deg)', null])
   record().props.onClick()
   check('the click after the turn is not a tap', player.toggles, 1)
   record().props.onPointerDown(pointer(at))
@@ -604,22 +644,62 @@ console.log('\nwhen it turns, and what is on it')
   const view = mount(Turntable, 'turntable')
   const face = () => view.find(byClass('app-tt-face'))[0]
   const draw = (props = {}) => view.render({ player: fakePlayer(), open: true, discArt: null, onPreview: () => {}, ...props })
+  //? the face's angle as the deck last wrote it straight onto the element
+  const angle = () => Number(/rotate\(([-\d.]+)deg\)/.exec(face().element.style.transform ?? '')?.[1] ?? 0)
+  frames = []
   draw()
-  check('playing and open: it turns', hasClass(face(), 'is-spinning'), true)
+  runFrames(10)
+  const first = angle()
+  runFrames(9)
+  check('playing and open: the deck turns it, frame by frame, a turn in 1.8 s (144 ms: 28.8 degrees)', [first > 0, Math.round((angle() - first) * 10) / 10], [true, 28.8])
+  check('...and Turntable never writes a style on the face itself, which a render would undo', face().props.style, undefined)
   draw({ player: fakePlayer({ playing: false }) })
-  check('paused: it stops', hasClass(face(), 'is-spinning'), false)
+  runFrames(10)
+  const pausing = angle()
+  runFrames(10)
+  check('paused by something else (a song ending, the lock screen): it waits a moment - a song change pauses for one - then spins down', angle() > pausing, true)
+  runFrames(80)
+  const still = angle()
+  runFrames(10)
+  check('...and stops: no more frames asked for, the record still', [angle() === still, frames.length], [true, 0])
+  draw()
+  runFrames(30)
+  const playing = angle()
   draw({ open: false })
-  check('Now Playing closed: it stops', hasClass(face(), 'is-spinning'), false)
+  runFrames(5)
+  check('Now Playing closed: no frame asked for, nothing drawn', frames.length, 0)
+  draw()
+  runFrames(2)
   document.visibilityState = 'hidden'
   fire('visibilitychange')
   draw()
-  check('the page hidden - a locked phone: it stops, nothing drawn for nobody', hasClass(face(), 'is-spinning'), false)
+  runFrames(5)
+  check('the page hidden - a locked phone: no frame asked for, nothing drawn for nobody', [frames.length, angle() > playing], [0, true])
   document.visibilityState = 'visible'
   fire('visibilitychange')
   draw()
-  check('showing again: it turns again', hasClass(face(), 'is-spinning'), true)
+  const back = angle()
+  runFrames(5)
+  check('showing again: it turns again', angle() > back, true)
+  //? a press before the deck's sound runs - .11's press, as every press in this section is (no audio
+  //? context here): the record stops under the finger, as .11's spin paused, and turns on when let go
+  const record = () => view.find(byClass('app-tt-record'))[0]
+  runFrames(2)
+  record().props.onPointerDown(pointer(onRecord(0)))
+  const pressedAt = angle()
+  runFrames(20)
+  check('pressed and resting (.11\'s press, before the sound runs): the record stops under the finger - and no frame is asked for',
+    [angle(), frames.length], [pressedAt, 0])
+  record().props.onPointerMove(pointer(onRecord(30)))
+  draw()
+  runFrames(5)
+  check('...turned: the face turns with the hand alone (on its wrapper), not on round under it as well', angle(), pressedAt)
+  record().props.onPointerUp(pointer(onRecord(30)))
+  runFrames(1)
+  check('...let go: it turns on from where the finger held it, a frame\'s worth - no jump', Math.round((angle() - pressedAt) * 10) / 10, 3.2)
   const source = fs.readFileSync(path.join(UI, 'src/player/Turntable.tsx'), 'utf8')
-  check('no frame loop of its own: the spin is the CSS\'s', /requestAnimationFrame|setInterval|setTimeout/.test(source), false)
+  check('no frame loop of its own: the platter is the deck\'s (player/deck.ts)',
+    [/requestAnimationFrame|setInterval|setTimeout/.test(source), /requestAnimationFrame/.test(fs.readFileSync(path.join(UI, 'src/player/deck.ts'), 'utf8'))], [false, true])
 
   const art = () => view.find((node) => node.type === 'img' && hasClass(node, 'app-tt-disc'))[0]
   draw({ discArt: '/deadwax/library/disc_art/navidrome?album=dsotm&disc=1' })
@@ -654,6 +734,233 @@ console.log('\nthe time line')
   check('...or where letting go will go: the record\'s turn from the song, the arm\'s needle',
     [view.render({ player, previewing: { how: 'record', offset: -61 } }).props.children, view.render({ player, previewing: { how: 'arm', time: 90 } }).props.children],
     [`Scrubbing ${String.fromCharCode(0xb7)} 1:30 of 7:05`, `Needle up ${String.fromCharCode(0xb7)} 1:30 of 7:05`])
+}
+
+/* ===== with the deck's sound running (2.0.0-player.14) ===== */
+
+//? an audio context that records what is asked of it, a worklet port, and deadwax's window route
+const contexts = []
+const port = []
+class FakeContext {
+  constructor() { this.state = 'suspended'; this.currentTime = 0; this.calls = []; this.audioWorklet = { addModule: () => Promise.resolve() }; contexts.push(this) }
+  addEventListener() {}
+  resume() { this.calls.push('resume'); this.state = 'running'; return Promise.resolve() }
+  suspend() { this.calls.push('suspend'); this.state = 'suspended'; return Promise.resolve() }
+  close() { this.calls.push('close'); this.state = 'closed'; return Promise.resolve() }
+  decodeAudioData(bytes, done) { const length = 30 * 48000; done({ numberOfChannels: 2, sampleRate: 48000, length, getChannelData: () => new Float32Array(length) }) }
+}
+class FakeNode { constructor() { this.port = { postMessage: (message) => port.push(message), onmessage: null } } connect() {} disconnect() {} }
+const windowsAsked = []
+const settle = async () => { for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve)) }
+
+//? a player whose toggle plays and pauses, as the engine's does, and that hears its own position
+function livePlayer() {
+  const player = {
+    track: { id: 'time', title: 'Time', coverArt: 'cover-dsotm', albumId: 'dsotm', suffix: 'flac' },
+    playing: true, duration: LENGTH, at: 151, seeks: [], toggles: [], listeners: new Set(),
+    seek(t) { this.seeks.push(Math.round(t * 1000) / 1000); this.at = t },
+    toggle() { this.playing = !this.playing; this.toggles.push(this.playing ? 'play' : 'pause') },
+    position() { return this.at }, onPosition(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener) },
+    moveTo(seconds) { this.at = seconds; for (const listener of [...this.listeners]) listener(seconds) },
+  }
+  for (const name of ['seek', 'toggle', 'position', 'onPosition', 'moveTo']) player[name] = player[name].bind(player)
+  return player
+}
+
+async function liveChecks() {
+  console.log('\nwith the deck\'s sound running: the record is taken, the song paused, and let go it lands where the platter does')
+  define('AudioContext', FakeContext)
+  define('AudioWorkletNode', FakeNode)
+  URL.createObjectURL = () => 'blob:deck-voice'
+  define('fetch', async (url) => {
+    windowsAsked.push(String(url))
+    const at = Number(new URL(String(url), 'http://x').searchParams.get('at'))
+    return { ok: true, status: 200, headers: { get: (name) => (name === 'x-deadwax-window' ? `${Math.round(at * 44100)}/${30 * 44100}/44100` : null) }, arrayBuffer: async () => new ArrayBuffer(3_000_000) }
+  })
+  const platter = require(path.join(OUT, 'lib/platter.js'))
+  const player = livePlayer()
+  const previews = []
+  const view = mount(Turntable, 'live turntable')
+  let windDown = true
+  const draw = () => view.render({ player, open: true, discArt: null, onPreview: (next) => previews.push(next), windDown })
+  draw()
+  const record = () => view.find(byClass('app-tt-record'))[0]
+  const at = onRecord(0)
+
+  //? the first tap: still .11's world until it - and it makes the audio context, in the click
+  record().props.onClick()
+  await settle()
+  draw()
+  check('a tap plays or pauses in the click, and makes the deck\'s audio context there, running', [player.toggles, contexts.length, contexts[0]?.state], [['pause'], 1, 'running'])
+  record().props.onClick()
+  await settle()
+  draw()
+  check('...the next tap plays again; the context is made once', [player.toggles, contexts.length], [['pause', 'play'], 1])
+  await settle()
+  draw()
+  check('the window asked for round the song as it plays', windowsAsked.at(-1), '/deadwax/navidrome/scrub/time?at=146&seconds=40')
+
+  //? a drag past a tap: taken, paused
+  player.seeks.length = 0
+  player.toggles.length = 0
+  record().props.onPointerDown(pointer(at))
+  check('pressed: the song plays on for now - it may be a tap', player.toggles, [])
+  advance(10)
+  record().props.onPointerMove(pointer(onRecord(20)))
+  draw()
+  check('moved past a tap: the record taken, the song paused - the player\'s own toggle', player.toggles, ['pause'])
+  check('...the record\'s sound takes over where the song was, at its own speed', [port.filter((m) => m.type === 'take').at(-1)?.at, port.filter((m) => m.type === 'take').at(-1)?.rate], [151, 1])
+  //? a flick forward: a turn a second for its last 100 ms
+  for (let step = 1; step <= 10; step++) {
+    advance(10)
+    record().props.onPointerMove(pointer(onRecord(20 + step * 3.6)))
+  }
+  const taken = 151 + (36 / 360) * SECONDS_PER_TURN
+  const plan = platter.motor(taken, 1.8, LENGTH)
+  record().props.onPointerUp(pointer(onRecord(56)))
+  record().props.onLostPointerCapture(pointer(onRecord(56)))
+  draw()
+  check('let go: sought NOW to where the motor will have the platter back at speed - nothing played yet', [player.seeks.length, Math.abs(player.seeks[0] - plan.x) < 0.01, player.toggles], [1, true, ['pause']])
+  record().props.onClick()
+  check('...the click after it is no tap', player.toggles, ['pause'])
+  runFrames(3)
+  draw()
+  check('while it comes back to speed the time line says where it is, scrubbing', [previews.at(-1)?.how, previews.at(-1)?.scrubbing], ['deck', true])
+  advance(plan.duration * 1000 + 20)
+  draw()
+  check('at speed: the song plays - the player\'s own toggle, after the tap', player.toggles, ['pause', 'play'])
+  player.moveTo(plan.x + 0.05)
+  check('...and once it really plays, the record\'s sound fades out', port.filter((m) => m.type === 'fade').length, 1)
+
+  //? a press that rests: taken after HOLD_MS, and let go it spins back up
+  player.seeks.length = 0
+  player.toggles.length = 0
+  const rested = player.at
+  record().props.onPointerDown(pointer(at))
+  advance(300)
+  draw()
+  check('pressed and held still longer than a tap: taken, the song paused', player.toggles, ['pause'])
+  record().props.onPointerUp(pointer(at))
+  draw()
+  check('let go without a turn: sought to where the spin-up has it at speed, 0.2 s on', player.seeks,
+    [Math.round(platter.motor(rested, 0, LENGTH).x * 1000) / 1000])
+  check('...which is 0.2 s on from where it was taken', Math.round((player.seeks[0] - rested) * 1000) / 1000, 0.2)
+  record().props.onClick()
+  check('...its click no tap', player.toggles, ['pause'])
+  advance(platter.SPIN_UP_S * 1000 + 20)
+  draw()
+  check('...and played at speed, 0.4 s later', player.toggles, ['pause', 'play'])
+
+  //? a cancel: nothing sought, the song plays on
+  player.seeks.length = 0
+  player.toggles.length = 0
+  record().props.onPointerDown(pointer(at))
+  advance(10)
+  record().props.onPointerMove(pointer(onRecord(30)))
+  record().props.onPointerCancel(pointer(onRecord(30)))
+  draw()
+  check('taken, then the system takes the touch: nothing sought, and the song it paused plays on', [player.seeks, player.toggles], [[], ['pause', 'play']])
+
+  //? a tap pauses - and winds down, sought to where it stops; the setting off: a plain pause. The
+  //? platter back at its own speed first (the cancel above set it spinning up again)
+  advance(600)
+  runFrames(2)
+  draw()
+  player.seeks.length = 0
+  player.toggles.length = 0
+  player.at = 152
+  record().props.onPointerDown(pointer(at))
+  record().props.onPointerUp(pointer(at))
+  record().props.onClick()
+  draw()
+  const winding = platter.coast(152, 1, LENGTH)
+  check('a tap pauses in the click, and the song is sought to where the record winds down to', [player.toggles, player.seeks], [['pause'], [Math.round(winding.x * 1000) / 1000]])
+  check('...the record\'s sound starting there, at its own speed', [port.filter((m) => m.type === 'take').at(-1)?.at, port.filter((m) => m.type === 'take').at(-1)?.rate], [152, 1])
+  //? a play tapped 0.1 s into the wind-down: from where the record has got to - what was heard - not
+  //? from where the wind-down was sought to end
+  advance(100)
+  player.seeks.length = 0
+  record().props.onPointerDown(pointer(at))
+  record().props.onPointerUp(pointer(at))
+  record().props.onClick()
+  draw()
+  check('a play mid wind-down: sought first to where the record is, then played - in the click',
+    [player.seeks, player.toggles], [[Math.round(platter.planAt(winding, 0.1).x * 1000) / 1000], ['pause', 'play']])
+  //? the switch: with it ON the same tap on a platter back at speed winds down (the control), OFF it doesn't
+  const backAtSpeed = () => {
+    advance(600)
+    runFrames(2)
+    draw()
+  }
+  backAtSpeed()
+  player.seeks.length = 0
+  player.at = 160
+  record().props.onPointerDown(pointer(at))
+  record().props.onPointerUp(pointer(at))
+  record().props.onClick()
+  draw()
+  check('"Pause winds the record down" on, the platter at speed: the tap\'s pause sought to where the wind-down stops',
+    [player.toggles.at(-1), player.seeks], ['pause', [Math.round(platter.coast(160, 1, LENGTH).x * 1000) / 1000]])
+  record().props.onPointerDown(pointer(at))
+  record().props.onPointerUp(pointer(at))
+  record().props.onClick()
+  backAtSpeed()
+  windDown = false
+  draw()
+  player.seeks.length = 0
+  player.at = 160
+  record().props.onPointerDown(pointer(at))
+  record().props.onPointerUp(pointer(at))
+  record().props.onClick()
+  draw()
+  check('...off, the same tap: a plain pause, nothing sought', [player.toggles.at(-1), player.seeks], ['pause', []])
+  windDown = true
+  record().props.onClick()
+  draw()
+
+  //? the arm: the record's sound stops, and the arm and the time line follow the finger, not the coast
+  backAtSpeed()
+  const stops = port.filter((m) => m.type === 'stop').length
+  record().props.onPointerDown(pointer(at))
+  advance(10)
+  record().props.onPointerMove(pointer(onRecord(40)))
+  record().props.onPointerUp(pointer(onRecord(40)))
+  runFrames(3)
+  draw()
+  check('a flick: coming back to speed, the deck shows where it is', previews.at(-1)?.how, 'deck')
+  const handle = () => view.find(byClass('app-tt-handle'))[0]
+  handle().props.onPointerDown(pointer(tt.needleAt(player.at, LENGTH)))
+  draw()
+  check('the arm taken while the record coasts: the record\'s sound stops', port.filter((m) => m.type === 'stop').length > stops, true)
+  check('...and the time line says Needle up, over the song, no longer the coast', previews.at(-1), { how: 'arm', time: null })
+  const toEnd = reachAt(tt.armAngle(LENGTH, LENGTH) + 10)
+  handle().props.onPointerMove(pointer(toEnd))
+  runFrames(3)
+  draw()
+  check('...dragged while the record is still coming back to speed: the arm, its value and the time line follow the finger',
+    [previews.at(-1)?.how, near(previews.at(-1)?.time ?? 0, LENGTH), handle().props['aria-valuenow'],
+      view.find(byClass('app-tt-arm'))[0].props.transform], ['arm', true, LENGTH, `rotate(${+tt.armAngle(LENGTH, LENGTH).toFixed(3)} ${ARM.x} ${ARM.y})`])
+  player.seeks.length = 0
+  handle().props.onPointerUp(pointer(toEnd))
+  check('...let go: sought where the arm was shown', player.seeks, [LENGTH])
+  advance(3000)
+  draw()
+
+  //? a hi-res song under "Up to 48 kHz": its window asked at the cap the song is played at, so it is cut
+  //? from the very copy the phone plays (its rate, its level)
+  player.track = { id: 'hires', title: 'Shine On', coverArt: 'cover-wywh', albumId: 'wywh', suffix: 'flac', sampleRate: 192000, bitDepth: 24 }
+  player.maxRate = '48000'
+  draw()
+  await settle()
+  check('a hi-res song played resampled: the turntable asks for its window at the same cap', /\/scrub\/hires\?.*&max_rate=48000$/.test(windowsAsked.at(-1)), true)
+  player.maxRate = 'original'
+  player.track = { ...player.track, id: 'hires-as-is' }
+  draw()
+  await settle()
+  check('...played as it is ("Original"): asked as it is', /\/scrub\/hires-as-is\?at=\d+&seconds=40$/.test(windowsAsked.at(-1)), true)
+
+  view.unmount()
+  check('gone: the audio context closed', contexts[0].calls.at(-1), 'close')
 }
 
 /* ===== Now Playing's two looks ===== */
@@ -716,7 +1023,46 @@ console.log('\nNow Playing opens as the setting says; the button switches it whi
   check('...and the button still switches it', looks(), ['Show as a turntable', false, true, false])
   const nowPlaying = fs.readFileSync(path.join(UI, 'src/player/NowPlaying.tsx'), 'utf8')
   check('the button leaves the setting alone: Now Playing has no way to change it', /onOpensAs|writePlayerOpensAs|setOpensAs/.test(nowPlaying), false)
+
+  //? the turntable's pause from the transport winds down as the record's tap does (2.0.0-player.14);
+  //? the cover's is always the plain toggle
+  const transport = () => view.find(byClass('pl-transport-button'))[1]
+  draw(false)
+  draw(true, 'cover')
+  draw(true, 'cover')
+  const seeksBefore = player.seeks.length
+  const togglesBefore = player.toggles
+  transport().props.onClick()
+  check('on the cover, the transport\'s pause is the plain toggle, nothing sought', [player.toggles - togglesBefore, player.seeks.length - seeksBefore], [1, 0])
+  view.render({ player, open: true, covered: false, opener: { current: null }, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'turntable', windDown: false })
+  view.render({ player, open: true, covered: false, opener: { current: null }, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'turntable', windDown: false })
+  button().props.onClick()
+  view.render({ player, open: true, covered: false, opener: { current: null }, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'turntable', windDown: false })
+  check('the turntable is handed You\'s "Pause winds the record down", and a place to put its deck', [turntable()?.props.windDown, typeof turntable()?.props.deck], [false, 'object'])
+  //? the deck as the turntable hands it: its pause says where the wind-down stops
+  turntable().props.deck.current = { pausing: () => 200.3 }
+  transport().props.onClick()
+  check('on the turntable, the transport\'s pause asks the deck, pauses in the tap, and seeks where the wind-down stops',
+    [player.toggles - togglesBefore, player.seeks.slice(seeksBefore)], [2, [200.3]])
+  turntable().props.deck.current = { pausing: () => null }
+  transport().props.onClick()
+  check('...a plain pause when the deck says so: nothing sought', [player.toggles - togglesBefore, player.seeks.slice(seeksBefore)], [3, [200.3]])
+  //? and its play while the record coasts or winds down: from where the record is, sought in the tap first
+  player.playing = false
+  turntable().props.deck.current = { resuming: () => 199.9 }
+  transport().props.onClick()
+  check('on the turntable, the transport\'s play mid wind-down: sought to where the record is, then played',
+    [player.toggles - togglesBefore, player.seeks.slice(seeksBefore)], [4, [200.3, 199.9]])
+  turntable().props.deck.current = { resuming: () => null }
+  transport().props.onClick()
+  check('...nothing sought when the deck says so', [player.toggles - togglesBefore, player.seeks.slice(seeksBefore)], [5, [200.3, 199.9]])
+  player.playing = true
 }
 
-console.log(failures ? `\n${failures} FAILED` : '\nall passed')
-process.exit(failures ? 1 : 0)
+liveChecks().then(() => {
+  console.log(failures ? `\n${failures} FAILED` : '\nall passed')
+  process.exit(failures ? 1 : 0)
+}, (error) => {
+  console.error(error)
+  process.exit(1)
+})

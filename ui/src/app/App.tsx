@@ -13,8 +13,9 @@ import { navidromeStatus, playedAlbum, sentFormat, type Album, type NavidromeSta
 import { Library } from '../player/Library'
 import { MiniPlayer } from '../player/MiniPlayer'
 import { NowPlaying } from '../player/NowPlaying'
+import { deckReport, onDeckReport, resumeDeckAudio } from '../player/deck'
 import { usePlayer, type Player } from '../player/usePlayer'
-import { readPlayerOpensAs, writePlayerOpensAs } from '../state/persisted'
+import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerWindDown } from '../state/persisted'
 import { ActionMenu } from './ActionMenu'
 import { ActionsContext, PlayerContext, pickActions } from './context'
 import { Home } from './Home'
@@ -139,6 +140,16 @@ export function App() {
     writePlayerOpensAs(look)
     setOpensAs(look)
   }, [])
+  //? "Pause winds the record down", kept on this device - the turntable's pause (2.0.0-player.14)
+  const [windDown, setWindDown] = useState<boolean>(readPlayerWindDown)
+  const chooseWindDown = useCallback((on: boolean) => {
+    writePlayerWindDown(on)
+    setWindDown(on)
+  }, [])
+  //? the turntable's sound, for Info > Debug: told when it changes - a window in, a context started -
+  //? never a frame at a time
+  const [turntableSound, setTurntableSound] = useState(deckReport)
+  useEffect(() => onDeckReport(setTurntableSound), [])
 
   const checkNavidrome = useCallback(() => {
     setStatus(null)
@@ -265,6 +276,9 @@ export function App() {
   const openSheet = useCallback((event: MouseEvent) => {
     sheetOpener.current = takeOpener(event)
     setSheetOpen(true)
+    //? the mini player's tap is a gesture: a turntable left showing gets its sound back from it
+    //? (never made here - resumed, when there is one)
+    resumeDeckAudio()
   }, [])
   const closeSheet = useCallback(() => {
     setOver('none')
@@ -335,9 +349,9 @@ export function App() {
         </NeedsNavidrome>
       ),
       search: <Search shown={searchSeen} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} />,
-      you: <You shown={youSeen} opensAs={opensAs} onOpensAs={chooseOpensAs} />,
+      you: <You shown={youSeen} opensAs={opensAs} onOpensAs={chooseOpensAs} windDown={windDown} onWindDown={chooseWindDown} />,
     }),
-    [status, youSeen, searchSeen, opensAs],
+    [status, youSeen, searchSeen, opensAs, windDown],
   )
   const roots: Record<Tab, JSX.Element> = { ...others, home, requests }
 
@@ -414,6 +428,7 @@ export function App() {
             onMore={openMenu}
             onAlbum={toAlbum ?? closeSheet}
             openAs={opensAs}
+            windDown={windDown}
           />
           {/* over Now Playing: its menu, then Info - the menu first, so where one closes as the
               other opens, focus ends in the one that opened */}
@@ -432,6 +447,7 @@ export function App() {
             player={player}
             album={playing ? playedAlbum(playing.albumId) : null}
             sentFormat={sentFormat}
+            turntable={turntableSound}
           />
         </div>
       </ActionsContext.Provider>
