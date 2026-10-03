@@ -1056,10 +1056,19 @@ async def _disc_art_answer(entry: Path) -> Response:
 
 @router.get("/disc_art")
 async def disc_art(album: str, file: str):
-    """One CD art image beside an album's tracks - only names the scan counts as disc art."""
+    """
+    One CD art image beside an album's tracks - only names the scan counts as disc art.
+
+    The listing's `is_file()` follows a symlink, so a `disc.jpg` that is a link out of the folder
+    would pass on its name and serve whatever it points at. The file itself must resolve inside
+    its folder, and one that doesn't is the same 404 as a file that isn't there.
+    """
     directory = _album_dir_or_404(album, "disc art")
     entry = _listed(directory, file)
     if entry is None or entry.name not in find_disc_art([entry]):
+        raise HTTPException(status_code=404, detail="no such image")
+    if not is_within(entry, directory):
+        logger.warning(f"refused disc art resolving outside its album: {album!r} / {file!r}")
         raise HTTPException(status_code=404, detail="no such image")
 
     return await _disc_art_answer(entry)
