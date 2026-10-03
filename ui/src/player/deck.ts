@@ -7,18 +7,24 @@
  * THE SOUND IS A SEPARATE PATH. The player's audio element is never connected to Web Audio, and never
  * touched here: a createMediaElementSource is what breaks locked playback on an iPhone, and normal
  * playback must stay exactly what it was. The record's sound is a stretch of the song round the
- * playhead - a FLAC window deadwax cuts (src/flac_window.py), decoded by decodeAudioData - read by an
- * AudioWorklet (lib/deckVoice.ts) on an AudioContext of its own, only for the moments the record is not
- * playing at its own speed: under the hand, coasting after a flick, winding down on a pause. The
+ * playhead - a FLAC window deadwax cuts (src/flac_window.py), decoded by decodeAudioData - read by
+ * lib/deckVoice.ts's voice on an AudioContext of its own, only for the moments the record is not playing
+ * at its own speed: under the hand, coasting after a flick, winding down on a pause. The voice runs in
+ * an AudioWorklet where the page can have one, and on the main thread in a ScriptProcessorNode where it
+ * can't (a page that isn't on HTTPS - `Voice`, 2.0.0-player.16). The
  * player's own song is moved only through the player's own actions - the host's `hold` and `resume`
  * (which Turntable makes player.toggle() calls of) and the seeks Turntable makes of what this returns.
  *
  * THE AUDIO CONTEXT is made or resumed only in an activating gesture - a click, a pointerup, a keyup:
  * the record's tap and release, the look button, the transport buttons, opening the screen
  * (wakeDeckAudio(), resumeDeckAudio()) - never a pointerdown, which WebKit doesn't count. Until it runs,
- * a press scrubs silently as 2.0.0-player.11's did (`live()` false: Turntable takes that path, and the
- * record stops under the finger - `holdStill`). It is suspended when the screen closes or the page is
- * hidden - nothing of it runs on a locked phone - and closed when the turntable goes.
+ * a voice is ready and a window covering the record is in it, a press scrubs silently as
+ * 2.0.0-player.11's did (`live()` false: Turntable takes that path, and the record stops under the
+ * finger - `holdStill`) - all but a press on a record the deck has coasting, which it catches whenever a
+ * voice is ready, the song paused by the flick already. It is suspended when the screen closes or the
+ * page is hidden - nothing of it runs on a locked phone, a hide while a tap's resume is still settling
+ * included - and closed when the turntable goes. While it lives the page's audio session
+ * is 'playback' (iOS's silent switch would mute it otherwise), put back as the turntable goes.
  *
  * WHAT THE HAND DOES (live):
  *  - A press on a playing record lets the song play on for a moment: a tap is a tap (play/pause, from
@@ -57,7 +63,7 @@
  * THE WINDOW is kept ready while the turntable shows and the song plays - once a tap has started the
  * sound, so there is something to decode it with and play it on: WINDOW_S of it, from a little before
  * the playhead, asked again as the playhead nears its end, and on demand when a hand or a coast goes
- * outside it. One is on its way at a time, from the ask until it is in the worklet (`pending`), so
+ * outside it. One is on its way at a time, from the ask until it is in the voice (`pending`), so
  * nothing asks for it again meanwhile. A hi-res song's windows come back shorter (deadwax's budget), and
  * the margins shrink with them (windowMargins), so each still moves on by most of its length. Its cost
  * - bytes fetched since the turntable showed - is in Info > Debug.
@@ -65,7 +71,8 @@
 
 import { isAbort, latestOnly } from '../lib/latest'
 import {
-  REPORTS_PER_SECOND, VOICE_PROCESSOR, voiceWorkletSource, type DeckReport, type VoiceHeard, type VoiceMessage,
+  REPORTS_PER_SECOND, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
+  type DeckReport, type VoiceHeard, type VoiceMessage,
 } from '../lib/deckVoice'
 import {
   DEGREES_PER_SECOND, VELOCITY_WINDOW_MS, acceleration, coast, degreesFor, handSpeed, motor, phaseAt, planAt, voiceRate,
@@ -111,7 +118,7 @@ export const PAUSE_SETTLE_MS = 300
  *  (a tap in Search, its own play already under way) is never toggled back off: the player's playing
  *  state follows its element's 'play' a moment after the play itself. */
 export const SONG_CHANGE_SETTLE_MS = 300
-/** What the worklet last said is believed for this long, in ms, extrapolated by its rate. */
+/** What the voice last said is believed for this long, in ms, extrapolated by its rate. */
 export const HEARD_FRESH_MS = 120
 /** The song found this far from where the deck had it sought, in seconds, was sought there by
  *  something else - Previous restarting it, a key on the arm - and the record's sound has nothing to
@@ -136,7 +143,8 @@ export interface DeckSong {
 /**
  * What the deck asks of the turntable. `hold` and `resume` are the player's toggle, made in
  * Turntable.tsx (ui/test/app-rules.sim.cjs pins which of its functions call it): pause the song as the
- * hand takes the record, play it as the motor has it back at speed.
+ * hand takes the record, play it as the motor has it back at speed - or as a press the deck can't take
+ * catches that run back to speed (holdStill).
  */
 export interface DeckHost {
   song(): DeckSong | null
@@ -208,22 +216,61 @@ interface Press {
 
 /* ===== the audio context, one for the page, made only in a gesture ===== */
 
-interface DeckAudio {
-  context: AudioContext | null
-  node: AudioWorkletNode | null
-  loading: boolean
-  problem: string | null
-  missing: 'unsupported' | 'no-worklet' | null
+/**
+ * What plays the record's sound (2.0.0-player.16) - lib/deckVoice.ts's functions, on one of two hosts:
+ * an AudioWorklet, on an audio thread of its own, wherever the page can have one; or a
+ * ScriptProcessorNode on the page's main thread where it can't. AudioWorklet is a SecureContext API -
+ * a browser gives it only to a page on HTTPS or localhost - and deadwax is often opened at a plain
+ * http:// address on a home network (James's iPhone and Mac: "the audio doesn't follow the turntable
+ * when scrubbing"). ScriptProcessorNode is deprecated but in every current browser, iOS Safari too, and
+ * needs no secure page. `ready` once it can sound: the worklet as its node is made, the script voice
+ * once it has played its first block - a browser that never calls it stays not ready, and a press stays
+ * 2.0.0-player.11's rather than pausing the song over silence.
+ */
+interface Voice {
+  kind: 'worklet' | 'script'
+  ready: boolean
+  post(message: VoiceMessage, transfer: Transferable[]): void
+  disconnect(): void
 }
 
-const audio: DeckAudio = { context: null, node: null, loading: false, problem: null, missing: null }
+interface DeckAudio {
+  context: AudioContext | null
+  voice: Voice | null
+  loading: boolean
+  problem: string | null
+  missing: 'unsupported' | 'no-voice' | null
+  /** why the script voice plays it, not the worklet - for Debug */
+  why: string | null
+}
+
+const audio: DeckAudio = { context: null, voice: null, loading: false, problem: null, missing: null, why: null }
 let moduleUrl: string | null = null
 const audioListeners = new Set<() => void>()
 let heardListener: ((heard: VoiceHeard) => void) | null = null
+//? the page's audio session kind before the deck set it to 'playback', while the deck lives; null when
+//? the deck hasn't set it
+let sessionBefore: string | null = null
+//? the turntable was hidden while its context was still starting or resuming (a tap's, and the page
+//? hidden before it settled): suspended as soon as it runs, since nothing else would - a gesture asking
+//? for the sound, or the turntable showing again, lets that go (review of 2.0.0-player.16)
+let sleepOnceRunning = false
+
+/** The main-thread voice's block, in samples: about 21 ms at 48 kHz (unmeasured on a phone). */
+export const SCRIPT_BUFFER = 1024
+/** How many of its blocks after it is said the main-thread voice hears a take or a drive: a message
+ *  waits up to one block for the next to be asked for, which plays a block after it is asked - 43 ms
+ *  at 48 kHz, a constant lag on the record's sound and nothing more (startScript). */
+export const SCRIPT_LAG_BLOCKS = 2
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 function audioChanged(): void {
+  const context = audio.context
+  if (sleepOnceRunning && context?.state === 'running') {
+    sleepOnceRunning = false
+    context.suspend().then(audioChanged, audioChanged)
+  }
   for (const listener of [...audioListeners]) listener()
 }
 
@@ -232,33 +279,127 @@ function contextClass(): (new (options?: AudioContextOptions) => AudioContext) |
   return scope.AudioContext ?? scope.webkitAudioContext ?? null
 }
 
-function startWorklet(context: AudioContext): void {
+/** The voice for a new context: the worklet where there is one - and the script voice where there
+ *  isn't (a page that isn't on HTTPS), or where it couldn't be made or wouldn't load. */
+function startVoice(context: AudioContext): void {
   if (!context.audioWorklet || typeof AudioWorkletNode === 'undefined') {
-    audio.missing = 'no-worklet'
+    const insecure = (globalThis as { isSecureContext?: boolean }).isSecureContext === false
+    startScript(context, insecure ? "this page isn't on HTTPS, so the browser has no AudioWorklet" : 'this browser has no AudioWorklet')
     return
   }
   try {
     moduleUrl ??= URL.createObjectURL(new Blob([voiceWorkletSource()], { type: 'text/javascript' }))
   } catch (error) {
-    audio.problem = `the sound's worklet couldn't be made - ${message(error)}`
+    startScript(context, `the AudioWorklet couldn't be made (${message(error)})`)
     return
   }
   audio.loading = true
-  context.audioWorklet.addModule(moduleUrl).then(
-    () => {
-      if (audio.context !== context) return
-      const node = new AudioWorkletNode(context, VOICE_PROCESSOR, { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] })
-      node.port.onmessage = (event: MessageEvent) => heardListener?.(event.data as VoiceHeard)
-      node.connect(context.destination)
-      audio.node = node
-    },
-    (error: unknown) => {
-      if (audio.context === context) audio.problem = `the sound's worklet wouldn't load - ${message(error)}`
-    },
-  ).finally(() => {
+  context.audioWorklet.addModule(moduleUrl).then(() => {
+    if (audio.context !== context) return
+    const node = new AudioWorkletNode(context, VOICE_PROCESSOR, { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] })
+    node.port.onmessage = (event: MessageEvent) => heardListener?.(event.data as VoiceHeard)
+    node.connect(context.destination)
+    audio.voice = { kind: 'worklet', ready: true, post: (said, transfer) => node.port.postMessage(said, transfer), disconnect: () => node.disconnect() }
+  }).catch((error: unknown) => {
+    if (audio.context === context && !audio.voice) startScript(context, `the AudioWorklet wouldn't load (${message(error)})`)
+  }).finally(() => {
     if (audio.context === context) audio.loading = false
     audioChanged()
   })
+}
+
+/**
+ * The script voice: a ScriptProcessorNode (no inputs, two output channels, SCRIPT_BUFFER a block) on
+ * the page's main thread, running THE SAME functions the worklet runs - lib/deckVoice.ts's
+ * newVoiceState, voiceCommand, renderVoice and voiceReport, never a copy of them. Each block is
+ * rendered as of the context time it will play at (its `playbackTime`, a block ahead of `currentTime`
+ * as the browser asks for it), and the messages that came since the last are applied to its state just
+ * before, as of that same time - as the worklet applies each on the audio clock as it comes. And what
+ * each says is heard SCRIPT_LAG_BLOCKS blocks after it was said - the most a message waits for the
+ * block it is first heard in - so a take and the drives after it keep the same spacing they had as they
+ * were said, and the voice plays exactly what the worklet would, that much later. Applied as they came,
+ * as of `currentTime`, a take started a block or two behind where the record was by the time it was
+ * heard, and raced to catch it up (review of 2.0.0-player.16: up to 1.8 times the speed, for 20-80 ms,
+ * on every grab and every wind-down); placed where the record had got to instead, a grab's still hand
+ * then pulled it back as far. Only what changes the voice is held: a drive replaces the drive before
+ * it, and a window every window before it. It says where it is as often as the worklet does. Ready once
+ * it has played its first block.
+ */
+function startScript(context: AudioContext, why: string): void {
+  if (typeof context.createScriptProcessor !== 'function') {
+    audio.missing = 'no-voice'
+    return
+  }
+  try {
+    const node = context.createScriptProcessor(SCRIPT_BUFFER, 0, 2)
+    const state = newVoiceState()
+    const held: VoiceMessage[] = []
+    const lag = (SCRIPT_LAG_BLOCKS * SCRIPT_BUFFER) / context.sampleRate
+    const voice: Voice = {
+      kind: 'script',
+      ready: false,
+      post: (message) => {
+        const said = message.type === 'take' || message.type === 'drive' ? { ...message, time: message.time + lag, until: message.until + lag } : message
+        //? a drive sets every field the one before it set; a window sets nothing but the window
+        if (said.type === 'drive' && held[held.length - 1]?.type === 'drive') held.pop()
+        if (said.type === 'window') for (let i = held.length - 1; i >= 0; i--) if (held[i]!.type === 'window') held.splice(i, 1)
+        held.push(said)
+      },
+      disconnect: () => {
+        node.onaudioprocess = null
+        held.length = 0
+        node.disconnect()
+      },
+    }
+    node.onaudioprocess = (event: AudioProcessingEvent) => {
+      const out = event.outputBuffer
+      const channels: Float32Array[] = []
+      for (let channel = 0; channel < out.numberOfChannels; channel++) channels.push(out.getChannelData(channel))
+      const at = Number.isFinite(event.playbackTime) ? event.playbackTime : context.currentTime
+      for (const said of held.splice(0)) voiceCommand(state, said, at, context.sampleRate)
+      renderVoice(state, channels, out.length, context.sampleRate, at)
+      const heard = voiceReport(state, out.length, context.sampleRate, at, REPORTS_PER_SECOND)
+      if (heard) heardListener?.(heard)
+      if (!voice.ready && audio.voice === voice) {
+        voice.ready = true
+        audioChanged()
+      }
+    }
+    node.connect(context.destination)
+    audio.voice = voice
+    audio.why = why
+  } catch (error) {
+    audio.problem = `the sound's ScriptProcessorNode couldn't be made - ${message(error)}`
+  }
+}
+
+/** The page's audio session made 'playback' (Safari 16.4+'s navigator.audioSession; nothing where it
+ *  is absent) as the deck wakes, in the gesture: while the record's sound plays the song's element is
+ *  paused, and WebKit then gives Web Audio the 'ambient' kind, which an iPhone's silent switch mutes. */
+function holdAudioSession(): void {
+  try {
+    const session = (globalThis as { navigator?: { audioSession?: { type: string } } }).navigator?.audioSession
+    if (!session || sessionBefore !== null) return
+    const before = session.type
+    session.type = 'playback'
+    //? only a kind the deck really changed is put back
+    sessionBefore = before
+  } catch {
+    //? a session that won't be set: the sound is as it would have been
+  }
+}
+
+/** ...and put back as it was when the turntable goes. */
+function releaseAudioSession(): void {
+  const before = sessionBefore
+  sessionBefore = null
+  if (before === null) return
+  try {
+    const session = (globalThis as { navigator?: { audioSession?: { type: string } } }).navigator?.audioSession
+    if (session) session.type = before
+  } catch {
+    //? nothing more to put back
+  }
 }
 
 /**
@@ -275,12 +416,14 @@ export function wakeDeckAudio(): void {
         audioChanged()
         return
       }
+      holdAudioSession()
       const context = new Context({ latencyHint: 'interactive' })
       audio.context = context
       audio.problem = null
       audio.missing = null
+      audio.why = null
       context.addEventListener?.('statechange', audioChanged)
-      startWorklet(context)
+      startVoice(context)
       audioChanged()
     }
     resumeDeckAudio()
@@ -294,6 +437,9 @@ export function wakeDeckAudio(): void {
  *  (App calls it as the mini player's tap opens the screen). Never makes one. */
 export function resumeDeckAudio(): void {
   const context = audio.context
+  //? a gesture asking for the sound: a hide before it no longer counts (the mini player's tap resumes
+  //? it a moment before the turntable shows)
+  sleepOnceRunning = false
   if (!context || context.state === 'running' || context.state === 'closed') return
   context.resume().then(audioChanged, (error: unknown) => {
     audio.problem = `the sound couldn't start - ${message(error)}`
@@ -301,25 +447,40 @@ export function resumeDeckAudio(): void {
   })
 }
 
+/** Suspended - or, starting or resuming still, suspended as soon as it runs. */
 function sleepDeckAudio(): void {
   const context = audio.context
-  if (context && context.state === 'running') context.suspend().then(audioChanged, audioChanged)
+  if (!context || context.state === 'closed') return
+  if (context.state === 'running') context.suspend().then(audioChanged, audioChanged)
+  else sleepOnceRunning = true
 }
 
 function closeDeckAudio(): void {
   const context = audio.context
-  audio.node?.disconnect()
+  try {
+    audio.voice?.disconnect()
+  } catch {
+    //? a node going with its context: nothing to stop
+  }
   audio.context = null
-  audio.node = null
+  audio.voice = null
   audio.loading = false
   audio.problem = null
+  audio.why = null
+  sleepOnceRunning = false
   if (context && context.state !== 'closed') context.close().catch(() => undefined)
+  releaseAudioSession()
   audioChanged()
 }
 
-/** Whether the audio context runs: what makes a press the deck's rather than 2.0.0-player.11's. */
+/** Whether the audio context runs. */
 export function deckAudioRunning(): boolean {
   return audio.context?.state === 'running'
+}
+
+/** Whether the record's sound can play: the context runs and a voice - worklet or script - is ready. */
+function voiceReady(): boolean {
+  return deckAudioRunning() && !!audio.voice?.ready
 }
 
 /* ===== what Info > Debug reads ===== */
@@ -387,7 +548,7 @@ export class Deck {
 
   //? the record's sound
   private window: { song: string; start: number; end: number; bytes: number; decodedAt: number } | null = null
-  //? the one window on its way, from the ask until it is in the worklet - fetched ('fetch'), or its
+  //? the one window on its way, from the ask until it is in the voice - fetched ('fetch'), or its
   //? bytes in hand, being decoded or waiting to be ('held') - and the stretch of the song it covers
   private pending: { song: string; from: number; to: number; stage: 'fetch' | 'held' } | null = null
   private fetchedWindow: { song: string; bytes: ArrayBuffer; first: number; rate: number } | null = null
@@ -399,6 +560,10 @@ export class Deck {
   private span: { song: string; seconds: number } | null = null
   private refreshedAt = -Infinity
   private refused: { song: string; why: string } | null = null
+  //? the song a press the deck didn't take wanted the window for, before there was a voice to put it in:
+  //? asked for once there is (review of 2.0.0-player.16: the release lets go of the press first, and the
+  //? ask was lost - two silent turns of a paused record, not one)
+  private wanted: string | null = null
   private failed: { song: string; why: string; until: number } | null = null
   private fetched = 0
   private since = now()
@@ -450,9 +615,24 @@ export class Deck {
 
   /* ----- what Turntable tells it ----- */
 
-  /** Whether the press it is about to start is the deck's: the audio context runs. */
+  /**
+   * Whether the press it is about to start is the deck's: the record can SOUND where it is - the audio
+   * context runs, a voice (worklet or script) is ready, and a window of this song covering that point
+   * is in it (2.0.0-player.16). Anything less - no voice, no window yet, a refused one, an MP3 - and
+   * the press is 2.0.0-player.11's: the song plays on under the finger and is sought where it lets go.
+   * Until then (.14) it was only "the context runs", so on a page with no AudioWorklet a press took the
+   * record and paused the song with nothing to sound.
+   *
+   * Except a record the deck has coasting or coming back to speed, with a voice ready: the hand that
+   * flicked it paused the song already, so there is nothing for .11's path to play on - the press
+   * catches it where the platter is, as .14 did, silent until the window there arrives (handWindow
+   * sounds it then). Out of the window is where a backwards flick goes, the next window still on its
+   * way (review of 2.0.0-player.16: taken down .11's path, the coast ran on under the finger).
+   */
   live(): boolean {
-    return deckAudioRunning()
+    const motion = this.motion
+    if (motion.kind === 'plan' && (motion.role === 'coast' || motion.role === 'handover') && voiceReady()) return true
+    return this.sounding(this.recordAt())
   }
 
   /** Whether the record has been taken by the press under way (the song paused under it). */
@@ -471,6 +651,9 @@ export class Deck {
     if (showing === this.showing) return
     this.showing = showing
     if (showing) {
+      //? a hide's suspend still waiting on a resume no longer applies: it shows (and stays suspended
+      //? until a tap, if it was)
+      sleepOnceRunning = false
       this.since = now()
       this.fetched = 0
       this.lastFetchAt = 0
@@ -558,6 +741,7 @@ export class Deck {
     this.decodes.supersede()
     this.pending = null
     this.failed = null
+    this.wanted = null
     const angle = this.angleNow()
     this.angle = angle
     this.motion = this.host.playing() ? { kind: 'turning', since: now(), from: angle } : { kind: 'still' }
@@ -590,10 +774,18 @@ export class Deck {
   }
 
   /**
-   * A press the deck doesn't take - one begun before its sound runs (`live()` false), which Turntable
-   * handles as 2.0.0-player.11 did: the record stops under the finger, as .11's spin did, and turns on
-   * from where it was held once the finger lets go (`held` false). A spin-up or spin-down caught under
-   * it ends where it was held.
+   * A press the deck doesn't take - one begun before the record can sound where it is (`live()`
+   * false), which Turntable handles as 2.0.0-player.11 did: the record stops under the finger, as .11's
+   * spin did, and turns on from where it was held once the finger lets go (`held` false). A spin-up or
+   * spin-down caught under it ends where it was held - and so does whatever else the deck had it doing
+   * (review of 2.0.0-player.16: left running, its timer moved the face a long way at the release, and a
+   * window landing under the still finger sounded it): a wind-down without its sound (an MP3, the
+   * setting off) stops there, the song where it paused; a coast or a run back to speed it couldn't
+   * catch (its context suspended by a hide since) goes quiet - nothing shown, nothing heard - and a run
+   * back to speed plays the song now, .11's song playing on under the finger, from where its release
+   * sought it. Pressed, the window where the record is is asked for - at once if a voice is ready to put
+   * it in, else as soon as one is (`wanted`) - since a paused song has none until it is pressed, so the
+   * next press there can be the deck's.
    */
   holdStill(held: boolean): void {
     if (held === this.stilled) return
@@ -601,6 +793,14 @@ export class Deck {
       this.angle = this.angleNow()
       this.stilled = true
       this.host.turnFace(this.angle)
+      const motion = this.motion
+      if (motion.kind === 'plan' && motion.role !== 'spin') {
+        clearTimeout(this.planTimer)
+        this.quieten(motion)
+        //? its end, now: still where it is held - or, a run back to speed, turning and the song played
+        this.planEnded(motion)
+      }
+      this.keep(this.recordAt())
       return
     }
     this.stilled = false
@@ -635,10 +835,8 @@ export class Deck {
       clearTimeout(this.planTimer)
       this.planTimer = undefined
       this.endHandover()
-      const { x, v } = planAt(motion.plan, (now() - motion.since) / 1000)
-      //? a wind-down that made no sound left the song where it paused, not where the platter got to -
-      //? and one something else sought (quiet) is where that put it
-      at = !motion.quiet && (motion.sounding || motion.role !== 'winddown') ? x : this.host.position()
+      const { v } = planAt(motion.plan, (now() - motion.since) / 1000)
+      at = this.recordAt()
       press.intent = motion.role === 'handover' ? 'play' : 'pause'
       if (!motion.sounding && this.sounding(at)) this.take(at, motion.quiet ? 0 : voiceRate(v))
     } else {
@@ -791,6 +989,18 @@ export class Deck {
   }
 
   /* ----- the platter ----- */
+
+  /** Where the record is in the song: where a coast or a run back to speed has the platter - a
+   *  wind-down too, when it sounds - or the song's own position. A wind-down that made no sound left
+   *  the song where it paused, not where the platter got to; and a plan something else sought (quiet)
+   *  is where that put it. */
+  private recordAt(): number {
+    const motion = this.motion
+    if (motion.kind === 'plan' && motion.role !== 'spin' && !motion.quiet && (motion.sounding || motion.role !== 'winddown')) {
+      return planAt(motion.plan, (now() - motion.since) / 1000).x
+    }
+    return this.host.position()
+  }
 
   /** Whether the song is meant to be playing when the deck lets go of it: the hand took it from
    *  playing, and hasn't given it back yet. */
@@ -958,7 +1168,7 @@ export class Deck {
 
   /* ----- the record's sound ----- */
 
-  /** What the worklet says it is playing, extrapolated by its rate - while it is sounding, and what it
+  /** What the voice says it is playing, extrapolated by its rate - while it is sounding, and what it
    *  said is fresh. */
   private heardNow(): number | null {
     const heard = this.heard
@@ -970,7 +1180,7 @@ export class Deck {
 
   private post(message: VoiceMessage, transfer: Transferable[] = []): void {
     try {
-      audio.node?.port.postMessage(message, transfer)
+      audio.voice?.post(message, transfer)
     } catch {
       //? a node going away mid-message: nothing to play it on anyway
     }
@@ -981,13 +1191,13 @@ export class Deck {
     this.post({ type: 'take', at, rate, time, until: time + DRIVE_FOR_S })
   }
 
-  /** Whether the record can sound at `at`: the context runs, the worklet is there, and its window
-   *  covers that point of this song. */
+  /** Whether the record can sound at `at`: the context runs, a voice is ready, and its window covers
+   *  that point of this song. */
   private sounding(at: number): boolean {
-    return deckAudioRunning() && !!audio.node && this.covers(at, 0)
+    return voiceReady() && this.covers(at, 0)
   }
 
-  /** Whether the window in the worklet covers `at` and `ahead` seconds after it, for this song. */
+  /** Whether the window in the voice covers `at` and `ahead` seconds after it, for this song. */
   private covers(at: number, ahead: number): boolean {
     const song = this.host.song()
     const window = this.window
@@ -1023,18 +1233,19 @@ export class Deck {
 
   /**
    * The window kept ready: while the turntable shows and the song plays - or a hand or a coast has
-   * the record - one covering `at` (the song's position by default) and, for the playing song,
-   * REFRESH_AHEAD_S after it (`span` seconds after it, for keepPath) is asked for when there isn't one
-   * - unless one is on its way that will (`pending`), this song has none (not a FLAC, refused,
-   * couldn't be decoded), there is nothing yet to decode it with and play it on (no audio context, or
-   * its worklet not there - still loading, missing or failed: onAudio asks once it is), or the last ask
-   * failed under RETRY_MS ago. A refresh ahead of a playhead the window still covers moves on from it,
+   * the record, or a press the deck didn't take holds it or wanted it (`wanted`) - one covering `at` (the song's position by
+   * default) and, for the playing song, REFRESH_AHEAD_S after it (`span` seconds after it, for
+   * keepPath) is asked for when there isn't one - unless one is on its way that will (`pending`), this
+   * song has none (not a FLAC, refused, couldn't be decoded), there is nothing yet to decode it with and
+   * play it on (no audio context, or no voice ready - the worklet still loading, the script voice yet
+   * to play its first block, or neither there: onAudio asks once one is), or the last ask failed under
+   * RETRY_MS ago. A refresh ahead of a playhead the window still covers moves on from it,
    * and comes no more often than REFRESH_MIN_MS.
    */
   private keep(at?: number, span?: number): void {
     const song = this.host.song()
     if (!this.showing || !song) return
-    const busy = !!this.press || (this.motion.kind === 'plan' && this.motion.role !== 'spin')
+    const busy = !!this.press || this.stilled || this.wanted === song.id || (this.motion.kind === 'plan' && this.motion.role !== 'spin')
     if (!this.host.playing() && !busy) return
     if (!song.flac) {
       if (this.refused?.song !== song.id) {
@@ -1044,7 +1255,13 @@ export class Deck {
       return
     }
     if (this.refused?.song === song.id) return
-    if (!audio.node || !audio.context || audio.context.state === 'closed') return
+    if (!audio.voice?.ready || !audio.context || audio.context.state === 'closed') {
+      //? a press the deck didn't take, with nothing yet to put its window in - the first turn of a paused
+      //? song before any tap: asked for as soon as there is (onAudio), whatever the record does meanwhile
+      if (this.stilled) this.wanted = song.id
+      return
+    }
+    this.wanted = null
     if (this.failed?.song === song.id && now() < this.failed.until) return
     const where = at ?? this.host.position()
     const { back, ahead } = windowMargins(this.span?.song === song.id ? this.span.seconds : WINDOW_S)
@@ -1100,7 +1317,7 @@ export class Deck {
   }
 
   /** A fetched window decoded - once there is an audio context to decode it with - and handed to the
-   *  worklet once there is one to hand it to. Only the newest decode counts. */
+   *  voice once one is ready to hand it to. Only the newest decode counts. */
   private decode(): void {
     const fetched = this.fetchedWindow
     const context = audio.context
@@ -1137,7 +1354,7 @@ export class Deck {
 
   private handWindow(): void {
     const decoded = this.decodedWindow
-    if (!decoded || !audio.node) return
+    if (!decoded || !audio.voice?.ready) return
     this.decodedWindow = null
     if (this.pending?.song === decoded.song) this.pending = null
     const length = decoded.channels[0]?.length ?? 0
@@ -1163,7 +1380,7 @@ export class Deck {
   }
 
   private readonly onAudio = () => {
-    //? a context made, resumed, suspended; the worklet ready: what was waiting goes on - and the
+    //? a context made, resumed, suspended; a voice ready: what was waiting goes on - and the
     //? window is asked for now, if none was for want of somewhere to put it
     this.decode()
     this.handWindow()
@@ -1182,11 +1399,13 @@ export class Deck {
     const song = this.host.song()
     const context = audio.context
     const state: DeckReport['context'] = audio.missing ?? (audio.problem ? 'failed'
-      : !context || context.state !== 'running' ? 'none' : audio.loading || !audio.node ? 'starting' : 'running')
+      : !context || context.state !== 'running' ? 'none' : audio.loading || !audio.voice?.ready ? 'starting' : 'running')
     const window = this.window && song && this.window.song === song.id ? this.window : null
     publish({
       context: state,
       problem: audio.problem,
+      voice: audio.voice?.kind ?? null,
+      voiceWhy: audio.voice?.kind === 'script' ? audio.why : null,
       window: window ? { start: window.start, end: window.end, kind: song?.kind || 'FLAC', decodedAt: window.decodedAt, bytes: window.bytes } : null,
       loading: !!this.pending,
       refused: this.refused && song && this.refused.song === song.id ? this.refused.why : null,
@@ -1197,5 +1416,5 @@ export class Deck {
   }
 }
 
-/** How often the worklet reports, for the docs and the sim. */
+/** How often the voice reports, for the docs and the sim. */
 export const HEARD_PER_SECOND = REPORTS_PER_SECOND

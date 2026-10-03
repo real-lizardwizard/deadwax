@@ -40,6 +40,8 @@
  *    Playing's transport and look button, the mini player's tap (App) - never a pointerdown. And none
  *    of it - deck.ts, lib/deckVoice.ts, Turntable.tsx - touches the player's own audio element: no
  *    createMediaElementSource, no element looked up, nothing set, loaded, played or paused on one.
+ *    Its main-thread voice (2.0.0-player.16: a ScriptProcessorNode, where the page has no AudioWorklet)
+ *    and the page's audio session it sets are made in the deck alone, as its context is.
  *  - The downloads are watched ONCE, in App (2.0.0-player.12): useDownloadJobs is called there and
  *    in no other file of the app, polling fast only while the Requests tab's root shows (watchingOf)
  *    or a failed look left something arriving (stallsOn), so the tab, Home's Arriving and the badge
@@ -464,6 +466,11 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
   ])
   const made = files.filter((file) => /\bnew\s+(?:Context|AudioContext|webkitAudioContext)\b/.test(code(read(file))))
   check('...and made in one place, the deck', made, ['player/deck.ts'])
+  //? 2.0.0-player.16: the main-thread voice (a page with no AudioWorklet) and the audio session it sets
+  //? while it lives are the deck's too - nothing else makes a node or touches the page's session
+  check('...as are its main-thread voice and the page\'s audio session (2.0.0-player.16)',
+    [files.filter((file) => /createScriptProcessor/.test(code(read(file)))), files.filter((file) => /\baudioSession\b/.test(code(read(file))))],
+    [['player/deck.ts'], ['player/deck.ts']])
   const deck = code(read('player/deck.ts'))
   const inDeck = [...deck.matchAll(/\n(export )?function (\w+)\([^)]*\)[^{]*\{[\s\S]*?\n\}/g)]
   const madeIn = inDeck.filter((fn) => /\bnew Context\(/.test(fn[0])).map((fn) => fn[2])

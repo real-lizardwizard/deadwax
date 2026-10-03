@@ -22,6 +22,10 @@
  *  - Gap: no change timed yet, a stream change, handovers with the earlier ones on their own
  *    line, and a failed change.
  *  - Last seek: none yet, interrupted, and judged at the song's end.
+ *  - Turntable sound (2.0.0-player.14): ready, or off and why, with the cost. Since 2.0.0-player.16
+ *    every way the record can't sound reads Off - starting, its window loading, none yet - since a
+ *    press then is 2.0.0-player.11's; and the note names the voice: its own audio thread, or the main
+ *    thread and why (the page not on HTTPS, the AudioWorklet refused).
  *  - "Navidrome sent": the names of the song's and the album's fields, sorted; those sent EMPTY
  *    ("", 0, [], {} - Navidrome always writes musicBrainzId and discTitles) named apart; the
  *    fields other songs of the album carry and this one doesn't (playCount and played are left
@@ -102,12 +106,13 @@ console.log('\nTurntable sound (2.0.0-player.14): ready, or off and why - how an
     table(rows.debugSections(input({ turntable: ready })))['Turntable sound'], ['Ready: 0:42-1:12, FLAC, decoded at 48 kHz', '3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in'])
   check('no turntable showing', [turntable(null).value, table(rows.debugSections(input()))['Turntable sound']],
     ["Off: the turntable isn't showing", "Off: the turntable isn't showing"])
-  check('no Web Audio, no AudioWorklet: said as such',
-    [turntable({ ...ready, context: 'unsupported', window: null }).value, turntable({ ...ready, context: 'no-worklet', window: null }).value],
-    ['Off: this browser has no Web Audio', 'Off: this browser has no AudioWorklet'])
+  check('no Web Audio, and nothing to play it on (neither an AudioWorklet nor a ScriptProcessorNode): said as such',
+    [turntable({ ...ready, context: 'unsupported', window: null }).value, turntable({ ...ready, context: 'no-voice', window: null }).value],
+    ['Off: this browser has no Web Audio', 'Off: this browser has neither an AudioWorklet nor a ScriptProcessorNode to play it'])
   check('the sound couldn\'t start: the browser\'s own words',
-    turntable({ ...ready, context: 'failed', problem: "the sound's worklet wouldn't load - SyntaxError: Unexpected token", window: null }).value,
-    "Off: the sound's worklet wouldn't load - SyntaxError: Unexpected token")
+    [turntable({ ...ready, context: 'failed', problem: "the sound couldn't start - NotAllowedError: not allowed", window: null }).value,
+      turntable({ ...ready, context: 'failed', problem: "the sound's ScriptProcessorNode couldn't be made - NotSupportedError: no", window: null }).value],
+    ["Off: the sound couldn't start - NotAllowedError: not allowed", "Off: the sound's ScriptProcessorNode couldn't be made - NotSupportedError: no"])
   check('not a FLAC, and a window this browser couldn\'t decode - its words - before anything else',
     [turntable({ ...ready, refused: "it isn't a FLAC file (it is MP3)" }).value,
       turntable({ ...ready, refused: "this browser couldn't decode its window - EncodingError: Decoding failed" }).value],
@@ -116,15 +121,40 @@ console.log('\nTurntable sound (2.0.0-player.14): ready, or off and why - how an
     [turntable({ ...ready, context: 'none', window: null, fetched: 0 }), turntable({ ...ready, context: 'none' }).note],
     [{ label: 'Turntable sound', value: 'Off: waiting for a tap to start the sound' },
       `Its window is ready: 0:42-1:12, FLAC, decoded at 48 kHz ${DOT} 3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in`])
-  check('starting: the worklet still on its way', turntable({ ...ready, context: 'starting' }).value, 'Starting: 0:42-1:12, FLAC, decoded at 48 kHz')
-  check('deadwax didn\'t send a window, loading, and none asked for yet',
+  //? 2.0.0-player.16: a press is the deck's only when the record can sound there, so every way it can't
+  //? says Off - and that a press then scrubs silently, as 2.0.0-player.11's did
+  check('starting - the voice not yet playing: off, a press silent until it is',
+    [turntable({ ...ready, context: 'starting', window: null, fetched: 0 }).value, turntable({ ...ready, context: 'starting', fetched: 0 }).note],
+    ['Off: still starting - a press scrubs silently until it has', 'Its window is ready: 0:42-1:12, FLAC, decoded at 48 kHz'])
+  check('deadwax didn\'t send a window, its window loading, and none asked for yet: each off, a press silent',
     [turntable({ ...ready, window: null, failed: "deadwax didn't send it - its MP4 couldn't be made just now", fetched: 0 }).value,
       turntable({ ...ready, window: null, loading: true, fetched: 0 }).value, turntable({ ...ready, window: null, fetched: 0 }).value],
-    ["Off: deadwax didn't send it - its MP4 couldn't be made just now", 'Loading the sound',
-      'No window yet: one is fetched while the song plays, or as the record is turned'])
+    ["Off: deadwax didn't send it - its MP4 couldn't be made just now", 'Off: its window is loading - a press scrubs silently until it is in',
+      'Off: no window yet - a press scrubs silently; one is fetched while the song plays, or as the record is pressed'])
   check('...the cost said only once something was fetched', turntable({ ...ready, window: null, loading: true, fetched: 0 }).note, undefined)
   check('...and measured to the moment the last window came - the report is made as things change, not as time passes - never a running clock it hasn\'t got',
     turntable({ ...ready, fetched: 2_500_000, lastFetchAt: 1_200 }).note, '3.4 MB a window; 2.5 MB fetched since the turntable showed, the last window 0:01 in')
+}
+
+console.log('\nTurntable sound (2.0.0-player.16): which voice plays it, and why')
+{
+  const turntable = (report) => rows.turntableRow(report)
+  const ready = {
+    context: 'running', problem: null, voice: 'script', voiceWhy: "this page isn't on HTTPS, so the browser has no AudioWorklet",
+    window: { start: 31, end: 72.6, kind: 'FLAC', decodedAt: 44100, bytes: 3_400_000 },
+    loading: false, refused: null, failed: null, fetched: 0, lastFetchAt: 0,
+  }
+  check('on the main thread, the page not on HTTPS: ready - and the note says where it plays and why',
+    [turntable(ready).value, turntable(ready).note], ['Ready: 0:31-1:12, FLAC, decoded at 44.1 kHz', "On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet"])
+  check('...the AudioWorklet refused: its words',
+    turntable({ ...ready, voiceWhy: "the AudioWorklet wouldn't load (SyntaxError: Unexpected token)" }).note, "On the main thread - the AudioWorklet wouldn't load (SyntaxError: Unexpected token)")
+  check('the worklet: its own audio thread',
+    turntable({ ...ready, voice: 'worklet', voiceWhy: null }).note, 'On its own audio thread (an AudioWorklet)')
+  check('...the voice said before the cost, on every row that has one - an off one too',
+    [turntable({ ...ready, fetched: 6_800_000, lastFetchAt: 61_000 }).note, turntable({ ...ready, window: null, loading: true }).note],
+    [`On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet ${DOT} 3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in`,
+      "On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet"])
+  check('...and none named while there is none', turntable({ ...ready, voice: null, voiceWhy: null, window: null }).note, undefined)
 }
 
 console.log('\nFormat: what Navidrome said of the file')

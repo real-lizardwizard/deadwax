@@ -4271,10 +4271,12 @@ be a switch in the global settings".
 ### The turntable (2.0.0-player.11)
 
 (Part of this is superseded by 2.0.0-player.14 - see "The turntable, part two": the CSS spin and
-`--dw-record-turn` are gone, the platter turned frame by frame by player/deck.ts; once the deck's
-audio context runs, a press pauses the song and its turn counts from where the record was taken, the
-release lands where the platter's momentum says, and the record has its own sound; a pause from the
-turntable winds down. Until the context runs, a press is exactly what is written below.)
+`--dw-record-turn` are gone, the platter turned frame by frame by player/deck.ts; once the record can
+sound where it is - the deck's audio context running, a voice ready to play it and a window of the song
+there in it (2.0.0-player.16; until then it was only "the context runs", which was James's silent
+turntable - see "After James's report") - a press pauses the song and its turn counts from where the
+record was taken, the release lands where the platter's momentum says, and the record has its own
+sound; a pause from the turntable winds down. Until it can, a press is exactly what is written below.)
 
 James: "I would like to definitely build the turntable" - on the phone ("I don't think it makes a
 lot of sense on desktop") - "as long as it has the disc art on the 'record'"; earlier, "the playhead
@@ -4927,7 +4929,9 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   `resumeSong` (the player's toggle) and its seeks of what the deck returns. `createMediaElementSource`
   is what breaks locked playback on an iPhone (the audio-fidelity memory note), and normal playback
   had to stay exactly what it was. So the record's sound is its own: a decoded WINDOW of the song
-  round the playhead, read by an AudioWorklet (`lib/deckVoice.ts`) on an AudioContext of its own
+  round the playhead, read by an AudioWorklet (`lib/deckVoice.ts`; since 2.0.0-player.16, on a page
+  with no AudioWorklet, a ScriptProcessorNode running the same functions - see "After James's report")
+  on an AudioContext of its own
   (`player/deck.ts`), and used only while the record is not at its own speed - under the hand, coasting,
   winding down. `app-rules.sim.cjs` holds `deck.ts`, `deckVoice.ts` and `Turntable.tsx` to touching no
   media element at all (no createMediaElementSource, no element looked up, nothing set, loaded, played
@@ -4941,11 +4945,14 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   four speeds). A drive runs out by itself (`until`, DRIVE_FOR_S 0.12 s): a stalled page never leaves
   a record whirring. A DC blocker at 10 Hz makes a record held still silent (it reads one sample over
   and over), fades at the window's edges and on take/fade/stop keep it from clicking. Its three
-  functions are SELF-CONTAINED - no imports, no module constants - because the worklet module is made
+  functions (four since 2.0.0-player.16, with `voiceReport`) are SELF-CONTAINED - no imports, no module
+  constants, nor one another - because the worklet module is made
   from their own `toString()` (`voiceWorkletSource()`, loaded from a Blob URL): a worklet runs in a scope
   of its own. A minified rolldown build of it was run in a fake worklet scope and plays (checked once,
-  not in CI); `deck.sim.cjs` runs the module as the browser would and holds it sample for sample to the
-  functions. It reports where it is 30 times a second (exactly: the count carries its remainder), and the
+  not in CI; again for .16's four - `deckVoice.ts` alone through rolldown, minified: its module played
+  the same samples as its functions, with 32 reports in 400 blocks); `deck.sim.cjs` runs the module as
+  the browser would and holds it sample for sample to the functions. It reports where it is 30 times a second (exactly: the count carries its remainder -
+  `voiceReport`, shared by both hosts since 2.0.0-player.16), and the
   needle and time line show that - extrapolated - while it sounds.
 - **The physics** (`lib/platter.ts`, pure): speeds in the platter's own (1 = 33 1/3 rpm = the rate the
   voice reads at, `voiceRate`), positions in song seconds. Free: friction, a constant part and a part
@@ -4999,9 +5006,10 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   cache's own client, so step 6 checks a user's access at the route (`test_every_navidrome_route_asks_
   through_client_for` counts it). MP3 is NOT given a window (the spec's "can"): its time can't be placed
   without an ID3 size and a Xing table - a VBR MP3 lands seconds off - so non-FLAC songs are silent on the
-  turntable and Debug says why. No server setting.
+  turntable (and since 2.0.0-player.16 have no momentum either: a press is .11's) and Debug says why. No server setting.
 - **Kept ready while the turntable shows and the song plays** - once a tap has started the sound: no window
-  is asked for without an audio context and its worklet to put it in (`keep()`), since a window that can't
+  is asked for without an audio context and a voice ready to put it in (`keep()`: the worklet, or since
+  2.0.0-player.16 the script voice once it has played a block), since a window that can't
   be decoded is only fetched again (review: with no context - Now Playing opened onto the turntable from
   the mini player - it fetched a fresh 40 s window every 2 s; with the worklet failed it did the same and
   decoded each). `onAudio` asks once there is somewhere to put it. WINDOW_S (40) from WINDOW_BACK_S (4)
@@ -5009,7 +5017,7 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   window asked again, refreshed once the playhead is within REFRESH_AHEAD_S (6) of its end, and fetched on
   demand when a hand or a coast goes outside it - and AT THE RELEASE over the whole of where a coast will go
   (`keepPath`: a backwards flick runs back past the window's start, and a sounding coast used to go silent
-  there). ONE window is on its way at a time, from the ask until it is in the worklet (`pending`, 'fetch'
+  there). ONE window is on its way at a time, from the ask until it is in the voice (`pending`, 'fetch'
   then 'held' while it decodes), so nothing asks for it again meanwhile; only the newest decode is handed
   on (`decodes`, a latestOnly); a hide lets go of a window still being fetched and keeps one in hand. A
   window deadwax cut short (a hi-res song as it is, at WINDOW_MAX_BYTES) shrinks the margins in proportion
@@ -5032,7 +5040,8 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   exactly those call sites by the handler each is in, and that the context is constructed only inside
   wakeDeckAudio. Suspended when the screen closes or the page hides - nothing of it runs on a locked
   phone - and closed when the turntable unmounts (the look switched to the cover). Never resumed without
-  a gesture, so after a hide the next tap brings it back. Until it runs, a press is EXACTLY 2.0.0-player.11's
+  a gesture, so after a hide the next tap brings it back. Until it runs - since 2.0.0-player.16, until the
+  record can SOUND where it is (a voice ready and a window there in it) - a press is EXACTLY 2.0.0-player.11's
   (`deck.live()` false at the press: silent, the song playing on under the finger, moved where it lets go,
   no momentum - and the record STOPPED under the finger, `deck.holdStill()`, as .11's paused CSS spin was;
   review: the first cut left the deck turning the face under a still finger) - the spec's "until it is
@@ -5100,7 +5109,8 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   and Now Playing. It governs the SOUND; the platter's visual spin-down is the deck's either way.
 - **Info > Debug's "Turntable sound"** (`turntableRow` in debugRows.ts, a new section "The turntable"): ready,
   "0:42-1:22, FLAC, decoded at 48 kHz", or off and why - the turntable isn't showing; no Web Audio; no
-  AudioWorklet; the sound couldn't start (the browser's words); "it isn't a FLAC file (it is MP3)" or
+  AudioWorklet (since 2.0.0-player.16: nothing to play it on, and the note names the voice); the sound
+  couldn't start (the browser's words); "it isn't a FLAC file (it is MP3)" or
   deadwax's 415; "this browser couldn't decode its window - <its words>"; waiting for a tap to start the
   sound; deadwax didn't send it; past the end; loading; no window yet. A note with what windows have cost
   since the turntable showed, and when the last of them came (`lastFetchAt`: the report is made as things
@@ -5167,6 +5177,166 @@ fixed with a check that fails without the fix (the bullets above say the rules a
   already paused) is invisible to the deck - no event fires, and seeing it would need the engine - so the
   coast still plays the song at speed. Rare: the lock screen and AirPods offer play then, as the Media
   Session says paused.
+
+#### After James's report (2.0.0-player.16)
+
+James, on his iPhone and then his Mac: "the audio doesn't follow the turntable when scrubbing", "it
+doesn't work on my mac either". A fix to .14, not a feature; the spec is the session scratchpad's
+`uplan/slice-turntable-fix.md`.
+
+- **The cause, reproduced before anything changed.** `BaseAudioContext.audioWorklet` is a
+  [SecureContext] API: a browser exposes it only on HTTPS or localhost, and James opens deadwax at a
+  plain `http://` address on his network. So the worklet was never there, deck.ts set
+  `missing = 'no-worklet'` and made no voice - and `Deck.live()` was only "the context runs", so a
+  press still TOOK the record and paused the song, with nothing to sound: silence under the hand, the
+  song back on release. Reproduced in headless Brave by loading the app as `http://deadwax.test:8081`
+  (`--host-resolver-rules=MAP deadwax.test 127.0.0.1`); over `http://localhost` every check passes,
+  which is why .14's verification never saw it. **The review of .14 raised exactly this** - "a press
+  takes the record and pauses the song whenever the context runs, even when the record can't make a
+  sound" - and its skeptics dropped it. It was this bug.
+- **A second host for the same voice.** Where the context has no `audioWorklet` (or no
+  `AudioWorkletNode`), or the worklet can't be made (the Blob URL), won't load (`addModule` refused)
+  or its node won't construct, the deck makes a **ScriptProcessorNode** instead
+  (`startScript`: `createScriptProcessor(SCRIPT_BUFFER 1024, 0, 2)`, to the destination) that runs
+  THE SAME four functions of `lib/deckVoice.ts` on the main thread - `newVoiceState`, `voiceCommand`
+  (each message applied to its state - held to the next block, see below), `renderVoice` and the new
+  `voiceReport`. `voiceReport` is the worklet's report count moved out of its source string into a
+  fourth self-contained function (the counter is `VoiceState.counted`), so both hosts say where they
+  are REPORTS_PER_SECOND times a second by one rule. One DSP, two hosts. ScriptProcessorNode is
+  deprecated, but it is in every current browser, iOS Safari included, and needs no secure page - which
+  is the whole reason it is here; the worklet stays the first choice wherever it exists (its own audio
+  thread: a busy page doesn't glitch it). Each block is rendered as of `event.playbackTime` - the
+  context time it will play at, a block ahead of `currentTime` as the browser asks for it. A script
+  voice is **ready only once it has played its first block**: a browser that never calls it stays not
+  ready, and every press stays .11's rather than pausing the song over silence. Debug says "still
+  starting" then. The buffer size is 1024 unmeasured on a phone.
+  - **How its messages are timed (review of this slice).** The first cut applied each message straight
+    to the state as of `currentTime` and rendered at `playbackTime`, a block or two on - and a `take`
+    sets the read head, so every take started that far BEHIND the record and the steering raced to
+    catch it up: measured with the real functions, 1.39x for one 1024-block's lead, 1.78x for two, for
+    20-80 ms - a chirp of 6-10 semitones on every grab of a playing record and at the start of every
+    wind-down (on by default), where the worklet's own lead gives 1.05x. "Sounds the same" was false
+    on exactly the path James uses. Three parts, none of them a second DSP: (1) `voiceCommand`'s take
+    now starts where the record IS as of the `now` it is applied at - `at + rate * (now - time)` - not
+    at `at` (its `now` argument was unused); the worklet's own catch-up goes with it. (2) The script
+    host HOLDS messages and applies them just before the next block, as of that block's `playbackTime`
+    - the moment they are first heard - as the worklet applies each on the audio clock. (3) Every take
+    and drive is heard `SCRIPT_LAG_BLOCKS` (2) blocks after it was said, its `time` and `until` both
+    moved on by 43 ms: the most a message waits for the block it is first heard in. Without (3) the take
+    was placed where the record had got to, and a grab's still hand - whose drives say the record
+    stopped where it was taken - then pulled it BACK as far (-0.86x); with it, a take and the drives
+    after it keep the spacing they were said with, and the voice plays what the worklet would, 43 ms
+    later. Measured in `deck.sim` with frames and blocks on one clock: a wind-down and a grab, each with
+    the take's block first and a frame first, never past 1.02x (1.41x before), and a grab's backward
+    swing -0.15 at worst. A drive replaces the drive before it in the hold and a window every window
+    before it, so a stalled page holds a handful, not a pile. NOT measured: what a real browser's
+    `playbackTime` lead is (Chrome's is a block at the event, by its source; WebKit's is computed the
+    same way) - a larger one only skips the first few ms of a take, still without a chirp.
+- **`live()` needs the sound** - the context running AND a voice ready (`voiceReady()`) AND a window
+  of this song covering where the record is (`recordAt()`: the platter for a coast, a run back to speed
+  or a sounding wind-down, else the song - one rule, shared with `takeOver`). Anything less - no voice,
+  a worklet still loading, a window still decoding or not yet asked, a refused one, an MP3 - is .11's
+  path: the song plays on under the finger and is sought on release, no momentum. So an MP3 lost the
+  silent momentum .14 gave it. Windows are asked once a VOICE is ready (`keep()`'s gate is
+  `audio.voice?.ready`); the wind-down needs one too (`sounding()` is `voiceReady() && covers`). A
+  paused song has no window until the record is turned, and its first press is now .11's - so a press
+  the deck doesn't take asks for the window where the record is (`holdStill(true)` calls `keep`; the
+  held record counts as busy), and the next press there is the deck's.
+  - **Except a coast or a run back to speed (review of this slice).** The first cut judged those by
+    the platter too, so once a flick ran it out of the window - a backwards flick past the window's 4 s
+    back margin, the next window still being fetched and decoded, which is ordinary flick-and-catch -
+    a press went .11's way, and `holdStill` only knew the spin's motions: the coast's timer ran on under
+    the still finger (the face leapt up to 417 degrees at the release, the time line froze on the
+    coast's last time, a window landing mid-hold sounded a burst of the coast's rate under a still
+    hand), and a run back to speed's end PLAYED the song under the held finger. But .11's premise - the
+    song plays on under the hand - can't hold there: the flick paused the song already. So `live()` is
+    true for a coast or a run back to speed whenever a voice is ready, as .14 had it: `takeOver` catches
+    it where the platter is, silently, and `handWindow` sounds it as the window arrives. Only those two
+    roles - a wind-down with no sound (an MP3, the setting off) must stay .11's, or an MP3 would get
+    silent momentum back. And `holdStill(true)` now ends whatever plan the deck still has when a press
+    IS .11's (a silent wind-down; a coast whose context a hide suspended since): `quieten` it, then its
+    end at once (`planEnded`) - still where it is held, or, a run back to speed, the song played now
+    (.11's song playing on under the finger, from where the release sought it), the sound stopped
+    rather than held at speed 1 for it.
+  - **The first turn of a paused song before any tap (review).** With no context yet - Now Playing
+    opened onto the turntable from the mini player, which only resumes one - the press's `keep` found
+    no voice, and by the time the release's `wakeDeckAudio` had one ready, `holdStill(false)` had let
+    go of the press: nothing asked, so it took two silent turns, not one, and the docs' "the next turn
+    has its sound" was wrong. `keep` now remembers a held press refused for want of a voice
+    (`wanted`, the song's id), counts it busy, and asks as soon as `onAudio` has a voice; the first pass
+    of the voice gate lets it go, so it is one ask, not a paused song kept in windows.
+- **The silent switch** (part three of the spec): while the record's sound plays the song's element
+  is paused, and WebKit then gives the page's Web Audio the 'ambient' kind, which an iPhone's ring/
+  silent switch mutes. `holdAudioSession()` sets `navigator.audioSession.type = 'playback'` (Safari
+  16.4+) as wakeDeckAudio makes the context - in the gesture - and `releaseAudioSession()` puts the
+  kind it found back in closeDeckAudio, as the turntable goes; only a kind it really changed is put
+  back, and both are guarded (absent elsewhere: nothing; a set that throws: nothing).
+  `app-rules.sim.cjs` holds `createScriptProcessor` and `audioSession` to deck.ts alone.
+- **A hide while a tap's resume is still settling (review, a nit older than this slice).**
+  `sleepDeckAudio` only suspended a context already 'running', and nothing looked again once the
+  resume settled, so a tap followed at once by the page hiding left the context running, hidden, until
+  the next show and hide - on the script voice that is `renderVoice` and `voiceReport` on the main
+  thread ~47 times a second for nothing. A hide that finds the context not running now marks it
+  (`sleepOnceRunning`) and `audioChanged` suspends it the moment it runs; a gesture asking for the
+  sound (`resumeDeckAudio`, which every wake goes through) and the turntable showing again let the mark
+  go - the mini player's tap resumes the context a moment BEFORE the turntable shows, and must not be
+  suspended for a hide that came before it.
+- **Debug's "Turntable sound"**: the report gained `voice` ('worklet' | 'script' | null) and
+  `voiceWhy`; the context state 'no-worklet' became 'no-voice' (neither host). The note names the
+  voice - "On its own audio thread (an AudioWorklet)", or "On the main thread - this page isn't on
+  HTTPS, so the browser has no AudioWorklet" (or "this browser has no AudioWorklet", or "the
+  AudioWorklet wouldn't load (<its words>)") - before the cost. Every way the record can't sound reads
+  Off, since a press then is .11's: "Off: still starting - …", "Off: its window is loading - …", "Off:
+  no window yet - …" (they were "Starting:", "Loading the sound", "No window yet:").
+- **NOT verified - James's iPhone list**: that WebKit calls a ScriptProcessorNode with no inputs
+  (if it never does, Debug stays on "still starting" and every press is .11's - say so); the record
+  heard over plain http on the phone; that 'playback' keeps the silent switch from muting it; and that
+  setting it leaves locked playback, the lock screen's controls and AirPods as they were after a
+  scrub. The real page (the orchestrator, from `http://localhost` - worklet - and
+  `http://deadwax.test:8081` - script) is checked after this change.
+- **Verified**: 2048 Python tests (none new: the change is the page's), pyflakes, tsc, and all 34 sims,
+  3232 checks (`deck` 222 - 30 of them from the review, below; before it 192, 33 more than .15: the script voice made where there is no AudioWorklet and where
+  `addModule` is refused, its arguments and connection, ready only after a block; its output held
+  sample for sample, block by block, to `renderVoice` fed the same messages at each block's
+  `playbackTime` through a take, a turn and a flick, with the four functions spied on where deck.js
+  reaches them; 32 reports in 50 blocks of 1024 as the worklet's 32 in 400 of 128, each reaching the
+  deck; `live()` false with no voice, a worklet loading, a window decoding, outside the window, a
+  suspended context, neither host, a paused song, an MP3, a 415 - and judged by the platter on a coast
+  (until the review: a coast is the deck's whenever a voice is ready);
+  a press the deck doesn't take asking for the window; the audio session set, kept, put back, a stubborn
+  one and an absent one; `debug` 84, 5 new and the changed words; `app-rules` 121, one new; `info`'s
+  fixture given the new fields). Mutations, each restored byte for byte - 33, every one caught: 31 by a
+  failing check (one, a Debug branch, first written as a comparison tsc refused as impossible and redone
+  as a wording change), two by the sim crashing (the worklet's module made without `voiceReport`, and
+  `voiceReport` reaching a module constant - the vm throws, as a worklet scope would). Not pinned: that a
+  session set which throws isn't put back (harmless either way). The engine guard is empty and
+  `player.sim.cjs` untouched.
+- **Its review** found the four things above marked "review" - the script voice's chirp, a .11 press
+  leaving a coast running under the finger (raised four times), the paused song's two
+  silent turns, the hide mid-resume - and two weak checks, both fixed: the audio-session checks read
+  `contexts.at(-1)`, which was the PREVIOUS block's context closed the same way, so with the session's
+  try/catch removed (no context made at all, the turntable silent) they still passed - each wake is
+  held to a context of its own now, running, the report not 'failed'; and the script voice's teardown
+  compared `onaudioprocess` through `check()`'s JSON, which writes a function as null - a boolean now.
+  The 30 checks: a late take's anchor (and an early, backwards one); the script voice's takes with
+  frames and blocks on one clock (`together()`: a frame every 16 ms, a block every 1024 samples
+  played a block later), a wind-down and a grab, each with its block first and a frame first - never
+  past 1.03x (the first cut gave 1.41x here), a grab's backward swing above -0.3 (-0.86x without the
+  lag); drives held as the last over twenty frames with no block, the newer of two windows held, a
+  drive heard 43 ms on for its whole 0.12 s; a coast out of the window caught where the platter is,
+  silently, nothing played in 3 s held, sounded as the window lands, sought where caught; a run back
+  to speed out of the window caught and nothing played under the hand; .11 presses on a coast and a
+  run back to speed whose context a hide suspended (no leap at the release; the song played, the sound
+  stopped, not held) and on an MP3's silent wind-down (no leap - it was 20-35 degrees); the paused first
+  turn with the worklet and on the main thread, asking once and only once; a hide mid-resume suspended
+  as it runs, the mini player's tap and a hide undone before it settled left running. Mutations, each
+  restored byte for byte on a copy: the first cut's lists rerun on the fixed code, all caught but one -
+  `live()` by the song's position rather than the platter's, equivalent now (they differ only on a
+  coast or a run back to speed, which the review's rule makes the deck's before either is asked, and on
+  a sounding wind-down, whose whole path its window covers) - three re-aimed at code the fixes moved;
+  and 22 for the fixes, every one caught (one - a drive's `until` not moved with its `time` - only once
+  a check for it was added). NOT measured anywhere but the harness: the chirp's absence and the 43 ms
+  lag by ear, on a phone - James's list.
 
 ### Sources and Get (2.0.0-player.15)
 
@@ -6295,6 +6465,14 @@ apply would. A library generated afresh needs the same, or the shot shows bare "
 
 ### Tooling and environment
 
+- **A test on localhost can't see a SecureContext-only API fail (2.0.0-player.16).** Browsers treat
+  `http://localhost` and `127.0.0.1` as secure, so AudioWorklet (and `crypto.subtle`, service workers,
+  `navigator.clipboard`) is there in every local check - and missing on the plain `http://` address
+  James actually opens deadwax at on his network. That is how .14's turntable shipped silent for him
+  while every check passed. Test any feature that might lean on one from a non-local hostname too:
+  headless Brave or Chrome with `--host-resolver-rules="MAP deadwax.test 127.0.0.1"`, loading
+  `http://deadwax.test:<port>` (the orchestrator reproduced the turntable's bug that way). And know
+  which APIs are SecureContext before relying on one: MDN marks them "Secure context".
 - **The browser preview pane is not a reliable witness.** Two distinct failure modes, both
   of which read as product bugs:
   - **It doesn't paint when it isn't fronted.** `loading="lazy"` images never start loading,
@@ -6836,7 +7014,7 @@ node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, 
 node ui/test/payload.sim.cjs    # the ONE download payload builder, deep-equal to what the main page's two Find buttons sent before the move (8 captured cases, labels too), and which credit each field comes from
 node ui/test/sources.sim.cjs    # the Sources sheet and its cards rendered - only the newest search, Cancel letting it go in the gesture, a Get from the tap with its runners-up, the best match whatever the sort, the chips, a pick for you and when it isn't made, Re-search, slskd's words, the store's box, the live region, focus kept in the sheet
 node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch; the rows' Get chips, and their lookups called off when you move on
-node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the deck against fakes (its windows, coasts, handovers, wind-downs)
+node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the main-thread voice where there is no worklet, the deck against fakes (its windows, coasts, handovers, wind-downs, when a press is its own)
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with

@@ -52,10 +52,12 @@ function kindOf(track: { suffix?: string | null | undefined; contentType?: strin
  *   it winds the record's sound down with the platter (You > Playback's "Pause winds the record
  *   down"), and the song is sought to where that stops; a play while the record coasts or winds down
  *   with its sound is sought first to where the record is (`resuming`), so nothing heard is skipped.
- * - TURNING it moves the song 1.8 s a turn, backwards too. Until the deck's sound runs (an audio
- *   context made in a tap: `live`), exactly as 2.0.0-player.11 did: silent, the song playing on under
+ * - TURNING it moves the song 1.8 s a turn, backwards too. Until the record can sound where it is (an
+ *   audio context made in a tap, a voice ready to play it, and a window of the song there in it:
+ *   `live`, 2.0.0-player.16), exactly as 2.0.0-player.11 did: silent, the song playing on under
  *   the finger, moved where it lets go - and the record stopped under the finger (the deck's
- *   `holdStill`, where .11's CSS spin paused). Once it runs, the press is the deck's: the record is taken as
+ *   `holdStill`, where .11's CSS spin paused); a record still coasting from a flick is caught as ever, the
+ *   flick having paused the song already. Once it can, the press is the deck's: the record is taken as
  *   the press moves past a tap or rests longer than one, the song pauses, the record's sound follows
  *   the hand, and letting go hands the platter the hand's speed - the deck says where the song lands,
  *   which this seeks to as the finger lets go, and plays it from there when there is no coast to wait
@@ -117,7 +119,7 @@ export function Turntable({
   const [turn, setTurn] = useState(0)
   //? the click after a turn is not a tap; reset by the next press, since not every turn has a click
   const turned = useRef(false)
-  //? whether the press under way is the deck's - its audio context ran when it began - or .11's
+  //? whether the press under way is the deck's - the record could sound when it began - or .11's
   const live = useRef(false)
   //? what the deck shows while it has the record, and what Now Playing was last told
   const [deckShown, setDeckShown] = useState<{ at: number; scrubbing: boolean } | null>(null)
@@ -145,7 +147,8 @@ export function Turntable({
 
   //? The deck's two moves of the song, by the player's own toggle - the only ones made outside a tap
   //? or a release (deck.ts says why each is allowed): pause the song as a hand takes the record, and
-  //? play it as the motor has the platter back at speed after a coast.
+  //? play it as the motor has the platter back at speed after a coast - or as a press the deck can't
+  //? take catches that run back to speed (its holdStill, from the press).
   const holdSong = () => {
     if (latest.current.playing) latest.current.toggle()
   }

@@ -338,7 +338,7 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   const deckView = mount(InfoSheet, 'info with the turntable')
   const drawDeck = () => deckView.render({
     open: true, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw',
-    turntable: { context: 'running', problem: null, window: { start: 42, end: 72, kind: 'FLAC', decodedAt: 48000, bytes: 3_400_000 },
+    turntable: { context: 'running', problem: null, voice: 'worklet', voiceWhy: null, window: { start: 42, end: 72, kind: 'FLAC', decodedAt: 48000, bytes: 3_400_000 },
       loading: false, refused: null, failed: null, fetched: 0, lastFetchAt: 0 },
   })
   drawDeck()

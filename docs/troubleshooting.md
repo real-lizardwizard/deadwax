@@ -513,9 +513,11 @@ shows when it can't find one. In the order to check:
 ## The turntable makes no sound when you turn the record
 
 Since 2.0.0-player.14 [the turntable](player.md#the-turntable) has its own sound: turning the record
-plays the song at the speed of your hand, a flick coasts audibly, and a pause winds down. When it's
-silent, **Info → Debug**'s **Turntable sound** row (**•••** on the now-playing screen, then **Info**,
-then **Debug**) says why, in the order to check:
+plays the song at the speed of your hand, a flick coasts audibly, and a pause winds down. Since
+2.0.0-player.16 a press only takes hold of the record when it can make that sound: whenever it can't,
+turning it works as it did before - silently, the song playing on under your finger, and no momentum -
+rather than pausing the song over silence. When it's silent, **Info → Debug**'s **Turntable sound**
+row (**•••** on the now-playing screen, then **Info**, then **Debug**) says why, in the order to check:
 
 - **`Off: waiting for a tap to start the sound`**: a phone only lets a page start sound from a tap,
   so the record's sound starts at the first tap on the record, the play/pause or skip buttons, or
@@ -523,8 +525,16 @@ then **Debug**) says why, in the order to check:
   screen brings it back too) - and a turn of the record before any of those is silent, with the
   song playing on under your finger as before. No stretch of the song is fetched for it until then.
   It stops again whenever the screen closes or the phone locks, and the next tap starts it.
+- **`Off: its window is loading - …`** or **`Off: no window yet - …`**: the record plays a stretch
+  of the song round where it is, and that stretch hasn't arrived. It's fetched while the song plays
+  (a moment after the first tap), or, for a paused song, when you first press the record - so the
+  first turn of a paused record is silent and the next has its sound. A press outside the stretch
+  shown on a `Ready: …` row works as before too - except on a record still coasting from a flick,
+  which you catch as ever, silent until the next stretch arrives.
+- **`Off: still starting - …`**: the part that plays the sound hasn't begun yet. If it never gets
+  past this, the browser isn't running it: tell us which browser and device.
 - **`Off: it isn't a FLAC file (…)`**: only FLAC songs have it. Anything else turns silently, with
-  the same momentum.
+  no momentum, as before 2.0.0-player.14.
 - **`Off: this browser couldn't decode its window - …`**: the phone refused the stretch of the song
   deadwax sent. The words after the dash are the browser's own: they are what to report.
 - **`Off: deadwax didn't send it - …`**: deadwax cuts the stretch from the copy of the song the phone
@@ -532,13 +542,23 @@ then **Debug**) says why, in the order to check:
   disk short of space (see
   [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which covers the cache), or
   Navidrome not answering. It asks again after ten seconds.
-- **`Off: this browser has no AudioWorklet`**, **`no Web Audio`**, **`the sound couldn't start - …`**
-  or **`the sound's worklet wouldn't load - …`**: the browser can't play it - the words after the
-  dash are its own.
-- **`Ready: …`** and still silent: if the phone's ringer switch is on silent, try it off - iOS has
-  silenced this kind of sound on silent before (not yet checked on a phone). The song's own playback
-  isn't affected either way.
+- **`Off: this browser has neither an AudioWorklet nor a ScriptProcessorNode to play it`**, **`no
+  Web Audio`**, **`the sound couldn't start - …`** or **`the sound's ScriptProcessorNode couldn't be
+  made - …`**: the browser can't play it - the words after the dash are its own.
+- **`Ready: …`** and still silent: if the phone's ringer switch is on silent, try it off. Since
+  2.0.0-player.16 deadwax asks iOS (16.4 and later) to treat the page as playing music from the first
+  tap that starts the record's sound until the turntable goes, which should keep the switch from
+  muting it - not yet checked on a phone, so say
+  if it does. The song's own playback isn't affected either way.
 - **`Off: the turntable isn't showing`**: the now-playing screen is on the cover, or closed.
+
+**Opened at a plain `http://` address?** That's fine since 2.0.0-player.16. A browser gives the
+AudioWorklet - the part that plays this sound on an audio thread of its own - only to pages on HTTPS
+or `localhost`, and until 2.0.0-player.16 the turntable had nothing else to play it with, so over
+plain `http://` the record took the song from you and played nothing (James: "the audio doesn't
+follow the turntable when scrubbing"). It now plays it on the page's main thread instead, and the line
+under **Turntable sound** says so: `On the main thread - this page isn't on HTTPS, so the browser has
+no AudioWorklet`. On HTTPS it says `On its own audio thread (an AudioWorklet)`.
 
 Turning the record never touches the song's own playback: if it's silent, the music still plays
 exactly as it did when you let go.

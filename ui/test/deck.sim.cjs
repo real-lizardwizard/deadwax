@@ -41,6 +41,28 @@
  *    where it got to; the arm quieting a coast; and the rules the docs state - the 10 s retry, a decode
  *    refused three ways, nothing for a paused song, a coast caught on its way back, a pause near the
  *    window's end, RESUME_IN_GESTURE_S, PAUSE_SETTLE_MS, a rested release 0.2 s on.
+ *  - THE SOUND ON A PAGE THAT ISN'T HTTPS (2.0.0-player.16): with no AudioWorklet (an insecure page),
+ *    or one whose module is refused, the voice is a ScriptProcessorNode on the main thread - no inputs,
+ *    two output channels, 1024 a block, connected to the speakers - running the very same functions
+ *    (they are called: spied on, and its output held sample for sample to them fed the same messages),
+ *    saying where it is as often as the worklet; ready once it has played a block. A press is the
+ *    deck's (`live()`) only when the record can sound there: the context running, a voice ready AND a
+ *    window covering it in the voice - not with no voice, a worklet still loading, a window still
+ *    decoding, or none; a press it doesn't take asks for the window, so the next can be. With neither
+ *    host, nothing is asked. The page's audio session is 'playback' from the wake until the turntable
+ *    goes, then put back; where there is none, nothing is touched.
+ *  - ITS REVIEW: a take applied after it was said starts where the record is by then; on the main
+ *    thread, with the page's frames and the browser's blocks on one clock, a wind-down and a grab -
+ *    either first - never read faster than the song, and a grab held still never swings far back
+ *    (messages held to the next block, heard SCRIPT_LAG_BLOCKS blocks on, a drive replacing the drive
+ *    before it and a window every window before it); a coast or a run back to speed out of its window
+ *    still the deck's - caught where the platter is, nothing played under the hand, sounded as the
+ *    window lands; a press that IS .11's ending whatever the deck had going (a silent wind-down, a
+ *    coast whose context a hide suspended - no leap at the release, the run back to speed's song
+ *    played, its sound stopped); the first turn of a paused song before any tap asking once there is a
+ *    voice, and only once; a hide while a tap's resume settles suspending it as it runs - but not the
+ *    mini player's tap, nor a hide undone before it settled; each audio-session wake held to a context
+ *    of its own.
  *
  * Run it with:  node ui/test/deck.sim.cjs
  */
@@ -401,6 +423,26 @@ console.log('\nloudness: faded in, faded out, stopped')
 
 /* ===== the worklet, as the browser runs it ===== */
 
+console.log('\na take applied after it was said starts where the record is by then (review of 2.0.0-player.16)')
+{
+  //? said as of 1 s - at 12 s in the song, at its own speed - and applied 43 ms on, as the main-thread
+  //? voice may apply one, two of its blocks later
+  const late = voice.newVoiceState()
+  voice.voiceCommand(late, sine(20), 0, SR)
+  voice.voiceCommand(late, { type: 'take', at: 12, rate: 1, time: 1, until: 1.2 }, 1.043, SR)
+  const start = late.pos
+  let fastest = 0
+  for (let i = 0; i < 0.1 * SR; i++) {
+    voice.renderVoice(late, [new Float32Array(1)], 1, SR, 1.043 + i / SR)
+    fastest = Math.max(fastest, late.rate)
+  }
+  check('it starts at 12.043 - where a record at 12 s and its own speed is 43 ms later - and never reads faster than the record goes (started at 12, it raced to catch up at up to 1.8 times)',
+    [round(start, 6), round(fastest, 4) <= 1], [12.043, true])
+  const early = voice.newVoiceState()
+  voice.voiceCommand(early, { type: 'take', at: 12, rate: -2, time: 1, until: 1.2 }, 0.99, SR)
+  check('...backwards too, and applied before its own time: where the record was then', round(early.pos, 6), 12.02)
+}
+
 console.log('\nthe worklet: made from the same functions, it plays the very same samples')
 {
   const source = voice.voiceWorkletSource()
@@ -432,8 +474,9 @@ console.log('\nthe worklet: made from the same functions, it plays the very same
   const heard = posted.filter((m) => m.type === 'heard')
   check('it says where it is ~30 times a second: 32 times in 400 blocks of 128', [heard.length, Object.keys(heard[0] ?? {}).sort()], [32, ['gain', 'pos', 'rate', 'time', 'type']])
   check('...and what it says is exactly where it was', heard.every((report) => report.pos === where.get(report.time)), true)
-  check('the three functions it is made of name nothing outside themselves (they run in a scope of their own)',
-    [voice.newVoiceState, voice.voiceCommand, voice.renderVoice].map((fn) => /\b(exports|require|platter|turntable)\b/.test(fn.toString())), [false, false, false])
+  check('the four functions it is made of name nothing outside themselves (they run in a scope of their own)',
+    [voice.newVoiceState, voice.voiceCommand, voice.renderVoice, voice.voiceReport].map((fn) => /\b(exports|require|platter|turntable|REPORTS_PER_SECOND)\b/.test(fn.toString())), [false, false, false, false])
+  check('...nor one another: voiceReport counts, it doesn\'t render (the main-thread voice calls renderVoice itself)', /renderVoice|voiceCommand|newVoiceState/.test(voice.voiceReport.toString()), false)
 }
 
 /* ===== the deck, against fakes ===== */
@@ -495,8 +538,41 @@ class FakeNode {
 let decodeMode = 'now'
 const decodesHeld = []
 let decodes = 0
-//? whether the worklet's module refuses to load
+//? whether the worklet's module refuses to load - or is held (its settlers kept here) as a slow one is
 let workletFails = false
+let workletHeld = null
+//? a context with no AudioWorklet (a page that isn't on HTTPS), or with no ScriptProcessorNode either
+let noWorklet = false
+let noScript = false
+//? resumes that settle only when the test says (their settlers kept here), not at once
+let resumesHeld = null
+//? decoded windows that hold a tone rather than silence, so what a voice plays can be compared
+let decodeTone = false
+//? the ScriptProcessorNodes made, and what is asked of them
+const scripts = []
+class FakeScript {
+  constructor(context, args) { this.context = context; this.args = args; this.connected = false; this.disconnected = false; this.onaudioprocess = null; scripts.push(this) }
+  connect(to) { this.connected = to === this.context.destination }
+  disconnect() { this.disconnected = true }
+}
+//? the browser asking a script voice for `blocks` blocks of 1024, each to play two blocks ahead of the
+//? context's clock, as a ScriptProcessorNode's are; what each was filled with comes back
+const fill = (script, playbackTime) => {
+  const channels = [new Float32Array(1024), new Float32Array(1024)]
+  script.onaudioprocess?.({ outputBuffer: { numberOfChannels: 2, length: 1024, getChannelData: (channel) => channels[channel] }, playbackTime })
+  return { channels, playbackTime }
+}
+const pump = (script, blocks = 1) => {
+  const filled = []
+  for (let block = 0; block < blocks; block++) {
+    const context = script.context
+    filled.push(fill(script, context.currentTime + 2048 / 48000))
+    context.currentTime += 1024 / 48000
+  }
+  return filled
+}
+//? the browser asking for blocks, with nothing compared - the script voice made ready
+const playBlocksQuietly = (script, blocks) => void pump(script, blocks)
 //? a window's bytes say how long it is (100 kB a second), so the decode gives back that much audio
 const BYTES_A_SECOND = 100_000
 class FakeContext {
@@ -504,17 +580,31 @@ class FakeContext {
     this.state = 'suspended'
     this.currentTime = 0
     this.calls = []
-    this.audioWorklet = { addModule: () => (workletFails ? Promise.reject(new Error('SyntaxError: Unexpected token')) : Promise.resolve()) }
+    this.sampleRate = 48000
+    this.destination = { speakers: true }
+    this.audioWorklet = noWorklet ? undefined : {
+      addModule: () => (workletHeld ? new Promise((resolve, reject) => workletHeld.push({ resolve, reject }))
+        : workletFails ? Promise.reject(new Error('SyntaxError: Unexpected token')) : Promise.resolve()),
+    }
+    if (noScript) this.createScriptProcessor = undefined
     contexts.push(this)
   }
+  createScriptProcessor(size, inputs, outputs) { return new FakeScript(this, [size, inputs, outputs]) }
   addEventListener() {}
-  resume() { this.calls.push('resume'); this.state = 'running'; return Promise.resolve() }
+  resume() {
+    this.calls.push('resume')
+    //? a resume the test settles (`resumesHeld`), as a real one settles a moment after it is asked
+    if (resumesHeld) return new Promise((resolve) => resumesHeld.push(() => { this.state = 'running'; resolve() }))
+    this.state = 'running'
+    return Promise.resolve()
+  }
   suspend() { this.calls.push('suspend'); this.state = 'suspended'; return Promise.resolve() }
   close() { this.calls.push('close'); this.state = 'closed'; return Promise.resolve() }
   decodeAudioData(bytes, done, failed) {
     decodes++
     const length = Math.round((bytes.byteLength / BYTES_A_SECOND) * 48000)
-    const buffer = { numberOfChannels: 2, sampleRate: 48000, length, getChannelData: () => new Float32Array(length) }
+    const tone = () => Float32Array.from({ length }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 440 * i) / 48000))
+    const buffer = { numberOfChannels: 2, sampleRate: 48000, length, getChannelData: () => (decodeTone ? tone() : new Float32Array(length)) }
     if (decodeMode === 'null') return failed(null)
     if (decodeMode === 'error') return failed(new Error('EncodingError: Decoding failed'))
     if (decodeMode === 'throw') throw new TypeError('Not enough arguments')
@@ -586,7 +676,7 @@ async function main() {
     check('no context until a gesture asks for one: a press is .11\'s', [contexts.length, deck.live()], [0, false])
     wakeDeckAudio()
     await settle()
-    check('wakeDeckAudio() - the record\'s tap, a release, the look button, the transport - makes it and resumes it', [contexts.length, contexts[0].calls, deck.live()], [1, ['resume'], true])
+    check('wakeDeckAudio() - the record\'s tap, a release, the look button, the transport - makes it and resumes it; its worklet ready and the window round the song in it, a press is the deck\'s', [contexts.length, contexts[0].calls, deck.live()], [1, ['resume'], true])
     wakeDeckAudio()
     check('...once: a second gesture finds it running and does nothing more', [contexts.length, contexts[0].calls], [1, ['resume']])
     deck.setShowing(false)
@@ -600,6 +690,40 @@ async function main() {
     check('resumeDeckAudio() (the mini player\'s tap opening the screen) resumes it', contexts[0].state, 'running')
     deck.destroy()
     check('gone: closed, and Info told no turntable shows', [contexts[0].calls.at(-1), deckReport()], ['close', null])
+  }
+
+  console.log('\nhidden while a tap\'s resume is still settling: suspended as soon as it runs (review of 2.0.0-player.16)')
+  {
+    resumesHeld = []
+    const deck = new Deck(fakeHost())
+    deck.setShowing(true)
+    wakeDeckAudio()
+    const context = contexts.at(-1)
+    deck.setShowing(false)
+    await settle()
+    check('the first tap makes it, and the page is hidden before its resume settles: nothing to suspend yet', [context.state, context.calls], ['suspended', ['resume']])
+    resumesHeld.splice(0).forEach((done) => done())
+    await settle()
+    check('...it settles: suspended at once - nothing of it runs on a hidden page (it ran on, the main-thread voice with it, until the next show and hide)', [context.state, context.calls], ['suspended', ['resume', 'suspend']])
+    //? shown and closed again with no tap between - suspended still - then the mini player's tap
+    deck.setShowing(true)
+    deck.setShowing(false)
+    deckModule.resumeDeckAudio()
+    resumesHeld.splice(0).forEach((done) => done())
+    await settle()
+    deck.setShowing(true)
+    check('the mini player\'s tap resuming it a moment before the turntable shows: left running - a gesture asking for the sound outweighs a hide before it', [context.state, context.calls.slice(2)], ['running', ['resume']])
+    deck.setShowing(false)
+    await settle()
+    deck.setShowing(true)
+    wakeDeckAudio()
+    deck.setShowing(false)
+    deck.setShowing(true)
+    resumesHeld.splice(0).forEach((done) => done())
+    await settle()
+    check('a tap, hidden and shown again before its resume settles: running, as it shows', [context.state, context.calls.slice(3)], ['running', ['suspend', 'resume']])
+    resumesHeld = null
+    deck.destroy()
   }
 
   console.log('\nmounting on the song playing: told the same song, the deck keeps what it began')
@@ -904,16 +1028,28 @@ async function main() {
     deck.destroy()
   }
   {
+    //? 2.0.0-player.16: the worklet refused - the same voice on the main thread instead, and the window
+    //? asked for once it plays (review of .14: nothing asked, nothing decoded, and the record silent)
     workletFails = true
     const host = fakeHost()
     const deck = new Deck(host)
     deck.setShowing(true)
+    const before = asked.length
     wakeDeckAudio()
     await settle()
-    const before = asked.length, decoded = decodes
-    await play(host, 5)
-    check('the worklet that plays it wouldn\'t load: nothing asked, nothing decoded - and Debug says why', [asked.length - before, decodes - decoded, deckReport().context], [0, 0, 'failed'])
+    const script = scripts.at(-1)
+    check('the worklet that plays it wouldn\'t load: a ScriptProcessorNode instead - no inputs, two output channels, 1024 a block, to the speakers - and Debug says why',
+      [script?.context === contexts.at(-1), script?.args, script?.connected, deckReport().voice, deckReport().voiceWhy],
+      [true, [1024, 0, 2], true, 'script', "the AudioWorklet wouldn't load (SyntaxError: Unexpected token)"])
+    await play(host, 1)
+    check('...not ready until it has played a block: nothing asked, and a press is .11\'s', [asked.length - before, deck.live(), deckReport().context], [0, false, 'starting'])
+    pump(script, 1)
+    await settle()
+    check('...its first block played: the window asked for, and in it - a press is the deck\'s',
+      [asked.length - before, deck.live(), deckReport().context, deckReport().window?.start], [1, true, 'running', 56])
     deck.destroy()
+    //? its handler compared as a boolean: check() compares JSON, which writes a function as null
+    check('...gone: the script voice let go of with the context - disconnected, its handler gone', [script.disconnected, script.onaudioprocess === null, contexts.at(-1).state], [true, true, 'closed'])
     workletFails = false
   }
   {
@@ -1258,6 +1394,487 @@ async function main() {
     await play(host, 5)
     check('a paused song, the turntable showing: nothing asked until it plays or the record is turned', asked.length, before)
     deck.destroy()
+  }
+
+  /* ===== 2.0.0-player.16: the sound on a page that isn't HTTPS ===== */
+
+  console.log('\n2.0.0-player.16: a page that isn\'t on HTTPS - no AudioWorklet, and the record\'s sound on the main thread')
+  {
+    noWorklet = true
+    globalThis.isSecureContext = false
+    decodeTone = true
+    //? the four functions spied on where deck.js reaches them (the module's own exports), and every
+    //? message mirrored onto a state of their own - so what the speakers get from the script voice can be
+    //? held to them, block by block, as the worklet's is above
+    const real = { newVoiceState: voice.newVoiceState, voiceCommand: voice.voiceCommand, renderVoice: voice.renderVoice, voiceReport: voice.voiceReport }
+    const called = { newVoiceState: 0, voiceCommand: 0, renderVoice: 0, voiceReport: 0, heard: 0 }
+    let mirror = null
+    let lastHeard = null
+    voice.newVoiceState = () => { called.newVoiceState++; mirror = real.newVoiceState(); return real.newVoiceState() }
+    const applied = []
+    voice.voiceCommand = (state, said, at, rate) => { called.voiceCommand++; applied.push(said.type); real.voiceCommand(mirror, said, at, rate); return real.voiceCommand(state, said, at, rate) }
+    voice.renderVoice = (...args) => { called.renderVoice++; return real.renderVoice(...args) }
+    voice.voiceReport = (...args) => { called.voiceReport++; const heard = real.voiceReport(...args); if (heard) { called.heard++; lastHeard = heard } return heard }
+    const same = []
+    let pumped = 0
+    let loudest = 0
+    //? how fast, and how fast backwards, the voice read at any sample while it was sounding: the mirror
+    //? is rendered a sample at a time - the very same samples a block gives (each is worked out from the
+    //? state and its own time alone) - so nothing between two block ends is missed
+    let fastest = -Infinity, slowest = Infinity
+    const playBlocks = (script, blocks) => pump(script, blocks).forEach(heardBlock)
+    const heardBlock = (block) => {
+      {
+        pumped++
+        const expected = [new Float32Array(1024), new Float32Array(1024)]
+        for (let i = 0; i < 1024; i++) {
+          const one = [new Float32Array(1), new Float32Array(1)]
+          real.renderVoice(mirror, one, 1, 48000, block.playbackTime + i * (1 / 48000))
+          expected[0][i] = one[0][0]
+          expected[1][i] = one[1][0]
+          if (mirror.gain > 0.05) {
+            fastest = Math.max(fastest, mirror.rate)
+            slowest = Math.min(slowest, mirror.rate)
+          }
+        }
+        same.push(block.channels.every((data, c) => data.every((value, i) => value === expected[c][i])))
+        loudest = Math.max(loudest, peak(block.channels[0]))
+      }
+    }
+
+    const host = fakeHost()
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    decodeMode = 'held'
+    decodesHeld.length = 0
+    const before = asked.length
+    wakeDeckAudio()
+    await settle()
+    const script = scripts.at(-1)
+    check('no AudioWorklet on the context (an insecure page): a ScriptProcessorNode instead - no inputs, two output channels, 1024 a block, to the speakers - and Debug says why',
+      [script?.context === contexts.at(-1), script?.args, script?.connected, deckReport().voice, deckReport().voiceWhy],
+      [true, [1024, 0, 2], true, 'script', "this page isn't on HTTPS, so the browser has no AudioWorklet"])
+    check('...the context running, its voice yet to play a block: no window asked, and a press is .11\'s', [contexts.at(-1).state, asked.length - before, deck.live()], ['running', 0, false])
+    playBlocks(script, 1)
+    await settle()
+    check('its first block played: the window asked for - and while it is still decoding, a press is .11\'s, never the deck\'s over silence',
+      [asked.slice(before), deckReport().loading, deck.live()], [['/deadwax/navidrome/scrub/time?at=56&seconds=40'], true, false])
+    decodesHeld[0]()
+    decodeMode = 'now'
+    check('...decoded and in the voice: a press is the deck\'s', [deckReport().window?.start, deckReport().context, deck.live()], [56, 'running', true])
+    host.at = 120
+    check('...but not where the window doesn\'t reach (2:00): .11\'s there', deck.live(), false)
+    host.at = 60
+
+    //? the record taken, turned back, let go and brought to speed: the same messages to both
+    deck.pressed(clock)
+    deck.takeOver()
+    playBlocks(script, 2)
+    for (let frame = 1; frame <= 12; frame++) {
+      deck.hand(clock, -frame * 0.06, 60 - (frame * 0.06 / (2 * Math.PI)) * SECONDS_PER_TURN)
+      runFrames(1)
+      playBlocks(script, 1)
+    }
+    deck.release(clock, 'up')
+    for (let frame = 0; frame < 30; frame++) {
+      runFrames(1)
+      playBlocks(script, 1)
+    }
+    check('taken, turned and flicked back: what the speakers got from it is, block for block, renderVoice fed the same messages at the time each block plays',
+      [same.length, same.every(Boolean), loudest > 0.1], [pumped, true, true])
+    check('...the very functions, called - not a copy: a state made by newVoiceState, every message through voiceCommand, every block through renderVoice and voiceReport',
+      [called.newVoiceState, called.voiceCommand > 10, called.renderVoice, called.voiceReport], [1, true, pumped, pumped])
+    const heardBefore = called.heard
+    playBlocks(script, 50)
+    check('it says where it is as often as the worklet: 32 times in 50 blocks of 1024 (the worklet, 32 in 400 of 128) - and the deck hears each',
+      [called.heard - heardBefore, deck.heard?.pos === lastHeard?.pos, deck.heard?.time === lastHeard?.time], [32, true, true])
+    //? a browser that stops asking for blocks a while (a stalled page): what waits for the next is only
+    //? what still changes the voice
+    deck.pressed(clock)
+    deck.takeOver()
+    playBlocks(script, 1)
+    applied.length = 0
+    const said = contexts.at(-1).currentTime
+    for (let frame = 0; frame < 20; frame++) {
+      deck.hand(clock, 0, deck.anchor())
+      runFrames(1)
+    }
+    playBlocks(script, 1)
+    check('...no block asked for over twenty frames of a hand: their drives held as the last of them, each replacing the one before', applied, ['drive'])
+    check('...and heard SCRIPT_LAG_BLOCKS blocks (43 ms) after it was said, whole: from then, for as long as it was said to hold (DRIVE_FOR_S)',
+      [round(mirror.driveTime - said, 6), round(mirror.driveUntil - mirror.driveTime, 6)], [round((2 * 1024) / 48000, 6), deckModule.DRIVE_FOR_S])
+    deck.release(clock, 'cancel')
+    playBlocks(script, 1)
+    applied.length = 0
+    host.isPlaying = true
+    host.moveTo(200)
+    await settle()
+    await settle()
+    host.moveTo(300)
+    await settle()
+    await settle()
+    const start = deckReport().window?.start
+    playBlocks(script, 1)
+    check('...nor over two windows arriving: the newer held, the older let go of', [start, applied, round(mirror.window?.start ?? 0, 3)], [296, ['window'], 296])
+    deck.destroy()
+
+    //? the page and the browser on one clock, for `ms`: a frame every 16 ms, and a block of the script
+    //? voice asked for every 1024 samples to play a block later (as a browser asks), in the order they
+    //? fall - the first of them a block, or a frame
+    const together = (script, ms, blockFirst) => {
+      const context = script.context
+      const start = clock, base = context.currentTime
+      let nextBlock = clock + (blockFirst ? 1 : 2), nextFrame = clock + (blockFirst ? 2 : 1)
+      while (Math.min(nextBlock, nextFrame) <= start + ms) {
+        const block = nextBlock < nextFrame
+        clock = block ? nextBlock : nextFrame
+        advanceTimersOnly()
+        context.currentTime = base + (clock - start) / 1000
+        if (block) {
+          heardBlock(fill(script, context.currentTime + 1024 / 48000))
+          nextBlock += (1000 * 1024) / 48000
+        } else {
+          const due = frames
+          frames = []
+          for (const frame of due) frame.run(clock)
+          nextFrame += 16
+        }
+      }
+    }
+    //? a take on it - a pause's wind-down, the hand grabbing a playing record and holding it still - its
+    //? first block asked for before the first frame's drive, and after it
+    const takes = {}
+    for (const first of ['block', 'frame']) {
+      for (const what of ['wind-down', 'grab']) {
+        const taker = fakeHost()
+        const taking = new Deck(taker)
+        taking.setShowing(true)
+        wakeDeckAudio()
+        await settle()
+        const script = scripts.at(-1)
+        playBlocks(script, 1)
+        await settle()
+        await settle()
+        const inWindow = deckReport().window?.start
+        fastest = -Infinity
+        slowest = Infinity
+        if (what === 'wind-down') {
+          taking.pausing()
+          taker.isPlaying = false
+        } else {
+          taking.pressed(clock)
+          taking.takeOver()
+        }
+        together(script, 300, first === 'block')
+        takes[`${what}, ${first === 'block' ? 'its block' : 'a frame'} first`] = [inWindow, round(fastest, 2), round(slowest, 2)]
+        taking.destroy()
+      }
+    }
+    const what = Object.values(takes)
+    check('a take on it - a pause winding down, a playing record grabbed and held still - never reads faster than the song: it starts where the record is when its block is heard, not a block or two behind (review: it raced to catch up, at up to 1.8 times the speed for 20-80 ms - in this harness, 1.41)',
+      [Object.keys(takes), what.every(([start]) => start === 56), what.map(([, fast]) => fast <= 1.03)], [Object.keys(takes), true, [true, true, true, true]])
+    check('...and a grab held still never runs the sound back past where the hand has it by more than the frame between them would: every message heard SCRIPT_LAG_BLOCKS blocks on, keeping its spacing (placed where the record had got to, a still hand pulled it back at up to -0.86)',
+      [deckModule.SCRIPT_LAG_BLOCKS, takes['grab, its block first'][2] > -0.3, takes['grab, a frame first'][2] > -0.3], [2, true, true])
+    console.log(`    (fastest and slowest, by case: ${JSON.stringify(takes)})`)
+    Object.assign(voice, real)
+    noWorklet = false
+    delete globalThis.isSecureContext
+    decodeTone = false
+  }
+
+  console.log('\nlive() only when the record can sound there: a running context alone is not enough')
+  {
+    workletHeld = []
+    const host = fakeHost()
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    const before = asked.length
+    wakeDeckAudio()
+    await settle()
+    await play(host, 2)
+    check('the worklet still loading, the context running: nothing asked, a press .11\'s - and Debug says it is starting',
+      [contexts.at(-1).state, asked.length - before, deck.live(), deckReport().context], ['running', 0, false, 'starting'])
+    const loading = workletHeld
+    workletHeld = null
+    loading[0].resolve()
+    await settle()
+    check('...loaded: the window asked for, and in it - a press is the deck\'s', [asked.length - before, deck.live(), deckReport().voice, deckReport().voiceWhy], [1, true, 'worklet', null])
+    deck.setShowing(false)
+    await settle()
+    deck.setShowing(true)
+    check('...hidden and shown again, its context suspended until a tap: .11\'s again - and a pause plain, though the window is in',
+      [deck.live(), deckReport().window?.start, deck.pausing()], [false, 58, null])
+    deck.destroy()
+  }
+  {
+    noWorklet = true
+    noScript = true
+    const host = fakeHost()
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    wakeDeckAudio()
+    await settle()
+    const before = asked.length
+    await play(host, 5)
+    check('neither an AudioWorklet nor a ScriptProcessorNode: the context running, and nothing asked in 5 s of play, every press .11\'s, Debug saying why',
+      [contexts.at(-1).state, asked.length - before, deck.live(), deckReport().context, deckReport().voice], ['running', 0, false, 'no-voice', null])
+    check('...and a pause is plain: no wind-down to seek to', deck.pausing(), null)
+    deck.destroy()
+    noWorklet = false
+    noScript = false
+  }
+  {
+    const { host, deck } = await fresh({ isPlaying: false })
+    const before = asked.length
+    check('a paused song, its voice ready: no window yet (none is asked for a paused song), so a press is .11\'s', [asked.length - before, deck.live()], [0, false])
+    deck.holdStill(true)
+    await settle()
+    check('...pressed - .11\'s press, the record held still under it: the window where the record is asked for', asked.slice(before), ['/deadwax/navidrome/scrub/time?at=56&seconds=40'])
+    deck.holdStill(false)
+    check('...so the next press there is the deck\'s', deck.live(), true)
+    deck.destroy()
+    const mp3 = await fresh({ song: () => ({ id: 'mp3', length: 200, flac: false, kind: 'MP3' }) })
+    mp3.deck.holdStill(true)
+    await settle()
+    check('an MP3: no window ever, so every press is .11\'s - no momentum without its sound', [mp3.deck.live(), asked.some((url) => url.includes('/mp3'))], [false, false])
+    mp3.deck.holdStill(false)
+    mp3.deck.destroy()
+    answer = 'not flac'
+    const refused = await fresh()
+    refused.deck.holdStill(true)
+    await settle()
+    check('a window deadwax refused (415): .11\'s too', [refused.deck.live(), deckReport().refused], [false, "it isn't a FLAC file"])
+    refused.deck.holdStill(false)
+    refused.deck.destroy()
+    answer = 'window'
+  }
+
+  {
+    //? where the press is, for a record that coasts: where the PLATTER is, not where the song was
+    //? sought to land - a paused record flicked back from 0:57.8, its window 0:56-1:36, landing at 0:53.5
+    const { host, deck } = await fresh({ isPlaying: false })
+    deck.pressed(clock)
+    deck.takeOver()
+    await settle()
+    for (let ms = 0; ms <= 500; ms += 20) deck.hand(clock + ms, (((60 - ms / 500) - 60) / SECONDS_PER_TURN) * 2 * Math.PI, 60 - ms / 500)
+    for (let ms = 520; ms <= 600; ms += 20) {
+      const at = 59 - (1.2 * (ms - 500)) / 100
+      deck.hand(clock + ms, ((at - 60) / SECONDS_PER_TURN) * 2 * Math.PI, at)
+    }
+    clock += 600
+    decodeMode = 'held'
+    decodesHeld.length = 0
+    const released = deck.release(clock, 'up')
+    host.moveTo(released.seek)
+    await settle()
+    advance(50)
+    check('a press on it as it coasts, the platter still in the window and the song sought outside it: the deck\'s',
+      [released.seek < 56, deck.live()], [true, true])
+    advance(250)
+    check('...once the platter is past the window\'s start, the next window still decoding: still the deck\'s - the flick paused the song already, and there is nothing for .11\'s path to play on (review: taken down it, the coast ran on under the finger)',
+      deck.live(), true)
+    const timersBefore = timers.length
+    deck.pressed(clock)
+    const caught = deck.takeOver()
+    const takes = posted('take').length
+    check('...pressed: caught where the platter is, outside the window - silently, nothing more of the coast to come',
+      [deck.taken(), caught < 56, caught > released.seek, timers.length <= timersBefore, posted('take').length - takes], [true, true, true, true, 0])
+    advance(3000)
+    runFrames(2)
+    check('...held 3 s: nothing played, the face where the hand has it, and the time line where it was caught',
+      [host.calls, round(host.shown.at(-1)[0], 1), host.shown.at(-1)[1]], [[], round(caught, 1), true])
+    decodesHeld.at(-1)()
+    decodeMode = 'now'
+    const sounded = posted('take').at(-1)
+    check('...that window in, under the hand: it sounds from where it was caught, held still', [posted('take').length - takes, round(sounded.at, 6), sounded.rate], [1, round(caught, 6), 0])
+    check('...let go where it was caught: sought there', round(deck.release(clock, 'up').seek, 6), round(caught, 6))
+    deck.destroy()
+  }
+  {
+    //? a playing record flicked back out of its window, caught as the motor brings it back to speed: the
+    //? deck's - and nothing plays the song under the hand
+    const { host, deck } = await fresh()
+    deck.pressed(clock)
+    deck.takeOver()
+    decodeMode = 'held'
+    decodesHeld.length = 0
+    for (let ms = 0; ms <= 800; ms += 20) deck.hand(clock + ms, -((ms / 100) / SECONDS_PER_TURN) * 2 * Math.PI, 60 - ms / 100)
+    clock += 800
+    await settle()
+    const released = deck.release(clock, 'up')
+    host.moveTo(released.seek)
+    await settle()
+    runFrames(5)
+    check('a run back to speed out of its window, the window it runs into still decoding: a press is the deck\'s', [released.seek < 56, deck.live()], [true, true])
+    deck.pressed(clock)
+    deck.takeOver()
+    advance(2000)
+    check('...caught and held 2 s: the song stays paused under the hand (review: .11\'s path let the coast\'s end play it under a held finger)', [host.calls, host.isPlaying], [['hold'], false])
+    decodesHeld.at(-1)()
+    decodeMode = 'now'
+    deck.destroy()
+  }
+  {
+    //? the same coast with its voice gone meanwhile - the page hidden and shown, its context suspended
+    //? until a tap: .11's press, which ends it where the finger holds it
+    const { host, deck } = await fresh({ isPlaying: false })
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, -(ms / 1000) * 6 * Math.PI, 60 - (ms / 1000) * 3 * SECONDS_PER_TURN)
+    clock += 100
+    host.moveTo(deck.release(clock, 'up').seek)
+    runFrames(3)
+    deck.setShowing(false)
+    await settle()
+    deck.setShowing(true)
+    runFrames(3)
+    const takes = posted('take').length
+    check('a coast whose context a hide suspended: a press is .11\'s', [contexts.at(-1).state, deck.live()], ['suspended', false])
+    deck.holdStill(true)
+    const held = host.angle
+    check('...pressed: the coast ends where the finger holds it - its timer gone, nothing shown of it', [timers.some((timer) => timer.at > clock + 50), host.shown.at(-1)], [false, null])
+    advance(2000)
+    runFrames(3)
+    deck.holdStill(false)
+    runFrames(1)
+    check('...let go 2 s on: the record doesn\'t move - no leap to where the coast would have got to - nothing sounded, nothing played', [round(host.angle - held, 3), posted('take').length - takes, host.calls], [0, 0, []])
+    deck.destroy()
+  }
+  {
+    const { host, deck } = await fresh()
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, -(ms / 1000) * 6 * Math.PI, 60 - (ms / 1000) * 3 * SECONDS_PER_TURN)
+    clock += 100
+    host.moveTo(deck.release(clock, 'up').seek)
+    runFrames(3)
+    deck.setShowing(false)
+    await settle()
+    deck.setShowing(true)
+    runFrames(3)
+    check('a run back to speed whose context a hide suspended, its sound running: a press is .11\'s', [contexts.at(-1).state, deck.live(), host.calls, deck.motion.sounding], ['suspended', false, ['hold'], true])
+    const drives = posted('drive').length
+    const stops = posted('stop').length
+    deck.holdStill(true)
+    const held = host.angle
+    check('...pressed: the song plays now, as .11\'s does under the finger - from where the release sought it - and the record\'s sound stops, rather than holding speed 1 for it under the finger',
+      [host.calls, host.isPlaying, host.shown.at(-1), posted('drive').length - drives, posted('stop').length - stops], [['hold', 'resume'], true, null, 0, 1])
+    deck.playingChanged(true)
+    runFrames(5)
+    check('...the record still under the finger', round(host.angle - held, 3), 0)
+    deck.holdStill(false)
+    runFrames(1)
+    check('...let go: it turns on from there - a frame\'s worth, no leap', round(host.angle - held, 3), 3.2)
+    deck.destroy()
+  }
+  {
+    //? an MP3 paused from the turntable: the platter spins down with no sound - and a press on it then
+    const mp3 = await fresh({ song: () => ({ id: 'mp3', length: 200, flac: false, kind: 'MP3' }) })
+    runFrames(5)
+    check('an MP3 paused on the turntable: a plain pause, the platter winding down silently', mp3.deck.pausing(), null)
+    mp3.host.isPlaying = false
+    mp3.deck.playingChanged(false)
+    runFrames(10)
+    check('...pressed as it winds down: .11\'s', mp3.deck.live(), false)
+    mp3.deck.holdStill(true)
+    const held = mp3.host.angle
+    advance(300)
+    runFrames(3)
+    mp3.deck.holdStill(false)
+    runFrames(3)
+    check('...let go 300 ms on: the wind-down ended where it was held - not a degree further (review: it ran on underneath, and the face leapt 33 degrees)', [round(mp3.host.angle - held, 3), frames.length], [0, 0])
+    mp3.deck.destroy()
+  }
+  for (const kind of ['worklet', 'script']) {
+    //? the first turn of a paused song before the sound has ever started (Now Playing opened onto the
+    //? turntable from the mini player, which only resumes a context): the release starts the sound, and
+    //? the window where the record is is asked for as soon as there is a voice to put it in
+    noWorklet = kind === 'script'
+    if (noWorklet) globalThis.isSecureContext = false
+    const host = fakeHost({ isPlaying: false })
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    const before = asked.length
+    const first = deck.live()
+    deck.holdStill(true)
+    //? the release, in Turntable's order: the sound woken in its gesture, .11's press let go, the song
+    //? sought where the turn put it
+    wakeDeckAudio()
+    deck.holdStill(false)
+    host.moveTo(65)
+    await settle()
+    if (kind === 'script') playBlocksQuietly(scripts.at(-1), 1)
+    await settle()
+    await settle()
+    check(`a paused song, its sound not yet started (${kind === 'script' ? 'on the main thread' : 'the worklet'}): the first press .11's, and its window asked for once the voice is there - so the next press has its sound (review: the release let go of the press first, and the ask was lost)`,
+      [first, asked.slice(before), deck.live()], [false, ['/deadwax/navidrome/scrub/time?at=60&seconds=40'], true])
+    //? the arm moving the paused song well away, and the screen closed and opened again: that one ask
+    //? was the press's, and nothing more is fetched for a paused song
+    host.moveTo(150)
+    deck.setShowing(false)
+    deck.setShowing(true)
+    await settle()
+    check('...that ask was the press\'s alone: the paused song moved elsewhere and the screen opened again, nothing more fetched', asked.length - before, 1)
+    deck.destroy()
+    noWorklet = false
+    delete globalThis.isSecureContext
+  }
+
+  console.log('\nthe page\'s audio session: \'playback\' while the deck lives, put back as the turntable goes - untouched where there is none')
+  {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+    const setNavigator = (value) => Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true })
+    const session = { type: 'auto' }
+    setNavigator({ audioSession: session })
+    const deck = new Deck(fakeHost())
+    deck.setShowing(true)
+    check('before the wake: as it was', session.type, 'auto')
+    wakeDeckAudio()
+    check('woken, in the gesture: \'playback\' - WebKit gives Web Audio the \'ambient\' kind, which the silent switch mutes, while the song\'s element is paused', session.type, 'playback')
+    await settle()
+    deck.setShowing(false)
+    await settle()
+    deck.setShowing(true)
+    wakeDeckAudio()
+    await settle()
+    check('...still, while the deck lives: hidden, shown and woken again', session.type, 'playback')
+    deck.destroy()
+    check('the turntable gone: put back as it was', session.type, 'auto')
+    session.type = 'ambient'
+    const again = new Deck(fakeHost())
+    again.setShowing(true)
+    wakeDeckAudio()
+    check('...whatever it was', session.type, 'playback')
+    again.destroy()
+    check('...\'ambient\' put back as \'ambient\'', session.type, 'ambient')
+    //? each wake below is held to a context of its OWN - made by it, running, the deck's report not
+    //? 'failed' - since the last one made before it was closed the same way (review: the checks read
+    //? that one, and passed with no sound made at all)
+    const woken = async (deck) => {
+      const made = contexts.length
+      let threw = null
+      let running = null
+      try {
+        wakeDeckAudio()
+        await settle()
+        running = [contexts.length - made, contexts.at(-1).state, deckReport()?.context]
+        deck.destroy()
+      } catch (error) {
+        threw = error
+      }
+      return [threw, running, contexts.length > made ? contexts.at(-1).calls : null]
+    }
+    setNavigator({ audioSession: { get type() { return 'auto' }, set type(value) { throw new TypeError('read-only') } } })
+    const stubborn = new Deck(fakeHost())
+    stubborn.setShowing(true)
+    check('a session that won\'t be set: nothing thrown, the sound made as ever', await woken(stubborn), [null, [1, 'running', 'running'], ['resume', 'close']])
+    setNavigator({})
+    const none = new Deck(fakeHost())
+    none.setShowing(true)
+    check('no audioSession at all (anything but Safari 16.4 and later): nothing set, nothing thrown, the sound made as ever', await woken(none), [null, [1, 'running', 'running'], ['resume', 'close']])
+    if (original) Object.defineProperty(globalThis, 'navigator', original)
+    else delete globalThis.navigator
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

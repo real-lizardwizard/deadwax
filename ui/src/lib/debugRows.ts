@@ -252,33 +252,47 @@ function megabytes(bytes: number): string {
 /**
  * "Turntable sound" (2.0.0-player.14): whether the turntable's own sound is ready - the window of the
  * song it has, "0:42-1:12, FLAC, decoded at 48 kHz" - or off, and why: the turntable isn't showing; no
- * Web Audio, or no AudioWorklet, in this browser; the sound couldn't start (the browser's words);
+ * Web Audio, or nothing to play it on, in this browser; the sound couldn't start (the browser's words);
  * not a FLAC; a window this browser couldn't decode (its words); waiting for a tap to start the sound
- * (an audio context starts only from one); deadwax not sending a window. This is how an iPhone tells
- * what WebKit made of it. The note says what windows have cost since the turntable showed - and when,
- * after it showed, the last of them came: the deck reports as things change, not as time passes, so
- * that is the time the bytes are measured to (divide one by the other for a rate).
+ * (an audio context starts only from one); still starting; deadwax not sending a window; its window
+ * loading, or none yet. Off, a press on the record is 2.0.0-player.11's: it scrubs silently, the song
+ * playing on (2.0.0-player.16 - the deck takes a press only when the record can sound there). This is
+ * how an iPhone tells what WebKit made of it. The note says which voice plays it and why (2.0.0-player.16:
+ * on the main thread when the page has no AudioWorklet - it isn't on HTTPS - or it wouldn't load), then
+ * what windows have cost since the turntable showed - and when, after it showed, the last of them came:
+ * the deck reports as things change, not as time passes, so that is the time the bytes are measured to
+ * (divide one by the other for a rate).
  */
 export function turntableRow(report: DeckReport | null | undefined): DebugRow {
   const label = 'Turntable sound'
   if (!report) return { label, value: "Off: the turntable isn't showing" }
+  const voice = report.voice === 'script'
+    ? `On the main thread - ${report.voiceWhy ?? 'this browser has no AudioWorklet'}`
+    : report.voice === 'worklet' ? 'On its own audio thread (an AudioWorklet)' : undefined
   const cost = report.fetched > 0
     ? `${report.window ? `${megabytes(report.window.bytes)} a window; ` : ''}${megabytes(report.fetched)} fetched since the turntable showed, the last window ${clock(report.lastFetchAt / 1000)} in`
     : undefined
-  const withCost = (row: DebugRow): DebugRow => (cost ? { ...row, note: row.note ? `${row.note} · ${cost}` : cost } : row)
+  //? the row's own note first, then which voice, then the cost
+  const withNotes = (row: DebugRow): DebugRow => {
+    const note = [row.note, voice, cost].filter(Boolean).join(' · ')
+    return note ? { ...row, note } : row
+  }
   const window = report.window
   const stretch = window ? `${clock(window.start)}-${clock(window.end)}, ${window.kind}, decoded at ${khz(window.decodedAt)}` : ''
   if (report.context === 'unsupported') return { label, value: 'Off: this browser has no Web Audio' }
-  if (report.context === 'no-worklet') return { label, value: 'Off: this browser has no AudioWorklet' }
-  if (report.context === 'failed') return withCost({ label, value: upperFirst(`off: ${report.problem ?? "the sound couldn't start"}`) })
-  if (report.refused) return withCost({ label, value: `Off: ${report.refused}` })
+  if (report.context === 'no-voice') return { label, value: 'Off: this browser has neither an AudioWorklet nor a ScriptProcessorNode to play it' }
+  if (report.context === 'failed') return withNotes({ label, value: upperFirst(`off: ${report.problem ?? "the sound couldn't start"}`) })
+  if (report.refused) return withNotes({ label, value: `Off: ${report.refused}` })
   if (report.context === 'none') {
-    return withCost({ label, value: 'Off: waiting for a tap to start the sound', ...(window ? { note: `Its window is ready: ${stretch}` } : {}) })
+    return withNotes({ label, value: 'Off: waiting for a tap to start the sound', ...(window ? { note: `Its window is ready: ${stretch}` } : {}) })
   }
-  if (window) return withCost({ label, value: `${report.context === 'starting' ? 'Starting' : 'Ready'}: ${stretch}`, mono: true })
-  if (report.failed) return withCost({ label, value: `Off: ${report.failed}` })
-  if (report.loading) return withCost({ label, value: 'Loading the sound' })
-  return withCost({ label, value: 'No window yet: one is fetched while the song plays, or as the record is turned' })
+  if (report.context === 'starting') {
+    return withNotes({ label, value: 'Off: still starting - a press scrubs silently until it has', ...(window ? { note: `Its window is ready: ${stretch}` } : {}) })
+  }
+  if (window) return withNotes({ label, value: `Ready: ${stretch}`, mono: true })
+  if (report.failed) return withNotes({ label, value: `Off: ${report.failed}` })
+  if (report.loading) return withNotes({ label, value: 'Off: its window is loading - a press scrubs silently until it is in' })
+  return withNotes({ label, value: 'Off: no window yet - a press scrubs silently; one is fetched while the song plays, or as the record is pressed' })
 }
 
 type Answer = Readonly<Record<string, unknown>>

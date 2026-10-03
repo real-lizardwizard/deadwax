@@ -6,9 +6,13 @@
  * A SEPARATE sound path. The player's own audio element is never connected to Web Audio - a
  * createMediaElementSource is what breaks locked playback on an iPhone - so normal playback is
  * exactly what it was, bit for bit. This sound is a stretch of the song round the playhead, decoded
- * from a FLAC window deadwax cuts (src/flac_window.py), and read here by an AudioWorklet at a SIGNED,
- * fractional rate: 1 is the song, 0 is silence - a record held still makes no sound - and negative
- * runs it backwards. Outside the window it is silent.
+ * from a FLAC window deadwax cuts (src/flac_window.py), and read here at a SIGNED, fractional rate: 1
+ * is the song, 0 is silence - a record held still makes no sound - and negative runs it backwards.
+ * Outside the window it is silent. What runs these functions is an AudioWorklet, on an audio thread of
+ * its own, wherever the page can have one - or, where it can't (a page that isn't on HTTPS: the browser
+ * gives AudioWorklet to secure pages only), a ScriptProcessorNode on the page's main thread
+ * (player/deck.ts, 2.0.0-player.16). One DSP, two hosts: nothing about the sound differs but where it
+ * runs - and, on the main thread, a constant 43 ms later (SCRIPT_LAG_BLOCKS, deck.ts's startScript).
  *
  *  - The worklet is driven by a position and a rate (`drive`): where the record is now in the song,
  *    and how fast it is going - the hand's, the coast's, the wind-down's, from player/deck.ts each
@@ -26,16 +30,17 @@
  *  - Read with four-point (Catmull-Rom) interpolation, so the song at speed 1 - the handover after a
  *    coast, the start of a wind-down - sounds as the song does, not dulled.
  *
- * The three functions the worklet runs - newVoiceState, voiceCommand and renderVoice - are written
- * SELF-CONTAINED (no imports, no module constants, no helpers outside themselves), because the
- * worklet's module is made from their own source text (voiceWorkletSource): an AudioWorklet runs in
- * a scope of its own, and the page's bundle can't be imported into it.
+ * The four functions the worklet runs - newVoiceState, voiceCommand, renderVoice and voiceReport - are
+ * written SELF-CONTAINED (no imports, no module constants, no helpers outside themselves, nor one
+ * another), because the worklet's module is made from their own source text (voiceWorkletSource): an
+ * AudioWorklet runs in a scope of its own, and the page's bundle can't be imported into it. The
+ * main-thread voice calls the very same four.
  */
 
 /** The worklet's name, as registerProcessor() and new AudioWorkletNode() say it. */
 export const VOICE_PROCESSOR = 'deadwax-deck-voice'
 
-/** How many times a second the worklet says where it is. */
+/** How many times a second the voice says where it is - either host (voiceReport). */
 export const REPORTS_PER_SECOND = 30
 
 /** A stretch of the song, decoded: its channels at `rate` samples a second, from `start` (song s). */
@@ -66,12 +71,15 @@ export interface VoiceState {
   /** the DC blocker's last input and output, per channel */
   lastIn: number[]
   lastOut: number[]
+  /** samples played since it last said where it is (voiceReport) */
+  counted: number
 }
 
 export type VoiceMessage =
   /** a new stretch of the song; the read head stays where it is in the song */
   | { type: 'window'; channels: Float32Array[]; start: number; rate: number }
-  /** start sounding at `at`, already at `rate` (1 for a song that was playing), faded in */
+  /** start sounding where the record is - at `at` as of context time `time`, moving at `rate` (1 for
+   *  a song that was playing) - already at that rate, faded in */
   | { type: 'take'; at: number; rate: number; time: number; until: number }
   /** steer towards `at`, moving at `rate` and changing it by `accel` a second (a coast's friction, the
    *  motor's pull), as of context time `time`, until `until` */
@@ -81,7 +89,7 @@ export type VoiceMessage =
   /** silence now (a few ms), and rest */
   | { type: 'stop' }
 
-/** What the worklet says ~30 times a second. */
+/** What the voice says ~30 times a second. */
 export interface VoiceHeard {
   type: 'heard'
   pos: number
@@ -95,7 +103,7 @@ export function newVoiceState(): VoiceState {
   return {
     pos: 0, rate: 0, gain: 0, gainTarget: 0, gainAlpha: 0.01,
     driving: false, driveAt: 0, driveRate: 0, driveAccel: 0, driveTime: 0, driveUntil: 0,
-    window: null, lastIn: [0, 0], lastOut: [0, 0],
+    window: null, lastIn: [0, 0], lastOut: [0, 0], counted: 0,
   }
 }
 
@@ -109,7 +117,11 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
     const channels = message.channels.filter((channel) => channel && channel.length)
     state.window = channels.length ? { channels, start: message.start, rate: message.rate, length: channels[0]!.length } : null
   } else if (message.type === 'take') {
-    state.pos = message.at
+    //? where the record is by `now`: it was at `at` as of context time `time`, moving at `rate` - and a
+    //? host may apply it later than that (the main-thread voice holds it to its next block, which plays
+    //? a block or two on). Started there, it has nothing to catch up; started at `at`, the steering would
+    //? race it to where the record had got to - a chirp, half an octave up (review of 2.0.0-player.16)
+    state.pos = message.at + message.rate * (now - message.time)
     state.rate = message.rate
     state.gain = 0
     state.gainTarget = 1
@@ -136,7 +148,6 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
     state.gainTarget = 0
     state.gainAlpha = alpha(QUICK_S)
   }
-  void now
 }
 
 /**
@@ -208,7 +219,20 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
 }
 
 /**
- * The worklet's module, made from the three functions' own source - so what the browser runs is
+ * After `frames` samples played from context time `now`: what the voice says of where it is, when
+ * `perSecond` times a second come round (exactly - the count carries its remainder), or null. Both
+ * hosts call it after renderVoice, so the worklet and the main-thread voice say it alike.
+ */
+export function voiceReport(state: VoiceState, frames: number, sampleRate: number, now: number, perSecond: number): VoiceHeard | null {
+  state.counted += frames
+  const every = sampleRate / perSecond
+  if (state.counted < every) return null
+  state.counted -= every
+  return { type: 'heard', pos: state.pos, rate: state.rate, gain: state.gain, time: now }
+}
+
+/**
+ * The worklet's module, made from the four functions' own source - so what the browser runs is
  * exactly what the sim runs, the page's build or not. Loaded through a Blob URL (player/deck.ts).
  */
 export function voiceWorkletSource(): string {
@@ -216,22 +240,19 @@ export function voiceWorkletSource(): string {
     `const newVoiceState = ${newVoiceState.toString()};`,
     `const voiceCommand = ${voiceCommand.toString()};`,
     `const renderVoice = ${renderVoice.toString()};`,
+    `const voiceReport = ${voiceReport.toString()};`,
     `class DeckVoice extends AudioWorkletProcessor {`,
     `  constructor() {`,
     `    super();`,
     `    this.state = newVoiceState();`,
-    `    this.counted = 0;`,
     `    this.port.onmessage = (event) => voiceCommand(this.state, event.data, currentTime, sampleRate);`,
     `  }`,
     `  process(inputs, outputs) {`,
     `    const out = outputs[0];`,
     `    if (out && out.length) {`,
     `      renderVoice(this.state, out, out[0].length, sampleRate, currentTime);`,
-    `      this.counted += out[0].length;`,
-    `      if (this.counted >= sampleRate / ${REPORTS_PER_SECOND}) {`,
-    `        this.counted -= sampleRate / ${REPORTS_PER_SECOND};`,
-    `        this.port.postMessage({ type: 'heard', pos: this.state.pos, rate: this.state.rate, gain: this.state.gain, time: currentTime });`,
-    `      }`,
+    `      const heard = voiceReport(this.state, out[0].length, sampleRate, currentTime, ${REPORTS_PER_SECOND});`,
+    `      if (heard) this.port.postMessage(heard);`,
     `    }`,
     `    return true;`,
     `  }`,
@@ -246,13 +267,22 @@ export function voiceWorkletSource(): string {
 export interface DeckReport {
   /**
    * The audio context: 'none' - no tap has started it yet, or it is suspended (the turntable hidden,
-   * the screen closed, the page in the background) - 'starting', 'running'; or why there is none:
-   * 'unsupported' (no Web Audio), 'no-worklet' (no AudioWorklet), 'failed' (`problem` says why).
+   * the screen closed, the page in the background) - 'starting' (running, its voice not yet playing),
+   * 'running'; or why there is none: 'unsupported' (no Web Audio), 'no-voice' (neither an AudioWorklet
+   * nor a ScriptProcessorNode to play it on), 'failed' (`problem` says why).
    */
-  context: 'none' | 'starting' | 'running' | 'unsupported' | 'no-worklet' | 'failed'
+  context: 'none' | 'starting' | 'running' | 'unsupported' | 'no-voice' | 'failed'
   /** the browser's own words, for 'failed' */
   problem: string | null
-  /** the window decoded and in the worklet: the stretch of the song (s), its kind, the rate it was
+  /**
+   * What plays it (2.0.0-player.16): 'worklet' - an AudioWorklet, on an audio thread of its own - or
+   * 'script' - a ScriptProcessorNode on the page's main thread, where the page has no AudioWorklet or
+   * it wouldn't load; null while there is neither.
+   */
+  voice: 'worklet' | 'script' | null
+  /** why the main thread, for 'script': "this page isn't on HTTPS, so the browser has no AudioWorklet" */
+  voiceWhy: string | null
+  /** the window decoded and in the voice: the stretch of the song (s), its kind, the rate it was
    *  decoded at, and its size as fetched */
   window: { start: number; end: number; kind: string; decodedAt: number; bytes: number } | null
   /** a window on its way (fetched, or waiting to be decoded) */

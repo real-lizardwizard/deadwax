@@ -211,7 +211,9 @@ setting: close the screen and open it again, and it's back to what You says.
 
 Since 2.0.0-player.14 the record has **momentum** and **its own sound**: flick it and it keeps
 turning; the sound follows your hand, faster and slower and backwards; and pausing from the turntable
-winds the sound down with the record. All of it is described below.
+winds the sound down with the record. The two come together: where the record can't make its sound
+(below), turning it works as it did before, silently and with no momentum. All of it is described
+below.
 
 - **The record's face is the album's CD art**: the `disc.jpg` (or `.png`) that the main page's
   **Get CD art** saves beside the tracks - see [the library](library.md#covers-cd-art-and-lyrics).
@@ -262,10 +264,15 @@ winds the sound down with the record. All of it is described below.
   - **Before its sound has started**: the record's sound can only start from a tap - a tap on the
     record, the play/pause or skip buttons, or the button that switches to the turntable (and, once
     it has started before, tapping the mini player to open the screen). It stops whenever the screen
-    closes or the phone locks. Until one of those taps, turning the record works as it did
-    before 2.0.0-player.14: silently, the song playing on while you hold it (the record itself stops
-    turning under your finger), moved on or back by as much as you turned it when you let go, and no
-    momentum. Letting go of the record counts as a tap, so the next turn has its sound.
+    closes or the phone locks. And it needs the stretch of the song where the record is (below) to
+    have arrived - a moment after that first tap while the song plays; for a paused song, the first
+    press asks for it. Until then (since 2.0.0-player.16 - before, a turn could pause the song and
+    play nothing), turning the record works as it did before 2.0.0-player.14: silently, the song
+    playing on while you hold it (the record itself stops turning under your finger), moved on or
+    back by as much as you turned it when you let go, and no momentum. Letting go of the record
+    counts as a tap, so the next turn has its sound once its stretch is in. A record still coasting
+    from a flick is the exception: the flick paused the song already, so you catch it as ever, even
+    where its next stretch hasn't arrived yet - silent until it does.
   - **The sound** comes from FLAC songs only - a stretch of about 40 seconds of the song round
     where it's playing (less for a hi-res song played as it is), which deadwax cuts from the very copy
     of the song the phone plays - for a hi-res song under **Maximum quality**'s **Up to 48 kHz**, the
@@ -274,9 +281,19 @@ winds the sound down with the record. All of it is described below.
     asked for that copy already, to play the song; otherwise deadwax makes it the first time. That
     costs about a third more data than the song itself while the turntable shows and the song plays
     (about half as much again for a hi-res song played as it is, whose stretches are shorter), and
-    nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns
-    silently, with the same momentum.
-    [Info → Debug](#info--debug)'s **Turntable sound** row says whether it's ready, and if not, why.
+    nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns as
+    before 2.0.0-player.14: silently, and with no momentum.
+  - **Over plain `http://` too** (since 2.0.0-player.16): a browser gives the part that best plays
+    this sound - an AudioWorklet, on an audio thread of its own - only to a page on HTTPS (or on the
+    computer itself, `localhost`). Opened at a plain `http://` address on your network, deadwax plays
+    the record's sound on the page's main thread instead, with the very same code, so it sounds the
+    same - only a few hundredths of a second later; on HTTPS it gets its own thread, which is steadier
+    if the page is busy. From the first tap
+    that starts the sound until the turntable goes (switched back to the cover), deadwax also tells an
+    iPhone that the page plays music, so the ringer switch on silent doesn't mute the record's sound (while you turn it the song itself is paused, and iOS would
+    otherwise treat the record's sound as the kind the switch silences - not yet checked on a phone).
+    [Info → Debug](#info--debug)'s **Turntable sound** row says whether it's ready, and if not, why,
+    and which of the two plays it.
     It never touches the song's own playback: what you hear when the record is at its own speed is
     the song, exactly as it always was.
 - **Pause winds the record down**, a checkbox in **You** under **Playback**, beside **Now Playing
@@ -423,7 +440,7 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
 | Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
 | | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
-| The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
+| The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why) and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
 | Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
 
 The **Gap** row is timed with Gapless off as well, the same way, so you can compare the two.
@@ -465,22 +482,28 @@ Anything longer than 30 seconds isn't counted either. If it says Gapless isn't h
 says what each answer means.
 
 **Turntable sound** says what your phone made of the record's own sound - which only your phone can
-say, since an iPhone decodes it its own way:
+say, since an iPhone decodes it its own way. Whenever it says **Off**, a press on the record works as
+it did before 2.0.0-player.14: silently, the song playing on under your finger.
 
 | it says | meaning |
 | --- | --- |
-| `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` | the stretch of the song the record can play, and the rate your phone decoded it at |
-| `Starting: …` | the stretch is there, and the part that plays it is still loading |
+| `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` | the stretch of the song the record can play, and the rate your phone decoded it at. A press there has the record's sound |
 | `Off: the turntable isn't showing` | the now-playing screen is on the cover, or closed |
 | `Off: waiting for a tap to start the sound` | the sound can only start from a tap: tap the record, a transport button or the look button. Nothing is fetched for it before the first one |
+| `Off: still starting - …` | the part that plays it hasn't begun yet |
 | `Off: it isn't a FLAC file (it is MP3)` | only FLAC songs have the record's sound |
 | `Off: this browser couldn't decode its window - …` | your phone refused the stretch deadwax sent, in its own words: tell us what it says |
-| `Off: this browser has no AudioWorklet` (or `no Web Audio`) | the browser can't play it at all |
-| `Off: the sound couldn't start - …` (or `the sound's worklet wouldn't load - …`) | the browser's own reason |
+| `Off: this browser has neither an AudioWorklet nor a ScriptProcessorNode to play it` (or `no Web Audio`) | the browser can't play it at all |
+| `Off: the sound couldn't start - …` (or `the sound's ScriptProcessorNode couldn't be made - …`) | the browser's own reason |
 | `Off: deadwax didn't send it - …` | deadwax couldn't make the stretch just then; it asks again after ten seconds |
 | `Off: deadwax said that is past the end of the song` | the phone asked for a stretch beyond the file's end (the song's length as Navidrome gave it is longer than the file); it asks again after ten seconds |
-| `Loading the sound` | the stretch is on its way |
-| `No window yet: …` | the song is paused and the record hasn't been turned: nothing is fetched until it plays |
+| `Off: its window is loading - …` | the stretch is on its way |
+| `Off: no window yet - …` | the song is paused and the record hasn't been pressed: nothing is fetched until it plays, or until the record is pressed |
+
+The line under it says which part plays the sound (since 2.0.0-player.16): `On its own audio thread
+(an AudioWorklet)`, or `On the main thread - this page isn't on HTTPS, so the browser has no
+AudioWorklet` when deadwax is opened at a plain `http://` address (or `… the AudioWorklet wouldn't
+load (…)`, in the browser's words, when it refused it) - then what its stretches have cost.
 
 **Navidrome sent** is there to check what your Navidrome really sends before later parts of the app
 rely on it: the field names only, such as `discTitles` on an album or `musicBrainzId`, `playCount`
@@ -812,6 +835,15 @@ question the whole player existed to answer. Still to find out:
   on silent before); then locking the phone mid-song after turning the record - the music should keep
   playing and the lock screen's next should work - and all of it on AirPods. If anything is silent,
   [Info → Debug](#info--debug)'s **Turntable sound** row says why;
+- **the turntable's sound over plain `http://`** (2.0.0-player.16 - the fix for "the audio doesn't
+  follow the turntable when scrubbing"): opened at your usual `http://` address, Debug's **Turntable
+  sound** should say `Ready: …` with `On the main thread - this page isn't on HTTPS …` under it,
+  and turning the record should be heard forwards and backwards, silent held still, with no quick
+  rise in pitch as you grab a playing record or pause from it; a press in the
+  moment before it's ready should leave the song playing under your finger; the ringer switch on
+  silent shouldn't mute it (deadwax now asks iOS to treat the page as playing music from the first
+  tap on the turntable until it goes); and, after turning the record, locking the phone mid-song should still leave the
+  music playing, with the lock screen's controls and AirPods working;
 - **Requests** on the phone: the ✕ asking in the card (a home-screen app always asks: it has its
   own storage, and no Settings tab to turn that off), the count on the tab, Home's Arriving coming
   and going, a download started on the main page showing up when you come back to the app, what
