@@ -211,25 +211,74 @@ export interface Candidate {
   /** Hz, e.g. 44100 / 96000. Empty means unknown. */
   sample_rates: number[]
   variable_bitrate: boolean
+  /**
+   * The release's tracks nothing in the folder was paired with (2.0.0-player.15), the first few in
+   * tracklist order - a source card's amber "Missing “Threads”" - and how many in all. A video
+   * track is never missing from a folder of audio. Absent from an older server.
+   */
+  missing_tracks?: MissingTrack[]
+  missing_count?: number
+  /**
+   * How many of the release's tracks are AUDIO (src/matching.py audio_tracks) - what a source
+   * card's Tracks counts against, so a CD+DVD shared whole is "14 of 14", not "14 of 34" with
+   * nothing missing. Absent from an older server.
+   */
+  audio_expected?: number
   files: CandidateFile[]
 }
 
-export interface FindCandidatesRequest {
+export interface MissingTrack {
+  position: number | null
+  disc: number | null
+  title: string
+}
+
+/**
+ * The release a download is FOR (2.0.0-player.15): what a Find or a Get searches Soulseek for, and
+ * what the job files the download as - built in ONE place, lib/releasePayload.ts, for the app and
+ * for the main page's two Find buttons alike (which reach it through the bridge). Every field is
+ * one the server declares (FindCandidatesRequest and EnqueueRelease in src/routes/download.py) -
+ * pydantic drops an undeclared field without a word, the trap that file describes six times over.
+ */
+export interface DownloadRelease {
+  /** AS CREDITED on the release - what a sharer typed into their folder name, so what is searched */
   artist: string
+  /** who the album is BY, in their CURRENT names - the folder it is filed under, the albumartist tag */
+  album_artist: string
+  artist_mbids: string[]
   album: string
-  year?: string | null
-  release_mbid?: string | null
-  edition_tags?: string[]
-  tracks?: Track[]
+  /** this pressing's year */
+  year: string | null
+  /** the album's own year (the group's first release) - what the folder is named after */
+  original_year: string | null
+  /** null for the album as a whole: no tracklist, and nothing checked as held or downloading */
+  release_mbid: string | null
+  edition_tags: string[]
+  tracks: Track[]
+  release_group_mbid: string | null
+  /** what names an edition's folder (src/editions.py) - absent from the album-as-a-whole fallback */
+  disambiguation?: string | null
+  media_format?: string | null
+  country?: string | null
+  catalog_number?: string | null
+}
+
+export interface FindCandidatesRequest extends DownloadRelease {
   format_preference?: FormatPreference
   /** Lets the UI re-run a tweaked query when the generated one finds nothing. */
   query_override?: string | null
-  /**
-   * The rest of what main.js's buildExpectedFromRelease puts in the payload - album_artist,
-   * artist_mbids, disambiguation and so on - which is also the release the download is filed
-   * as. Passed through untouched.
-   */
-  [field: string]: unknown
+}
+
+/**
+ * POST /download/store_state (2.0.0-player.15): what the library and the downloads already have of
+ * a pressing, with no Soulseek search - the album page's status line before Get. The same four
+ * fields find_candidates answers with.
+ */
+export interface StoreStateResponse {
+  held: HeldPressing | null
+  downloading: DownloadInFlight | null
+  downloading_part: DownloadInFlight | null
+  other_pressings: OtherPressing[]
 }
 
 export interface FindCandidatesResponse {
@@ -305,20 +354,10 @@ export interface EnqueueRequest {
   files: CandidateFile[]
   directory?: string
   /**
-   * Persisted denormalized with the job so organizing later needs no MusicBrainz call. The
-   * named fields are the ones read on this side; the vanilla candidates panel sends the whole
-   * payload built by buildExpectedFromRelease (album_artist, artist_mbids, disambiguation...),
-   * which passes through untouched.
+   * Persisted denormalized with the job so organizing later needs no MusicBrainz call: the release
+   * the candidate was searched for, exactly as lib/releasePayload.ts built it.
    */
-  release?: {
-    artist?: string
-    album?: string
-    year?: string | null
-    release_mbid?: string | null
-    edition_tags?: string[]
-    tracks?: Track[]
-    [field: string]: unknown
-  }
+  release?: DownloadRelease
   /** The rest of the list as shown, in order - where "try next peer" goes (v0.9.12). */
   alternatives?: EnqueueAlternative[]
 }

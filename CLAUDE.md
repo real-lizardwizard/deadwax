@@ -208,7 +208,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    with the player inside them - see "The one app". player/deck.ts is the
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts) - see
                    "The turntable, part two".
-tests/             1998 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2048 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -783,9 +783,10 @@ reader (`getSettings`) that only it used.
   transition part-played and the drag landed half a window off-screen - the harness trap in
   "Tooling and environment", not a bug; measure only after a screenshot has forced a paint.
 - **Opened through the bridge (`openCandidates`)** by the vanilla releases grid's two Find
-  buttons, which still build the release payload (`buildExpectedFromRelease` and
-  `buildExpectedFromReleaseGroup`) - that payload is also what the download is filed as, so
-  the builders stay in main.js until the grid is ported. `openCandidatesPanel` in main.js is a
+  buttons. They built the release payload themselves (`buildExpectedFromRelease` and
+  `buildExpectedFromReleaseGroup`) until 2.0.0-player.15, when both were deleted for the ONE
+  builder, `ui/src/lib/releasePayload.ts`, which the bundle hangs on the bridge
+  (`buildDownloadRelease`) - see "Sources and Get". `openCandidatesPanel` in main.js is a
   one-line forwarder.
 - **Download goes through `lib/downloadRequests.ts`** to the downloads panel's `enqueue`, so the
   "asking slskd..." row still appears on the click. A module rather than the bridge, because
@@ -1080,8 +1081,9 @@ the agent's memory), each affecting the single-user install as it stands. Shippe
   filed untagged (or kept the sharer's release id) and no "already held" check could ever match
   it. It now uses the card's pressings (or fetches them, with a sweep on the button). It picks
   the group's most common tracklist (chooseBase), then Official, then CD or Digital Media only,
-  then the earliest date. It builds the payload with the ROW's builder, `buildExpectedFromRelease`,
-  so both Finds send the same shape. MusicBrainz unreachable falls back to the old group-level
+  then the earliest date. It builds the payload with the ROW's builder, `buildExpectedFromRelease`
+  (since 2.0.0-player.15 both go through `lib/releasePayload.ts`, the one builder), so both Finds
+  send the same shape. MusicBrainz unreachable falls back to the old group-level
   payload, which now carries `release_group_mbid`. A `findRequests` latestOnly guard means a
   slow lookup never opens over a newer Find. `write_tags` also deletes a sharer's
   `musicbrainz_albumid` when the job names no release, since `tag_values` skips empty values.
@@ -1135,7 +1137,8 @@ A review of 1.0.1 found seven real problems in it, all fixed together:
 - **The editor followed a stale album after an apply.** `onApplied` set the editing album and
   the queue's paths from whatever the closure held; both are functional updates keyed on the
   OLD path now, so an apply landing after you stepped on can't pull the editor back.
-- **Downloads carry `original_year`** (main.js, both builders, through `realYear()` - `getYear()`
+- **Downloads carry `original_year`** (main.js, both builders - one, `lib/releasePayload.ts`,
+  since 2.0.0-player.15 - through `realYear()` - `getYear()`
   says 'N/A' for display, which the group fallback sent as a year: "Album (N/A)"). A card's Find
   standing for a real pressing made it matter: Wish You Were Here's card picks a 1985 CD, which
   without it files as `(1985)`. **Verified in the real page**: that card now sends year 1985,
@@ -1202,9 +1205,11 @@ A review of 1.0.1 found seven real problems in it, all fixed together:
   be that the two never resolve to the same name in the first place.
 - **`instrumental`, `acoustic` and `a cappella` are therefore in the edition vocabulary**, and
   that vocabulary exists in THREE places which must stay in step: `EDITION_PATTERNS` in
-  `matching.py` tags the Soulseek FOLDER being offered, `EDITION_KEYWORDS` in `main.js` tags
-  the RELEASE you picked for a download, and `EDITION_KEYWORDS` in `ui/src/lib/release.ts` tags
-  the release you pick in the metadata editor. The first two are scored against each other, so
+  `matching.py` tags the Soulseek FOLDER being offered, `EDITION_KEYWORDS` in
+  `ui/src/lib/release.ts` tags the RELEASE you picked - for a download (through
+  `lib/releasePayload.ts`, the one payload builder, since 2.0.0-player.15; `main.js`'s copy did it
+  until then) and in the metadata editor - and `EDITION_KEYWORDS` in `main.js` now only DRAWS the
+  releases grid's edition chips and facet. The first two are scored against each other, so
   **a marker in only one of them is worse than one in neither** — the release would carry a tag
   no folder could match. **The third copy had none of the three markers until v0.6.9**, so
   applying "Jackpot Juicer (instrumental)" in the editor aimed it at the ordinary album's
@@ -1567,7 +1572,8 @@ drawn whole: 12,720 rows for a song search on a thousand albums.
 - **Tracks carry both numberings.** `position` stays the RUNNING number across discs - the
   matcher keys on it and files are named after it, which keeps a two-disc set in order inside
   one folder - and `disc`/`disc_position` are MusicBrainz's own. `flattenTracks()` in release.ts
-  and `buildExpectedFromRelease()` in main.js both produce them; keep the two in step.
+  (the editor's) and `tracksOf()` in `lib/releasePayload.ts` (a download's - `buildExpectedFromRelease()`
+  in main.js until 2.0.0-player.15) both produce them; keep the two in step.
 - **A multi-disc release is tagged per disc; a single-disc release writes no disc tag at all -
   unless the file claims some OTHER disc (v0.6.9).** Writing "1" everywhere would give every
   album in the library a discnumber diff, so an album that is already right could never again
@@ -1611,8 +1617,9 @@ From Pre-FM Master Tape'".
   disc 4 of a 2018 GB BOOTLEG, "The High Resolution Remasters" (`74a781e4-...`), there as "TDSOTM -
   Live at Wembley - From Pre-FM Master Tape"; the official 2023 box calls its live discs "The Dark
   Side of the Moon Live at Wembley Empire Pool, London, 1974".
-- **Carried per TRACK, as `disc_title`**, by both builders (`buildExpectedFromRelease` in main.js,
-  `flattenTracks` in release.ts - the same trim-to-null rule; keep them in step) and declared on
+- **Carried per TRACK, as `disc_title`**, by both builders (`lib/releasePayload.ts` for a download -
+  main.js's `buildExpectedFromRelease` until 2.0.0-player.15 - and `flattenTracks` in release.ts for
+  the editor: the same trim-to-null rule; keep them in step) and declared on
   the download `Track` (the pydantic trap, a sixth time). Per track because `tag_values` already
   takes everything about the disc from the track. It reaches the file on both paths because the
   organizer and, since v1.0.10, `execute_retag` both hand `write_tags` the matched track whole.
@@ -3699,8 +3706,9 @@ below).
   becomes `missing`; one whose first file isn't this release (shared with an untagged rip) simply
   doesn't count and the download goes ahead.
 - **Video tracks don't count** (`store_index.audio_tracks`). Both payload builders mark a track
-  `video` - `isVideoTrack()` in interface/scripts/credits.mjs (buildExpectedFromRelease) and its
-  twin in ui/src/lib/release.ts (flattenTracks), held to one answer by credits.sim.cjs - when its
+  `video` - with `isVideoTrack()` in ui/src/lib/release.ts, for the editor (flattenTracks) and,
+  since 2.0.0-player.15, for a download (lib/releasePayload.ts; until then its twin in
+  interface/scripts/credits.mjs, for buildExpectedFromRelease, which went with it) - when its
   medium is a video format (DVD-Video, Blu-ray, Blu-ray-R, HD-DVD, VHS, VCD, SVCD, Betamax,
   LaserDisc, CED, UMD, a DualDisc's DVD-Video side) or its recording is `video`. A plain "DVD" or
   "DVD-R" counts only by the recording's flag: it may be DVD-Audio, and an audio track taken for
@@ -3783,15 +3791,16 @@ below).
   and without a release id), and going on from the job as it is now, AUTO_RETRY_PEER (quiet when
   a click won), the rename pause, the poller marking a folder being filed, and every writer through
   its real route with real FLACs. The two spelling tests skip on a case-sensitive disk (they ran,
-  on APFS). credits.sim.cjs asks both copies of `isVideoTrack` eight cases; candidates.sim.cjs pins
-  the part-downloading note.
+  on APFS). credits.sim.cjs asks both copies of `isVideoTrack` eight cases (one copy since
+  2.0.0-player.15: credits.mjs's went with main.js's builders, and the sim checks it is gone);
+  candidates.sim.cjs pins the part-downloading note.
   Mutation-checked, each failing a test: the early return, the 409, the lock, either retry's
   refusal, the empty-scan guard, the organizing age bound, the first-file tag check, the filing
   hook, the reconcile's second look, each writer hook; after review the unambiguous pairing,
   the still-there check before recording, missing-only revive, the retry re-read, the 120s bound,
   `fills_gaps`, and `quiet`; and after the second review title-first matching, the other-track
   guard, the running-position fallback, the video exclusion and its all-video fallback, `video`
-  declared, either `isVideoTrack` copy, the partial-job rule (in the store and in the covering
+  declared, either `isVideoTrack` copy (one since 2.0.0-player.15), the partial-job rule (in the store and in the covering
   count) and its note, the per-job lock, recency in `_missing_here` and `_moving_row`, the
   already-paired move, this-scan-first pairing, exact spelling and the on-disk spelling, the
   being-filed skip, the poller marking and clearing it, the cleared-job refusal, auto-retry's
@@ -4035,7 +4044,7 @@ the `/deadwax/me` seam, and disc titles on the album page.
   - The mini player keeps its 64px, its sides and its buttons, and moves up:
     `.app-shell .pl-mini { bottom: <the tab bar> + inset }`, with `.app-shell` padding for both.
     Stacking: the tab bar 8, the mini player 10, Now Playing 20 (and since 2.0.0-player.10 its •••
-    menu and Info, 30).
+    menu and Info, 30; since 2.0.0-player.15 the Sources sheet, 25).
   - New chrome is `app-` classes in app.css, tokens only - line heights, the pressed opacity and
     the primary button's pressed filter included (`--dw-leading-*`, `--dw-pressed-cover`,
     `--dw-primary-pressed`, review). `tests/test_app_css.py` reads the rules and fails on a raw
@@ -4475,9 +4484,10 @@ persistent all the time".
   would be a second request, throwing the first's answer away. Nothing on mount: the hook's own first
   poll is there. So a download started on another device shows when you look, which is what the
   plan's "refresh on visibility" was for.
-- **App registers `handleDownloadRequests(enqueue)`**, so a later slice's Get hands its pending row
-  to the one hook. Until Get exists nothing in the app enqueues, so "asking slskd…" and refused rows
-  can't appear there yet; the words are pinned for when they do, and the docs say so.
+- **App registers `handleDownloadRequests(enqueue)`**, so a Get hands its pending row to the one
+  hook. Until Get existed nothing in the app enqueued, so "asking slskd…" and refused rows couldn't
+  appear there; the words were pinned for when they did - and since 2.0.0-player.15 they do (see
+  "Sources and Get").
 - **The grouping and every word are `lib/requestsView.ts`** (pure; `requests.sim.cjs`, 149 checks):
   Downloading (downloading, organizing, and queued with progress - bytes moving before the poller's
   next look), Waiting (asking slskd first, then queued: "#4 in their queue", or "starting" as the
@@ -4622,7 +4632,8 @@ persistent all the time".
   on its side, a busy button's opacity, and the live region's hidden box.
 - **Not built, on purpose**: the board's "Missing from artists you have" and "Only as MP3" (after
   step 4, per the plan); per-user requests (step 4); tapping a Done row to play its album (the id
-  bridge, slices.md's S6 - Done rows are not links); Get (S5).
+  bridge, slices.md's S6 - Done rows are not links); Get (S5 - built in 2.0.0-player.15, "Sources and
+  Get").
 - **After review**: nineteen findings, each confirmed by skeptics, fixed together - the blocking
   confirm, the album-page memo that never held, "Nothing requested yet" before the first answer,
   Arriving and the badge freezing after one failed look (the app's side; the hook's is main's),
@@ -4740,9 +4751,10 @@ and "show the bonus track differences on an album that has them".
   The id in the address goes through `groupMbid()` (lowercased, MusicBrainz's pattern): anything
   else is `NOT_AN_ALBUM_LINK`, "That isn't a link to an album on MusicBrainz.", with no Try again
   and nothing asked - it was a 422 drawn as a URL with a Try again that could never work. `app-rg-actions` holds the `PressingPicker` where the album page has Play
-  and Shuffle; **Get is left out entirely until S5** (an unusable button is worse than none), the
-  column being where it goes under the picker - so the page has no solid purple button yet
-  (app-rules pins that). Outside the Navidrome gate (App's `pageView` branches on `page.kind`).
+  and Shuffle; **Get was left out entirely until S5** (an unusable button is worse than none), the
+  column being where it goes under the picker - so the page had no solid purple button (app-rules
+  pinned that; since 2.0.0-player.15 it pins Get as the ONE - see "Sources and Get"). Outside the
+  Navidrome gate (App's `pageView` branches on `page.kind`).
   - Its pressings: NEW `GET /search_musicbrainz/release_group?release_group_mbid=` (an MBID or a
     422) = `get_releases(with_tracks=True)` - every pressing's tracklist, which the base and the
     differences need - cached by ResponseCache like every success. `getReleaseGroup` in
@@ -4866,7 +4878,7 @@ and "show the bonus track differences on an album that has them".
   page's bars, mini player or not), the fold's accent, tap targets, ellipses, the tint and the
   sweep.
 - **Not built, on purpose**: Get on the page and Get chips on rows (S5: an unusable button is worse
-  than none); artist pages and the top result as a link (S6); a held MusicBrainz group opening the
+  than none - both came in 2.0.0-player.15, "Sources and Get"); artist pages and the top result as a link (S6); a held MusicBrainz group opening the
   album you have (S6's id bridge); `#/search?q=` in the address (the root stays mounted, so the box
   keeps its text across tabs; a reload empties it); a visible type filter (none on the board, and
   never silently on); trimming `/release_group`'s payload on the server (the API keeps
@@ -5156,6 +5168,276 @@ fixed with a check that fails without the fix (the bullets above say the rules a
   coast still plays the song at speed. Rare: the lock screen and AirPods offer play then, as the Media
   Session says paused.
 
+### Sources and Get (2.0.0-player.15)
+
+Slice 5 of the one app (`uplan/slices.md` S5, numbered .15 because the turntable took .11 and .14).
+The boards are `Sources.dc.html` (the sheet and its cards, its tweaks the searching and failure
+states), `Request.dc.html` (Get's place on the album you don't have), `Search.dc.html` (the rows'
+Get chips), `Requests.dc.html` (where a Get lands) and `You.dc.html` ("Getting albums"). James
+(2026-09-29): "Get the album" shows the SOURCES by default, picking one automatically is a setting,
+OFF - "I don't think I can reliably trust automatically grabbing from the correct source"; sources as
+CARDS, not a comparison table, with speed no longer buried; the pressing dropdown decides what Get
+and the sources are for; "Get the album" is the screen's ONE solid purple button.
+
+- **ONE payload builder: `ui/src/lib/releasePayload.ts`.** `buildDownloadRelease(group, release |
+  null)` -> `{release, label}`: `groupContext(group)` (createReleaseGroupElement's context: the
+  credit as credited, the current names, the ids, the group's title, its first-release year),
+  `releasePayload(release, context)` (a pressing - the row Find's, and the card's), `groupFallback`
+  (the album as a whole: no tracklist, no release id, so nothing is checked as held) and
+  `downloadLabel` (the panel's heading). `ui/src/main.tsx` puts it on the bridge
+  (`buildDownloadRelease`); main.js's two Find buttons call it through one helper (`findRelease`,
+  with the raw release group riding in `releaseGroupContext.group`) and its own two builders -
+  `buildExpectedFromRelease`, `buildExpectedFromReleaseGroup` - and `realYear` are DELETED, as is
+  credits.mjs's `isVideoTrack` twin (release.ts's is the one rule; credits.sim asks it alone and
+  checks credits.mjs keeps no copy). **The rule is now "anything added to a download's payload goes
+  in releasePayload.ts"** - the old "add it to BOTH builders, and click both buttons" is gone with
+  the second builder. It keeps main.js's quirks on purpose, since the main page still sends what it
+  builds: "N/A" for a credit naming nobody (a track's empty credit too), `||` for the country (an
+  empty ISO code falls through), a year four digits or null, the album's own year from the group.
+  main.js's `EDITION_KEYWORDS` now only draws the grid's edition chips and facet: a download's
+  `edition_tags` come from release.ts's copy (the three lists still stay in step).
+  - **Held to the old page's own output**: `ui/test/payload.sim.cjs` deep-equals the builder against
+    `tests/fixtures/payloads/find-buttons.json` - what main.js's Find buttons handed `openCandidates`
+    at 2.0.0-player.14, captured in headless Brave against live MusicBrainz (the orchestrator's
+    capture): Dummy's card and its GB CD row, the Experience edition row (two disc titles, 1975 vs
+    2011), Donda's card (credited Kanye West, filed under Ye, DELUXE) and BULLY's, an undated
+    bootleg (year and original_year null), a CD+DVD (20 tracks video) and an instrumental (tagged
+    INSTRUMENTAL) - all eight bodies and labels; plus the quirks, the album-as-a-whole fallback, and
+    that main.js has no builder of its own. **The undated case's inputs were wrong in the capture**:
+    the card's Find fetched /releases, but the capture read its answers before its own fetch wrapper
+    had recorded that one and fell back to the search's best-match-releases - another group's
+    pressing (Live Weisen 1998). Its `pressings` were replaced with the group's one release as
+    MusicBrainz answers it (fetched 2026-10-02, trimmed like the rest, `pressings_note` says so);
+    `expected` and `label` - the old page's output - are untouched, and every other case is
+    byte-identical to the capture. The orchestrator re-captures the changed old page and diffs it
+    with the same file.
+  - The type `DownloadRelease` (api/types.ts) is what `FindCandidatesRequest` extends and
+    `EnqueueRequest.release` is: every field one the server declares, no index signature left.
+- **Get, in two places, both in Search's tab.** "Get the album" on the album you don't have
+  (`ReleaseGroupPage.tsx`): under the picker, in the space .13 reserved, the page's one solid purple
+  button (`app-rg-get`, full width, the board's download icon `GetIcon` in player/icons.tsx); shown
+  only once a pressing is chosen, and it gets THE CHOSEN PRESSING - from `answer.releases` (the
+  page reads them through tracklistDiff's types), built with `getGroup()` (lib/pressings.ts: the
+  group Search handed over, else the pressings' `release-group`, the chosen pressing's credit
+  standing in for a bare group's, and with no group at all its title and the earliest date). And a
+  **Get chip** on each "Not in your library yet" row (`Search.tsx`, the row now a `<li
+  class="app-result-row">` holding the row's button and the chip - no button in a button): the
+  usual pressing (`usualPressing` = representativeRelease) of `/release_group`'s pressings, through
+  its own latestOnly (`getRequests`; "Get…" and aria-busy meanwhile), from the session's lists when
+  the page or a chip already has them (`app/pressingLists.ts` - the album page's Map, moved to a
+  module so both share it; still only complete answers, PRESSINGS_KEPT 20). MusicBrainz failing,
+  or breaking the list off, is the album as a whole (`buildDownloadRelease(group, null)`), as the
+  main page's card falls back, and the sheet's subtitle says "… · the album as a whole". A row the
+  library turned out to hold has no chip. Both take their opener in the tap (`takeOpener`). A
+  chip's lookup is called off (`standDown`: superseded, the chip back to "Get") when the box changes
+  or Search's root stops being what shows - App's `active` prop, `searchActive` = the Search tab,
+  no page on its stack, neither sheet open - so its late answer never opens the sheet over Now
+  Playing, another tab or a page (review).
+- **What is already here, under Get**: NEW `POST /download/store_state` = `_store_state(request,
+  body)` with the Find's body - what find_candidates answers before deciding whether to search
+  (held, downloading, downloading_part, other_pressings) and nothing more: no Soulseek search. Same
+  pressing, same judgement as a Get. The page asks it for the chosen pressing through its own
+  latestOnly (`stateRequests`), again as another is chosen, as an album is filed (`onAlbumsFiled`)
+  and as the page shows again (`shown`, from App: its tab current, the Sources sheet closed, the app
+  in front - so after a Get it says "Already downloading", and a download cancelled in Requests
+  stops being said; out of view it asks nothing). Asked again for the SAME pressing the last
+  answer stays until the new one lands (`known` never shows another pressing's), and it draws UNDER
+  "Get the album" - above it, an answer landing late moved Get under a finger reaching for it (both
+  review) - in a polite live region (`app-rg-store`, taking no room when empty but still drawn -
+  VoiceOver reads a region only once it is already there) with
+  `StoreState.tsx`: lib/candidates.ts's `storeStatus` (now taking where a download is cancelled:
+  'Downloads' on the main page, 'Requests' in the app) and `storeNotes`, as a card and notes - the
+  step-2 store's boxes in the app's look; paths break anywhere. `tests/test_store_state.py` (9)
+  through start() with real FLACs: held, part held (fills_gaps), downloading with done_files, part
+  downloading, another pressing, nothing, no release id, a store that won't open, and the
+  same-origin guard - the fake slskd records every search, and every case asserts none.
+- **The Sources sheet** (`app/Sources.tsx`, z 25 `--app-z-sources`, a sheet by `useSheet` with its
+  own lock `app-sources-open`, focus in to Cancel and back to the Get; App holds it - `sourcesOpen`,
+  `getting` (the last Get, kept as it slides away), a new `key` per Get so the same album got twice
+  searches twice - and the page behind is inert while it shows: `covered = sheetOpen ||
+  sourcesOpen`. It is never open with Now Playing: each covers what would open the other, a chip's
+  late lookup is called off before it can open (above), and `openSources` refuses while Now Playing
+  is open - `nowPlayingOpen`, a ref set in openSheet's tap and every render - the backstop). Cancel
+  and "Choose a source" on one row (`1fr auto 1fr`, the title centred and one line at 320px), the
+  subtitle ("Third · CD · 2008 · GB · Island") under them across the head's whole width, wrapping -
+  its distinguishing part comes last, and the old ellipsis in an 80px-sided column took exactly that
+  at 390, 375 and 320 (review); the chips; one scroller (`touch-action: pan-y`, as Info's).
+  - **The search is `hooks/useCandidateSearch.ts`** - CandidatesPanel's orchestration repeated (the
+    old panel is NOT refactored, so the main page and merges from main stay safe; the copy goes at
+    retirement): one `CandidateSearch` value only the newest search becomes (latestOnly, the
+    superseded one called off - and closing the sheet calls it off, which stops it in slskd: Cancel,
+    the backdrop and Escape do it IN the gesture, `onClose` = `state.stop()` then the prop, as the
+    old panel's close does; the `[open]` effect stays as the backstop. Left to the effect alone, an
+    answer landing in the frame before it ran could still pick and queue a source after Cancel);
+    each candidate downloads as the release IT was searched for; only an edited query overrides
+    (queryOverride); up to ten runners-up as SHOWN; the format preference read per search. The app
+    has no format chips, so "clear the format chips per search" has nothing to clear - its chips are
+    a floor's, a choice that holds. One download per search (`askedFor`): a second tap before the
+    sheet goes asks nothing.
+  - **A card** (`SourceCard.tsx`, words in lib/candidates.ts): the score (green from
+    AUTO_GRAB_MIN_SCORE's 75 - scoreClass's good band, the one a pick needs - where the board's
+    example data used 85; amber under), the folder (ellipsis), "from <peer>" ("· 2 disc folders"
+    for a joined set), Get (`is-primary` on the BEST MATCH only - the top of the chips' list by
+    score, `sortCandidates(passing, 'score')[0]`, wherever the sort puts its card - `is-tinted` on
+    the rest, 32px reaching 44; named "Get <folder> from <peer>", since one peer's FLAC and MP3
+    folders were two "Get from bob"s in VoiceOver's rotor - review). **Speed leads** (`speedFact`): `measured` - peer_speed's figure, green, "what you
+    got from them", `~` for an average of several (measuredSpeed's hedge) - else `advertised`, the
+    peer's own `upload_speed`, "their own average" (never presented as the download speed - the
+    rule from "The peer's advertised speed is not your download speed"), else "Unknown", "no speed
+    reported yet"; the bar is the speed / `SPEED_BAR_FULL` (3 MiB/s, formatSpeed's units), capped
+    at 100. Then Tracks ("11 of 11" - against `audio_expected`, held = audio less missing - amber when tracks are missing), Quality (`qualityText`: "FLAC
+    16/44.1", "FLAC 24-bit", "MP3 320k", "MP3 VBR 245k" - only what was reported), Size, Starts
+    (`startsFact`: "now" with a free slot, "3 ahead" in their queue, "next" with no slot and nobody
+    ahead - the board has only the first two; amber unless now). The amber **Missing** line
+    (`missingLine`): 'Missing “Threads”', up to three named, "and N more".
+  - **`missing_tracks` on a candidate** (server): `matching.missing_tracks(expected, mapping)`, in
+    `score_candidate` where the pairing is - `track_mapping` is dropped before the page - every
+    unpaired track in tracklist order as {position, disc, title}; a VIDEO track is never missing
+    from a folder of audio, and a release that is all video keeps every track (audio_tracks'
+    rule - `matching.audio_tracks`, shared). `_serialize_candidate` sends the first `MISSING_NAMED`
+    (5), `missing_count` and `audio_expected` (how many tracks are audio). The card's Tracks counts
+    against `audio_expected` (`tracksText`: audio less missing, of audio), so a CD+DVD shared whole
+    is "14 of 14" agreeing with the missing line, not "14 of 34" with nothing missing (review); an
+    answer without it counts matched/expected as the old panel does. The SCORE still counts every
+    track (title_match, track_count - older than this slice; changing it re-ranks everything), so a
+    CD+DVD folder still scores low. `tests/test_candidate_missing_tracks.py` (12).
+  - **The chips**: Lossless - a new `lossless` flag on lib/candidates.ts's `CandidateFilters`
+    (optional, so the main panel builds its filters as before): every file lossless by format, and
+    a folder whose formats nobody could tell never passes - 24-bit (minBitDepth 24), Free slot, and
+    the sort (a chip holding the platform's own `<select>`, invisible over it, 17px so iOS doesn't
+    zoom; the chip shows the choice). They START as the quality floor (`floorFilters`) on every
+    Get; a **320 kbps** chip, which the board hasn't, is drawn only while the floor is 320 (or it
+    is on), so a floor is never a filter on out of sight. The settings landing after the sheet
+    opened re-seed the chips unless they were tapped (`touched`).
+  - **States**: asking (the sweep, `searchingLine`: 'Asking Soulseek for “Third” by Portishead…', or
+    'by Kanye West or Ye…' - the names search_names asks under, "N/A" left out); slskd unable to
+    search (`error`: the find route's 502 detail, i.e. the 409 explanation the server already
+    builds, in amber, with Try again); nothing found (`queriesText`, the query to edit and
+    Re-search, a `<form>` so Enter works); none passing the chips (Clear filters, shown only with
+    some pressed); the store's box where the cards would be (held whole, downloading whole - the
+    server searched nothing) and its notes above them; the cards and `searchedLine` ("Searched
+    Soulseek for “Portishead Third” · 41 folders, 4 match your filters"). **A 409 from the enqueue**
+    ("already downloading from bob", a peer offline) is the pending row in Requests reading
+    "refused" with the server's words - the sheet has gone by then; that is .12's refused row.
+  - **Get on a card**: `state.download(candidate, shown)` - `requestDownload` called in the tap,
+    nothing awaited before it, so the downloads hook (App's one, which registers
+    `handleDownloadRequests`) lays the pending row down in that call - then `onQueued`: App's
+    `gotten` closes the sheet with its opener cleared (focus has nowhere to land) and
+    `router.root('requests')`. Requests' root showing makes the hook poll fast (`watching`), so
+    `useDownloadJobs(watching === 'requests' || stalled)` needed no change for Sources.
+- **"When I tap Get" and the quality floor** (You > Getting albums, FIRST, as the board has it;
+  `GettingChoices.tsx`: two radio groups like LookChoice - the board's disclosure rows made the list
+  itself, one tap not two; nothing checked or choosable until deadwax answers). Stored PER USER ON
+  THE SERVER: a `user_prefs(user, key, value, updated_at, PK(user, key))` table in store.py (only keys
+  chosen have rows, plus routes/me.py's `SEEDED` (`_seeded`), which EVERY save writes, an empty one
+  too - the answer's `seeded`, "something was saved for this user"; an old database gains the table
+  through SCHEMA's CREATE IF NOT EXISTS) and `GET`/`PUT
+  /deadwax/me/preferences` in routes/me.py, through `current_user` (a dependency, as `/me`): the
+  allowlist `PREFERENCES` - `get_mode` sources|pick, `quality_floor` any|320|lossless|24bit, first
+  the default - a pydantic model with `extra="forbid"` and Literals (anything else a 422, nothing
+  written), a stored value no longer allowed read as the default, `stored` (which are set),
+  `seeded` and `can_save`; a PUT is a write, so the same-origin guard refuses another site's. 503
+  for an unwritable database, or a write it refused. `tests/test_me_prefs.py` (22) incl. a cross-origin PUT
+  refused through start(), per user, and the three lists (here, the model, lib/getSettings.ts) read
+  as one. The client store `app/useGetSettings.ts` (a module, as useOwned): asked when Search first
+  shows, each time You's tab is opened (its new `current` prop) and on Check again, and each time
+  the sheet opens - never at start-up - an answer in hand ASKED AGAIN and standing meanwhile (a
+  change made on another device arrives in a home-screen app left open for days - review); the
+  defaults until the first answer (a Get then shows the sources: the safe way round); SEEDED ONCE -
+  a read with `seeded` false and `can_save` PUTs `seedFromPreferences(readPreferences())`, which is
+  ONLY what differs from the defaults (the main page's candidate floors in this browser: bit depth
+  24 -> 24-bit, 16 -> Lossless, bitrate 320 -> 320 kbps, anything less `{}`; get_mode never -
+  auto-grab is not carried over), saved even when empty since the save is the mark; never a default
+  stored as if chosen (review: seeding both made a later change of default reach nobody). What
+  shows is `confirmed` (the server's last word) with `pending` choices laid over it in order, and
+  every read and save goes `inTurn` - each sent once the one before has answered - so answers come
+  back in the order asked: an older choice's answer can't put a newer one back, a re-ask can't undo
+  a choice being saved, a refused choice goes back to the server's word keeping later ones on top
+  ("Not saved: …", in a live region always in You), and deadwax commits the choices in the order
+  made (review: the arrow keys sent overlapping PUTs). The main page keeps its own copies
+  (configuration.md says so).
+- **Auto-pick** ("Pick the best source for me"): in the hook, read as the answer lands
+  (`pickingNow`: getSettingsNow() and the chips then), only on a FRESH Get (`start`; Try again after
+  a failed search is that Get again, so also fresh) - never a Re-search - and never when
+  `autoPickBlocked(result)` (the answer's own store fields: downloading, held complete, a part
+  downloading, a part held - another pressing held doesn't stop it); then `autoGrabPick(candidates,
+  candidateFilters(chips), 'score')` at AUTO_GRAB_MIN_SCORE or more, asked for as a tapped Get is,
+  and the sheet hands over. Otherwise the cards show with `notPickedLine` ("Didn't pick a source
+  for you: …"). `autoPickBlocked(result, release)` also refuses a release with no tracklist ("with
+  no tracklist to match the folders against, no score can be trusted") or no release id ("with no
+  release id, deadwax can't tell whether you already have it"): the album as a whole, a chip's
+  fallback, is scored on edition, format and peer alone - a two-track FLAC folder from a fast peer
+  reaches 100 - and can't be checked as held, nor 409'd (review). The old panel's auto-grab has the
+  same gap on its card fallback and is left as it is.
+- **For VoiceOver** (review): the sheet has ONE live region, always there (visually hidden,
+  polite, atomic), saying each outcome in a line (`sourcesAnnouncement` in lib/candidates.ts:
+  asking, slskd's words, the store's title, nothing found, none passing, "4 sources", plus the
+  not-picked line) - the pending block lost its own `role="status"`, which was inserted already
+  filled and then removed. Try again, Re-search and Clear filters each end the state they sit in,
+  so they first hand focus to the list (`keepFocus`: the scroller, `tabIndex={-1}`, no ring) -
+  never to `<body>`, outside the dialog. A closed sheet's asking bar is paused in CSS.
+- **app-rules.sim.cjs** (120): the sheets list gains Sources (its lock, inert, backdrop); the
+  behind wrapper is `covered`; the page has exactly ONE `app-rg-get` and Search and the picker no
+  primary (the chip is tinted); the page and Search reach App's `openSources` with the opener taken
+  in the tap; `gotten`; a card's Get is download-then-hand-over in the click, `requestDownload`
+  with nothing awaited before it and ten runners-up; the search, the store state and the chip each
+  through a latestOnly of its own; a pick only fresh and never blocked; the settings read as the
+  answer lands; in the sheet only the best match's Get is primary, the top by score whatever the
+  sort; and, after review, the two sheets can't stack (`searchActive`, Search's `standDown`,
+  `openSources`' Now Playing guard), Cancel lets the search go in the gesture, and the album page's
+  `shown` (asked again as it shows, Get above the store line, no clearing). The pages memo is keyed
+  on `sourcesOpen` and `pageShown` too, for that `shown`. No playback action is reached from any
+  new file (the allowlist is unchanged).
+- **Style** (tokens only): theme.css section 10 gains `--dw-bar-green` (a measured speed's fill) and
+  `--dw-best` (#7e4bb8, the best match's edge); app.css gains `--app-rg-get-*`, `--app-store-*`,
+  `--app-result-get*`, `--app-z-sources`, `--app-sources-*`, `--app-chip*` and `--app-source-*`.
+  Every control a tap target (the chips 30px, a card's Get and a row's chip 32px, each reaching 44
+  from its padding box; the chip rows' reaches never overlap - row gap twice the reach - with room
+  kept above and below); the sheet placed as Info is (`top: max(48px, safe-top + 8px)`, the insets
+  placing it, never padding it). `test_app_css.py` holds all of it (45, seven new: after review
+  the head's grid - `--app-sources-side` gone - the wrapping subtitle, the list's focus and the
+  paused bar).
+- **Not built, on purpose**: Get on the main page's own album pages beyond its Finds (they are
+  untouched but for the builder); a Signals or size filter in the sheet (the board has none);
+  per-card "Queued" states (the sheet goes as a Get is asked for); the old CandidatesPanel refactored
+  onto the hook (merges from main stay safe); the desktop's sources table (S8). `useDownloadJobs`
+  polling fast while the sheet shows (the plan suggested it; the hand-over to Requests makes it
+  moot).
+- **After review** (22 findings, each confirmed by skeptics, all fixed in this same slice and each
+  marked "(review)" above): a chip's late lookup opening the sheet over Now Playing, another tab or
+  a newer Get (`searchActive`/`standDown`, `openSources`' guard); Cancel leaving the search to an
+  effect after the frame; auto-pick on the album as a whole; the store line stale after a Get and
+  cleared on every re-ask, ABOVE Get so it moved the button (now under it, kept, asked again as the
+  page shows); the settings read once a page and saved with no order (re-asked; `inTurn`,
+  `confirmed` plus `pending`); seeding storing the defaults (`SEEDED`, only what differs); Tracks
+  counting video (`audio_expected`); the best-match look following the sort; the subtitle's
+  ellipsis; no announcement of the outcomes (one live region) or a failed save (a region in You);
+  self-removing buttons dropping focus to `<body>` (`keepFocus`); two "Get from bob" buttons; and
+  test gaps - which credit each payload field comes from (a synthetic case in payload.sim), the
+  `touched` guard and Try again's fresh pick (sources.sim) - and stale words: the credit rules
+  above and in the source comments, `getArtistIds` (deleted; credits.sim checks it is gone).
+- **Verified**: 2048 Python tests (50 new: `test_candidate_missing_tracks.py` 12,
+  `test_store_state.py` 9, `test_me_prefs.py` 22, seven in `test_app_css.py`), pyflakes, tsc, and all 34 sims (`payload` 53 and `sources` 65 new;
+  `candidates` 106, `group` 68, `search` 66, `you` 61, `app-rules` 120 and `credits` 25 extended); 74
+  mutations, one or more per rule pinned, each caught and restored byte for byte - four first got
+  past (an untrimmed disc title, a superseded store answer for the same pressing, a chip's
+  called-off answer landing anyway, a broken-off list kept) and gained the checks that catch them -
+  and after review 48 more, one or more per fix, every one caught.
+  The engine guard is empty, and `useDownloadJobs.ts`, `downloads.sim.cjs`, `CandidatesPanel.tsx`,
+  `player.sim.cjs` and `test_enqueue.py` are untouched. (`test_player_cache.py::
+  test_a_setgid_bit_is_no_bar` fails when pytest runs with TMPDIR pointed at the session scratchpad,
+  as the sims need: macOS won't set setgid on a folder whose group, wheel there, the user isn't in.
+  Untouched by this slice; it passes with the ordinary TMPDIR.)
+  **NOT verified here**: the real page (the orchestrator builds the bundle and checks against a
+  fake slskd serving Third's folders - a measured peer, a busy peer, a 24/96 rip, one missing
+  "Threads" - and re-captures the old page's Find bodies to diff with find-buttons.json); a real
+  slskd and real Soulseek folder names; and everything on the iPhone - the sheet scrolling under a
+  finger with the page still, the sort's wheel, a tap above the sheet, a Get showing in Requests
+  from the tap, VoiceOver on the cards, its live region and where its focus lands after Try again.
+  After review, also for the real page: a chip's slow lookup with Now Playing opened meanwhile
+  (nothing opens), the subtitle wrapping at 320/375/390, and the store line under Get coming back
+  as "Already downloading" after a Get.
+
 ### Artists who have renamed (v0.6.18)
 
 James: "so Ye shows up as Kanye, that seems like a gap somewhere" - and then "I want to make
@@ -5223,7 +5505,11 @@ most up-to-date name".
   on a card in the real page and reading the request, which had no `album_artist`. The group
   context now carries `albumArtist` and `artistMbids` from the group's own credit. **Anything
   added to a download's payload has to be added in BOTH builders** - and checked by clicking
-  both buttons, since only one of them is on the path any sim can see.
+  both buttons, since only one of them is on the path any sim can see. **Superseded in
+  2.0.0-player.15: there is ONE builder now, `ui/src/lib/releasePayload.ts`**, used by both of
+  main.js's Finds (through the bridge's `buildDownloadRelease`) and the app's Get, and pinned by
+  `ui/test/payload.sim.cjs` to the bodies the two Finds sent before the move - anything added to a
+  download's payload goes THERE (see "Sources and Get").
   **Verified in the real page** (scratch database and library, slskd stubbed as logged out):
   both Finds send `artist: "Kanye West"` and `album_artist: "Ye"` with Ye's id; the row's
   carries all 32 tracks, each still credited "Kanye West".
@@ -5251,7 +5537,12 @@ most up-to-date name".
   of main.js into `credits.mjs` for this - main.js touches the DOM at module scope and cannot
   be imported by a test, the same reason `sort.mjs` exists - and `ui/test/credits.sim.cjs` asks
   every case of BOTH copies. If they drift, one album goes to one folder when downloaded and
-  another when corrected.
+  another when corrected. **Superseded in 2.0.0-player.15**: a download's folder now comes from
+  release.ts's `currentName()` too, through `lib/releasePayload.ts` (the one payload builder), so
+  a download and a correction are one function and can't part. credits.mjs's
+  `getCurrentArtistNames()` is left only DRAWING - it is a name the main page's card tries for
+  its "in your library" match - so a drift between the two copies now marks a card wrong and
+  files nothing anywhere. The sim still asks both.
 - **Collaborations still get their own folder**, in current names: Watch the Throne files under
   `JAŸ‐Z & Ye/`. That was always so (it was `Jay‐Z & Kanye West/`); only the names changed.
 - ~~NOT built: finding albums already filed under an old name~~ **Built in v0.9.14** - the scan
@@ -5362,7 +5653,10 @@ metadata as well".
   `interface/scripts/credits.mjs` (moved out of main.js in v0.6.18 so a sim can reach it). One
   names a folder, the other writes the tag inside it - both in the browser, which sends the
   server names already joined. (A third copy, `credit_name()` in `src/artists.py`, was called by
-  nothing but its own tests and went in the v0.9.19 audit.)
+  nothing but its own tests and went in the v0.9.19 audit.) Since 2.0.0-player.15 a download's
+  artist comes from release.ts's `creditName()` (through `lib/releasePayload.ts`), and
+  credits.mjs's `getArtistNames()` only draws the main page's card credit; its `getArtistIds()`,
+  which only the deleted builders used, went in the review.
 - **A track keeps its OWN artist.** `tag_values` gave every track the release's artist, so
   applying a release to a compilation rewrote eighteen artists into one. The track's credit wins
   where it has one; `albumartist` stays the release's, which is what the two tags are for.
@@ -6427,7 +6721,8 @@ covers everything the main page does, the vanilla half retires in one commit.
   unchanged. A visual difference means a porting mistake, not a restyle.
 - Both files are ES modules and can't call each other, so cross-boundary calls meet on
   `window.deadwax` (`ui/src/bridge.ts`). Entries today: `refreshDownloads`,
-  `openCandidates` (v0.9.10), `closeDownloads`, `closeOtherDropdowns`, `runSearch`,
+  `openCandidates` (v0.9.10), `buildDownloadRelease` (2.0.0-player.15 - the one payload builder,
+  for the releases grid's Find buttons), `closeDownloads`, `closeOtherDropdowns`, `runSearch`,
   `refreshNewImports`. **An empty bridge means the migration is done.**
 
 Why, from measurements of the original code:
@@ -6495,7 +6790,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 1998 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2048 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -6514,11 +6809,11 @@ node ui/test/downloads.sim.cjs  # optimistic overlays incl. the wrong-prediction
 node ui/test/sort.sim.cjs       # result ordering - undated groups, ties, and relevance-as-no-op
 node ui/test/tree.sim.cjs       # the library tree - what's on screen when, filtering, discs, field choices, compact tracks, windowing
 node ui/test/tags.sim.cjs       # hand tag edits (only edited fields sent), ticking, column order/widths, disc default
-node ui/test/credits.sim.cjs    # credited vs current artist names - the folder a download and a correction both file under
+node ui/test/credits.sim.cjs    # credited vs current artist names - release.ts's (a download's folder and the editor's) held to the main page's drawing copy in credits.mjs; isVideoTrack's cases
 node ui/test/tracklist.sim.cjs  # one base tracklist per release group, and what each pressing changes - the .mjs and its TS port, on real groups
 node ui/test/owned.sim.cjs      # which search results the library already holds - by pressing, by album, "maybe" by name - both copies
 node ui/test/latest.sim.cjs     # only the newest answer counts - both copies of the guard, answers arriving out of order
-node ui/test/candidates.sim.cjs # the candidates panel's filters, the edited-query rule, and what a row says
+node ui/test/candidates.sim.cjs # the candidates panel's filters, the edited-query rule, and what a row says; the app's source cards' words, the Lossless chip, when a pick is made, the quality floor (lib/getSettings.ts)
 node ui/test/playqueue.sim.cjs  # the phone player's queue - what previous does, shuffle's first song, what counts as a play
 node ui/test/gapless.sim.cjs    # the gapless switch - what the standby holds, hand over or not, which events count, memory
 node ui/test/scrub.sim.cjs      # the player's scrubber - a point on the bar, fingers and keys, a seek on its way, where it landed
@@ -6530,15 +6825,17 @@ node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and no
 node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history
 node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
-node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions
+node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions, Getting albums and their store (seeded once, asked again, saves in turn)
 node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Navidrome sent
 node ui/test/info.sim.cjs       # Info > About's rows, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape
 node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button; with the deck's sound, the press, release, wind-down and the arm during a coast
 node ui/test/requests.sim.cjs   # the Requests tab and Home's Arriving - grouping, every row's words, one primary, Arriving = the badge, asking again, the ✕'s question, what a screen reader hears
 node ui/test/searchQuery.sim.cjs # the app's one search box - an artist at either end, an artist alone, va, the brackets before a type filter, what's left out
 node ui/test/pressings.sim.cjs  # the album you don't have - the default pressing, the dropdown's list and fold, the line above the tracklist, Bonus rows, disc titles
-node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, Try again, the session's cache, a pick, the listbox, focus going nowhere
-node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch
+node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, Try again, the session's cache, a pick, the listbox, focus going nowhere, Get and what's already here of the pressing (under Get, asked again as the page shows)
+node ui/test/payload.sim.cjs    # the ONE download payload builder, deep-equal to what the main page's two Find buttons sent before the move (8 captured cases, labels too), and which credit each field comes from
+node ui/test/sources.sim.cjs    # the Sources sheet and its cards rendered - only the newest search, Cancel letting it go in the gesture, a Get from the tap with its runners-up, the best match whatever the sort, the chips, a pick for you and when it isn't made, Re-search, slskd's words, the store's box, the live region, focus kept in the sheet
+node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch; the rows' Get chips, and their lookups called off when you move on
 node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the deck against fakes (its windows, coasts, handovers, wind-downs)
 ```
 
@@ -6560,7 +6857,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 1998 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2048 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

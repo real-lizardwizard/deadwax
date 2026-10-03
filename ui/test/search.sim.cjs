@@ -22,6 +22,14 @@
  *    ask - and asking again when the text comes back.
  *  - The real prefetch: a press that turned into a scroll calls off a tile's own ask, never one Search
  *    keeps, whichever asked first; the album page still takes a kept ask once.
+ *  - Get chips (2.0.0-player.15): on a MusicBrainz row the library doesn't hold, not on one it does;
+ *    a tap takes its opener, asks for the album's pressings (busy meanwhile) through a latestOnly of
+ *    its own - a newer tap calls the older off, and a late answer opens nothing - and opens the
+ *    Sources sheet for the USUAL pressing, built by the one payload builder; MusicBrainz failing is
+ *    the album as a whole, said so; a complete answer is kept for the session, so a second tap asks
+ *    nothing, and a failure is not. And (review) a lookup still out is called off - the chip back to
+ *    Get, its late answer opening nothing - the moment the tab's root stops being what shows (App's
+ *    `active`) or the box changes.
  *
  * Run it with:  node ui/test/search.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -74,6 +82,14 @@ exports.root = (component) => {
 
 fs.writeFileSync(path.join(OUT, 'api/musicbrainz.js'), `
 exports.fullySearch = (query, limit, releases, signal) => globalThis.__search.fullySearch(query, limit, releases, signal)
+exports.getReleaseGroup = (id, signal) => globalThis.__search.getReleaseGroup(id, signal)
+`)
+//? You > Getting albums, asked as the tab shows; and the opener a chip's tap focuses
+fs.writeFileSync(path.join(OUT, 'app/useGetSettings.js'), `
+exports.useGetSettings = (ask) => { globalThis.__search.settingsAsked.push(ask); return { settings: null, canSave: true, problem: null } }
+`)
+fs.writeFileSync(path.join(OUT, 'app/useSheet.js'), `
+exports.takeOpener = (event) => event.currentTarget
 `)
 fs.writeFileSync(path.join(OUT, 'api/library.js'), `
 exports.owned = () => globalThis.__search.owned()
@@ -130,9 +146,18 @@ async function answerOwned(answer) {
   }
 }
 
-const asks = { owned: [], library: [], musicbrainz: [], prefetch: [] }
+const asks = { owned: [], library: [], musicbrainz: [], prefetch: [], pressings: [] }
 globalThis.__search = {
   calls: [],
+  settingsAsked: [],
+  //? false: an answer already on its way when it was called off still lands
+  abortRejects: true,
+  getReleaseGroup(id, signal) {
+    const d = deferred()
+    asks.pressings.push({ id, signal, ...d })
+    if (signal && globalThis.__search.abortRejects) signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; d.reject(error) })
+    return d.promise
+  },
   actions: { playTracks: (queue, at) => globalThis.__search.calls.push(['playTracks', queue.map((track) => track.id), at]) },
   owned() { const d = deferred(); asks.owned.push(d); return d.promise },
   searchLibrary(text, signal) { const d = deferred(); asks.library.push({ text, signal, ...d }); return d.promise },
@@ -227,7 +252,9 @@ async function main() {
   const opened = []
   const groupsOpened = []
   const render = hooks.root(Search)
-  const props = { shown: true, status, onRetry() {}, onOpenAlbum: (album) => opened.push(album), onOpenGroup: (group) => groupsOpened.push(group) }
+  const gets = []
+  const props = { shown: true, active: true, status, onRetry() {}, onOpenAlbum: (album) => opened.push(album), onOpenGroup: (group) => groupsOpened.push(group),
+    onGet: (request, opener) => gets.push([request, opener]) }
   const draw = (more = {}) => { Object.assign(props, more); tree = render(props); render.commit(); return tree }
   const type = (value) => { find((node) => node.type === 'input')[0].props.onInput({ currentTarget: { value } }); draw(); draw() }
   const section = () => find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-search-musicbrainz')[0]
@@ -306,6 +333,96 @@ async function main() {
   draw()
   check('an answer landing after never takes a row away: it says so in place', rows(),
     [['Third', 'Album · 2008 · in your library'], ['Roseland NYC Live', 'Live album · 1998']])
+
+  console.log('\nGet chips (2.0.0-player.15): the usual pressing, in the Sources sheet')
+  {
+    check('You > Getting albums asked as the tab shows', globalThis.__search.settingsAsked.at(-1), true)
+    const rowOf = (title) => find((node) => node.type === 'li' && byClass('app-result-row')(node), section()).find((li) => text(find(byClass('app-result-title'), li)[0]) === title)
+    const chipOf = (title) => find(byClass('app-result-get'), rowOf(title))[0]
+    check('a row the library holds has no chip; one it doesn\'t has', [!!chipOf('Third'), !!chipOf('Roseland NYC Live')], [false, true])
+    check('...beside the row\'s own button, which still opens the album', [find((node) => node.type === 'button' && byClass('app-result')(node), rowOf('Roseland NYC Live')).length, text(chipOf('Roseland NYC Live'))], [1, 'Get'])
+    const track = (title, position) => ({ title, position, length: 300000 + position, recording: { title, length: 300000 + position, video: false } })
+    const PRESSINGS = [
+      { id: 'r-vinyl', title: 'Roseland NYC Live', status: 'Official', date: '1998-11-09', country: 'GB', media: [{ format: '12" Vinyl', position: 1, tracks: [track('Humming', 1), track('Cowboys', 2)] }] },
+      { id: 'r-cd', title: 'Roseland NYC Live', status: 'Official', date: '1998-11-02', country: 'GB', 'label-info': [{ 'catalog-number': '559 424-2', label: { name: 'Go! Beat' } }], media: [{ format: 'CD', position: 1, tracks: [track('Humming', 1), track('Cowboys', 2)] }] },
+    ]
+    const tap = () => chipOf('Roseland NYC Live').props.onClick({ currentTarget: { chip: true } })
+    tap()
+    draw()
+    check('a tap asks for the album\'s pressings, the chip busy meanwhile', [asks.pressings.length, asks.pressings[0]?.id, text(chipOf('Roseland NYC Live')), chipOf('Roseland NYC Live').props['aria-busy']],
+      [1, ROSELAND.id, 'Get…', true])
+    tap()
+    check('a second tap calls the first ask off', [asks.pressings.length, asks.pressings[0].signal.aborted], [2, true])
+    await settle()
+    asks.pressings[1].reject(new Error('MusicBrainz is unreachable right now'))
+    await settle()
+    draw()
+    check('MusicBrainz failing: the album as a whole, said so - nothing opened for the call that was called off',
+      [gets.length, gets[0]?.[0].release.release_mbid, gets[0]?.[0].release.tracks.length, gets[0]?.[0].subtitle, gets[0]?.[1]?.chip, text(chipOf('Roseland NYC Live'))],
+      [1, null, 0, 'Roseland NYC Live · the album as a whole', true, 'Get'])
+    //? two more taps, the first's answer already on its way when the second called it off
+    globalThis.__search.abortRejects = false
+    tap()
+    tap()
+    check('a failure isn\'t kept: the next taps ask again, the first of them called off', [asks.pressings.length, asks.pressings[2].signal.aborted], [4, true])
+    asks.pressings[3].resolve({ id: ROSELAND.id, releases: PRESSINGS.slice(0, 1), problem: 'MusicBrainz failed part way' })
+    await settle()
+    check('a list MusicBrainz broke off is the album as a whole - never a short list passing for its pressings',
+      [gets.length, gets[1]?.[0].release.release_mbid, gets[1]?.[0].subtitle], [2, null, 'Roseland NYC Live · the album as a whole'])
+    tap()
+    check('...and isn\'t kept: the next tap asks again', asks.pressings.length, 5)
+    asks.pressings[2].resolve({ id: ROSELAND.id, releases: PRESSINGS, problem: null })
+    await settle()
+    check('the call called off, its answer landing anyway, opens nothing', gets.length, 2)
+    asks.pressings[4].resolve({ id: ROSELAND.id, releases: PRESSINGS, problem: null })
+    await settle()
+    globalThis.__search.abortRejects = true
+    check('the usual pressing - a CD over the vinyl - built from the row\'s group', [gets.length, gets[2]?.[0].release.release_mbid, gets[2]?.[0].release.release_group_mbid, gets[2]?.[0].subtitle],
+      [3, 'r-cd', ROSELAND.id, 'Roseland NYC Live · CD · 1998 · GB · Go! Beat'])
+    tap()
+    await settle()
+    check('kept for the session: another tap asks nothing, and opens at once', [asks.pressings.length, gets.length, gets[3]?.[0].release.release_mbid], [5, 4, 'r-cd'])
+
+    //? A lookup takes seconds (every pressing with its tracklist, at MusicBrainz's pace); meanwhile
+    //? the person opens Now Playing, another tab or a row's page, or types. Its answer landing then
+    //? must open nothing - not the sheet over Now Playing, not over another tab (review)
+    const GLORY = { id: '00000000-0000-4000-8000-0000000000aa', title: 'Glory Times', 'primary-type': 'Album', 'first-release-date': '1995' }
+    find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+    draw()
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [THIRD, ROSELAND, GLORY] })
+    await settle()
+    await answerOwned(holding(DUMMY, THIRD))
+    await settle()
+    draw()
+    check('(a row whose pressings nothing has asked for yet)', !!chipOf('Glory Times'), true)
+    globalThis.__search.abortRejects = false
+    const opened = gets.length
+    const tapGlory = () => chipOf('Glory Times').props.onClick({ currentTarget: { chip: true } })
+    tapGlory()
+    draw()
+    const out = asks.pressings.at(-1)
+    check('a tap asks for its pressings, the chip busy', [out.id, text(chipOf('Glory Times'))], [GLORY.id, 'Get…'])
+    draw({ active: false })
+    draw()
+    check('the tab\'s root no longer what shows (Now Playing, another tab, a page over it): the lookup called off, the chip Get again',
+      [out.signal.aborted, text(chipOf('Glory Times')), chipOf('Glory Times').props['aria-busy']], [true, 'Get', false])
+    //? (an answer MusicBrainz broke off, so it isn't kept and the next tap asks again)
+    out.resolve({ id: GLORY.id, releases: PRESSINGS.slice(0, 1), problem: 'MusicBrainz failed part way' })
+    await settle()
+    check('...and its answer, landing anyway, opens no sheet over what you went to', gets.length, opened)
+    draw({ active: true })
+    tapGlory()
+    draw()
+    const typed = asks.pressings.at(-1)
+    check('(asked afresh)', typed !== out, true)
+    type('portishead live')
+    check('the box changed: the lookup called off too, the chip Get again', [typed.signal.aborted, text(chipOf('Glory Times'))], [true, 'Get'])
+    typed.resolve({ id: GLORY.id, releases: PRESSINGS, problem: null })
+    await settle()
+    check('...its answer opening nothing', gets.length, opened)
+    type('portishead')
+    globalThis.__search.abortRejects = true
+  }
 
   console.log('\na box cut back below three characters')
   type('po')

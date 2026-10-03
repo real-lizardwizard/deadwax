@@ -78,6 +78,45 @@ deadwax won't fetch a second copy of a pressing you have complete. The panel nam
 replace it, delete the album in the library tab first, then **Find** again. A different pressing
 of the same album is searched as usual, with a note that you have the other one.
 
+## The app's Get says "refused: already downloading from …" or "already in your library"
+
+A **Get** in the app (or **Download** on the main page) is checked once more as it's queued, and
+deadwax refuses a second download of a pressing that is already downloading whole, already being
+filed, or already in your library complete - with a `409`. The row in **Requests**, under Needs
+attention, reads "refused", with deadwax's words in red under it: "already downloading from bob",
+"already downloaded from bob, and being filed now", "already in your library: *folder*". It happens
+when the album was
+started or filed somewhere else - another tab, the main page, another phone - after the app last
+looked: the album page's line under Get, and the sources sheet, said what they knew when
+they asked. Nothing is lost: the download that is already on its way is in Requests (cancel it
+there to try another user, then Get again), and an album you have is in your library. **Clear done**
+removes the refused row. A download of only part of a pressing - one disc's folder - refuses nothing.
+
+## The app's Get shows "slskd isn't logged in…", or nothing to choose from
+
+The sources sheet asks slskd to search Soulseek, as **Find** does, so the same things stop it:
+
+- **slskd's own words, in amber, with Try again** - "slskd isn't logged in to Soulseek, so it can't
+  search", "it's waiting for its VPN", or that it can't be reached: see [A search fails with "not
+  logged in"](#a-search-fails-with-not-logged-in-or-slskd-refused-it) and [The slskd pill is
+  red](#the-slskd-pill-is-red). You's **Connections** says whether deadwax can reach slskd.
+- **"Soulseek found nothing for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
+  query under it (to the album title alone, say) and **Re-search**.
+- **"N folders on Soulseek, none pass your filters"**: the chips above the list are hiding them -
+  **Lossless** and **24-bit** start pressed when your quality floor (You → Getting albums) says so.
+  **Clear filters**, or tap the chip, to see them all.
+- **"Didn't pick a source for you: …"** with **Pick the best source for me** on: nothing scored 75 or
+  more through the chips, or you already have part of the pressing (or part of it is downloading),
+  or it was the album as a whole (below), with no tracklist to judge the folders by. The sources
+  are there to choose from yourself.
+- **Get's sheet says "… · the album as a whole"**: a row's Get chip couldn't get the album's
+  pressings from MusicBrainz, so it searched for the album with no tracklist to match against, as
+  the main page's card **Find** does then - so it never picks one for you, whatever your setting.
+  Open the album (tap the row) once MusicBrainz is back to choose a pressing and Get that.
+- **A row's Get went back to "Get" without opening anything**: it gives up when you move on while it
+  asks MusicBrainz for the album's pressings - typing, opening a row, Now Playing or another tab - so
+  the sheet never opens over where you went. Tap it again.
+
 ## The slskd pill is red
 
 - **`CONNECTION_ERROR`**: slskd can't be reached at `SLSKD_URL` from inside the container. Use

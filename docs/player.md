@@ -10,7 +10,8 @@ It's growing into one app for everything deadwax does: five tabs along the botto
 **Library**, **Search**, **Requests** and **You**), with the player inside them. **Requests** shows
 your downloads as they arrive (since 2.0.0-player.12), and **Search** looks in your library and
 then on MusicBrainz, and shows an album you don't have with each of its pressings' tracklists
-(since 2.0.0-player.13). Starting a download is still on the main page for now.
+(since 2.0.0-player.13) - and **Get** fetches it: the sources found on Soulseek, to choose from
+(since 2.0.0-player.15).
 
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
@@ -108,7 +109,10 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   names the tab it goes back to.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
-- **You**: **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as** and
+- **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
+  source for me**) and the **Quality floor** (Any, 320 kbps, Lossless, 24-bit), kept for you on
+  deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax));
+  **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as** and
   **Pause winds the record down** ([the turntable](#the-turntable)) and **Maximum quality**
   ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
@@ -123,10 +127,9 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   **Clear done** at the top. Until deadwax first answers it shows a spinner, never "Nothing
   requested yet". With VoiceOver, what changes is read out: a retry starting or refused, a
   download moving to another heading. The tab carries a count of what's on its way. Covers come
-  from the Cover Art Archive, so a phone with no internet shows plain squares. Starting a download
-  is still on the main page.
-  [Downloading](downloading.md#on-the-phone-the-requests-tab) has every state and what each button
-  does.
+  from the Cover Art Archive, so a phone with no internet shows plain squares. A **Get** lands here,
+  showing from the tap. [Downloading](downloading.md#on-the-phone-the-requests-tab) has every state
+  and what each button does.
 - **Search**: one box, your library first, then MusicBrainz. **In your library** lists the
   artist you typed (as the **Top result**), albums and songs; an album opens it, and a song plays
   from there through its album once that album has been fetched (a ▶ at its right says so - the
@@ -137,7 +140,18 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   starting on the usual pressing, and that pressing's tracklist, with its bonus tracks, other
   versions and renamed or missing tracks marked. MusicBrainz isn't asked for anything until you
   search, and the album page works with Navidrome down. [Finding music](finding-music.md#on-the-phone-the-apps-search-tab)
-  has how the box is read and what every note means. Getting the album comes in a later version.
+  has how the box is read and what every note means.
+- **Get**: **Get the album** on the album you don't have - under the Pressing button, with a line
+  under it saying what you already have of that pressing, if anything - gets the pressing chosen;
+  **Get** at the end of a row under Not in your library yet gets the album's usual pressing. Either opens
+  **Choose a source**, a sheet of the folders found on Soulseek, one card each: the score, the
+  folder and who it's from, then **Speed** first and large (what you got from that user before, in
+  green, or their own average, or none reported), Tracks, Quality, Size and when it **Starts**, and
+  what it's missing in amber. **Lossless**, **24-bit**, **Free slot** and the sort narrow the list.
+  A card's **Get** queues it and switches to Requests, where it already shows. With **Pick the best
+  source for me** in You, Get queues the best match itself when one scores 75 or more under your
+  quality floor (never for the album as a whole, with no tracklist to judge by).
+  [Downloading](downloading.md#on-the-phone-get-and-choosing-a-source) has every state of the sheet.
 - **Links to the main page** (You's, and the Navidrome message's) open it beside the player, in a
   new tab, so the music keeps playing. From the home-screen app it opens outside the app, in Safari
   or a browser view over it.
@@ -747,15 +761,12 @@ fixes that.
   [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened).
 - **CarPlay**: not something a web page can offer.
 - **Offline**: nothing is kept on the phone for listening without a connection.
-- **Getting an album**: the app's Search finds albums you don't have and shows their pressings,
-  but starting the download is on the main page (**Find**) until a later version adds **Get**.
 - **Artist pages**: an artist in Search, or on an album, isn't a link yet.
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
-- **The rest of deadwax**: starting a download, editing, the albums that need a look and the
-  settings are on the main page, which also works on a phone; the Requests tab follows a download
-  from there. Tapping a finished download doesn't open its album yet.
+- **The rest of deadwax**: editing, the albums that need a look and the server settings are on the
+  main page, which also works on a phone. Tapping a finished download doesn't open its album yet.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata
@@ -810,6 +821,10 @@ question the whole player existed to answer. Still to find out:
   (it hasn't been tried against a real Navidrome yet), a song's tap starting its album, the
   pressing list scrolling under a finger without the page moving, and the Cover Art Archive's
   covers over your VPN;
+- **Get** (2.0.0-player.15) against your slskd and real Soulseek folders: the sources sheet
+  scrolling under a finger without the page behind it moving, a tap above it closing it, the sort's
+  picker (iOS's own wheel), the cards' words for real folders and users, a download showing in
+  Requests from the tap, and **Pick the best source for me**;
 - **Info and the ••• menu** under a real finger: that Info's list scrolls and nothing behind it
   does, that a tap above it closes it, and that the Gapless checkbox in You turns gapless on from
   its tap as the switch did;

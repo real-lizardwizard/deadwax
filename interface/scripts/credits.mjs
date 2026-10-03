@@ -2,10 +2,14 @@
  * Artist credits, as the vanilla half needs them.
  *
  * Its own module for the same reason sort.mjs is: main.js touches the DOM at module scope, so
- * nothing can import it to test it, and these decide what a download's FOLDER is called - which
- * is exactly the kind of thing that must not drift from its TypeScript twin in silence.
- * ui/test/credits.sim.cjs loads this file and ui/src/lib/release.ts side by side and holds the
- * two to the same answers.
+ * nothing can import it to test it. Until 2.0.0-player.15 these decided what a download's FOLDER
+ * was called; since then a download's payload is built from their TypeScript twins
+ * (ui/src/lib/releasePayload.ts, the one builder, which main.js reaches through the bridge), and
+ * main.js uses these only to DRAW - the card's credit, and the "in your library" match by name -
+ * so a drift between the two copies would mark a card wrong, never file an album under a second
+ * folder. ui/test/credits.sim.cjs still loads this file and ui/src/lib/release.ts side by side and
+ * holds the two to the same answers. (getArtistIds, which only the payload builders used, went with
+ * them; the sim checks it isn't here.)
  *
  * Two different names come out of one credit, and they are not interchangeable:
  *
@@ -24,8 +28,9 @@
 // collaboration, " feat. " for a guest spot. Joining on ", " instead - which this did - invents
 // punctuation and turns a duet into what reads as two separate acts.
 //
-// Third copy of this rule, and they must agree: creditName() in ui/src/lib/release.ts and
-// credit_name() in src/artists.py. One of them names a folder, another writes the tag inside it.
+// The twin of creditName() in ui/src/lib/release.ts, and the two must agree: that one names what a
+// download is searched for and tagged with (lib/releasePayload.ts), this one draws the card's credit
+// (and is a name its "in your library" match tries).
 export function getArtistNames(artistCredit) {
     if (!artistCredit || !artistCredit.length) return 'N/A';
     return artistCredit
@@ -36,44 +41,13 @@ export function getArtistNames(artistCredit) {
 
 // The same credit in each artist's CURRENT name, keeping the credit's own join phrases - so a
 // split stays a split and a feature stays a feature, only the names are brought up to date.
-// '' rather than 'N/A' when there is nothing: this names a folder, and the caller falls back to
-// the credit instead of filing an album under "N/A".
+// '' rather than 'N/A' when there is nothing, and the caller falls back to the credit.
 //
-// Mirrors currentName() in ui/src/lib/release.ts.
+// Mirrors currentName() in ui/src/lib/release.ts, which names a download's folder (through
+// lib/releasePayload.ts) and seeds the editor's; this one is a name the "in your library" match tries.
 export function getCurrentArtistNames(artistCredit) {
     return (artistCredit || [])
         .map(ac => `${ac.artist?.name || ac.name || ''}${ac.joinphrase ?? ''}`)
         .join('')
         .trim();
-}
-
-// Every artist id in a credit, in the order credited. Mirrors creditIds()/credit_ids().
-export function getArtistIds(artistCredit) {
-    const ids = [];
-    for (const entry of artistCredit || []) {
-        const id = entry.artist?.id;
-        if (id && !ids.includes(id)) ids.push(id);
-    }
-    return ids;
-}
-
-// ------------------------------------------------------------------ one rule about tracks
-//
-// Here for the same reason as the credit helpers: main.js builds a download's payload with it,
-// and flattenTracks() in ui/src/lib/release.ts builds the editor's with its TypeScript twin,
-// isVideoTrack() - ui/test/credits.sim.cjs asks both the same cases.
-//
-// A track that never arrives as an audio file: one on a video medium, or of a recording
-// MusicBrainz marks as video. Marked `video` on the payload so the "already have it" checks
-// leave it out (store_index.audio_tracks) - otherwise a CD+DVD deluxe held whole could never
-// read as complete. Only formats that are video whatever is on them: a plain "DVD" or "DVD-R"
-// may be DVD-Audio, so it counts only by its recording's own flag. (Getting it wrong the other
-// way - an audio track taken for video - would call a part held complete and refuse a download.)
-const VIDEO_FORMATS = new Set([
-    'DVD-Video', 'Blu-ray', 'Blu-ray-R', 'HD-DVD', 'VHS', 'VCD', 'SVCD', 'Betamax', 'LaserDisc',
-    'CED', 'UMD', 'DualDisc (DVD-Video side)',
-]);
-
-export function isVideoTrack(medium, track) {
-    return track?.recording?.video === true || VIDEO_FORMATS.has(medium?.format || '');
 }

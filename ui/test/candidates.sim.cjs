@@ -5,6 +5,18 @@
  * refuse (an unjudgeable signal passing a minimum), a Re-search that silently narrows a search to one
  * name, and the advertised speed going back to reading like a promise.
  *
+ * And for the app's Sources sheet (2.0.0-player.15) - its cards' words (lib/candidates.ts) and You >
+ * Getting albums (lib/getSettings.ts): the Lossless chip (unknown never passes); Speed - measured
+ * ("what you got from them", green), the peer's own average (never the download speed), or none -
+ * and its bar against 3 MB/s; Starts ("now", "3 ahead"); Quality and Tracks; the amber "Missing …"
+ * line; what the sheet says while asking and under the cards; when a pick must leave the choice to
+ * you, and the line saying why; the quality floor as chips pressed (320 kbps's only while it is the
+ * floor) and as the filters a pick goes by; what a first read seeds from the main page's settings.
+ * After review: Tracks counted against the release's AUDIO tracks (a CD+DVD shared whole is "14 of
+ * 14", agreeing with the missing line); no pick without a tracklist or a release id (the album as a
+ * whole scores on edition, format and peer alone); the one line the sheet says to VoiceOver for
+ * each outcome; a seed that carries over only what differs from the defaults; `seeded` read.
+ *
  * Run it with:  node ui/test/candidates.sim.cjs
  */
 
@@ -15,11 +27,12 @@ const UI = path.resolve(__dirname, '..');
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-candidates-'));
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/candidates.ts', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022',
+  'src/lib/candidates.ts', 'src/lib/getSettings.ts', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022',
   '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' });
 
 const C = require(path.join(OUT, 'lib/candidates.js'));
+const G = require(path.join(OUT, 'lib/getSettings.js'));
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -112,6 +125,151 @@ check('...and never reads as a broken string', C.peerSpeedLabel(0), 'peer avg un
 check('no measurement renders as nothing', C.measuredSpeed(candidate()), null);
 check('one transfer is not hedged', C.measuredSpeed(candidate({ measured_speed: 800 * 1024, measured_samples: 1 })).text, 'you got 800 KB/s');
 check('an average is', C.measuredSpeed(candidate({ measured_speed: 800 * 1024, measured_samples: 4 })).text, 'you got ~800 KB/s');
+
+console.log('\nthe Lossless chip (2.0.0-player.15): every file lossless, and unknown never passes');
+{
+  const lossless = (fields) => filters({ lossless: true, ...fields });
+  check('a folder of FLACs passes, of MP3s doesn\'t', [C.passesFilters(flac(), lossless()), C.passesFilters(mp3([320]), lossless())], [true, false]);
+  check('...one MP3 among the FLACs is not a lossless folder', C.passesFilters(candidate({ formats: ['flac', 'mp3'] }), lossless()), false);
+  check('...every lossless format counts (ALAC, APE, WAV, AIFF, WavPack)', ['alac', 'ape', 'wav', 'aiff', 'wv'].map((f) => C.passesFilters(candidate({ formats: [f] }), lossless())), [true, true, true, true, true]);
+  check('a folder whose formats nobody could tell never passes', C.passesFilters(candidate({ formats: [] }), lossless()), false);
+  check('off, it lets everything through as before', C.passesFilters(mp3([128]), filters({ lossless: false })), true);
+}
+
+console.log('\na source card\'s Speed: measured, their own average, or none - and never a promise');
+{
+  const MB = 1024 * 1024;
+  check('measured from them before: green, and says so', C.speedFact(candidate({ measured_speed: 2.1 * MB, measured_samples: 1, upload_speed: 9 * MB })),
+    { kind: 'measured', text: '2.1 MB/s', note: 'what you got from them', percent: 70 });
+  check('...an average of several transfers is hedged', C.speedFact(candidate({ measured_speed: 900 * 1024, measured_samples: 3 })).text, '~900 KB/s');
+  check('otherwise the peer\'s own average, said to be theirs - never "you\'ll get"', C.speedFact(candidate({ upload_speed: 1.2 * MB })),
+    { kind: 'advertised', text: '1.2 MB/s', note: 'their own average', percent: 40 });
+  check('neither: unknown, and an empty bar', C.speedFact(candidate({ upload_speed: 0 })), { kind: 'unknown', text: 'Unknown', note: 'no speed reported yet', percent: 0 });
+  check('the bar is the speed against 3 MB/s, full past it', [C.SPEED_BAR_FULL, C.speedFact(candidate({ upload_speed: 9 * MB })).percent, C.speedFact(candidate({ upload_speed: 0.3 * MB })).percent], [3 * MB, 100, 10]);
+}
+
+console.log('\nStarts, Quality, Tracks, and what is missing');
+{
+  check('a free slot starts now; a queue says how many ahead; no slot and nobody ahead is next',
+    [C.startsFact(candidate({ has_free_slot: true, queue_length: 4 })), C.startsFact(candidate({ has_free_slot: false, queue_length: 3 })), C.startsFact(candidate({ has_free_slot: false, queue_length: 0 }))],
+    [{ text: 'now', waits: false }, { text: '3 ahead', waits: true }, { text: 'next', waits: true }]);
+  check('quality: depth/rate for lossless, ranges for a mixed folder, only what was reported',
+    [C.qualityText(flac({ bit_depths: [16], sample_rates: [44100] })), C.qualityText(flac({ bit_depths: [24], sample_rates: [96000] })),
+     C.qualityText(flac({ bit_depths: [16, 24], sample_rates: [44100, 96000] })), C.qualityText(flac({ bit_depths: [24] })), C.qualityText(flac({ sample_rates: [48000] })), C.qualityText(flac())],
+    ['FLAC 16/44.1', 'FLAC 24/96', 'FLAC 16-24/44.1-96', 'FLAC 24-bit', 'FLAC 48 kHz', 'FLAC']);
+  check('...a bitrate for lossy, VBR said, and unknown when there is no format at all',
+    [C.qualityText(mp3([320])), C.qualityText(mp3([192, 320])), C.qualityText(mp3([245], { variable_bitrate: true })), C.qualityText(mp3([])), C.qualityText(candidate({ formats: [] }))],
+    ['MP3 320k', 'MP3 192-320k', 'MP3 VBR 245k', 'MP3', 'Unknown']);
+  check('tracks: "11 of 11" against a tracklist, files without', [C.tracksText(candidate({ matched_tracks: 10 })), C.tracksText(candidate({ expected_tracks: 0, audio_file_count: 1 }))], ['10 of 11', '1 file']);
+  //? a CD+DVD (the fixture's HAARP: 34 tracks, 20 of them the DVD's): what a folder of audio can hold
+  //? is the 14, and the missing line - which leaves video out - agrees with the count (review)
+  const haarp = (fields) => candidate({ expected_tracks: 34, audio_expected: 14, matched_tracks: 14, missing_tracks: [], missing_count: 0, ...fields });
+  check('a CD+DVD shared whole is 14 of 14 - never "14 of 34" with nothing said missing', [C.tracksText(haarp()), C.missingLine(haarp())], ['14 of 14', null]);
+  check('...one track short is 13 of 14, and the line names it',
+    [C.tracksText(haarp({ matched_tracks: 13, missing_tracks: [{ position: 3, disc: 1, title: 'Map of the Problematique' }], missing_count: 1 })),
+     C.missingLine(haarp({ missing_tracks: [{ position: 3, disc: 1, title: 'Map of the Problematique' }], missing_count: 1 }))],
+    ['13 of 14', 'Missing “Map of the Problematique”']);
+  check('...the DVD\'s audio ripped too counts no higher than the CD\'s 14', C.tracksText(haarp({ matched_tracks: 34 })), '14 of 14');
+  check('an answer from before audio_expected counts as the old panel did', C.tracksText(candidate({ matched_tracks: 10, audio_expected: undefined })), '10 of 11');
+  const missing = (titles, count = titles.length) => candidate({ missing_tracks: titles.map((title, n) => ({ position: n + 1, disc: 1, title })), missing_count: count });
+  check('nothing missing, no line', [C.missingLine(candidate()), C.missingLine(missing([]))], [null, null]);
+  check('one missing, named in the board\'s quotes', C.missingLine(missing(['Threads'])), 'Missing “Threads”');
+  check('two, and three', [C.missingLine(missing(['Threads', 'Small'])), C.missingLine(missing(['Silence', 'Hunter', 'Small']))],
+    ['Missing “Threads” and “Small”', 'Missing “Silence”, “Hunter” and “Small”']);
+  check('more than three: three named, the rest counted - the server names five of however many',
+    C.missingLine(missing(['Silence', 'Hunter', 'Nylon Smile', 'The Rip', 'Plastic'], 8)), 'Missing “Silence”, “Hunter”, “Nylon Smile” and 5 more');
+  check('...an untitled track by its number', C.missingLine(candidate({ missing_tracks: [{ position: 7, disc: 1, title: '' }], missing_count: 1 })), 'Missing “track 7”');
+}
+
+console.log('\nwhat the sheet says while asking, and under the cards');
+{
+  check('asking: the album and every name it is asked for under, once each',
+    [C.searchingLine({ artist: 'Portishead', album_artist: 'Portishead', album: 'Third' }), C.searchingLine({ artist: 'Kanye West', album_artist: 'Ye', album: 'Donda' }),
+     C.searchingLine({ artist: 'N/A', album_artist: '', album: 'Untitled' })],
+    ['Asking Soulseek for “Third” by Portishead…', 'Asking Soulseek for “Donda” by Kanye West or Ye…', 'Asking Soulseek for “Untitled”…']);
+  const result = (n, queries = ['Portishead Third']) => ({ query: queries[0], queries, response_count: 9, candidates: Array.from({ length: n }, () => candidate()) });
+  check('under the cards: what was searched, how many folders, how many pass',
+    [C.searchedLine(result(41), 4), C.searchedLine(result(3), 3), C.searchedLine(result(1), 1), C.searchedLine(result(2, ['Kanye West Donda', 'Ye Donda']), 1)],
+    ['Searched Soulseek for “Portishead Third” · 41 folders, 4 match your filters', 'Searched Soulseek for “Portishead Third” · 3 folders, all match your filters',
+     'Searched Soulseek for “Portishead Third” · 1 folder, it matches your filters', 'Searched Soulseek for “Kanye West Donda” and “Ye Donda” · 2 folders, 1 matches your filters']);
+}
+
+console.log('\nwhen "Pick the best source for me" leaves the choice to you, and says why');
+{
+  const answer = (fields = {}) => ({ query: 'q', queries: ['q'], response_count: 1, candidates: [], held: null, downloading: null, downloading_part: null, other_pressings: [], ...fields });
+  const job = { job_id: 1, status: 'queued', username: 'bob', files: 11 };
+  const keep = { path: 'P/T', paths: ['P/T'], artist: 'P', album: 'T', edition: '', track_count: 11, expected_tracks: 11, formats: ['flac'], fills_gaps: false, filed_to: null };
+  check('downloading, held whole, part downloading, part held - each its reason',
+    [C.autoPickBlocked(answer({ downloading: job })), C.autoPickBlocked(answer({ held: { ...keep, complete: true } })),
+     C.autoPickBlocked(answer({ downloading_part: { ...job, files: 5 } })), C.autoPickBlocked(answer({ held: { ...keep, track_count: 9, complete: false } }))],
+    ['it is already downloading', 'it is already in your library', 'a download of part of it is already running', 'you already have part of it']);
+  check('another pressing held, or nothing at all, doesn\'t stop a pick', [C.autoPickBlocked(answer({ other_pressings: [{ path: 'x' }] })), C.autoPickBlocked(answer()), C.autoPickBlocked(null)], [null, null, null]);
+  check('the line saying why, or that nothing scored well enough', [G.notPickedLine('you already have part of it'), G.notPickedLine(null)],
+    ["Didn't pick a source for you: you already have part of it.", "Didn't pick a source for you: none scores 75 or more and passes your filters."]);
+  //? the album as a whole - MusicBrainz couldn't list its pressings - scores on edition, format and
+  //? peer alone, so a two-track FLAC folder reaches 100: 75 means nothing there (review)
+  const whole = { release_mbid: null, tracks: [] };
+  const pressing = { release_mbid: 'rel', tracks: [{ position: 1 }] };
+  check('no tracklist, or no release id: no pick, and why - the store\'s reasons first',
+    [C.autoPickBlocked(answer(), whole), C.autoPickBlocked(answer(), { release_mbid: 'rel', tracks: [] }), C.autoPickBlocked(answer(), { release_mbid: null, tracks: [{ position: 1 }] }),
+     C.autoPickBlocked(answer(), pressing), C.autoPickBlocked(answer({ downloading: job }), whole)],
+    ['with no tracklist to match the folders against, no score can be trusted', 'with no tracklist to match the folders against, no score can be trusted',
+     "with no release id, deadwax can't tell whether you already have it", null, 'it is already downloading']);
+  check('...said whole', G.notPickedLine(C.autoPickBlocked(answer(), whole)),
+    "Didn't pick a source for you: with no tracklist to match the folders against, no score can be trusted.");
+  check('in the app, a download in flight is cancelled in Requests', C.storeStatus(answer({ downloading: { ...job, status: 'downloading', done_files: 4 } }), 'Requests').lines,
+    ['From bob · 4 of 11 files', 'Open Requests to cancel it if you want another peer.']);
+}
+
+console.log('\nthe quality floor (You > Getting albums): the chips it starts as, the filters a pick goes by');
+{
+  check('the floors and the modes, as You words them', [G.QUALITY_FLOORS.map((f) => [f.value, f.label]), G.GET_MODES.map((m) => [m.value, m.label])],
+    [[['any', 'Any'], ['320', '320 kbps'], ['lossless', 'Lossless'], ['24bit', '24-bit']], [['sources', 'Show me the sources'], ['pick', 'Pick the best source for me']]]);
+  check('the default shows the sources, at any quality', G.GET_SETTINGS_DEFAULT, { get_mode: 'sources', quality_floor: 'any' });
+  check('each floor is a chip pressed: Lossless, 24-bit, 320 kbps - Any none',
+    ['any', '320', 'lossless', '24bit'].map((floor) => G.floorFilters(floor)),
+    [{ lossless: false, bit24: false, freeSlot: false, kbps320: false }, { lossless: false, bit24: false, freeSlot: false, kbps320: true },
+     { lossless: true, bit24: false, freeSlot: false, kbps320: false }, { lossless: false, bit24: true, freeSlot: false, kbps320: false }]);
+  const labels = (floor, filters) => G.sourceChips(floor, filters).map((chip) => `${chip.label}${chip.on ? '*' : ''}`);
+  check('the chips: Lossless, 24-bit, Free slot - and 320 kbps only while it is the floor (never a filter on out of sight)',
+    [labels('lossless', G.floorFilters('lossless')), labels('320', G.floorFilters('320')), labels('320', G.NO_SOURCE_FILTERS), labels('any', G.NO_SOURCE_FILTERS)],
+    [['Lossless*', '24-bit', 'Free slot'], ['Lossless', '24-bit', '320 kbps*', 'Free slot'], ['Lossless', '24-bit', '320 kbps', 'Free slot'], ['Lossless', '24-bit', 'Free slot']]);
+  const pool = [mp3([320], { username: 'mp3' }), flac({ username: 'cd', bit_depths: [16] }), flac({ username: 'hires', bit_depths: [24], sample_rates: [96000] }), mp3([128], { username: 'thin' })];
+  const passing = (sourceFilters) => pool.filter((c) => C.passesFilters(c, G.candidateFilters(sourceFilters))).map((c) => c.username);
+  check('as filters: Any keeps all, 320 drops the thin MP3 (lossless passes a bitrate floor), Lossless the MP3s, 24-bit all but the hi-res',
+    ['any', '320', 'lossless', '24bit'].map((floor) => passing(G.floorFilters(floor))),
+    [['mp3', 'cd', 'hires', 'thin'], ['mp3', 'cd', 'hires'], ['cd', 'hires'], ['hires']]);
+  check('Free slot is a slot', passing({ ...G.NO_SOURCE_FILTERS, freeSlot: true }).length, 4);
+  check('a pick under a 24-bit floor takes the 24/96 only at 75 or more',
+    [C.autoGrabPick([pool[1], { ...pool[2], score: 0.8 }], G.candidateFilters(G.floorFilters('24bit')), G.PICK_SORT)?.pick.username,
+     C.autoGrabPick([pool[1], { ...pool[2], score: 0.7 }], G.candidateFilters(G.floorFilters('24bit')), G.PICK_SORT)],
+    ['hires', null]);
+  check('pressed chips are counted, so Clear filters shows only with some', [G.pressedCount(G.NO_SOURCE_FILTERS), G.pressedCount({ ...G.floorFilters('lossless'), freeSlot: true })], [0, 2]);
+  check('a server answer read safely: what it doesn\'t know is the default',
+    [G.readGetSettings({ get_mode: 'pick', quality_floor: 'flac', stored: ['get_mode'], seeded: true, can_save: true }), G.readGetSettings(null)],
+    [{ get_mode: 'pick', quality_floor: 'any', stored: ['get_mode'], seeded: true, can_save: true }, { get_mode: 'sources', quality_floor: 'any', stored: [], seeded: false, can_save: true }]);
+  check('...seeded as the server says, and always when something is stored',
+    [G.readGetSettings({ stored: [], seeded: true }).seeded, G.readGetSettings({ stored: ['quality_floor'] }).seeded, G.readGetSettings({ stored: [], seeded: false }).seeded], [true, true, false]);
+  check('a first read carries the floor over from the main page\'s settings: 24-bit, 16-bit (lossless only), 320 - only what differs from the defaults, and never picks for you',
+    [{ candidateMinBitrate: 0, candidateMinBitDepth: 24 }, { candidateMinBitrate: 320, candidateMinBitDepth: 16 }, { candidateMinBitrate: 320, candidateMinBitDepth: 0 }, { candidateMinBitrate: 256, candidateMinBitDepth: 0 }]
+      .map((preferences) => G.seedFromPreferences(preferences)),
+    [{ quality_floor: '24bit' }, { quality_floor: 'lossless' }, { quality_floor: '320' }, {}]);
+}
+
+console.log('\nwhat the Sources sheet says to VoiceOver, one line for each outcome');
+{
+  const release = { artist: 'Portishead', album_artist: 'Portishead', album: 'Third' };
+  const result = (n) => ({ query: 'Portishead Third', queries: ['Portishead Third'], candidates: Array.from({ length: n }, () => candidate()) });
+  const said = (fields) => C.sourcesAnnouncement({ pending: false, release, error: null, status: null, result: null, shown: 0, notPicked: null, ...fields });
+  check('asking, refused, held, nothing found, none passing, how many - and why none was picked',
+    [said({ pending: true }), said({ error: "slskd isn't logged in to Soulseek" }), said({ status: { title: 'Already in your library' }, result: result(0) }),
+     said({ result: result(0) }), said({ result: result(3), shown: 0 }), said({ result: result(1), shown: 0 }), said({ result: result(4), shown: 4 }), said({ result: result(1), shown: 1 }),
+     said({ result: result(4), shown: 2, notPicked: "Didn't pick a source for you: you already have part of it." })],
+    ['Asking Soulseek for “Third” by Portishead…', "slskd isn't logged in to Soulseek", 'Already in your library',
+     'Soulseek found nothing for “Portishead Third”.', '3 folders on Soulseek, none pass your filters', '1 folder on Soulseek, none pass your filters', '4 sources', '1 source',
+     "2 sources. Didn't pick a source for you: you already have part of it."]);
+  check('...and nothing before a search has begun', said({}), '');
+}
 
 console.log('\nalready in the store (step 2)');
 {

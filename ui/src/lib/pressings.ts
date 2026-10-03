@@ -9,7 +9,7 @@
  *
  *  - THE DEFAULT is representativeRelease() (lib/tracklistDiff.ts, the main page's rule ported):
  *    the group's most common tracklist, then Official, CD or digital, no disambiguation, earliest.
- *    The same pressing a card's Find downloads as, and the one Get will get.
+ *    The same pressing a card's Find downloads as, and the one Get gets until you choose another.
  *  - "THE USUAL TRACKLIST" is chooseBase()'s: the most common, by titles in order. A pressing has it
  *    when nothing is added, left out, renamed or another version - a few seconds' difference in
  *    a length is MusicBrainz rounding or a pressing's own timing, and doesn't count (so the app,
@@ -330,6 +330,31 @@ export function pageHeader(
 export function metaLine(header: { year: string; kind: string }, held: boolean | null): string {
   const holding = held === null ? '' : held ? 'in your library' : 'not in your library'
   return [header.year, header.kind, holding].filter(Boolean).join(' · ')
+}
+
+/**
+ * The release group a Get on this page builds its download from (2.0.0-player.15, through
+ * lib/releasePayload.ts) - the group Search handed over, else the one the pressings carry - so the
+ * album is searched under its credit and filed under its current name and its own year, exactly as
+ * the main page's Find on the same pressing would. Where MusicBrainz gave no credit for the group (a
+ * cold link whose pressings carry a bare group), the chosen pressing's credit stands in; with no
+ * group at all, its title and the earliest date any pressing came out (first-release-date's meaning).
+ */
+export function getGroup(
+  id: string,
+  preview: ReleaseGroup | null,
+  releases: readonly PageRelease[],
+  chosen: PageRelease | null,
+): Pick<ReleaseGroup, 'id' | 'title' | 'first-release-date' | 'artist-credit'> {
+  const group = preview ?? releases.find((release) => release['release-group'])?.['release-group'] ?? null
+  const dates = releases.map((release) => release.date || release['release-events']?.[0]?.date || '').filter(Boolean).sort()
+  const credit = group?.['artist-credit']?.length ? group['artist-credit'] : chosen?.['artist-credit']
+  return {
+    id: group?.id || id,
+    title: group?.title || chosen?.title || releases[0]?.title || '',
+    'first-release-date': group ? group['first-release-date'] ?? '' : dates[0] ?? '',
+    ...(credit ? { 'artist-credit': credit } : {}),
+  }
 }
 
 /** The Cover Art Archive's front for the pressing shown, then for the album as a whole. */

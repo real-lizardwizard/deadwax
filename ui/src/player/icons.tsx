@@ -125,6 +125,9 @@ export const RequestsIcon = thin(
   </>,
 )
 
+/** An arrow down onto a line - "Get the album", as Request.dc.html draws it. */
+export const GetIcon = line(<path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" />)
+
 export const YouIcon = thin(
   <>
     <circle cx="12" cy="8.5" r="3.8" />

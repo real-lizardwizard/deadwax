@@ -1,34 +1,29 @@
 import { Fragment } from 'preact'
 import { useEffect, useMemo, useState } from 'preact/hooks'
 
+import { storeState } from '../api/download'
 import { MusicBrainzUnavailable } from '../api/http'
 import { getReleaseGroup } from '../api/musicbrainz'
-import type { ReleaseGroup, ReleaseGroupResponse } from '../api/types'
+import type { ReleaseGroup, ReleaseGroupResponse, StoreStateResponse } from '../api/types'
+import { storeNotes, storeStatus } from '../lib/candidates'
 import { isAbort, latestOnly } from '../lib/latest'
+import { onAlbumsFiled } from '../lib/libraryEvents'
 import { ownedForGroup } from '../lib/owned'
 import {
-  coverAddresses, groupMbid, leftOut, metaLine, pageHeader, pressingsView, summaryLine, trackRows, type PageRelease,
+  coverAddresses, getGroup, groupMbid, leftOut, metaLine, pageHeader, pressingLabel, pressingsView, summaryLine, trackRows,
+  type PageRelease,
 } from '../lib/pressings'
-import { ChevronLeftIcon } from '../player/icons'
+import { buildDownloadRelease } from '../lib/releasePayload'
+import { ChevronLeftIcon, GetIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import { PressingPicker } from './PressingPicker'
+import { keep, kept } from './pressingLists'
+import type { GetRequest } from './Sources'
+import { StoreState } from './StoreState'
+import { takeOpener } from './useSheet'
 import { useOwned } from './useOwned'
 
-/** How many albums' pressing lists the session keeps, so Back (and a tab switch) asks nothing again. */
-export const PRESSINGS_KEPT = 20
-
-//? the session's pressing lists, by release group - only complete answers, never a failure, and
-//? the oldest let go past PRESSINGS_KEPT (a big group's tracklists are a large payload)
-const pressings = new Map<string, ReleaseGroupResponse>()
-
-function keep(id: string, answer: ReleaseGroupResponse): void {
-  pressings.delete(id)
-  pressings.set(id, answer)
-  if (pressings.size > PRESSINGS_KEPT) {
-    const [oldest] = pressings.keys()
-    if (oldest !== undefined) pressings.delete(oldest)
-  }
-}
+export { PRESSINGS_KEPT } from './pressingLists'
 
 //? `final`: asking again can't help (the address isn't an album's) - no Try again
 type Trouble = { message: string; unavailable: boolean; final?: boolean }
@@ -42,8 +37,22 @@ export const NOT_AN_ALBUM_LINK = "That isn't a link to an album on MusicBrainz."
  * don't have opens like one you do". So its header is the album page's: back, the centred cover
  * (from the Cover Art Archive - the pressing's front, else the album's), the title, the artist (not
  * a link: there is no artist page yet), and "{year} · {kind} · not in your library". Where the album
- * page has Play and Shuffle, this has the Pressing dropdown; "Get the album" goes under it in the next
- * slice, and nothing stands in its place meanwhile - a button that does nothing is worse than none.
+ * page has Play and Shuffle, this has the Pressing dropdown, and under it (2.0.0-player.15) "Get the
+ * album", the screen's ONE solid purple button, and under that what the library and the downloads
+ * already have of the pressing chosen - POST /download/store_state, which searches nothing
+ * ("Already in your library", "Already downloading", "You have 9 of 10 tracks", "You also have
+ * another pressing"). Get downloads the CHOSEN pressing (James: the dropdown decides what Get and the
+ * sources are for): it opens the Sources sheet for that pressing, built by the one payload builder
+ * (lib/releasePayload.ts) from the album's group, so the main page's Find on the same pressing sends
+ * the same. It shows once a pressing is chosen - before that there is nothing it could get.
+ *
+ * What is already here sits UNDER Get, not between the pressing and it (review): its answer lands
+ * after Get is drawn, and is a few lines tall, so above Get it moved the button under a finger
+ * reaching for it. It is asked for the pressing chosen, again as another is chosen, as an album is
+ * filed, and as the page comes back into view (`shown`: its tab current, the Sources sheet closed,
+ * the app in front - so after a Get, or a download cancelled in Requests, it says so). Asked again
+ * for the SAME pressing, the last answer stays until the new one lands; another pressing's never
+ * stands for this one.
  *
  * Then the chosen pressing's TRACKLIST, not the release list (James: "for both, I'd like the album
  * page to show the tracklist instead of the release list ... a dropdown somewhere to pick which
@@ -69,22 +78,28 @@ export function ReleaseGroupPage({
   id,
   release,
   preview,
+  shown,
   onBack,
   backLabel,
   onPick,
+  onGet,
 }: {
   id: string
   release: string | null
   /** the group as Search showed it, for the header before (or without) the pressings */
   preview: ReleaseGroup | null
+  /** the page is what shows - its tab current, no sheet over it, the app in front (App) */
+  shown: boolean
   onBack: () => void
   backLabel: string
   /** a pressing chosen: its id, or null for the default */
   onPick: (groupId: string, releaseId: string | null) => void
+  /** Get: open the Sources sheet for the chosen pressing, focus given back to `opener` as it closes */
+  onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
 }) {
   //? the id as MusicBrainz writes it, or null for an address that isn't an album's
   const mbid = groupMbid(id)
-  const [answer, setAnswer] = useState<ReleaseGroupResponse | null>(() => (mbid && pressings.get(mbid)) || null)
+  const [answer, setAnswer] = useState<ReleaseGroupResponse | null>(() => (mbid && kept(mbid)) || null)
   const [trouble, setTrouble] = useState<Trouble | null>(null)
   const requests = useMemo(latestOnly, [])
   const owned = useOwned(true)
@@ -96,7 +111,7 @@ export function ReleaseGroupPage({
       setTrouble({ message: NOT_AN_ALBUM_LINK, unavailable: false, final: true })
       return
     }
-    const held = pressings.get(mbid)
+    const held = kept(mbid)
     if (held) {
       setAnswer(held)
       setTrouble(null)
@@ -139,6 +154,45 @@ export function ReleaseGroupPage({
   const missing = leftOut(diff)
   const summary = view ? summaryLine(view, releases.length) : null
 
+  //? What Get would download: the chosen pressing, as the one payload builder makes it from the
+  //? album's group - and what the library and the downloads already have of it, asked of the store
+  //? (no Soulseek search) as the pressing is chosen, as an album is filed, and as the page shows again
+  const group = mbid && chosen ? getGroup(mbid, preview, releases, chosen) : null
+  //? the chosen pressing as MusicBrainz sent it (the page reads it through tracklistDiff's types)
+  const pressing = answer?.releases.find((release) => release.id === chosen?.id) ?? null
+  const download = group && pressing ? buildDownloadRelease(group, pressing) : null
+  const stateRequests = useMemo(latestOnly, [])
+  const [store, setStore] = useState<{ id: string; state: StoreStateResponse } | null>(null)
+  const [filed, setFiled] = useState(0)
+  useEffect(() => onAlbumsFiled(() => setFiled((n) => n + 1)), [])
+  useEffect(() => {
+    if (!download || !chosen) {
+      stateRequests.supersede()
+      return
+    }
+    //? out of view (another tab, the sheet over it, the app in the background): asked as it comes back
+    if (!shown) return
+    const request = stateRequests.begin()
+    //? the last answer stays while this pressing is asked about again - it is still the best known,
+    //? and clearing it would empty the line for a moment; another pressing's is never drawn (`known`)
+    const asked = chosen.id
+    storeState(download.release, request.signal).then(
+      (state) => {
+        if (request.current()) setStore({ id: asked, state })
+      },
+      () => {
+        //? a check that can't be made says nothing - Get asks again, and the server refuses a second copy
+      },
+    )
+    return () => stateRequests.supersede()
+  }, [chosen?.id, group?.id, filed, shown])
+  const known = store && store.id === chosen?.id ? store.state : null
+
+  const get = (event: MouseEvent) => {
+    if (!download || !chosen) return
+    onGet({ release: download.release, subtitle: [header.title, pressingLabel(chosen)].filter(Boolean).join(' · ') }, takeOpener(event))
+  }
+
   return (
     <section class="pl-album-page app-rg">
       <header class="pl-nav-bar">
@@ -155,9 +209,19 @@ export function ReleaseGroupPage({
         {/* said once something is known - a cold link has nothing to say until the pressings come */}
         <p class="pl-hero-meta">{preview || answer ? metaLine(header, held) : ''}</p>
 
-        {/* where the album page has Play and Shuffle: the pressing, and (from the next slice) Get */}
+        {/* where the album page has Play and Shuffle: the pressing, Get, and what's already here of
+            it - under Get, where an answer landing late moves nothing a finger is reaching for */}
         <div class="app-rg-actions">
           {view && <PressingPicker view={view} onPick={(picked) => onPick(id, picked === view.defaultId ? null : picked)} />}
+          {download && (
+            <button type="button" class="app-rg-get" onClick={get}>
+              <GetIcon class="app-rg-get-icon" />
+              Get the album
+            </button>
+          )}
+          <div class="app-rg-store" aria-live="polite">
+            {known && <StoreState status={storeStatus(known, 'Requests')} notes={storeNotes(known)} />}
+          </div>
         </div>
       </div>
 

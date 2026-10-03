@@ -9,7 +9,7 @@
  * Keep this small and keep it shrinking. Every entry is a piece of the old app the new one
  * still depends on, so an empty bridge is the signal that the migration is done.
  */
-import type { FindCandidatesRequest } from './api/types'
+import type { DownloadRelease, FindCandidatesRequest, Release, ReleaseGroup } from './api/types'
 
 export interface DeadwaxBridge {
   /**
@@ -38,6 +38,18 @@ export interface DeadwaxBridge {
    * the release payload - it goes when the grid is ported.
    */
   openCandidates?: (release: FindCandidatesRequest, label: string) => void
+
+  /**
+   * The ONE download payload builder (lib/releasePayload.ts, 2.0.0-player.15): what a Find sends -
+   * the release a pressing of `group` is downloaded as, or with no pressing the album as a whole -
+   * and the label the candidates panel heads it with. Set by this bundle (main.tsx), called by the
+   * vanilla releases grid's two Find buttons, which deleted their own builders for it so the app's
+   * Get and the main page's Finds can never send different things. Goes when the grid is ported.
+   */
+  buildDownloadRelease?: (
+    group: Pick<ReleaseGroup, 'id' | 'title' | 'first-release-date' | 'artist-credit'>,
+    release: Release | null,
+  ) => { release: DownloadRelease; label: string }
 
   /**
    * Runs a MusicBrainz search on the vanilla side. Set by main.js, called from the library

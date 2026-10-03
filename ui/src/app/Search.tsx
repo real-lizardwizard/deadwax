@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { MusicBrainzUnavailable } from '../api/http'
-import { fullySearch } from '../api/musicbrainz'
-import type { ReleaseGroup } from '../api/types'
+import { fullySearch, getReleaseGroup } from '../api/musicbrainz'
+import type { ReleaseGroup, ReleaseGroupResponse } from '../api/types'
 import { isAbort, latestOnly } from '../lib/latest'
-import { coverAddresses } from '../lib/pressings'
+import { coverAddresses, pressingLabel, type PageRelease } from '../lib/pressings'
+import { buildDownloadRelease, usualPressing } from '../lib/releasePayload'
 import {
   LIBRARY_SETTLE_MS, MUSICBRAINZ_SETTLE_MS, SEARCH_MAX_CHARS, artistNames, asksMusicBrainzBySettling, musicBrainzOnTyping, searchQuery,
   type SearchPlan,
@@ -19,7 +20,11 @@ import { PlayIcon, SearchIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import { usePlayerActions } from './context'
 import { NeedsNavidrome } from './NeedsNavidrome'
+import { keep, kept } from './pressingLists'
+import type { GetRequest } from './Sources'
+import { useGetSettings } from './useGetSettings'
 import { ownedNow, refreshOwned, useOwned } from './useOwned'
+import { takeOpener } from './useSheet'
 
 /** How many albums MusicBrainz is asked for: a screenful, with room for the ones you hold. */
 export const MUSICBRAINZ_LIMIT = 12
@@ -67,6 +72,16 @@ type Musicbrainz =
  *    held rather than taking it away from under a finger. A box cut back below
  *    MUSICBRAINZ_MIN_CHARS drops what the longer text found (musicBrainzOnTyping). A tap opens the
  *    album you don't have.
+ *  - A GET CHIP on each of those rows (2.0.0-player.15): the usual pressing of the album - the one
+ *    its page opens on, and a main-page card's Find downloads (representativeRelease over every
+ *    pressing, from /search_musicbrainz/release_group or the session's lists, through its own
+ *    latestOnly so only the newest tap opens anything) - in the Sources sheet, as the page's "Get the
+ *    album" would. MusicBrainz unable to list the pressings: the album as a whole, as the main page's
+ *    card falls back to, and the sheet says so. Not on a row the library turned out to hold. That
+ *    lookup can take seconds (every pressing with its tracklist, at MusicBrainz's pace), so it is
+ *    called off - and the chip says Get again - the moment you move on: the box changing, or the
+ *    tab's root no longer what shows (App's `active`: another tab, a page opened over it, Now
+ *    Playing, the sheet). A late answer then opens nothing over what you went to (review).
  *
  * The albums of the songs found are asked for KEPT (prefetchAlbum's `keep`): a tile or an album
  * row pressed and scrolled shares the ask, and must not call off the one a song's tap waits for.
@@ -77,21 +92,29 @@ type Musicbrainz =
  */
 export function Search({
   shown,
+  active,
   status,
   onRetry,
   onOpenAlbum,
   onOpenGroup,
+  onGet,
 }: {
   /** the tab has been shown at least once: what the library holds is asked then */
   shown: boolean
+  /** the tab's root is what shows, with nothing over it - a Get chip's lookup is called off when it isn't */
+  active: boolean
   status: NavidromeStatus | null
   onRetry: () => void
   onOpenAlbum: (album: Album) => void
   onOpenGroup: (group: ReleaseGroup) => void
+  /** a row's Get: open the Sources sheet for its usual pressing, focus given back to `opener` */
+  onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
 }) {
   const actions = usePlayerActions()
   //? asked the first time the tab shows - not as the app starts, when it is mounted hidden
   const owned = useOwned(shown)
+  //? You > Getting albums, asked as the tab first shows, so a Get knows them by the time it is tapped
+  useGetSettings(shown)
   const input = useRef<HTMLInputElement>(null)
 
   const [text, setText] = useState('')
@@ -105,6 +128,9 @@ export function Search({
 
   const libraryRequests = useMemo(latestOnly, [])
   const musicRequests = useMemo(latestOnly, [])
+  //? a Get chip's lookup of the album's pressings: only the newest tap opens the sheet
+  const getRequests = useMemo(latestOnly, [])
+  const [resolving, setResolving] = useState<string | null>(null)
   //? what each half was last asked, so Enter and the pause after it don't ask twice
   const asked = useRef<string | null>(null)
   const libraryAsked = useRef<string | null>(null)
@@ -171,6 +197,8 @@ export function Search({
   //? both halves called off, for an empty box. Cut back below MUSICBRAINZ_MIN_CHARS, MusicBrainz's
   //? answer for the longer text goes (nothing would ever replace it), its search called off too.
   useEffect(() => {
+    //? the box changed: a Get chip's lookup for what it said before opens nothing now
+    standDown()
     const musicBrainz = musicBrainzOnTyping(query, asked.current)
     if (musicBrainz === 'clear') {
       libraryRequests.supersede()
@@ -207,11 +235,56 @@ export function Search({
     if (status?.ok && query) askLibrary(query)
   }, [status?.ok])
 
+  /** A Get chip's lookup still out is called off, and its chip says Get again. */
+  function standDown() {
+    getRequests.supersede()
+    setResolving(null)
+  }
+
+  //? the tab's root no longer what shows - another tab, a page over it, Now Playing or the sheet:
+  //? a chip's lookup still out must not open the sheet over where you went (review)
+  useEffect(() => {
+    if (!active) standDown()
+  }, [active])
+
   //? leaving the app calls both halves off
   useEffect(() => () => {
     libraryRequests.supersede()
     musicRequests.supersede()
+    getRequests.supersede()
   }, [])
+
+  /**
+   * A row's Get: the album's usual pressing - from the session's lists, else asked of MusicBrainz -
+   * in the Sources sheet. The chip takes focus in the tap (the WebKit rule), so the sheet has it to
+   * give back as it closes; MusicBrainz failing, or breaking the list off, is the album as a whole.
+   */
+  async function getAlbum(group: ReleaseGroup, event: MouseEvent) {
+    const opener = takeOpener(event)
+    const request = getRequests.begin()
+    let pressings: ReleaseGroupResponse | null = kept(group.id)
+    if (!pressings) {
+      setResolving(group.id)
+      try {
+        const found = await getReleaseGroup(group.id, request.signal)
+        if (!found.problem) {
+          keep(group.id, found)
+          pressings = found
+        }
+      } catch (reason) {
+        if (!request.current() || isAbort(reason)) return
+      }
+    }
+    if (!request.current()) return
+    setResolving(null)
+    const usual = pressings ? usualPressing(pressings.releases as PageRelease[]) : null
+    const pressing = usual ? pressings!.releases.find((release) => release.id === usual.id) ?? null : null
+    const built = buildDownloadRelease(group, pressing)
+    onGet({
+      release: built.release,
+      subtitle: [group.title, usual ? pressingLabel(usual) : 'the album as a whole'].filter(Boolean).join(' · '),
+    }, opener)
+  }
 
   const submit = (event: Event) => {
     event.preventDefault()
@@ -368,17 +441,32 @@ export function Search({
               </div>
             ) : found.length ? (
               <ul class="app-results">
-                {found.map((group) => (
-                  <li key={group.id}>
-                    <button type="button" class="app-result" onClick={() => onOpenGroup(group)}>
-                      <ArchiveCover addresses={coverAddresses(null, group.id, 250)} class="app-result-cover" />
-                      <span class="app-result-text">
-                        <span class="app-result-title">{group.title ?? ''}</span>
-                        <span class="app-result-line">{groupLine(group, groupHeld(owned?.index ?? null, group.id))}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                {found.map((group) => {
+                  const held = groupHeld(owned?.index ?? null, group.id)
+                  const asking = resolving === group.id
+                  return (
+                    <li key={group.id} class="app-result-row">
+                      <button type="button" class="app-result" onClick={() => onOpenGroup(group)}>
+                        <ArchiveCover addresses={coverAddresses(null, group.id, 250)} class="app-result-cover" />
+                        <span class="app-result-text">
+                          <span class="app-result-title">{group.title ?? ''}</span>
+                          <span class="app-result-line">{groupLine(group, held)}</span>
+                        </span>
+                      </button>
+                      {!held && (
+                        <button
+                          type="button"
+                          class={`app-result-get${asking ? ' is-busy' : ''}`}
+                          aria-label={`Get ${group.title ?? 'this album'}`}
+                          aria-busy={asking}
+                          onClick={(event) => void getAlbum(group, event)}
+                        >
+                          {asking ? 'Get…' : 'Get'}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             ) : (
               <p class="app-search-empty">

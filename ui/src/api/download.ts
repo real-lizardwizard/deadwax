@@ -9,6 +9,7 @@ import type {
   JobsResponse,
   RetryResponse,
   RetrySameResponse,
+  StoreStateResponse,
 } from './types'
 
 /**
@@ -19,6 +20,14 @@ export function findCandidates(
   body: FindCandidatesRequest, signal?: AbortSignal,
 ): Promise<FindCandidatesResponse> {
   return post<FindCandidatesResponse>('/download/find_candidates', body, signal)
+}
+
+/**
+ * What the library and the downloads already have of a pressing, WITHOUT searching Soulseek
+ * (2.0.0-player.15) - the app's status line under the pressing before Get. The body is the Find's.
+ */
+export function storeState(body: FindCandidatesRequest, signal?: AbortSignal): Promise<StoreStateResponse> {
+  return post<StoreStateResponse>('/download/store_state', body, signal)
 }
 
 export function enqueue(body: EnqueueRequest): Promise<EnqueueResponse> {

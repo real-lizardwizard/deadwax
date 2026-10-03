@@ -464,6 +464,34 @@ def join_disc_folders(candidates: list[dict]) -> list[dict]:
             for c in candidates if id(c) in joined or id(c) not in joined_ids]
 
 
+def audio_tracks(expected_tracks: list[dict]) -> list[dict]:
+    """
+    The release's tracks that arrive as AUDIO files - what a folder of audio can hold, so what the
+    app's source cards count it against (2.0.0-player.15). A VIDEO track (a DVD-Video side, a
+    concert film's recording - the payload builder marks it) never does: a CD+DVD deluxe shared
+    whole holds every track there is to have. A release that is ALL video keeps every track, as
+    store_index.audio_tracks does - whatever audio of it is shared is all of it.
+    """
+    return [track for track in expected_tracks if not track.get("video")] or list(expected_tracks)
+
+
+def missing_tracks(expected_tracks: list[dict], mapping: dict[int, dict]) -> list[dict]:
+    """
+    The release's tracks no file of the folder was paired with, in tracklist order, as
+    [{position, disc, title}] - what the app's source cards name in amber ("Missing “Threads”",
+    2.0.0-player.15). Worked out here, where the pairing is, because `track_mapping` is dropped
+    before a candidate reaches the page.
+
+    Only the AUDIO tracks (audio_tracks): a video track is never missing from a folder of audio, or
+    a CD+DVD deluxe shared whole would name every film as missing.
+    """
+    return [
+        {"position": track.get("position"), "disc": track.get("disc"), "title": track.get("title") or ""}
+        for track in audio_tracks(expected_tracks)
+        if track.get("position") not in mapping
+    ]
+
+
 def is_single_disc(expected: dict) -> bool:
     """True only when the release's tracklist is known and every track of it is on one disc."""
     tracks = expected.get("tracks") or []
@@ -505,6 +533,13 @@ def score_candidate(candidate: dict, expected: dict, format_preference: str = "p
         "expected_tracks": len(expected_tracks),
         "audio_file_count": len(files),
         "track_mapping": mapping,
+        #? every track nothing in the folder was paired with (missing_tracks) - the page is sent
+        #? the first few and how many in all (routes/download.py, _serialize_candidate)
+        "missing_tracks": missing_tracks(expected_tracks, mapping),
+        #? how many of the release's tracks are audio (audio_tracks): what a card's Tracks counts
+        #? against, so "14 of 14" and the missing line agree on a CD+DVD - never "14 of 34" with
+        #? nothing missing. The score still counts every track, as it always has.
+        "audio_expected": len(audio_tracks(expected_tracks)),
         "detected_edition_tags": sorted(detect_edition_tags(candidate["directory"])),
         #? the peer's own folder per disc, for a set joined from them (join_disc_folders)
         "disc_folders": candidate.get("disc_folders", []),

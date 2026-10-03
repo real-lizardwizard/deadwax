@@ -1,6 +1,6 @@
 import { init} from './init.js';
 import { DEFAULT_SORT, SORT_MODES, isSortMode, sortReleaseGroups, sortModeLabel } from './sort.mjs';
-import { getArtistIds, getArtistNames, getCurrentArtistNames, isVideoTrack } from './credits.mjs';
+import { getArtistNames, getCurrentArtistNames } from './credits.mjs';
 import { chooseBase, diffTracklists, formatSeconds, releaseTracks, representativeRelease, summarizeDiff } from './tracklistDiff.mjs';
 import { buildOwnedIndex, describeFolders, describeGroupOwnership, ownedForGroup, ownedForRelease } from './owned.mjs';
 import { isAbort, latestOnly } from './latest.mjs';
@@ -905,9 +905,9 @@ function renderSearchResults() {
 /*
  * The candidates window is the Preact bundle's since v0.9.10: the search, its filters, the
  * rows and the Download button, and the rule that only the newest search is ever drawn. What
- * stays here is what the vanilla releases grid still needs - building the release payload a
- * Find button searches for, which is also what the download is filed as - and handing it over.
- * Both go when the grid is ported.
+ * stays here is what the vanilla releases grid still needs - its two Find buttons, which hand
+ * the bundle a pressing to build the release payload from (findRelease, below) and open the
+ * panel with it. Both go when the grid is ported.
  */
 function openCandidatesPanel(expected, label) {
     //? a card's Find still looking up its pressings must not open over a Find pressed since
@@ -921,113 +921,29 @@ function openCandidatesPanel(expected, label) {
 const findRequests = latestOnly();
 
 
-function buildExpectedFromRelease(release, releaseGroupContext) {
-    // MusicBrainz numbers tracks per-disc, so a 2xCD set has two "track 1"s. The matcher keys
-    // its file mapping on position, so flatten to a running number across all discs - and keep
-    // the per-disc numbering alongside, because that is what a multi-disc release is TAGGED
-    // with (see organizer.tag_values). Same shape as flattenTracks() in ui/src/lib/release.ts.
-    const tracks = [];
-    let position = 0;
-
-    (release.media || []).forEach((medium, discIndex) => {
-        // the DISC's own title, where MusicBrainz gives it one ('' when not) - written as
-        // DISCSUBTITLE. Same rule as discTitle in flattenTracks(); keep the two in step.
-        const discTitle = (medium.title || '').trim() || null;
-        (medium.tracks || []).forEach((track, trackIndex) => {
-            position += 1;
-            // the track's OWN credit - the release's on an ordinary album, somebody else's on
-            // a compilation or a split. Carried so the file gets tagged with who is on it.
-            const credit = track['artist-credit'] || track.recording?.['artist-credit'];
-            tracks.push({
-                position,
-                title: track.recording?.title || track.title || '',
-                length_ms: track.recording?.length ?? track.length ?? null,
-                disc: medium.position ?? discIndex + 1,
-                disc_position: track.position ?? trackIndex + 1,
-                artist: credit ? getArtistNames(credit) : null,
-                artist_mbids: getArtistIds(credit),
-                disc_title: discTitle,
-                // on a DVD or Blu-ray, or a video recording: never an audio file, so the
-                // "already have it" checks leave it out (isVideoTrack, in step with release.ts)
-                video: isVideoTrack(medium, track),
-            });
-        });
-    });
-
-    const rawDate = release['release-events']?.[0]?.date || release.date || '';
-    const labelInfo = (release['label-info'] || [])
-        .map(entry => entry['catalog-number'])
-        .filter(Boolean);
-
-    return {
-        // AS CREDITED - what the sleeve says, and so what a stranger typed into their folder
-        // name. The Soulseek search is built from this and the matcher scores against it, which
-        // is why it is not the current name: nobody's share is called "Ye - Donda".
-        artist: releaseGroupContext.artist,
-        // Who the album is BY, in their current name - what it is filed under, and the
-        // albumartist tag inside. Ye's albums are credited "Kanye West" and "Ye" depending on
-        // the year, and filing by the credit gave him two folders. From the release's own
-        // credit, the same one the ids below come from, so the name and the id can't disagree.
-        album_artist: getCurrentArtistNames(release['artist-credit']) || releaseGroupContext.albumArtist,
-        artist_mbids: getArtistIds(release['artist-credit']),
-        album: release.title || releaseGroupContext.album,
-        year: rawDate ? rawDate.substring(0, 4) : realYear(releaseGroupContext.year),
-        // the ALBUM's year, from the group's first release - what the folder is named after,
-        // so a 2014 vinyl of a 1994 album files under 1994 (see organizer.build_target_path).
-        // The editor has always sent it; downloads never did, which mattered little until a
-        // card's Find began standing for a real pressing in 1.0.1 - often a later one.
-        original_year: realYear(releaseGroupContext.year),
-        release_mbid: release.id,
-        edition_tags: getEditionTags(release),
-        tracks,
-
-        // everything below is what lets the organizer file two editions of the same album
-        // into separate folders instead of one silently skipping against the other. See
-        // src/editions.py - `disambiguation` is by far the most useful of them, being
-        // MusicBrainz's own words for how this release differs from its siblings.
-        release_group_mbid: releaseGroupContext.releaseGroupId || null,
-        disambiguation: release.disambiguation || null,
-        media_format: (release.media || []).map(m => m.format).filter(Boolean).join(' + ') || null,
-        // the raw ISO code, NOT getCountryCode() - that one rewrites the "worldwide" codes
-        // XW/XE into 'un'/'eu' for flag display, and src/editions.py needs to recognise and
-        // discard them rather than labelling a folder "[UN]"
-        country: release['release-events']?.[0]?.area?.['iso-3166-1-codes']?.[0]
-                 || release.country || null,
-        catalog_number: labelInfo.join(', ') || null,
-    };
+/*
+ * What a Find sends, built by the ONE download payload builder: ui/src/lib/releasePayload.ts, which
+ * the bundle hangs on the bridge (`buildDownloadRelease`, set in ui/src/main.tsx) - since
+ * 2.0.0-player.15, when the app's Get began sending the same thing. The two builders that lived
+ * here (buildExpectedFromRelease for a row, buildExpectedFromReleaseGroup for a card with no
+ * pressing to stand for) are gone: two copies were two answers waiting to drift, and the rule
+ * "anything added to a download's payload goes in BOTH builders" was kept by hand. It goes in
+ * releasePayload.ts now. ui/test/payload.sim.cjs holds it to the bodies these buttons sent before
+ * the move, captured from this page against live MusicBrainz.
+ *
+ * `release` is one pressing of the group - the row's own, or the one a card stands for - or null for
+ * the album as a whole. The bundle also draws the candidates panel, so a page without it can't Find
+ * at all, as before.
+ */
+function findRelease(releaseGroupContext, release) {
+    const built = window.deadwax?.buildDownloadRelease?.(releaseGroupContext.group, release);
+    if (built) openCandidatesPanel(built.release, built.label);
 }
 
 
 
-function buildExpectedFromReleaseGroup(releaseGroupContext) {
-    // No specific release picked, so there's no tracklist to match against. The matcher
-    // drops the tracklist-dependent signals rather than scoring these as failures. Since
-    // v1.0.1 this is only the fallback, for when MusicBrainz can't say which pressings the
-    // album has: a card's Find normally stands for a real pressing (representativeRelease).
-    //
-    // The OTHER way a download starts, and the one the current-name change first missed: it
-    // does not go through buildExpectedFromRelease, so its folder name has to be set here too.
-    // Found by clicking Find on a card in the real page, where the request carried no
-    // album_artist at all - no test reaches this path.
-    return {
-        artist: releaseGroupContext.artist,
-        album_artist: releaseGroupContext.albumArtist,
-        artist_mbids: releaseGroupContext.artistMbids,
-        album: releaseGroupContext.album,
-        year: realYear(releaseGroupContext.year),
-        original_year: realYear(releaseGroupContext.year),
-        release_mbid: null,
-        release_group_mbid: releaseGroupContext.releaseGroupId || null,
-        edition_tags: [],
-        tracks: [],
-    };
-}
-
-
-
-
-// getArtistNames, getCurrentArtistNames and getArtistIds live in credits.mjs, where a sim can
-// reach them - one of them names the folder a download is filed into.
+// getArtistNames and getCurrentArtistNames live in credits.mjs, where a sim holds them to their
+// TypeScript twins in ui/src/lib/release.ts - which is what a download's payload is built from now.
 
 
 
@@ -1042,14 +958,6 @@ function getYear(dateStr) {
     if (!dateStr) return 'N/A';
     return dateStr.substring(0, 4);
 }
-
-//? getYear() is for DISPLAY and says 'N/A'; a payload wants a year or nothing, or an undated
-//? album files as "Album (N/A)".
-function realYear(year) {
-    return /^\d{4}$/.test(year || '') ? year : null;
-}
-
-
 
 function getCountryCode(release) {
     try {
@@ -1096,11 +1004,15 @@ function getLanguageScript(release) {
 
 
 /*
- * KEEP THIS IN STEP WITH EDITION_PATTERNS IN src/matching.py.
+ * KEEP THIS IN STEP WITH EDITION_PATTERNS IN src/matching.py AND EDITION_KEYWORDS IN
+ * ui/src/lib/release.ts.
  *
- * This list tags the RELEASE you picked; that one tags the Soulseek FOLDER offered against
- * it. They are compared to each other, so a marker present in only one of them is worse than
- * one present in neither - the release would carry a tag no folder could ever match.
+ * Since 2.0.0-player.15 this list only DRAWS - the releases grid's edition chips and its edition
+ * filter. The tags a download's release carries come from release.ts's copy (the one payload
+ * builder, releasePayload.ts, uses it), and those are what is scored against the Soulseek FOLDER
+ * matching.py tags: a marker present in only one of those two is worse than one in neither - the
+ * release would carry a tag no folder could ever match. A marker only here is a chip that a Find's
+ * search never asks for.
  */
 const EDITION_KEYWORDS = [
     { regex: /super deluxe/, label: 'SUPER DELUXE' },
@@ -1895,15 +1807,9 @@ function buildReleasesGrid(releases, releaseGroupId, releaseGroupContext) {
             const actionCell = document.createElement('td');
             actionCell.className = 'releases-col-action';
             actionCell.innerHTML = `<h4 class="text green releaseAddButton">Find</h4>`;
-            actionCell.querySelector('.releaseAddButton').addEventListener('click', async (e) => {
+            actionCell.querySelector('.releaseAddButton').addEventListener('click', (e) => {
                 e.stopPropagation();
-
-                const expected = buildExpectedFromRelease(release, releaseGroupContext);
-                const editionSuffix = expected.edition_tags.length ? ` [${expected.edition_tags.join(', ')}]` : '';
-                await openCandidatesPanel(
-                    expected,
-                    `${releaseGroupContext.artist} - ${expected.album}${editionSuffix}`
-                );
+                findRelease(releaseGroupContext, release);
             });
             row.appendChild(actionCell);
 
@@ -2231,15 +2137,15 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
         : '';
     const releaseGroupId = releaseGroup.id;
     const artistId = getArtistId(releaseGroup['artist-credit']);
-    // carried down into the releases grid so each row can build a soulseek search for itself.
-    // `artist` is the credit (what Soulseek folders are named after); `albumArtist` is who the
-    // group is by NOW, which is what a download from the card itself is filed under - it has no
-    // release to take a credit from, so without this it filed by the credit and gave Ye two
-    // folders again. The ids ride along for the same reason.
+    // carried down into the releases grid so each row's Find can build its download. `group` is the
+    // release group itself, as MusicBrainz sent it: the ONE payload builder (releasePayload.ts,
+    // through the bridge - see findRelease) takes the credit as credited (what Soulseek folders are
+    // named after), who the album is by NOW (what it is filed under - filing by the credit gave Ye
+    // two folders), the ids and the album's year from it, for a row's Find and a card's alike.
+    // `albumArtist` also names the card's "in your library" match.
     const releaseGroupContext = {
-        artist, album: title, year, releaseGroupId, artistId,
+        group: releaseGroup,
         albumArtist: getCurrentArtistNames(releaseGroup['artist-credit']) || artist,
-        artistMbids: getArtistIds(releaseGroup['artist-credit']),
     };
     const imageWrapper = document.createElement('div');
     imageWrapper.className = 'results-box-image-container';
@@ -2349,14 +2255,9 @@ function createReleaseGroupElement(releaseGroup, releases = null) {
         }
         if (!request.current() || !div.isConnected) return;
 
-        const pressing = representativeRelease(pressings);
-        if (!pressing) {
-            openCandidatesPanel(buildExpectedFromReleaseGroup(releaseGroupContext), `${artist} - ${title}`);
-            return;
-        }
-        const expected = buildExpectedFromRelease(pressing, releaseGroupContext);
-        const editionSuffix = expected.edition_tags.length ? ` [${expected.edition_tags.join(', ')}]` : '';
-        openCandidatesPanel(expected, `${artist} - ${expected.album}${editionSuffix}`);
+        //? none (MusicBrainz unreachable, or no pressings): the album as a whole, as a card's Find
+        //? always searched before it stood for a pressing
+        findRelease(releaseGroupContext, representativeRelease(pressings));
     });
 
     if (releases?.length) {

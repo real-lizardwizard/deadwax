@@ -323,6 +323,20 @@ async def _store_state(request: Request, body: "FindCandidatesRequest") -> dict:
     return state
 
 
+@router.post("/store_state")
+async def store_state(request: Request, body: FindCandidatesRequest):
+    """
+    What the library and the downloads already have of this pressing - and NO Soulseek search
+    (2.0.0-player.15). The app's album-you-don't-have page asks it before Get, so it can say
+    "Already in your library", "Already downloading", "You have 9 of 10 tracks" or "You also have
+    another pressing" under the pressing you chose without costing a search: exactly what
+    find_candidates answers before it decides whether to search (_store_state), and nothing more.
+    The body is a Find's (the release the Get would download), so the same pressing is judged the
+    same way by both. Never fails: a check that can't be made says nothing.
+    """
+    return await _store_state(request, body)
+
+
 @router.post("/find_candidates")
 async def find_candidates(request: Request, body: FindCandidatesRequest):
     """
@@ -490,11 +504,19 @@ async def _attach_measured_speeds(request: Request, candidates: list[dict]) -> N
         candidate["measured_at"] = row["last_seen"]
 
 
+#? How many of a candidate's missing tracks are named on the page (2.0.0-player.15); the rest are
+#? only counted, in `missing_count` - a folder missing half an album is said in a line, not a list.
+MISSING_NAMED = 5
+
+
 def _serialize_candidate(candidate: dict) -> dict:
     """
     Strip the bits the UI doesn't need. `track_mapping` in particular holds whole file dicts
-    and gets big; it's recomputed server-side when the organizer needs it (phase 3).
+    and gets big; it's recomputed server-side when the organizer needs it (phase 3). What the
+    page wants of it - which tracks nothing in the folder was paired with - was worked out
+    before it was dropped (matching.missing_tracks): the first MISSING_NAMED, and how many.
     """
+    missing = candidate.get("missing_tracks") or []
     return {
         "username": candidate["username"],
         "directory": candidate["directory"],
@@ -515,6 +537,10 @@ def _serialize_candidate(candidate: dict) -> dict:
         "bit_depths": candidate.get("bit_depths", []),
         "sample_rates": candidate.get("sample_rates", []),
         "variable_bitrate": candidate.get("variable_bitrate", False),
+        "missing_tracks": missing[:MISSING_NAMED],
+        "missing_count": len(missing),
+        #? the release's audio tracks (matching.audio_tracks) - a card's Tracks is "held of these"
+        "audio_expected": candidate.get("audio_expected", candidate["expected_tracks"]),
         "files": [
             {"filename": f["filename"], "size": f.get("size", 0)}
             for f in candidate["files"]

@@ -184,11 +184,102 @@ otherwise slskd keeps it, which is its normal behaviour.
 
 **Clear finished** removes finished, failed and cancelled downloads from the list.
 
+## On the phone: Get, and choosing a source
+
+[The phone app](player.md) at `/player/` gets an album too (since 2.0.0-player.15). Two places
+start it, both in its **Search** tab:
+
+- **Get the album**, the purple button on [the album you don't have](finding-music.md#the-album-you-dont-have),
+  under the **Pressing** button. It gets **the pressing chosen there** - the usual one unless you
+  picked another - and the sources are matched against that pressing's tracks.
+- **Get**, the small button at the end of each row under **Not in your library yet**. It gets the
+  album's usual pressing (the one its page opens on, and the main page's card **Find** downloads),
+  without opening the page. It reads **Get…** while it asks MusicBrainz for the album's pressings,
+  which can take a few seconds; if you move on meanwhile - type in the box, open a row, Now Playing
+  or another tab - it gives up and reads **Get** again, so the sheet never opens over where you went.
+  If MusicBrainz can't list the album's pressings just then, it gets the album as a whole, as the
+  main page's card does, and the sheet says so ("… · the album as a whole").
+
+Under **Get the album**, the album's page says what the library and the downloads already have of
+the pressing chosen - the same checks as [When you already have it](#when-you-already-have-it), made
+without searching Soulseek: **Already in your library** with the folder and "11 of 11 tracks · FLAC",
+**Already downloading** with who from and how far, "You have 9 of 10 tracks of this pressing, in …",
+"A download of part of this pressing is already running", "You also have another pressing: …". It's
+asked again when you choose another pressing, when an album is filed, and when you come back to the
+page - so after a Get it says **Already downloading**, and a download cancelled in Requests stops
+being said. While it's asked again, what it said last stays.
+
+Get opens **Choose a source**, a sheet over the page, which searches Soulseek for the pressing
+(under every name the artist goes by, as **Find** does) while it says **Asking Soulseek for "Third"
+by Portishead…**. Each folder found is a card:
+
+- **The score**, the **folder**, **from** the user (and **2 disc folders** for a set shared one
+  folder per disc), and **Get**. The score is green from 75 up, amber below. The best match - the
+  highest score that passes the chips, first in **Best match** order - has a purple edge and the one
+  solid purple Get, and keeps them when you sort another way; the rest are tinted.
+- **Speed**, large, with a bar (full at 3 MB/s). It says where its number comes from: **what you got
+  from them**, in green, when deadwax has downloaded from that user before (with a `~` when it's an
+  average of several downloads); **their own average** - the user's own upload rate over their whole
+  history, shared between everyone they serve, never a promise of yours - otherwise; and **Unknown**,
+  **no speed reported yet**, when there's neither.
+- **Tracks** ("11 of 11", amber when tracks are missing), **Quality** ("FLAC 16/44.1", "FLAC 24/96",
+  "MP3 320k", only what the user's client reported), **Size**, and **Starts**: **now** with a free
+  slot, **3 ahead** in the user's queue, or **next** with no free slot and nobody ahead.
+- **Missing "Threads"**, in amber, when the folder hasn't some of the pressing's tracks - up to three
+  named, then how many more. A DVD's tracks are never counted, in Tracks or as missing: a CD+DVD
+  shared whole is "14 of 14", its 20 film tracks left out. (The score still counts them, as the main
+  page's does, so such a folder scores lower than its tracks deserve.)
+
+Above the cards are **Lossless** (every file lossless; a folder whose format couldn't be told never
+passes), **24-bit**, **Free slot** and the sort (**Best match**, **Highest quality**, **Largest
+first**, **Smallest first**). They start as your **quality floor** (You → Getting albums, below):
+Lossless or 24-bit pressed, or a **320 kbps** chip, which shows only while that's your floor. Under
+the cards: "Searched Soulseek for "Portishead Third" · 41 folders, 4 match your filters".
+
+**Get** on a card queues that folder with slskd, as **Download** does on the main page - the release
+the search was for, with the rest of the list as shown kept for **Next peer** - and the app switches
+to **Requests**, where the download is already showing ("asking slskd…") from the tap. If slskd or
+deadwax refuses it - the user is offline, or deadwax answers that the pressing is **already
+downloading from** someone or **already in your library** (a second tab, or a download started
+elsewhere meanwhile) - the row there says **refused**, in their own words, under Needs attention.
+
+The sheet's other states:
+
+- **Already in your library** or **Already downloading**, in a box where the cards would be: Soulseek
+  wasn't searched. A download in flight is cancelled in Requests, if you want another user.
+- Notes above the cards for a part held, a part downloading, and another pressing held.
+- **"41 folders on Soulseek, none pass your filters"**, with **Clear filters**.
+- **"Soulseek found nothing for "Portishead Third""**, with the query to edit and **Re-search**. An
+  unedited Re-search searches every name again; an edited one searches exactly what you typed.
+- **slskd unable to search** - not logged in to Soulseek, waiting for its VPN, unreachable - in
+  slskd's own words, in amber, with **Try again**.
+
+**Cancel**, Escape or a tap above the sheet closes it, and stops the search in slskd - at once, so
+an answer arriving as you close it picks nothing. With VoiceOver, each outcome is read out as it
+comes - "4 sources", "Soulseek found nothing for …", slskd's refusal, "Already in your library" - and
+**Try again**, **Re-search** and **Clear filters** leave the focus in the sheet.
+
+**When I tap Get** (You → Getting albums) can be **Pick the best source for me** instead of the
+default, **Show me the sources**. Then a Get takes the top card itself - in best-match order,
+through the chips (your quality floor, unless you change them while it searches), and only when it
+scores 75 or more - queues it, and switches to Requests. When nothing qualifies it shows the cards,
+with a line saying why: "Didn't pick a source for you: none scores 75 or more and passes your
+filters." It never picks for a pressing you already have, whole or in part, or that is already
+downloading, whole or in part: held or downloading whole shows its box, as above, and a part held or
+downloading shows the cards with the reason ("Didn't pick a source for you: you already have part of
+it."). It never picks for **the album as a whole** either - a row's Get when MusicBrainz couldn't
+list the pressings - since with no tracklist a folder is scored on its edition, format and user alone,
+and nearly any lossless folder reaches 75 however few of the tracks it holds ("Didn't pick a source
+for you: with no tracklist to match the folders against, no score can be trusted."). And it never
+picks on a **Re-search**, which you're steering by hand - only on Get itself (and on **Try again**
+after slskd couldn't search, which is that Get again). Both settings are kept for you on deadwax -
+see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax).
+
 ## On the phone: the Requests tab
 
 [The phone app](player.md) at `/player/` shows the same downloads in its **Requests** tab, with
-the same buttons. Starting a download is still on the main page for now; watching it, and dealing
-with one that failed, works from the phone.
+the same buttons. Watching a download, and dealing with one that failed, works from the phone, and
+since 2.0.0-player.15 so does starting one ([above](#on-the-phone-get-and-choosing-a-source)).
 
 - **Downloading**: the album, who it's coming from, a progress bar and files done out of files
   wanted with the live speed ("6 of 10 files · 1.8 MB/s"). **✕** cancels it. It asks first, in
@@ -226,9 +317,9 @@ with one that failed, works from the phone.
 Each album shows its cover from the Cover Art Archive (the pressing's front cover), or a plain
 square when there's none, or no internet to fetch it from.
 
-Once albums can be got in the app itself (a later step), a download asked for there will show from
-the tap, under Waiting as "asking slskd…" until slskd answers, or under Needs attention in slskd's
-own words if it refuses - as the main page's Downloads panel shows one asked for on the main page.
+A download asked for with the app's **Get** shows from the tap, under Waiting as "asking slskd…"
+until slskd answers, or under Needs attention as "refused", in slskd's or deadwax's own words, if it
+is refused - as the main page's Downloads panel shows one asked for on the main page.
 
 The **Requests** tab carries a count of the downloads on their way, and **Home** shows up to three of
 them under **Arriving**, above Recently added, with **See all** (or a tap on one) going to the list

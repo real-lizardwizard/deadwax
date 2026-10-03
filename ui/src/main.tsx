@@ -5,7 +5,9 @@ import { DownloadsPanel } from './components/DownloadsPanel'
 import { LibraryView } from './components/LibraryView'
 import { SettingsView } from './components/SettingsView'
 import { Tabs, type TabId } from './components/Tabs'
+import { bridge } from './bridge'
 import { useNewImports } from './hooks/useNewImports'
+import { buildDownloadRelease } from './lib/releasePayload'
 
 /**
  * The tab bar, plus the count of albums waiting to be looked at.
@@ -68,6 +70,10 @@ function renderShell(active: TabId): void {
   mount('library-root', <LibraryView active={active === 'library'} onNavigate={renderShell} />)
   mount('settings-root', <SettingsView active={active === 'settings'} />)
 }
+
+//? the releases grid's two Find buttons build what they send with the app's own builder
+//? (lib/releasePayload.ts, 2.0.0-player.15) - one payload builder for the main page and the app
+bridge().buildDownloadRelease = buildDownloadRelease
 
 mount('downloads-root', <DownloadsPanel />)
 mount('candidates-root', <CandidatesPanel />)

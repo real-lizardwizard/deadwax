@@ -49,6 +49,25 @@ And for the Search tab and the album you don't have (2.0.0-player.13):
 - A track that differs is tinted past the column without moving its number or length - green for a
   Bonus track, amber for another version or a rename.
 - "Asking MusicBrainz…" stops moving for reduced motion.
+
+And for Get and the Sources sheet (2.0.0-player.15):
+
+- The Sources sheet has its own scroll lock, sits over Now Playing and under its menu and Info,
+  starts where its board does (or under the status bar), is placed clear of a notch rather than
+  padded by it, and its list is the one part that scrolls - saying so itself.
+- Every control is a tap target to a finger, drawn at the board's size: Get the album, Cancel, the
+  chips (30px, reaching 44 - their stacked rows' reaches never overlapping), a card's Get and a
+  Search row's Get chip (32px, reaching 44), none with an overflow that would clip its reach.
+- The text fields - the query to edit, the sort's own picker - are never small enough for iOS to zoom.
+- A source card as its board draws it: the best match's purple edge, the solid Get on it and tinted
+  ones on the rest, the score's green and amber badges, the speed's sunken bar with a green fill for
+  a measured speed and grey for the peer's own average, the folder giving way with an ellipsis, the
+  facts wrapping rather than running off a narrow phone, and the missing line in amber.
+- What is already here of a pressing breaks anywhere: its paths are strangers' folder names.
+- After review: the sheet's subtitle - which pressing the sources are for, its distinguishing part
+  last - has the head's whole width and wraps, never an ellipsis, while the title stays on one line,
+  centred, at 320px; the list takes focus a button that ended its state hands it, with no ring; and
+  the asking bar of a sheet closed mid-search stops moving.
 """
 
 import re
@@ -223,11 +242,12 @@ def px(token: str) -> float:
 
 def test_each_sheet_has_its_own_scroll_lock():
     assert declarations(PLAYER_CSS, "html.pl-sheet-open")["overflow"] == "hidden"
-    for lock in ("html.app-menu-open", "html.app-info-open"):
+    for lock in ("html.app-menu-open", "html.app-info-open", "html.app-sources-open"):
         assert declarations(APP, lock)["overflow"] == "hidden", lock
-    #? the classes the sheets put on <html> are exactly these three
+    #? the classes the sheets put on <html> are exactly these four (Sources since 2.0.0-player.15)
     ui = Path(__file__).resolve().parent.parent / "ui" / "src"
-    sheets = {"player/NowPlaying.tsx": "pl-sheet-open", "app/ActionMenu.tsx": "app-menu-open", "app/InfoSheet.tsx": "app-info-open"}
+    sheets = {"player/NowPlaying.tsx": "pl-sheet-open", "app/ActionMenu.tsx": "app-menu-open", "app/InfoSheet.tsx": "app-info-open",
+              "app/Sources.tsx": "app-sources-open"}
     for file, lock in sheets.items():
         assert f"lockClass: '{lock}'" in (ui / file).read_text(), file
 
@@ -545,3 +565,116 @@ def test_asking_musicbrainz_stops_moving_for_reduced_motion():
     assert "app-sweep" in declarations(APP, ".app-sweep::before")["animation"]
     assert declarations(APP, ".app-sweep::before", "@media (prefers-reduced-motion: reduce)")["animation"] == "none"
     assert declarations(APP, ".app-sweep")["overflow"] == "hidden"
+
+
+def test_the_sources_sheet_stacks_starts_and_scrolls_as_a_sheet_should():
+    #? over the page and Now Playing (20), under Now Playing's menu and Info (30)
+    assert declarations(APP, ".app-sources-layer")["z-index"] == "var(--app-z-sources)"
+    assert int(declarations(PLAYER_CSS, ".pl-sheet")["z-index"]) < int(ALL_TOKENS["--app-z-sources"]) < int(ALL_TOKENS["--app-z-over"])
+    sheet = declarations(APP, ".app-sources")
+    assert sheet["top"] == "max(var(--app-sources-top), calc(var(--pl-safe-top) + var(--app-info-pad)))"
+    assert ALL_TOKENS["--app-sources-top"] == "48px"  # from the top of the screen, as Sources.dc.html draws it
+    #? clear of a notch by where it is placed, never padded by it - as the menu and Info
+    assert (sheet["left"], sheet["right"]) == ("var(--pl-safe-left)", "var(--pl-safe-right)")
+    assert sheet["max-width"] == "var(--pl-content-max)" and sheet["margin"] == "0 auto"
+    assert sheet["padding"] == "var(--app-info-pad) var(--dw-gutter-grouped) 0"
+    assert declarations(APP, ".app-layer.is-open .app-sources")["transform"] == "translateY(0)"
+    #? its list is the one part that scrolls: the layer takes every touch, a scroller starts its own count
+    scroller = declarations(APP, ".app-sources-scroll")
+    assert scroller["touch-action"] == "pan-y"
+    assert (scroller["overflow-y"], scroller["overflow-x"], scroller["overscroll-behavior"], scroller["min-height"]) == ("auto", "hidden", "contain", "0")
+    #? the head and the chips hold still above it
+    assert declarations(APP, ".app-sources-head")["flex"] == declarations(APP, ".app-sources-chips")["flex"] == "none"
+
+
+def test_every_control_of_get_and_the_sources_is_a_tap_target():
+    hit = px("--pl-hit")
+    hairline = px("--dw-hairline")
+    assert declarations(APP, ".app-rg-get")["min-height"] == "var(--pl-hit)"
+    assert declarations(APP, ".app-sources-cancel")["min-height"] == "var(--dw-row)" and px("--dw-row") >= hit
+    #? drawn at the board's size, reaching 44 above and below from the padding box (inside the border),
+    #? with no overflow of their own to clip that reach
+    for control, size, reach in ((".app-chip", "--app-chip", "--app-chip-reach"), (".app-source-get", "--app-source-get", "--app-source-get-reach"),
+                                 (".app-result-get", "--app-result-get", "--app-result-get-reach")):
+        found = declarations(APP, control)
+        assert found["height"] == f"var({size})" and found["position"] == "relative", control
+        assert found["border"].startswith("var(--dw-hairline) "), control
+        assert "overflow" not in found, control
+        before = declarations(APP, f"{control}::before")
+        assert before["top"] == before["bottom"] == f"calc(-1 * var({reach}))", control
+        assert ALL_TOKENS[reach] == f"calc((var(--pl-hit) - var({size})) / 2 + var(--dw-hairline))", control
+        assert px(size) - 2 * hairline + 2 * ((hit - px(size)) / 2 + hairline) >= hit, control
+    assert (px("--app-chip"), px("--app-source-get"), px("--app-result-get")) == (30, 32, 32)  # as the boards draw them
+    #? the chips wrap on a narrow phone: a row's reaches never overlap the next row's, and the row keeps
+    #? room above and below for its own
+    chips = declarations(APP, ".app-sources-chips")
+    assert chips["flex-wrap"] == "wrap" and chips["gap"] == "calc(2 * var(--app-chip-reach)) var(--app-chip-gap)"
+    assert chips["padding"] == "var(--app-chip-reach) 0" and chips["margin"] == "calc(-1 * var(--app-chip-reach)) 0"
+
+
+def test_the_sources_text_fields_are_never_small_enough_for_ios_to_zoom():
+    for field in (".app-sources-query-input", ".app-sources-sort-select"):
+        assert declarations(APP, field)["font-size"] == "var(--dw-text-body)", field
+    assert px("--dw-text-body") >= 16
+    #? the sort's own picker covers its chip whole, unseen - the chip shows what it says
+    select = declarations(APP, ".app-sources-sort-select")
+    assert (select["position"], select["inset"], select["opacity"]) == ("absolute", "0", "var(--app-chip-select)")
+    assert ALL_TOKENS["--app-chip-select"] == "0"
+
+
+def test_a_source_card_is_drawn_as_its_board_has_it():
+    assert declarations(APP, ".app-source.is-best")["border-color"] == "var(--dw-best)"
+    assert ALL_TOKENS["--dw-best"] == "#7e4bb8"  # STYLE.md's "selected / best match"
+    #? the solid purple on the best match's Get, the toggled tint on the rest
+    assert declarations(APP, ".app-source-get.is-primary")["background"] == "var(--dw-primary-bg)"
+    assert declarations(APP, ".app-source-get.is-tinted")["background"] == "var(--dw-toggled-bg)"
+    assert declarations(APP, ".app-rg-get")["background"] == "var(--dw-primary-bg)"
+    #? the score: green from the good band up, amber under it
+    assert declarations(APP, ".app-source-score")["color"] == "var(--dw-amber-text)"
+    assert declarations(APP, ".app-source-score.is-good")["color"] == "var(--dw-badge-green-text)"
+    #? the speed's bar is STYLE.md's sunken track: green for a speed deadwax measured, grey for the
+    #? peer's own average, nothing for none
+    bar = declarations(APP, ".app-source-bar")
+    assert (bar["height"], bar["background"], bar["box-shadow"], bar["overflow"]) == ("var(--app-source-bar)", "var(--dw-track)", "var(--dw-track-inset)", "hidden")
+    assert px("--app-source-bar") == 8
+    assert declarations(APP, ".app-source-bar-fill")["background"] == "var(--dw-bar-grey)"
+    assert declarations(APP, ".app-source-bar-fill.is-measured")["background"] == "var(--dw-bar-green)"
+    assert ALL_TOKENS["--dw-bar-green"] == "linear-gradient(to bottom, #5ee39a, #34c47f)"
+    assert declarations(APP, ".app-source-speed-text.is-measured")["color"] == "var(--dw-badge-green-text)"
+    #? the folder gives way; the facts and the speed line wrap rather than run off a narrow phone
+    assert declarations(APP, ".app-source-name")["min-width"] == "0"
+    folder = declarations(APP, ".app-source-folder")
+    assert (folder["overflow"], folder["text-overflow"], folder["white-space"]) == ("hidden", "ellipsis", "nowrap")
+    assert declarations(APP, ".app-source-facts")["flex-wrap"] == declarations(APP, ".app-source-speed-line")["flex-wrap"] == "wrap"
+    missing = declarations(APP, ".app-source-missing")
+    assert missing["color"] == "var(--dw-amber-text)" and missing["overflow-wrap"] == "anywhere"
+
+
+def test_the_sources_subtitle_has_the_whole_width_and_wraps():
+    #? Cancel and an empty column either side of the title share what it leaves, so it stays centred
+    #? and on one line; the subtitle spans all three, under them, and wraps
+    head = declarations(APP, ".app-sources-head")
+    assert (head["display"], head["grid-template-columns"]) == ("grid", "1fr auto 1fr")
+    title = declarations(APP, ".app-sources-title")
+    assert (title["grid-column"], title["white-space"], title["text-align"]) == ("2", "nowrap", "center")
+    subtitle = declarations(APP, ".app-sources-subtitle")
+    assert (subtitle["grid-column"], subtitle["grid-row"], subtitle["overflow-wrap"]) == ("1 / -1", "2", "anywhere")
+    assert "white-space" not in subtitle and "text-overflow" not in subtitle and "overflow" not in subtitle
+    assert declarations(APP, ".app-sources-cancel")["grid-column"] == "1"
+    #? the old fixed 80px side columns, which left the title 128px at 320, are gone
+    assert "--app-sources-side" not in ALL_TOKENS
+
+
+def test_the_sources_list_takes_focus_without_a_ring_and_a_closed_sheets_bar_stops():
+    assert declarations(APP, ".app-sources-scroll:focus") == {"outline": "none"}
+    assert declarations(APP, ".app-sources-layer:not(.is-open) .app-sweep::before") == {"animation-play-state": "paused"}
+
+
+def test_what_is_already_here_of_a_pressing_breaks_anywhere():
+    for selector in (".app-store-line", ".app-store-note", ".app-sources-state-text", ".app-sources-footer"):
+        assert declarations(APP, selector)["overflow-wrap"] == "anywhere", selector
+    #? nothing there to say takes no room under Get - and is still drawn, a live region VoiceOver
+    #? already knows of (it reads one only once it is there; a hidden one isn't)
+    assert declarations(APP, ".app-rg-store:empty") == {"margin-top": "calc(-1 * var(--app-rg-get-gap))"}
+    assert declarations(APP, ".app-rg-actions")["gap"] == "var(--app-rg-get-gap)"
+

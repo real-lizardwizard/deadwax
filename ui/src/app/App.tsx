@@ -24,6 +24,7 @@ import { NeedsNavidrome } from './NeedsNavidrome'
 import { ReleaseGroupPage } from './ReleaseGroupPage'
 import { Requests } from './Requests'
 import { Search } from './Search'
+import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
 import { takeOpener } from './useSheet'
 import { You } from './You'
@@ -103,6 +104,19 @@ function usePageShown(): boolean {
  * and an album you don't (openGroup: a MusicBrainz release group, drawn outside the Navidrome gate,
  * since nothing on it is Navidrome's). A pressing chosen there replaces the page's own address
  * (pickPressing, router.update), so scroll is kept by scrollKey, which leaves the pressing out.
+ *
+ * Get (2.0.0-player.15) - the album page's "Get the album", or a Get chip on a Search row - opens
+ * the Sources sheet over everything (openSources; z 25, under Now Playing's menu and Info), and the
+ * page behind is inert while it shows, as it is behind Now Playing. It is never open with Now
+ * Playing: each covers what would open the other, and a chip's lookup that lands late can't stack
+ * them either - Search is told when its root stops being what shows (`searchActive`: another tab,
+ * a page over it, Now Playing, the sheet) and calls the lookup off, and openSources refuses while
+ * Now Playing is open, the backstop (review). A source's Get - or a pick made for you - asks for the
+ * download in the tap through the one downloads hook here (its pending row is up from that call),
+ * and `gotten` closes the sheet with no focus given back and shows Requests at its root. The album
+ * page is told whether it is what shows (its tab current, the sheet closed, the app in front), so
+ * what it says is already here of a pressing is asked again as you come back to it - after a Get,
+ * or a download cancelled in Requests.
  */
 export function App() {
   const player = usePlayer()
@@ -130,6 +144,12 @@ export function App() {
 
   const [status, setStatus] = useState<NavidromeStatus | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  //? Now Playing open, for a callback made once: set in the tap that opens it, and every render
+  const nowPlayingOpen = useRef(false)
+  nowPlayingOpen.current = sheetOpen
+  //? the Sources sheet: whether it shows, and the last Get it was opened for (kept as it slides away)
+  const [sourcesOpen, setSourcesOpen] = useState(false)
+  const [getting, setGetting] = useState<GetRequest | null>(null)
   //? what is over Now Playing: its ••• menu, or Info - never both
   const [over, setOver] = useState<'none' | 'menu' | 'info'>('none')
   const [youSeen, setYouSeen] = useState(nav.tab === 'you')
@@ -268,6 +288,27 @@ export function App() {
   //? Arriving's "See all", and a tap on one of its cards: the list of downloads, at Requests' root
   const seeRequests = useCallback(() => router.root('requests'), [])
 
+  //? Get: the Sources sheet for the release it was for - a new key every time, so a second Get of
+  //? the same album searches again - with focus given back to the Get as it closes. Never over Now
+  //? Playing: a Get is tapped with nothing over the page, so one arriving while Now Playing is open
+  //? is a lookup that landed late, and opens nothing
+  const sourcesOpener = useRef<HTMLElement | null>(null)
+  const gets = useRef(0)
+  const openSources = useCallback((request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => {
+    if (nowPlayingOpen.current) return
+    sourcesOpener.current = opener
+    gets.current += 1
+    setGetting({ ...request, key: gets.current })
+    setSourcesOpen(true)
+  }, [])
+  const closeSources = useCallback(() => setSourcesOpen(false), [])
+  //? a download asked for from the sheet: it goes - focus going nowhere it would land - and Requests shows
+  const gotten = useCallback(() => {
+    sourcesOpener.current = null
+    setSourcesOpen(false)
+    router.root('requests')
+  }, [])
+
   //? What each sheet gives focus back to as it closes, taken in the tap that opened it: the button
   //? focuses itself first (WebKit doesn't focus a tapped button), before the page behind turns
   //? inert. The sheets do the rest themselves (useSheet.ts).
@@ -276,6 +317,7 @@ export function App() {
   const openSheet = useCallback((event: MouseEvent) => {
     sheetOpener.current = takeOpener(event)
     setSheetOpen(true)
+    nowPlayingOpen.current = true
     //? the mini player's tap is a gesture: a turntable left showing gets its sound back from it
     //? (never made here - resumed, when there is one)
     resumeDeckAudio()
@@ -311,9 +353,15 @@ export function App() {
   }
 
   //? The tab roots, memoised: they read no player state, so the music playing leaves them alone.
-  //? You reads the player from context, and re-renders with it by itself. Home and Requests are
-  //? memoised apiece, on the downloads they draw, so a poll re-renders only them.
+  //? You reads the player from context, and re-renders with it by itself. Each is memoised apiece,
+  //? on what it is handed - Home and Requests on the downloads they draw, so a poll re-renders only
+  //? them; Search on whether its root is what shows, so that changing re-renders only Search.
   const arrivingTrouble = downloadsError !== null
+  //? Search's root is what shows, with nothing over it: a Get chip's lookup still out when it stops
+  //? being so is called off, so its late answer opens no sheet over what you went to instead
+  const searchActive = nav.tab === 'search' && nav.stacks.search.length === 0 && !sheetOpen && !sourcesOpen
+  //? You's tab is the one showing: its Getting albums are asked again each time it is opened
+  const youCurrent = nav.tab === 'you'
   const home = useMemo(
     () => (
       <Home
@@ -341,30 +389,38 @@ export function App() {
     ),
     [view, answered.current, trackingEnabled, downloadsError, cancel, retry, clearFinished],
   )
-  const others = useMemo<Record<'library' | 'search' | 'you', JSX.Element>>(
-    () => ({
-      library: (
-        <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
-          <Library onOpen={openAlbum} />
-        </NeedsNavidrome>
-      ),
-      search: <Search shown={searchSeen} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} />,
-      you: <You shown={youSeen} opensAs={opensAs} onOpensAs={chooseOpensAs} windDown={windDown} onWindDown={chooseWindDown} />,
-    }),
-    [status, youSeen, searchSeen, opensAs, windDown],
+  const library = useMemo(
+    () => (
+      <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
+        <Library onOpen={openAlbum} />
+      </NeedsNavidrome>
+    ),
+    [status],
   )
-  const roots: Record<Tab, JSX.Element> = { ...others, home, requests }
+  const search = useMemo(
+    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onGet={openSources} />,
+    [status, searchSeen, searchActive],
+  )
+  const you = useMemo(
+    () => <You shown={youSeen} current={youCurrent} opensAs={opensAs} onOpensAs={chooseOpensAs} windDown={windDown} onWindDown={chooseWindDown} />,
+    [youSeen, youCurrent, opensAs, windDown],
+  )
+  const roots: Record<Tab, JSX.Element> = { library, search, you, home, requests }
 
-  //? an album you don't have needs no Navidrome, so it is drawn outside the gate
+  //? an album you don't have needs no Navidrome, so it is drawn outside the gate. It is told whether
+  //? it is what shows - its tab current, no Sources sheet over it, the app in front - and asks the
+  //? store again as it comes back to that
   const pageView = (tab: Tab, page: Page, player: Player) =>
     page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
         preview={groupPreviews.current.get(page.id) ?? null}
+        shown={pageShown && nav.tab === tab && !sourcesOpen}
         onBack={back}
         backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
         onPick={pickPressing}
+        onGet={openSources}
       />
     ) : (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
@@ -382,7 +438,8 @@ export function App() {
   //? one. `player` is a new object on every render of this component, so it can't be what the
   //? memo is keyed on: an album page reads only the playing song's id, whether it plays, and
   //? playTracks (one function for the page's life) - app-rules.sim.cjs holds AlbumPage to those,
-  //? so reading more of the player there fails until it is added here too.
+  //? so reading more of the player there fails until it is added here too. The group page's
+  //? `shown` reads the Sources sheet and whether the app is in front, so those key it too.
   const playingId = player.track?.id ?? null
   const pages = useMemo(
     () =>
@@ -393,18 +450,20 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown],
   )
 
   const playing = player.track
   const toAlbum = playing?.albumId ? () => goToAlbum(playing) : null
+  //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows
+  const covered = sheetOpen || sourcesOpen
 
   return (
     <PlayerContext.Provider value={player}>
       <ActionsContext.Provider value={actions}>
         <div class={`pl-app app-shell${player.track ? ' has-mini' : ''}`}>
           {/* what Now Playing covers: inert while it is open */}
-          <div class="app-behind" aria-hidden={sheetOpen} inert={sheetOpen}>
+          <div class="app-behind" aria-hidden={covered} inert={covered}>
             {TABS.map((tab) => {
               const stack = nav.stacks[tab]
               const top = stack[stack.length - 1] ?? null
@@ -419,6 +478,8 @@ export function App() {
             <MiniPlayer player={player} onOpen={openSheet} />
             <TabBar current={nav.tab} onSelect={chooseTab} arriving={view.arriving.length} />
           </div>
+          {/* a Get's sources (2.0.0-player.15): over the page, under Now Playing's menu and Info */}
+          <Sources open={sourcesOpen} request={getting} opener={sourcesOpener} onClose={closeSources} onQueued={gotten} />
           <NowPlaying
             player={player}
             open={sheetOpen}

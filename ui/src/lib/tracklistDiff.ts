@@ -185,8 +185,9 @@ const PLAIN_FORMATS = ['CD', 'Digital Media']
  * The one pressing that stands for the album: the group's most common tracklist, then Official,
  * then a CD or digital release, then no disambiguation, then the earliest full date (a year alone
  * sorts after full dates in it), then the release id - so the answer never depends on the order
- * the list came in. Null when no release lists any tracks. The page's default pressing, and (from
- * the next slice) the one Get gets.
+ * the list came in. Null when no release lists any tracks. The album page's default pressing, the
+ * one its Get gets until another is chosen, and the one a Search row's Get chip gets
+ * (lib/releasePayload.ts usualPressing).
  */
 export function representativeRelease<R extends PressingRelease>(releases: readonly R[]): R | null {
   const withTracks = releases.filter((release) => releaseTracks(release).length)

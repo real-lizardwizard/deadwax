@@ -59,6 +59,18 @@
  *    Search first shows, when the page opens, and beside each MusicBrainz search - never as the
  *    app starts - and a filing asks again once anything has; search.sim.cjs drives the store
  *    itself (one ask out, "ask again", what a refresh waits for).
+ *  - Get (2.0.0-player.15): the album page's "Get the album" - the page's ONE solid purple button -
+ *    and the Get chip on a Search row open the Sources sheet, a sheet by the one hook like the others,
+ *    over everything and with the page behind it inert. A source's Get asks for the download in the
+ *    tap (requestDownload, nothing awaited before it, so the pending row is up from the tap) and then
+ *    hands over to Requests; a pick made for you goes the same way, only on a fresh Get and never
+ *    for a pressing held or on its way, or with no tracklist or release id to judge it by. Each fetch
+ *    that draws - the search, the page's store state, a chip's pressings - goes through its own
+ *    latestOnly(). In the sheet the best match's Get is the one solid purple button, wherever the
+ *    sort puts it. After review: the two sheets can't stack - Search is told when its root stops
+ *    being what shows and calls a chip's lookup off, and openSources refuses while Now Playing is
+ *    open; the sheet's Cancel, backdrop and Escape let the search go in the gesture; and the album
+ *    page is told whether it is what shows, so its store line is asked again as it comes back.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -252,7 +264,8 @@ console.log('\nan album page is memoised on what it reads of the player')
   const app = code(read('app/App.tsx'))
   //? usePlayer returns a new object on every render, so a memo keyed on `player` held for no poll
   check('the pages are memoised on the playing song and whether it plays - never the whole player',
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? (2.0.0-player.15: and the Sources sheet and whether the app is in front, which the group page's `shown` reads)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -289,11 +302,13 @@ console.log('\na link out of the app opens beside it')
 console.log('\nNow Playing covers everything behind it')
 {
   const app = code(read('app/App.tsx'))
-  const behind = /<div class="app-behind" aria-hidden=\{sheetOpen\} inert=\{sheetOpen\}>([\s\S]*?)<\/div>\s*<NowPlaying/.exec(app)
+  //? 2.0.0-player.15: inert behind Now Playing OR the Sources sheet - each covers what would open the other
+  const behind = /<div class="app-behind" aria-hidden=\{covered\} inert=\{covered\}>([\s\S]*?)<\/div>\s*(?:\{(?:\/\*[\s\S]*?\*\/)?\}\s*)?<Sources\b[^\n]*\/>\s*<NowPlaying/.exec(app)
   check('the panes, the mini player and the tab bar are inside one inert wrapper',
     [!!behind, /TABS\.map/.test(behind?.[1] ?? ''), /<MiniPlayer\b/.test(behind?.[1] ?? ''), /<TabBar\b/.test(behind?.[1] ?? '')], [true, true, true, true])
-  check('...which Now Playing, its menu and Info are not in',
-    /<\/div>\s*<NowPlaying\b[\s\S]*?\/>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<ActionMenu\b[\s\S]*?\/>\s*<InfoSheet\b[\s\S]*?\/>\s*<\/div>\s*<\/ActionsContext/.test(read('app/App.tsx')), true)
+  check('...inert while Now Playing or the Sources sheet shows', /const covered = sheetOpen \|\| sourcesOpen\b/.test(app), true)
+  check('...which the Sources sheet, Now Playing, its menu and Info are not in',
+    /<\/div>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<Sources\b[^\n]*\/>\s*<NowPlaying\b[\s\S]*?\/>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<ActionMenu\b[\s\S]*?\/>\s*<InfoSheet\b[\s\S]*?\/>\s*<\/div>\s*<\/ActionsContext/.test(read('app/App.tsx')), true)
   const sheet = code(read('player/NowPlaying.tsx'))
   check('Now Playing takes focus to its close button as it opens, and gives it back to its opener',
     [/useSheet\(\{ open, covered, onClose, lockClass: 'pl-sheet-open', first: closeButton, opener \}\)/.test(sheet),
@@ -306,15 +321,19 @@ console.log('\nNow Playing covers everything behind it')
 console.log('\nevery sheet is a sheet by the one hook')
 {
   const hook = code(read('app/useSheet.ts'))
-  const SHEETS = { 'player/NowPlaying.tsx': 'pl-sheet-open', 'app/ActionMenu.tsx': 'app-menu-open', 'app/InfoSheet.tsx': 'app-info-open' }
+  const SHEETS = {
+    'player/NowPlaying.tsx': 'pl-sheet-open', 'app/ActionMenu.tsx': 'app-menu-open', 'app/InfoSheet.tsx': 'app-info-open',
+    //? Get's sources (2.0.0-player.15)
+    'app/Sources.tsx': 'app-sources-open',
+  }
   const texts = Object.fromEntries(Object.keys(SHEETS).map((file) => [file, code(read(file))]))
   check('each calls useSheet with a scroll lock of its own',
     Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, /useSheet\(\{[^}]*lockClass: '([^']+)'/.exec(text)?.[1] ?? null])), SHEETS)
   check('...and they are the only ones', files.filter((file) => /\buseSheet\(/.test(code(read(file))) && file !== 'app/useSheet.ts').sort(), Object.keys(SHEETS).sort())
-  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true])
+  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true, true])
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
-  check('the menu and Info close on their backdrop',
-    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true])
+  check('the menu, Info and the sources close on their backdrop',
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true])
   check('the hook: the lock on <html>, focus in, focus back, Escape for the one on top',
     [/document\.documentElement\.classList\.toggle\(lockClass, open\)/.test(hook),
       /first\.current\?\.focus\(/.test(hook),
@@ -548,8 +567,66 @@ console.log('\nSearch: a song plays from the tap, with its album in hand; the ne
     [/target\?\.focus\(\{ preventScroll: true \}\)\s*reveal\(target\)/.test(picker), /box\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(picker),
       /if \(to && !root\.current\?\.contains\(to\)\) close\(false\)/.test(picker)],
     [true, true, true])
-  check('no solid purple button on the page, its picker or Search until Get comes',
-    ['app/ReleaseGroupPage.tsx', 'app/PressingPicker.tsx', 'app/Search.tsx'].filter((file) => /is-primary|app-primary/.test(code(read(file)))), [])
+  check('the page\'s ONE solid purple button is Get (2.0.0-player.15); its picker and Search have none - a row\'s Get chip is tinted',
+    [(code(read('app/ReleaseGroupPage.tsx')).match(/class="app-rg-get"/g) ?? []).length,
+      ['app/ReleaseGroupPage.tsx', 'app/PressingPicker.tsx', 'app/Search.tsx'].filter((file) => /is-primary|app-primary/.test(code(read(file)))),
+      /class=\{`app-result-get\b/.test(code(read('app/Search.tsx')))],
+    [1, [], true])
+}
+
+console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
+{
+  const app = code(read('app/App.tsx'))
+  const sheet = code(read('app/Sources.tsx'))
+  const card = code(read('app/SourceCard.tsx'))
+  const hook = code(read('hooks/useCandidateSearch.ts'))
+  const page = code(read('app/ReleaseGroupPage.tsx'))
+  const search = code(read('app/Search.tsx'))
+  check('the page and Search open the sheet through App, the opener taken in the tap',
+    [/<ReleaseGroupPage\b[\s\S]*?onGet=\{openSources\}/.test(app), /<Search\b[^>]*onGet=\{openSources\}/.test(app),
+      /const openSources = useCallback\(\(request: Omit<GetRequest, 'key'>, opener: HTMLElement \| null\) => \{\s*if \(nowPlayingOpen\.current\) return\s*sourcesOpener\.current = opener/.test(app),
+      /onGet\(\{[\s\S]*?\}, takeOpener\(event\)\)/.test(page), /const opener = takeOpener\(event\)\s*const request = getRequests\.begin\(\)/.test(search)],
+    [true, true, true, true, true])
+  check('a download asked for: the sheet goes, focus with nowhere to land, and Requests shows at its root',
+    /const gotten = useCallback\(\(\) => \{\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*router\.root\('requests'\)/.test(app), true)
+  check('...the Sources element handed that, its opener and its own open',
+    /<Sources open=\{sourcesOpen\} request=\{getting\} opener=\{sourcesOpener\} onClose=\{closeSources\} onQueued=\{gotten\} \/>/.test(app), true)
+  check('a card\'s Get asks for the download, then hands over - in the tap, nothing awaited',
+    [/onClick=\{\(\) => onGet\(candidate\)\}/.test(card), /const get = \(candidate: Candidate\) => \{\s*if \(state\.download\(candidate, shown\)\) onQueued\(\)\s*\}/.test(sheet)], [true, true])
+  const ask = /function ask\([^)]*\): boolean \{([\s\S]*?)\n  \}/.exec(hook)?.[1] ?? ''
+  check('...and the hook asks requestDownload straight away (the pending row is up from the tap), with up to ten runners-up as shown',
+    [/requestDownload\(\{/.test(ask), /\bawait\b/.test(ask.slice(0, ask.indexOf('requestDownload('))), /release: \{ \.\.\.release \}/.test(ask), /\.slice\(0, 10\)/.test(ask)],
+    [true, false, true, true])
+  const run = /async function run\([^)]*\) \{([\s\S]*?)\n  \}/.exec(hook)?.[1] ?? ''
+  check('the search: the newest answer only, its fetch called off when superseded',
+    [/const requests = useMemo\(latestOnly, \[\]\)/.test(hook), /const request = requests\.begin\(\)/.test(run), /request\.signal/.test(run),
+      /if \(!request\.current\(\)\) return\s*setSearch\(\{ release, pending: false, result/.test(run), /if \(!request\.current\(\) \|\| isAbort\(caught\)\) return/.test(run)],
+    [true, true, true, true, true])
+  check('a pick only on a fresh Get, never for a pressing held or on its way, and said when it isn\'t made',
+    [/if \(!fresh \|\| !rule\.pick\) return/.test(run), /const blocked = autoPickBlocked\(result, release\)/.test(run), /autoGrabPick\(result\.candidates, rule\.filters, rule\.sort\)/.test(run),
+      /setNotPicked\(notPickedLine\(blocked\)\)/.test(run), /requery\(\) \{\s*if \(search\) void run\(search\.release, queryOverride\(query, shownQuery\), false\)/.test(hook)],
+    [true, true, true, true, true])
+  check('...the settings read as the answer lands, the safe default until they\'re in',
+    /pick: getSettingsNow\(\)\.get_mode === 'pick'/.test(sheet), true)
+  check('the page\'s store state, and a chip\'s pressings, each through a latestOnly() of its own',
+    [/const stateRequests = useMemo\(latestOnly, \[\]\)/.test(page), /storeState\(download\.release, request\.signal\)/.test(page), /if \(request\.current\(\)\) setStore\(/.test(page),
+      /const getRequests = useMemo\(latestOnly, \[\]\)/.test(search), /getReleaseGroup\(group\.id, request\.signal\)/.test(search), /if \(!request\.current\(\)\) return\s*setResolving\(null\)/.test(search)],
+    [true, true, true, true, true, true])
+  check('in the sheet, the best match\'s Get is the one solid purple button - the top by score, wherever the sort puts it',
+    [/class=\{`app-source-get \$\{best \? 'is-primary' : 'is-tinted'\}`\}/.test(card), /best=\{candidateKey\(candidate\) === best\}/.test(sheet),
+      /const top = sortCandidates\(passing, 'score'\)\[0\]/.test(sheet), /best=\{index === 0\}/.test(sheet), /is-primary|app-primary/.test(sheet)], [true, true, true, false, false])
+  //? review: the two sheets never stack, however late a chip's lookup lands
+  check('a chip\'s lookup is called off when Search\'s root stops being what shows, and Sources never opens over Now Playing',
+    [/const searchActive = nav\.tab === 'search' && nav\.stacks\.search\.length === 0 && !sheetOpen && !sourcesOpen/.test(app), /<Search\b[^>]*\bactive=\{searchActive\}/.test(app),
+      /useEffect\(\(\) => \{\s*if \(!active\) standDown\(\)\s*\}, \[active\]\)/.test(search), /function standDown\(\) \{\s*getRequests\.supersede\(\)\s*setResolving\(null\)/.test(search),
+      /const openSources = useCallback\([^)]*\) => \{\s*if \(nowPlayingOpen\.current\) return/.test(app), /nowPlayingOpen\.current = sheetOpen/.test(app)],
+    [true, true, true, true, true, true])
+  check('Cancel, the backdrop and Escape let the search go in the gesture, the effect a backstop',
+    [/const onClose = \(\) => \{\s*state\.stop\(\)\s*closeSheet\(\)\s*\}/.test(sheet), /useSheet\(\{ open, onClose, lockClass: 'app-sources-open'/.test(sheet),
+      /onClose: closeSheet,/.test(sheet), /if \(!open\) state\.stop\(\)/.test(sheet)], [true, true, true, true])
+  check('the album page is told whether it is what shows, and asks the store again as it comes back - Get above what is already here',
+    [/shown=\{pageShown && nav\.tab === tab && !sourcesOpen\}/.test(app), /\}, \[chosen\?\.id, group\?\.id, filed, shown\]\)/.test(page), /if \(!shown\) return/.test(page),
+      page.indexOf('class="app-rg-get"') < page.indexOf('class="app-rg-store"'), /setStore\(null\)/.test(page)], [true, true, true, true, false])
 }
 
 console.log('\nApp moves history only through the router')

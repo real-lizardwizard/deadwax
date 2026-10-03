@@ -198,6 +198,26 @@ CREATE INDEX IF NOT EXISTS idx_store_album_release ON store_album(root, release_
 CREATE INDEX IF NOT EXISTS idx_store_album_group ON store_album(root, release_group_mbid);
 -- "is this release already downloading" is asked at every Find and every enqueue
 CREATE INDEX IF NOT EXISTS idx_jobs_release ON jobs(release_mbid);
+
+CREATE TABLE IF NOT EXISTS user_prefs (
+    -- What each user chose for themselves in the app (2.0.0-player.15): You > Getting albums -
+    -- "When I tap Get" and the quality floor. PER USER and on the SERVER, unlike a device's own
+    -- settings (Gapless, Maximum quality), because getting an album is something a person does
+    -- from any device and expects the same of. Keyed on src/users.py's user: always `local` while
+    -- logins are off, which is what step 3's take-over (adopt_local) looks for.
+    --
+    -- Only keys the user has SET live here, as in `settings`: an absent key is the default, so a
+    -- default changed later reaches everyone who never chose. Which keys and values are allowed
+    -- is routes/me.py's (PREFERENCES); a row it doesn't recognise reads as the default. Beside
+    -- them, every save writes one more row, routes/me.py's SEEDED (`_seeded`), which only says the
+    -- app has written for this user - so it carries the main page's quality floor over once, and
+    -- never by storing the defaults as if they were chosen.
+    user        TEXT NOT NULL,
+    key         TEXT NOT NULL,
+    value       TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY (user, key)
+);
 """
 
 #? Columns added to `jobs` after it first shipped, with the definition an existing database is
@@ -702,6 +722,50 @@ class JobStore:
             return await asyncio.to_thread(write)
         except Exception as e:
             logger.error(f"could not clear the setting {key} ({e})", extra={"frontend": True})
+            return False
+
+    # ===== a user's own preferences (2.0.0-player.15) ===========================
+
+    async def user_preferences(self, user: str) -> dict[str, str] | None:
+        """
+        Every preference `user` has set, {key: value} - or None when they can't be read (no
+        store), which is not the same answer as "none set": the app seeds a user's preferences on
+        its first read only when deadwax can keep them.
+        """
+        if not self.available:
+            return None
+
+        def read():
+            with self._connect() as connection:
+                rows = connection.execute("SELECT key, value FROM user_prefs WHERE user = ?", (user,)).fetchall()
+            return {row["key"]: row["value"] for row in rows}
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not read the preferences of {user} ({e})")
+            return None
+
+    async def set_user_preferences(self, user: str, values: dict[str, str]) -> bool:
+        """Store `values` for `user`, each key overwriting what was there, in one transaction."""
+        if not self.available:
+            return False
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                connection.executemany(
+                    "INSERT INTO user_prefs (user, key, value, updated_at) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(user, key) DO UPDATE SET value = excluded.value, "
+                    "updated_at = excluded.updated_at",
+                    [(user, key, value, now) for key, value in values.items()],
+                )
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not store the preferences of {user} ({e})", extra={"frontend": True})
             return False
 
     async def record_albums_seen(self, albums: list[dict], source: str = "scan") -> int:

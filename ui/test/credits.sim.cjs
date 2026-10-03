@@ -1,12 +1,14 @@
 /**
  * Artist credits, and the two names that come out of one.
  *
- * A script for the same reason as the other sims: there is no JS test runner here. This one
- * exists because the rule for what an album's FOLDER is called lives twice in the browser -
- * interface/scripts/credits.mjs names a download's folder, ui/src/lib/release.ts seeds the
- * metadata editor's - and if they drift, the same album goes to one folder when downloaded and
- * another when corrected, which is the exact split this code was written to end. So every case
- * below is asked of BOTH, and a disagreement fails even where each answer looks reasonable.
+ * A script for the same reason as the other sims: there is no JS test runner here. The rule for an
+ * album's current-name credit lives twice in the browser. ui/src/lib/release.ts's currentName()
+ * names a download's FOLDER (through lib/releasePayload.ts, the one payload builder, since
+ * 2.0.0-player.15) and seeds the metadata editor's - one function, so a download and a correction
+ * can't part. interface/scripts/credits.mjs's getCurrentArtistNames() is the main page's copy, which
+ * since 2.0.0-player.15 only DRAWS: it is a name the card's "in your library" match tries, so a
+ * drift would mark a card wrong. Every case below is still asked of BOTH, and a disagreement fails
+ * even where each answer looks reasonable.
  *
  * Run it with:  node ui/test/credits.sim.cjs
  */
@@ -51,8 +53,8 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
 
   //? every case, asked of both copies, which must agree
   function both(label, credit, expected) {
-    check(`${label} (download, credits.mjs)`, credits.getCurrentArtistNames(credit), expected);
-    check(`${label} (editor, release.ts)`, release.currentName(credit), expected);
+    check(`${label} (the main page's card, credits.mjs)`, credits.getCurrentArtistNames(credit), expected);
+    check(`${label} (a download and the editor, release.ts)`, release.currentName(credit), expected);
   }
 
   console.log('\none artist, one folder, whatever the sleeve said');
@@ -70,8 +72,9 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
   console.log('\nthe credit itself is untouched - it is what Soulseek folders are called');
   check('the download still searches Soulseek for "Kanye West"', credits.getArtistNames(DONDA), 'Kanye West');
   check('...and the editor agrees on the credit too', release.creditName(DONDA), 'Kanye West');
-  check('the ids are the same whichever name is used', credits.getArtistIds(WATCH_THE_THRONE), ['jz', YE_ID]);
-  check('...in both copies', release.creditIds(WATCH_THE_THRONE), ['jz', YE_ID]);
+  check('the ids are the same whichever name is used', release.creditIds(WATCH_THE_THRONE), ['jz', YE_ID]);
+  //? only the payload builders took ids, and they are one, in TypeScript, since 2.0.0-player.15
+  check('...and credits.mjs keeps no copy of that rule - nothing on the main page reads one', 'getArtistIds' in credits, false);
 
   console.log('\nthe editor can still find an album filed under the current name');
   const query = release.fieldedAlbumQuery('Donda', 'Ye');
@@ -82,9 +85,10 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
   check('a quote in a name stays inside its phrase',
         release.fieldedAlbumQuery('The "Blue" Album', 'A').split('"').length % 2, 1);
 
-  console.log('\na track that never arrives as audio - both payload builders, one answer');
-  //? what the "already have it" checks leave out (store_index.audio_tracks): a download's payload
-  //? (credits.mjs) and the editor's (release.ts) must mark the same tracks
+  console.log('\na track that never arrives as audio - one rule, for a download and the editor alike');
+  //? what the "already have it" checks leave out (store_index.audio_tracks). Since 2.0.0-player.15 a
+  //? download's payload is built by lib/releasePayload.ts, which marks tracks with release.ts's
+  //? isVideoTrack, as the editor's does - credits.mjs's twin went with main.js's two builders
   const VIDEO_CASES = [
     ['a CD track', { format: 'CD' }, { recording: { video: false } }, false],
     ['a track on a DVD-Video', { format: 'DVD-Video' }, { recording: {} }, true],
@@ -95,9 +99,9 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
     ['Blu-spec CD is a CD, whatever its name', { format: 'Blu-spec CD' }, {}, false],
     ['no medium format and no recording', {}, undefined, false],
   ];
+  check('credits.mjs keeps no copy of it - one rule, not two', 'isVideoTrack' in credits, false);
   for (const [label, medium, track, expected] of VIDEO_CASES) {
-    check(`${label} (download, credits.mjs)`, credits.isVideoTrack(medium, track), expected);
-    check(`${label} (editor, release.ts)`, release.isVideoTrack(medium, track), expected);
+    check(label, release.isVideoTrack(medium, track), expected);
   }
 
   console.log(failures ? `\n${failures} FAILED\n` : '\nall passed\n');

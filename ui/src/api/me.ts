@@ -4,7 +4,8 @@
  * rather than from assumptions, so step 3's logins change what it says and nothing in the page.
  */
 
-import { get } from './http'
+import type { GetSettings, GetSettingsAnswer } from '../lib/getSettings'
+import { get, put } from './http'
 
 export interface Me {
   user: string
@@ -17,4 +18,18 @@ export interface Me {
 
 export function me(signal?: AbortSignal): Promise<Me> {
   return get<Me>('/me', signal)
+}
+
+/**
+ * What the user chose in You > Getting albums (2.0.0-player.15) - kept per user on the server
+ * (src/routes/me.py): "When I tap Get" and the quality floor, which of them they set, and whether
+ * deadwax can keep them.
+ */
+export function getPreferences(signal?: AbortSignal): Promise<GetSettingsAnswer> {
+  return get<GetSettingsAnswer>('/me/preferences', signal)
+}
+
+/** Set any of them; the rest stay. Answers with all of them, as getPreferences does. */
+export function putPreferences(values: Partial<GetSettings>): Promise<GetSettingsAnswer> {
+  return put<GetSettingsAnswer>('/me/preferences', values)
 }

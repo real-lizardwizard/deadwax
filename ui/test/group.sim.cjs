@@ -24,6 +24,14 @@
  *    and Escape close it. Focus going NOWHERE (WebKit's tap on a button without a tabindex, an
  *    element removed) doesn't close it; focus going to something outside does; the fold takes
  *    tabIndex -1 so WebKit focuses it on a tap.
+ *  - Get (2.0.0-player.15): not before a pressing is chosen; then "Get the album", the page's one
+ *    solid purple button, opening the Sources sheet for the CHOSEN pressing - built by the one payload
+ *    builder from the album's group, the opener taken in the tap. Under it (review: above it, an
+ *    answer landing late moved Get under a finger), what the library and the downloads already have
+ *    of that pressing, asked of the store (POST /download/store_state - no search) for the pressing
+ *    shown, again as another is chosen, as an album is filed and as the page comes back into view
+ *    (after a Get, or a download cancelled in Requests), and only the newest answer drawn - the last
+ *    one standing while the same pressing is asked again, another pressing's never.
  *
  * Run it with:  node ui/test/group.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -82,7 +90,14 @@ fs.writeFileSync(path.join(OUT, 'hooks/useDismiss.js'), `
 exports.useDismiss = () => {}
 `)
 fs.writeFileSync(path.join(OUT, 'player/icons.js'), `
-exports.ChevronLeftIcon = exports.ChevronDownIcon = exports.CheckIcon = function Icon() { return null }
+exports.ChevronLeftIcon = exports.ChevronDownIcon = exports.CheckIcon = exports.GetIcon = function Icon() { return null }
+`)
+//? the store's answer for a pressing (2.0.0-player.15), faked; and the opener a tap would focus
+fs.writeFileSync(path.join(OUT, 'api/download.js'), `
+exports.storeState = (body, signal) => globalThis.__group.storeState(body, signal)
+`)
+fs.writeFileSync(path.join(OUT, 'app/useSheet.js'), `
+exports.takeOpener = (event) => event.currentTarget
 `)
 
 const asked = []
@@ -91,8 +106,15 @@ const answers = []
 const UNREACHABLE = '00000000-0000-4000-8000-000000000001'
 const EMPTY = '00000000-0000-4000-8000-000000000002'
 const owning = (albums) => ({ index: OwnedIndex.buildOwnedIndex(albums), artists: [] })
+const stateAsks = []
 globalThis.__group = {
   owned: null,
+  storeState(body, signal) {
+    const d = {}
+    d.promise = new Promise((yes, no) => { d.resolve = yes; d.reject = no })
+    stateAsks.push({ body, signal, ...d })
+    return d.promise
+  },
   ask(id) {
     asked.push(id)
     const next = answers.shift()
@@ -147,7 +169,7 @@ const settle = () => new Promise((resolve) => setImmediate(() => setImmediate(re
 function page(props) {
   const render = hooks.root(ReleaseGroupPage)
   const picks = []
-  const all = { release: null, preview: null, backLabel: 'Search', onBack() {}, onPick: (group, release) => picks.push([group, release]), ...props }
+  const all = { release: null, preview: null, shown: true, backLabel: 'Search', onBack() {}, onPick: (group, release) => picks.push([group, release]), ...props }
   const draw = (more = {}) => {
     Object.assign(all, more)
     tree = render(all)
@@ -356,6 +378,115 @@ async function main() {
     classed('app-picker')[0].props.onKeyDown({ key: 'Escape', preventDefault() {} })
     draw()
     check('Escape closes it', classed('app-picker-popover')[0].props.hidden, true)
+  }
+
+  console.log('\nGet: the chosen pressing, built by the one payload builder, and what is already here of it')
+  {
+    const R = require(path.join(OUT, 'lib/releasePayload.js'))
+    const { StoreState } = require(path.join(OUT, 'app/StoreState.js'))
+    const { announceAlbumsFiled } = require(path.join(OUT, 'lib/libraryEvents.js'))
+    stateAsks.length = 0
+    const gets = []
+    const onGet = (request, opener) => gets.push([request, opener])
+    answers.push(() => new Promise(() => {}))
+    const waiting = page({ id: '00000000-0000-4000-8000-000000000009', onGet })
+    waiting.draw()
+    check('no Get, and nothing asked of the store, before there is a pressing to get', [classed('app-rg-get').length, stateAsks.length], [0, 0])
+
+    //? The Slow Rush, kept from above: drawn at once
+    const { draw } = page({ id: slowRush.group.id, preview: PREVIEW, onGet })
+    draw()
+    const usual = byPrefix(slowRush, '1cf564b9')
+    const expected = R.buildDownloadRelease(PREVIEW, usual).release
+    check('"Get the album": one, the page\'s one solid purple button', [classed('app-rg-get').length, text(classed('app-rg-get')[0])], [1, 'Get the album'])
+    check('the store asked about the pressing shown - the body Get would send', [stateAsks.length, JSON.stringify(stateAsks[0]?.body) === JSON.stringify(expected)], [1, true])
+    check('...nothing said until it answers', find((node) => node.type === StoreState).length, 0)
+    const opener = { focus() {} }
+    classed('app-rg-get')[0].props.onClick({ currentTarget: opener })
+    check('Get opens the sources for the CHOSEN pressing, the opener taken in the tap',
+      [gets.length, gets[0]?.[0].release.release_mbid, gets[0]?.[0].subtitle, gets[0]?.[1] === opener, JSON.stringify(gets[0]?.[0].release) === JSON.stringify(expected)],
+      [1, usual.id, 'The Slow Rush · CD · 2020 · AU · Caroline International', true, true])
+    check('...searched as credited, filed under the current name, the album\'s own year', [gets[0]?.[0].release.artist, gets[0]?.[0].release.original_year], ['Tame Impala', '2020'])
+
+    stateAsks[0].resolve({ held: null, downloading: { job_id: 1, status: 'queued', username: 'bob', files: 12 }, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    check('the answer drawn under the pressing: already downloading, cancelled in Requests', find((node) => node.type === StoreState)[0]?.props.status,
+      { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'Open Requests to cancel it if you want another peer.'] })
+    check('...in a polite live region that is always there', classed('app-rg-store')[0]?.props['aria-live'], 'polite')
+    check('...UNDER Get, where an answer landing late moves nothing a finger is reaching for',
+      classed('app-rg-actions')[0]?.props.children.filter(Boolean).map((child) => child.type === 'button' ? child.props.class : child.props?.class ?? child.type?.name), ['PressingPicker', 'app-rg-get', 'app-rg-store'].map((name) => name))
+
+    //? another pressing: asked about afresh; the first's late answer must not stand for it
+    const japan = byPrefix(slowRush, '452ccdb4')
+    draw({ release: japan.id })
+    check('another pressing chosen: the store asked about it', [stateAsks.length, stateAsks[1]?.body.release_mbid], [2, japan.id])
+    check('...the last pressing\'s answer not drawn for this one', find((node) => node.type === StoreState).length, 0)
+    classed('app-rg-get')[0].props.onClick({ currentTarget: opener })
+    check('...and Get now gets THAT pressing - the dropdown decides what Get is for',
+      [gets.length, gets[1]?.[0].release.release_mbid, gets[1]?.[0].release.tracks.length, gets[1]?.[0].subtitle], [2, japan.id, 13, 'The Slow Rush · CD · 2020 · JP · Caroline International'])
+    draw({ release: null })
+    check('back to the usual pressing: asked again, the Japanese CD\'s ask called off', [stateAsks.length, stateAsks[1].signal.aborted], [3, true])
+    stateAsks[1].resolve({ held: null, downloading: { job_id: 2, status: 'queued', username: 'late', files: 13 }, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    check('the superseded answer, landing late, is not drawn - only this pressing\'s own last answer stands while it is asked again',
+      find((node) => node.type === StoreState).map((box) => box.props.status.lines[0]), ['From bob · queued'])
+    stateAsks[2].resolve({ held: { path: 'Tame Impala/The Slow Rush (2020)', paths: ['Tame Impala/The Slow Rush (2020)'], artist: 'Tame Impala', album: 'The Slow Rush', edition: '', track_count: 12, expected_tracks: 12, formats: ['flac'], complete: true, fills_gaps: false, filed_to: null },
+      downloading: null, downloading_part: null, other_pressings: [{ path: 'Tame Impala/The Slow Rush (2020) [JP]', release_mbid: japan.id, edition: 'JP', year: '2020', track_count: 13, formats: ['flac'] }] })
+    await settle()
+    draw()
+    check('held whole: said, with the other pressing as a note', [find((node) => node.type === StoreState)[0]?.props.status.title, find((node) => node.type === StoreState)[0]?.props.notes],
+      ['Already in your library', ['You also have another pressing: JP · FLAC · Tame Impala/The Slow Rush (2020) [JP]']])
+    announceAlbumsFiled()
+    draw()
+    check('an album filed: the store asked again', [stateAsks.length, stateAsks[3]?.body.release_mbid], [4, usual.id])
+    //? an ask for the SAME pressing superseded (filed again while the last ask was out): its late answer
+    //? must not stand - only the newest
+    announceAlbumsFiled()
+    draw()
+    check('...and again, the last ask called off', [stateAsks.length, stateAsks[3].signal.aborted], [5, true])
+    stateAsks[3].resolve({ held: null, downloading: { job_id: 9, status: 'queued', username: 'stale', files: 12 }, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    check('the superseded answer for the same pressing, landing late, is not drawn - the last real answer stands while it is asked again',
+      find((node) => node.type === StoreState)[0]?.props.status.title, 'Already in your library')
+    stateAsks[4].resolve({ held: null, downloading: null, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    check('...and the newest, with nothing to say, says nothing', find((node) => node.type === StoreState)[0]?.props.status ?? null, null)
+
+    //? Get taps hand over to Requests, and the page stays mounted under Search's tab: coming back
+    //? to it must say "Already downloading" - and a download cancelled in Requests meanwhile must not
+    //? go on being said (review)
+    draw({ shown: false })
+    check('out of view (another tab, the sheet over it, the app in the background): nothing asked', stateAsks.length, 5)
+    draw({ shown: true })
+    check('shown again: asked again, for the same pressing', [stateAsks.length, stateAsks[5]?.body.release_mbid], [6, usual.id])
+    stateAsks[5].resolve({ held: null, downloading: { job_id: 4, status: 'downloading', username: 'bob', files: 12, done_files: 3 }, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    check('...and the Get made meanwhile is said', find((node) => node.type === StoreState)[0]?.props.status.title, 'Already downloading')
+    draw({ shown: false })
+    draw({ shown: true })
+    check('cancelled in Requests and back again: asked again - "Already downloading" standing until it answers',
+      [stateAsks.length, find((node) => node.type === StoreState)[0]?.props.status.title], [7, 'Already downloading'])
+    stateAsks[6].resolve({ held: null, downloading: null, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    check('...then no longer said', find((node) => node.type === StoreState)[0]?.props.status ?? null, null)
+  }
+
+  console.log('\na cold link: Get builds from the group the pressings carry, the pressing\'s credit where it has none')
+  {
+    const P2 = require(path.join(OUT, 'lib/pressings.js'))
+    const bare = { id: dummy.group.id, title: 'Dummy', 'first-release-date': '1994-08-22' }
+    const chosen = byPrefix(dummy, '87888070')
+    check('the group\'s own title and year, the pressing\'s credit standing in for the missing one', P2.getGroup(dummy.group.id, null, dummy.releases.map((release) => ({ ...release, 'release-group': bare })), chosen),
+      { id: dummy.group.id, title: 'Dummy', 'first-release-date': '1994-08-22', 'artist-credit': chosen['artist-credit'] })
+    check('...no group at all: the pressing\'s title, the earliest date any pressing came out', [P2.getGroup('x', null, dummy.releases, chosen).title, P2.getGroup('x', null, dummy.releases, chosen)['first-release-date'].slice(0, 4)],
+      ['Dummy', '1994'])
+    check('...Search\'s group wins when it has one', P2.getGroup('x', PREVIEW, slowRush.releases, null)['artist-credit'], PREVIEW['artist-credit'])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

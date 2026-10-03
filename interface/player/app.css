@@ -4,7 +4,9 @@
   tabs - and, since 2.0.0-player.10, what opens over Now Playing (its ••• menu and Info) and You's
   Gapless checkbox; since 2.0.0-player.11, Now Playing's look button and the turntable; since
   2.0.0-player.12, the Requests tab, Home's Arriving and the Requests tab's badge; since
-  2.0.0-player.13, the Search tab and the album you don't have, with its pressing dropdown. Loaded
+  2.0.0-player.13, the Search tab and the album you don't have, with its pressing dropdown; since
+  2.0.0-player.15, Get on that page and on Search's rows, what is already here of a pressing, the
+  Sources sheet and its cards, and You's Getting albums. Loaded
   after player.css, which draws the player itself (the library grid, the
   album page, the mini player and Now Playing) and whose mechanics - safe areas, edges, tap targets
   - these rules build on.
@@ -156,6 +158,47 @@
     --app-rg-summary-gap: 6px;
     --app-rg-disc-top: 18px;
     --app-rg-disc-bottom: 6px;
+    /* Get, and what is already here of the pressing (2.0.0-player.15), as Request.dc.html draws them */
+    --app-rg-get-gap: 12px;          /* the pressing to Get, Get to what's here of it */
+    --app-rg-get-icon: 20px;
+    --app-rg-get-inner: 8px;         /* the icon to "Get the album" */
+    --app-store-pad: 12px;           /* inside the box saying what's here */
+    --app-store-lines: 2px;
+    --app-store-gap: 8px;            /* the box to its notes, and note to note */
+    /* a Get chip on a Search row, as Search.dc.html draws it: 32px, reaching 44 */
+    --app-result-get: 32px;
+    --app-result-get-pad: 16px;
+    --app-result-get-reach: calc((var(--pl-hit) - var(--app-result-get)) / 2 + var(--dw-hairline));
+    /* the Sources sheet (2.0.0-player.15), as Sources.dc.html draws it */
+    --app-z-sources: 25;             /* over the page and Now Playing (20), under its menu and Info (30) */
+    --app-sources-top: 48px;         /* its top edge, from the top of the screen, as the board has it */
+    --app-sources-gap: 14px;         /* between its head, its chips and its list */
+    --app-sources-list-gap: 10px;    /* card to card */
+    --app-sources-state-pad: 40px;   /* above and below "Asking Soulseek…" and the other states */
+    --app-sources-state-gap: 12px;
+    --app-sources-sweep: 240px;      /* the asking bar's width */
+    --app-chip: 30px;                /* a filter chip, drawn as the board has it... */
+    --app-chip-pad: 12px;
+    --app-chip-gap: 8px;
+    --app-chip-icon: 12px;
+    --app-chip-select: 0;            /* the sort's own select, laid over its chip and drawn by it */
+    /* ...44px to a finger: the reach starts at the chip's padding box, inside its border */
+    --app-chip-reach: calc((var(--pl-hit) - var(--app-chip)) / 2 + var(--dw-hairline));
+    --app-source-pad: 12px;          /* inside a card */
+    --app-source-gap: 10px;          /* a card's rows, and its facts side by side */
+    --app-source-top-gap: 12px;      /* the score, the folder and Get */
+    --app-source-score-width: 38px;
+    --app-source-score-height: 32px;
+    --app-source-get: 32px;          /* Get, as the board draws it... */
+    --app-source-get-pad: 18px;
+    --app-source-get-reach: calc((var(--pl-hit) - var(--app-source-get)) / 2 + var(--dw-hairline));
+    --app-source-speed-pad-y: 10px;  /* the speed's well */
+    --app-source-speed-pad-x: 12px;
+    --app-source-speed-gap: 7px;
+    --app-source-speed-inner: 8px;   /* "Speed" to its number */
+    --app-source-bar: 8px;           /* the speed bar's sunken track */
+    --app-source-facts-pad: 2px;
+    --app-source-lines: 2px;         /* a fact's label to its value */
 }
 
 /* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
@@ -593,7 +636,8 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 /* Each sheet stops the page behind scrolling with a class of its own on <html> (useSheet.ts), as
    Now Playing does with pl-sheet-open: whichever closes first takes only its own away. */
 html.app-menu-open,
-html.app-info-open { overflow: hidden; }
+html.app-info-open,
+html.app-sources-open { overflow: hidden; }
 
 /* the whole screen: a dimmed backdrop, which closes on a tap, and the sheet over it. Hidden - and
    inert - while closed; visibility waits for the slide down to finish */
@@ -1595,7 +1639,44 @@ button.app-result:active { background: var(--dw-pressed); }
 /* ===== the album you don't have (2.0.0-player.13): the album page's header, the pressing, the
    chosen pressing's tracklist and what differs in it ===== */
 
-.app-rg-actions { width: 100%; max-width: var(--app-rg-actions-max); margin-top: var(--app-rg-actions-gap); }
+.app-rg-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-rg-get-gap);
+    width: 100%;
+    max-width: var(--app-rg-actions-max);
+    margin-top: var(--app-rg-actions-gap);
+}
+
+/* what is already here of the pressing, under Get: nothing to say takes no room - but is still
+   drawn, an empty live region, since VoiceOver reads a region only once it is already there (a
+   hidden one isn't) */
+.app-rg-store:empty { margin-top: calc(-1 * var(--app-rg-get-gap)); }
+
+/* "Get the album": the screen's ONE solid purple button, the width of the pressing above it */
+.app-rg-get {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-rg-get-inner);
+    width: 100%;
+    min-height: var(--pl-hit);
+    border: var(--dw-hairline) solid var(--dw-primary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-rg-get:active { filter: var(--dw-primary-pressed); }
+.app-rg-get-icon { flex: none; width: var(--app-rg-get-icon); height: var(--app-rg-get-icon); }
+
+.app-rg-get:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
 .app-rg-asking { padding: var(--pl-gap-sm) var(--pl-edge-right) 0 var(--pl-edge-left); }
 .app-rg-trouble .app-button { width: 100%; margin-top: var(--pl-gap-sm); }
 
@@ -1798,3 +1879,456 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-rg-left { margin-top: var(--app-section-gap); }
 .app-rg-left-title { margin: 0; color: var(--dw-text-heading-color); font-size: var(--dw-text-heading); font-weight: var(--dw-weight-semibold); }
 .app-rg-track.is-left .app-rg-title { color: var(--dw-text-3); }
+
+/* ===== what is already here of a pressing (2.0.0-player.15): step 2's store, in the app's look -
+   the box where the sources would be (held whole, downloading whole), and the notes above them ===== */
+
+.app-store { display: flex; flex-direction: column; gap: var(--app-store-gap); text-align: left; }
+
+.app-store-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-store-lines);
+    padding: var(--app-store-pad);
+}
+
+.app-store-title {
+    margin: 0;
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-heading);
+}
+
+.app-store-box.is-held .app-store-title { color: var(--dw-badge-green-text); }
+
+/* a path is a stranger's folder name as often as not: it breaks anywhere rather than push the
+   screen sideways */
+.app-store-line,
+.app-store-note {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-store-line.is-detail { color: var(--dw-text-3); }
+.app-store-notes { display: flex; flex-direction: column; gap: var(--app-store-gap); margin: 0; padding: 0; list-style: none; }
+
+/* ===== a Get chip on a Search row (2.0.0-player.15): the row opens the album, the chip gets it ===== */
+
+.app-result-row { display: flex; align-items: center; gap: var(--app-result-gap); }
+.app-result-row .app-result { flex: 1; min-width: 0; }
+
+/* STYLE.md's toggled tint, as the board draws it; 44px to a finger. No overflow of its own, so
+   nothing clips its reach. */
+.app-result-get {
+    position: relative;
+    flex: none;
+    height: var(--app-result-get);
+    padding: 0 var(--app-result-get-pad);
+    border: var(--dw-hairline) solid var(--dw-toggled-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-toggled-bg);
+    color: var(--dw-accent-text);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    white-space: nowrap;
+}
+
+.app-result-get::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--app-result-get-reach));
+    right: 0;
+    bottom: calc(-1 * var(--app-result-get-reach));
+    left: 0;
+}
+
+.app-result-get:active { background: var(--dw-secondary-bg-active), var(--dw-toggled-bg); }
+.app-result-get.is-busy { opacity: var(--app-job-busy); }
+
+.app-result-get:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+/* ===== the Sources sheet (2.0.0-player.15): a sheet from a little under the top, as Info is ===== */
+
+.app-sources-layer { z-index: var(--app-z-sources); }
+
+.app-sources {
+    position: absolute;
+    top: max(var(--app-sources-top), calc(var(--pl-safe-top) + var(--app-info-pad)));
+    right: var(--pl-safe-right);
+    bottom: 0;
+    left: var(--pl-safe-left);
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-sources-gap);
+    max-width: var(--pl-content-max);
+    margin: 0 auto;
+    padding: var(--app-info-pad) var(--dw-gutter-grouped) 0;
+    border-radius: var(--dw-radius-sheet) var(--dw-radius-sheet) 0 0;
+    background: var(--dw-bg-sheet);
+    box-shadow: var(--dw-highlight);
+    transform: translateY(100%);
+    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.app-layer.is-open .app-sources { transform: translateY(0); }
+
+/* Cancel at the left and the title in the middle, as the board has them - the side columns share
+   what the title leaves, so it stays centred and on one line at 320px - and what it is for under
+   them, across the sheet's whole width, wrapping: the part that tells one pressing from another
+   (its label, its edition) comes LAST, and an ellipsis on a phone took exactly that (review) */
+.app-sources-head {
+    display: grid;
+    flex: none;
+    grid-template-columns: 1fr auto 1fr;
+    row-gap: var(--app-line-gap);
+    align-items: center;
+}
+
+.app-sources-cancel {
+    justify-self: start;
+    min-height: var(--dw-row);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-body);
+    text-align: left;
+}
+
+.app-sources-cancel:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-sources-cancel { grid-column: 1; grid-row: 1; }
+
+.app-sources-title {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-label);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.app-sources-subtitle {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+/* the chips: STYLE.md's secondary look, the pressed ones its toggled tint. They wrap on a narrow
+   phone rather than run off it; the reach above and below keeps them 44px to a finger. */
+.app-sources-chips {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    gap: calc(2 * var(--app-chip-reach)) var(--app-chip-gap);
+    padding: var(--app-chip-reach) 0;
+    margin: calc(-1 * var(--app-chip-reach)) 0;
+}
+
+.app-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-tab-gap);
+    height: var(--app-chip);
+    padding: 0 var(--app-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    white-space: nowrap;
+}
+
+.app-chip::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--app-chip-reach));
+    right: 0;
+    bottom: calc(-1 * var(--app-chip-reach));
+    left: 0;
+}
+
+.app-chip.is-on {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    box-shadow: none;
+    color: var(--dw-accent-text);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-chip:focus-visible,
+.app-sources-sort:has(.app-sources-sort-select:focus-visible) {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+/* the sort: a chip holding the platform's own picker (iOS's wheel) - the select covers it whole,
+   unseen, and the chip shows what it says. 17px, or iOS zooms the page as it is tapped. */
+.app-sources-sort-select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    opacity: var(--app-chip-select);
+    font-size: var(--dw-text-body);
+}
+
+.app-sources-sort-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
+
+/* the list: the one part of the sheet that scrolls, so it says so itself (the layer takes every
+   touch, as Info's does) and keeps its scroll from running on into the page behind */
+.app-sources-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: calc(var(--pl-safe-bottom) + var(--pl-gutter));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
+.app-sources-scroll > * + * { margin-top: var(--app-sources-list-gap); }
+
+/* focus handed to the list by a button that ended the state it sat in (Try again, Re-search, Clear
+   filters): it is no tab stop (-1), only somewhere inside the sheet for focus to be, so no ring */
+.app-sources-scroll:focus { outline: none; }
+
+/* the sheet closed mid-search: the asking bar it slides away with stops moving */
+.app-sources-layer:not(.is-open) .app-sweep::before { animation-play-state: paused; }
+
+.app-sources-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--app-sources-state-gap);
+    padding: var(--app-sources-state-pad) var(--app-source-pad);
+    text-align: center;
+}
+
+.app-sources-sweep { width: min(var(--app-sources-sweep), 100%); }
+
+.app-sources-state-text {
+    margin: 0;
+    font-size: var(--dw-text-heading);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-sources-state-text.is-warning { color: var(--dw-amber-text); }
+
+.app-sources-state-note,
+.app-sources-not-picked,
+.app-sources-footer {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-sources-footer { text-align: center; }
+.app-sources-state .app-button { min-width: 50%; }
+
+/* the query to edit when Soulseek found nothing: the search field's well, 17px so iOS doesn't zoom */
+.app-sources-query { display: flex; flex-direction: column; gap: var(--app-line-gap); width: 100%; text-align: left; }
+.app-sources-query-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+.app-sources-query-input {
+    width: 100%;
+    height: var(--app-field);
+    padding: 0 var(--app-field-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-field);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--dw-text-body);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.app-sources-query-input:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring); }
+
+.app-sources-list { display: flex; flex-direction: column; gap: var(--app-sources-list-gap); margin: 0; padding: 0; list-style: none; }
+
+/* --- a source: the score, the folder, who from and Get; the speed in its well; the facts --- */
+
+.app-source {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-source-gap);
+    padding: var(--app-source-pad);
+}
+
+.app-source.is-best { border-color: var(--dw-best); }
+
+.app-source-top { display: flex; align-items: center; gap: var(--app-source-top-gap); }
+
+.app-source-score {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--app-source-score-width);
+    height: var(--app-source-score-height);
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-badge-amber-bg);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-bold);
+}
+
+.app-source-score.is-good {
+    border-color: var(--dw-badge-green-border);
+    background: var(--dw-badge-green-bg);
+    color: var(--dw-badge-green-text);
+}
+
+.app-source-name { display: flex; flex: 1; flex-direction: column; gap: var(--app-source-lines); min-width: 0; }
+
+.app-source-folder {
+    overflow: hidden;
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-label);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-source-peer {
+    overflow: hidden;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Get: 32px as the board draws it, 44 to a finger; the best match's the solid purple, the rest tinted */
+.app-source-get {
+    position: relative;
+    flex: none;
+    height: var(--app-source-get);
+    padding: 0 var(--app-source-get-pad);
+    border: var(--dw-hairline) solid transparent;
+    border-radius: var(--dw-radius-control);
+    font-size: var(--dw-text-data);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-source-get::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--app-source-get-reach));
+    right: 0;
+    bottom: calc(-1 * var(--app-source-get-reach));
+    left: 0;
+}
+
+.app-source-get.is-primary {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+}
+
+.app-source-get.is-primary:active { filter: var(--dw-primary-pressed); }
+
+.app-source-get.is-tinted {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    color: var(--dw-accent-text);
+}
+
+.app-source-get:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+/* the speed leads: a well, the number large and saying where it comes from, and its bar */
+.app-source-speed {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-source-speed-gap);
+    padding: var(--app-source-speed-pad-y) var(--app-source-speed-pad-x);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+}
+
+.app-source-speed-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--app-line-gap) var(--app-source-gap);
+}
+
+.app-source-speed-value { display: flex; align-items: baseline; gap: var(--app-source-speed-inner); }
+.app-source-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+.app-source-speed-text {
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-bold);
+}
+
+.app-source-speed-text.is-measured { color: var(--dw-badge-green-text); }
+.app-source-speed-text.is-unknown { color: var(--dw-text-3); }
+.app-source-speed-note { color: var(--dw-text-2); font-size: var(--dw-text-label); }
+
+.app-source-bar {
+    display: flex;
+    height: var(--app-source-bar);
+    overflow: hidden;
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-track);
+    background: var(--dw-track);
+    box-shadow: var(--dw-track-inset);
+}
+
+.app-source-bar-fill { display: block; border-radius: var(--dw-radius-fill); background: var(--dw-bar-grey); }
+.app-source-bar-fill.is-measured { background: var(--dw-bar-green); }
+.app-source-bar-fill.is-unknown { background: transparent; }
+
+/* the facts side by side, wrapping on a narrow phone rather than running off it */
+.app-source-facts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--app-source-speed-gap) var(--app-source-gap);
+    margin: 0;
+    padding: 0 var(--app-source-facts-pad);
+}
+
+.app-source-fact { display: flex; flex-direction: column; gap: var(--app-source-lines); min-width: 0; }
+.app-source-fact dd { margin: 0; }
+.app-source-value { font-size: var(--dw-text-footnote); white-space: nowrap; }
+.app-source-value.is-warning { color: var(--dw-amber-text); }
+.app-source-value.is-now { color: var(--dw-badge-green-text); }
+
+.app-source-missing {
+    margin: 0;
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}

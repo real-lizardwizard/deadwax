@@ -4,6 +4,8 @@ There are two kinds of setting. **Server settings** belong to the container: whe
 where your library is, how albums are filed. **Preferences** belong to your browser: how many
 search results to ask for, which candidate filters start switched on. Both are edited in the
 **Settings** tab, which has five pages: Search, Downloads, Library, Connections and Interface.
+[The phone app](player.md) has a few of its own: some kept on the device, and two - how **Get**
+works - [kept for you on deadwax](#your-settings-in-the-app-per-user-on-deadwax).
 
 ![The Connections page of the settings tab, saying where each setting came from](../assets/images/settings.png)
 
@@ -144,7 +146,7 @@ These are stored in your browser, so each browser and device has its own. They'r
 | preference | default | what it does |
 | --- | --- | --- |
 | Format | Prefer lossless | **Any format**: format doesn't count. **Prefer lossless**: FLAC and other lossless formats score higher, MP3 still eligible. **Lossless only**: lossy candidates are left out. |
-| Auto-grab best match | off | on a new **Find**, download the top candidate straight away if it scores 75 or more. The panel says it did. It never happens on a re-search. |
+| Auto-grab best match | off | on a new **Find**, download the top candidate straight away if it scores 75 or more. The panel says it did. It never happens on a re-search. The app's **Get** has its own, kept for you on deadwax: **When I tap Get** (below). |
 | Confirm before cancelling | on | a confirmation before a download is cancelled, by the Downloads panel's ✕ and, in the same browser, the phone app's ✕ in its Requests tab. Cancelling loses your place in the peer's queue. |
 | Candidate filters | all off | what the candidates panel starts with: a minimum score, free slot only, complete albums only, a minimum bitrate and bit depth, and the sort. |
 
@@ -171,3 +173,36 @@ itself. None of them is on the main page's Settings tab.
 The Requests tab's **✕** asks before cancelling, by **Confirm before cancelling** above - in the
 card itself (**Keep it** or **Cancel download**), never as a pop-up, which would hold up the music.
 A home-screen app keeps its own storage and has no Settings tab, so there it always asks.
+
+## Your settings in the app (per user, on deadwax)
+
+Two settings in the app's **You → Getting albums** (since 2.0.0-player.15) decide what **Get** does
+([Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source)). They are kept
+**on deadwax, per user** - not on the device - so they follow you from the phone to a browser and
+back. With logins off, as deadwax runs today, there is one user, so every device shares them; once
+logins exist, each person has their own. Each is a list to tap in You: the choice shows at once and
+is saved behind it, and if deadwax can't keep it (its database isn't writable) it goes back to what
+deadwax has and You says so. Choices made quickly are saved one after another, in the order you made
+them, so the last one is what stays. The app asks deadwax for them each time You is opened, on
+**Check again** under Connections, and each time a Get opens the sources - so a change made on
+another device shows without closing the app. Until deadwax has first answered, nothing shows as
+chosen and nothing can be, and a Get shows the sources.
+
+| setting | default | what it does |
+| --- | --- | --- |
+| When I tap Get | Show me the sources | **Show me the sources**: Get opens the list of folders found on Soulseek, and you choose. **Pick the best source for me**: Get takes the best match itself when it scores 75 or more and passes your quality floor, queues it and shows Requests - and shows you the sources, saying why, when nothing does, when you already have the pressing (whole or in part) or it is already downloading, or when it is the album as a whole (a row's Get when MusicBrainz couldn't list the pressings: with no tracklist, no score can be trusted). Never on a Re-search. |
+| Quality floor | Any | what a source must at least be: **Any**, **320 kbps** (lossless passes too), **Lossless** (every file lossless; a folder whose format couldn't be told doesn't pass) or **24-bit**. It's what a pick must pass, and what the sources start filtered by - as a chip pressed above them (Lossless, 24-bit, or a 320 kbps chip, shown only while that's your floor), so it's never a filter on out of sight: tap the chip to see everything. |
+
+The first time the app asks for them, with nothing saved yet, the quality floor starts from what the
+main page's **Candidate filters** (above) say in that browser: a minimum bit depth of 24 is
+**24-bit**, of 16 is **Lossless** (only lossless files report a bit depth), and a minimum bitrate
+of 320 is **320 kbps**; anything else is Any. **When I tap Get** always starts at Show me the
+sources - the main page's Auto-grab is not carried over. That happens once: from then on the app
+and the main page keep their own copies, and changing one doesn't change the other. (A home-screen
+app keeps its own storage, apart from Safari's, so on a phone the main page's preferences usually
+aren't there to start from, and the defaults stand.) Only what differs from the defaults is saved,
+so a default changed in a later version still reaches you if you never chose otherwise.
+
+They're stored in deadwax's database (`DB_PATH`), in its `user_prefs` table - a row for each one
+you chose, and one more that says something was saved for you, which is how that first carrying
+over happens only once - through `GET` and `PUT /deadwax/me/preferences`.

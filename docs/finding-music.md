@@ -121,9 +121,10 @@ already in your library, or already downloading in full, the panel says so and d
 ## On the phone: the app's Search tab
 
 The [phone app](player.md) at `/player/` has its own **Search** tab (since 2.0.0-player.13): one
-box, **your library first, then MusicBrainz**. Getting an album from Soulseek isn't in the app yet
-- it comes in a later version - so for now the app is for finding and looking; **Find** on the main
-page starts the download, and the app's Requests tab follows it from there.
+box, **your library first, then MusicBrainz**. Since 2.0.0-player.15 it gets albums too: **Get** on
+a row of albums you don't have, or **Get the album** on an album's page, opens the sources found on
+Soulseek to choose from - see [Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source) -
+and the app's Requests tab follows the download from there.
 
 ### The box
 
@@ -172,7 +173,10 @@ where it is and says "· in your library" at the end of its second line, rather 
 under your finger. Each row is the
 cover (from the Cover Art Archive, so a phone with no internet shows a plain square), the title,
 and what it is, who by and when ("Live album · Portishead · 1998"). Tap one to open
-[the album you don't have](#the-album-you-dont-have).
+[the album you don't have](#the-album-you-dont-have). **Get**, at the end of the row, gets the
+album's usual pressing without opening it (it reads "Get…" while it asks MusicBrainz for the
+album's pressings, which an album opened before already has, and gives up if you type, open
+something or switch tab meanwhile); a row that turns out to be in your library has none.
 
 How the box is read, since there's only one:
 
@@ -203,8 +207,12 @@ album you do; and it counts a folder tagged with any of the album's pressings, t
 above included. Opened from a saved link or after a reload it says the same, since the album's
 title, kind and year come with its pressings. A link whose address isn't a MusicBrainz album says
 *That isn't a link to an album on MusicBrainz.* Under it is the **Pressing** button, where an album you have has Play and
-Shuffle (**Get the album** goes under it in a later version), and then **that pressing's
-tracklist**.
+Shuffle; then **Get the album**, the page's one purple button, which gets **the pressing chosen**
+([Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source)); under it,
+what you already have of that pressing, if anything ("Already in your library", "Already
+downloading", "You have 9 of 10 tracks of this pressing…", "You also have another pressing…" -
+asked of deadwax without searching Soulseek, for the pressing chosen, and again as you come back to
+the page); and then **that pressing's tracklist**.
 
 It needs only MusicBrainz, so it works with Navidrome down. To work out the differences it fetches
 **every pressing's tracklist** at once, which for an album with a lot of pressings can take
@@ -217,7 +225,7 @@ for a worldwide release; "Europe" for MusicBrainz's European ones) and its Music
 disambiguation, or else its label - "CD · 2020 · AU · Caroline International". It starts on **the
 usual pressing**: one with the album's most common tracklist, an official release over a promo or
 bootleg, a CD or digital release over vinyl, one with no disambiguation, then the earliest. That's
-the pressing a card's **Find** on the main page downloads as, and the one the app's Get will get.
+the pressing a card's **Find** on the main page downloads as, and the one a row's **Get** gets.
 
 Tap it for the list of pressings, each with a note of how it compares. It opens below the button
 and, on a phone, scrolls the page so the whole list is in view above the tab bar and the mini

@@ -649,6 +649,10 @@
     --dw-tint-green:         rgba(52, 211, 153, 0.1);    /* a Bonus track's row */
     --dw-tint-amber:         rgba(251, 191, 36, 0.08);   /* an Other version's or a Renamed track's row */
 
+    /* --- Sources and Get (2.0.0-player.15), as Sources.dc.html draws them --- */
+    --dw-bar-green:  linear-gradient(to bottom, #5ee39a, #34c47f);  /* a speed deadwax measured */
+    --dw-best:       #7e4bb8;   /* the best match's card edge: STYLE.md's "selected / best match" */
+
     /* --- the turntable (2.0.0-player.11), as its board draws it ------- */
     --dw-tt-plinth:       #19171e;
     --dw-tt-platter:      #2a2730;

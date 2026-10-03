@@ -8,8 +8,10 @@ import { ChevronRightIcon } from '../player/icons'
 import { usePlayerActions, usePlayerState } from './context'
 import type { Look } from '../lib/turntable'
 import { GaplessChoice } from './GaplessChoice'
+import { GettingChoices } from './GettingChoices'
 import { LookChoice } from './LookChoice'
 import { QualityChoice } from './QualityChoice'
+import { askGetSettings, chooseGetSettings, useGetSettings } from './useGetSettings'
 import { WindDownChoice } from './WindDownChoice'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
@@ -43,10 +45,15 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
 }
 
 /**
- * You: what this device plays like, whether deadwax can reach what it needs, and what version it
- * is. The rest of looking after deadwax - server settings, the albums that need a look, the log,
- * editing an album - is on the main page for now, and this says so and links there.
+ * You: how Get works for you, what this device plays like, whether deadwax can reach what it needs,
+ * and what version it is. The rest of looking after deadwax - server settings, the albums that need
+ * a look, the log, editing an album - is on the main page for now, and this says so and links there.
  *
+ * - Getting albums (2.0.0-player.15, GettingChoices.tsx): "When I tap Get" (Show me the sources, the
+ *   default, or Pick the best source for me) and the quality floor - kept per USER on the server
+ *   (useGetSettings.ts), asked each time You's tab is opened and on "Check again", so one changed on
+ *   another device shows here without the app being killed. A choice not kept ("Not saved: …") is
+ *   said in a live region that is always in the page, so VoiceOver hears why the choice went back.
  * - Playback: Gapless, a checkbox (GaplessChoice.tsx - moved here from the now-playing screen in
  *   2.0.0-player.10, where it was a switch), "Now Playing opens as" (LookChoice.tsx,
  *   2.0.0-player.11: the cover or the turntable - App keeps it, and hands it here), "Pause winds the
@@ -65,16 +72,20 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   here carries on: in the same page it would unload the player, its queue and all.
  *
  * It works with Navidrome unset or down: nothing here waits on it. A page, so it reads the player
- * from context; `shown` is App's word that the tab has been opened at least once.
+ * from context; `shown` is App's word that the tab has been opened at least once, `current` that it
+ * is the tab showing now.
  */
 export function You({
   shown,
+  current,
   opensAs,
   onOpensAs,
   windDown,
   onWindDown,
 }: {
   shown: boolean
+  /** the tab showing now: Getting albums are asked again each time it becomes so */
+  current: boolean
   /** "Now Playing opens as", and the way to change it - App's */
   opensAs: Look
   onOpensAs: (look: Look) => void
@@ -89,6 +100,8 @@ export function You({
   const [checks, setChecks] = useState<Record<Service, CheckState> | null>(null)
   const meRequests = useMemo(latestOnly, [])
   const pingRequests = useMemo(latestOnly, [])
+  //? Getting albums: the server's answer, asked each time the tab is opened (the first time too)
+  const getting = useGetSettings(current)
 
   function askWho() {
     const request = meRequests.begin()
@@ -106,6 +119,8 @@ export function You({
 
   function checkAll() {
     askWho()
+    //? Getting albums too: changed on another device, they show here (what's in hand stands meanwhile)
+    void askGetSettings()
     const request = pingRequests.begin()
     setChecks({ musicbrainz: PENDING, slskd: PENDING, navidrome: PENDING })
     const settle = (service: Service, state: CheckState) => {
@@ -144,6 +159,26 @@ export function You({
           {identity && <p class="app-identity-sub">{identity}</p>}
         </div>
       </header>
+
+      <section class="app-section" aria-labelledby="app-getting-title">
+        <h2 id="app-getting-title" class="app-section-title">
+          Getting albums
+        </h2>
+        <GettingChoices settings={getting.settings} onChoose={(values) => void chooseGetSettings(values)} />
+        <p id="app-get-note" class="app-footnote">
+          With “Pick the best source for me”, Get takes the best match that passes your quality floor,
+          and shows you the sources when nothing matches well. The floor is also what the sources
+          start filtered by. Both are kept for you on deadwax, not on this device.
+        </p>
+        {!getting.canSave && (
+          <p class="app-footnote app-error">deadwax can't keep these: its database isn't writable.</p>
+        )}
+        {/* always in the page, so VoiceOver hears a choice that wasn't kept (it reads a region only
+            once it is already there) */}
+        <div aria-live="polite" aria-atomic="true">
+          {getting.problem && <p class="app-footnote app-error">{getting.problem}</p>}
+        </div>
+      </section>
 
       <section class="app-section" aria-labelledby="app-playback-title">
         <h2 id="app-playback-title" class="app-section-title">

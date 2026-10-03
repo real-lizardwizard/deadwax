@@ -53,8 +53,9 @@ export function detectEditionTags(release: Release): string[] {
  * and a folder holding both would otherwise sort them side by side. `disc` and `disc_position`
  * are MusicBrainz's own numbering, and they are what a multi-disc release is TAGGED with.
  *
- * Must produce the same shape as buildExpectedFromRelease() in interface/scripts/main.js, so an
- * album corrected here carries the same tags as one downloaded fresh.
+ * Must produce the same shape as tracksOf() in lib/releasePayload.ts (the one download payload
+ * builder, since 2.0.0-player.15), so an album corrected here carries the same tags as one
+ * downloaded fresh.
  */
 /**
  * An artist credit as MusicBrainz itself renders it.
@@ -64,8 +65,9 @@ export function detectEditionTags(release: Release): string[] {
  * everywhere - invents punctuation MusicBrainz did not use and turns a duet into what reads
  * as two separate acts.
  *
- * Mirrors credit_name() in src/artists.py; the two must agree, because one names a folder
- * and the other writes the tag inside it.
+ * One rule for both halves of the browser: lib/releasePayload.ts builds a download's artist with
+ * it (what is searched for and tagged), and the metadata editor its own; getArtistNames() in
+ * interface/scripts/credits.mjs is the main page's copy, which only draws the card's credit.
  */
 export function creditName(credit: ArtistCredit[] | undefined): string {
   return (credit ?? [])
@@ -83,8 +85,10 @@ export function creditName(credit: ArtistCredit[] | undefined): string {
  * by the credit gave one artist two folders. The join phrases are kept, so a split stays a
  * split and a feature stays a feature - only the names are brought up to date.
  *
- * Mirrors getCurrentArtistNames() in interface/scripts/credits.mjs, which names a download's
- * folder while this seeds the editor's; ui/test/credits.sim.cjs holds the two to one answer.
+ * Names a download's folder (through lib/releasePayload.ts, since 2.0.0-player.15) and seeds the
+ * editor's - one function, so the two can't part. getCurrentArtistNames() in
+ * interface/scripts/credits.mjs is the main page's copy, which only feeds the card's "in your
+ * library" match; ui/test/credits.sim.cjs holds the two to one answer.
  */
 export function currentName(credit: ArtistCredit[] | undefined): string {
   return (credit ?? [])
@@ -109,7 +113,7 @@ export function fieldedAlbumQuery(album: string, artist: string): string {
   return `releasegroup:${quote(album)} AND (artist:${quote(artist)} OR artistname:${quote(artist)})`
 }
 
-/** Every artist id in a credit, in the order credited. Mirrors credit_ids() in src/artists.py. */
+/** Every artist id in a credit, in the order credited - a download's and the editor's alike. */
 export function creditIds(credit: ArtistCredit[] | undefined): string[] {
   const ids: string[] = []
 
@@ -133,9 +137,10 @@ const VIDEO_FORMATS = new Set([
 
 /**
  * A track that never arrives as an audio file: on a video medium, or of a video recording.
- * Marked `video` so the "already have it" checks leave it out (store_index.audio_tracks). The
- * twin of isVideoTrack() in interface/scripts/credits.mjs, which builds a download's payload;
- * ui/test/credits.sim.cjs holds the two to the same answers.
+ * Marked `video` so the "already have it" checks leave it out (store_index.audio_tracks). The ONE
+ * rule since 2.0.0-player.15 - for the editor (flattenTracks) and a download (lib/releasePayload.ts);
+ * credits.mjs's twin went with main.js's two builders, and ui/test/credits.sim.cjs asks this one its
+ * cases and checks no copy is left there.
  */
 export function isVideoTrack(
   medium: { format?: string | null } | undefined,
@@ -152,7 +157,7 @@ function flattenTracks(release: Release): Track[] {
     const discTracks = medium.tracks ?? []
     const disc = medium.position ?? discIndex + 1
     //? the disc's own title ('' from MusicBrainz when it has none) - written as DISCSUBTITLE.
-    //? Same rule as discTitle in main.js's buildExpectedFromRelease; keep the two in step.
+    //? Same rule as tracksOf() in lib/releasePayload.ts; keep the two in step.
     const discTitle = (medium.title ?? '').trim() || null
 
     for (const [trackIndex, raw] of discTracks.entries()) {
@@ -187,11 +192,10 @@ function flattenTracks(release: Release): Track[] {
 /**
  * Turn a MusicBrainz release into the payload the retag endpoints take.
  *
- * The typed counterpart of buildExpectedFromRelease() in main.js, and deliberately produces
+ * The counterpart of releasePayload() in lib/releasePayload.ts - the one download payload builder,
+ * which replaced main.js's buildExpectedFromRelease in 2.0.0-player.15 - and deliberately produces
  * the same shape: an album corrected by hand should end up carrying exactly the tags one
  * downloaded fresh would have, rather than a second dialect of the same thing.
- *
- * When the search view is ported this replaces the vanilla function outright.
  */
 export function buildRetagRelease(
   release: Release,

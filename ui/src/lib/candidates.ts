@@ -26,6 +26,13 @@ export interface CandidateFilters {
   minSignals: Readonly<Record<string, number>>
   /** What the files must be at least, and how big the folder may be. See QualityFilters. */
   quality: QualityFilters
+  /**
+   * Every file lossless (2.0.0-player.15) - the app's Lossless chip, and its "Lossless" quality
+   * floor. Judged by the folder's formats, so UNKNOWN never passes: a folder whose formats nobody
+   * could tell is not a lossless one. Optional, so the main page's panel, which has no such chip,
+   * builds its filters as it always did.
+   */
+  lossless?: boolean
 }
 
 /**
@@ -102,6 +109,8 @@ export function passesFilters(candidate: Candidate, filters: CandidateFilters): 
       && candidate.matched_tracks < candidate.expected_tracks) return false
 
   if (filters.formats.size && !candidate.formats.some((f) => filters.formats.has(f))) return false
+
+  if (filters.lossless && !allLossless(candidate)) return false
 
   for (const [signal, minimum] of Object.entries(filters.minSignals)) {
     if (!minimum) continue
@@ -284,6 +293,190 @@ export const EDITION_TAG_COLORS: Readonly<Record<string, string>> = {
   'SPECIAL EDITION': 'white-tertiary',
 }
 
+/*
+ * The app's source cards (2.0.0-player.15), as Sources.dc.html words them - one card a folder:
+ * its score, the folder, "from <peer>" and Get, then labelled facts. James asked for the speed to
+ * stop being buried, so it leads, large, with a bar, and says where its number comes from.
+ */
+
+/** A source card's speed bar is full at this - 3 MB/s, as the board has it - and capped there. */
+export const SPEED_BAR_FULL = 3 * 1024 * 1024
+
+export interface SpeedFact {
+  /**
+   * `measured`: what deadwax got from this peer before (peer_speed) - green, "what you got from
+   * them". `advertised`: the peer's own average upload rate to everyone - never the download speed,
+   * so labelled "their own average" (CLAUDE.md, "The peer's advertised speed is not your download
+   * speed"). `unknown`: neither.
+   */
+  kind: 'measured' | 'advertised' | 'unknown'
+  /** "2.1 MB/s", "~900 KB/s" (an average of several transfers), "Unknown" */
+  text: string
+  note: string
+  /** how full the bar is, 0-100: the speed against SPEED_BAR_FULL */
+  percent: number
+}
+
+/** The card's Speed: what deadwax measured from this peer where it has, else their own average. */
+export function speedFact(candidate: Candidate): SpeedFact {
+  const bar = (rate: number) => Math.min(100, Math.round((rate / SPEED_BAR_FULL) * 100))
+  if (candidate.measured_speed) {
+    //? one transfer is an anecdote; more than one is an average, and says so (measuredSpeed's rule)
+    const hedge = (candidate.measured_samples || 1) > 1 ? '~' : ''
+    return { kind: 'measured', text: `${hedge}${formatSpeed(candidate.measured_speed)}`, note: 'what you got from them', percent: bar(candidate.measured_speed) }
+  }
+  if (candidate.upload_speed) {
+    return { kind: 'advertised', text: formatSpeed(candidate.upload_speed), note: 'their own average', percent: bar(candidate.upload_speed) }
+  }
+  return { kind: 'unknown', text: 'Unknown', note: 'no speed reported yet', percent: 0 }
+}
+
+/**
+ * The card's Starts: "now" with a free upload slot; "3 ahead" in the peer's queue; "next" with no
+ * free slot and nobody ahead (it starts when a slot frees). `waits` draws it amber.
+ */
+export function startsFact(candidate: Candidate): { text: string; waits: boolean } {
+  if (candidate.has_free_slot) return { text: 'now', waits: false }
+  return candidate.queue_length > 0 ? { text: `${candidate.queue_length} ahead`, waits: true } : { text: 'next', waits: true }
+}
+
+/**
+ * The card's Quality, short: "FLAC 16/44.1", "FLAC 24/96", "FLAC 16-24/44.1-96", "FLAC 24-bit",
+ * "MP3 320k", "MP3 VBR 245k", "FLAC" when the client reported nothing more, "Unknown" with no
+ * format at all. Only what was reported - nothing guessed.
+ */
+export function qualityText(candidate: Candidate): string {
+  const formats = candidate.formats.filter(Boolean).map((format) => format.toUpperCase()).join(', ')
+  if (!formats) return 'Unknown'
+  const span = (values: readonly number[] | undefined, show: (n: number) => string) => {
+    if (!values?.length) return ''
+    const low = Math.min(...values)
+    const high = Math.max(...values)
+    return low === high ? show(low) : `${show(low)}-${show(high)}`
+  }
+  if (allLossless(candidate)) {
+    const depth = span(candidate.bit_depths, String)
+    const rate = span(candidate.sample_rates, (hz) => trimRate(hz / 1000))
+    if (depth && rate) return `${formats} ${depth}/${rate}`
+    if (depth) return `${formats} ${depth}-bit`
+    if (rate) return `${formats} ${rate} kHz`
+    return formats
+  }
+  const bitrate = span(candidate.bitrates, String)
+  return bitrate ? `${formats} ${candidate.variable_bitrate ? 'VBR ' : ''}${bitrate}k` : formats
+}
+
+/**
+ * The card's Tracks: "11 of 11" against a tracklist, "12 files" without one. Counted against the
+ * release's AUDIO tracks (`audio_expected`) - the same tracks the missing line names from - so a
+ * CD+DVD shared whole is "14 of 14", never "14 of 34" with nothing said missing; what it holds is
+ * those less the missing ones. An answer without `audio_expected` counts as the old panel does.
+ */
+export function tracksText(candidate: Candidate): string {
+  if (!candidate.expected_tracks) return `${candidate.audio_file_count} ${candidate.audio_file_count === 1 ? 'file' : 'files'}`
+  const audio = candidate.audio_expected
+  if (typeof audio !== 'number' || audio <= 0) return `${candidate.matched_tracks} of ${candidate.expected_tracks}`
+  return `${Math.max(0, audio - (candidate.missing_count ?? candidate.missing_tracks?.length ?? 0))} of ${audio}`
+}
+
+/**
+ * The card's amber line, or null: 'Missing “Threads”', 'Missing “Threads” and “Small”', 'Missing
+ * “Silence”, “Hunter”, “Small” and 2 more' - up to three named, the rest counted. From what the
+ * server worked out before it dropped the pairing (missing_tracks, missing_count); a video track
+ * is never among them.
+ */
+export function missingLine(candidate: Candidate): string | null {
+  const named = (candidate.missing_tracks ?? []).map((track) => `“${track.title || `track ${track.position ?? '?'}`}”`)
+  const count = Math.max(candidate.missing_count ?? 0, named.length)
+  if (!count) return null
+  const shown = named.slice(0, 3)
+  const more = count - shown.length
+  if (!more) return `Missing ${listed(shown)}`
+  return shown.length ? `Missing ${shown.join(', ')} and ${more} more` : `Missing ${count} ${count === 1 ? 'track' : 'tracks'}`
+}
+
+/**
+ * What the sheet says while Soulseek is asked: 'Asking Soulseek for “Third” by Portishead…' - and
+ * 'by Kanye West or Ye…' where the album is shared under two names (the credit and the current
+ * name, both searched - routes/download.py search_names).
+ */
+export function searchingLine(release: { artist: string; album_artist?: string | null; album: string }): string {
+  const names: string[] = []
+  for (const name of [release.artist, release.album_artist ?? '']) {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== 'N/A' && !names.some((known) => known.toLowerCase() === trimmed.toLowerCase())) names.push(trimmed)
+  }
+  return `Asking Soulseek for “${release.album}”${names.length ? ` by ${names.join(' or ')}` : ''}…`
+}
+
+/** "“Portishead Third”", or "“Kanye West Donda” and “Ye Donda”" - every query a search ran. */
+export function queriesText(result: Pick<FindCandidatesResponse, 'query' | 'queries'>): string {
+  const queries = result.queries?.length ? result.queries : result.query ? [result.query] : []
+  return listed(queries.map((query) => `“${query}”`))
+}
+
+/** The line under the cards: 'Searched Soulseek for “Portishead Third” · 41 folders, 4 match your filters'. */
+export function searchedLine(result: Pick<FindCandidatesResponse, 'query' | 'queries' | 'candidates'>, shown: number): string {
+  const total = result.candidates.length
+  const folders = `${total} ${total === 1 ? 'folder' : 'folders'}`
+  const matching = shown === total ? (total === 1 ? 'it matches your filters' : 'all match your filters') : `${shown} ${shown === 1 ? 'matches' : 'match'} your filters`
+  return `Searched Soulseek for ${queriesText(result)} · ${folders}, ${matching}`
+}
+
+/**
+ * Whether "Pick the best source for me" must leave the choice to you whatever scores well: the
+ * pressing is already in your library (whole or in part) or already downloading (whole or in part).
+ * A part held or a part downloading still searches, and a pick there would fetch a second copy you
+ * should decide on. Another pressing held is only a note, and doesn't stop it. Read off the answer
+ * itself - the server's word at the moment it searched - and never left to an empty list.
+ *
+ * And, given the release the search was for: one with NO TRACKLIST (the album as a whole, when
+ * MusicBrainz couldn't list its pressings) is judged by edition, format and peer alone - nearly any
+ * lossless folder from a fast peer scores in the 90s however few tracks it holds - so 75 means
+ * nothing there; and one with no release id can't be checked as held or downloading at all (review).
+ */
+export function autoPickBlocked(
+  result: FindCandidatesResponse | null | undefined,
+  release?: { release_mbid?: string | null; tracks?: readonly unknown[] } | null,
+): string | null {
+  if (!result) return null
+  if (result.downloading) return 'it is already downloading'
+  if (result.held?.complete) return 'it is already in your library'
+  if (result.downloading_part) return 'a download of part of it is already running'
+  if (result.held) return 'you already have part of it'
+  if (release && !release.tracks?.length) return 'with no tracklist to match the folders against, no score can be trusted'
+  if (release && !release.release_mbid) return "with no release id, deadwax can't tell whether you already have it"
+  return null
+}
+
+/**
+ * What the Sources sheet says to VoiceOver, in its one live region that is always there (iOS reads
+ * only a region already in the page): what is on screen in the sheet, in one line - asking, slskd's
+ * refusal, the store's box, nothing found, none passing, or how many sources, and why none was
+ * picked. Every outcome is said, so someone waiting on Cancel hears the search finish or fail.
+ */
+export function sourcesAnnouncement(state: {
+  pending: boolean
+  release: { artist: string; album_artist?: string | null; album: string } | null
+  error: string | null
+  status: { title: string } | null
+  result: Pick<FindCandidatesResponse, 'query' | 'queries' | 'candidates'> | null
+  shown: number
+  notPicked: string | null
+}): string {
+  if (state.pending && state.release) return searchingLine(state.release)
+  if (state.error) return state.error
+  if (state.status) return state.status.title
+  if (!state.result) return ''
+  const total = state.result.candidates.length
+  const line = !total
+    ? `Soulseek found nothing for ${queriesText(state.result)}.`
+    : !state.shown
+      ? `${total} ${total === 1 ? 'folder' : 'folders'} on Soulseek, none pass your filters`
+      : `${state.shown} ${state.shown === 1 ? 'source' : 'sources'}`
+  return state.notPicked ? `${line}. ${state.notPicked}` : line
+}
+
 /** The "good" band of the score colours - below it, auto-grab leaves the choice to you. */
 export const AUTO_GRAB_MIN_SCORE = 75
 
@@ -358,9 +551,13 @@ export interface StoreStatus {
 
 /**
  * The status in place of the results, when there is one - downloading first, since a job in
- * flight is what the server checks first too - or null for an ordinary result.
+ * flight is what the server checks first too - or null for an ordinary result. `cancelIn` is where
+ * a download is cancelled: the main page's Downloads panel, or the app's Requests tab.
  */
-export function storeStatus(result: FindCandidatesResponse | null | undefined): StoreStatus | null {
+export function storeStatus(
+  result: Pick<FindCandidatesResponse, 'held' | 'downloading'> | null | undefined,
+  cancelIn: 'Downloads' | 'Requests' = 'Downloads',
+): StoreStatus | null {
   const downloading = result?.downloading
   if (downloading) {
     const line = `From ${downloading.username} · ${downloadProgressText(downloading)}`
@@ -370,7 +567,7 @@ export function storeStatus(result: FindCandidatesResponse | null | undefined): 
       : {
           kind: 'downloading',
           title: 'Already downloading',
-          lines: [line, 'Open Downloads to cancel it if you want another peer.'],
+          lines: [line, `Open ${cancelIn} to cancel it if you want another peer.`],
         }
   }
   const held = result?.held
@@ -412,7 +609,9 @@ function whatADownloadDoes(held: HeldPressing): string {
  * The notes above the results: a download of part of this pressing already running, part of it
  * held, and each other pressing held.
  */
-export function storeNotes(result: FindCandidatesResponse | null | undefined): string[] {
+export function storeNotes(
+  result: Pick<FindCandidatesResponse, 'held' | 'downloading_part' | 'other_pressings'> | null | undefined,
+): string[] {
   const notes: string[] = []
   const part = result?.downloading_part
   if (part) {
