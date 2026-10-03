@@ -88,6 +88,25 @@ And for artists and the two libraries joined (2.0.0-player.17):
   artist's name that isn't a link isn't drawn in the link's colour, and an album page's artist line
   holds its place before the album answers; Info's folder can be selected; and the order chips the
   Library's chips replaced are gone, rules and tokens.
+
+And for pins and a finished Home (2.0.0-player.18):
+
+- The pin on an album page and an artist page as their boards draw it - a 32px box, an icon button
+  or a chip, toggled purple once pinned with its head filled, faded while it can't be used - reaching
+  44px to a finger every way, with nothing clipping the reach; the album page's bar and the artist
+  hero's top row hold the back link at their left and the pin at their right, a gap between, the back
+  link giving way (min-width 0) whatever the page below is called - an album's long title pushed the
+  artist's pin out of the hero, where it was clipped.
+- Home's Pinned as its board draws it: two columns of 64px cards, a 48px picture, an artist's round,
+  a name of two lines at most over a sub-line that gives way with an ellipsis; a card that won't open
+  steps back its picture and says why in two lines (its title one) in the sub-line's own colour, and
+  under 374px the cards take one column, so those words are read whole. Edit, a tap target square at
+  least; "Not saved" under the list, taking room only while it says something.
+- Edit's up, down and unpin are 32px faces in 44px boxes side by side, no gap between - 44 to a finger
+  every way; the grip is a tap target square, the one part of a row that takes a drag (touch-action:
+  none) - the rest of the row lets the page scroll; the row being dragged sits over the rest.
+- The app's one notice for pins: fixed at the top, over Now Playing's menu and Info, taking no taps,
+  clipped away (never removed) while it says nothing.
 """
 
 import re
@@ -842,3 +861,96 @@ def test_the_order_chips_the_librarys_chips_replaced_are_gone():
     selectors = {selector.strip() for _, found, _ in rules(PLAYER_CSS) for selector in found.split(",")}
     assert not [selector for selector in selectors if re.search(r"\.pl-orders?\b", selector)]
     assert not [token for token in ("--pl-chip-pad", "--pl-toggled-bg", "--pl-toggled-edge") if token in ALL_TOKENS]
+
+
+def test_the_pin_is_drawn_as_its_boards_draw_it_and_reaches_44px():
+    pin = declarations(APP, ".app-pin-toggle")
+    assert pin["height"] == "var(--app-pin-toggle)" and "overflow" not in pin
+    assert px("--app-pin-toggle") == 32
+    assert declarations(APP, ".app-pin-toggle.is-icon")["width"] == "var(--app-pin-toggle)"
+    assert declarations(APP, ".app-pin-toggle::before")["inset"] == "calc(-1 * var(--app-pin-toggle-reach))"
+    #? the reach starts at the padding box, inside the border: 32 + 2 x (6 + 1) = 46, at least 44
+    assert ALL_TOKENS["--app-pin-toggle-reach"] == "calc((var(--pl-hit) - var(--app-pin-toggle)) / 2 + var(--dw-hairline))"
+    on = declarations(APP, ".app-pin-toggle.is-on")
+    assert (on["background"], on["border-color"], on["color"]) == ("var(--dw-toggled-bg)", "var(--dw-toggled-border)", "var(--dw-accent-text)")
+    assert declarations(APP, ".app-pin-toggle.is-on .app-pin-head") == {"fill": "currentColor"}
+    assert declarations(APP, ".app-pin-toggle[aria-disabled='true']") == {"opacity": "var(--app-pin-off)"}
+    bar = declarations(APP, ".app-album-bar")
+    assert (bar["display"], bar["justify-content"]) == ("flex", "space-between")
+    assert declarations(APP, ".app-album-bar .pl-back")["min-width"] == "0"
+
+
+def test_the_artist_heros_back_link_gives_way_to_the_pin():
+    """Its label is the page below's - an album's title, as often as not: without min-width 0 the link
+    kept its whole label's width and pushed the pin out of the hero, whose overflow clipped it."""
+    top = declarations(APP, ".app-artist-top")
+    assert (top["display"], top["justify-content"], top["gap"]) == ("flex", "space-between", "var(--pl-gap-sm)")
+    back = declarations(APP, ".app-artist-back")
+    assert (back["min-width"], back["max-width"]) == ("0", "100%")
+    assert declarations(APP, ".app-artist-hero")["overflow"] == "hidden"
+    assert declarations(APP, ".app-pin-toggle")["flex"] == "none"
+
+
+def test_home_pins_two_columns_of_cards_as_the_board_has_them():
+    grid = declarations(APP, ".app-pins")
+    assert grid["grid-template-columns"] == "repeat(2, minmax(0, 1fr))"
+    assert grid["gap"] == "var(--app-pins-gap)" and px("--app-pins-gap") == 10
+    card = declarations(APP, ".app-pin-card")
+    assert (card["height"], card["padding"], card["border-radius"]) == ("var(--app-pin-card)", "var(--app-pin-pad)", "var(--dw-radius-card)")
+    assert (px("--app-pin-card"), px("--app-pin-pad"), px("--app-pin-thumb")) == (64, 7, 48)
+    assert declarations(APP, ".app-pin-thumb")["border-radius"] == "var(--dw-radius-cover)"
+    assert declarations(APP, ".app-pin-thumb.is-round")["border-radius"] == "var(--dw-radius-round)"
+    title = declarations(APP, ".app-pin-title")
+    assert title["-webkit-line-clamp"] == "var(--app-pin-title-clamp)" and ALL_TOKENS["--app-pin-title-clamp"] == "2"
+    line = declarations(APP, ".app-pin-line")
+    assert (line["text-overflow"], line["white-space"]) == ("ellipsis", "nowrap")
+    assert declarations(APP, ".app-pin-text")["min-width"] == "0"
+    assert declarations(APP, ".app-pin-card.is-closed .app-pin-thumb") == {"opacity": "var(--app-pin-off)"}
+
+
+def test_a_card_that_wont_open_says_why_in_words_read_whole():
+    """"Removed from the store" is about 137px of 12px Noto Sans, and a phone's card had 96 at 390px,
+    61 at 320: the words wrap to two lines, the title gives one up, and under 374px one column."""
+    assert declarations(APP, ".is-closed .app-pin-title")["-webkit-line-clamp"] == "var(--app-pin-closed-title-clamp)"
+    closed = declarations(APP, ".is-closed .app-pin-line")
+    assert (closed["white-space"], closed["display"], closed["-webkit-line-clamp"]) == ("normal", "-webkit-box", "var(--app-pin-closed-line-clamp)")
+    assert (ALL_TOKENS["--app-pin-closed-title-clamp"], ALL_TOKENS["--app-pin-closed-line-clamp"]) == ("1", "2")
+    #? one title line and two of words fit the card: 17 + 2 x 14 within its 64 - 2 x 7 - 2 x 1
+    assert px("--app-pin-title-line") + 2 * px("--app-pin-line-line") <= px("--app-pin-card") - 2 * px("--app-pin-pad") - 2
+    #? the words in the sub-line's own colour - the only place a closed card says why
+    assert "color" not in closed and not [selector for _, selector, values in rules(APP) if "is-closed" in selector and "color" in values]
+    assert declarations(APP, ".app-pins", "@media (max-width: 373px)")["grid-template-columns"] == "minmax(0, 1fr)"
+
+
+def test_edit_and_the_note_under_pinned():
+    edit = declarations(APP, ".app-pinned-edit")
+    assert (edit["min-width"], edit["padding"], edit["text-align"]) == ("var(--pl-hit)", "0", "right")
+    note = declarations(APP, ".app-pinned-note")
+    assert note["margin"] == "0" and declarations(APP, ".app-pinned-note.is-said") == {"margin-top": "var(--app-job-gap)"}
+
+
+def test_the_pin_notice_is_over_everything_takes_no_taps_and_stays_in_the_page():
+    notice = declarations(APP, ".app-pin-notice")
+    assert (notice["position"], notice["pointer-events"], notice["z-index"]) == ("fixed", "none", "var(--app-z-notice)")
+    assert int(ALL_TOKENS["--app-z-notice"]) > int(ALL_TOKENS["--app-z-over"])
+    assert notice["top"] == "calc(var(--pl-safe-top) + var(--app-pin-notice-top))"
+    #? clipped, never display: none or visibility: hidden - either takes a live region out of what iOS reads
+    assert declarations(APP, ".app-pin-notice:not(.is-shown)") == {"clip-path": "inset(50%)"}
+
+
+def test_edits_buttons_reach_44px_and_only_the_grip_takes_a_drag():
+    """Each a 32px face in a 44px box, side by side with no gap: 32px wide boxes 4px apart put unpin a
+    few pixels from a thumb aimed at down."""
+    move = declarations(APP, ".app-pin-move")
+    assert (move["width"], move["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
+    face = declarations(APP, ".app-pin-move-face")
+    assert (face["width"], face["height"]) == ("var(--app-pin-move-face)", "var(--app-pin-move-face)") and px("--app-pin-move-face") == 32
+    assert "gap" not in declarations(APP, ".app-pin-row")
+    assert not declarations(APP, ".app-pin-move::before")
+    grip = declarations(APP, ".app-pin-grip")
+    assert (grip["width"], grip["height"], grip["touch-action"]) == ("var(--pl-hit)", "var(--pl-hit)", "none")
+    #? nothing else in a row says touch-action, so the page scrolls under a finger anywhere but the grip
+    assert not [selector for _, selector, values in rules(APP) if "app-pin" in selector and "touch-action" in values and selector != ".app-pin-grip"]
+    assert declarations(APP, ".app-pin-row.is-dragging")["z-index"] == "var(--app-z-pin-drag)"
+    assert declarations(APP, ".app-pin-row .app-pin-text")["flex"] == "1"
+

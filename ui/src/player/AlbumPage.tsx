@@ -3,10 +3,13 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import { storeAlbum } from '../api/store'
 import type { StoreAlbumResponse } from '../api/types'
+import { PINS_UNSAVED, PinToggle } from '../app/PinToggle'
+import { sayPins, setPinned, usePins } from '../app/usePins'
 import { discHeadings } from '../lib/discTitles'
 import { formatDuration, sharedFormat, trackTime } from '../lib/format'
 import { alsoChips } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
+import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import { album as fetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
@@ -35,6 +38,14 @@ import type { Player } from './usePlayer'
  * hold that Navidrome has - the id bridge (GET /store/album, asked as the page opens, through its
  * own latestOnly) says which. The row is drawn from the first frame, so a chip arriving moves
  * nothing a finger is reaching for; a chip opens that pressing's page over this one.
+ *
+ * Since 2.0.0-player.18 the bar's top right has the pin (Album.dc.html's): it pins the album to Home
+ * by its release - the bridge's answer says which - and deadwax keys the pin on the store's row for
+ * it, so it follows the album through a re-file. Drawn from the first frame, waiting until the bridge
+ * has answered and the pins have (so it never says "not pinned" of an album that is); an album with no
+ * release id to know it by has none (nothing would find it again).
+ * Whether it is pinned comes from the app's one store of pins (app/usePins.ts), asked when none is
+ * in hand or what is is old.
  */
 export function AlbumPage({
   id,
@@ -60,7 +71,10 @@ export function AlbumPage({
   const requests = useMemo(latestOnly, [])
   //? what the store holds of this album, and its other pressings - the id bridge
   const [store, setStore] = useState<StoreAlbumResponse | null>(null)
+  //? the bridge failed to answer - so, answered or not, whether the album can be pinned is known
+  const [storeFailed, setStoreFailed] = useState(false)
   const storeRequests = useMemo(latestOnly, [])
+  const { pins, known: pinsKnown, canSave } = usePins(true)
 
   useEffect(() => {
     const request = requests.begin()
@@ -81,12 +95,14 @@ export function AlbumPage({
   useEffect(() => {
     const request = storeRequests.begin()
     setStore(null)
+    setStoreFailed(false)
     storeAlbum({ navidrome_id: id }, request.signal).then(
       (answer) => {
         if (request.current()) setStore(answer)
       },
-      () => {
-        //? a check that can't be made draws no chip
+      (reason: unknown) => {
+        //? a check that can't be made draws no chip - and no pin, with no release to pin it by
+        if (request.current() && !isAbort(reason)) setStoreFailed(true)
       },
     )
     return () => storeRequests.supersede()
@@ -103,6 +119,14 @@ export function AlbumPage({
   const artistId = shown?.artistId ?? album?.artistId
   const artistName = shown?.artist ?? ''
 
+  //? the pin: this album by its release, as the bridge has it - Navidrome's id while that is coming
+  const release = store?.release_mbid ?? null
+  const storeDone = store !== null || storeFailed
+  const pinTarget: AlbumPinTarget = {
+    kind: 'album', release_mbid: release, navidrome_id: id, label: shown?.name ?? '', sub: artistName, cover: shown?.coverArt ?? null,
+  }
+  const pinned = pinOf(pins, pinTarget) !== null
+
   const play = (start: number | null, shuffle = false) => {
     if (!album || !tracks.length) return
     rememberPlayed(album)
@@ -111,11 +135,21 @@ export function AlbumPage({
 
   return (
     <section class="pl-album-page">
-      <header class="pl-nav-bar">
+      <header class="pl-nav-bar app-album-bar">
         <button type="button" class="pl-back" onClick={onBack}>
           <ChevronLeftIcon class="pl-back-icon" />
           <span class="pl-back-label">{backLabel}</span>
         </button>
+        {!(storeDone && !release) && (
+          <PinToggle
+            look="icon"
+            pinned={pinned}
+            ready={storeDone && !!release && pinsKnown}
+            unsaved={!canSave}
+            onToggle={() => void setPinned(pinTarget, !pinned)}
+            onRefused={() => sayPins(PINS_UNSAVED)}
+          />
+        )}
       </header>
 
       <div class="pl-album-hero">

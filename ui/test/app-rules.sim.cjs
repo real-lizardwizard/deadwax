@@ -84,6 +84,16 @@
  *    Done rows, Info's details - goes through a latestOnly() of its own, and a row's look still out
  *    when its page or tab stops showing opens nothing. An artist Navidrome knows is drawn inside the
  *    gate, one MusicBrainz knows outside it.
+ *  - Pins, and a finished Home (2.0.0-player.18): pins are deadwax's own - nothing in the app ever
+ *    asks Navidrome to star or unstar - and nothing about them reaches a playback action: a pinned
+ *    card opens its album (asked for as the finger lands, as a tile is) or its artist, and the pin on
+ *    an album, an artist and in Now Playing's menu only saves. The app's one store of pins asks only
+ *    when asked - afresh each time Home comes into view, from a page only when nothing recent is in
+ *    hand, as Now Playing opens for its menu, never as the app starts - and sends every read and
+ *    change in turn, so the newest answer is the last to land; Home's shelves wait for the pins (or a
+ *    moment) so Pinned landing moves nothing; Not played in a while draws only the newest answer
+ *    (latestOnly). The menu's pin closes the menu and saves. Edit's drag is the grip's alone and never
+ *    reorders the list under the pointer.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -380,6 +390,7 @@ console.log('\nevery sheet is a sheet by the one hook')
     [/moreOpener\.current = null\s*closeSheet\(\)\s*openAlbum\(/.test(going), /const closeSheet = useCallback\(\(\) => \{\s*setOver\('none'\)\s*setSheetOpen\(false\)/.test(app)],
     [true, true])
   check('...one handler for all three, each in its own props', ['NowPlaying', 'ActionMenu', 'InfoSheet'].map((tag) => has(tag, /\bonAlbum=\{toAlbum\b/)), [true, true, true])
+  check('the menu is handed the album\'s pin (2.0.0-player.18)', [has('ActionMenu', /\bpinned=\{menuPinned\}/), has('ActionMenu', /\bonPin=\{pinPlaying\}/)], [true, true])
   //? 2.0.0-player.14: Info's "Turntable sound" from the deck's report, which App is told of as it
   //? changes; and Now Playing handed "Pause winds the record down"
   check('Info is handed the turntable\'s sound, App told of it as it changes; Now Playing the wind-down setting',
@@ -723,6 +734,78 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
       /const views = VIEWS\.filter\(\(entry\) => entry\.id !== 'songs' \|\| hasSongs !== false\)/.test(library),
       /const showing: LibraryView = view === 'songs' && hasSongs === false \? 'albums' : view/.test(library)],
     [true, true, true])
+}
+
+console.log('\npins: deadwax\'s own, asked when asked, and nothing about them plays')
+{
+  const PIN_FILES = ['app/Pinned.tsx', 'app/PinToggle.tsx', 'app/PinNotice.tsx', 'app/usePins.ts', 'lib/pins.ts', 'lib/home.ts', 'app/Home.tsx', 'app/ActionMenu.tsx']
+  check('nothing about pins, or Home, reaches a playback action', PIN_FILES.map((file) => [file, actionsIn(code(read(file)))]), PIN_FILES.map((file) => [file, []]))
+  //? stars are a Navidrome user's own, and will be the personal library (step 5): a pin is never one
+  check('never Navidrome\'s stars: nothing in the app asks Navidrome to star, unstar or list them',
+    files.filter((file) => /['"`/](un)?star['"`?/]|getStarred/.test(code(read(file)))), [])
+  check('...and the pins are deadwax\'s routes', [/get<PinsAnswer>\('\/me\/pins'/.test(code(read('api/me.ts'))), /put<PinsAnswer>\('\/me\/pins'/.test(code(read('api/me.ts'))),
+    /post<PinsAnswer>\('\/me\/pins\/toggle'/.test(code(read('api/me.ts')))], [true, true, true])
+
+  const store = code(read('app/usePins.ts'))
+  check('every read and every change through the store, one after another, so the newest answer lands last',
+    [/confirmed = await getPins\(\)/.test(store) && /asking = inTurn\(async \(\) => \{/.test(store), /confirmed = await inTurn\(request\)/.test(store),
+      /togglePin\(toggleBody\(target, true\)\)/.test(store),
+      //? Edit's PUT made at send time from the server's word, with that word beside it (`known`)
+      /const word = confirmed\?\.pins \?\? \[\]\s*return putPins\(orderBody\(applyPinOp\(word, op\), word\)\)/.test(store)],
+    [true, true, true, true])
+  check('...asked only when a component asks: afresh, or only when nothing recent is in hand',
+    [/if \(ask\) void askPins\(ask === 'fresh'\)/.test(store), /if \(!fresh && confirmed && Date\.now\(\) - confirmedAt < PINS_KEPT_MS\) return Promise\.resolve\(\)/.test(store)], [true, true])
+
+  const home = code(read('app/Home.tsx'))
+  const app = code(read('app/App.tsx'))
+  check('Home asks afresh as it comes into view, and App says when that is - never as the app starts',
+    [/const \{ pins, problem \} = usePins\(shown \? 'fresh' : false\)/.test(home), /const homeShown = watching === 'home'/.test(app), /<Home\b[^>]*?shown=\{homeShown\}/.test(app.replace(/\n\s*/g, ' ')),
+      /\[status, arriving, arrivingTrouble, homeShown\]/.test(app)],
+    [true, true, true, true])
+  check('...the shelves drawn once the pins have answered, or failed, or the wait - counted only while Home shows - is over',
+    [/const ready = pins !== null \|\| problem !== null \|\| waited/.test(home), /<div class="app-home-shelves" hidden=\{!ready\}>/.test(home), /if \(!shown \|\| waited\) return/.test(home)], [true, true, true])
+  check('...Pinned first, then Recently added, then Not played in a while, all inside the gate',
+    /<NeedsNavidrome\b[^>]*>\s*<Shelves\b/.test(home) && home.indexOf('<Pinned ') < home.indexOf('{recent}') && home.indexOf('{recent}') < home.indexOf('{notPlayed}'), true)
+  const notPlayed = home.slice(home.indexOf('function NotPlayedInAWhile('), home.indexOf('function Shelves('))
+  check('Not played in a while: recent at 500, only the newest answer drawn',
+    [/const requests = useMemo\(latestOnly, \[\]\)/.test(notPlayed), /albumPage\('recent', 0, request\.signal, RECENT_LISTED\)/.test(notPlayed), /if \(request\.current\(\)\) setAlbums\(notPlayedInAWhile\(/.test(notPlayed)],
+    [true, true, true])
+
+  const pinned = code(read('app/Pinned.tsx'))
+  check('a pinned album opens as a tile does - asked for as the finger lands, called off for a scroll, opened on the click',
+    /onPointerDown=\{\(\) => pin\.kind === 'album' && pin\.navidrome_id && prefetchAlbum\(pin\.navidrome_id\)\}\s*onPointerCancel=\{\(\) => pin\.kind === 'album' && pin\.navidrome_id && dropPrefetch\(pin\.navidrome_id\)\}\s*onClick=\{\(\) => open\(pin\)\}/.test(pinned), true)
+  check('Edit\'s drag is the grip\'s, and moves rows by transform only - the list never reorders under the pointer',
+    [/<span\s+class="app-pin-grip"[\s\S]*?onPointerDown=/.test(pinned), (pinned.match(/onPointerDown=/g) ?? []).length, /\{pins\.map\(\(pin, index\) => \{\s*const key = pinKey\(pin\)\s*const dragging/.test(pinned), /moveTo\(/.test(pinned)],
+    [true, 2, true, false])
+
+  const album = code(read('player/AlbumPage.tsx')).replace(/\n\s*/g, ' ')
+  check('the album page\'s pin: by the release the bridge says, drawn until it says there is none, live only once it has - and the pins have',
+    [/release_mbid: release, navidrome_id: id/.test(album), /\{!\(storeDone && !release\) && \(/.test(album), /ready=\{storeDone && !!release && pinsKnown\}/.test(album),
+      /onToggle=\{\(\) => void setPinned\(pinTarget, !pinned\)\}/.test(album), /const \{ pins, known: pinsKnown, canSave \} = usePins\(true\)/.test(album),
+      /onRefused=\{\(\) => sayPins\(PINS_UNSAVED\)\}/.test(album)],
+    [true, true, true, true, true, true])
+  const artist = code(read('app/ArtistPage.tsx')).replace(/\n\s*/g, ' ')
+  check('the artist\'s pin: by MusicBrainz id, else name and Navidrome\'s id - live once that is settled, and the pins have answered',
+    [/const pinTarget: ArtistPinTarget = \{ kind: 'artist', mbid, navidrome_id: libraryId, name, cover: picture \}/.test(artist),
+      /const pinReady = pinsKnown && !!name && \(mbid !== null \|\| \(library\.state !== 'asking' && ownedKnown && libraryId !== null\)\)/.test(artist),
+      /<PinToggle look="chip" pinned=\{pinned\} ready=\{pinReady\}/.test(artist), /const \{ pins, known: pinsKnown, canSave \} = usePins\(true\)/.test(artist),
+      /onRefused=\{\(\) => sayPins\(PINS_UNSAVED\)\}/.test(artist)],
+    [true, true, true, true, true])
+  const appLine = app.replace(/\n\s*/g, ' ')
+  check('the ••• menu\'s pin: asked as Now Playing opens, its tap closing the menu, saving and saying so - App\'s, handed to the menu',
+    [/const pins = usePins\(sheetOpen\)/.test(app), /const pinPlaying = menuPin \? \(\) => \{\s*closeOver\(\)\s*void setPinned\(menuPin, !menuPinned, true\)/.test(app),
+      /aria-disabled=\{pinned === null\}/.test(code(read('app/ActionMenu.tsx'))), /if \(pinned !== null\) onPin\(\)/.test(code(read('app/ActionMenu.tsx')))],
+    [true, true, true, true])
+  check('...only for a song whose album can be pinned: its album named, Navidrome not saying it has no release id (""), deadwax able to keep pins',
+    /menuPinNow\.current = playing\?\.albumId && playingRelease !== '' && pins\.canSave \? \{/.test(appLine), true)
+  check('...decided as the menu OPENS - nothing coming or going, nor changing album, while it is up - and inactive once pins can\'t be kept',
+    [/const openMenu = useCallback\(\(event: MouseEvent\) => \{ moreOpener\.current = takeOpener\(event\) setMenuPin\(menuPinNow\.current\) setOver\('menu'\) \}, \[\]\)/.test(appLine),
+      /const menuPinned = menuPin && pins\.pins && pins\.canSave \? pinOf\(pins\.pins, menuPin\) !== null : null/.test(app),
+      /onPin=\{pinPlaying\}/.test(app)],
+    [true, true, true])
+  check('...and the ••• button promises the pin only then', /pinnable=\{menuPinNow\.current !== null\}/.test(app), true)
+  check('the app\'s one notice for pins, drawn once - by App', [(app.match(/<PinNotice \/>/g) ?? []).length,
+    files.filter((file) => file !== 'app/App.tsx' && /<PinNotice\b/.test(code(read(file))))], [1, []])
 }
 
 console.log('\nApp moves history only through the router')

@@ -22,6 +22,10 @@ clearing it. Storing only the ignores means the queue empties itself.
 id that survives a rename, so a release already held - or already on its way - is not fetched a
 second time. See store_album in the schema and src/store_index.py.
 
+**Per user** (the one app, 2.0.0-player.15 on): what each user chose for themselves (user_prefs) and
+pinned to the app's Home (pins, keyed on that same stable store_album id - never Navidrome's stars).
+Both are `local`'s while logins are off; adopt_local hands them to the first admin in step 3.
+
 Every table lives in one file and one connection. A failure to open it degrades rather than
 raises: downloads still work untracked, and the queue still works without remembering what
 you ignored.
@@ -36,6 +40,8 @@ from pathlib import Path
 from src.config import Config
 from src.logger import logger
 from src.peer_speed import merge_observation
+from src.pins import MERGE_HOPS, PINS_MAX
+from src.users import LOCAL_USER
 
 
 SCHEMA = """
@@ -218,7 +224,34 @@ CREATE TABLE IF NOT EXISTS user_prefs (
     updated_at  TEXT NOT NULL,
     PRIMARY KEY (user, key)
 );
+
+CREATE TABLE IF NOT EXISTS pins (
+    -- The albums and artists each user pinned to the app's Home (2.0.0-player.18), in their order.
+    -- deadwax's OWN - never Navidrome's stars, which are per Navidrome user and will mean a person's
+    -- own library in step 5. Keyed on src/users.py's user, `local` while logins are off, which is
+    -- what step 3's take-over (adopt_local) moves to the first admin.
+    --
+    -- `ref` is what the pin follows (src/pins.py): an album's `store:<store_album.id>` - the id that
+    -- stays put through a re-file or a merge - or `release:<mbid>` until the index holds the
+    -- release; an artist's `mb:<mbid>`, or `name:<folded name>` for one with no MusicBrainz id.
+    -- `label` and `sub` are what the pin said when it was made (the album and its artist, or the
+    -- artist's name), shown when nothing better can be had; `navidrome_id` and `cover` are the last
+    -- Navidrome album or artist id it opened and the picture it showed, refreshed as Home reads them.
+    user          TEXT NOT NULL DEFAULT 'local',
+    kind          TEXT NOT NULL CHECK (kind IN ('album', 'artist')),
+    ref           TEXT NOT NULL,
+    label         TEXT NOT NULL DEFAULT '',
+    sub           TEXT NOT NULL DEFAULT '',
+    navidrome_id  TEXT,
+    cover         TEXT,
+    position      INTEGER NOT NULL,
+    created_at    TEXT NOT NULL,
+    PRIMARY KEY (user, kind, ref)
+);
 """
+
+#? The columns a pin row has, in the order they are written.
+PIN_COLUMNS = ("kind", "ref", "label", "sub", "navidrome_id", "cover", "created_at")
 
 #? Columns added to `jobs` after it first shipped, with the definition an existing database is
 #? given - see JobStore.init. Keep in step with SCHEMA.
@@ -767,6 +800,144 @@ class JobStore:
         except Exception as e:
             logger.error(f"could not store the preferences of {user} ({e})", extra={"frontend": True})
             return False
+
+    # ===== a user's pins (2.0.0-player.18) ======================================
+
+    async def pins(self, user: str) -> list[dict] | None:
+        """
+        `user`'s pins, in their order - or None when they can't be read (no store), which is not the
+        same answer as "nothing pinned". Each is the row as stored: src/routes/pins.py brings the
+        refs up to date and finds what each opens.
+        """
+        if not self.available:
+            return None
+
+        def read():
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"SELECT {', '.join(PIN_COLUMNS)} FROM pins WHERE user = ? ORDER BY position, created_at",
+                    (user,)).fetchall()
+            return [dict(row) for row in rows]
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not read the pins of {user} ({e})")
+            return None
+
+    async def write_pins(self, user: str, pins: list[dict]) -> bool:
+        """
+        `user`'s pins become exactly these, in this order - in one transaction, so a failure leaves
+        the ones before. Each (kind, ref) once: the caller has said which place a pin keeps.
+        """
+        if not self.available:
+            return False
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                connection.execute("DELETE FROM pins WHERE user = ?", (user,))
+                connection.executemany(
+                    "INSERT INTO pins (user, kind, ref, label, sub, navidrome_id, cover, position, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [(user, pin["kind"], pin["ref"], pin.get("label") or "", pin.get("sub") or "",
+                      pin.get("navidrome_id") or None, pin.get("cover") or None, position,
+                      pin.get("created_at") or now)
+                     for position, pin in enumerate(pins)],
+                )
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not store the pins of {user} ({e})", extra={"frontend": True})
+            return False
+
+    async def index_follow(self, row_ids: list[int]) -> dict[int, dict | None] | None:
+        """
+        Each store_album row id's row as it is NOW, for a pin that keys on it: a disc folder merged
+        into its release's followed along `merged_into` to the row it ended in (at most
+        pins.MERGE_HOPS of them - a longer chain, or one that loops, is a broken index and answers
+        None, as an id with no row does). Any other tombstone is answered as it is: a `deleted` row
+        is the album gone, a `missing` one an album whose folder isn't there just now. None when the
+        index couldn't be read - which is not every album gone.
+        """
+        if not self.available:
+            return None
+        if not row_ids:
+            return {}
+
+        def read():
+            found: dict[int, dict | None] = {}
+            with self._connect() as connection:
+                for start in dict.fromkeys(row_ids):
+                    row_id, seen, row = start, set(), None
+                    for _hop in range(MERGE_HOPS + 1):
+                        if row_id in seen:
+                            row = None
+                            break
+                        seen.add(row_id)
+                        current = connection.execute("SELECT * FROM store_album WHERE id = ?", (row_id,)).fetchone()
+                        row = _index_row(current) if current is not None else None
+                        if row is None or row["state"] != "merged" or row.get("merged_into") is None:
+                            break
+                        row_id = row["merged_into"]
+                    else:
+                        row = None
+                    found[start] = row
+            return found
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not follow pinned albums in the store index ({e})")
+            return None
+
+    async def adopt_local(self, user: str) -> tuple[int, int] | None:
+        """
+        Step 3's take-over, written and tested now: what `local` saved while logins were off - its
+        pins and its preferences - becomes `user`'s, the first admin to sign in, and `local` is left
+        with nothing. What `user` has already set wins: a preference they chose is kept over local's,
+        and a pin they already have keeps its place; local's other pins come after theirs, in local's
+        order, while Home holds them (pins.PINS_MAX). One transaction: all of it moves or none.
+        Returns (pins taken, preferences taken) - None when it couldn't be done - and adopting into
+        `local` itself takes nothing.
+        """
+        if not self.available:
+            return None
+        if not user or user == LOCAL_USER:
+            return 0, 0
+
+        def write():
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                preferences = connection.execute(
+                    "INSERT OR IGNORE INTO user_prefs (user, key, value, updated_at) "
+                    "SELECT ?, key, value, updated_at FROM user_prefs WHERE user = ?",
+                    (user, LOCAL_USER)).rowcount
+                connection.execute("DELETE FROM user_prefs WHERE user = ?", (LOCAL_USER,))
+
+                theirs = connection.execute("SELECT COUNT(*) FROM pins WHERE user = ?", (user,)).fetchone()[0]
+                local_pins = connection.execute(
+                    f"SELECT {', '.join(PIN_COLUMNS)} FROM pins WHERE user = ? ORDER BY position, created_at",
+                    (LOCAL_USER,)).fetchall()
+                taken = 0
+                for pin in local_pins:
+                    if theirs + taken >= PINS_MAX:
+                        break
+                    taken += connection.execute(
+                        "INSERT OR IGNORE INTO pins (user, kind, ref, label, sub, navidrome_id, cover, position, created_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (user, pin["kind"], pin["ref"], pin["label"], pin["sub"], pin["navidrome_id"], pin["cover"],
+                         theirs + taken, pin["created_at"])).rowcount
+                connection.execute("DELETE FROM pins WHERE user = ?", (LOCAL_USER,))
+            return taken, preferences
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not hand what {LOCAL_USER} saved to {user} ({e})", extra={"frontend": True})
+            return None
 
     async def record_albums_seen(self, albums: list[dict], source: str = "scan") -> int:
         """

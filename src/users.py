@@ -9,8 +9,10 @@ readable from the routes themselves, and nothing is added to every request. It i
 from every route (see test_no_middleware_hides_a_disconnect_from_the_routes).
 
 With logins off - the only way deadwax runs today - there is one implicit user, `local`, and it is
-the admin. Step 3 changes the body of `current_user` to read the session, and adds the "take over
-what `local` saved" step for each per-user table; nothing that depends on it has to change.
+the admin. Step 3 changes the body of `current_user` to read the session, and calls the "take over
+what `local` saved" step on the first admin's sign-in - `JobStore.adopt_local(user)` (src/store.py,
+2.0.0-player.18), which moves local's preferences (user_prefs) and pins to them, theirs winning;
+written and tested already, called by nothing yet. Nothing that depends on it has to change.
 """
 
 #? The one user there is while logins are off. Rows saved per user before logins exist are saved

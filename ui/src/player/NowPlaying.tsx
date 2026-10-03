@@ -165,6 +165,7 @@ export function NowPlaying({
   onAlbum,
   openAs,
   windDown = true,
+  pinnable = false,
 }: {
   player: Player
   open: boolean
@@ -181,6 +182,8 @@ export function NowPlaying({
   openAs: Look
   /** You > Playback's "Pause winds the record down" - the turntable's pause only */
   windDown?: boolean
+  /** the ••• menu will have the album's pin (App's: a song whose album can be pinned) */
+  pinnable?: boolean
 }) {
   const track = player.track
   const [dragY, setDragY] = useState(0)
@@ -374,8 +377,9 @@ export function NowPlaying({
             type="button"
             class="pl-icon-button"
             onClick={onMore}
-            //? what the menu holds: "Go to album" only for a song that names its album
-            aria-label={track.albumId ? 'More: info, go to album' : 'More: info'}
+            //? what the menu holds: "Go to album" only for a song that names its album, and the album's pin
+            //? (2.0.0-player.18) only when the menu will have one - App says so
+            aria-label={`More: info${track.albumId ? ', go to album' : ''}${track.albumId && pinnable ? ', pin' : ''}`}
             aria-haspopup="dialog"
             aria-expanded={covered}
           >

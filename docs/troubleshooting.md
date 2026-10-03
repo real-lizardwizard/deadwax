@@ -422,6 +422,49 @@ ask again. A Navidrome that answers an empty
 search with nothing (an older one, or one set up to) can't list songs this way, and the Library
 shows Albums and Artists only. The albums of the songs are all in Albums.
 
+## The app's Home has no "Not played in a while"
+
+It shows only with at least four albums you last played more than 30 days ago, and only when
+Navidrome says when each album was last played (OpenSubsonic's `played`, on its "recently played"
+list). A library you've been listening through - everything played in the last month - or a fresh
+Navidrome has nothing to show yet. A Navidrome that doesn't send `played` never shows it: Info →
+Debug's **Navidrome sent** row lists the fields it sends for the album playing. The plays are the
+ones Navidrome counts for the account deadwax signs in with, so plays made in another app under
+another Navidrome user don't count.
+
+## A pinned album says "Removed from the store", "Not on disk just now" or "Not in Navidrome yet"
+
+- **Removed from the store**: the album was deleted from the main page. Unpin it from Home's **Edit**,
+  or get it again - the pin opens the new copy of the same pressing once it's filed.
+- **Not on disk just now**: its folder isn't where deadwax last saw it - usually a share or
+  disk that isn't mounted. It opens again once the folder is back and deadwax has looked at your
+  library again: the main page's library tab scans as it opens, and **Rescan** scans at once. A
+  folder moved by hand outside deadwax is matched up by that scan too, and the pin follows it.
+- **Not in Navidrome yet**: deadwax has the album, but Navidrome doesn't, or not as that
+  release - it may still be scanning after a download or a re-file. Come back to Home in a moment:
+  it asks again each time it's shown. If it stays, check that Navidrome can see the folder and that
+  the album's files carry its MusicBrainz release id (Navidrome's `musicBrainzId` on the album).
+
+## A pin won't stay, or the app says "Couldn't pin …" or "Not saved"
+
+Pins are kept in deadwax's database. A pin or an unpin deadwax couldn't keep goes back, and a note at
+the top of the screen says which album or artist and why ("Couldn't pin Dummy: …"); a change made in
+Home's **Edit** says **Not saved: …** under the list instead. The reasons:
+
+- **"Home holds up to 50 pins - unpin one first"**: Home is full. Unpin something in **Edit**.
+- **"its database refused the write"** or **"isn't writable"**: check `DB_PATH`, and that the folder
+  it's in can be written as `PUID`/`PGID`. When deadwax can't keep pins at all, the pin buttons are
+  greyed, and a tap on one says so.
+- **"deadwax couldn't read its pins just now"** (or Home's Pinned saying **Couldn't get your pins: …**
+  with nothing pinned shown): the database didn't answer in time - usually something else holding it
+  a while. Your pins are still there; Home asks again each time it's shown, and keeps what it last had.
+- **"deadwax couldn't ask Navidrome about this album just now - try again"**: pinning from the now-
+  playing screen's **•••** menu sometimes needs Navidrome to say which release the album is, and it
+  didn't answer. Tap again once it's back.
+- **"it has no MusicBrainz release id to find it by"**: nothing would find the album again once it
+  moved, so it can't be pinned. An album page shows no pin for such an album, and the ••• menu offers
+  none when it knows; tag the album with its release (apply a release in the main page's editor).
+
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
 The [phone player](player.md) shows one of these on Home and in the Library tab, in place of your

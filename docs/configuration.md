@@ -207,3 +207,7 @@ so a default changed in a later version still reaches you if you never chose oth
 They're stored in deadwax's database (`DB_PATH`), in its `user_prefs` table - a row for each one
 you chose, and one more that says something was saved for you, which is how that first carrying
 over happens only once - through `GET` and `PUT /deadwax/me/preferences`.
+
+**What you pin to Home** (since 2.0.0-player.18) is kept the same way: on deadwax, per user, in its
+`pins` table - never as a star in Navidrome. It isn't a setting: the album, artist and now-playing
+screens pin and unpin, and Home's Edit reorders ([Home and pins](player.md#home-and-pins)).

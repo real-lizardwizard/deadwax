@@ -8,6 +8,7 @@ import { TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Pa
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
+import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import type { Look } from '../lib/turntable'
 import { AlbumPage } from '../player/AlbumPage'
 import { navidromeStatus, playedAlbum, sentFormat, type Album, type Artist, type NavidromeStatus } from '../player/api'
@@ -29,6 +30,8 @@ import { Search } from './Search'
 import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
 import { useInfoDetails } from './useInfoDetails'
+import { PinNotice } from './PinNotice'
+import { setPinned, usePins } from './usePins'
 import { takeOpener } from './useSheet'
 import { You } from './You'
 
@@ -131,6 +134,13 @@ function usePageShown(): boolean {
  * filed - and calls a tap's look off when it stops being so; it is told why Navidrome can't be asked
  * (`navidromeProblem`), for a row that can't open. Info asks for what fills its About in as it opens
  * (useInfoDetails).
+ *
+ * Pins (2.0.0-player.18) are the app's one store (usePins.ts), read where they show: Home is told when
+ * it is what shows (`homeShown`), and asks its pins afresh then; the album and artist pages read
+ * theirs themselves. The ••• menu's pin is App's: the playing song's album, by the answer it was
+ * played from, taken as the menu OPENS (so no row comes or goes, nor changes album, while it is up) -
+ * its tap closes the menu, saves behind it and says what became of it in the app's one notice
+ * (PinNotice, drawn here once), and plays nothing.
  */
 export function App() {
   const player = usePlayer()
@@ -366,8 +376,13 @@ export function App() {
     setOver('none')
     setSheetOpen(false)
   }, [])
+  //? the album the ••• menu's pin is for, taken as the menu opens (2.0.0-player.18): what can be pinned
+  //? NOW is menuPinNow, kept in step below; the menu acts on what it opened with
+  const menuPinNow = useRef<AlbumPinTarget | null>(null)
+  const [menuPin, setMenuPin] = useState<AlbumPinTarget | null>(null)
   const openMenu = useCallback((event: MouseEvent) => {
     moreOpener.current = takeOpener(event)
+    setMenuPin(menuPinNow.current)
     setOver('menu')
   }, [])
   const openInfo = useCallback(() => setOver('info'), [])
@@ -418,18 +433,22 @@ export function App() {
     : !status.configured ? "Navidrome isn't set up, so deadwax can't open the album here"
     : !status.ok ? "Navidrome isn't answering just now, so deadwax can't open the album here"
     : null
+  //? Home is what shows: its pins are asked again as it comes into view (2.0.0-player.18)
+  const homeShown = watching === 'home'
   const home = useMemo(
     () => (
       <Home
         status={status}
         onRetry={checkNavidrome}
         onOpen={openAlbum}
+        onOpenArtist={openArtist}
         arriving={arriving}
         onSeeAll={seeRequests}
         arrivingTrouble={arrivingTrouble}
+        shown={homeShown}
       />
     ),
-    [status, arriving, arrivingTrouble],
+    [status, arriving, arrivingTrouble, homeShown],
   )
   const requests = useMemo(
     () => (
@@ -545,6 +564,25 @@ export function App() {
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows
   const covered = sheetOpen || sourcesOpen
 
+  //? The ••• menu's pin (2.0.0-player.18): the playing song's album, by its release where the answer
+  //? it was played from says it (none at all, "", and it can't be pinned), else by Navidrome's id,
+  //? from which deadwax reads the release. The pins are asked as Now Playing opens, so the menu
+  //? knows by the time it does. Whether the menu has the row, and for which album, is decided as it
+  //? opens (menuPin, from menuPinNow): a pins answer or the next song landing while it is up moves no
+  //? row - a row deadwax can no longer keep pins for stays, inactive. Its tap closes the menu, saves
+  //? behind it and says what became of it (PinNotice) - it plays nothing.
+  const pins = usePins(sheetOpen)
+  const playingRelease = playedFrom?.musicBrainzId?.trim()
+  menuPinNow.current = playing?.albumId && playingRelease !== '' && pins.canSave ? {
+    kind: 'album', release_mbid: playingRelease ?? null, navidrome_id: playing.albumId, label: playedFrom?.name ?? playing.album,
+    sub: playedFrom?.artist ?? playing.artist ?? '', cover: playedFrom?.coverArt ?? playing.coverArt ?? null,
+  } : null
+  const menuPinned = menuPin && pins.pins && pins.canSave ? pinOf(pins.pins, menuPin) !== null : null
+  const pinPlaying = menuPin ? () => {
+    closeOver()
+    void setPinned(menuPin, !menuPinned, true)
+  } : null
+
   return (
     <PlayerContext.Provider value={player}>
       <ActionsContext.Provider value={actions}>
@@ -577,6 +615,7 @@ export function App() {
             onAlbum={toAlbum ?? closeSheet}
             openAs={opensAs}
             windDown={windDown}
+            pinnable={menuPinNow.current !== null}
           />
           {/* over Now Playing: its menu, then Info - the menu first, so where one closes as the
               other opens, focus ends in the one that opened */}
@@ -586,6 +625,8 @@ export function App() {
             onClose={closeOver}
             onInfo={openInfo}
             onAlbum={toAlbum}
+            pinned={menuPinned}
+            onPin={pinPlaying}
           />
           <InfoSheet
             open={sheetOpen && over === 'info'}
@@ -599,6 +640,8 @@ export function App() {
             details={infoDetails}
             onArtist={toArtist}
           />
+          {/* what became of a pin, said over everything (2.0.0-player.18) */}
+          <PinNotice />
         </div>
       </ActionsContext.Provider>
     </PlayerContext.Provider>

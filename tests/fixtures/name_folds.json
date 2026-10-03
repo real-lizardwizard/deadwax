@@ -1,0 +1,97 @@
+{
+ "_note": "Artist names as pins fold them: src/artists.py _fold, and lib/pins.ts foldArtistName, which test_pins.py and pins.sim.cjs hold to these same answers.",
+ "cases": [
+  [
+   "Bj\u00f6rk",
+   "bjork"
+  ],
+  [
+   "BJORK",
+   "bjork"
+  ],
+  [
+   "JAY\u2010Z",
+   "jay-z"
+  ],
+  [
+   "Mot\u00f6rhead",
+   "motorhead"
+  ],
+  [
+   "Guns N\u2019 Roses",
+   "guns n' roses"
+  ],
+  [
+   "  Sigur   R\u00f3s  ",
+   "sigur ros"
+  ],
+  [
+   "Beyonc\u00e9",
+   "beyonce"
+  ],
+  [
+   "Die \u00c4rzte",
+   "die arzte"
+  ],
+  [
+   "Stra\u00dfe",
+   "strasse"
+  ],
+  [
+   "\u1e9eTRASSE",
+   "sstrasse"
+  ],
+  [
+   "\u201cWeird Al\u201d Yankovic",
+   "\"weird al\" yankovic"
+  ],
+  [
+   "Sin\u00e9ad O\u2019Connor",
+   "sinead o'connor"
+  ],
+  [
+   "Bonnie \u2018Prince\u2019 Billy",
+   "bonnie 'prince' billy"
+  ],
+  [
+   "A\u00a0B",
+   "a b"
+  ],
+  [
+   "\u039f\u0394\u03a5\u03a3\u03a3\u0395\u0391\u03a3",
+   "\u03bf\u03b4\u03c5\u03c3\u03c3\u03b5\u03b1\u03c3"
+  ],
+  [
+   "\ufb01ve",
+   "five"
+  ],
+  [
+   "\uff2d\uff4f\uff47\uff57\uff41\uff49",
+   "mogwai"
+  ],
+  [
+   "Ma\u0303e",
+   "mae"
+  ],
+  [
+   "Ke$ha",
+   "ke$ha"
+  ],
+  [
+   "AC/DC",
+   "ac/dc"
+  ],
+  [
+   "Sunn O)))",
+   "sunn o)))"
+  ],
+  [
+   "\u2014",
+   "-"
+  ],
+  [
+   "   ",
+   ""
+  ]
+ ]
+}

@@ -8,6 +8,7 @@ import {
   artistMbid, artistRef, artistRows, factsLine, inTurns, libraryArtistFor, playOrder, playsLine, rowLine, type ArtistRow,
 } from '../lib/artistPage'
 import { isAbort, latestOnly } from '../lib/latest'
+import { pinOf, type ArtistPinTarget } from '../lib/pins'
 import { coverAddresses } from '../lib/pressings'
 import {
   artistAlbums, artistIndexAge, libraryArtists, prefetchAlbum, rememberQueue, toQueueTrack,
@@ -17,9 +18,11 @@ import { Cover } from '../player/Cover'
 import { CheckIcon, ChevronLeftIcon, PlayIcon, ShuffleIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import { usePlayerActions } from './context'
+import { PINS_UNSAVED, PinToggle } from './PinToggle'
 import { keep, kept as keptPressings, usualGet } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { ownedNow, useOwned, whenOwned } from './useOwned'
+import { sayPins, setPinned, usePins } from './usePins'
 import { takeOpener } from './useSheet'
 
 /** What an artist page shows before anything has answered: what the row that opened it knew. */
@@ -95,8 +98,12 @@ function keptArtist(id: string): KeptArtist {
  * through /cover - the `artist.jpg` deadwax writes is what Navidrome serves) and their name at its
  * foot, who they are under it (MusicBrainz's facts), Play and Shuffle over the albums you have, and
  * their albums - MusicBrainz's discography, with what you hold of each marked, and every album you
- * have of theirs that MusicBrainz's list doesn't claim. The hero's top row leaves room at its right
- * for a pin (slices.md's S7, not built here).
+ * have of theirs that MusicBrainz's list doesn't claim. The hero's top row has the pin at its right
+ * (2.0.0-player.18, Artist.dc.html's "Pinned" chip): it pins them to Home by their MusicBrainz id -
+ * or, with none to be had, by their name and Navidrome's id for them - so it waits, drawn but
+ * inactive, until who they are is settled (their id known, or Navidrome and the library having both
+ * answered without one) and the pins have answered, so it never says "Pin" of an artist who is
+ * pinned. Whether they are pinned is the app's one store of pins (usePins.ts).
  *
  * The id is Navidrome's artist, or `mb:<mbid>` for one known only by MusicBrainz (the album you
  * don't have links here so); lib/artistPage.ts finds each side from the other and orders the rows.
@@ -160,6 +167,7 @@ export function ArtistPage({
   onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
 }) {
   const actions = usePlayerActions()
+  const { pins, known: pinsKnown, canSave } = usePins(true)
   const ref = useMemo(() => artistRef(id), [id])
   const kept = useMemo(() => keptArtist(id), [id])
   const owned = useOwned(true)
@@ -426,6 +434,12 @@ export function ArtistPage({
   const name = artist?.name ?? facts?.name ?? preview?.name ?? ''
   const picture = artist?.coverArt ?? preview?.coverArt ?? null
 
+  //? the pin: by their MusicBrainz id, else by name and Navidrome's id - ready once that is settled,
+  //? and the pins have answered
+  const pinTarget: ArtistPinTarget = { kind: 'artist', mbid, navidrome_id: libraryId, name, cover: picture }
+  const pinned = pinOf(pins, pinTarget) !== null
+  const pinReady = pinsKnown && !!name && (mbid !== null || (library.state !== 'asking' && ownedKnown && libraryId !== null))
+
   /** A row: the album you have, or - held only by the store's word - Navidrome's album for it, or
    *  the album you don't have. A tap calls off any row's lookup still out. */
   const openRow = (row: ArtistRow) => {
@@ -501,6 +515,16 @@ export function ArtistPage({
             <ChevronLeftIcon class="pl-back-icon" />
             <span class="pl-back-label">{backLabel}</span>
           </button>
+          {(ref.navidrome !== null || ref.mbid !== null) && (
+            <PinToggle
+              look="chip"
+              pinned={pinned}
+              ready={pinReady}
+              unsaved={!canSave}
+              onToggle={() => void setPinned(pinTarget, !pinned)}
+              onRefused={() => sayPins(PINS_UNSAVED)}
+            />
+          )}
         </div>
         <div class="app-artist-names">
           <h1 class="app-artist-name">{name}</h1>

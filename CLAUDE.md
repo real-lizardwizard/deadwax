@@ -137,7 +137,11 @@ src/
                    the tab can draw a snapshot before touching the disk. Also finds cover
                    art, and reads one album's files in full for the track viewer.
   store.py         SQLite job store + transfer reconciliation helpers. Also the store index
-                   (store_album): every album folder under an id that survives a rename.
+                   (store_album): every album folder under an id that survives a rename - and,
+                   per user, the app's preferences (user_prefs) and pins (pins), with
+                   adopt_local() for step 3.
+  pins.py          PURE. What a pin to the app's Home keys on (store:<store_album.id>, mb:<mbid>)
+                   and the PUT's list - see "Pins, and a finished Home". Never Navidrome stars.
   store_index.py   keeps the store index in step with every scan and writer, and the "already
                    have it" checks Find, /enqueue and the retries make - see "Already in the
                    store".
@@ -190,7 +194,7 @@ src/
                    settings (editable since v0.5.1 - see "The settings tab"), navidrome
                    (the player's FIXED list of Subsonic calls - see "The phone player"),
                    me, store_album (the app's id bridge - see "Artists, and the two
-                   libraries joined")
+                   libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home")
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
                    are ported. main.css styles BOTH halves - see below.
   styles/theme.css THE TOKEN LAYER. Every colour, size, space, radius, shadow, duration and
@@ -210,7 +214,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    with the player inside them - see "The one app". player/deck.ts is the
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts) - see
                    "The turntable, part two".
-tests/             2111 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2180 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -4029,9 +4033,10 @@ the `/deadwax/me` seam, and disc titles on the album page.
 - **Search and Requests were honest placeholders** ("On the main page for now", with a link),
   Search until slices.md's S4 (2.0.0-player.13, which deleted `app/Placeholder.tsx`; Requests keeps
   its `app-placeholder-*` card classes for its own empty and failed states) and Requests until S3. Home had only "Recently added"
-  (getAlbumList2 `newest`, 20 albums): Arriving, Pinned and Not played in a while come in later
-  slices and are NOT faked meanwhile. Requests and Arriving came in 2.0.0-player.12 (S3) - see
-  "Requests, and what's arriving". **Future slices are named by their slices.md id (S4 Search, S5
+  (getAlbumList2 `newest`, 20 albums): Arriving, Pinned and Not played in a while came in later
+  slices and were NOT faked meanwhile. Requests and Arriving came in 2.0.0-player.12 (S3) - see
+  "Requests, and what's arriving" - and Pinned and Not played in a while in 2.0.0-player.18 (S7) -
+  see "Pins, and a finished Home". **Future slices are named by their slices.md id (S4 Search, S5
   Sources and Get, S6 Artists and the id bridge, S7 Pins, S8 the desktop frame), never a version
   number**: the turntable went in as .11 outside the plan, so every slice after it took the next
   number up, and slices.md's own numbers no longer say which version a slice ships as.
@@ -4142,8 +4147,9 @@ be a switch in the global settings".
   (`--pl-byline-reach-*` against `--pl-scrub-gap`, held by the test). The ellipsis is on the span
   INSIDE the button, since clipping the button would clip that reach away.
 - **The ••• menu** (`app/ActionMenu.tsx`): the board draws the button, not the menu, so it is a short
-  sheet from the bottom over a dimmed Now Playing: Info, Go to album, Cancel. Pin joins it with
-  pins (slices.md S7). Go to album is left out, not greyed, for a song with no album id.
+  sheet from the bottom over a dimmed Now Playing: Info, Go to album, Cancel - and since
+  2.0.0-player.18 "Pin album to Home" (see "Pins, and a finished Home"). Go to album is left out,
+  not greyed, for a song with no album id.
 - **Go to album** - the menu's row, the album line and Info's album card, one `toAlbum` in App:
   every sheet closes and the album opens on the tab showing, through the `openAlbum` a tile uses,
   drawn at once from the answer it was played from (`playedAlbum`) or the queue's name and cover.
@@ -5634,7 +5640,8 @@ Slice 6 of the one app (`uplan/slices.md` S6, numbered .17: the turntable took .
 decisions it carries: Info is about the music, its artist LINKING TO THEIR PAGE; one search box,
 whose artist rows and artist top result become links now; the album you have and the album you
 don't both show the artist as a link; pins of albums and artists come next ("pin from an album or
-artist page"), so the artist hero keeps room for one.
+artist page"), so the artist hero keeps room for one (built in 2.0.0-player.18 - "Pins, and a
+finished Home").
 
 - **Three more calls on the fixed list** (routes/navidrome.py; `test_there_is_no_general_proxy`
   and the turntable test's copy edited on purpose; `test_navidrome_artists.py` (19) through
@@ -5687,7 +5694,7 @@ artist page"), so the artist hero keeps room for one.
   `mb:` one outside it (its you-have half asked only while Navidrome answers). Hero: Navidrome's
   picture through `/cover` (the `artist.jpg` the main page's artist images save) in a 240px band of
   `--dw-artist-hero`, a scrim only over a picture, the back link at the top with the right kept for
-  S7's pin, the name at the foot, MusicBrainz's facts under it (`factsLine`: "Group · Bristol ·
+  S7's pin (there since 2.0.0-player.18), the name at the foot, MusicBrainz's facts under it (`factsLine`: "Group · Bristol ·
   since 1991", "1965 to 2014"). **The rows** (`artistRows`): the discography browse
   (`/discography?types=album`, complete - not a search) with what the library holds of each by the
   store's word (owned folders by GROUP id), opened as the Navidrome album holding one of those
@@ -5818,7 +5825,8 @@ artist page"), so the artist hero keeps room for one.
     the name 3:1 over a white sky on one line or two, the facts 4.5:1 - test_app_css computes it);
     the order chips the Library's chips replaced are gone, rules and tokens; Requests' empty state
     points at Search, not "the main page".
-- **Not built, on purpose**: the pin (S7 - the hero's top right is kept for it); grouping the
+- **Not built, on purpose**: the pin (S7 - the hero's top right is kept for it; built in
+  2.0.0-player.18); grouping the
   discography by type (the board draws one "Albums" list; `types=album`, so EPs and singles you
   have appear as your own rows); an artist page for a collaboration (whose page?); the label from
   MusicBrainz (OpenSubsonic's `recordLabels` costs no request); `#/library?view=` in the address
@@ -5839,6 +5847,226 @@ artist page"), so the artist hero keeps room for one.
   `musicBrainzId`, whether search3 finds an album by its release MBID (the bridge falls back to the
   title), what an empty search3 lists, `displayComposer`, `playCount` and `recordLabels`, and an
   artist's picture.
+
+### Pins, and a finished Home (2.0.0-player.18)
+
+Slice 7 of the one app (`uplan/slices.md` S7, numbered .18: the turntable took .11, .14 and .16). The
+boards are `Home.dc.html` (Pinned: two columns of cards, round artists, square albums, Edit; Not played
+in a while), `Album.dc.html` and `Artist.dc.html` (where the pin goes) and `NowPlaying.dc.html` (the
+••• button's "More: info, go to album, pin"). James (2026-09-29): Home is the PLAYER's, not the
+librarian's; Arriving only while something is on its way; "Pinned albums and artists come next, at the
+top (pin from an album or artist page)"; then Recently added and "Not played in a while" (liked). He
+said Home "looks a bit empty" and accepted that these two are what fill it.
+
+- **Pins are deadwax's own, NEVER Navidrome's stars.** A star is per Navidrome user (James has two other
+  Navidrome users), Amperfy shows stars as favourites, and step 5 makes starred albums a person's own
+  library. A pin is a place on deadwax's Home. `app-rules.sim.cjs` fails on any star, unstar or
+  getStarred in ui/src; `test_pins_are_never_navidromes_stars` holds Navidrome to getAlbum and search3.
+- **What a pin keys on** (`src/pins.py`, pure): an album's `store:<store_album.id>` - the store index's
+  row, whose id stays put through a re-file (index_move), a release applied and a merge (merged_into
+  followed) - not Navidrome's album id (new when the tags change enough; the scratch stub's is the
+  folder's) nor the path. An album the index doesn't hold yet (pinned before the first scan) is
+  `release:<mbid>`, and becomes `store:<id>` on the first read that finds it indexed. An artist's
+  `mb:<mbid>`, or `name:<folded>` for one nobody can say an id for (artists.py's `_fold`: case, accents,
+  which dash). `MBID_PATTERN` is written out there, held to search_musicbrainz's by a test, so the store
+  imports no route.
+- **The table** (store.py SCHEMA, so an old database gains it - tested): `pins(user DEFAULT 'local', kind
+  CHECK album|artist, ref, label, sub, navidrome_id, cover, position, created_at, PK(user, kind, ref))`.
+  `label`/`sub` are what the card said when made (shown when nothing better can be had), `navidrome_id`
+  and `cover` the last Navidrome id it opened and its picture, refreshed as Home reads them. Methods:
+  `pins()` (None when unreadable - not "nothing pinned"; with a store there, every route answers that
+  None with a 503 "deadwax couldn't read its pins just now", which the page answers by keeping what it
+  had - only NO store at all is `{pins: [], can_save: false}`), `write_pins()` (the whole list,
+  renumbered, one transaction; False from it is a 503 for a PUT or a toggle - tested), `index_follow()`
+  (merged_into followed, at most `MERGE_HOPS` 16 - a loop or a longer chain is None; None from the method
+  itself when the index can't be read, which the GET answers with a 503 rather than every album "gone")
+  and `adopt_local()`.
+- **The routes** (`src/routes/pins.py`, prefix `/deadwax/me/pins`, through `current_user`, every write
+  behind the same-origin guard): **GET**, **PUT** and **POST `/toggle`**, each answering the whole list.
+  - **Brought up to date on every answer** (`_up_to_date`): a `release:` pin the index now holds becomes
+    `store:`; a merge is followed; a live row whose folder has gone is marked `missing` (the bridge's
+    `live_rows`, as Find's checks mark one); a pin whose album isn't present (missing, deleted, a merge
+    that can't be followed) is pointed at a LIVE copy of its release when there is one - so an album
+    deleted and got again opens the new copy; each (kind, ref) once (two pins come to one album - a
+    deleted one and its copy - are one, in the first one's place; tested, or the table's key fails the
+    write on every read). State: `present` (a live row in
+    this LIBRARY_PATH's root, or a `release:` pin not indexed yet), `missing`, `gone`.
+  - **Navidrome's id, checked** (`_navidrome_for`), for each present album pin: the bridge's kept id or
+    the pin's last-known, asked with getAlbum - its `musicBrainzId` must still be the release; a 404 or
+    another release has the bridge FORGET it (`forget_navidrome_id`, new in store_album.py beside
+    `known_navidrome_id`/`remember_navidrome_id`/`is_release`/`live_rows`) and look afresh
+    (`navidrome_album`: search3 by id, then title), its coverArt read with getAlbum; Navidrome that
+    can't be asked leaves the last known standing. **This is what keeps a re-filed album opening from
+    its pin**: the bridge's 600 s memo would otherwise hand out the id of an album Navidrome no longer
+    has (the stub, whose ids are folders, shows it every time). One getAlbum per album pin per answer,
+    side by side; Home holds `PINS_MAX` (50).
+  - **Navidrome is asked OUTSIDE the per-user lock** (`_writing`, refcounted and dropped like
+    store_index's `release_lock`): the lock covers read, change and write; what Navidrome said is written
+    back in a second short locked pass onto the pins as they are by then. So a Navidrome slow to answer
+    holds up no toggle.
+  - **PUT** takes the WHOLE ordered list (`{pins: [{kind, ref}]}`, at most PINS_MAX, refs checked by
+    `valid_ref`, nothing else taken): the list's refs brought up to date as the stored ones are (a
+    `release:` pin upgraded since the list was drawn is still the pin it names), the stored pins it
+    names in its order, the rest removed - it never adds. **`known`** (optional, the same shape): every
+    pin the list was MADE FROM. `rules.ordered(stored, wanted, known)` then removes only pins the page
+    knew of and left out: a stored pin it was never told of (pinned on another device since) keeps its
+    place, and the page's pins fill the places its known pins held, in its order. The app always sends
+    it (the server's word the list was made from); without it, the list is the whole of it.
+  - **toggle** says what the thing IS and whether it should end up `pinned` - so it is idempotent. An
+    album by `release_mbid`, or `navidrome_id` from which deadwax reads the release (getAlbum, through
+    store_album's `album_release`, which RAISES where `navidrome_release` swallows): none at all is a
+    422 (nothing would find it again); Navidrome answering it has no such album a 422 that says so; and
+    a Navidrome that can't be asked a **503** "couldn't ask Navidrome about this album just now" - never
+    "no release id", which is a fact about the album (an unpin needs no release, and is matched by
+    Navidrome's id whatever Navidrome says). Its ref the first live row by path, else `release:`. An
+    artist by `mbid`, or `navidrome_id` and `name` (a 422 without either). Matching (`same`) and
+    lib/pins.ts's `isPinOf` give the same answer for every pin: an album by release where both sides
+    have one, else by Navidrome's id; an artist by MusicBrainz id where both have one, by the `name:`
+    ref where the page has none (the name folded alike - `foldArtistName` in lib/pins.ts is artists.py's
+    `_fold`, and `tests/fixtures/name_folds.json` is what both answer, test_pins.py holding one and
+    pins.sim the other), else by Navidrome's id where one side has no MusicBrainz id - so two Navidrome
+    artists whose names fold alike ("Björk", "Bjork") are one pin, shown pinned on both pages, which
+    the table's key made them on the server all along. A `name:` pin takes the `mb:` ref in its place
+    when the id arrives with its Navidrome id. A new pin goes FIRST. A 409 past PINS_MAX, a 503 for a
+    database that can't keep them.
+- **`adopt_local(user)`** (store.py), step 3's take-over, written and tested now and called by nothing
+  yet (users.py names it): local's `user_prefs` and `pins` become the first admin's in one transaction,
+  theirs winning (INSERT OR IGNORE - a preference they chose, a pin they have, keeps its place), local's
+  other pins after theirs in local's order while under PINS_MAX, local left with nothing; into `local`
+  itself it takes nothing; None when the store can't.
+- **The app's one store** (`app/usePins.ts`, a module, as useGetSettings is): asked `'fresh'` each time
+  Home comes into view (App's `homeShown = watching === 'home'`, handed to Home and keying its memo);
+  `usePins(true)` from the album and artist pages (only with nothing in hand or older than
+  `PINS_KEPT_MS`, 30 s); App's `usePins(sheetOpen)` for the menu; never at start-up. A change is a
+  `PinOp` laid over the server's word (lib/pins.ts `applyPinOp`): a pin (a pending one, `pending:N`,
+  FIRST), an unpin (by what it is), a move or removal (by key); each sent in turn (`inTurn`), so the
+  newest answer always lands last - what latestOnly() does for a fetch that draws. **A move's or
+  removal's PUT is made at SEND time from the server's word as it stands then, and sends that word as
+  `known`**: made at send time, it lands on what this page saved before it (pins.sim holds both
+  orders); `known` is what keeps a pin another device added since this page last ASKED (a desktop
+  left on Home while the phone pins) - the send-time list alone unpinned it unseen, and the first cut
+  claimed it didn't (a review found it; `test_a_put_made_from_what_the_page_knew_keeps_a_pin_made_since_
+  on_another_device`). `known` (in the hook's answer) is true once the pins answered or failed to. A
+  refusal goes back to the server's word and is said WHERE IT WAS MADE: a pin or an unpin in the app's
+  one notice (`PinNotice.tsx`, drawn once by App, fixed at the top over everything, `pointer-events:
+  none`, a polite region always in the page - clipped, never hidden, while it says nothing - for
+  `PIN_NOTICE_MS` 5 s), naming it ("Couldn't pin Dummy: Home holds up to 50 pins - unpin one first");
+  one of Edit's as `problem`, "Not saved: …", under Home's list until the next change or a successful
+  read. The first cut put every refusal on Home, naming nothing, until the next change - for a pin made
+  on an album page or from the menu (which had closed), days later.
+- **Home** (`app/Home.tsx`): Arriving, then inside the gate `Shelves` - Pinned, Recently added
+  (unchanged; its tiles are now the shared `Tiles`, the board's markup test_app_css reads), Not played
+  in a while. **The shelves are drawn (`.app-home-shelves`, `hidden` until then, Recently added asking
+  all the while) once the pins have answered, or failed, or `PINNED_WAIT_MS` (1.5 s) has passed WHILE
+  Home showed** - counted afresh each time Home comes into view until it has once run out (leaving
+  mid-wait clears the timer; home.sim holds it) - Pinned is at the top, and landing after the shelves
+  it would push them under a finger; counted out of sight, the wait could be over before the pins were
+  asked. Don't "fix" it to time from the first showing: that is exactly the jump it exists to stop.
+  Each shelf a memoised element.
+- **Pinned** (`app/Pinned.tsx`, props only): the board's cards (64px, padding 7, a 48px picture - an
+  artist's round - a 14px name of two lines over a 12px line that ellipsizes). A card that opens is a
+  button - an album as a tile (prefetchAlbum on pointerdown, dropPrefetch on pointercancel, openAlbum on
+  the click), an artist's page (openArtist: **by MusicBrainz id where the pin has one** - `mb:<id>`, so
+  the page finds Navidrome's artist itself; the Navidrome id kept since pinning goes stale when a rename
+  re-files their albums, and opened by it, getArtist failed with no way to the id the pin held; a
+  `name:` pin by Navidrome's id) - and plays nothing; one that doesn't is words (`pinLine`: "Removed from
+  the store", "Not on disk just now", "Not in Navidrome yet" - the last two shortened from "Not in your
+  library just now" and "Navidrome hasn't found it yet", which a phone's card cut to "Navidrome
+  has…"). **A closed card (and Edit row, `is-closed`) gives those words two lines and its title one**,
+  in the sub-line's own colour (`--dw-text-2`; the tertiary was 3.9:1), and **under 374px the cards
+  take one column** (`@media (max-width: 373px)`): measured in the bundled Noto Sans, "Removed from"
+  is 83px and a card's text column 88.5 at 375, 61 at 320. Nothing pinned says how to pin
+  (`NOTHING_PINNED`). Edit/Done is at least `--pl-hit` wide, its word flush right. **Edit** makes ONE
+  column of rows: up, down, unpin - each a 32px face (`.app-pin-move-face`) in a 44px box, side by
+  side with no gap (32px boxes 4px apart put unpin a few pixels from a thumb aimed at down) -
+  aria-disabled at the ends and for a pin not saved yet, and a grip (aria-hidden - the buttons are the
+  accessible way; `touch-action: none` on it alone, so the page scrolls under a finger anywhere else).
+  **Focus is never dropped to the page**: a move by a button puts it back on that button where the row
+  went; an unpin on the next row's unpin (the one before, at the end; Done, with none left); Done with
+  nothing left pinned on the heading (`tabIndex -1`) - rows found by `dataset.pin`, never a selector
+  built from a key with a colon. **A drag moves rows by transform only** (`dragOffset`: the dragged row
+  follows the finger, the rows it passes make way) and the list never reorders under the pointer:
+  moving the dragged row's element in the page would take the grip's pointer capture away (an element
+  removed from the document loses it) and end the drag half way. A polite region says what changed;
+  "Not saved: …" is a second one UNDER the list (`.app-pinned-note`, room taken only while `is-said`),
+  so its arriving and going move no row.
+- **The pin controls** (`app/PinToggle.tsx`, a leaf): the album page's 32px icon button named "Pin to
+  Home" whichever way it is (`aria-pressed` says), the artist's chip "Pin"/"Pinned", both reaching 44px,
+  aria-disabled - tap refused, focus kept - until what they pin is known **and the pins have answered**
+  (usePins' `known`: a toggle live on "not pinned" for an album that is, on a cold link, was the first
+  cut), or while deadwax can't keep pins (`PINS_UNSAVED` as the title, and a tap calls `onRefused`,
+  which says it in the notice - a title never shows on a phone). **Album page**: pinned by the bridge's
+  release (matched by Navidrome's id while that is coming); drawn from the first frame in the bar's
+  right (`.app-album-bar` flexes the sticky bar), live once the bridge answered WITH a release, and gone
+  once it answered without one or failed. **Artist page**: `{mbid, navidrome_id: libraryId, name, cover:
+  picture}`, live once their id is known - or Navidrome and the library have both answered and nobody
+  can say one; the hero's top row has a gap and `.app-artist-back` `min-width: 0` (its label is the
+  page below's - an album's long title pushed the chip out of the hero, whose overflow clipped it).
+  **The ••• menu**: "Pin album to Home" / "Unpin album from Home" after Go to album. What can be pinned
+  NOW is `menuPinNow` (from the answer the song was played from: `musicBrainzId` "" means none; not
+  sent: the server reads it; nothing while deadwax can't keep pins); **the menu takes it as it OPENS**
+  (`menuPin`, set in openMenu), so a pins answer or the next song landing while it is up neither adds,
+  removes nor re-aims a row - a row deadwax can no longer keep pins for stays, aria-disabled. It is
+  aria-disabled until it is known whether the album is pinned (so no row moves as that lands); its tap
+  closes the menu (focus back on •••), saves, and says the outcome in the notice either way
+  (`setPinned(target, on, true)` - "Pinned Dummy to Home"). Now Playing's ••• is named "More: info, go
+  to album, pin" only when App says the menu will have the pin (`pinnable`), "More: info, go to album"
+  otherwise.
+- **No playback action from any new file**: the app-rules allowlist is unchanged; app-rules holds the
+  pin files (PinNotice.tsx among them) to that, the card to the tile's prefetch-and-open, the store's
+  turns and its PUT with `known`, Home's asks and wait, the pages waiting for the pins, and the menu:
+  its condition (`playingRelease !== ''`, `pins.canSave`), taken as it opens, close-then-save-and-say,
+  `pinnable`, and PinNotice drawn once, by App.
+- **Not played in a while** (`lib/home.ts`, pure): getAlbumList2 `recent` at `RECENT_LISTED` (500, the
+  route's most), each album's OpenSubsonic `played` (now on player/api.ts's Album) MORE than
+  `NOT_PLAYED_DAYS` (30) old, the longest ago first (ties by id, an album listed twice once), up to
+  `NOT_PLAYED_SHOWN` (20); none at all with fewer than `NOT_PLAYED_FEWEST` (4) - which is also what a
+  Navidrome sending no `played` comes to, every album being left out. No section, heading included,
+  with nothing to show or after a failure (Recently added beside it says Navidrome failed for both);
+  last, so landing late moves nothing. Plays past `recent`'s first 500 aren't looked at (the guide says
+  so). Whether 0.64.2 sends `played` on an album list is unverified (it is omitempty, set once played).
+- **Style** (tokens only): app.css `--app-pins-*`, `--app-pin-*`, `--app-z-pin-drag`, `--app-z-notice`
+  (40, over the menu and Info's 30), over theme.css's toggled, danger, best and shadow tokens.
+  `test_app_css.py` (61, seven new) holds the pin's box and reach, the artist hero's back link giving
+  way, the two columns of cards and one under 374px, a closed card's two lines, Edit's 44px boxes and
+  width, the note under the list, the grip as the one part taking a drag, and the notice.
+- **Not built, on purpose**: pinning an album you don't have (decisions.md: it can't be pinned; the
+  group page has no pin); a play button on a pinned card (tiles navigate - the gesture rule); keeping an
+  artist pin's Navidrome id fresh (an `mb:` pin opens by its MusicBrainz id, so a stale one can't open a
+  broken page - it once did, by the stored Navidrome id; a `name:` pin, which has nothing else, opens by
+  it, and is pinned again from the artist's page if that id goes); the desktop's layout (S8, built on
+  this); pins on the main page.
+- **After review** (25 findings, merged to 17 fixes, each with a check that fails without it): the
+  ••• label promising a pin the menu lacked; the artist chip pushed out of the hero by a long back
+  label; a closed card's words cut on every phone width ("Navidrome has…") in 3.9:1 grey; Edit's PUT
+  unpinning another device's pin (`known`); an `mb:` artist pin opening by a stale Navidrome id; a
+  refused pin said only on Home, naming nothing, for ever (the notice, `problem` scoped to Edit and
+  cleared by a read); the page pins live on "not pinned" before the pins answered; focus dropped to the
+  page by an unpin and by Done; a pins read that failed answered as "nothing pinned, can't save" (a
+  503 now); Edit's buttons 32px wide, unpin 4px from down; "Not saved" moving every row; Edit/Done a
+  27px target; the menu's outcome unsaid and a greyed pin's reason only in a title; the menu's row
+  coming or going while it was open; `name:` matching differing between server and app; two
+  documented server rules untested (a refused write's 503, two pins come to one); the menu's
+  no-release rule unpinned by any sim; pinning by Navidrome's id with Navidrome down called "no
+  release id" (a 503 now); and the wait's wording ("since Home first showed" - it is while Home shows).
+- **Verified**: 2180 Python tests (69 new: `test_pins.py` 62, seven in `test_app_css.py`), pyflakes,
+  tsc, and all 37 sims (`home` 32 and `pins` 106 new; `app-rules` 158, `artist` 127 and `info` 123
+  extended - home.sim and pins.sim fail if they stop before their end, which a check left waiting on an
+  unanswered promise would otherwise do with exit 0); 57 mutations, one per rule pinned, each caught
+  and restored byte for byte - three first got past (a merge chain longer than MERGE_HOPS, a removal's
+  PUT made from the screen, a page's ask with a recent answer in hand - the last because the check
+  awaited an answer that never came and the script quietly stopped) and gained the checks that catch
+  them - and 30 more for the review's fixes (nine on the server, 21 in the app and the stylesheet),
+  every one caught. The engine guard is empty, and `useDownloadJobs.ts`, `downloads.sim.cjs` and
+  `player.sim.cjs` are untouched.
+  **NOT verified here**: the real page (the orchestrator builds the bundle and checks against the
+  stub's seeded plays - The Slow Rush 41 days, Dummy 64, Third 95, Wish You Were Here 210, Donda 3, so
+  Not played shows exactly four, and `PLAYED_OFF=1` hides it - pins from an album page, the artist page
+  and the ••• menu, Edit with buttons and a real drag, Dummy re-filed through the old editor still
+  opening from its pin, a deleted album reading "Removed from the store" whole in two lines, the
+  notice at the top over Now Playing, one column of cards at 320, an artist opened from a long-titled
+  album keeping its chip in the hero), and everything on the iPhone: the drag under a real finger with
+  the page still, VoiceOver's focus after an unpin, and whether 0.64.2 sends `played`.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -7200,7 +7428,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2111 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2180 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -7248,6 +7476,8 @@ node ui/test/sources.sim.cjs    # the Sources sheet and its cards rendered - onl
 node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch; the rows' Get chips, and their lookups called off when you move on
 node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the main-thread voice where there is no worklet, the deck against fakes (its windows, coasts, handovers, wind-downs, when a press is its own)
 node ui/test/artist.sim.cjs     # the artist page's order and who-is-who (Navidrome's artist <-> MusicBrainz's), Library > Artists' sort, the id bridge's "Also" chips, "This pressing" and the folder; the page rendered - rows drawn once with steady keys, Play waiting for the library, a few albums at a time, the session's answers, late lookups opening nothing
+node ui/test/home.sim.cjs       # Home finished - "Not played in a while" (more than 30 days, oldest first, up to 20, none under 4 or without played), Pinned first then Recently added then Not played, the shelves waiting for the pins (counted while Home shows), all in the gate
+node ui/test/pins.sim.cjs       # pins - which pin is the thing on screen (names folded as the server folds them), a card's words, what a toggle sends, Edit's operations and the drag; the store (asked when asked, changes in turn, Edit's PUT with known, refusals put back and said where made); Pinned and its Edit rendered (focus kept, Not saved under the list); the notice; the pin control
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -7268,7 +7498,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2111 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2180 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -238,6 +238,45 @@
     /* a Done row's round play button, as Requests.dc.html draws it: 32px in a 44px target */
     --app-done-play-face: 32px;
     --app-done-play-icon: 16px;
+    /* pins (2.0.0-player.18): Home's Pinned as Home.dc.html draws it, and the pin on an album page
+       (Album.dc.html's 32px icon button) and an artist page (Artist.dc.html's chip) */
+    --app-pins-gap: 10px;            /* between the cards, both ways */
+    --app-pin-card: 64px;            /* a card's height */
+    --app-pin-pad: 7px;              /* inside a card */
+    --app-pin-inner: 10px;           /* the picture to the words */
+    --app-pin-thumb: 48px;
+    --app-pin-title-size: 14px;      /* a card's name, two lines at most, over its 12px sub-line */
+    --app-pin-title-line: 17px;
+    --app-pin-title-clamp: 2;
+    --app-pin-line-line: 14px;
+    /* a card or an Edit row that won't open: its title one line, the words saying why two - read whole
+       ("Removed from the store" needs about 84px; a phone's card has 88 at 375px, and every width
+       under 374px takes one column of cards, so each card has the room) */
+    --app-pin-closed-title-clamp: 1;
+    --app-pin-closed-line-clamp: 2;
+    --app-pin-off: 0.45;             /* a pin, or an Edit button, that can't be used just now - aria-disabled,
+                                        so focus stays on it - and a card's picture that won't open */
+    --app-pin-toggle: 32px;          /* the pin's drawn box... */
+    --app-pin-toggle-pad: 12px;      /* ...the chip's sides */
+    --app-pin-toggle-gap: 6px;       /* the chip's pin to its word */
+    --app-pin-toggle-icon: 17px;
+    --app-pin-toggle-icon-chip: 15px;
+    /* ...44px to a finger: the reach starts at its padding box, inside its border */
+    --app-pin-toggle-reach: calc((var(--pl-hit) - var(--app-pin-toggle)) / 2 + var(--dw-hairline));
+    --app-pin-row: 52px;             /* a row in Home's Edit */
+    --app-pin-row-pad: 12px;         /* its words from its left edge */
+    --app-pin-row-gap: 8px;          /* row to row */
+    --app-pin-move-face: 32px;       /* Edit's up, down and unpin: a 32px face in a 44px box, side by side -
+                                        44 to a finger every way, and 12px between faces, down's and unpin's */
+    --app-pin-move-gap: 4px;         /* the words to the first box (its face 6px further in) */
+    --app-pin-move-icon: 16px;
+    --app-pin-grip-icon: 20px;       /* ...and the grip a row is dragged by, a tap target square */
+    --app-z-pin-drag: 1;             /* the row being dragged, over the rows it passes */
+    /* the app's one notice for pins (PinNotice): a card at the top, over everything */
+    --app-pin-notice-top: 8px;
+    --app-pin-notice-pad-y: 10px;
+    --app-pin-notice-pad-x: 14px;
+    --app-z-notice: 40;              /* over Now Playing's menu and Info (30) */
 }
 
 /* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
@@ -2375,7 +2414,7 @@ button.app-result:active { background: var(--dw-pressed); }
 /* ===== Artists, and the two libraries joined (2.0.0-player.17) ===== */
 
 /* the artist page's hero: the picture under it, its own colour in place of one; the back link at
-   the top (with room at its right for a pin, which comes later), the name at the foot */
+   the top with the pin at its right (2.0.0-player.18), the name at the foot */
 .app-artist-hero {
     position: relative;
     display: flex;
@@ -2409,11 +2448,20 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-artist-top,
 .app-artist-names { position: relative; z-index: var(--app-z-hero-words); }
 
-.app-artist-top { display: flex; align-items: center; justify-content: space-between; min-height: var(--pl-hit); }
+/* the back link gives way to the pin - its label ellipsizing - whatever the page below is called (an
+   album's title, as often as not); the gap keeps the pin's reach off the label's end */
+.app-artist-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pl-gap-sm);
+    min-height: var(--pl-hit);
+}
 
 .app-artist-back {
     display: inline-flex;
     align-items: center;
+    min-width: 0;
     max-width: 100%;
     min-height: var(--pl-hit);
     color: var(--dw-text);
@@ -2679,3 +2727,296 @@ button.app-done-open:active { background: var(--dw-pressed); }
     user-select: text;
     white-space: pre-line;
 }
+
+/* ===== pins (2.0.0-player.18): the pin on an album and an artist, Home's Pinned, and its Edit ===== */
+
+/* the album page's bar: the back link at its left, the pin at its right */
+.app-album-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pl-gap-sm);
+}
+
+.app-album-bar .pl-back { min-width: 0; }
+
+/* the pin: STYLE.md's secondary button, toggled purple once pinned; its head filled then too */
+.app-pin-toggle {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-pin-toggle-gap);
+    height: var(--app-pin-toggle);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-pin-toggle.is-icon { width: var(--app-pin-toggle); }
+.app-pin-toggle.is-chip { padding: 0 var(--app-pin-toggle-pad); }
+
+/* 44px to a finger, every way: it stands alone at the top right of its bar or hero */
+.app-pin-toggle::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--app-pin-toggle-reach));
+}
+
+.app-pin-toggle.is-on {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    box-shadow: none;
+    color: var(--dw-accent-text);
+}
+
+.app-pin-toggle:active:not([aria-disabled='true']) { background: var(--dw-secondary-bg-active); }
+.app-pin-toggle.is-on:active:not([aria-disabled='true']) { background: var(--dw-toggled-bg); }
+.app-pin-toggle[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
+.app-pin-toggle:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+.app-pin-icon { flex: none; width: var(--app-pin-toggle-icon); height: var(--app-pin-toggle-icon); }
+.app-pin-toggle.is-chip .app-pin-icon { width: var(--app-pin-toggle-icon-chip); height: var(--app-pin-toggle-icon-chip); }
+.app-pin-toggle.is-on .app-pin-head { fill: currentColor; }
+
+/* --- Home's Pinned --- */
+
+.app-pinned { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+
+/* Edit at the heading's right end, a tap target tall and at least as wide - its word flush with the
+   edge, the target reaching in from it ("Edit" alone is 27px) - and so is the heading's row, which
+   leaves about the board's 12px between the heading's words and the first card, as Arriving's does */
+.app-pinned-edit {
+    min-width: var(--pl-hit);
+    padding: 0;
+    text-align: right;
+}
+
+/* the heading takes focus only when Done, with nothing left pinned, has gone from under it */
+.app-pinned-head .app-section-title:focus { outline: none; }
+
+/* one of Edit's changes not kept: under the list, room taken only while it says something */
+.app-pinned-note {
+    margin: 0;
+    color: var(--dw-danger-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-pinned-note.is-said { margin-top: var(--app-job-gap); }
+
+.app-pinned-empty {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+/* two columns of cards, an artist round and an album square */
+.app-pins {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--app-pins-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* under 374px two columns leave a card no room to say why it won't open: one column there */
+@media (max-width: 373px) {
+    .app-pins { grid-template-columns: minmax(0, 1fr); }
+}
+
+.app-pins-item { min-width: 0; }
+
+.app-pin-card {
+    display: flex;
+    align-items: center;
+    gap: var(--app-pin-inner);
+    box-sizing: border-box;
+    width: 100%;
+    height: var(--app-pin-card);
+    padding: var(--app-pin-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+button.app-pin-card:active { background: linear-gradient(var(--dw-pressed), var(--dw-pressed)), var(--dw-card); }
+
+.app-pin-card:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-card);
+}
+
+.app-pin-thumb {
+    display: block;
+    flex: none;
+    width: var(--app-pin-thumb);
+    height: var(--app-pin-thumb);
+    object-fit: cover;
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+}
+
+.app-pin-thumb.is-round { border-radius: var(--dw-radius-round); }
+
+/* an album that won't open says why in its sub-line - in the sub-line's own colour, read whole in two
+   lines with its title in one - and its picture steps back */
+.app-pin-card.is-closed .app-pin-thumb { opacity: var(--app-pin-off); }
+
+.app-pin-text { display: flex; flex-direction: column; min-width: 0; }
+
+.app-pin-title {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--app-pin-title-clamp);
+    font-size: var(--app-pin-title-size);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--app-pin-title-line);
+    overflow-wrap: anywhere;
+}
+
+.app-pin-line {
+    overflow: hidden;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--app-pin-line-line);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.is-closed .app-pin-title { -webkit-line-clamp: var(--app-pin-closed-title-clamp); }
+
+.is-closed .app-pin-line {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--app-pin-closed-line-clamp);
+    overflow-wrap: break-word;
+    white-space: normal;
+}
+
+/* --- Edit: one column of rows - up, down, unpin, and a grip to drag by --- */
+
+.app-pins-edit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-pin-row-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-pin-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: var(--app-pin-row);
+    padding-left: var(--app-pin-row-pad);
+}
+
+.app-pin-row .app-pin-text { flex: 1; margin-right: var(--app-pin-move-gap); }
+
+/* the row under a finger: over the rest, its edge the accent's */
+.app-pin-row.is-dragging {
+    z-index: var(--app-z-pin-drag);
+    border-color: var(--dw-best);
+    box-shadow: var(--dw-highlight), var(--dw-shadow);
+}
+
+/* a tap target square, side by side with no gap - so a finger aimed at down is 22px from unpin's box */
+.app-pin-move {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+}
+
+/* ...the button the board draws, inside it */
+.app-pin-move-face {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: var(--app-pin-move-face);
+    height: var(--app-pin-move-face);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+}
+
+.app-pin-move:active:not([aria-disabled='true']) .app-pin-move-face { background: var(--dw-secondary-bg-active); }
+.app-pin-move[aria-disabled='true'] { opacity: var(--app-pin-off); }
+.app-pin-remove .app-pin-move-face { color: var(--dw-danger-text); }
+
+.app-pin-move:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-pin-move-icon { width: var(--app-pin-move-icon); height: var(--app-pin-move-icon); }
+
+/* only the grip takes the drag - the page scrolls under a finger anywhere else on the row */
+.app-pin-grip {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    color: var(--dw-text-3);
+    cursor: grab;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.app-pin-row.is-dragging .app-pin-grip { cursor: grabbing; }
+.app-pin-grip-icon { width: var(--app-pin-grip-icon); height: var(--app-pin-grip-icon); }
+
+/* the ••• menu's pin, while it isn't known yet whether the album is pinned */
+.app-menu-item[aria-disabled='true'] { color: var(--dw-text-3); }
+
+/* the app's one notice for pins: a card at the top of the screen, over everything, taking no taps -
+   in the page all the time (a status region iOS reads only if it is already there), clipped away
+   while it has nothing to say */
+.app-pin-notice {
+    position: fixed;
+    top: calc(var(--pl-safe-top) + var(--app-pin-notice-top));
+    left: 50%;
+    z-index: var(--app-z-notice);
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(calc(100% - var(--pl-edge-left) - var(--pl-edge-right)), var(--pl-content-max));
+    margin: 0;
+    padding: var(--app-pin-notice-pad-y) var(--app-pin-notice-pad-x);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight), var(--dw-shadow);
+    color: var(--dw-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: break-word;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+.app-pin-notice:not(.is-shown) { clip-path: inset(50%); }

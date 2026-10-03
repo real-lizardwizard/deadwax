@@ -28,6 +28,12 @@
  *    the song was sent only when it is drawn; what was drawn stays drawn as the sheet slides away;
  *    its list is back at the top as it opens and as the tab changes, and not as it closes.
  *  - Now Playing is inert and deaf to Escape while the menu or Info is over it.
+ *  - The menu's album pin (2.0.0-player.18): "Pin album to Home" or "Unpin album from Home" after Go
+ *    to album, its tap handed to App; drawn but doing nothing until it is known whether the album is
+ *    pinned, so no row moves as that lands; no row for an album that can't be pinned. The ••• button
+ *    names what the menu holds: "More: info, go to album, pin" only when App says the menu will have
+ *    the pin (`pinnable`) - "More: info, go to album" for an album with no release id, or while
+ *    deadwax can't keep pins.
  *
  * Run it with:  node ui/test/info.sim.cjs
  */
@@ -524,6 +530,21 @@ console.log('\nthe ••• menu')
   check('closed for Info: focus is left to Info', document.activeElement === done, true)
   draw(true, { onAlbum: null })
   check('no album to go to: the row is left out, not greyed', items().map(text), ['Info'])
+  //? the album's pin (2.0.0-player.18): App's, handed in - the menu only draws it and hands the tap on
+  draw(true, { pinned: false, onPin: () => calls.push('pin') })
+  check('an album that can be pinned: "Pin album to Home", after Go to album', items().map(text), ['Info', 'Go to album', 'Pin album to Home'])
+  items()[2].props.onClick()
+  check('...its tap handed to App', calls.slice(-1), ['pin'])
+  draw(true, { pinned: true, onPin: () => calls.push('unpin') })
+  items()[2].props.onClick()
+  check('pinned already: "Unpin album from Home", the same row', [items().map(text)[2], calls.slice(-1)], ['Unpin album from Home', ['unpin']])
+  const asked = calls.length
+  draw(true, { pinned: null, onPin: () => calls.push('pin') })
+  items()[2].props.onClick()
+  check('not known yet whether it is: drawn - so nothing moves as it is known - aria-disabled, its tap doing nothing',
+    [items().map(text)[2], items()[2].props['aria-disabled'], calls.length - asked], ['Pin album to Home', true, 0])
+  draw(true, { pinned: false, onPin: null })
+  check('an album that can\'t be pinned: no row for it', items().map(text), ['Info', 'Go to album'])
   draw(false)
   check('closed again: its lock off, and deaf to Escape', [locks(), press('Escape').defaultPrevented], [[], false])
 }
@@ -535,7 +556,7 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   let closes = 0
   const view = mount(NowPlaying, 'now playing')
   const draw = (open, covered = false) => view.render({
-    player, open, covered, opener: openerRef, onClose: () => { closes += 1 }, onMore: () => {}, onAlbum: () => {}, openAs: 'cover',
+    player, open, covered, opener: openerRef, onClose: () => { closes += 1 }, onMore: () => {}, onAlbum: () => {}, openAs: 'cover', pinnable: true,
   })
   const sheet = () => one(view, byClass('pl-sheet'))
   const close = () => one(view, byClass('pl-sheet-close'))
@@ -551,14 +572,17 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   draw(false)
   check('...and focus goes back to the mini player', [document.activeElement === opener, locks()], [true, []])
   check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
-  check('the icon row: ••• only, with no speaker to send to', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['More: info, go to album'])
+  check('the icon row: ••• only, with no speaker to send to', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['More: info, go to album, pin'])
+  view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', pinnable: false })
+  check('...an album the menu has no pin for (no release id, or deadwax can\'t keep pins): ••• doesn\'t promise one',
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['More: info, go to album'])
   let albums = 0
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
   check('...and a tap on it asks App to go there', albums, 1)
   //? a song whose album the queue has no id for: the same line, as words that go nowhere
   const lone = { ...player, track: queueTrack({ albumId: null }), airplay: true }
-  view.render({ player: lone, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
+  view.render({ player: lone, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover', pinnable: true })
   check('no album id: the line is words, not a button, in the same box',
     [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
     [0, 'Pink Floyd — Wish You Were Here'])

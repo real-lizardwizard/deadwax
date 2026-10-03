@@ -44,7 +44,13 @@
  *    them; a failed look with Try again; Navidrome having none of theirs said under the buttons;
  *  - a row's lookup that answers after the page stopped showing opens nothing, and the row fades
  *    while it looks; "MusicBrainz doesn't know who this is" only once the library has had its say;
- *  - the session's answers draw a page come back to on its first frame.
+ *  - the session's answers draw a page come back to on its first frame;
+ *  - the pin in the hero (2.0.0-player.18): drawn from the first frame, live only once who they are
+ *    is settled - their MusicBrainz id known, or Navidrome and the library both having answered
+ *    without one - and the pins have answered (or failed to), so it never reads "Pin" of an artist who
+ *    is pinned; pinning them by that id (else by name and Navidrome's id), pressed when pinned by
+ *    their id whatever Navidrome's id was, and not live while deadwax can't keep pins - a tap then
+ *    saying why in the app's notice.
  *
  * Run it with:  node ui/test/artist.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -356,7 +362,13 @@ exports.rememberQueue = (albums) => globalThis.__page.remembered.push(albums.map
 exports.toQueueTrack = (song, album) => ({ id: song.id, albumId: album.id })
 `)
 write('player/Cover.js', `exports.Cover = function Cover() { return null }\n`)
-write('player/icons.js', `exports.CheckIcon = exports.ChevronLeftIcon = exports.PlayIcon = exports.ShuffleIcon = function Icon() { return null }\n`)
+write('player/icons.js', `exports.CheckIcon = exports.ChevronLeftIcon = exports.PlayIcon = exports.ShuffleIcon = exports.PinIcon = function Icon() { return null }\n`)
+//? the app's one store of pins (2.0.0-player.18): what is pinned, given by the test, and every pin asked for kept
+write('app/usePins.js', `
+exports.usePins = () => globalThis.__page.pins
+exports.setPinned = (target, on) => { globalThis.__page.pinned.push([target, on]); return Promise.resolve() }
+exports.sayPins = (text) => globalThis.__page.said.push(text)
+`)
 write('app/ArchiveCover.js', `exports.ArchiveCover = function ArchiveCover() { return null }\n`)
 write('app/context.js', `exports.usePlayerActions = () => ({ playTracks: (...args) => globalThis.__page.plays.push(args) })\n`)
 write('app/pressingLists.js', `exports.keep = () => {}\nexports.kept = () => null\nexports.usualGet = (group) => ({ release: { title: group.title }, subtitle: group.title })\n`)
@@ -369,6 +381,7 @@ exports.whenOwned = () => globalThis.__page.owned ? Promise.resolve() : new Prom
 
 const W = globalThis.__page = {
   asks: [], open: [], owned: null, ownedWaiting: [], indexAge: 0, plays: [], remembered: [],
+  pins: { pins: [], known: true, canSave: true, problem: null }, pinned: [], said: [],
   ask(name, ...args) {
     W.asks.push([name, ...args])
     let resolve, reject
@@ -392,6 +405,7 @@ function ownedAnswers(index) {
 }
 function reset() {
   W.asks.length = 0; W.open.length = 0; W.owned = null; W.ownedWaiting.length = 0; W.indexAge = 0; W.plays.length = 0; W.remembered.length = 0
+  W.pins = { pins: [], known: true, canSave: true, problem: null }; W.pinned.length = 0; W.said.length = 0
 }
 
 //? the albums' wait (ROWS_WAIT_MS): a timer the test fires by hand
@@ -402,6 +416,7 @@ const waitOver = () => { for (const timer of timers.splice(0)) if (timer.live) t
 
 const hooks = require(path.join(PAGE, 'node_modules/preact/hooks.js'))
 const { ArtistPage, PREFETCH_AT_ONCE } = require(path.join(PAGE, 'app/ArtistPage.js'))
+const { PINS_UNSAVED: P_UNSAVED } = require(path.join(PAGE, 'app/PinToggle.js'))
 
 let tree = null
 function find(test, within = tree) {
@@ -637,6 +652,57 @@ async function page() {
     ownedAnswers(O.buildOwnedIndex([]))
     await one.settled()
     check('...it has, and can\'t say either: said', words(classed('app-search-empty')[0]), "MusicBrainz doesn't know who this is from your files, so only the albums you have are here.")
+  }
+
+  console.log('\nthe page: the pin (2.0.0-player.18)')
+  {
+    reset()
+    const one = mount({ id: 'ar-pinme' })
+    one.draw()
+    //? the PinToggle element, drawn as it draws itself (a leaf with no hooks of its own)
+    const pin = () => {
+      const element = find((node) => typeof node.type === 'function' && node.type.name === 'PinToggle')[0]
+      return element ? element.type(element.props) : undefined
+    }
+    check('drawn in the hero\'s top row from the first frame - not live while who they are isn\'t settled', [!!pin(), pin().props['aria-disabled'], words(pin())], [true, true, 'Pin'])
+    pin().props.onClick()
+    check('...its tap doing nothing then', W.pinned, [])
+    //? the pins not answered yet: whether they are pinned isn't known, so "Pin" can't be claimed
+    W.pins = { pins: null, known: false, canSave: true, problem: null }
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-pinme' })
+    await one.settled()
+    check('Navidrome named their MusicBrainz id, the pins not in yet: still not live', pin().props['aria-disabled'], true)
+    W.pins = { pins: [], known: true, canSave: true, problem: null }
+    one.draw()
+    check('Navidrome named their MusicBrainz id: live', pin().props['aria-disabled'], false)
+    pin().props.onClick()
+    check('...a tap pins them by it, with Navidrome\'s id, their name and picture', W.pinned,
+      [[{ kind: 'artist', mbid: PORTISHEAD, navidrome_id: 'ar-pinme', name: 'Portishead', cover: 'ar-p' }, true]])
+    W.pins = { pins: [{ kind: 'artist', ref: `mb:${PORTISHEAD}`, label: 'Portishead', sub: '', state: 'present', navidrome_id: 'ar-other', cover: null, mbid: PORTISHEAD }], known: true, canSave: true, problem: null }
+    one.draw()
+    check('pinned (by their MusicBrainz id, whatever Navidrome\'s id was then): pressed, "Pinned"', [pin().props['aria-pressed'], words(pin())], [true, 'Pinned'])
+    pin().props.onClick()
+    check('...a tap unpins them', W.pinned.slice(-1).map((one) => one[1]), [false])
+    W.pins = { pins: [], known: true, canSave: false, problem: null }
+    one.draw()
+    check('deadwax can\'t keep pins: not live', pin().props['aria-disabled'], true)
+    pin().props.onClick()
+    check('...a tap says why in the app\'s notice, and pins nothing', [W.said, W.pinned.length], [[P_UNSAVED], 2])
+    W.pins = { pins: null, known: true, canSave: true, problem: "Couldn't get your pins: Failed to fetch" }
+    one.draw()
+    check('the pins couldn\'t be had: live all the same (not held for ever), reading "Pin"', [pin().props['aria-disabled'], words(pin())], [false, 'Pin'])
+
+    reset()
+    const anon = mount({ id: 'ar-anon-pin' })
+    anon.draw()
+    answer('artistAlbums', { id: 'ar-anon-pin', name: 'Anon', album: [nd('nd-a', 'Tape', 1990)] })
+    await anon.settled()
+    check('no MusicBrainz id from Navidrome, the library not answered: still not live', pin().props['aria-disabled'], true)
+    ownedAnswers(O.buildOwnedIndex([]))
+    await anon.settled()
+    pin().props.onClick()
+    check('...nobody can say one: live, pinning them by name and Navidrome\'s id', [pin().props['aria-disabled'], W.pinned],
+      [false, [[{ kind: 'artist', mbid: null, navidrome_id: 'ar-anon-pin', name: 'Anon', cover: null }, true]]])
   }
 }
 

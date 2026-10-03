@@ -147,6 +147,25 @@ export function CloseIcon({ class: cls }: IconProps) {
 /** A row's "goes somewhere" mark. */
 export const ChevronRightIcon = line(<path d="m9 6 6 6-6 6" />)
 
+/** Up a place - Home's Edit, beside the drag. */
+export const ChevronUpIcon = line(<path d="M6 14.5l6-6 6 6" />)
+
+/**
+ * A pin (2.0.0-player.18), as Album.dc.html and Artist.dc.html draw it: its head and its point. The
+ * head is filled once the thing is pinned - by CSS on `.app-pin-head`, so one glyph serves both.
+ */
+export function PinIcon({ class: cls }: IconProps) {
+  return (
+    <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path class="app-pin-head" d="M9 3.5h6l-1 6.5 3.5 3.5h-11L10 10z" />
+      <path d="M12 13.5v7" />
+    </svg>
+  )
+}
+
+/** Three lines - what a row in Home's Edit is dragged by. */
+export const GripIcon = thin(<path d="M5 8h14M5 12h14M5 16h14" />)
+
 /** The tick beside the chosen row of a list, as iOS's settings draw it. */
 export const CheckIcon = line(<path d="M4.5 12.5l5 5L19.5 6.5" />)
 

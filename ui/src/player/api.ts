@@ -36,6 +36,9 @@ export interface Album {
   musicBrainzId?: string
   /** OpenSubsonic: the labels the files name - Info's album line (2.0.0-player.17) */
   recordLabels?: { name?: string }[]
+  /** OpenSubsonic: when it was last played (ISO), sent only once it has been - Home's "Not played in
+   *  a while" (2.0.0-player.18, lib/home.ts) */
+  played?: string
 }
 
 export interface Song {

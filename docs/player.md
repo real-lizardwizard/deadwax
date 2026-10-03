@@ -11,7 +11,8 @@ It's growing into one app for everything deadwax does: five tabs along the botto
 your downloads as they arrive (since 2.0.0-player.12), and **Search** looks in your library and
 then on MusicBrainz, and shows an album you don't have with each of its pressings' tracklists
 (since 2.0.0-player.13) - and **Get** fetches it: the sources found on Soulseek, to choose from
-(since 2.0.0-player.15).
+(since 2.0.0-player.15). **Home** has the albums and artists you [pin](#home-and-pins) to it, and
+what you haven't played in a while (since 2.0.0-player.18).
 
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
@@ -92,9 +93,11 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **Home**: **Arriving**, up to three downloads on their way, with **See all** going to the list
   on Requests - only while something is on its way: otherwise Home has no Arriving at all. If
   deadwax stops answering meanwhile, Arriving says what it shows is deadwax's last answer, and the
-  app keeps asking until it answers. Then **Recently
-  added**, Navidrome's 20 newest albums in a row you swipe along. Tap one to open it. (Pinned
-  albums and what you haven't played in a while come later.)
+  app keeps asking until it answers. Then **Pinned**, the albums and artists you pinned, two to a
+  row, with **Edit** to reorder and unpin them; **Recently added**, Navidrome's 20 newest albums in
+  a row you swipe along; and **Not played in a while**, the albums you last played longest ago (more
+  than 30 days), when there are at least four. Tap an album to open it, an artist for their page.
+  [Home and pins](#home-and-pins) has the details.
 - **Library**: **Albums**, **Artists** or **Songs**, chosen by the chips under the title, with a
   sort under them (tap it for the phone's own picker) and how many there are beside it once the
   whole list is in. **Albums** is a grid in one of four orders - **Recently added**, **Recently
@@ -116,7 +119,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   names the tab it goes back to. The artist's name under the title opens [their page](#artist-pages).
   Under it, **In your library**, and an **Also: …** chip for each other pressing of the album you
   have that Navidrome has found ("Also: 20th Anniversary Reissue 180gram", or the year when a
-  pressing has no edition of its own) - tap it for that pressing's page.
+  pressing has no edition of its own) - tap it for that pressing's page. The pin at the top right
+  pins the album to Home ([Home and pins](#home-and-pins)).
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
 - **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
@@ -183,9 +187,12 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   close arrow, and closing it goes back to where you were. Until 2.0.0-player.10 it also showed two
   lines about how the song was sent and how the last song changes and seek went, and the Gapless
   switch: those are in [Info → Debug](#info--debug) and in **You** now.
-- **•••** on the now-playing screen opens a short menu: **Info**, and **Go to album**, which closes
+- **•••** on the now-playing screen opens a short menu: **Info**; **Go to album**, which closes
   the now-playing screen and opens the song's album in the tab you're on, as if you'd tapped it
-  there.
+  there; and **Pin album to Home** (**Unpin album from Home** once it is), which pins the song's
+  album, closes the menu and says at the top of the screen that it did (or why it couldn't). The
+  menu shows what it showed as it opened: a song changing while it's up doesn't change the pin's
+  album under your finger.
 - **Info** is a sheet over the now-playing screen, with two tabs. **About** is the song, the album
   and the artist: the song's title and artist, "Track 3 of 6 · 5:08 · played 12 times" (counted on
   its own disc; the plays as Navidrome counts them now), its disc's title when the album has disc
@@ -236,7 +243,9 @@ have, and Info's artist card.
 - **At the top**, their picture - the one Navidrome has for them, which is the `artist.jpg` the main
   page's [artist images](library.md#artist-pages) saves into their folder - or a plain coloured
   band, with their name at its foot and who they are under it ("Group · Bristol · since 1991",
-  from MusicBrainz).
+  from MusicBrainz). **Pin** at its top right pins them to Home (it reads **Pinned** once they
+  are); it waits, greyed, until the page knows who they are on MusicBrainz, or that nobody can say -
+  [Home and pins](#home-and-pins).
 - **Play** and **Shuffle** play every album of theirs you have, one copy of each (the plain edition
   when you have several), in the order the page lists them. They wait - greyed - until every
   album's songs have come from Navidrome - fetched a few at a time as soon as the page knows them -
@@ -266,6 +275,74 @@ have, and Info's artist card.
 - The page works with Navidrome down for an artist opened from MusicBrainz (their albums, without
   what you have); one opened from your library needs Navidrome, like an album you have. If deadwax
   couldn't ask Navidrome for them, the page says why, with **Try again**.
+
+## Home and pins
+
+**Home** is the player's: what's on its way, what you keep coming back to, what's new, and what you
+haven't heard for a while. In order:
+
+- **Arriving**, only while a download is on its way ([above](#what-it-does)).
+- **Pinned** - the albums and artists you pinned, two to a row (one to a row on a phone narrower
+  than 374 points, so each card has room to say what it needs): an artist's picture round, an
+  album's cover square, its name over "Artist" or the album's artist. Tap a card to open the album or
+  the artist's page. With nothing pinned yet it says how to pin something.
+- **Recently added**, Navidrome's 20 newest albums.
+- **Not played in a while**: the albums you last played more than 30 days ago, the longest ago
+  first, up to 20 - made from Navidrome's list of the albums played most recently (its first 500),
+  by when each was last played. With fewer than four, or a Navidrome that doesn't say when an album
+  was played, there's no such section at all. The plays are the ones Navidrome counts for the
+  account deadwax signs in with.
+
+Home waits a moment for your pins before it draws the shelves under them (a second and a half at
+most while Home is on screen - counted again if you leave it before then and come back, until your
+pins have once arrived or the wait has once run out), so Pinned arriving never pushes them down under
+your finger.
+
+**Pinning.** Three places pin something to Home: the pin at the top right of **an album** you have,
+**Pin** at the top right of **an artist's page** (it says **Pinned** once they are), and **Pin album to
+Home** in the now-playing screen's **•••** menu, for the song's album. Tap again to unpin. A new pin
+goes first. The pin shows straight away and is saved behind it; if deadwax can't keep it, it goes
+back, and a note at the top of the screen says which album or artist and why ("Couldn't pin Dummy:
+Home holds up to 50 pins - unpin one first"). The ••• menu closes as you tap it, so the note says
+what happened either way ("Pinned Dummy to Home"). A page's pin waits, greyed, until deadwax has said
+what is pinned, so it never shows an album as unpinned that is pinned; when deadwax can't keep pins
+at all, it stays greyed and a tap says why. The ••• menu leaves the pin out for an album Navidrome
+says has no MusicBrainz release id, or while deadwax can't keep pins, and the ••• button says "pin"
+in its name only when the menu has it.
+
+**Edit**, at the right of the Pinned heading, turns the cards into a list. Each row has **up** and
+**down** buttons, an **✕** to unpin it, and a grip at its right end to drag it by (only the grip
+drags, so the page still scrolls under your finger anywhere else). Each change is saved as you make
+it. Edit sends deadwax the list as you saw it along with the change, so something pinned on another
+device since your Home last asked keeps its place rather than being unpinned unseen. If deadwax
+can't keep a change, the list goes back and **Not saved** and why is said under the list (never
+above it, so no row moves under your finger) until your next change, or until Home asks deadwax
+again. After a move, the keyboard (or VoiceOver) stays on the button you used, in the row's new
+place; after an unpin, on the next row's **✕**. **Done** goes back to the cards.
+
+**What a pin follows.** An album is pinned by deadwax's own record of it in your library - the same
+one that knows you already have an album when you Get it - so it keeps opening the album after you
+re-file it, apply another release to it, or merge a disc folder into it in the main page's editor.
+An album pinned before deadwax has looked at your library is pinned by its MusicBrainz release, and
+moves onto that record as soon as deadwax has one. An artist is pinned by their MusicBrainz id, and
+their card opens their page by it (so it still opens after their albums are re-filed under a new
+name), or - when nobody can say one - by their name and Navidrome's id for them. Names pinned that
+way that differ only in how they were typed (accents, case, which dash) are one pin: "Björk" and
+"Bjork" show as pinned on both pages. A card can say why it won't open, in two lines under its title:
+
+- **Removed from the store** - the album was deleted in deadwax (from the main page). If you get it
+  again, the pin opens the new copy.
+- **Not on disk just now** - its folder isn't where deadwax last saw it: usually a share that isn't
+  mounted. It comes back once the folder is back and deadwax has looked at your library again (the
+  main page's library tab scans as it opens; **Rescan** scans at once).
+- **Not in Navidrome yet** - deadwax has it, but Navidrome doesn't (yet): it may still be scanning.
+
+**Where they're kept.** On deadwax, for you - not on the phone, and **never as stars in Navidrome**
+(stars belong to each Navidrome user and mean something else there). With logins off, as deadwax runs
+today, there is one user, so every device sees the same pins; once logins exist, each person has
+their own, and the first admin to sign in takes over the ones pinned before. They're in deadwax's
+database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pins` and
+`POST /deadwax/me/pins/toggle`. Home holds up to 50.
 
 ## The turntable
 
@@ -851,8 +928,12 @@ fixes that.
   [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened).
 - **CarPlay**: not something a web page can offer.
 - **Offline**: nothing is kept on the phone for listening without a connection.
-- **Pins** - an album or an artist pinned to Home - come next; the artist page's top right is
-  kept for one.
+- **Not played in a while** looks only at the 500 albums you played most recently, so in a
+  library with more played albums than that, the very oldest plays aren't considered. It needs
+  Navidrome to send when each album was last played (OpenSubsonic's `played`); without it, the
+  section isn't shown.
+- **An album with no MusicBrainz release id can't be pinned** (its pin isn't shown): nothing would
+  find it again once it moved.
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
@@ -927,6 +1008,11 @@ question the whole player existed to answer. Still to find out:
   (deadwax asks that first, then by the album's title), what its empty search lists for **Songs**,
   whether it sends a song's play count and writers and an album's label (Info → About), and an
   artist's picture as the page's hero;
+- **Pins and Home** (2.0.0-player.18): whether your Navidrome sends `played` on its "recently
+  played" list (Home's **Not played in a while** shows only if it does), dragging a row in **Edit**
+  by its grip under a real finger without the page scrolling, the pin on an album page, an artist
+  page and in the ••• menu, and a pinned album still opening after you re-file it in the main page's
+  editor;
 - **Get** (2.0.0-player.15) against your slskd and real Soulseek folders: the sources sheet
   scrolling under a finger without the page behind it moving, a tap above it closing it, the sort's
   picker (iOS's own wheel), the cards' words for real folders and users, a download showing in

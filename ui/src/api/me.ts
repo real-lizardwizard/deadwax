@@ -5,7 +5,8 @@
  */
 
 import type { GetSettings, GetSettingsAnswer } from '../lib/getSettings'
-import { get, put } from './http'
+import type { PinKind, PinsAnswer, PinToggleBody } from '../lib/pins'
+import { get, post, put } from './http'
 
 export interface Me {
   user: string
@@ -32,4 +33,25 @@ export function getPreferences(signal?: AbortSignal): Promise<GetSettingsAnswer>
 /** Set any of them; the rest stay. Answers with all of them, as getPreferences does. */
 export function putPreferences(values: Partial<GetSettings>): Promise<GetSettingsAnswer> {
   return put<GetSettingsAnswer>('/me/preferences', values)
+}
+
+/**
+ * What the user pinned to Home (2.0.0-player.18) - kept per user on the server (src/routes/pins.py),
+ * deadwax's own and never Navidrome's stars: every pin as it is now, its state and what it opens.
+ */
+export function getPins(signal?: AbortSignal): Promise<PinsAnswer> {
+  return get<PinsAnswer>('/me/pins', signal)
+}
+
+/**
+ * Home's Edit: the whole ordered list - the pins it names, in its order; the rest are unpinned - and
+ * `known`, the list it was made from: a pin stored since that it doesn't hold keeps its place.
+ */
+export function putPins(body: { pins: { kind: PinKind; ref: string }[]; known?: { kind: PinKind; ref: string }[] }): Promise<PinsAnswer> {
+  return put<PinsAnswer>('/me/pins', body)
+}
+
+/** Pin or unpin one album or artist, by what it is (lib/pins.ts toggleBody). Answers with every pin. */
+export function togglePin(body: PinToggleBody): Promise<PinsAnswer> {
+  return post<PinsAnswer>('/me/pins/toggle', body)
 }

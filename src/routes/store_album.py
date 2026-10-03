@@ -57,7 +57,9 @@ SEARCH_ALBUMS = 20
 #? Release id -> Navidrome album id, once found: an album page, a Done row and Info all ask about
 #? the same few albums, and each lookup is up to two searches of the library. Kept a while and no
 #? longer - Navidrome gives an album a new id when its tags change enough - and only what was FOUND:
-#? an album Navidrome hasn't scanned yet is asked about afresh next time.
+#? an album Navidrome hasn't scanned yet is asked about afresh next time. Home's pins (2.0.0-player.18,
+#? src/routes/pins.py) check each id they open with getAlbum, and forget one Navidrome no longer has
+#? as that release (forget_navidrome_id) - so an album moved since is found afresh, here too.
 NAVIDROME_IDS_KEPT = 256
 NAVIDROME_ID_SECONDS = 600.0
 
@@ -67,6 +69,22 @@ _navidrome_ids: "OrderedDict[str, tuple[str, float]]" = OrderedDict()
 def forget_navidrome_ids() -> None:
     """Every release's Navidrome id forgotten (the tests; a Navidrome URL changing)."""
     _navidrome_ids.clear()
+
+
+def forget_navidrome_id(release_mbid: str) -> None:
+    """One release's Navidrome id forgotten: the id kept for it named an album Navidrome no longer
+    has as that release (pins found it so - src/routes/pins.py - after an album moved)."""
+    _navidrome_ids.pop(release_mbid, None)
+
+
+def known_navidrome_id(release_mbid: str) -> str | None:
+    """The Navidrome album id found for a release a moment ago, while it is still kept."""
+    return _kept(release_mbid)
+
+
+def remember_navidrome_id(release_mbid: str, album_id: str) -> None:
+    """A Navidrome album id seen to BE the release (its own musicBrainzId), kept as a found one is."""
+    _keep(release_mbid, album_id)
 
 
 def _kept(release_mbid: str) -> str | None:
@@ -91,6 +109,11 @@ def _keep(release_mbid: str, album_id: str) -> None:
 def _same_release(album: dict, release_mbid: str) -> bool:
     found = album.get("musicBrainzId")
     return isinstance(found, str) and found.strip().lower() == release_mbid.lower()
+
+
+def is_release(album: dict, release_mbid: str) -> bool:
+    """Whether a Navidrome album answer is this release, by its own musicBrainzId."""
+    return _same_release(album, release_mbid)
 
 
 async def navidrome_album(client: NavidromeClient, release_mbid: str | None, title: str | None = None) -> str | None:
@@ -124,16 +147,26 @@ async def navidrome_album(client: NavidromeClient, release_mbid: str | None, tit
     return None
 
 
-async def navidrome_release(client: NavidromeClient, album_id: str) -> str | None:
-    """The release a Navidrome album is, by Navidrome's reading of its files - or None."""
-    try:
-        body = await client.call("getAlbum", {"id": album_id})
-    except NavidromeError as e:
-        logger.debug(f"no release for Navidrome album {album_id!r}: {e}")
-        return None
+async def album_release(client: NavidromeClient, album_id: str) -> str | None:
+    """
+    The release a Navidrome album is, by Navidrome's reading of its files - None for an album it has
+    with no release id. RAISES NavidromeError when Navidrome couldn't be asked, or has no album by
+    that id (its status 404): for a caller that must tell "this album has no release id" apart from
+    "Navidrome didn't say" (the pins' toggle, src/routes/pins.py).
+    """
+    body = await client.call("getAlbum", {"id": album_id})
     album = body.get("album")
     release = album.get("musicBrainzId") if isinstance(album, dict) else None
     return release.strip().lower() if isinstance(release, str) and release.strip() else None
+
+
+async def navidrome_release(client: NavidromeClient, album_id: str) -> str | None:
+    """The release a Navidrome album is, by Navidrome's reading of its files - or None."""
+    try:
+        return await album_release(client, album_id)
+    except NavidromeError as e:
+        logger.debug(f"no release for Navidrome album {album_id!r}: {e}")
+        return None
 
 
 def _usable(store) -> bool:
@@ -155,6 +188,12 @@ async def _live(store, root: str, rows: list[dict]) -> list[dict]:
         else:
             await store.index_gone(root, row["path"], "missing")
     return kept
+
+
+async def live_rows(store, root: str, rows: list[dict]) -> list[dict]:
+    """The rows whose folders are still there (what the bridge lists) - one that has gone is marked
+    `missing`, as Find's checks mark one. For pins too (src/routes/pins.py)."""
+    return await _live(store, root, rows)
 
 
 def _row(row: dict) -> dict:
