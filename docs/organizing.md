@@ -134,3 +134,16 @@ skipped.
 With `SLSKD_INCOMPLETE_PATH` set, the empty folders slskd leaves behind in its incomplete
 folder are also swept every ten minutes. It only ever removes *empty* folders, never one that
 changed in the last ten minutes, and never a partial file or the folders holding one.
+
+## Correcting an album afterwards
+
+Filing a download - and the lyrics fetched with it, unless `FETCH_LYRICS` is off - is all deadwax
+writes into your library on its own. Correcting an album afterwards - applying the release it really
+is, editing tags by hand, fetching a missing cover, CD art or lyrics later, deleting it - is something
+you ask for, previewed first where it can be: in the main page's Library tab
+([the library guide](library.md#the-metadata-editor)), or, in the app at `/player/` on a desktop,
+from an album's own page with **Edit** (since 2.0.0-player.21, [editing an album in the
+app](library.md#editing-an-album-in-the-app)). Both are the same editors with the same rules: a
+re-applied release files the album where a fresh download of it would go - this page's template,
+its edition, the artist's current name - and a rename that comes with new tags waits for Navidrome
+to see the tags first.

@@ -57,9 +57,11 @@ SEARCH_ALBUMS = 20
 #? Release id -> Navidrome album id, once found: an album page, a Done row and Info all ask about
 #? the same few albums, and each lookup is up to two searches of the library. Kept a while and no
 #? longer - Navidrome gives an album a new id when its tags change enough - and only what was FOUND:
-#? an album Navidrome hasn't scanned yet is asked about afresh next time. Home's pins (2.0.0-player.18,
-#? src/routes/pins.py) check each id they open with getAlbum, and forget one Navidrome no longer has
-#? as that release (forget_navidrome_id) - so an album moved since is found afresh, here too.
+#? an album Navidrome hasn't scanned yet is asked about afresh next time. A kept id is CHECKED with
+#? getAlbum before each use (navidrome_album, 2.0.0-player.21) and looked up afresh when Navidrome no
+#? longer has it as that release - an album renamed by an apply moments after it was found, by a
+#? Navidrome that ids albums by folder. Home's pins (2.0.0-player.18, src/routes/pins.py) also check
+#? each id they open, and forget one gone (forget_navidrome_id).
 NAVIDROME_IDS_KEPT = 256
 NAVIDROME_ID_SECONDS = 600.0
 
@@ -131,7 +133,19 @@ async def navidrome_album(client: NavidromeClient, release_mbid: str | None, tit
         return None
     known = _kept(release_mbid)
     if known:
-        return known
+        #? Checked before it is used (2.0.0-player.21): an apply writes the tags, Navidrome scans, and
+        #? the album found then can be renamed a moment later - and a Navidrome that ids albums by
+        #? folder gives it a new id, while this one would be handed out for the rest of the while,
+        #? the album page following an apply never reaching it. One getAlbum, not up to two searches.
+        try:
+            body = await client.call("getAlbum", {"id": known})
+            album = body.get("album")
+            if isinstance(album, dict) and _same_release(album, release_mbid):
+                return known
+        except NavidromeError as e:
+            if e.unreachable:
+                return known  # Navidrome not there: what was found stands, as it always did
+        _navidrome_ids.pop(release_mbid, None)
     for query in dict.fromkeys(term for term in (release_mbid, (title or "").strip()) if term):
         try:
             body = await client.call("search3", {

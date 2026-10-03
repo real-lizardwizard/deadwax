@@ -44,6 +44,17 @@
  *    media queries say on the first render, followed as the window crosses 1024 and 1280px, a resize
  *    within one frame making no new state, a change between the first render and the listening caught
  *    up, iOS 13's addListener, no matchMedia at all the phone's, and the listeners taken off after.
+ *  - Editing an album on a desktop (2.0.0-player.21, lib/albumEdit.ts): the Edit panel a third kind
+ *    of side panel (one at a time, making room as a column, lying over the page as a drawer, closed
+ *    crossing back to the phone); the album page an edit gave a new id in Navidrome becoming that
+ *    album's page in place (`becomeTop`: its entry replaced, back still leaving it); and the panel's
+ *    pure rules - its tabs and their keys, which folder an album page's album is (the id bridge's
+ *    rows, else the scan by the release, else - an album with no release anywhere - by its name and
+ *    artist, several of them a choice the user makes), when the page is followed to a new id, and a
+ *    track's number in the Tags tab. After review: a move remembered (`noteMove`, `movedTo`), so a
+ *    page of the old id coming back on top is the new one's; whether a delete leaves Navidrome nothing
+ *    of the album (`deletesAll`); and what the panel says (`editStatus`) - never "Finding" for good
+ *    after the real scan failed, nothing over an album still being edited.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -57,13 +68,14 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-routes-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/appRoutes.ts', 'src/lib/appHistory.ts', 'src/lib/appFrame.ts', '--outDir', OUT,
+  'src/lib/appRoutes.ts', 'src/lib/appHistory.ts', 'src/lib/appFrame.ts', 'src/lib/albumEdit.ts', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' })
 
 const R = require(path.join(OUT, 'appRoutes.js'))
 const H = require(path.join(OUT, 'appHistory.js'))
 const F = require(path.join(OUT, 'appFrame.js'))
+const E = require(path.join(OUT, 'albumEdit.js'))
 
 let failures = 0
 function check(label, actual, expected) {
@@ -604,6 +616,133 @@ console.log('\nend to end: choosing a pressing on the album you don\'t have')
   check('an update for another page does nothing', d.hashes(), ['#/search', '#/search/group/rg-1'])
 }
 
+console.log('\nan album an edit gave a new id: the page becomes it, in place (2.0.0-player.21)')
+{
+  const at = (stack) => ({ tab: 'library', stacks: { home: [], library: stack, search: [], requests: [], you: [] } })
+  const nav = at([album('X', 'Dummy'), album('A', 'Dummy')])
+  const moved = R.becomeTop(nav, { kind: 'album', id: 'A' }, album('B', 'Dummy'))
+  check('the page on top becomes the new one, the rest of the stack as it was', stackIds(moved, 'library'), ['X', 'B'])
+  check('...its label kept as given', moved.stacks.library[1], { kind: 'album', id: 'B', label: 'Dummy' })
+  check('nothing when the page on top is another, or the same page',
+    [R.becomeTop(nav, { kind: 'album', id: 'X' }, album('B')) === nav, R.becomeTop(nav, { kind: 'album', id: 'A' }, album('A')) === nav,
+      R.becomeTop(nav, { kind: 'group', id: 'A' }, album('B')) === nav], [true, true, true])
+  const twice = at([album('A'), album('X'), album('A')])
+  check('...and a copy lower down (Go to album) is left as it is', stackIds(R.becomeTop(twice, { kind: 'album', id: 'A' }, album('B')), 'library'), ['A', 'X', 'B'])
+
+  const b = makeBrowser('#/library')
+  b.load()
+  b.router.open(album('A', 'Dummy'))
+  b.router.become({ kind: 'album', id: 'A' }, album('B', 'Dummy'))
+  check('end to end: the entry REPLACED with the new address - no new one', [b.hashes(), b.index], [['#/library', '#/library/album/B'], 1])
+  b.router.become({ kind: 'album', id: 'A' }, album('C'))
+  check('...and once it is B, a move from A does nothing', b.hashes(), ['#/library', '#/library/album/B'])
+  b.router.back()
+  b.settle()
+  check('back still leaves the page, by history\'s own back', [where(b), b.index, b.left], [['library', []], 0, false])
+  b.forward()
+  check('forward lands on the album as it is now', [stackIds(b.router.nav, 'library'), b.entries[b.index].hash], [['B'], '#/library/album/B'])
+}
+
+console.log('\nediting an album: the panel\'s rules (2.0.0-player.21, lib/albumEdit.ts)')
+{
+  check('the tabs, as the board has them', E.EDIT_TABS.map((tab) => tab.label), ['Release', 'Tags', 'Artwork', 'Lyrics', 'Delete'])
+  check('the arrows move between them, round the ends',
+    [E.tabAfter('release', 1), E.tabAfter('release', -1), E.tabAfter('delete', 1), E.tabAfter('tags', -1)], ['tags', 'delete', 'release', 'release'])
+  check('the album as the page had it, songs left behind',
+    [E.editAlbum({ id: 'n1', name: 'Dummy', artist: 'Portishead', songCount: 11, musicBrainzId: ' r-cd ', song: [{}] }), E.editAlbum({ id: 'n2', name: 'Rip', musicBrainzId: '' })],
+    [{ id: 'n1', name: 'Dummy', artist: 'Portishead', songCount: 11, musicBrainzId: 'r-cd' }, { id: 'n2', name: 'Rip' }])
+
+  const scan = [
+    { path: 'Portishead/Dummy (1994)', album: 'Dummy', artist: 'Portishead', release_mbid: 'r-cd', track_count: 11 },
+    { path: 'Portishead/Dummy (1994) [Vinyl]', album: 'Dummy', artist: 'Portishead', release_mbid: 'r-vinyl', track_count: 11 },
+    { path: 'Portishead - Dummy', album: 'Dummy', artist: 'Portishead', release_mbid: '', track_count: 11 },
+    { path: 'Old Rips/Dummy', album: 'Dummy', artist: 'Portishead', release_mbid: '', track_count: 10 },
+    { path: 'Radiohead/OK Computer', album: 'OK Computer', artist: 'Radiohead', release_mbid: '', track_count: 12 },
+  ]
+  const bridge = (release, ...paths) => ({ release_mbid: release, present: paths.map((path) => ({ path })) })
+  check('the id bridge\'s rows first - a set kept one folder per disc is both, in its order, each once',
+    [E.editFolders(bridge('r-cd', 'Portishead/Dummy (1994)'), scan, { id: 'n', name: 'Dummy' }),
+      E.editFolders(bridge('r-box', 'A/Box (Disc 1)', 'A/Box (Disc 2)', 'A/Box (Disc 1)'), scan, { id: 'n', name: 'Box' })],
+    [{ paths: ['Portishead/Dummy (1994)'], from: 'store' }, { paths: ['A/Box (Disc 1)', 'A/Box (Disc 2)'], from: 'store' }])
+  check('no rows in the store (not indexed yet): the scan, by the release - never by name for a tagged album',
+    [E.editFolders(bridge('r-vinyl'), scan, { id: 'n', name: 'Dummy', artist: 'Portishead' }),
+      E.editFolders(bridge('r-unknown'), scan, { id: 'n', name: 'Dummy', artist: 'Portishead' })],
+    [{ paths: ['Portishead/Dummy (1994) [Vinyl]'], from: 'release' }, { paths: [], from: 'none' }])
+  check('...the bridge not answering: the release Navidrome sent, as the album page had it (any case)',
+    E.editFolders(null, scan, { id: 'n', name: 'Dummy', musicBrainzId: 'R-CD' }), { paths: ['Portishead/Dummy (1994)'], from: 'release' })
+  check('no release anywhere (a stranger\'s rip): untagged folders by name and artist, folded - narrowed by the track count',
+    [E.editFolders(bridge(null), scan, { id: 'n', name: 'dummy', artist: 'PORTISHEAD', songCount: 11 }),
+      E.editFolders(bridge(null), scan, { id: 'n', name: 'OK Computer', artist: 'Radiohead' })],
+    [{ paths: ['Portishead - Dummy'], from: 'name' }, { paths: ['Radiohead/OK Computer'], from: 'name' }])
+  const several = E.editFolders(bridge(null), scan, { id: 'n', name: 'Dummy', artist: 'Portishead' })
+  check('...several by name are a choice the user makes - several of a release are not',
+    [several, E.needsChoice(several), E.needsChoice(E.editFolders(bridge('r-box', 'a', 'b'), scan, { id: 'n', name: 'Box' }))],
+    [{ paths: ['Portishead - Dummy', 'Old Rips/Dummy'], from: 'name' }, true, false])
+  check('...a count that matches none leaves them all; another artist, or no name, finds nothing',
+    [E.editFolders(bridge(null), scan, { id: 'n', name: 'Dummy', artist: 'Portishead', songCount: 3 }).paths.length,
+      E.editFolders(bridge(null), scan, { id: 'n', name: 'Dummy', artist: 'Massive Attack' }), E.editFolders(bridge(null), scan, { id: 'n', name: '' })],
+    [2, { paths: [], from: 'none' }, { paths: [], from: 'none' }])
+
+  check('the page is followed only after an apply changed the release - kept, or taken away, it keeps its id',
+    [E.followRelease(null, 'r-cd'), E.followRelease('', 'R-CD'), E.followRelease('r-cd', 'r-vinyl'), E.followRelease('r-cd', 'R-CD '),
+      E.followRelease(' R-CD', 'r-cd'), E.followRelease('r-cd', ''), E.followRelease('r-cd', null)],
+    ['r-cd', 'r-cd', 'r-vinyl', null, null, null, null])
+  check('...to Navidrome\'s album for it, when it has one that isn\'t the page\'s own',
+    [E.followsTo('n1', 'n2'), E.followsTo('n1', 'n1'), E.followsTo('n1', null)], ['n2', null, null])
+  check('...looked for at once, then less often - under a minute in all; the page asked again 10 s after a write',
+    [E.FOLLOW_LOOKS_MS[0], E.FOLLOW_LOOKS_MS.every((ms, index, all) => index === 0 || ms > all[index - 1]), E.FOLLOW_LOOKS_MS.reduce((sum, ms) => sum + ms, 0) < 60000, E.EDIT_SETTLE_MS],
+    [0, true, true, 10000])
+  //? after review
+  const moves = new Map()
+  E.noteMove(moves, 'X', 'Y')
+  check('a move remembered: a page of the old id goes to the new one, a page that never moved nowhere',
+    [E.movedTo(moves, 'X'), E.movedTo(moves, 'Y'), E.movedTo(moves, 'Q')], ['Y', null, null])
+  E.noteMove(moves, 'Y', 'Z')
+  check('...moved twice, to where it is now', [E.movedTo(moves, 'X'), E.movedTo(moves, 'Y')], ['Z', 'Z'])
+  E.noteMove(moves, 'Z', 'X')
+  check('...and applied back to its first release (Navidrome\'s id for it the same): that id is live again, and no loop',
+    [E.movedTo(moves, 'X'), E.movedTo(moves, 'Y'), E.movedTo(moves, 'Z')], [null, 'X', 'X'])
+  check('...a loop that got in anyway is followed once round, not for ever',
+    E.movedTo(new Map([['A', 'B'], ['B', 'A']]), 'A'), 'B')
+
+  const one = { paths: ['P/Dummy'], from: 'store' }
+  const twoOfARelease = { paths: ['A/Box (Disc 1)', 'A/Box (Disc 2)'], from: 'store' }
+  const twoByName = { paths: ['Portishead - Dummy', 'Old Rips/Dummy'], from: 'name' }
+  check('a delete leaves Navidrome nothing of the album: its only folder - not one of several of a release, which are ONE album there',
+    [E.deletesAll(one, 11, { id: 'n', name: 'Dummy' }), E.deletesAll(null, 11, { id: 'n', name: 'Dummy' }),
+      E.deletesAll(twoOfARelease, 10, { id: 'n', name: 'Box', songCount: 20 })], [true, true, false])
+  check('...found by name among several: the page\'s whole album when the folder holds every song Navidrome lists for it',
+    [E.deletesAll(twoByName, 11, { id: 'n', name: 'Dummy', songCount: 11 }), E.deletesAll(twoByName, 11, { id: 'n', name: 'Dummy', songCount: 21 }),
+      E.deletesAll(twoByName, 11, { id: 'n', name: 'Dummy' })], [true, false, false])
+
+  const facts = (over) => ({
+    deleted: null, problem: null, error: null, albums: 3, loaded: true, stale: false, asked: true,
+    folders: { paths: ['P/Dummy'], from: 'store' }, holding: false, release: 'r-cd', ...over,
+  })
+  check('what the panel says: busy until the bridge and the REAL scan are in, nothing once an album is held',
+    [E.editStatus(facts({ asked: false })), E.editStatus(facts({ stale: true })), E.editStatus(facts({ loaded: false })), E.editStatus(facts({ holding: true }))],
+    [{ text: "Finding the album's folder…", busy: true }, { text: "Finding the album's folder…", busy: true }, { text: "Finding the album's folder…", busy: true }, null])
+  check('...the saved scan in and the real one FAILED: said, with Look again - never "Finding" for good',
+    E.editStatus(facts({ stale: true, error: 'HTTP 504' })), { text: "deadwax couldn't read the library: HTTP 504", retry: true })
+  check('...a failed read with nothing to show says so too; one under an album still being edited, nothing',
+    [E.editStatus(facts({ albums: 0, error: 'down' })), E.editStatus(facts({ error: 'down', holding: true })), E.editStatus(facts({ error: 'down' }))],
+    [{ text: "deadwax couldn't read the library: down", retry: true }, null, { text: "The library's scan doesn't list P/Dummy yet.", retry: true }])
+  check('...an album held keeps its editors, whatever a later read finds (a hand edit renamed it out of the name it was found by)',
+    E.editStatus(facts({ holding: true, folders: { paths: [], from: 'none' }, release: null })), null)
+  check('...no folder: by release, or by name - Look again, and the main page',
+    [E.editStatus(facts({ folders: { paths: [], from: 'none' } })).text.startsWith('deadwax has no folder of this album'),
+      E.editStatus(facts({ folders: { paths: [], from: 'none' }, release: null })).text.startsWith("deadwax can't tell which folder"),
+      E.editStatus(facts({ folders: null })).retry, E.editStatus(facts({ folders: null })).mainPage], [true, true, true, true])
+  check('...several by name: the choice drawn instead; deleted, the folder named; LIBRARY_PATH unset, said first',
+    [E.editStatus(facts({ folders: twoByName })), E.editStatus(facts({ deleted: 'P/Dummy', holding: true })), E.editStatus(facts({ problem: 'LIBRARY_PATH is not set', asked: false }))],
+    [null, { text: 'Deleted P/Dummy.' }, { text: 'LIBRARY_PATH is not set' }])
+  check('the editors let go once a drawer has slid away (player.css: 420ms)', E.EDIT_SLIDE_MS > 420 && E.EDIT_SLIDE_MS < 1000, true)
+
+  check('a track\'s number in the Tags tab: the disc first on a set, a dot for none',
+    [E.trackLabel({ position: 4, disc: 2 }, 2), E.trackLabel({ position: 4, disc: null }, 2), E.trackLabel({ position: 12, disc: 1 }, 0), E.trackLabel({ position: null, disc: 1 }, 2)],
+    ['2-04', '1-04', '12', '·'])
+}
+
 console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
 {
   check('the breakpoints: 1024 and 1280, the media queries built from them',
@@ -619,13 +758,21 @@ console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
   check('only a sheet is modal: a drawer and a column leave the page beside them usable',
     ['sheet', 'drawer', 'column'].map(F.panelIsModal), [true, false, false])
   check('one panel at a time, and none on a phone - Info the one showing if both were ever open (it is opened over Sources)',
-    [F.sideOf('desktop', { sources: true, info: false }), F.sideOf('desktop', { sources: false, info: true }), F.sideOf('desktop', { sources: false, info: false }),
-      F.sideOf('phone', { sources: true, info: false }), F.sideOf('desktop', { sources: true, info: true })], ['sources', 'info', 'none', 'none', 'info'])
+    [F.sideOf('desktop', { sources: true, info: false, edit: false }), F.sideOf('desktop', { sources: false, info: true, edit: false }), F.sideOf('desktop', { sources: false, info: false, edit: false }),
+      F.sideOf('phone', { sources: true, info: false, edit: false }), F.sideOf('desktop', { sources: true, info: true, edit: false })], ['sources', 'info', 'none', 'none', 'info'])
+  //? 2.0.0-player.21: the album page's Edit panel, a third kind - App opens one at a time, and this
+  //? says which shows if two ever were
+  check('the Edit panel is a side panel too: shown alone, under Info, over Sources - and never on a phone',
+    [F.sideOf('desktop', { sources: false, info: false, edit: true }), F.sideOf('desktop', { sources: false, info: true, edit: true }),
+      F.sideOf('desktop', { sources: true, info: false, edit: true }), F.sideOf('phone', { sources: false, info: false, edit: true })], ['edit', 'info', 'edit', 'none'])
+  check('...making room as a column, lying over the page as a drawer',
+    [F.makesRoom('column', 'edit'), F.makesRoom('drawer', 'edit'), F.liesOver('drawer', 'edit'), F.liesOver('column', 'edit')], [true, false, true, false])
   check('the main area makes room only for a third column - a drawer lies over it',
     [F.makesRoom('column', 'sources'), F.makesRoom('column', 'info'), F.makesRoom('column', 'none'), F.makesRoom('drawer', 'sources'), F.makesRoom('sheet', 'sources')],
     [true, true, false, false, false])
-  check('crossing into the desktop closes Now Playing; back to the phone, the Info panel',
-    [F.closesOnCrossing('desktop'), F.closesOnCrossing('phone')], [{ nowPlaying: true, infoPanel: false }, { nowPlaying: false, infoPanel: true }])
+  check('crossing into the desktop closes Now Playing; back to the phone, the Info panel - and the Edit panel, which a phone has none of',
+    [F.closesOnCrossing('desktop'), F.closesOnCrossing('phone')],
+    [{ nowPlaying: true, infoPanel: false, editPanel: false }, { nowPlaying: false, infoPanel: true, editPanel: true }])
   check('a drawer, showing, lies over the page - a column makes room instead, and a sheet is no panel',
     [F.liesOver('drawer', 'sources'), F.liesOver('drawer', 'info'), F.liesOver('drawer', 'none'), F.liesOver('column', 'info'), F.liesOver('sheet', 'sources')],
     [true, true, false, false, false])

@@ -183,6 +183,19 @@ export function replaceTop(nav: Nav, page: Page): Nav {
   return withStack(nav, nav.tab, [...stack.slice(0, -1), page.release ? { ...kept, release: page.release } : kept])
 }
 
+/**
+ * The page on top of the tab showing become ANOTHER page (2.0.0-player.21): an album an edit gave a
+ * new identity - applying another release gives it a new id in Navidrome - shown as it is now, not
+ * left on an id Navidrome no longer has. Its entry is replaced, never a page pushed over it, so back
+ * still leaves it. The same nav unless `from` is on top and `to` is another page; a copy of `from`
+ * lower in the stack (Go to album can put one there) is left as it is.
+ */
+export function becomeTop(nav: Nav, from: Page, to: Page): Nav {
+  const stack = nav.stacks[nav.tab]
+  if (!samePage(top(nav), from) || samePage(from, to)) return nav
+  return withStack(nav, nav.tab, [...stack.slice(0, -1), to])
+}
+
 /** The page on top taken off; the same nav at the root. */
 export function popPage(nav: Nav): Nav {
   const stack = nav.stacks[nav.tab]

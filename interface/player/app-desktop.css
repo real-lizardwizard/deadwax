@@ -16,6 +16,12 @@
   The document stays the scroller, as on a phone - so the per-tab scroll App keeps and puts back, the
   Library's pages and every sticky bar work unchanged: the sidebar, the bar and a panel are fixed,
   and the shell keeps room for them.
+
+  Since 2.0.0-player.21 the Edit panel (DesktopManage.dc.html) is a third side panel, and the main
+  page's editors drawn inside it - the metadata editor, the tag editor, the delete confirmation and the
+  cover viewer - are styled here, keyed on their own ids and classes under `.app-desk .app-edit`: they
+  are the main page's components, reused as they are, and that page's main.css and resize.js are not
+  on this one. A side panel neither moves nor resizes.
 */
 
 @media (min-width: 1024px) {
@@ -140,6 +146,37 @@
         --app-desk-fact-lines: 4px;
         --app-desk-speed-text: 14px;
         --app-desk-speed-bar: 7px;
+
+        /* the Edit panel (2.0.0-player.21), as DesktopManage.dc.html draws it - and the main page's
+           editors inside it, in the panel's measure */
+        --app-desk-edit-gap: 16px;        /* the head, the tabs and the body */
+        --app-desk-edit-tab-y: 8px;       /* an underline tab's padding */
+        --app-desk-edit-tab-x: 10px;
+        --app-desk-edit-tabs-gap: 4px;
+        --app-desk-edit-rule: 2px;        /* the chosen tab's underline */
+        --app-desk-edit-block: 12px;      /* between an editor's blocks */
+        --app-desk-edit-lines: 6px;       /* between a block's lines */
+        --app-desk-edit-pad-y: 10px;      /* a pressing, as the board pads it; a well */
+        --app-desk-edit-pad-x: 12px;
+        --app-desk-edit-control: 32px;    /* a field, a secondary button */
+        --app-desk-edit-apply: 36px;      /* Apply and Cancel, as the board has them */
+        --app-desk-edit-apply-pad: 20px;
+        --app-desk-edit-list: 280px;      /* the pressings at their tallest, scrolling inside */
+        --app-desk-edit-thumb: 96px;      /* the two covers compared */
+        --app-desk-edit-cover: 140px;     /* Artwork's cover */
+        --app-desk-edit-tag: 84px;        /* a change's tag name */
+        --app-desk-edit-check: 16px;      /* a tick box */
+        --app-desk-edit-tick: var(--app-desk-edit-check); /* ...and the label round it, its target */
+        --app-desk-edit-number: 40px;     /* the Tags tab's # */
+        --app-desk-edit-length: 52px;
+        --app-desk-spin: 12px;            /* busy, beside a label: the player's own ring */
+        --app-desk-spin-panel: 22px;      /* ...and on its own, in an empty list */
+        --app-desk-spin-ring: 2px;
+        --app-desk-spin-time: 0.8s;
+        --app-desk-viewer-pad: 24px;      /* the cover viewer, over the whole window */
+        --app-desk-viewer-max: 1400px;
+        --app-desk-viewer-height: 92vh;
+        --app-z-edit-viewer: 1;           /* over the panel's own parts, inside its layer */
     }
 
     /* keyboard focus scrolls clear of the bar - not of a tab bar that isn't there - and of the album
@@ -575,6 +612,10 @@
     .app-desk .pl-hero-title { letter-spacing: var(--dw-tracking-title); }
     .app-desk .pl-hero-meta { font-size: var(--app-desk-text-sm); }
 
+    /* "In your library" and its chips start under the title, as Play and Shuffle do - the phone's
+       centred row left them floating mid-column beside a left-aligned hero */
+    .app-desk .app-album-chips { justify-content: flex-start; }
+
     /* Play and Shuffle, a row of the board's 34px buttons */
     .app-desk .pl-hero-actions {
         display: flex;
@@ -582,6 +623,42 @@
         width: auto;
         max-width: none;
         margin-top: var(--app-desk-actions-gap);
+    }
+
+    /* A drawer open over the album you have (1024-1279px): Play, Shuffle and Edit go UNDER the cover, at
+       the main area's edge, wrapping in the part the drawer leaves in view - beside the cover they start
+       236px in, and a drawer covers the page from 322px in at 1024, so the Edit panel's own drawer would
+       open over the button that closes it. The album you don't have does the same with Get (below). From
+       1280px the panel is a column the page makes room for, and nothing moves. */
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .pl-album-hero {
+        display: grid;
+        grid-template-columns: var(--app-desk-hero-cover) minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto auto auto auto auto;
+        justify-content: normal;
+        justify-items: start;
+        column-gap: var(--app-desk-hero-gap);
+        row-gap: var(--app-desk-hero-lines);
+        padding-left: var(--pl-edge-left);
+    }
+
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .pl-hero-cover {
+        position: static;
+        grid-column: 1;
+        grid-row: 1 / 6;
+        align-self: end;
+        width: 100%;
+    }
+
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .pl-hero-title { grid-column: 2; grid-row: 2; }
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .pl-hero-artist { grid-column: 2; grid-row: 3; }
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .pl-hero-meta { grid-column: 2; grid-row: 4; }
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .app-album-chips { grid-column: 2; grid-row: 5; }
+
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .pl-hero-actions {
+        flex-wrap: wrap;
+        grid-column: 1 / -1;
+        grid-row: 6;
+        max-width: calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap));
     }
 
     .app-desk .pl-pill {
@@ -814,7 +891,8 @@
     .app-desk .app-layer.is-panel .app-backdrop { display: none; }
 
     .app-desk .app-layer.is-panel .app-sources,
-    .app-desk .app-layer.is-panel .app-info {
+    .app-desk .app-layer.is-panel .app-info,
+    .app-desk .app-layer.is-panel .app-edit {
         inset: 0;
         max-width: none;
         margin: 0;
@@ -827,15 +905,18 @@
     }
 
     .app-desk .app-layer.is-panel.is-open .app-sources,
-    .app-desk .app-layer.is-panel.is-open .app-info { transform: none; }
+    .app-desk .app-layer.is-panel.is-open .app-info,
+    .app-desk .app-layer.is-panel.is-open .app-edit { transform: none; }
 
     /* the box takes focus from a click on something in it that can't (so Escape there is from inside
        it) - a click, never a ring: it isn't in the tab order */
     .app-desk .app-layer.is-panel .app-sources:focus,
-    .app-desk .app-layer.is-panel .app-info:focus { outline: none; }
+    .app-desk .app-layer.is-panel .app-info:focus,
+    .app-desk .app-layer.is-panel .app-edit:focus { outline: none; }
 
     .app-desk .app-layer.is-column .app-sources,
-    .app-desk .app-layer.is-column .app-info { transition: none; }
+    .app-desk .app-layer.is-column .app-info,
+    .app-desk .app-layer.is-column .app-edit { transition: none; }
 
     .app-desk .app-layer.is-panel .app-sources { gap: var(--app-desk-panel-gap); }
 
@@ -860,7 +941,9 @@
         text-align: left;
     }
 
-    .app-desk .app-sources-close {
+    .app-desk .app-sources-close,
+    .app-desk .app-edit-close,
+    .app-desk .app-edit .window-close {
         display: flex;
         flex: none;
         align-items: center;
@@ -874,12 +957,14 @@
         color: var(--dw-text-on-secondary);
     }
 
-    .app-desk .app-sources-close:focus-visible {
+    .app-desk .app-sources-close:focus-visible,
+    .app-desk .app-edit-close:focus-visible {
         outline: var(--app-ring) solid var(--dw-accent);
         outline-offset: var(--app-ring);
     }
 
-    .app-desk .app-sources-close-icon { width: var(--app-desk-close-icon); height: var(--app-desk-close-icon); }
+    .app-desk .app-sources-close-icon,
+    .app-desk .app-edit-close-icon { width: var(--app-desk-close-icon); height: var(--app-desk-close-icon); }
 
     /* the chips, the board's 26px */
     .app-desk .app-layer.is-panel .app-sources-chips { column-gap: var(--app-desk-chips-gap); }
@@ -992,6 +1077,811 @@
         overflow-wrap: break-word;
     }
     .app-desk .app-layer.is-panel .app-source-missing { grid-column: 1 / -1; font-size: var(--dw-text-data); }
+
+    /* ===== the Edit panel (2.0.0-player.21): the album page's editors beside it ===== */
+
+    /* Edit on the album page: Play and Shuffle's secondary button, in the toggled tint while the
+       panel shows this album, as the board draws it */
+    .app-desk .app-edit-toggle[aria-pressed="true"] {
+        border-color: var(--dw-toggled-border);
+        background: var(--dw-toggled-bg);
+        box-shadow: none;
+        color: var(--dw-accent-text);
+    }
+
+    .app-desk .app-edit {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-edit-gap);
+        transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+    }
+
+    /* "Edit album" and the close button */
+    .app-desk .app-edit-head {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--app-desk-panel-gap);
+    }
+
+    .app-desk .app-edit-title {
+        margin: 0;
+        color: var(--dw-text-heading-color);
+        font-size: var(--dw-text-heading);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    /* underline tabs - the board's own idiom for the editor (Info's are a segmented control) */
+    .app-desk .app-edit-tabs {
+        display: flex;
+        flex: none;
+        gap: var(--app-desk-edit-tabs-gap);
+        border-bottom: var(--dw-hairline) solid var(--dw-border);
+    }
+
+    .app-desk .app-edit-tab {
+        margin-bottom: calc(-1 * var(--dw-hairline));
+        padding: var(--app-desk-edit-tab-y) var(--app-desk-edit-tab-x);
+        border-bottom: var(--app-desk-edit-rule) solid transparent;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-edit-tab:hover { color: var(--dw-text); }
+
+    .app-desk .app-edit-tab.is-on {
+        border-bottom-color: var(--dw-accent);
+        color: var(--dw-text);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-edit-tab:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring-inset);
+        border-radius: var(--dw-radius-control);
+    }
+
+    /* which folder, for an album kept in several */
+    .app-desk .app-edit-folder { display: flex; flex: none; align-items: center; gap: var(--app-desk-field-gap); min-width: 0; }
+    .app-desk .app-edit-label { flex: none; color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+    /* the body scrolls, and says its touches pan (the layer it sits in takes every touch) */
+    .app-desk .app-edit-body {
+        flex: 1;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-edit-body:focus { outline: none; }
+    .app-desk .app-edit-pane { padding-bottom: var(--app-desk-panel-pad); }
+
+    .app-desk .app-edit-state {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--app-desk-edit-block);
+        padding-top: var(--app-desk-edit-lines);
+    }
+
+    .app-desk .app-edit-sweep { align-self: stretch; }
+
+    /* a path or a name typed by whoever made the folder can be one long word: broken, never clipped */
+    .app-desk .app-edit-note {
+        margin: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-edit-link { color: var(--dw-accent); font-size: var(--app-desk-text-sm); }
+
+    .app-desk .app-edit-choices {
+        display: flex;
+        flex-direction: column;
+        align-self: stretch;
+        gap: var(--app-desk-edit-lines);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    /* a folder to choose: a path, typed by whoever named it */
+    .app-desk .app-edit-choice {
+        width: 100%;
+        padding: var(--app-desk-edit-pad-y) var(--app-desk-edit-pad-x);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-card);
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-data);
+        text-align: left;
+        overflow-wrap: anywhere;
+        user-select: text;
+    }
+
+    .app-desk .app-edit-choice:hover { border-color: var(--dw-selection-border); background: var(--dw-selection-bg); }
+
+    /* Artwork and Lyrics: a heading, what is there, and the main page's Get button */
+    .app-desk .app-edit-sections { display: flex; flex-direction: column; gap: var(--app-desk-edit-gap); }
+    .app-desk .app-edit-section { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-desk-edit-block); }
+
+    .app-desk .app-edit-heading {
+        margin: 0;
+        color: var(--dw-text-heading-color);
+        font-size: var(--dw-text-heading);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-edit-cover-row { display: flex; align-items: flex-start; gap: var(--app-desk-edit-block); }
+
+    .app-desk .app-edit-cover {
+        flex: none;
+        width: var(--app-desk-edit-cover);
+        height: var(--app-desk-edit-cover);
+        object-fit: cover;
+        border: var(--dw-hairline) solid var(--dw-border-cover);
+        border-radius: var(--dw-radius-cover);
+        background: var(--dw-empty-cover);
+    }
+
+    .app-desk .app-edit-lines { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-desk-edit-lines); min-width: 0; }
+
+    /* Tags: the album's tracks, a tick box each */
+    .app-desk .app-edit-tags { display: flex; flex-direction: column; gap: var(--app-desk-edit-block); }
+    .app-desk .app-edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-desk-field-gap); }
+
+    .app-desk .app-edit-tracks {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-edit-tracks th,
+    .app-desk .app-edit-tracks td {
+        padding: 0 var(--app-desk-cell-gap);
+        overflow: hidden;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-desk .app-edit-tracks thead th {
+        height: var(--app-desk-th);
+        border-bottom: var(--dw-hairline) solid var(--dw-border);
+        color: var(--dw-text-label-color);
+        font-size: var(--dw-text-label);
+        font-weight: var(--dw-weight-regular);
+    }
+
+    .app-desk .app-edit-tracks td { height: var(--app-desk-row); border-bottom: var(--dw-hairline) solid var(--dw-row-border); }
+    .app-desk .app-edit-tracks tr.is-ticked td { background: var(--dw-selected-row); }
+    .app-desk .app-edit-tracks .app-edit-tick { width: calc(var(--app-desk-edit-tick) + 2 * var(--app-desk-cell-gap)); }
+
+    /* the label round a tick box: a click on it is the box's - the target a finger gets (coarse, below) */
+    .app-desk .app-edit-hit {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--app-desk-edit-tick);
+        min-height: var(--app-desk-edit-tick);
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .app-desk .app-edit-tracks .app-edit-number {
+        width: calc(var(--app-desk-edit-number) + 2 * var(--app-desk-cell-gap));
+        color: var(--dw-text-3);
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-data);
+        text-align: right;
+    }
+
+    .app-desk .app-edit-tracks .app-edit-length {
+        width: calc(var(--app-desk-edit-length) + 2 * var(--app-desk-cell-gap));
+        color: var(--dw-text-2);
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-data);
+        text-align: right;
+    }
+
+    /* --- the main page's editors, in the panel: their words, fields and buttons --- */
+
+    .app-desk .app-edit h4,
+    .app-desk .app-edit h5,
+    .app-desk .app-edit p { margin: 0; }
+
+    .app-desk .app-edit h4 { font-size: var(--app-desk-text-sm); font-weight: var(--dw-weight-semibold); }
+    .app-desk .app-edit h5 { font-size: var(--app-desk-text-sm); font-weight: var(--dw-weight-regular); }
+
+    /* the main page's colour classes, in this page's palette */
+    .app-desk .app-edit .white { color: var(--dw-text); }
+    .app-desk .app-edit .default { color: var(--dw-text-heading-color); }
+    .app-desk .app-edit .default-secondary { color: var(--dw-text-2); }
+
+    .app-desk .app-edit .white-tertiary,
+    .app-desk .app-edit .default-muted { color: var(--dw-text-3); }
+
+    .app-desk .app-edit .yellow { color: var(--dw-amber-text); }
+    .app-desk .app-edit .red { color: var(--dw-danger-text); }
+    .app-desk .app-edit .green { color: var(--dw-badge-green-text); }
+
+    /* a text field: STYLE.md's well, its edge the best match's purple with focus */
+    .app-desk .app-edit .releases-filter-input,
+    .app-desk .app-edit-select {
+        width: 100%;
+        min-width: 0;
+        height: var(--app-desk-edit-control);
+        padding: 0 var(--app-desk-item-pad);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-well);
+        box-shadow: var(--dw-well-inset);
+        color: var(--dw-text);
+        font: inherit;
+        font-size: var(--app-desk-text-sm);
+        outline: none;
+    }
+
+    .app-desk .app-edit .releases-filter-input:focus,
+    .app-desk .app-edit-select:focus { border-color: var(--dw-best); }
+
+    .app-desk .app-edit .releases-filter-input::placeholder { color: var(--dw-text-3); }
+
+    .app-desk .app-edit input[type="checkbox"] {
+        width: var(--app-desk-edit-check);
+        height: var(--app-desk-edit-check);
+        margin: 0;
+        accent-color: var(--dw-accent);
+    }
+
+    /* STYLE.md's secondary button: the editors' own, the Get buttons, and the viewer's */
+    .app-desk .app-edit .app-edit-button,
+    .app-desk .app-edit .columns-toggle-button,
+    .app-desk .app-edit .win-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--app-desk-field-gap);
+        min-height: var(--app-desk-edit-control);
+        padding: 0 var(--app-desk-control-pad-sm);
+        border: var(--dw-hairline) solid var(--dw-secondary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-secondary-bg);
+        box-shadow: var(--dw-highlight);
+        color: var(--dw-text-on-secondary);
+        font-size: var(--app-desk-text-sm);
+        font-weight: var(--dw-weight-medium);
+        white-space: nowrap;
+    }
+
+    .app-desk .app-edit .app-edit-button:hover:not(:disabled),
+    .app-desk .app-edit .columns-toggle-button:hover:not(:disabled),
+    .app-desk .app-edit .win-button:hover:not(:disabled) { background: var(--dw-secondary-bg-active); }
+
+    /* a Get that failed: still a button to press again, its words amber */
+    .app-desk .app-edit .app-edit-button.failed { color: var(--dw-amber-text); }
+
+    /* the solid purple: Apply, in the release editor and the tag editor - and the viewer's choice */
+    .app-desk .app-edit #metadata-apply-button,
+    .app-desk .app-edit #tags-apply-button,
+    .app-desk .app-edit .win-button.is-default {
+        border: var(--dw-hairline) solid var(--dw-primary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-primary-bg);
+        box-shadow: var(--dw-primary-highlight);
+        color: var(--dw-text);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    /* Apply and Cancel at the board's 36px */
+    .app-desk .app-edit #metadata-apply-button,
+    .app-desk .app-edit #tags-apply-button,
+    .app-desk .app-edit #metadata-footer .columns-toggle-button,
+    .app-desk .app-edit .tags-footer .columns-toggle-button,
+    .app-desk .app-edit #delete-actions .columns-toggle-button {
+        min-height: var(--app-desk-edit-apply);
+        padding: 0 var(--app-desk-edit-apply-pad);
+        font-size: var(--app-desk-text);
+    }
+
+    .app-desk .app-edit button:focus-visible,
+    .app-desk .app-edit input:focus-visible,
+    .app-desk .app-edit-select:focus-visible,
+    .app-desk .app-edit summary:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring);
+    }
+
+    /* busy: the player's own ring, beside a label or alone in an empty list */
+    .app-desk .app-edit .loading-blocks { display: inline-flex; align-items: center; gap: var(--app-desk-field-gap); }
+
+    .app-desk .app-edit .loading-blocks::before,
+    .app-desk .app-edit .loading-panel::before {
+        content: '';
+        flex: none;
+        width: var(--app-desk-spin);
+        height: var(--app-desk-spin);
+        border: var(--app-desk-spin-ring) solid var(--dw-border-cover);
+        border-top-color: var(--dw-text-2);
+        border-radius: var(--dw-radius-round);
+        animation: pl-spin var(--app-desk-spin-time) linear infinite;
+    }
+
+    .app-desk .app-edit .loading-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--app-desk-edit-lines);
+        padding: var(--app-desk-edit-gap) 0;
+        color: var(--dw-text-2);
+    }
+
+    .app-desk .app-edit .loading-panel::before { width: var(--app-desk-spin-panel); height: var(--app-desk-spin-panel); }
+
+    /* busy inside a solid button (Apply's "Applying, renaming in 20s", "Saving", "Deleting"): the
+       button's own white, never the muted grey a label beside one takes - grey on purple or red can't
+       be read */
+    .app-desk .app-edit #metadata-apply-button .loading-blocks,
+    .app-desk .app-edit #tags-apply-button .loading-blocks,
+    .app-desk .app-edit #delete-confirm-button .loading-blocks,
+    .app-desk .app-edit .win-button.is-default .loading-blocks { color: inherit; }
+
+    /* --- the release editor (components/MetadataEditor.tsx), one column in the panel --- */
+
+    .app-desk .app-edit #metadata-window,
+    .app-desk .app-edit #metadata-panel,
+    .app-desk .app-edit #metadata-body,
+    .app-desk .app-edit .metadata-plan { display: flex; flex-direction: column; gap: var(--app-desk-edit-block); }
+
+    .app-desk .app-edit #metadata-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--app-desk-edit-lines) var(--app-desk-field-gap);
+    }
+
+    .app-desk .app-edit #metadata-header > h4 { font-size: var(--app-desk-text); }
+
+    /* the folder: the one string here people copy */
+    .app-desk .app-edit .metadata-path,
+    .app-desk .app-edit .tags-path,
+    .app-desk .app-edit .delete-path {
+        flex-basis: 100%;
+        min-width: 0;
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-label);
+        overflow-wrap: anywhere;
+        user-select: text;
+    }
+
+    /* the panel's own close button stands for the editor's */
+    .app-desk .app-edit #metadata-close-button { display: none; }
+
+    .app-desk .app-edit #metadata-issues { display: flex; flex-direction: column; gap: var(--app-desk-edit-lines); }
+
+    .app-desk .app-edit .metadata-issue {
+        display: flex;
+        align-items: baseline;
+        gap: var(--app-desk-field-gap);
+        font-size: var(--dw-text-label);
+        line-height: var(--dw-leading-note);
+    }
+
+    /* an issue: STYLE.md's amber badge */
+    .app-desk .app-edit .library-issue-chip {
+        flex: none;
+        padding: 0 var(--app-desk-chip-pad);
+        border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+        border-radius: var(--dw-radius-tag);
+        background: var(--dw-badge-amber-bg);
+        color: var(--dw-amber-text);
+        font-size: var(--dw-text-label);
+    }
+
+    .app-desk .app-edit .metadata-issue-undo,
+    .app-desk .app-edit .tags-revert { color: var(--dw-accent); font-size: var(--dw-text-label); }
+
+    .app-desk .app-edit #metadata-current {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--app-line-gap) var(--app-desk-field-gap);
+        font-size: var(--dw-text-label);
+    }
+
+    .app-desk .app-edit .metadata-mbid { color: var(--dw-text-2); font-family: var(--dw-font-mono); }
+
+    .app-desk .app-edit #metadata-search { display: flex; gap: var(--app-desk-field-gap); }
+    .app-desk .app-edit #metadata-search > input { flex: 1; }
+
+    /* the pressings: Explorer's list, scrolling inside itself */
+    .app-desk .app-edit .metadata-releases {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-edit-lines);
+        max-height: var(--app-desk-edit-list);
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+    }
+
+    .app-desk .app-edit .metadata-release {
+        display: flex;
+        flex: none;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--app-line-gap) var(--app-desk-field-gap);
+        width: 100%;
+        padding: var(--app-desk-edit-pad-y) var(--app-desk-edit-pad-x);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-card);
+        text-align: left;
+    }
+
+    .app-desk .app-edit .metadata-release:hover { border-color: var(--dw-border-cover); }
+
+    .app-desk .app-edit .metadata-release.active {
+        border-color: var(--dw-selection-border);
+        background: var(--dw-selection-bg);
+        color: var(--dw-selected-text);
+    }
+
+    /* a pressing as the board draws it: its title and track count on the first line, what it is under
+       them - the count drawn before the detail, which takes a line of its own */
+    .app-desk .app-edit .metadata-release-title { flex: 1 1 auto; min-width: 0; font-weight: var(--dw-weight-semibold); overflow-wrap: anywhere; }
+    .app-desk .app-edit .metadata-release-detail { flex-basis: 100%; order: 2; font-size: var(--dw-text-label); }
+
+    .app-desk .app-edit .metadata-release-tracks {
+        flex: none;
+        order: 1;
+        margin-left: auto;
+        color: var(--dw-text-2);
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-data);
+    }
+
+    .app-desk .app-edit .metadata-release-tracks.mismatch { color: var(--dw-amber-text); }
+
+    /* the release the album is tagged with: STYLE.md's green badge */
+    .app-desk .app-edit .metadata-current-badge {
+        flex: none;
+        padding: 0 var(--app-desk-chip-pad);
+        border: var(--dw-hairline) solid var(--dw-badge-green-border);
+        border-radius: var(--dw-radius-tag);
+        background: var(--dw-badge-green-bg);
+        color: var(--dw-badge-green-text);
+        font-size: var(--dw-text-label);
+    }
+
+    .app-desk .app-edit .metadata-status { padding: var(--app-desk-edit-lines) 0; }
+
+    /* the fields: artist, album and edition across, the two years side by side */
+    .app-desk .app-edit .metadata-fields { display: flex; flex-wrap: wrap; gap: var(--app-desk-edit-lines) var(--app-desk-field-gap); }
+    .app-desk .app-edit .metadata-field { display: flex; flex: 1 1 100%; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+    .app-desk .app-edit .metadata-field-short { flex: 1 1 0; }
+    .app-desk .app-edit .metadata-field > span:first-child { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+    .app-desk .app-edit .metadata-hint,
+    .app-desk .app-edit .tags-hint { color: var(--dw-text-3); font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+
+    /* the cover you have beside the release's */
+    .app-desk .app-edit .metadata-art { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-desk-field-gap) var(--app-desk-edit-block); }
+    .app-desk .app-edit .metadata-art-slot { display: flex; flex-direction: column; gap: var(--app-line-gap); font-size: var(--dw-text-label); }
+
+    .app-desk .app-edit .metadata-art-slot img,
+    .app-desk .app-edit .metadata-art-empty {
+        width: var(--app-desk-edit-thumb);
+        height: var(--app-desk-edit-thumb);
+        object-fit: cover;
+        border: var(--dw-hairline) solid var(--dw-border-cover);
+        border-radius: var(--dw-radius-cover);
+    }
+
+    .app-desk .app-edit .metadata-art-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--dw-empty-cover);
+        color: var(--dw-text-3);
+        text-align: center;
+    }
+
+    .app-desk .app-edit .metadata-art-open { display: block; cursor: zoom-in; }
+    .app-desk .app-edit .metadata-art-open:hover > img { border-color: var(--dw-accent); }
+    .app-desk .app-edit .metadata-art-size { font-family: var(--dw-font-mono); }
+    .app-desk .app-edit .metadata-art-arrow { color: var(--dw-text-2); }
+    .app-desk .app-edit .metadata-art-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-desk-field-gap); }
+
+    .app-desk .app-edit .metadata-checkbox {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: start;
+        gap: var(--app-line-gap) var(--app-desk-field-gap);
+    }
+
+    .app-desk .app-edit .metadata-checkbox > .metadata-hint { grid-column: 2; }
+
+    /* what applying it changes: a well, as the board draws it */
+    .app-desk .app-edit .metadata-move {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-line-gap);
+        padding: var(--app-desk-edit-pad-y) var(--app-desk-edit-pad-x);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-well);
+        box-shadow: var(--dw-well-inset);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-edit .metadata-file {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-line-gap);
+        padding-top: var(--app-desk-edit-lines);
+        border-top: var(--dw-hairline) solid var(--dw-row-border);
+    }
+
+    .app-desk .app-edit .metadata-file-name { font-family: var(--dw-font-mono); font-size: var(--dw-text-data); overflow-wrap: anywhere; }
+
+    .app-desk .app-edit .metadata-change {
+        display: grid;
+        grid-template-columns: var(--app-desk-edit-tag) minmax(0, 1fr) minmax(0, 1fr);
+        gap: var(--app-desk-field-gap);
+        font-size: var(--dw-text-label);
+    }
+
+    /* a tag's own name (musicbrainz_releasegroupid is 146px at 11px) breaks inside its column, never
+       running over the old value beside it */
+    .app-desk .app-edit .metadata-tag { min-width: 0; overflow-wrap: anywhere; }
+
+    .app-desk .app-edit .metadata-from,
+    .app-desk .app-edit .metadata-to { overflow-wrap: anywhere; }
+
+    .app-desk .app-edit .metadata-from { text-decoration: line-through; }
+
+    /* Apply and Cancel stay in reach at the foot of the panel, the summary over them */
+    .app-desk .app-edit #metadata-footer,
+    .app-desk .app-edit .tags-footer {
+        position: sticky;
+        bottom: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--app-desk-field-gap);
+        padding: var(--app-desk-edit-block) 0;
+        border-top: var(--dw-hairline) solid var(--dw-border);
+        background: var(--dw-side-panel);
+    }
+
+    .app-desk .app-edit .metadata-summary,
+    .app-desk .app-edit .metadata-result,
+    .app-desk .app-edit .tags-result { flex-basis: 100%; font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+
+    .app-desk .app-edit .tags-spacer { flex: 1; }
+
+    /* --- the tag editor (components/TrackTagEditor.tsx) --- */
+
+    .app-desk .app-edit #tags-window,
+    .app-desk .app-edit .tags-body,
+    .app-desk .app-edit .tags-form,
+    .app-desk .app-edit .tags-preview { display: flex; flex-direction: column; gap: var(--app-desk-edit-block); }
+
+    .app-desk .app-edit .window-titlebar {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--app-desk-field-gap);
+    }
+
+    .app-desk .app-edit .window-title {
+        min-width: 0;
+        color: var(--dw-text-heading-color);
+        font-size: var(--app-desk-text-sm);
+        font-weight: var(--dw-weight-semibold);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-edit .tags-subject,
+    .app-desk .app-edit .delete-subject {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--app-line-gap) var(--app-desk-field-gap);
+    }
+
+    .app-desk .app-edit .tags-preview-title { color: var(--dw-text-heading-color); font-size: var(--dw-text-heading); }
+    .app-desk .app-edit .tags-tracks > summary { color: var(--dw-text-2); font-size: var(--dw-text-label); cursor: pointer; }
+
+    .app-desk .app-edit .tags-track-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-line-gap);
+        margin: var(--app-desk-edit-lines) 0 0;
+        padding: 0;
+        list-style: none;
+        font-size: var(--dw-text-label);
+    }
+
+    .app-desk .app-edit .tags-track-list > li { display: flex; gap: var(--app-desk-field-gap); min-width: 0; }
+    .app-desk .app-edit .tags-track-list > li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+    .app-desk .app-edit .tags-track-list .is-mono { flex: none; color: var(--dw-text-3); font-family: var(--dw-font-mono); }
+
+    /* the fields: two to a row for the short ones (track, disc, the years), the rest across */
+    .app-desk .app-edit .tags-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--app-desk-edit-lines) var(--app-desk-field-gap);
+    }
+
+    .app-desk .app-edit .tags-field { display: flex; flex-direction: column; grid-column: 1 / -1; gap: var(--app-line-gap); min-width: 0; }
+    .app-desk .app-edit .tags-field.is-short { grid-column: span 1; }
+    .app-desk .app-edit .tags-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--app-desk-field-gap); }
+    .app-desk .app-edit .tags-field-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+    .app-desk .app-edit .tags-field.is-edited .tags-field-label { color: var(--dw-accent-text); }
+    .app-desk .app-edit .tags-field.has-problem .releases-filter-input { border-color: var(--dw-amber-icon); }
+    .app-desk .app-edit .tags-field-note { font-size: var(--dw-text-label); }
+
+    /* --- the delete confirmation (components/DeleteAlbumDialog.tsx) --- */
+
+    .app-desk .app-edit #delete-window,
+    .app-desk .app-edit #delete-panel { display: flex; flex-direction: column; gap: var(--app-desk-edit-block); }
+
+    .app-desk .app-edit #delete-panel > h4 { font-size: var(--app-desk-text); }
+
+    .app-desk .app-edit .library-edition {
+        padding: 0 var(--app-desk-chip-pad);
+        border: var(--dw-hairline) solid var(--dw-badge-purple-border);
+        border-radius: var(--dw-radius-tag);
+        background: var(--dw-badge-purple-bg);
+        color: var(--dw-accent-text);
+        font-size: var(--dw-text-label);
+    }
+
+    /* the files a delete takes beside the tracks - a rip log may be the only copy - named in full */
+    .app-desk .app-edit .delete-others {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-line-gap);
+        font-size: var(--dw-text-label);
+        overflow-wrap: anywhere;
+    }
+    .app-desk .app-edit .delete-warning { line-height: var(--dw-leading-note); }
+    .app-desk .app-edit #delete-actions { display: flex; flex-wrap: wrap; gap: var(--app-desk-field-gap); }
+
+    /* the one destructive button: the primary's shape, in red */
+    .app-desk .app-edit #delete-confirm-button {
+        min-height: var(--app-desk-edit-apply);
+        padding: 0 var(--app-desk-edit-apply-pad);
+        border: var(--dw-hairline) solid var(--dw-danger-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-danger-bg);
+        box-shadow: var(--dw-primary-highlight);
+        color: var(--dw-text);
+        font-size: var(--app-desk-text);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    /* --- the cover viewer (components/ArtViewer.tsx), over the whole window: drawn inside the panel,
+       whose box has no transform once open, so fixed is the window's, and its layer is over the frame --- */
+
+    .app-desk .app-edit #art-viewer {
+        position: fixed;
+        inset: 0;
+        z-index: var(--app-z-edit-viewer);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--app-desk-viewer-pad);
+        background: var(--dw-scrim);
+        touch-action: none;
+    }
+
+    .app-desk .app-edit .art-viewer-frame {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-edit-lines);
+        width: min(var(--app-desk-viewer-max), 100%);
+        height: min(var(--app-desk-viewer-height), 100%);
+        padding: var(--app-desk-edit-pad-y) var(--app-desk-edit-pad-x);
+        overflow: hidden;
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-bg-sheet);
+        box-shadow: var(--dw-highlight), var(--dw-shadow);
+    }
+
+    .app-desk .app-edit .art-viewer-panes {
+        display: grid;
+        flex: 1;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--dw-hairline);
+        min-height: 0;
+        background: var(--dw-border);
+    }
+
+    .app-desk .app-edit .art-viewer-panes.count-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+    .app-desk .app-edit .art-viewer-pane {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        background: var(--dw-field);
+    }
+
+    .app-desk .app-edit .art-viewer-caption {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: var(--app-desk-field-gap);
+        padding: var(--app-desk-edit-lines) var(--app-desk-edit-pad-x);
+        border-bottom: var(--dw-hairline) solid var(--dw-border);
+        color: var(--dw-text-2);
+        font-size: var(--dw-text-label);
+    }
+
+    .app-desk .app-edit .art-viewer-label { color: var(--dw-text); font-weight: var(--dw-weight-medium); }
+    .app-desk .app-edit .art-viewer-dims { color: var(--dw-text-3); font-family: var(--dw-font-mono); }
+
+    .app-desk .app-edit .art-viewer-largest {
+        padding: 0 var(--app-desk-chip-pad);
+        border: var(--dw-hairline) solid var(--dw-badge-green-border);
+        border-radius: var(--dw-radius-tag);
+        color: var(--dw-badge-green-text);
+    }
+
+    .app-desk .app-edit .art-viewer-stage {
+        position: relative;
+        display: flex;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+        padding: var(--app-desk-edit-pad-x);
+        overflow: hidden;
+    }
+
+    /* moved and zoomed by a transform the viewer sets, clipped by the stage */
+    .app-desk .app-edit .art-viewer-stage > img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        box-shadow: var(--dw-shadow);
+        cursor: zoom-in;
+        touch-action: none;
+        -webkit-user-drag: none;
+        user-select: none;
+    }
+
+    .app-desk .app-edit .art-viewer-stage.is-zoomed > img { cursor: grab; }
+    .app-desk .app-edit .art-viewer-stage.is-panning > img { cursor: grabbing; }
+
+    .app-desk .app-edit .art-viewer-status {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--app-desk-edit-gap);
+        font-size: var(--dw-text-label);
+        text-align: center;
+    }
+
+    .app-desk .app-edit .art-viewer-footer { display: flex; flex: none; align-items: center; gap: var(--app-desk-field-gap); }
+    .app-desk .app-edit .art-viewer-hint { margin-right: auto; font-size: var(--dw-text-label); }
+    .app-desk .app-edit .hint-touch { display: none; }
 }
 
 /* A FINGER, NOT A POINTER YOU AIM: an iPad on its side is 1024px wide and more, and gets this frame.
@@ -1015,12 +1905,37 @@
         --app-desk-close: var(--pl-hit);
         --app-desk-chip-h: var(--pl-hit);
         --app-desk-source-get: var(--pl-hit);
+        --app-desk-edit-control: var(--pl-hit);
+        --app-desk-edit-apply: var(--pl-hit);
+        --app-desk-edit-tick: var(--pl-hit);
     }
 
     .app-desk .app-side-input { font-size: var(--dw-text-body); }
     .app-desk .app-playbar { padding-bottom: var(--pl-safe-bottom); }
     /* Previous and Next: their 22px glyph in a box a finger can find */
     .app-desk .app-playbar-transport .app-playbar-button { min-width: var(--pl-hit); min-height: var(--pl-hit); }
+    /* the Edit panel (2.0.0-player.21): its tabs a finger's height, its fields never small enough for
+       iOS to zoom into, and the cover viewer's hint for a hand that taps and pinches */
+    .app-desk .app-edit-tab { min-height: var(--pl-hit); }
+
+    /* ...and its smaller targets too - a tick box's label (the token above), a folder to choose, the
+       tag editor's list of tracks and undo, the issue's un-ignore, the link to the main page */
+    .app-desk .app-edit-choice { min-height: var(--pl-hit); }
+    .app-desk .app-edit .tags-tracks > summary { min-height: var(--pl-hit); line-height: var(--pl-hit); }
+
+    .app-desk .app-edit .tags-revert,
+    .app-desk .app-edit .metadata-issue-undo,
+    .app-desk .app-edit-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--pl-hit);
+    }
+
+    .app-desk .app-edit .releases-filter-input,
+    .app-desk .app-edit-select { font-size: var(--dw-text-body); }
+
+    .app-desk .app-edit .hint-pointer { display: none; }
+    .app-desk .app-edit .hint-touch { display: inline; }
 }
 
 /* from 1280px the bar's two sides have the board's room, and a panel is a third column (App's

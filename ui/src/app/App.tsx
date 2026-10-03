@@ -8,6 +8,8 @@ import { closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCur
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
+import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
+import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { latestOnly } from '../lib/latest'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
@@ -27,6 +29,7 @@ import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerW
 import { ActionMenu } from './ActionMenu'
 import { ArtistPage, type ArtistPreview } from './ArtistPage'
 import { ActionsContext, PlayerContext, pickActions } from './context'
+import { EditPanel, type AlbumChange, type EditRequest } from './EditPanel'
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
 import { chooseLibrary, libraryPick, librarySongs, useLibraryPick } from './libraryPick'
@@ -174,8 +177,21 @@ function usePageShown(): boolean {
  * crosses back to a phone's width. Its audio context is made in that click (openVisualizer: the gesture
  * a browser wants), and it analyses a silent copy of the song, never the player's own element. While
  * it shows, everything behind it is inert - the page, and a desktop's Sources or Info panel left open
- * beside it (`covered`) - and nothing behind it counts as watched (the downloads' fast poll stops, as
+ * beside it, or the Edit panel (`covered`) - and nothing behind it counts as watched (the downloads' fast poll stops, as
  * it does behind Now Playing).
+ *
+ * EDITING AN ALBUM (2.0.0-player.21, DesktopManage.dc.html): on a desktop, for an admin (`/deadwax/me`
+ * again), the album page has Edit, which opens the Edit panel (EditPanel.tsx) - a third kind of side
+ * panel, by the same rule: one at a time (Edit puts Sources and Info away, and either puts Edit away),
+ * not modal, a column or a drawer, and the desktop's alone (drawn only in its frame; crossing to the
+ * phone closes it). It is the album page's: it closes as that page stops being the one showing. What
+ * it writes comes back as `albumChanged`: the album page asked again (`refreshes`, now and once
+ * Navidrome has scanned) and the library's listeners told (announceAlbumsFiled - the owned marks, an
+ * album-you-don't-have page's store line); an album an apply gave a new id in Navidrome becomes that
+ * page in place (`router.become` - its entry replaced, its scroll and hero kept), and the move is
+ * remembered (`moves`), so a page of the old id that comes back on top - back to it, forward to it,
+ * another tab showing it - becomes the new one's too; and a deleted album's page is gone back from
+ * when nothing of the album is left in Navidrome.
  */
 export function App() {
   const player = usePlayer()
@@ -234,6 +250,22 @@ export function App() {
   const [getting, setGetting] = useState<GetRequest | null>(null)
   //? what is over Now Playing: its ••• menu, or Info - never both
   const [over, setOver] = useState<'none' | 'menu' | 'info'>('none')
+  //? the desktop's Edit panel (2.0.0-player.21): whether it shows, and the last album it was opened for
+  //? (kept as it slides away) - and what it gives focus back to, the album page's Edit
+  const [editOpen, setEditOpen] = useState(false)
+  const editOpenNow = useRef(false)
+  editOpenNow.current = editOpen
+  const [edit, setEdit] = useState<EditRequest | null>(null)
+  const editNow = useRef<EditRequest | null>(null)
+  editNow.current = edit
+  const editOpener = useRef<HTMLElement | null>(null)
+  const editKeys = useRef(0)
+  //? album pages asked again after an edit: each album's count, a new number each time (AlbumPage's
+  //? `refresh`) - one per album, so asking one again never changes what another was handed
+  const [refreshes, setRefreshes] = useState<ReadonlyMap<string, number>>(() => new Map())
+  //? the albums an apply gave a new id in Navidrome this session, old id to new (lib/albumEdit.ts
+  //? noteMove): a page of the old id coming back on top is the new one's
+  const moves = useRef(new Map<string, string>())
   //? a desktop's Info: the side panel, opened from the player bar (2.0.0-player.19)
   const [infoPanel, setInfoPanel] = useState(false)
   const infoPanelOpen = useRef(false)
@@ -416,10 +448,12 @@ export function App() {
     gets.current += 1
     setGetting({ ...request, key: gets.current })
     setSourcesOpen(true)
-    //? one side panel at a time on a desktop: Sources puts Info away, giving focus back to nothing
-    //? (Sources takes it)
+    //? one side panel at a time on a desktop: Sources puts Info and Edit away, giving focus back to
+    //? nothing (Sources takes it)
     infoOpener.current = null
     setInfoPanel(false)
+    editOpener.current = null
+    setEditOpen(false)
   }, [])
   const closeSources = useCallback(() => setSourcesOpen(false), [])
   //? a download asked for from the sheet: it goes - focus going nowhere it would land - and Requests shows
@@ -469,6 +503,8 @@ export function App() {
     infoOpener.current = takeOpener(event)
     sourcesOpener.current = null
     setSourcesOpen(false)
+    editOpener.current = null
+    setEditOpen(false)
     setInfoPanel(true)
   }, [])
   const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
@@ -483,6 +519,25 @@ export function App() {
     setVisualizing(true)
   }, [])
   const closeVisualizer = useCallback(() => setVisualizing(false), [])
+
+  //? The album page's Edit (2.0.0-player.21): the Edit panel for the album - a new request each press,
+  //? so it starts afresh - and pressed again on the album it shows, closed. One panel at a time: it
+  //? puts Sources (and its search, by Sources' backstop) and Info away, focus going to the panel.
+  const toggleEdit = useCallback((event: MouseEvent, album: EditAlbum) => {
+    if (editOpenNow.current && editNow.current?.album.id === album.id) {
+      setEditOpen(false)
+      return
+    }
+    editOpener.current = takeOpener(event)
+    editKeys.current += 1
+    setEdit({ album, key: editKeys.current })
+    setEditOpen(true)
+    sourcesOpener.current = null
+    setSourcesOpen(false)
+    infoOpener.current = null
+    setInfoPanel(false)
+  }, [])
+  const closeEdit = useCallback(() => setEditOpen(false), [])
 
   //? Crossing into the other frame (lib/appFrame.ts closesOnCrossing): into the desktop, Now Playing
   //? and what is over it close - the desktop's player is its bar; back to the phone, the Info panel.
@@ -504,7 +559,84 @@ export function App() {
       //? the visualizer is a desktop's: a phone's width closes it, and it doesn't come back by itself
       setVisualizing(false)
     }
+    if (closes.editPanel) {
+      editOpener.current = null
+      setEditOpen(false)
+    }
   }, [frame])
+
+  //? The Edit panel is the album page's: as that page stops being the one showing - another page, a
+  //? tab, the sidebar - it closes, focus given back to nothing (the Edit it came from is gone)
+  const topNow = nav.stacks[nav.tab][nav.stacks[nav.tab].length - 1] ?? null
+  const editShown = edit !== null && topNow?.kind === 'album' && topNow.id === edit.album.id
+  useEffect(() => {
+    if (!editOpen || editShown) return
+    editOpener.current = null
+    setEditOpen(false)
+  }, [editOpen, editShown])
+
+  /**
+   * What the Edit panel wrote (2.0.0-player.21), for the album it names. A write: the library's
+   * listeners told (announceAlbumsFiled - the owned marks, an album-you-don't-have page's store line)
+   * and the album page asked again; Navidrome having scanned: the page asked once more. A new id in
+   * Navidrome after another release was applied: the page showing the album becomes that album's -
+   * its entry replaced, its hero and scroll kept - and the panel follows it. Deleted: the panel goes,
+   * and the page is gone back from when that was the album's only folder.
+   */
+  const albumChanged = useCallback((change: AlbumChange) => {
+    //? the album asked again under the id it has now - a write's `settled` can land after its move
+    const ask = (id: string) => {
+      const now = movedTo(moves.current, id) ?? id
+      setRefreshes((was) => new Map(was).set(now, (was.get(now) ?? 0) + 1))
+    }
+    const top = currentRoute(router.nav).page
+    const showing = top?.kind === 'album' && top.id === change.id
+    if (change.kind === 'written' || change.kind === 'settled') {
+      if (change.kind === 'written') announceAlbumsFiled()
+      ask(change.id)
+      return
+    }
+    if (change.kind === 'moved') {
+      noteMove(moves.current, change.id, change.to)
+      const at = editNow.current
+      if (at && at.album.id === change.id) setEdit({ ...at, album: { ...at.album, id: change.to } })
+      const preview = previews.current.get(change.id)
+      if (preview) previews.current.set(change.to, { ...preview, id: change.to })
+      //? not showing (the page left during the rename's wait): the page becomes it when it is back on top
+      if (!showing) return
+      scrolls.current.set(scrollKey({ tab: router.nav.tab, page: { kind: 'album', id: change.to } }), window.scrollY)
+      router.become({ kind: 'album', id: change.id }, { kind: 'album', id: change.to, ...(top.label ? { label: top.label } : {}) })
+      return
+    }
+    //? deleted: the panel closes - focus back to Edit while its page stays, to nothing when it goes
+    announceAlbumsFiled()
+    if (editNow.current?.album.id === change.id) {
+      if (change.last) editOpener.current = null
+      setEditOpen(false)
+    }
+    if (!change.last) ask(change.id)
+    else if (showing) router.back()
+  }, [])
+
+  //? A page of an album an apply moved, back on top - back to it, forward to it, its tab chosen: it
+  //? becomes the album's page as it is now, its entry replaced (as the move itself does to the page
+  //? showing), never left on an id Navidrome no longer has
+  useEffect(() => {
+    if (topNow?.kind !== 'album') return
+    const to = movedTo(moves.current, topNow.id)
+    if (!to) return
+    const preview = previews.current.get(topNow.id)
+    if (preview && !previews.current.has(to)) previews.current.set(to, { ...preview, id: to })
+    router.become(topNow, { kind: 'album', id: to, ...(topNow.label ? { label: topNow.label } : {}) })
+  }, [nav])
+
+  //? The Edit focus goes back to, once a move has put the page under the album's new id: that page's
+  //? own Edit (the one it was opened from went with the old page), on the tab showing
+  useEffect(() => {
+    const was = editOpener.current
+    if (!editOpen || !was || was.isConnected) return
+    editOpener.current = document.querySelector<HTMLElement>(`.app-pane[data-tab="${nav.tab}"] .app-edit-toggle[aria-pressed="true"]`)
+  })
 
   //? The desktop sidebar (2.0.0-player.19): Home, Requests and You are their tabs' buttons, and so is
   //? the Library view showing; another Library view is that view at the Library's root - from another
@@ -691,6 +823,9 @@ export function App() {
           backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
           onArtist={openAlbumArtist}
           onOpenAlbum={openAlbum}
+          onEdit={desktop && admin ? toggleEdit : undefined}
+          editing={editOpen && edit?.album.id === page.id}
+          refresh={refreshes.get(page.id) ?? 0}
         />
       </NeedsNavidrome>
     )
@@ -711,7 +846,7 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes],
   )
 
   const playing = player.track
@@ -728,7 +863,7 @@ export function App() {
   const covered = (!desktop && (sheetOpen || sourcesOpen)) || visualizerShown
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)
-  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel })
+  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen })
 
   //? The ••• menu's pin (2.0.0-player.18): the playing song's album, by its release where the answer
   //? it was played from says it (none at all, "", and it can't be pinned), else by Navidrome's id,
@@ -824,6 +959,8 @@ export function App() {
             panel={panel}
             covered={visualizerShown}
           />
+          {/* the album page's Edit panel (2.0.0-player.21) - the desktop's alone, in its frame only */}
+          {desktop && <EditPanel open={editOpen} request={edit} opener={editOpener} onClose={closeEdit} onChanged={albumChanged} panel={panel} covered={visualizerShown} />}
           {/* what became of a pin, said over everything (2.0.0-player.18) */}
           <PinNotice />
           {/* the desktop's full-screen visualizer, over everything (2.0.0-player.20) */}

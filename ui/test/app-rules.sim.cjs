@@ -118,6 +118,25 @@
  *    the player bar, which only a desktop draws), and closed with it; nothing of it needs a secure
  *    page (no AudioWorklet), nothing of it is random, its frame loop stops while the page is hidden,
  *    and everything behind it is inert while it shows. Crossing back to a phone's width closes it.
+ *  - Editing an album on a desktop (2.0.0-player.21): the album page's Edit - handed to it only in the
+ *    desktop frame and for an admin (/deadwax/me) - opens the Edit panel (app/EditPanel.tsx), a third
+ *    kind of side panel by the same rule: drawn only in the desktop's frame (crossing to the phone
+ *    closes it), one panel at a time (Edit puts Sources and Info away, either puts Edit away, Edit
+ *    pressed again closes it), not modal (the one hook, `modal` from the panel style), and the album
+ *    page's own - closed as that page stops being the one showing. Its editors are the main page's,
+ *    handed a close that passes over an Escape from the page (they listen on the whole document); the
+ *    album it edits is held and updated from what a reload resolves with, never derived from the list
+ *    a write reloads; what it fetches goes through latestOnly(); and it calls no playback action -
+ *    nothing on the list below gains a file. A page an apply gave a new id becomes it through the
+ *    router (`become`), and only while it is the page showing. After review: the move is remembered,
+ *    and a page of the old id back on top becomes the new one's; the look for the new id has a
+ *    latestOnly of its own, so a later write doesn't call it off; the editors are let go once the
+ *    panel has closed (a cover viewer left open took the next Escape anywhere); an Escape in the tag
+ *    editor or the delete confirmation closes that layer alone; a control that removes itself hands
+ *    focus on inside the panel; the library is read again underneath on each Edit after the first; a
+ *    delete of one folder of several asks the page again once Navidrome has scanned; and the state
+ *    rules each pinned (the release editor keyed on the session, several by name a choice, the album
+ *    from a real scan, the library read only once the panel opens, the files read only for Tags).
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -329,7 +348,8 @@ console.log('\nan album page is memoised on what it reads of the player')
   check('the pages are memoised on the playing song and whether it plays - never the whole player',
     //? (2.0.0-player.15: and the Sources sheet and whether the app is in front, which the group page's `shown` reads;
     //? 2.0.0-player.19: and the frame, and which album - and pressing - a desktop's Sources panel shows)
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? 2.0.0-player.21: and the Edit toggle's state - admin, the panel, its album - and an edit's refresh)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -359,9 +379,10 @@ console.log('\na link out of the app opens beside it')
   const out = files.filter(APP_SIDE).flatMap((file) => linksOut(code(read(file))).map((tag) => [file, tag]))
   check('every one opens in a new tab, rel="noopener"', out.filter(([, tag]) => !opensBeside(tag)), [])
   //? the Search placeholder's link went with it in 2.0.0-player.13 (Requests' in .12); the desktop
-  //? sidebar's Managing link came in 2.0.0-player.19
-  check('...and there are links to look at (You, the gate, the desktop sidebar)',
-    [...new Set(out.map(([file]) => file))].sort(), ['app/NeedsNavidrome.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+  //? sidebar's Managing link came in 2.0.0-player.19, and the Edit panel's to the main page's library
+  //? (an album it can't find a folder for) in 2.0.0-player.21
+  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel)',
+    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/NeedsNavidrome.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -382,6 +403,13 @@ console.log('\nNow Playing covers everything behind it')
       ...['app/Sources.tsx', 'app/InfoSheet.tsx'].flatMap((file) => [/aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(code(read(file))),
         /useSheet\(\{ open, covered, onClose/.test(code(read(file)))])],
     [true, true, true, true, true, true])
+  //? (2.0.0-player.21, after the rebase onto .20) ...and the Edit panel the same: built beside the
+  //? visualizer, it had no `covered`, and stayed live and tabbable under it
+  check('...and so is the Edit panel',
+    [/<EditPanel\b[^\n]*\bcovered=\{visualizerShown\}[^\n]*\/>/.test(app),
+      /aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(code(read('app/EditPanel.tsx'))),
+      /useSheet\(\{ open, covered: inner \|\| covered, onClose/.test(code(read('app/EditPanel.tsx')))],
+    [true, true, true])
   check('...which the Sources sheet, Now Playing, its menu and Info are not in',
     /<\/div>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<Sources\b[^\n]*\/>\s*<NowPlaying\b[\s\S]*?\/>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<ActionMenu\b[\s\S]*?\/>\s*<InfoSheet\b[\s\S]*?\/>\s*<\/div>\s*<\/ActionsContext/.test(read('app/App.tsx')), true)
   const sheet = code(read('player/NowPlaying.tsx'))
@@ -400,15 +428,17 @@ console.log('\nevery sheet is a sheet by the one hook')
     'player/NowPlaying.tsx': 'pl-sheet-open', 'app/ActionMenu.tsx': 'app-menu-open', 'app/InfoSheet.tsx': 'app-info-open',
     //? Get's sources (2.0.0-player.15)
     'app/Sources.tsx': 'app-sources-open',
+    //? the desktop's Edit panel (2.0.0-player.21) - never a sheet, so its lock is never taken
+    'app/EditPanel.tsx': 'app-edit-open',
   }
   const texts = Object.fromEntries(Object.keys(SHEETS).map((file) => [file, code(read(file))]))
   check('each calls useSheet with a scroll lock of its own',
     Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, /useSheet\(\{[^}]*lockClass: '([^']+)'/.exec(text)?.[1] ?? null])), SHEETS)
   check('...and they are the only ones', files.filter((file) => /\buseSheet\(/.test(code(read(file))) && file !== 'app/useSheet.ts').sort(), Object.keys(SHEETS).sort())
-  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true, true])
+  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true, true, true])
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
-  check('the menu, Info and the sources close on their backdrop',
-    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true])
+  check('the menu, Info, the sources and the Edit panel close on their backdrop (a panel\'s is not drawn)',
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/EditPanel.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true])
   //? (2.0.0-player.19: a desktop's side panel is no sheet over the page - no lock - and Escape closes
   //? it only from inside it; a sheet is modal unless it says otherwise)
   check('the hook: the lock on <html> (a sheet\'s, never a panel\'s), focus in, focus back, Escape for the one on top',
@@ -894,16 +924,17 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
       [sheet, info].map((text) => /const modal = panelIsModal\(panel\)/.test(text) && /useSheet\(\{[^}]*\bmodal, area: box \}\)/.test(text)),
       /export function panelIsModal\(panel: PanelStyle\): boolean \{\s*return panel === 'sheet'\s*\}/.test(code(read('lib/appFrame.ts')))],
     [true, [true, true], true])
-  check('one side panel at a time: Sources puts Info away, and Info Sources',
-    [/setSourcesOpen\(true\)[\s\S]{0,200}?infoOpener\.current = null\s*setInfoPanel\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
-      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*setInfoPanel\(true\)/.test(app)],
+  //? (2.0.0-player.21: and the Edit panel, each putting it away too)
+  check('one side panel at a time: Sources puts Info and Edit away, and Info Sources and Edit',
+    [/setSourcesOpen\(true\)[\s\S]{0,250}?infoOpener\.current = null\s*setInfoPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
+      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*setInfoPanel\(true\)/.test(app)],
     [true, true])
   //? (review) the player bar's Info closes the panel it opened - "the Info button again"
   check('...and the player bar\'s Info, pressed again, closes it',
     /const toggleInfo = useCallback\(\(event: MouseEvent\) => \{\s*if \(infoPanelOpen\.current\) \{\s*setInfoPanel\(false\)\s*return\s*\}/.test(app), true)
   //? (review) which panel shows feeds both the shell's classes: room made for a column, a drawer over the page
   check('what the panel shows - Sources or Info - makes room for a column (`.has-side`) and marks a drawer (`.has-drawer`)',
-    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel \}\)/.test(app),
+    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel, edit: editOpen \}\)/.test(app),
       /\$\{makesRoom\(panel, side\) \? ' has-side' : ''\}\$\{liesOver\(panel, side\) \? ' has-drawer' : ''\}/.test(app)],
     [true, true])
   //? (review) a drawer lies over the page Go to album and Info's artist open: the Info drawer goes with them
@@ -1094,6 +1125,132 @@ console.log('\nthe desktop visualizer: a silent copy, never the player\'s elemen
     /if \(document\.visibilityState === 'hidden'\) \{\s*stop\(\)\s*suspendVisualizerAudio\(\)\s*\} else \{\s*resumeVisualizerAudio\(\)\s*start\(\)/.test(screen), true)
   check('...and the only frame loops in the app are the deck\'s and the visualizer\'s',
     files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['player/Visualizer.tsx', 'player/deck.ts'])
+}
+
+console.log('\nediting an album on a desktop: the Edit panel, a side panel by the same rule (2.0.0-player.21)')
+{
+  const app = code(read('app/App.tsx'))
+  const panel = code(read('app/EditPanel.tsx'))
+  const page = code(read('player/AlbumPage.tsx'))
+  check('drawn only in the desktop\'s frame, after Info - never on a phone, which has no board for it',
+    [/\{desktop && <EditPanel open=\{editOpen\} request=\{edit\} opener=\{editOpener\} onClose=\{closeEdit\} onChanged=\{albumChanged\} panel=\{panel\} covered=\{visualizerShown\} \/>\}/.test(app),
+      app.indexOf('<EditPanel') > app.indexOf('<InfoSheet'), files.filter((file) => file !== 'app/App.tsx' && /<EditPanel\b/.test(code(read(file))))],
+    [true, true, []])
+  check('Edit is on the album page only for a desktop and an admin, and drawn only when handed',
+    [/onEdit=\{desktop && admin \? toggleEdit : undefined\}/.test(app), /\{onEdit && \(\s*<button\b[^>]*class="pl-pill app-edit-toggle"\s*aria-pressed=\{editing\}/.test(page),
+      /editing=\{editOpen && edit\?\.album\.id === page\.id\}/.test(app)],
+    [true, true, true])
+  const toggle = /const toggleEdit = useCallback\(\(event: MouseEvent, album: EditAlbum\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
+  check('Edit opens it - a new request each press - putting Sources and Info away; pressed again on its album, closes it',
+    [/if \(editOpenNow\.current && editNow\.current\?\.album\.id === album\.id\) \{\s*setEditOpen\(false\)\s*return\s*\}/.test(toggle),
+      /editOpener\.current = takeOpener\(event\)\s*editKeys\.current \+= 1\s*setEdit\(\{ album, key: editKeys\.current \}\)\s*setEditOpen\(true\)/.test(toggle),
+      /sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)/.test(toggle)],
+    [true, true, true])
+  check('crossing to the phone closes it, and so does its page stopping being the one showing',
+    [/if \(closes\.editPanel\) \{\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(app),
+      /const editShown = edit !== null && topNow\?\.kind === 'album' && topNow\.id === edit\.album\.id/.test(app),
+      /if \(!editOpen \|\| editShown\) return\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(app)],
+    [true, true, true])
+  check('a side panel by the one hook: modal only as a sheet (it never is), Escape from inside it, focus in to its close and back to Edit',
+    [/const modal = panelIsModal\(panel\)/.test(panel), /useSheet\(\{ open, covered: inner \|\| covered, onClose, lockClass: 'app-edit-open', first: closeButton, opener, modal, area: box \}\)/.test(panel),
+      /<button ref=\{closeButton\} type="button" class="app-edit-close"/.test(panel), /tabIndex=\{-1\}/.test(panel)],
+    [true, true, true, true])
+  //? (review) the direction pinned, and each handler's guard - not only that they exist
+  check('an editor\'s own Escape (they listen on the document) passed over when it came from the page beside',
+    [/document\.addEventListener\('keydown', onKeyDown, true\)/.test(panel), /at !== null && at\.event\.eventPhase !== 0 \? at\.from : null/.test(panel),
+      /const from = !box\.current\?\.contains\(event\.target as Node \| null\) \? 'page' : inner\.current \? 'inner' : 'panel'/.test(panel),
+      ['onClose={closeFromEditor}', 'onClose={closeTagEditor}', 'onCancel={cancelDelete}'].map((prop) => panel.includes(prop)),
+      /const closeFromEditor = useMemo\(\(\) => \(\) => \{\s*const from = escapeFrom\(\)\s*if \(from !== 'page' && from !== 'inner'\) close\.current\(\)/.test(panel),
+      /const closeTagEditor = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*setEditingTags\(null\)/.test(panel),
+      /const cancelDelete = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*setTab\('release'\)/.test(panel)],
+    [true, true, true, [true, true, true], true, true, true])
+  check('(review) an Escape in the tag editor or the delete confirmation closes that layer alone: the panel covered under it, the release editor\'s close passing it over',
+    [/const inner = drawn && \(\(tab === 'tags' && editingTags !== null && editingTags\.path === subject!\.path\) \|\| tab === 'delete'\)/.test(panel),
+      /innerNow\.current = inner/.test(panel), /const escapeFrom = useEscapeFrom\(box, innerNow\)/.test(panel)],
+    [true, true, true])
+  check('(review) the editors let go once the panel has closed - at once as a column, once a drawer has slid away - so no cover viewer outlives it',
+    [/if \(open\) \{\s*setLetGo\(false\)\s*return\s*\}\s*const timer = setTimeout\(\(\) => setLetGo\(true\), panel === 'drawer' \? EDIT_SLIDE_MS : 0\)/.test(panel),
+      /const drawn = !!subject && !!request && !deleted && !letGo/.test(panel), /\{drawn && subject && request && \(/.test(panel),
+      (panel.match(/<MetadataEditor\b/g) ?? []).length],
+    [true, true, true, 1])
+  check('(review) a control that removes itself hands focus on inside the panel, never to the page',
+    [/useLayoutEffect\(\(\) => \{\s*const pick = focusNext\.current\s*if \(!pick\) return\s*focusNext\.current = null\s*const active = document\.activeElement\s*if \(active && active !== document\.body\) return\s*pick\(\)\?\.focus\(\{ preventScroll: true \}\)/.test(panel),
+      /setEditingTags\(null\)\s*focusNext\.current = \(\) => tagsPane\.current\?\.querySelector<HTMLElement>\('\.app-edit-tags-open'\)/.test(panel),
+      /setTab\('release'\)\s*focusNext\.current = toTab\('release'\)/.test(panel),
+      /setEditingTags\(\{ path, filenames \}\)\s*focusNext\.current = /.test(panel),
+      /void library\.reload\(false\)\s*focusNext\.current = \(\) => scroller\.current/.test(panel),
+      /chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),
+      /editOpener\.current = document\.querySelector<HTMLElement>\(`\.app-pane\[data-tab="\$\{nav\.tab\}"\] \.app-edit-toggle\[aria-pressed="true"\]`\)/.test(app)],
+    [true, true, true, true, true, true, true])
+  check('the main page\'s editors, reused - not rewritten, nor copied',
+    ['MetadataEditor', 'TrackTagEditor', 'DeleteAlbumDialog', 'LibraryParts'].map((name) => new RegExp(`from '\\.\\./components/${name}'`).test(panel)),
+    [true, true, true, true])
+  check('what it asks goes through latestOnly(): the album\'s folders, and what follows a write',
+    [/const lookups = useMemo\(latestOnly, \[\]\)/.test(panel), /const ticket = lookups\.begin\(\)/.test(panel),
+      /const afterWrites = useMemo\(latestOnly, \[\]\)/.test(panel), /const ticket = afterWrites\.begin\(\)/.test(panel)],
+    [true, true, true, true])
+  const writeBody = /const afterWrite = \(at: EditRequest, release: string \| null, lookFor: string \| null\) => \{([\s\S]*?)\n  \}\n/.exec(panel)?.[1] ?? ''
+  const lookBody = /const lookForMove = \(from: string, release: string\) => \{([\s\S]*?)\n  \}\n/.exec(panel)?.[1] ?? ''
+  check('(review) the look for the album\'s new id has a latestOnly of its own: a write after the apply (CD art, a hand edit) never calls it off',
+    [/const follows = useMemo\(latestOnly, \[\]\)/.test(panel), /const ticket = follows\.begin\(\)/.test(lookBody), /afterWrites/.test(lookBody),
+      /if \(lookFor\) lookForMove\(idOf\(at\), lookFor\)/.test(writeBody), /follows\.begin|FOLLOW_LOOKS_MS/.test(writeBody),
+      /follows\.supersede\(\)/.test(panel), /for \(const delay of FOLLOW_LOOKS_MS\)/.test(lookBody)],
+    [true, true, false, true, false, true, true])
+  check('(verified in the page) the page\'s own id found is no answer: the look goes on until Navidrome has scanned the rename',
+    [/const to = followsTo\(from, found\.navidrome_id\)\s*if \(!to\) continue\s*changed\.current\(\{ kind: 'moved', id: from, to \}\)\s*return/.test(lookBody)],
+    [true])
+  check('(review) each Edit after the first reads the library again underneath, the album followed to the fresh read - unless a write was made meanwhile',
+    [/lookUp\(request\)\s*if \(!library\.loaded \|\| library\.loading\) return/.test(panel),
+      /void library\.reload\(false\)\.then\(\(fresh\) => \{\s*if \(!fresh\.length \|\| lookedUp\.current !== key \|\| writes\.current !== since\) return\s*setSubject\(\(current\) => \(current \? fresh\.find\(\(album\) => album\.path === current\.path\) \?\? null : current\)\)/.test(panel),
+      /\}, \[folders, subject\]\)/.test(panel), /const asked = request !== null && askedFor === request\.key/.test(panel)],
+    [true, true, true, true])
+  //? (review) the state rules the panel restates from the main page, each one pinned
+  check('(review) the release editor keyed on the session (never per apply); several by name a choice; the album only from a REAL scan; the library read only once the panel opens; the files only for Tags',
+    [/<MetadataEditor\s+key=\{session\}/.test(panel), /if \(subject \|\| deleted \|\| !folders \|\| !folders\.paths\.length \|\| needsChoice\(folders\)\) return/.test(panel),
+      /const libraryReady = library\.loaded && !library\.stale/.test(panel), /const library = useLibrary\(open\)/.test(panel),
+      /useTrackDetails\(subject && tagsSeen \? subject\.path : null, library\.albums\)/.test(panel),
+      /editStatus\(\{[\s\S]*?holding: !!subject,/.test(panel)],
+    [true, true, true, true, true, true])
+  check('the album held, and followed from what a reload resolves with - only while it is still the one shown',
+    [/const \[subject, setSubject\] = useState<LibraryAlbum \| null>\(null\)/.test(panel),
+      /setSubject\(\(current\) => \(current && current\.path === oldPath \? updated : current\)\)/.test(panel),
+      /const fresh = await library\.reload\(false\)\s*const updated = follow\(fresh, album\.path, newPath\)/.test(panel)],
+    [true, true, true])
+  const changed = /const albumChanged = useCallback\(\(change: AlbumChange\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
+  check('a page an apply gave a new id becomes it through the router, only while it shows; a write tells the library\'s listeners',
+    [/if \(!showing\) return[\s\S]*?router\.become\(\{ kind: 'album', id: change\.id \}, \{ kind: 'album', id: change\.to/.test(changed),
+      /if \(change\.kind === 'written'\) announceAlbumsFiled\(\)/.test(changed), /else if \(showing\) router\.back\(\)/.test(changed)],
+    [true, true, true])
+  //? (review) what albumChanged does to the page and the panel, each pinned
+  check('(review) a move: remembered, the panel following it; a write and its settle ask the page again (by its id now); a delete closes the panel',
+    [/noteMove\(moves\.current, change\.id, change\.to\)/.test(changed),
+      /if \(at && at\.album\.id === change\.id\) setEdit\(\{ \.\.\.at, album: \{ \.\.\.at\.album, id: change\.to \} \}\)/.test(changed),
+      /const now = movedTo\(moves\.current, id\) \?\? id\s*setRefreshes\(\(was\) => new Map\(was\)\.set\(now, \(was\.get\(now\) \?\? 0\) \+ 1\)\)/.test(changed),
+      /if \(change\.kind === 'written' \|\| change\.kind === 'settled'\) \{\s*if \(change\.kind === 'written'\) announceAlbumsFiled\(\)\s*ask\(change\.id\)\s*return/.test(changed),
+      /if \(editNow\.current\?\.album\.id === change\.id\) \{\s*if \(change\.last\) editOpener\.current = null\s*setEditOpen\(false\)\s*\}\s*if \(!change\.last\) ask\(change\.id\)/.test(changed)],
+    [true, true, true, true, true])
+  check('(review) a page of an album that moved, back on top (back, forward, its tab chosen), becomes the album\'s page as it is now',
+    [/useEffect\(\(\) => \{\s*if \(topNow\?\.kind !== 'album'\) return\s*const to = movedTo\(moves\.current, topNow\.id\)\s*if \(!to\) return[\s\S]*?router\.become\(topNow, \{ kind: 'album', id: to,[\s\S]*?\}, \[nav\]\)/.test(app)],
+    [true])
+  check('(review) a delete: Navidrome left with nothing of the album by `deletesAll`; one folder of several asked again once Navidrome has scanned',
+    [/onDeleted=\{albumDeleted\(request, subject, deletesAll\(folders, subject\.track_count, request\.album\)\)\}/.test(panel),
+      /changed\.current\(\{ kind: 'deleted', id: idOf\(at\), last \}\)\s*if \(!last\) settleLater\(at\)/.test(panel),
+      /const settleLater = \(at: EditRequest\) => \{\s*const ticket = afterWrites\.begin\(\)\s*void wait\(EDIT_SETTLE_MS, ticket\.signal\)\.then\(\(\) => \{\s*if \(ticket\.current\(\)\) changed\.current\(\{ kind: 'settled', id: idOf\(at\) \}\)/.test(panel)],
+    [true, true, true])
+  check('...and it calls no playback action, nor reads a context', [actionsIn(panel), /useContext|PlayerContext|ActionsContext/.test(panel)], [[], false])
+  check('the page is followed only after an apply changed the release; tags, art and lyrics keep the id - and each write carries the Edit it was made under',
+    [/afterWrite\(at, release, followRelease\(album\.release_mbid, release\)\)/.test(panel),
+      /const wrote = \(at: EditRequest, album: LibraryAlbum\) => async \(\) => \{\s*writes\.current \+= 1\s*follow\(await library\.reload\(false\), album\.path\)\s*afterWrite\(at, album\.release_mbid \|\| null, null\)/.test(panel)],
+    [true, true])
+  check('the folder is asked for as the panel opens on a new Edit - never for a request kept from before; the delete confirmation drawn only while its tab shows',
+    [/if \(!open \|\| !request \|\| lookedUp\.current === request\.key\) return/.test(panel), /\{tab === 'delete' && \(\s*<DeleteAlbumDialog\b/.test(panel)],
+    [true, true])
+  check('an edit asks the album page again - afresh, keeping what it drew, a failed refresh silent - per album',
+    [/\}, \[id, refresh, requests\]\)/.test(page), /\}, \[id, refresh, storeRequests\]\)/.test(page),
+      /if \(!again\) \{\s*setAlbum\(null\)\s*setError\(null\)\s*\}/.test(page), /if \(!request\.current\(\) \|\| isAbort\(reason\) \|\| again\) return/.test(page),
+      /refresh=\{refreshes\.get\(page\.id\) \?\? 0\}/.test(app),
+      /const answer = again \? prefetchAlbum\(id, false, true\)\.then\(\(\) => fetchAlbum\(id, request\.signal\)\) : fetchAlbum\(id, request\.signal\)/.test(page)],
+    [true, true, true, true, true, true])
 }
 
 console.log('\nApp moves history only through the router')

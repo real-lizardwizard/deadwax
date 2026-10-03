@@ -21,7 +21,12 @@ these hold:
     asked again (Navidrome gives an album a new id when its tags change enough), no more than
     NAVIDROME_IDS_KEPT are kept (the least recently used let go), only OTHER_PRESSINGS_LOOKED_UP
     other pressings are looked up, and a store read that fails says nothing of the store while
-    Navidrome's id is still answered.
+    Navidrome's id is still answered;
+  - (2.0.0-player.21) the path the app's Edit panel hands every editor: a row's `path` IS the folder
+    relative to LIBRARY_PATH that the library's routes take - at the library's root, or with brackets,
+    an ampersand, a hash and accents in it - and it follows the album through a re-file (the same
+    row, at the new folder), a disc merge (the folder it joined, the merged-away one not listed even
+    while a leftover cover keeps it on disk) and a delete through the route (no folder at all).
 """
 
 import asyncio
@@ -265,13 +270,52 @@ def test_what_is_found_is_kept_and_what_isnt_is_asked_again(root, store, navidro
     assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd"
     asked = len(seen)
     assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd"
-    assert len(seen) == asked, "a second look at the same albums asks Navidrome nothing"
+    #? a second look searches nothing: the kept ids are only CHECKED (getAlbum), one each
+    assert {r.url.path for r in seen[asked:]} == {"/rest/getAlbum"}, "a second look searches Navidrome for nothing"
 
     #? an album Navidrome hasn't scanned yet: asked again, and found once it has
     del state["albums"]["nd-third"]
     assert ask(store, release_mbid=THIRD).json()["navidrome_id"] is None
     state["albums"]["nd-third"] = {"id": "nd-third", "name": "Third", "musicBrainzId": THIRD}
     assert ask(store, release_mbid=THIRD).json()["navidrome_id"] == "nd-third"
+
+
+def test_a_kept_id_navidrome_no_longer_has_is_found_afresh_at_once(root, store, navidrome_up):
+    #? an apply writes the tags, Navidrome scans and the album is found - then the folder is renamed,
+    #? and a Navidrome that ids albums by folder gives it a new id: the kept one must not be handed
+    #? out for the rest of the while (the album page following the apply would never reach it)
+    state, _ = navidrome_up
+    navidrome_albums(state)
+    dummies(root, store)
+    assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd"
+
+    state["albums"]["nd-cd-renamed"] = {**state["albums"].pop("nd-cd"), "id": "nd-cd-renamed"}
+
+    assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd-renamed"
+
+
+def test_a_kept_id_that_is_now_another_release_is_found_afresh(root, store, navidrome_up):
+    state, _ = navidrome_up
+    navidrome_albums(state)
+    dummies(root, store)
+    assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd"
+
+    #? the same id, re-tagged as another pressing; the CD now under another id
+    state["albums"]["nd-cd"] = {"id": "nd-cd", "name": "Dummy", "musicBrainzId": REMASTER}
+    state["albums"]["nd-cd-elsewhere"] = {"id": "nd-cd-elsewhere", "name": "Dummy", "musicBrainzId": CD}
+
+    assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd-elsewhere"
+
+
+def test_a_kept_id_stands_while_navidrome_cant_be_reached(root, store, navidrome_up):
+    state, _ = navidrome_up
+    navidrome_albums(state)
+    dummies(root, store)
+    assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd"
+
+    state["down"] = True
+
+    assert ask(store, release_mbid=CD).json()["navidrome_id"] == "nd-cd"
 
 
 def test_navidrome_down_is_a_null_id_and_the_store_still_answers(root, store, navidrome_up):
@@ -428,3 +472,93 @@ def test_a_store_read_that_fails_says_nothing_of_the_store_and_navidrome_still_a
 
     assert answer.status_code == 200
     assert (answer.json()["present"], answer.json()["other_pressings"], answer.json()["navidrome_id"]) == ([], [], "nd-cd")
+
+
+# ---------------------------------------------------------------- the path the Edit panel opens (2.0.0-player.21)
+#
+# The app's Edit panel finds an album page's folder here - the store's `present` rows - and hands that
+# path, as it is, to every editor: the release editor, the tag editor, the Get buttons, the delete
+# confirmation. So a row's path must BE the folder relative to LIBRARY_PATH that the library's routes
+# take; follow the album through a re-file, a disc merge and a delete; and be every folder of a set kept
+# one per disc, in a steady order (the panel starts on the first).
+
+def library(store, method, route, **kwargs):
+    app = start()
+    app.state.store = store
+    client = TestClient(app)  # no `with`: no lifespan
+    return client.get(route, **kwargs) if method == "get" else client.post(route, **kwargs)
+
+
+def track(root, path, name="01 - Wandering Star.flac"):
+    (root / path / name).write_bytes(b"")
+
+
+def test_a_rows_path_is_the_folder_the_library_routes_take(root, store, navidrome_up):
+    dummies(root, store)
+    track(root, CD_PATH)
+
+    [row] = ask(store, release_mbid=CD).json()["present"]
+
+    assert (root / row["path"]).resolve() == (root / CD_PATH).resolve()
+    tracks = library(store, "get", "/deadwax/library/tracks", params={"album": row["path"]})
+    assert tracks.status_code == 200 and tracks.json()["album"] == CD_PATH
+    summary = library(store, "get", "/deadwax/library/deletion_summary", params={"album": row["path"]})
+    assert summary.status_code == 200 and summary.json()["audio_files"] == 1
+
+
+def test_a_folder_at_the_librarys_root_and_one_named_with_awkward_characters_both_map(root, store, navidrome_up):
+    """A stranger's rip sits at the top of the library, with no artist folder; a name can hold brackets,
+    an ampersand, a hash and accents - each goes through a query string to the routes and back."""
+    rip = folder(root, "Portishead - Dummy", store, CD)
+    awkward = "Sigur Rós/( ) [Edition #1] & More"
+    folder(root, awkward, store, VINYL, edition="Edition #1", year="2002")
+
+    assert [(r["id"], r["path"]) for r in ask(store, release_mbid=CD).json()["present"]] == [(rip, "Portishead - Dummy")]
+    [row] = ask(store, release_mbid=VINYL).json()["present"]
+    assert row["path"] == awkward
+    for path in ("Portishead - Dummy", awkward):
+        assert library(store, "get", "/deadwax/library/tracks", params={"album": path}).json()["album"] == path
+
+
+def test_a_refiled_album_is_answered_at_its_new_folder_by_the_same_row(root, store, navidrome_up):
+    """The release editor renames a folder (the retag route re-indexes it as moved): the row follows,
+    same id, and the bridge answers the new path - the panel's next look finds the album where it is."""
+    ids = dummies(root, store)
+    (root / CD_PATH).rename(root / "Portishead" / "Dummy (1994) [UK CD]")
+    run(store.index_move(str(root), CD_PATH, "Portishead/Dummy (1994) [UK CD]", CD))
+
+    [row] = ask(store, release_mbid=CD).json()["present"]
+
+    assert (row["id"], row["path"]) == (ids["cd"], "Portishead/Dummy (1994) [UK CD]")
+    assert library(store, "get", "/deadwax/library/tracks", params={"album": CD_PATH}).status_code == 404
+
+
+def test_a_disc_folder_merged_in_is_answered_as_the_folder_it_joined(root, store, navidrome_up):
+    disc_one = folder(root, "Portishead/Roseland (1998) (Disc 1)", store, CD, album="Roseland")
+    folder(root, "Portishead/Roseland (1998) (Disc 2)", store, CD, album="Roseland")
+
+    both = ask(store, release_mbid=CD).json()["present"]
+    #? a set kept one folder per disc: both, in the store's steady order - the panel starts on the first
+    assert [row["path"] for row in both] == ["Portishead/Roseland (1998) (Disc 1)", "Portishead/Roseland (1998) (Disc 2)"]
+
+    #? the merge moves the tracks across; a cover of the same name stays behind with its folder
+    #? (retag._merge_into never overwrites), so the folder is still there - and still not the album
+    (root / "Portishead/Roseland (1998) (Disc 2)" / "cover.jpg").write_bytes(b"")
+    run(store.index_merge(str(root), "Portishead/Roseland (1998) (Disc 2)", "Portishead/Roseland (1998) (Disc 1)"))
+
+    assert [(row["id"], row["path"]) for row in ask(store, release_mbid=CD).json()["present"]] == [
+        (disc_one, "Portishead/Roseland (1998) (Disc 1)")]
+
+
+def test_an_album_deleted_through_the_route_is_answered_as_nothing(root, store, navidrome_up):
+    """The panel's Delete is the library's delete route: the folder goes, its row a `deleted` tombstone,
+    and the bridge then answers no folder for the release - the album page has nothing left to edit."""
+    dummies(root, store)
+    track(root, VINYL_PATH)
+
+    deleted = library(store, "post", "/deadwax/library/delete", json={"album_path": VINYL_PATH})
+
+    assert deleted.status_code == 200 and deleted.json()["deleted"] is True
+    assert not (root / VINYL_PATH).exists()
+    assert ask(store, release_mbid=VINYL).json()["present"] == []
+    assert [row["path"] for row in ask(store, release_mbid=CD).json()["present"]] == [CD_PATH]

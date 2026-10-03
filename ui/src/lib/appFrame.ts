@@ -19,7 +19,10 @@
  * main area makes room for it, and a drawer over the main area's right edge between 1024 and 1279 -
  * at 1024 - 232 - 470 = 322px a third column would leave no room for a tracklist (so what the page
  * needs beside a drawer keeps to the part it leaves in view, `liesOver`). ONE panel at a time: opening
- * Info puts Sources away and the other way round (App; `sideOf` says which shows).
+ * Info puts Sources away and the other way round (App; `sideOf` says which shows). Since
+ * 2.0.0-player.21 the album page's Edit panel is a third kind (DesktopManage.dc.html: the editors
+ * beside the album they edit) - the desktop's alone, with no sheet on a phone: crossing back under
+ * 1024px closes it.
  *
  * The breakpoints are the stylesheets' too (interface/player/app-desktop.css, theme.css's desktop
  * tokens): tests/test_app_desktop_css.py reads these constants and holds every @media there to them.
@@ -65,14 +68,14 @@ export function panelIsModal(panel: PanelStyle): boolean {
 /* ===== the desktop's one side panel ===== */
 
 /** What the desktop's side panel shows - one at a time: the column has room for one, and opening
- *  either puts the other away (App). */
-export type Side = 'none' | 'sources' | 'info'
+ *  any puts the others away (App). `edit` is the album page's Edit panel (2.0.0-player.21). */
+export type Side = 'none' | 'sources' | 'info' | 'edit'
 
-/** What the side panel shows, from what is open: Info when it is (it was opened last - opening
- *  either puts the other away), else Sources; on a phone neither is a panel. */
-export function sideOf(frame: Frame, open: { sources: boolean; info: boolean }): Side {
+/** What the side panel shows, from what is open: Info when it is (it is opened over the others -
+ *  opening any puts the rest away), then the Edit panel, then Sources; on a phone none is a panel. */
+export function sideOf(frame: Frame, open: { sources: boolean; info: boolean; edit: boolean }): Side {
   if (frame === 'phone') return 'none'
-  return open.info ? 'info' : open.sources ? 'sources' : 'none'
+  return open.info ? 'info' : open.edit ? 'edit' : open.sources ? 'sources' : 'none'
 }
 
 /** Whether the main area makes room for the panel: only a third column does; a drawer lies over it. */
@@ -95,10 +98,13 @@ export function liesOver(panel: PanelStyle, side: Side): boolean {
  * What crossing into another frame closes. Into the desktop: Now Playing and whatever is over it
  * (its menu, Info as its sheet) - the desktop has no Now Playing sheet (its player bar is the
  * player, and the turntable is the phone's alone); the Sources sheet stays open, becoming the panel.
- * Back to the phone: the Info panel - Info is a sheet over Now Playing there, which isn't open.
+ * Back to the phone: the Info panel - Info is a sheet over Now Playing there, which isn't open - and
+ * the Edit panel (2.0.0-player.21), which a phone has no board for, and so no sheet.
  */
-export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: boolean } {
-  return to === 'desktop' ? { nowPlaying: true, infoPanel: false } : { nowPlaying: false, infoPanel: true }
+export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: boolean; editPanel: boolean } {
+  return to === 'desktop'
+    ? { nowPlaying: true, infoPanel: false, editPanel: false }
+    : { nowPlaying: false, infoPanel: true, editPanel: true }
 }
 
 /* ===== the sidebar ===== */

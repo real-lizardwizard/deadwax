@@ -135,8 +135,9 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
-  version, and that logins are off. Server settings, the albums that need a look, the log and
-  editing an album are on the main page for now, and **Open the main page** takes you there.
+  version, and that logins are off. Server settings, the albums that need a look and the log are on
+  the main page for now - and so is editing an album, on a phone (on a desktop an album's page has
+  **Edit**, [below](#on-a-desktop)) - and **Open the main page** takes you there.
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
   from, and **✕** to cancel, which asks in the card first: **Keep it** or **Cancel download**),
   **Waiting** (its place in the user's queue, or "starting"), **Needs attention** (why it stopped,
@@ -361,7 +362,8 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   and **Requests** (with the count of what's arriving, as the tab has), the Library's views -
   **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
   songs, as on a phone) - then **Managing**, whose **Open the main page** opens the main page in a new
-  tab (server settings, the albums that need a look, the log and editing are there for now), and
+  tab (server settings, the albums that need a look and the log are there for now; an album is
+  edited from its own page, below), and
   **You** at the foot. Where you are is highlighted. Home, Requests and You work as the phone's tabs
   do: a click shows it as you left it, and a click on the one showing goes back to its first page
   (and, there, to the top). So does the Library view showing. Another Library view shows that view -
@@ -388,8 +390,20 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   the Info button again, or Escape while you're in the panel closes it. Going to an album or an
   artist from the player - the bar's "Artist — Album", or Info's own cards - closes it too when it
   lies over the page (between 1024 and 1279 pixels wide); as a column beside the page it stays.
-- **An album** has its cover beside its title, **Play** and **Shuffle** in a row, and its songs in
-  a list as on a phone.
+- **An album** has its cover beside its title, **Play**, **Shuffle** and **Edit** in a row, and its
+  songs in a list as on a phone. Between 1024 and 1279 pixels wide, while a panel lies over the page,
+  the row moves under the cover, so the panel - the Edit panel included - leaves it in view.
+- **Edit** (since 2.0.0-player.21, for an admin - everyone, with logins off) opens the **Edit album**
+  panel beside the page, and shows pressed while it's open: underline tabs for **Release** (the main
+  page's metadata editor: pick the pressing, read the preview, **Apply**), **Tags** (the album's
+  tracks with tick boxes, and the tag editor for the ticked ones), **Artwork** (**Get cover**, **Get
+  CD art**), **Lyrics** (**Get lyrics**) and **Delete**. They're the main page's own editors, so they
+  work as [the library guide](library.md#editing-an-album-in-the-app) says - which also says how the
+  panel finds the album's folder, and what happens after an edit: the page asks Navidrome again,
+  and after you apply a different release it follows the album to the new id Navidrome gives it.
+  The panel closes when you go to another page; the close button, Edit again, or Escape while
+  you're in the panel closes it too (in the tag editor or the delete confirmation, Escape closes that
+  first, back to its tab).
 - **The album you don't have** has its cover beside its title, then **Get the album** with the
   **Pressing** button beside it, what you already have of that pressing under them, and the
   tracklist as a table - #, Title, Length - with an **Against the usual tracklist** column whenever
@@ -416,7 +430,8 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   you're in the panel, closes it.
 - **Where the panel goes**: from 1280 pixels wide it's a third column and the page makes room for
   it; between 1024 and 1279 it lies over the right of the page, which there isn't room to share. One
-  panel shows at a time: opening Info puts the sources away, and Get puts Info away.
+  panel shows at a time: opening Info puts the sources away, and Get puts Info away - and an album's
+  **Edit** puts either away, as they put the Edit panel away.
 - **The look** is the desktop's version of the same style: smaller labels and headings, a darker
   page and cards, and Explorer-style highlights in the sidebar and the pressing list.
 - **On a touch screen** in this layout - an iPad on its side - every control is a finger's size
@@ -1086,21 +1101,23 @@ fixes that.
   section isn't shown.
 - **An album with no MusicBrainz release id can't be pinned** (its pin isn't shown): nothing would
   find it again once it moved.
-- **On a desktop**, the sidebar's **Managing** opens the main page rather than its own screens, and
-  editing an album in the app isn't built yet; between 1024 and 1279 pixels wide a panel lies over the
-  right of the page, the end of a long tracklist under it. The [visualizer](#the-visualizer) sees FLAC
-  songs only; its play/pause is its one control of the music (skip and seek from the player bar, after
-  leaving it).
+- **On a desktop**, the sidebar's **Managing** opens the main page rather than its own screens;
+  between 1024 and 1279 pixels wide a panel lies over the right of the page, the end of a long
+  tracklist under it. The Edit panel edits one album: the albums that need a look, the bulk runs, an
+  artist's pictures and **Move albums to …** are the main page's. The [visualizer](#the-visualizer)
+  sees FLAC songs only; its play/pause is its one control of the music (skip and seek from the player
+  bar, after leaving it).
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
-- **The rest of deadwax**: editing, the albums that need a look and the server settings are on the
-  main page, which also works on a phone.
+- **The rest of deadwax**: editing an album on a phone, the albums that need a look and the server
+  settings are on the main page, which also works on a phone.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata
   editor, since Navidrome may give it a new id. The page says Navidrome has nothing by that id;
-  go back to the Library and open it again.
+  go back to the Library and open it again. (Applied from the app's own **Edit** panel, the page
+  follows the album to its new id; a link saved before still names the old one.)
 
 ## Not yet verified on a real iPhone
 

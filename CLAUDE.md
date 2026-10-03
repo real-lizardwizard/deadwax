@@ -214,7 +214,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    with the player inside them - see "The one app". player/deck.ts is the
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts) - see
                    "The turntable, part two".
-tests/             2207 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2227 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -3994,7 +3994,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
     `.load(` - comments included, so don't name them in a comment there.
   - **A link out of the app opens beside it** (`target="_blank" rel="noopener"`, review): the
     Search card (until 2.0.0-player.13, and Requests' until .12), You's Managing row, the gate's settings link and
-    (since 2.0.0-player.19) the desktop sidebar's "Open the main page". Followed in the
+    (since 2.0.0-player.19) the desktop sidebar's "Open the main page" - and (since 2.0.0-player.21)
+    the Edit panel's, for an album it can't find a folder for. Followed in the
     same page, `/` unloads the player - the audio element, any stream and the queue, which
     nothing keeps. From the home-screen app it opens outside the app's scope either way (Safari
     or a browser view over it; not seen on the phone). The sim fails on any `<a href>` in app/ or
@@ -5670,7 +5671,14 @@ finished Home").
   row - and an album is believed only when its own `musicBrainzId` IS the release, so a title's
   other pressings are never taken. Found ids are memoised (`NAVIDROME_ID_SECONDS` 600,
   `NAVIDROME_IDS_KEPT` 256; misses are not, since an album just filed is still being scanned), and
-  forgotten when the settings tab changes Navidrome (`forget_navidrome_ids`). Given `navidrome_id`,
+  forgotten when the settings tab changes Navidrome (`forget_navidrome_ids`). **Since 2.0.0-player.21
+  a kept id is CHECKED with getAlbum before each use** and looked up afresh when Navidrome no longer
+  has it as that release (it stands while Navidrome can't be reached). Found in the real page by the
+  desktop editor's staged-rip check: an apply writes the tags, Navidrome scans, the page's follow
+  finds the album - and the rename a moment later gave it a new id on the stub (which ids albums by
+  folder), while the memo handed out the old one for ten minutes and the page never moved. A
+  Navidrome on its default PIDs keeps the id across a rename (the release id is in it), so James's
+  wouldn't have shown it; the check costs one getAlbum instead of the searches it saves. Given `navidrome_id`,
   the release is getAlbum's `musicBrainzId` (as the turntable's disc art reads it). Navidrome unset,
   down or not having it is `navidrome_id: null` with the store's half answered. Exactly one of the
   two ids (each bounded, the MBID anchored), or a 422 with nothing asked. `tests/test_store_lookup.py`
@@ -6227,7 +6235,8 @@ later; "Managing links to / for now".
   stays small.
 - **Not built, on purpose**: pins (.18, in parallel); the visualizer (later - its place is left; built in
   2.0.0-player.20, see "The desktop visualizer");
-  the turntable on a desktop; the desktop editor (S9, DesktopManage); the comparison table (rejected);
+  the turntable on a desktop; the desktop editor (S9, DesktopManage - built in 2.0.0-player.21, "Editing
+  an album on desktop"); the comparison table (rejected);
   "Mine / Everything in the store" (logins are off); the sidebar's "Needs a look" count, Settings and
   Log as their own items (one "Open the main page" link until the Managing slice); Lyrics and Queue in
   the bar (nothing for them to open); a desktop Now Playing; "Results for …" as the breadcrumb (the
@@ -6384,9 +6393,9 @@ butterchurn or preset libraries); shapes follow the music's feel, speed its temp
   full screen, or leaving full screen (fullscreenchange after it was entered) closes it; focus goes in
   as it opens and back to the player bar's button as it closes (again once the browser has left full
   screen - until then Chromium keeps the page inert); Tab stays inside it; everything behind
-  it is inert while it shows (`covered` gained `|| visualizerShown` - and a desktop's Sources or Info
-  panel left open beside it, outside that wrapper, takes `covered={visualizerShown}` as Now Playing
-  takes what is over it); nothing behind it counts as watched (`watchingOf` gets `sheetOpen: sheetOpen
+  it is inert while it shows (`covered` gained `|| visualizerShown` - and a desktop's Sources, Info or
+  (since .21) Edit panel left open beside it, outside that wrapper, takes `covered={visualizerShown}`
+  as Now Playing takes what is over it); nothing behind it counts as watched (`watchingOf` gets `sheetOpen: sheetOpen
   || (desktop && visualizing)`, so Requests' 500 ms poll stops under it); the page behind doesn't
   scroll (`html.app-viz-open`, its own lock class, as each sheet has); a window narrowed to a phone's
   width closes it (in the crossing effect's Info branch) and it never reopens by itself. Its chrome is
@@ -6500,6 +6509,203 @@ butterchurn or preset libraries); shapes follow the music's feel, speed its temp
   synthetic click after a waking tap lands inside WAKE_CLICK_MS; the next song's window arriving
   before a real gapless join; a song that can't be seen (the stub library is all FLAC; the sims hold
   it); and how it feels with James's music.
+
+### Editing an album on desktop (2.0.0-player.21)
+
+Slice S9 of the one app (`uplan/slices.md` S9, numbered .21: built beside .20's desktop visualizer on
+player-spike, and rebased onto it). The board is `DesktopManage.dc.html`: the album page's **Edit**
+toggle, and an "Edit album" side panel with underline tabs - Release, Tags, Artwork, Lyrics, Delete.
+James's decisions it carries: "Managing links to / for now" (so the review queue, settings and the
+log stay the main page's); no editor on the phone (there is no board for one); the editors are the
+main page's, reused - their hard-won state rules stay exactly as they are.
+
+- **Edit on the album page, a desktop's and an admin's**: App hands AlbumPage `onEdit` only when
+  `desktop && admin` (`admin` is the `/deadwax/me` answer the sidebar's Managing reads - true until
+  deadwax says otherwise, so everyone with logins off), and AlbumPage draws Edit (`pl-pill
+  app-edit-toggle`, `aria-pressed` while the panel shows this album) after Play and Shuffle only when
+  handed it - so below 1024px the DOM is the phone's, untouched. Live once the album has answered:
+  its tap hands App the album as Navidrome sent it (`lib/albumEdit.ts` `editAlbum`), which is what
+  the panel finds the folder by when the store can't.
+- **A third side panel, by the frame's rule** (`lib/appFrame.ts`): `Side` gains `'edit'` (`sideOf`
+  takes `{ sources, info, edit }`; were two ever open, Info, then Edit, then Sources), so `.has-side`
+  and `.has-drawer` come from it as from the others; one at a time - `toggleEdit` puts Sources (its
+  search going with it, by Sources' backstop) and Info away, `openSources` and `toggleInfo` put Edit
+  away, Edit pressed again on its album closes it; `closesOnCrossing('phone').editPanel`; and App
+  draws `{desktop && <EditPanel .../>}` after InfoSheet (app-rules' Sources-then-NowPlaying checks
+  stand). **The panel is the album page's**: it closes as that page stops being the one on top of the
+  tab showing (`editShown`, an effect) - another page, a tab, the sidebar. Not modal (`useSheet` with
+  `modal` from the panel style - never a sheet), focus in to its close button and back to Edit,
+  Escape from inside it; its box a tab stop of -1, as Sources' is. 470px, the frame's panel token
+  (the board draws 440), so the shell's `.has-side` room holds.
+- **The editors, reused - `ui/src/components/` has no diff**: Release is `MetadataEditor` (keyed on a
+  `session` counter that moves per album and per folder chosen, never per apply - the main page's
+  rule); Tags is the panel's own track list with a tick box each (`TagsList`: `tickTracks` from
+  lib/tagEdit.ts, Shift for a run, the head's tri-state box) and `TrackTagEditor` for the ticked ones -
+  or all, none ticked - its file list fixed as it opens, its details from `useTrackDetails`, fetched
+  only once Tags has been opened (generation: the panel's library albums, as on the main page);
+  Artwork is `GetArtButton` and `GetDiscArtButton`, with a line saying why when either draws nothing
+  (it has a cover - replaced in Release, comparing; no release id - match one first); Lyrics is
+  `GetLyricsButton` and the count; Delete is `DeleteAlbumDialog`, mounted only while its tab shows so
+  its summary is read live. "Tick boxes on the track table" is read as the Tags tab's table (the
+  scan's filenames), not the album page's Navidrome song list: pairing Navidrome's songs with files
+  needs paths Navidrome reports only with ReportRealPath, and an untagged file - the case hand edits
+  are for - has no track number to pair by.
+- **Escape, twice over.** The editors listen for Escape on the whole document and close themselves
+  (the main page's floating windows always did). Beside the page that Escape is the page's, so the
+  panel takes keydown in the CAPTURE phase and passes over an editor's close or cancel while an
+  Escape from outside its box is still being dispatched (`escape.current.eventPhase !== 0` - a
+  dispatched event's phase is 0 once it is done; clearing a flag in a microtask would be too early,
+  since a native dispatch runs a microtask checkpoint after each listener). Inside the box Escape
+  closes the panel (useSheet, and the release editor's own close - both the same) - EXCEPT in a layer
+  over a tab, the tag editor or the delete confirmation (review): there Escape is that layer's alone
+  (useSheet's `covered: inner`, and the capture listener records the press as `'inner'`, which the
+  release editor's close - listening on the document whatever tab shows - passes over). Where it came
+  from is recorded in the capture phase, before any listener has changed state: a re-render in the
+  checkpoint after the tag editor's own listener would otherwise make the release editor's see the
+  layer gone. The cover viewer still stops Escape on `window`'s capture before anything hears it, as
+  on the main page - and is let go with the editors once the panel has closed (below), so it can't go
+  on taking the next Escape anywhere in the app.
+- **Which folder** (`editFolders`, pure, routes.sim): the id bridge's `present` rows, asked by the
+  page's Navidrome id (`/store/album`, through a latestOnly); else the library's scan by the release
+  (the bridge's, else the album's own `musicBrainzId` - the bridge failing degrades to this) - and
+  NEVER by name for a tagged album; else, no release anywhere, the scan's untagged folders by
+  `foldName` of the name and artist, narrowed by Navidrome's `songCount` when that still leaves
+  several. Several by name are a choice the user makes (`needsChoice`: a guess could hand the release
+  editor the wrong copy); several of one release - a set kept one folder per disc - start on the
+  first, a Folder select above the tabs for the rest. **The scan fallback is not optional**: the
+  bridge answers nothing for an album Navidrome knows by no release, and that is the v0.9.33 staged
+  rip - the album the release editor exists for. The scan is `useLibrary` (the main page's hook: the
+  saved scan, then a real one), read the first time the panel opens, and the album taken only from a
+  REAL scan (`loaded && !stale`) - and read AGAIN underneath on every Edit after that (review: the app
+  is a player left open for hours, and an album changed from the main page or another device was
+  shown as the first read had it, with no way to refresh): the album is taken from the scan in hand
+  at once and followed to the fresh read by path - let go, to be taken again from the fresh folders,
+  when its folder is gone - unless a write was made meanwhile (`writes`, a count), whose own reload
+  followed it already. The bridge's answer counts only for the Edit it was asked for (`askedFor`).
+- **The album is held, never derived** (the main page's lesson about a rename landing as two
+  commits): `subject` is set once and followed from the array `library.reload()` resolves with, a
+  functional update keyed on the old path. Each write carries the Edit it was made under
+  (`afterWrite(at, ...)`): an apply that waited for Navidrome can land after another album's Edit.
+- **After a write** (`AlbumChange`, App's `albumChanged`): `written` - `announceAlbumsFiled()` (the
+  owned marks, an album-you-don't-have page's store line; the panel's own useLibrary rescans after its
+  gather, cheap and ETag-unchanged) and the album page asked again; `settled` - asked once more after
+  `EDIT_SETTLE_MS` (10 s: Navidrome's watcher waits ~5 s, then scans); the folders re-asked by
+  release; and, only after an apply that CHANGED the album's release (`followRelease`), its new id
+  looked for by that release (`FOLLOW_LOOKS_MS`: at once, 3, 6, 12, 24 s - 45 s in all) - `moved`:
+  the page on top becomes that album's in place (`becomeTop` / `Router.become`: the entry replaced,
+  never pushed; the preview and the scroll carried to the new key), the panel following it (the same
+  request key, the new id). Only a changed release, because Navidrome makes an album's id from its
+  release id when it has one (its PID - "The 1.0.1 fixes"): a retag or rename keeping the release
+  keeps the id; the staged rip gaining its first release, or another one applied, gets a new id.
+  `deleted` - the panel closes, the page goes back when nothing of the album is left in Navidrome
+  (`deletesAll`: its only folder, or - found by name among several, which Navidrome may keep as
+  albums of their own - one holding as many songs as Navidrome lists), and otherwise is asked again
+  at once and after `EDIT_SETTLE_MS`, as after any write (review: it was asked once, before
+  Navidrome had noticed). The asking again goes through one latestOnly() - the next write calls the
+  last one's off - but the LOOK for a new id has a latestOnly of its own (`follows`, review): a write
+  straight after an apply (CD art, a hand edit, a cover) used to call the look off and start none,
+  leaving the page on an id Navidrome no longer had. App remembers each move (`moves`, `noteMove`):
+  a page of the old id that comes back on top - back, forward, its tab chosen, the page left during
+  the rename's wait - becomes the new one's by the same `become` (`movedTo`, an effect on `nav`), and
+  a `settled` landing after its move asks the new id.
+- **AlbumPage's `refresh`** (App's `refreshes`, a count PER ALBUM - one album asked again never
+  changes the prop another is handed, so nothing else re-asks): the album (prefetchAlbum `fresh`,
+  then taken) and the bridge asked afresh, what is drawn kept until they answer, a failed refresh
+  silent - the album may be under a new id Navidrome hasn't scanned yet. app-rules holds the pages'
+  memo to `admin, editOpen, edit, refreshes` too.
+- **Style** (app-desktop.css, every rule under `.app-desk`, inside the desktop media queries): the
+  panel joins the side panels' shared rules (`.app-edit` beside `.app-sources` and `.app-info`), the
+  board's underline tabs (2px accent rule, the chosen white and semibold), Edit toggled while it
+  shows; and the main page's editors styled by their own ids under `.app-desk .app-edit`
+  (`#metadata-window`, `#tags-window`, `#delete-window`, `#art-viewer`, their classes and the main
+  page's colour classes in this page's palette) - no main.css and no resize.js on this page, and a
+  side panel neither moves nor resizes. The editor's own ✕ is hidden (the panel's stands for it);
+  Apply is the solid purple at the board's 36px, sticky at the panel's foot with the summary;
+  "delete permanently" is the one red button (`--dw-danger-bg`, `--dw-danger-border`, new in
+  theme.css section 10). Busy is player.css's `pl-spin` ring - app-desktop.css can't hold keyframes
+  (its only contexts are the three media queries test_app_desktop_css holds), and theme.css's
+  reduced-motion rule stops it after one turn. The cover viewer is drawn inside the panel (beside the
+  editor's window, as the main page draws it) and `position: fixed` is still the window's: the
+  panel's box has no transform once open, and overflow never clips a fixed box; its z is within the
+  panel's layer (30), over the frame (8). A coarse pointer: controls and Apply 44px, the tabs a
+  finger's height, the fields 17px (iOS zooms under 16), the viewer's touch hint. Tokens
+  `--app-desk-edit-*`, `--app-desk-spin*`, `--app-desk-viewer-*`, `--app-z-edit-viewer`.
+- **After review** (21 findings, every one fixed but a footer order - all in the panel's own files,
+  `ui/src/components/` still without a diff): the editors drawn only while the panel shows and let go
+  once it has closed (`letGo`: at once as a column, after `EDIT_SLIDE_MS` for a drawer) - every Edit is
+  a new request anyway; the follow's own latestOnly and the remembered moves (above); the library read
+  again on each Edit (above); what the body says moved to the pure `editStatus` - nothing over an album
+  still HELD (a hand edit renaming an untagged album out of the name it was found by had put "can't
+  tell which folder" over working editors), and a failed real scan after the saved one said with Look
+  again rather than "Finding…" for good; a control that removes itself (Edit N tracks…, the tag
+  editor's Close, Delete's Cancel, Look again, a folder chosen) hands focus on inside the panel once
+  the swap has drawn (`focusNext`, a layout effect - only when focus fell to the body), and after a
+  move App re-points what focus goes back to at the new page's Edit; a delete of one folder of
+  several gives focus back to Edit. CSS: the album page's Play, Shuffle and Edit go under the cover
+  while a drawer is open (`.has-drawer .pl-album-page:not(.app-rg)`, as `.app-rg`'s Get - Edit's own
+  drawer had covered Edit from 1024 to about 1225px); a tag's raw key broken inside the preview's 84px
+  column; busy words inside Apply, the tag editor's Apply, the viewer's Save and "delete permanently"
+  the button's white; a pressing's track count on its first line (`order`); long names broken, never
+  clipped (the panel's notes, the delete warning's other files, the tag editor's list); and each tick
+  box in a label filling its cell, 44px where the pointer is coarse (`--app-desk-edit-tick`), with the
+  panel's other small targets. **Not changed**: Apply before Cancel, as the board draws them - the
+  reused editors keep their DOM order, and reordering by CSS would part what is seen from the
+  keyboard's order.
+- **Not built, on purpose**: an editor on the phone (no board); the review queue's stepping (Review
+  N), the bulk runs, artist images and re-filing (the main page's still - FRONTEND-MIGRATION lists
+  what remains before parity); tick boxes on the album page's own song list (above); following an
+  album with NO release id through a hand edit that changes its Navidrome id (nothing to look it up
+  by - the page keeps what it drew); the Library's grid refreshing itself (it is Navidrome's).
+- **Verified**: 2219 Python tests (17 new: `test_store_lookup.py` 5 - a row's path IS the folder the library's
+  routes take, a folder at the library's root and one of awkward characters, a re-file answered at the
+  new folder by the same row, a merged disc folder left holding a cover answered as the one it joined,
+  and an album deleted through the route answered as nothing; `test_app_desktop_css.py` 12, 6 of them
+  the review's), pyflakes, tsc, and all 37 sims (`routes` 218 and `app-rules` 198 extended); 64
+  mutations, one or more per rule pinned, each caught and restored byte for byte - and 49 more after
+  review, one or more per fix and per rule the review found unpinned (the release editor keyed on the
+  session, the needsChoice guard, `loaded && !stale`, `useLibrary(open)`, the tagsSeen gate, albumChanged's
+  follow, count, ask and close, `prefetchAlbum`'s `fresh`, the Escape's direction and each handler's
+  guard), all caught - two first got past and gained the checks that catch
+  them (the release compared without its case on the BEFORE side too; the merge test, whose disc
+  folder had been removed, so the bridge's own liveness check hid it whether or not it was marked
+  merged - it now keeps the folder, holding the cover a merge leaves behind). The engine guard is
+  empty, `player.sim.cjs` untouched, and `ui/src/components/` and `ui/src/hooks/` have no diff;
+  `tags.sim` and `queue.sim` pass as they were.
+- **Verified in the real page** (headless Brave against the stubs on :8082, real mouse input at
+  1440x900, 18 checks): the v0.9.33 staged-rip check - Portishead's Third copied to the library's root
+  as `Third rip`, its MusicBrainz tags, original date, pictures and cover stripped. The album page
+  has Edit; Edit opens the panel as a column, which finds the rip's folder by name; Release lists the
+  pressings, a pick draws its preview, says it renames and will wait for Navidrome first, and Apply
+  says it is applying; the folder is re-filed as `Portishead/Third (2008) [Made in Germany by EDC]`
+  and the rip folder is gone; **the page follows the album to its new id**; the tag editor opens on
+  two ticked tracks and writes the genre to those two only; Get CD art answers; Delete shows the
+  summary, deleting closes the panel and goes back from the page, and the folder is gone from disk;
+  a phone has no Edit; no console errors. Two bugs it found, both fixed here:
+  - **The bridge handed out a stale id.** `navidrome_album` kept a release's Navidrome id for ten
+    minutes and trusted it: an apply writes the tags, Navidrome scans the album at its OLD folder
+    (a Navidrome that ids albums by folder, as the stub does), the bridge finds and keeps that id,
+    and the rename a moment later gives the album a new one - which the bridge then never reported.
+    A kept id is now checked with one getAlbum before each use and looked up afresh when Navidrome
+    no longer has it as that release (kept as found while Navidrome can't be reached).
+    `test_store_lookup.py` has three new tests, each failing with the check taken out.
+  - **The page's follow gave up at once.** `lookForMove` stopped at the first answer with any id -
+    and right after a rename that answer is the page's OWN id (the album still listed at the old
+    folder, scanned between the tags and the rename). The page's own id is no answer now: the look
+    goes on until Navidrome has scanned the move, or its ~45 s run out. With a Navidrome that keeps
+    ids across a rename, that is five small requests and the page stays, as it should.
+    `app-rules.sim` pins it.
+  Also from the real page: "In your library" and its chips sat centred mid-column on the desktop
+  album page, the phone's centred row under a left-aligned hero (a .19 slip); `.app-desk
+  .app-album-chips` now starts them under the title. **After the rebase onto .20**, the Edit panel
+  takes `covered` as Sources and Info do: built beside the visualizer, it stayed live and tabbable
+  under it (app-rules pins it, and fails without it). An Escape from the visualizer is the page's to
+  every editor, so none closes under it. **Totals after the rebase**: 2227 Python tests, pyflakes,
+  tsc, all 40 sims (`app-rules` 231, `routes` 218).
+  **NOT verified here**: the editors' look at 1280x800 and 1024x768 (the drawer, with Play, Shuffle
+  and Edit under the cover), an iPad, a real Navidrome giving the new id after an apply (search3 by
+  the release id, the title fallback), and, of the review's fixes, the label forwarding a Shift-click
+  to its box, focus landing where `focusNext` sends it, one Escape closing one layer, a cover viewer
+  gone with the panel.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -7781,7 +7987,10 @@ the page, and ported panels mount into it via one extra module script.
 **Beside the port, the one app** (2.0.0-player.9): the page at `/player/` is growing into the app
 that will replace the main page - five tabs with the player inside them, born in Preact, with
 Search and Requests linking to the main page until they are built. See "The one app"; when it
-covers everything the main page does, the vanilla half retires in one commit.
+covers everything the main page does, the vanilla half retires in one commit. **Since
+2.0.0-player.21 the main page's editors serve both pages**: the app's desktop Edit panel hosts
+`MetadataEditor`, `TrackTagEditor`, the Get buttons and `DeleteAlbumDialog` as they are (styled for
+it in app-desktop.css by their ids), so a change to one of them is checked on both.
 
 **How the two halves coexist:**
 
@@ -7861,7 +8070,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2207 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2227 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -7893,8 +8102,8 @@ node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (Web
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
 node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player, Now Playing opens as and its key, Pause winds the record down and its key
-node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history; the desktop frame (panels over sheets, a drawer over the page, the sidebar's moves, the Library's store, useFrame against a fake matchMedia)
-node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin; the visualizer - no createMediaElementSource anywhere, its silent copy's chain however spelled, its toggle from the click (a held Space's repeats ignored), its context only from the bar's click, nothing secure-only or random, a press waking it and nothing more, focus kept in it, the panels inert and the poll stopped behind it, its scroll lock, its pictures per address
+node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history; the desktop frame (panels over sheets, a drawer over the page, the sidebar's moves, the Library's store, useFrame against a fake matchMedia); the Edit panel's rules (a third side panel, a page becoming an album's new id, which folder, when to follow, moves remembered, what the panel says, whether a delete empties the album)
+node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin; the visualizer - no createMediaElementSource anywhere, its silent copy's chain however spelled, its toggle from the click (a held Space's repeats ignored), its context only from the bar's click, nothing secure-only or random, a press waking it and nothing more, focus kept in it, the panels inert and the poll stopped behind it, its scroll lock, its pictures per address; the Edit panel (desktop and admin only, one panel at a time, closed off its page, the editors' Escape from the page passed over and a layer's Escape its own, the editors let go once it closes, the follow's own latestOnly, focus kept in the panel, no playback action)
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
 node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions, Getting albums and their store (seeded once, asked again, saves in turn)
 node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Navidrome sent
@@ -7934,7 +8143,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2207 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2227 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

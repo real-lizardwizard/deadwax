@@ -569,6 +569,10 @@
     --dw-amber-icon:   #fbbf24;
     --dw-danger-text:  #fca5a5;   /* the boards' failure text; not in STYLE.md's palette */
     --dw-amber-text:   #fcd34d;   /* a warning's words: STYLE.md's amber badge text */
+    /* the one destructive button - the Edit panel's "delete permanently" (2.0.0-player.21): STYLE.md
+       has none, so the primary's gentle gradient and edge, in a red */
+    --dw-danger-bg:     linear-gradient(to bottom, #dc4a4a 0%, #b91c1c 100%);
+    --dw-danger-border: #991b1b;
 
     /* --- badges: STYLE.md's purple one (the Requests tab's count, 2.0.0-player.12) --- */
     --dw-badge-purple-bg:     rgba(168, 85, 247, 0.16);

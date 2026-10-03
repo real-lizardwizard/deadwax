@@ -465,6 +465,34 @@ Home's **Edit** says **Not saved: …** under the list instead. The reasons:
   moved, so it can't be pinned. An album page shows no pin for such an album, and the ••• menu offers
   none when it knows; tag the album with its release (apply a release in the main page's editor).
 
+## The app's Edit panel can't find the album's folder
+
+On a desktop, an album page's **Edit** finds the album's folder by its MusicBrainz release, or - for
+an album Navidrome knows by no release - by its name among the library's untagged folders ([how it
+finds it](library.md#editing-an-album-in-the-app)). What it says when it can't:
+
+- **"deadwax has no folder of this album: Navidrome knows it by a MusicBrainz release no folder in
+  the library is tagged with"**: the files Navidrome scanned carry a release id that no folder in the
+  library has - usually an album added by another program since the library was last read, or a
+  Navidrome looking at a different folder from `LIBRARY_PATH`. **Look again** reads the library again;
+  if that doesn't find it, check the two paths point at the same music.
+- **"deadwax can't tell which folder this album is: Navidrome knows it by no MusicBrainz release, and
+  no untagged folder in the library has its name"**: the album's name or artist in Navidrome isn't the
+  one in its files' tags as deadwax reads them, or its folder does carry a release id. **Open the main
+  page** and find it in the Library tab, where its editor works the same.
+- **"Which one is it?"**, with a list of folders: more than one untagged folder has the album's name
+  and artist (its number of tracks didn't tell them apart). Pick the one this page plays.
+- **"The library's scan doesn't list … yet"**: the store knows the folder but the library's last scan
+  doesn't. **Look again** scans it.
+- **"deadwax couldn't read the library: …"**: reading the library failed - often a reverse proxy
+  giving up on a first scan of a large or sleeping library, or a moment without the network. **Look
+  again** reads it again.
+- **LIBRARY_PATH is not set**: the panel needs the library, as the main page's Library tab does - see
+  [the library tab is empty](#the-library-tab-is-empty-or-doesnt-show-a-change).
+
+**Edit** itself is missing on a phone (there's no editor there yet), in a window under 1024 pixels
+wide, and for someone deadwax says isn't an admin - with logins off, nobody.
+
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
 The [phone player](player.md) shows one of these on Home and in the Library tab, in place of your

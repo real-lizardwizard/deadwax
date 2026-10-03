@@ -32,6 +32,15 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   from 1280px and wrap only at a narrow desktop, leaving "now:" and "feel:" out until 1280px; play/pause
   a primary button at the foot; a note at the foot kept to its corner, clear of play/pause and the keys;
   and its controls a finger's size where the pointer is coarse.
+- And the Edit panel (2.0.0-player.21, DesktopManage.dc.html): a third side panel by the same rule; the
+  board's underline tabs and the album page's Edit toggled while it shows; the main page's editors
+  drawn inside it styled by their own ids under `.app-desk .app-edit` (their own close hidden, Apply the
+  solid purple at the board's 36px, delete the one red button); the cover viewer over the whole window;
+  the pressings scrolling inside the panel with Apply kept in reach; and a finger's targets, and fields
+  iOS won't zoom into, where the pointer is coarse. After review: the album page's Play, Shuffle and
+  Edit under its cover while a drawer is open (Edit's own drawer would cover it); a tag's long name
+  broken inside its column; busy words in a solid button the button's white; a pressing's track count
+  on its first line; long names broken, never clipped; and a tick box's label a finger's target.
 """
 
 import re
@@ -398,3 +407,153 @@ def test_the_visualizers_controls_are_a_fingers_where_the_pointer_is_coarse():
     assert DESKTOP.rindex("@media (min-width: 1024px) and (pointer: coarse)") > DESKTOP.index("--app-viz-control: 32px")
     #? a pointer you aim keeps the board's sizes
     assert (desk["--app-viz-control"], desk["--app-viz-option"], desk["--app-viz-play-h"]) == ("32px", "30px", "40px")
+
+
+def test_the_edit_panel_is_a_side_panel_by_the_same_rule():
+    """Beside the page as Sources and Info are: a box sliding over the page's edge as a drawer, there in
+    place as a column, focusable by a click with no ring - and a column of its head, tabs and body, the
+    body the one part that scrolls (saying its touches pan: the layer takes every touch)."""
+    box = declarations(DESKTOP, ".app-desk .app-layer.is-panel .app-edit", DESK)
+    assert (box["inset"], box["transform"], box["background"], box["border-radius"]) == ("0", "translateX(100%)", "var(--dw-side-panel)", "0")
+    assert declarations(DESKTOP, ".app-desk .app-layer.is-panel.is-open .app-edit", DESK)["transform"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-layer.is-column .app-edit", DESK)["transition"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-layer.is-panel .app-edit:focus", DESK)["outline"] == "none"
+    own = declarations(DESKTOP, ".app-desk .app-edit", DESK)
+    assert (own["position"], own["display"], own["flex-direction"]) == ("absolute", "flex", "column")
+    body = declarations(DESKTOP, ".app-desk .app-edit-body", DESK)
+    assert (body["min-height"], body["overflow-x"], body["overflow-y"], body["touch-action"]) == ("0", "hidden", "auto", "pan-y")
+
+
+def test_the_edit_panels_tabs_are_the_boards_underline_tabs():
+    tokens = media_tokens(DESKTOP, DESK)
+    assert (tokens["--app-desk-edit-tab-y"], tokens["--app-desk-edit-tab-x"], tokens["--app-desk-edit-rule"]) == ("8px", "10px", "2px")
+    assert declarations(DESKTOP, ".app-desk .app-edit-tabs", DESK)["border-bottom"] == "var(--dw-hairline) solid var(--dw-border)"
+    tab = declarations(DESKTOP, ".app-desk .app-edit-tab", DESK)
+    assert (tab["border-bottom"], tab["color"]) == ("var(--app-desk-edit-rule) solid transparent", "var(--dw-text-2)")
+    on = declarations(DESKTOP, ".app-desk .app-edit-tab.is-on", DESK)
+    assert (on["border-bottom-color"], on["color"], on["font-weight"]) == ("var(--dw-accent)", "var(--dw-text)", "var(--dw-weight-semibold)")
+    #? Edit on the album page: the toggled tint while the panel shows its album, as the board draws it
+    pressed = declarations(DESKTOP, '.app-desk .app-edit-toggle[aria-pressed="true"]', DESK)
+    assert (pressed["background"], pressed["border-color"], pressed["color"]) == ("var(--dw-toggled-bg)", "var(--dw-toggled-border)", "var(--dw-accent-text)")
+
+
+def test_the_main_pages_editors_are_styled_by_their_own_ids_inside_the_panel():
+    """They are the main page's components, reused as they are - and its main.css isn't on this page - so
+    each is drawn here, keyed on its own ids, inside the panel only."""
+    selectors = {part.strip() for _where, found, _values in rules(DESKTOP) for part in found.split(",")}
+    for key in ("#metadata-window", "#metadata-footer", "#tags-window", "#delete-window", "#art-viewer",
+                "#metadata-apply-button", "#tags-apply-button", "#delete-confirm-button"):
+        assert any(selector.startswith(".app-desk .app-edit ") and key in selector for selector in selectors), key
+    #? the panel's close button stands for the editor's own
+    assert declarations(DESKTOP, ".app-desk .app-edit #metadata-close-button", DESK)["display"] == "none"
+    #? Apply the solid purple at the board's 36px; delete the one red button, from theme.css section 10
+    apply = declarations(DESKTOP, ".app-desk .app-edit #metadata-apply-button", DESK)
+    assert (apply["background"], apply["border"], apply["min-height"]) == (
+        "var(--dw-primary-bg)", "var(--dw-hairline) solid var(--dw-primary-border)", "var(--app-desk-edit-apply)")
+    assert media_tokens(DESKTOP, DESK)["--app-desk-edit-apply"] == "36px"
+    danger = declarations(DESKTOP, ".app-desk .app-edit #delete-confirm-button", DESK)
+    assert (danger["background"], danger["border"]) == ("var(--dw-danger-bg)", "var(--dw-hairline) solid var(--dw-danger-border)")
+    theme = {name for where, selector, values in rules(THEME) if where == "" and selector == ":root" for name in values}
+    assert {"--dw-danger-bg", "--dw-danger-border"} <= theme
+    #? the folder - the one string people copy - can be selected
+    assert declarations(DESKTOP, ".app-desk .app-edit .metadata-path", DESK)["user-select"] == "text"
+
+
+def test_the_cover_viewer_covers_the_window_over_the_panel():
+    """Drawn inside the panel (beside the editor's window, as the main page draws it): fixed is the
+    window's, the panel's box having no transform once open, and it sits over the panel's own parts."""
+    viewer = declarations(DESKTOP, ".app-desk .app-edit #art-viewer", DESK)
+    assert (viewer["position"], viewer["inset"], viewer["z-index"]) == ("fixed", "0", "var(--app-z-edit-viewer)")
+    assert declarations(DESKTOP, ".app-desk .app-layer.is-panel.is-open .app-edit", DESK)["transform"] == "none"
+    #? zoomed and moved by the viewer's own transform, clipped by its stage, the drag the image's
+    assert declarations(DESKTOP, ".app-desk .app-edit .art-viewer-stage", DESK)["overflow"] == "hidden"
+    assert declarations(DESKTOP, ".app-desk .app-edit .art-viewer-stage > img", DESK)["touch-action"] == "none"
+
+
+def test_the_pressings_scroll_inside_the_panel_and_apply_stays_in_reach():
+    releases = declarations(DESKTOP, ".app-desk .app-edit .metadata-releases", DESK)
+    assert (releases["max-height"], releases["overflow-y"]) == ("var(--app-desk-edit-list)", "auto")
+    footer = declarations(DESKTOP, ".app-desk .app-edit #metadata-footer", DESK)
+    assert (footer["position"], footer["bottom"], footer["background"]) == ("sticky", "0", "var(--dw-side-panel)")
+    assert declarations(DESKTOP, ".app-desk .app-edit .tags-footer", DESK)["position"] == "sticky"
+
+
+def test_the_edit_panel_is_a_fingers_where_the_pointer_is_coarse():
+    coarse = media_tokens(DESKTOP, COARSE)
+    assert coarse["--app-desk-edit-control"] == coarse["--app-desk-edit-apply"] == "var(--pl-hit)"
+    assert declarations(DESKTOP, ".app-desk .app-edit-tab", COARSE)["min-height"] == "var(--pl-hit)"
+    for field in (".app-desk .app-edit .releases-filter-input", ".app-desk .app-edit-select"):
+        assert declarations(DESKTOP, field, COARSE)["font-size"] == "var(--dw-text-body)", field
+    #? the cover viewer's hint for a hand that taps and pinches
+    assert declarations(DESKTOP, ".app-desk .app-edit .hint-touch", COARSE)["display"] == "inline"
+    assert declarations(DESKTOP, ".app-desk .app-edit .hint-pointer", COARSE)["display"] == "none"
+
+
+def test_the_album_page_keeps_play_shuffle_and_edit_clear_of_a_drawer():
+    """(review) Beside the cover the album page's buttons start 236px in, and a drawer covers the page from
+    322px in at 1024 - so the Edit panel's own drawer opened over Edit, the button that closes it. With a
+    drawer open they go under the cover at the main area's edge, wrapping in the part left in view, as the
+    album you don't have's Get does; from 1280 (no drawer) nothing moves."""
+    page = ".app-desk.has-drawer .pl-album-page:not(.app-rg)"
+    hero = declarations(DESKTOP, f"{page} .pl-album-hero", DESK)
+    assert (hero["display"], hero["padding-left"]) == ("grid", "var(--pl-edge-left)")
+    cover = declarations(DESKTOP, f"{page} .pl-hero-cover", DESK)
+    assert (cover["position"], cover["grid-row"]) == ("static", "1 / 6")
+    assert declarations(DESKTOP, f"{page} .app-album-chips", DESK)["grid-row"] == "5"
+    actions = declarations(DESKTOP, f"{page} .pl-hero-actions", DESK)
+    assert (actions["grid-column"], actions["grid-row"], actions["flex-wrap"]) == ("1 / -1", "6", "wrap")
+    #? the same reach as the album you don't have's: the hero's width less the drawer's reach into it
+    assert actions["max-width"] == declarations(DESKTOP, ".app-desk.has-drawer .app-rg .app-rg-actions", DESK)["max-width"]
+    assert not any(selector.startswith(".app-desk.has-drawer .pl-album-page") for where, selector, _values in rules(DESKTOP) if where != DESK)
+
+
+def test_the_release_editors_preview_breaks_a_long_tag_name_inside_its_column():
+    """(review) The preview names each tag by its key - musicbrainz_releasegroupid is 146px at 11px, with
+    no break in it - in an 84px column: it ran over the old value beside it."""
+    assert declarations(DESKTOP, ".app-desk .app-edit .metadata-change", DESK)["grid-template-columns"].startswith("var(--app-desk-edit-tag)")
+    tag = declarations(DESKTOP, ".app-desk .app-edit .metadata-tag", DESK)
+    assert (tag["min-width"], tag["overflow-wrap"]) == ("0", "anywhere")
+
+
+def test_busy_words_in_a_solid_button_are_the_buttons_white():
+    """(review) A busy label is the muted grey beside a button - and inside Apply ("Applying, renaming in
+    20s"), the tag editor's Apply, the viewer's Save and "delete permanently" that was grey on purple or
+    red, about 1.5:1."""
+    for button in ("#metadata-apply-button", "#tags-apply-button", "#delete-confirm-button", ".win-button.is-default"):
+        assert declarations(DESKTOP, f".app-desk .app-edit {button} .loading-blocks", DESK)["color"] == "inherit", button
+        assert declarations(DESKTOP, f".app-desk .app-edit {button}", DESK)["color"] == "var(--dw-text)", button
+
+
+def test_a_pressing_has_its_track_count_on_its_first_line():
+    """(review) The detail takes a line of its own; drawn before the count, it pushed the count onto a third."""
+    detail = declarations(DESKTOP, ".app-desk .app-edit .metadata-release-detail", DESK)
+    count = declarations(DESKTOP, ".app-desk .app-edit .metadata-release-tracks", DESK)
+    assert detail["flex-basis"] == "100%"
+    assert int(count["order"]) < int(detail["order"])
+    assert declarations(DESKTOP, ".app-desk .app-edit .metadata-release", DESK)["flex-wrap"] == "wrap"
+
+
+def test_long_names_in_the_panel_are_broken_never_clipped():
+    """(review) The body clips sideways, so a rip log's name in the delete warning, a stranger's filename as
+    a title in the tag editor's list, or a path in the panel's own words ran past its edge, cut mid-word."""
+    assert declarations(DESKTOP, ".app-desk .app-edit-body", DESK)["overflow-x"] == "hidden"
+    for selector in (".app-desk .app-edit-note", ".app-desk .app-edit .delete-others", ".app-desk .app-edit .tags-track-list > li > span:last-child"):
+        assert declarations(DESKTOP, selector, DESK)["overflow-wrap"] == "anywhere", selector
+    assert declarations(DESKTOP, ".app-desk .app-edit .tags-track-list > li > span:last-child", DESK)["min-width"] == "0"
+
+
+def test_a_tick_box_is_a_fingers_target_where_the_pointer_is_coarse():
+    """(review) The box is 16px; its label fills the cell, and is 44px where the pointer is coarse - with
+    the panel's other small targets."""
+    assert media_tokens(DESKTOP, DESK)["--app-desk-edit-tick"] == "var(--app-desk-edit-check)"
+    assert media_tokens(DESKTOP, COARSE)["--app-desk-edit-tick"] == "var(--pl-hit)"
+    hit = declarations(DESKTOP, ".app-desk .app-edit-hit", DESK)
+    assert (hit["min-width"], hit["min-height"], hit["display"]) == ("var(--app-desk-edit-tick)", "var(--app-desk-edit-tick)", "flex")
+    assert declarations(DESKTOP, ".app-desk .app-edit-tracks .app-edit-tick", DESK)["width"] == \
+        "calc(var(--app-desk-edit-tick) + 2 * var(--app-desk-cell-gap))"
+    for selector in (".app-desk .app-edit-choice", ".app-desk .app-edit .tags-tracks > summary", ".app-desk .app-edit .tags-revert",
+                     ".app-desk .app-edit .metadata-issue-undo", ".app-desk .app-edit-link"):
+        assert declarations(DESKTOP, selector, COARSE)["min-height"] == "var(--pl-hit)", selector
+    #? and the box sits in its label in the markup
+    panel = (SRC / "app" / "EditPanel.tsx").read_text()
+    assert len(re.findall(r'<label class="app-edit-hit">\s*<input\s+type="checkbox"', panel)) == 2

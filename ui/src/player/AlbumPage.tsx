@@ -1,5 +1,5 @@
 import { Fragment } from 'preact'
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { storeAlbum } from '../api/store'
 import type { StoreAlbumResponse } from '../api/types'
@@ -7,10 +7,11 @@ import { PINS_UNSAVED, PinToggle } from '../app/PinToggle'
 import { sayPins, setPinned, usePins } from '../app/usePins'
 import { discHeadings } from '../lib/discTitles'
 import { formatDuration, sharedFormat, trackTime } from '../lib/format'
+import { editAlbum, type EditAlbum } from '../lib/albumEdit'
 import { alsoChips } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
-import { album as fetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
+import { album as fetchAlbum, prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
 import type { Player } from './usePlayer'
@@ -46,6 +47,14 @@ import type { Player } from './usePlayer'
  * release id to know it by has none (nothing would find it again).
  * Whether it is pinned comes from the app's one store of pins (app/usePins.ts), asked when none is
  * in hand or what is is old.
+ *
+ * Since 2.0.0-player.21, on a desktop and for an admin, Edit after Play and Shuffle (DesktopManage.dc.html:
+ * a toggle, pressed while the Edit panel shows this album) - App's `onEdit`, handed the album as
+ * Navidrome sent it, which is what the panel finds its folder by; a phone has no editor, and is handed
+ * none. Live once the album has answered. After an edit App asks the page again (`refresh`): the album
+ * and the bridge are asked afresh and what is drawn stays until they answer - a refresh that fails
+ * keeps it, since the album may be under a new id Navidrome hasn't scanned yet (App moves the page to
+ * it once found).
  */
 export function AlbumPage({
   id,
@@ -55,6 +64,9 @@ export function AlbumPage({
   backLabel,
   onArtist,
   onOpenAlbum,
+  onEdit,
+  editing = false,
+  refresh = 0,
 }: {
   id: string
   preview: Album | null
@@ -65,6 +77,12 @@ export function AlbumPage({
   onArtist?: (artist: { id: string; name: string }) => void
   /** another pressing's page, from its "Also" chip */
   onOpenAlbum?: (album: Album) => void
+  /** Edit, on a desktop and for an admin (2.0.0-player.21): the Edit panel for this album, or closed */
+  onEdit?: ((event: MouseEvent, album: EditAlbum) => void) | undefined
+  /** the Edit panel shows this album: Edit pressed */
+  editing?: boolean
+  /** asked again after an edit: a new number each time */
+  refresh?: number
 }) {
   const [album, setAlbum] = useState<AlbumWithSongs | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -76,37 +94,50 @@ export function AlbumPage({
   const storeRequests = useMemo(latestOnly, [])
   const { pins, known: pinsKnown, canSave } = usePins(true)
 
+  //? the refresh last asked for: a new one is an edit's (2.0.0-player.21), asked afresh and drawn over
+  //? what is on screen rather than blanking it
+  const asked = useRef(refresh)
+
   useEffect(() => {
     const request = requests.begin()
-    setAlbum(null)
-    setError(null)
-    fetchAlbum(id, request.signal).then(
+    const again = asked.current !== refresh
+    if (!again) {
+      setAlbum(null)
+      setError(null)
+    }
+    //? an edit's ask goes to Navidrome whatever was fetched ahead (prefetchAlbum's `fresh`)
+    const answer = again ? prefetchAlbum(id, false, true).then(() => fetchAlbum(id, request.signal)) : fetchAlbum(id, request.signal)
+    answer.then(
       (found) => {
         if (request.current()) setAlbum(found)
       },
       (reason: unknown) => {
-        if (!request.current() || isAbort(reason)) return
+        if (!request.current() || isAbort(reason) || again) return
         setError(reason instanceof Error ? reason.message : String(reason))
       },
     )
     return () => requests.supersede()
-  }, [id, requests])
+  }, [id, refresh, requests])
 
   useEffect(() => {
     const request = storeRequests.begin()
-    setStore(null)
-    setStoreFailed(false)
+    const again = asked.current !== refresh
+    asked.current = refresh
+    if (!again) {
+      setStore(null)
+      setStoreFailed(false)
+    }
     storeAlbum({ navidrome_id: id }, request.signal).then(
       (answer) => {
         if (request.current()) setStore(answer)
       },
       (reason: unknown) => {
         //? a check that can't be made draws no chip - and no pin, with no release to pin it by
-        if (request.current() && !isAbort(reason)) setStoreFailed(true)
+        if (request.current() && !isAbort(reason) && !again) setStoreFailed(true)
       },
     )
     return () => storeRequests.supersede()
-  }, [id, storeRequests])
+  }, [id, refresh, storeRequests])
 
   const shown: Album | null = album ?? (preview?.id === id ? preview : null)
   const songs = album?.song ?? []
@@ -196,6 +227,20 @@ export function AlbumPage({
             <ShuffleIcon class="pl-pill-icon" />
             Shuffle
           </button>
+          {/* a desktop's, for an admin (2.0.0-player.21): the Edit panel beside the page */}
+          {onEdit && (
+            <button
+              type="button"
+              class="pl-pill app-edit-toggle"
+              aria-pressed={editing}
+              disabled={!album}
+              onClick={(event) => {
+                if (album) onEdit(event as unknown as MouseEvent, editAlbum(album))
+              }}
+            >
+              Edit
+            </button>
+          )}
         </div>
       </div>
 

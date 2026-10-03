@@ -14,7 +14,7 @@
  */
 
 import {
-  addressesBelow, browserMoved, currentRoute, formatRoute, openPage, parseHash, popPage, pushed,
+  addressesBelow, becomeTop, browserMoved, currentRoute, formatRoute, openPage, parseHash, popPage, pushed,
   replaced, replaceTop, selectTab, startHistory, startNav, stepsBack,
   type HistoryNote, type Nav, type Page, type Tab, type TabAction,
 } from './appRoutes'
@@ -108,6 +108,12 @@ export interface Router {
    * another page or nothing changed.
    */
   update(page: Page): void
+  /**
+   * The page on top become another (2.0.0-player.21): an album whose identity an edit changed - its
+   * new id in Navidrome after another release was applied. Its address REPLACED, never a new entry,
+   * so back still leaves it. Nothing when `from` isn't on top.
+   */
+  become(from: Page, to: Page): void
   /** the in-app back button */
   back(): void
   /** a tap on a tab; 'scroll-to-top' is the caller's to do */
@@ -200,6 +206,11 @@ export function createRouter(host: RouterHost): Router {
 
     update(page) {
       const next = replaceTop(nav, page)
+      if (next !== nav) commit(next, 'replace')
+    },
+
+    become(from, to) {
+      const next = becomeTop(nav, from, to)
       if (next !== nav) commit(next, 'replace')
     },
 

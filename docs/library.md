@@ -8,7 +8,8 @@ app at `/player/` has a Library tab of its own, for listening - **Albums**, **Ar
 **Songs** from Navidrome, and an [artist page](player.md#artist-pages) with their albums from
 MusicBrainz and Play and Shuffle over the ones you have - which the [phone player
 guide](player.md#what-it-does) covers. [The app on a desktop](#the-app-on-a-desktop), below, says
-how that Library is laid out in a window 1024 pixels wide or more.
+how that Library is laid out in a window 1024 pixels wide or more, and [Editing an album in the
+app](#editing-an-album-in-the-app) how this page's editors work from an album's page there.
 
 ## Opening it
 
@@ -268,8 +269,67 @@ Library:
   shows the Library as you left it (an album you opened from it still open), and on the Library it
   goes back to its first page (and, there, to the top). Another view shows that view - where you
   left it if you were already on the Library's first page, at its top from anywhere else.
-- **Editing an album** - this page's metadata editor, tag editor, covers, lyrics and delete - isn't
-  in the app yet: the sidebar's **Managing** opens this page in a new tab.
+- **Editing an album** - this page's metadata editor, tag editor, covers, lyrics and delete - is on
+  the album's own page, its **Edit** button (since 2.0.0-player.21; [below](#editing-an-album-in-the-app)).
+  The albums that need a look (**Review N**), the bulk runs (**Get covers · N** and the rest), an
+  artist's pictures and **Move albums to …** are still this page's: the sidebar's **Managing** opens
+  it in a new tab.
+
+## Editing an album in the app
+
+In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), an album's page has
+**Edit** after **Play** and **Shuffle** (since 2.0.0-player.21). It opens the **Edit album** panel
+beside the page, and shows pressed while the panel is open; click it again to close the panel. It's
+there for an admin, which with logins off is everyone. There's no editor on a phone.
+
+The panel holds this page's own editors, not copies of them - so everything this page says about
+them is true there too:
+
+- **Release** is [the metadata editor](#the-metadata-editor): it searches MusicBrainz as it opens,
+  you pick the pressing, check the fields, read the preview and **Apply**, with the same pause before
+  a rename (*Applying, waiting for Navidrome*, or *Applying, renaming in 20s*) and **Compare full
+  size…** for the cover. **Cancel** closes the panel; nothing is written until **Apply**. **It's
+  fine as it is** is there for an album with issues, as here.
+- **Tags** lists the album's tracks with a tick box each. Tick some (Shift ticks a run), then **Edit
+  N tracks…**, or **Edit all tracks…** with none ticked, for [the tag editor](#editing-tags-by-hand):
+  only the fields you change are written. **Cancel**, **Close** or Escape goes back to the list.
+- **Artwork** shows the cover the album has and what CD art is beside its tracks, with **Get cover**
+  and **Get CD art** where they can help ([as here](#covers-cd-art-and-lyrics)): each needs the
+  album's release id, so an untagged album is matched in **Release** first. A cover you have is
+  replaced from **Release**, comparing the two.
+- **Lyrics** says how many tracks have a `.lrc`, with **Get lyrics** for the rest. The lyrics lead,
+  and re-timing what is saved, are in this page's settings.
+- **Delete** is [the delete confirmation](#deleting-an-album): what the folder holds, read as you
+  open the tab, and **delete permanently**. **Cancel** (or Escape) goes back to **Release**.
+
+**Which folder.** The album page knows the album by Navidrome's id; the editors work on a folder.
+deadwax finds it by the album's MusicBrainz release, as the store index has it (the same lookup that
+gives the album page its "Also: …" chips). An album Navidrome knows by **no** release - a rip that was
+never tagged, exactly what the release editor is for - is found among the library's folders that
+carry no release id either, by its name and artist (and its track count, when that still leaves
+several); when more than one folder fits, the panel asks which. A release kept one folder per disc
+starts on the first folder, with a **Folder** choice above the tabs for the others - apply the
+release to each, as here, and they merge. The panel reads the library the first time you press
+**Edit**, and again, behind what it shows, each time after - the app can be left open for hours, and
+an album changed meanwhile from this page or another device is shown as it is now.
+
+**After an edit**, the album page asks Navidrome again at once and once more ten seconds later
+(Navidrome notices a change about five seconds after it's made, then scans), and the app's marks of
+what you hold are asked again. Applying a **different** release gives the album a new id in Navidrome:
+the page follows it, in place, once Navidrome has scanned (it keeps looking for about 45 seconds,
+whatever else you edit meanwhile), so it shows the album as it is now rather than one Navidrome no
+longer has - and if you'd gone to another page meanwhile, going back to the album shows it under its
+new id too. Deleting the album closes the panel and goes back from its page - unless it was one folder
+of several, when the page stays and is asked again, at once and ten seconds later. The Library's grid
+is Navidrome's, so it changes once Navidrome has scanned.
+
+The panel is a side panel like Sources and Info - a third column from 1280 pixels wide, lying over
+the right of the page below that - and one shows at a time: **Edit** puts Sources and Info away, and
+either puts the Edit panel away. It closes when you go to another page, and when the window narrows
+to a phone's. The close button, or Escape while you're in the panel, closes it - in the tag editor or
+the delete confirmation, Escape closes that first, back to its tab; Escape out in the page (in the
+search field, say) is the page's. Between 1024 and 1279 pixels wide, while it lies over the page, the
+album's **Play**, **Shuffle** and **Edit** move under its cover, so **Edit** stays in view to close it.
 
 ## Deleting an album
 
