@@ -661,6 +661,17 @@
     --dw-artist-scrim: linear-gradient(to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.8) 100%);
     --dw-play-face:    rgba(192, 132, 252, 0.2);   /* a Done row's round play button */
 
+    /* --- the desktop frame (2.0.0-player.19), as DesktopLibrary.dc.html draws it ---------- */
+    --dw-sidebar:          #111018;
+    --dw-side-panel:       #131219;   /* Sources and Info beside the page */
+    --dw-player-bar:       #16151c;
+    --dw-frame-border:     #22202b;   /* the rules between the sidebar, the page, a panel and the bar */
+    --dw-row-border:       #17161e;   /* a desktop table's rows */
+    /* Explorer's selection, as STYLE.md gives it for a desktop list: a faint gradient in a thin edge */
+    --dw-selection-bg:     linear-gradient(to bottom, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.1));
+    --dw-selection-border: rgba(192, 132, 252, 0.5);
+    --dw-selected-text:    #e9d5ff;
+
     /* --- the turntable (2.0.0-player.11), as its board draws it ------- */
     --dw-tt-plinth:       #19171e;
     --dw-tt-platter:      #2a2730;
@@ -681,4 +692,28 @@
     /* (--dw-record-turn, the CSS spin's 1.8 s, went in 2.0.0-player.14: the platter is turned frame
        by frame by player/deck.ts now, at lib/platter.ts's DEGREES_PER_SECOND - one turn in
        SECONDS_PER_TURN - and stopped under reduced motion there.) */
+}
+
+/* The desktop's values for the same tokens (2.0.0-player.19). From 1024px the app is drawn in its
+   desktop frame (ui/src/lib/appFrame.ts's DESKTOP_MIN), and STYLE.md sets a desktop's labels at
+   11px, its section headings at 13px, its data at 12px, its page and album titles at 28 and 30px,
+   the artist under an album's title at 18px, and its cards #1e1c26 on the boards' #0b0a10. They are
+   REDEFINED here, never changed for the phone - below 1024px nothing is different - so no component
+   forks per layout. The pressing list becomes a desktop list: the card's colour and edge, and
+   Explorer's selection. Body text (--dw-text-body, 17px) is left alone: text fields read it, an iPad
+   on its side is 1024px or wider, and iOS zooms the page into a field under 16px. */
+@media (min-width: 1024px) {
+    :root {
+        --dw-bg:               #0b0a10;
+        --dw-card:             #1e1c26;
+        --dw-text-large-title: 28px;
+        --dw-text-title:       30px;
+        --dw-text-artist-hero: 18px;
+        --dw-text-heading:     13px;
+        --dw-text-data:        12px;
+        --dw-text-label:       11px;
+        --dw-popover:          var(--dw-card);
+        --dw-popover-border:   var(--dw-border);
+        --dw-selected-row:     var(--dw-selection-bg);
+    }
 }

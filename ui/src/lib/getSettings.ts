@@ -119,22 +119,32 @@ export function sourceChips(floor: QualityFloor, filters: SourceFilters): { key:
   return chips
 }
 
-/** The chips as lib/candidates.ts's filters - what passesFilters, the cards and a pick all go by. */
-export function candidateFilters(filters: SourceFilters): CandidateFilters {
+/**
+ * The chips as lib/candidates.ts's filters - what passesFilters, the cards and a pick all go by. And
+ * on a desktop (2.0.0-player.19) the Signals chip's per-signal minimums, as the main page's panel has
+ * them (DesktopRequest.dc.html draws the chip; the phone's sheet has none, so none apply there).
+ */
+export function candidateFilters(filters: SourceFilters, minSignals?: Readonly<Record<string, number>>): CandidateFilters {
   return {
     freeSlotOnly: filters.freeSlot,
     completeOnly: false,
     minScore: 0,
     formats: new Set(),
-    minSignals: noSignalMinimums(),
+    minSignals: minSignals ? { ...noSignalMinimums(), ...minSignals } : noSignalMinimums(),
     quality: { ...NO_QUALITY_FILTERS, minBitDepth: filters.bit24 ? 24 : 0, minBitrate: filters.kbps320 ? 320 : 0 },
     lossless: filters.lossless,
   }
 }
 
-/** How many chips are pressed - "Clear filters" shows only when some are. */
-export function pressedCount(filters: SourceFilters): number {
-  return Object.values(filters).filter(Boolean).length
+/** How many chips are pressed - "Clear filters" shows only when some are - and how many of the
+ *  Signals chip's minimums are set (a desktop's), each one as a chip pressed. */
+export function pressedCount(filters: SourceFilters, minSignals?: Readonly<Record<string, number>>): number {
+  return Object.values(filters).filter(Boolean).length + signalsSet(minSignals)
+}
+
+/** How many per-signal minimums are set (0 is off): what the Signals chip counts. */
+export function signalsSet(minSignals?: Readonly<Record<string, number>>): number {
+  return minSignals ? Object.values(minSignals).filter((value) => value > 0).length : 0
 }
 
 /** A pick is always by best match: "the best match that passes your quality floor". */

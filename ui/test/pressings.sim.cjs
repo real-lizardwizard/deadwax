@@ -94,13 +94,13 @@ console.log('\nthe tracklist, and what differs in it')
 const japan = byPrefix(slowRush, '452ccdb4')
 const japanRows = P.trackRows(japan, P.pressingsView(slowRush.releases, japan.id).diffs.get(japan.id))
 check('the Japanese CD\'s thirteenth track is a Bonus row, only on this pressing',
-  japanRows.filter((row) => row.mark).map((row) => [row.number, row.title, row.length, row.mark]), [['13', 'Patience', '4:53', { kind: 'bonus', chip: 'Bonus', note: 'Only on this pressing' }]])
+  japanRows.filter((row) => row.mark).map((row) => [row.number, row.title, row.length, row.mark]), [['13', 'Patience', '4:53', { kind: 'bonus', chip: 'Bonus', note: 'Only on this pressing', brief: 'only on this pressing' }]])
 check('...and the other twelve are plain, numbered and timed', japanRows.slice(0, 3).map((row) => [row.number, row.title, row.length, row.mark]),
   [['1', 'One More Year', '5:22', null], ['2', 'Instant Destiny', '3:14', null], ['3', 'Borderline', '3:58', null]])
 const mix = byPrefix(slowRush, '3a12923d')
 check('the single mix: Borderline at 4:34 is another version, against the usual 3:58',
   P.trackRows(mix, P.pressingsView(slowRush.releases, mix.id).diffs.get(mix.id)).filter((row) => row.mark).map((row) => [row.title, row.length, row.mark]),
-  [['Borderline', '4:34', { kind: 'version', chip: 'Other version', note: 'The usual version is 3:58' }]])
+  [['Borderline', '4:34', { kind: 'version', chip: 'Other version', note: 'The usual version is 3:58', brief: 'usually 3:58' }]])
 const tenTrack = byPrefix(dummy, '87888070')
 const tenDiff = P.pressingsView(dummy.releases, tenTrack.id).diffs.get(tenTrack.id)
 //? the usual length is the DEFAULT pressing's (76df3287: 3:49), not the first-listed one's (3:48)
@@ -108,7 +108,7 @@ check('a pressing\'s left-out tracks are listed with the usual length', P.leftOu
 check('...nothing left out, nothing listed', P.leftOut(null), [])
 const renamedRelease = { id: 'renamed', media: [{ position: 1, tracks: [{ title: 'One', length: 200000 }, { title: 'Two (Remix)', length: 201000 }] }] }
 const renamedDiff = T.diffTracklists(T.releaseTracks({ media: [{ tracks: [{ title: 'One', length: 200000 }, { title: 'Two', length: 200000 }] }] }), T.releaseTracks(renamedRelease))
-check('a renamed track says what it is usually called', P.trackRows(renamedRelease, renamedDiff)[1].mark, { kind: 'renamed', chip: 'Renamed', note: 'Usually “Two”' })
+check('a renamed track says what it is usually called', P.trackRows(renamedRelease, renamedDiff)[1].mark, { kind: 'renamed', chip: 'Renamed', note: 'Usually “Two”', brief: 'usually “Two”' })
 check('no differences to mark, nothing marked', P.trackRows(japan, null).some((row) => row.mark), false)
 check('no pressing, no rows', P.trackRows(null, null), [])
 

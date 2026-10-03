@@ -30,6 +30,8 @@
  *    nothing, and a failure is not. And (review) a lookup still out is called off - the chip back to
  *    Get, its late answer opening nothing - the moment the tab's root stops being what shows (App's
  *    `active`) or the box changes.
+ *  - The desktop's search field (2.0.0-player.19, app/searchBox.ts): this box's text is shared for the
+ *    sidebar's field to show, typing there is typing here, and its Enter asks both halves at once.
  *
  * Run it with:  node ui/test/search.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -491,6 +493,23 @@ async function main() {
   type('massive attack')
   await advance(700)
   check('Navidrome not asked, MusicBrainz asked', [asks.library.length - libraryAsks, asks.musicbrainz.at(-1).query], [0, 'massive attack'])
+
+  console.log('\nthe desktop sidebar\'s field is this box (2.0.0-player.19, app/searchBox.ts)')
+  {
+    const Box = require(path.join(OUT, 'app/searchBox.js'))
+    draw({ status })
+    check('what the box says is shared, for the sidebar\'s field to show', Box.searchText(), 'massive attack')
+    Box.typeSearch('portishead third')
+    draw()
+    draw()
+    check('typing in the sidebar\'s field is typing here', [find((node) => node.type === 'input')[0].props.value, Box.searchText()], ['portishead third', 'portishead third'])
+    const libraryBefore = asks.library.length
+    const musicBefore = asks.musicbrainz.length
+    Box.submitSearch()
+    await settle()
+    check('...and its Enter asks both halves at once, as this form\'s submit - no pause waited for',
+      [asks.library.length - libraryBefore, asks.library.at(-1)?.text, asks.musicbrainz.length - musicBefore], [1, 'portishead third', 1])
+  }
 
   console.log('\nthe real prefetch (player/api.ts): a scroll calls off a tile\'s ask, never one Search keeps')
   {

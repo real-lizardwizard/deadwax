@@ -1,9 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { ARTIST_ORDERS, ArtistsView, SongsView, countText, type ArtistOrder } from '../app/LibraryViews'
+import { chooseLibrary, onLibraryLeaving, setLibrarySongs, useLibraryPick } from '../app/libraryPick'
+import { useFrame } from '../app/useFrame'
 import { usePaged } from '../app/usePaged'
+import { LIBRARY_TITLES, shownPick, type LibraryPick } from '../lib/appFrame'
 import { latestOnly } from '../lib/latest'
-import { readPlayerLibraryView, readPlayerOrder, writePlayerLibraryView, writePlayerOrder, type LibraryView } from '../state/persisted'
+import { readPlayerOrder, writePlayerOrder, type LibraryView } from '../state/persisted'
 import { PAGE_SIZE, albumPage, dropPrefetch, librarySongs, prefetchAlbum, type Album, type AlbumOrder, type Artist } from './api'
 import { Cover } from './Cover'
 import { ChevronDownIcon } from './icons'
@@ -94,73 +97,98 @@ function AlbumsView({ order, onOpen, onCount }: { order: AlbumOrder; onOpen: (al
  * shown, and the albums' order, are kept on this device. Each view is drawn once first chosen and
  * kept, hidden, after - so coming back to one finds it where it was left, scrolled where it was.
  *
+ * ON A DESKTOP (2.0.0-player.19) the views are the sidebar's (app/Sidebar.tsx) - so the chips aren't
+ * drawn and the title is the view's name, as DesktopLibrary.dc.html has "Albums" - and the sidebar
+ * has one more, "Recently added": the albums, newest first, a view of its own beside Albums, so the
+ * Albums view keeps the order chosen for it. Which view shows is app/libraryPick.ts's, a store both
+ * choose from; a phone shows the albums for "Recently added". A view's scroll is kept as another is
+ * chosen, by the chips or the sidebar, and put back as it is chosen again.
+ *
  * Tiles and rows navigate; nothing here plays (see "The one app" in CLAUDE.md).
  */
 export function Library({ onOpen, onOpenArtist }: { onOpen: (album: Album) => void; onOpenArtist: (artist: Artist) => void }) {
-  const [view, setView] = useState<LibraryView>(readPlayerLibraryView)
+  //? what shows is the store's (app/libraryPick.ts): chosen by the chips here, or the desktop sidebar -
+  //? and so is whether Navidrome's empty search lists songs, which both leave Songs out without
+  const { pick, hasSongs } = useLibraryPick()
+  const desktop = useFrame().frame === 'desktop'
   const [order, setOrder] = useState<AlbumOrder>(savedOrder)
   const [artistOrder, setArtistOrder] = useState<ArtistOrder>('name')
-  const [visited, setVisited] = useState<ReadonlySet<LibraryView>>(() => new Set([view]))
-  const [counts, setCounts] = useState<Record<LibraryView, number | null>>({ albums: null, artists: null, songs: null })
-  //? null until Navidrome has said whether its empty search lists songs at all
-  const [hasSongs, setHasSongs] = useState<boolean | null>(null)
+  const [counts, setCounts] = useState<Record<LibraryPick, number | null>>({ recent: null, albums: null, artists: null, songs: null })
   const probes = useMemo(latestOnly, [])
   //? where each view was scrolled to, as another was chosen
-  const scrolled = useRef(new Map<LibraryView, number>())
+  const scrolled = useRef(new Map<LibraryPick, number>())
+  const page = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const request = probes.begin()
     librarySongs(0, 1, request.signal).then(
       (songs) => {
-        if (request.current()) setHasSongs(songs.length > 0)
+        if (request.current()) setLibrarySongs(songs.length > 0)
       },
       () => {
         //? a failed ask says nothing: the chip stays, and the view says what went wrong if chosen
-        if (request.current()) setHasSongs(true)
+        if (request.current()) setLibrarySongs(true)
       },
     )
     return () => probes.supersede()
   }, [])
 
-  //? the songs view chosen on this device, and Navidrome turning out to list none: the albums
+  //? the phone's chips: the albums for "Recently added", which is the desktop sidebar's - and the
+  //? songs view chosen on this device, Navidrome turning out to list none: the albums
+  const view: LibraryView = pick === 'recent' ? 'albums' : pick
   const showing: LibraryView = view === 'songs' && hasSongs === false ? 'albums' : view
   const views = VIEWS.filter((entry) => entry.id !== 'songs' || hasSongs !== false)
+  //? what is drawn: the view showing - or on a desktop "Recently added" (lib/appFrame.ts's shownPick)
+  const drawn: LibraryPick = shownPick(pick, hasSongs, desktop ? 'desktop' : 'phone')
+  const [visited, setVisited] = useState<ReadonlySet<LibraryPick>>(() => new Set([drawn]))
+  useEffect(() => {
+    setVisited((before) => (before.has(drawn) ? before : new Set(before).add(drawn)))
+  }, [drawn])
 
+  //? Only while this tab is the one showing: the sidebar can choose a view from another tab, whose
+  //? page the document's scroll belongs to then (App opens the Library at that view's top).
+  const onScreen = () => !!page.current && page.current.getClientRects().length > 0
+  const drawnNow = useRef(drawn)
+  drawnNow.current = drawn
+  useEffect(
+    () =>
+      onLibraryLeaving(() => {
+        if (onScreen()) scrolled.current.set(drawnNow.current, window.scrollY)
+      }),
+    [],
+  )
   useLayoutEffect(() => {
-    if (scrolled.current.has(showing)) window.scrollTo(0, scrolled.current.get(showing)!)
-  }, [showing])
+    if (onScreen() && scrolled.current.has(drawn)) window.scrollTo(0, scrolled.current.get(drawn)!)
+  }, [drawn])
 
-  function choose(next: LibraryView) {
-    if (next === showing) return
-    scrolled.current.set(showing, window.scrollY)
-    writePlayerLibraryView(next)
-    setView(next)
-    setVisited((before) => (before.has(next) ? before : new Set(before).add(next)))
+  const choose = (next: LibraryView) => {
+    if (next !== showing) chooseLibrary(next)
   }
 
-  const counted = (which: LibraryView) => (count: number | null) => setCounts((before) => (before[which] === count ? before : { ...before, [which]: count }))
+  const counted = (which: LibraryPick) => (count: number | null) => setCounts((before) => (before[which] === count ? before : { ...before, [which]: count }))
   const onAlbumsCount = useMemo(() => counted('albums'), [])
+  const onRecentCount = useMemo(() => counted('recent'), [])
   const onArtistsCount = useMemo(() => counted('artists'), [])
   const onSongsCount = useMemo(() => counted('songs'), [])
 
   const sorts =
-    showing === 'albums'
+    drawn === 'albums'
       ? { label: 'Album order', value: order, options: ORDERS, change: (next: string) => {
           writePlayerOrder(next)
           setOrder(next as AlbumOrder)
         } }
-      : showing === 'artists'
+      : drawn === 'artists'
         ? { label: 'Artist order', value: artistOrder, options: ARTIST_ORDERS, change: (next: string) => setArtistOrder(next as ArtistOrder) }
         : null
   const count =
-    showing === 'albums' ? countText(counts.albums, 'album', 'albums')
-      : showing === 'artists' ? countText(counts.artists, 'artist', 'artists')
+    drawn === 'albums' || drawn === 'recent' ? countText(counts[drawn], 'album', 'albums')
+      : drawn === 'artists' ? countText(counts.artists, 'artist', 'artists')
         : countText(counts.songs, 'song', 'songs')
 
   return (
-    <section class="pl-library">
+    <section class="pl-library" ref={page}>
       <header class="pl-large-header">
-        <h1 class="pl-large-title">Library</h1>
+        <h1 class="pl-large-title">{desktop ? LIBRARY_TITLES[drawn] : 'Library'}</h1>
       </header>
 
       <div class="app-library-views" role="group" aria-label="Show">
@@ -201,18 +229,24 @@ export function Library({ onOpen, onOpenArtist }: { onOpen: (album: Album) => vo
         <span class="app-library-count app-mono">{count}</span>
       </div>
 
-      {(visited.has('albums') || showing === 'albums') && (
-        <div hidden={showing !== 'albums'}>
+      {(visited.has('albums') || drawn === 'albums') && (
+        <div hidden={drawn !== 'albums'}>
           <AlbumsView order={order} onOpen={onOpen} onCount={onAlbumsCount} />
         </div>
       )}
-      {(visited.has('artists') || showing === 'artists') && (
-        <div hidden={showing !== 'artists'}>
-          <ArtistsView order={artistOrder} shown={showing === 'artists'} onOpenArtist={onOpenArtist} onCount={onArtistsCount} />
+      {/* the desktop sidebar's "Recently added": the albums newest first, beside the Albums view */}
+      {(visited.has('recent') || drawn === 'recent') && (
+        <div hidden={drawn !== 'recent'}>
+          <AlbumsView order="newest" onOpen={onOpen} onCount={onRecentCount} />
         </div>
       )}
-      {visited.has('songs') && hasSongs !== false && (
-        <div hidden={showing !== 'songs'}>
+      {(visited.has('artists') || drawn === 'artists') && (
+        <div hidden={drawn !== 'artists'}>
+          <ArtistsView order={artistOrder} shown={drawn === 'artists'} onOpenArtist={onOpenArtist} onCount={onArtistsCount} />
+        </div>
+      )}
+      {(visited.has('songs') || drawn === 'songs') && hasSongs !== false && (
+        <div hidden={drawn !== 'songs'}>
           <SongsView onOpen={onOpen} onCount={onSongsCount} />
         </div>
       )}

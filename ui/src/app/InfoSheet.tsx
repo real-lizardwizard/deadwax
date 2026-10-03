@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { aboutRows, type About, type AboutAlbumFields, type AboutDetails } from '../lib/aboutRows'
+import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import type { DeckReport } from '../lib/deckVoice'
 import { debugSections, type DebugSection } from '../lib/debugRows'
 import type { QueueTrack } from '../lib/playQueue'
@@ -49,6 +50,12 @@ interface Drawn {
  * from one opening to the next and from one tab to the other: it is put back at the top as Info
  * opens and as the tab changes - never as it closes, while it is still sliding away in sight.
  *
+ * ON A DESKTOP (2.0.0-player.19) it is the side panel, opened from the player bar's Info - a third
+ * column from 1280px, a drawer over the page's edge below that (lib/appFrame.ts's panel rule) - and
+ * not modal: no backdrop, no scroll lock, the page beside it still usable, and Escape closing it only
+ * from inside it (its box takes focus from a click on anything in it that can't). The desktop has no
+ * Now Playing sheet for it to sit over; Done closes it, and focus goes back to the bar's Info button.
+ *
  * A leaf: props only, so the sim renders it alone.
  */
 export function InfoSheet({
@@ -62,6 +69,7 @@ export function InfoSheet({
   turntable = null,
   details = null,
   onArtist = null,
+  panel = 'sheet',
 }: {
   open: boolean
   opener?: { current: HTMLElement | null } | undefined
@@ -78,12 +86,16 @@ export function InfoSheet({
   details?: AboutDetails | null
   /** close everything and open the artist's page, by Navidrome's id for them; null for none */
   onArtist?: ((artist: { id: string; name: string }) => void) | null
+  /** how it is drawn: a sheet over Now Playing (a phone), or a desktop's side panel */
+  panel?: PanelStyle
 }) {
+  const modal = panelIsModal(panel)
   const done = useRef<HTMLButtonElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<InfoTab>('about')
   const drawn = useRef<Drawn>({ about: null, debug: null })
-  useSheet({ open, onClose, lockClass: 'app-info-open', first: done, opener })
+  useSheet({ open, onClose, lockClass: 'app-info-open', first: done, opener, modal, area: box })
 
   //? the list from its top, whichever song and tab it opens on - Format and Sent as, not the end
   useLayoutEffect(() => {
@@ -128,9 +140,11 @@ export function InfoSheet({
   }
 
   return (
-    <div class={`app-layer app-info-layer${open ? ' is-open' : ''}`} aria-hidden={!open} inert={!open}>
+    <div class={`app-layer app-info-layer${open ? ' is-open' : ''}${modal ? '' : ` is-panel is-${panel}`}`} aria-hidden={!open} inert={!open}>
       <div class="app-backdrop" onClick={onClose} />
-      <div class="app-info" role="dialog" aria-modal="true" aria-labelledby="app-info-title">
+      {/* a panel's box takes focus from a click on anything in it that can't (its heading, and in
+          Safari a tab), so Escape there is still from inside it */}
+      <div ref={box} class="app-info" role="dialog" aria-modal={modal ? 'true' : 'false'} aria-labelledby="app-info-title" tabIndex={modal ? undefined : -1}>
         <header class="app-info-head">
           <h2 id="app-info-title" class="app-info-title">
             Info

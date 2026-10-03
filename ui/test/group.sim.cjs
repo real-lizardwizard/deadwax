@@ -32,6 +32,15 @@
  *    shown, again as another is chosen, as an album is filed and as the page comes back into view
  *    (after a Get, or a download cancelled in Requests), and only the newest answer drawn - the last
  *    one standing while the same pressing is asked again, another pressing's never.
+ *  - On a desktop (2.0.0-player.19): Get first and the pressing inline after it; the tracklist a
+ *    table with an "Against the usual tracklist" column while any pressing of the album differs (and
+ *    none when they are all alike), each marked track's chip and its note in the board's short words,
+ *    the whole note and every title in the cell's tooltip; Get drawn pressed while the Sources panel
+ *    shows the sources of the pressing ON SCREEN (never another pressing's of the album), a click on
+ *    it then closing them; and with the panel open for this album, each other pressing chosen asked
+ *    for again - `again`, from this page, focus going back to Get - as is the page's own pressing when
+ *    it comes back to a panel left open for another; nothing asked by a page that isn't showing, nor
+ *    once the panel shows something else. A phone's page is as it was: no pressed state on its Get.
  *
  * Run it with:  node ui/test/group.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -489,6 +498,107 @@ async function main() {
     check('...no group at all: the pressing\'s title, the earliest date any pressing came out', [P2.getGroup('x', null, dummy.releases, chosen).title, P2.getGroup('x', null, dummy.releases, chosen)['first-release-date'].slice(0, 4)],
       ['Dummy', '1994'])
     check('...Search\'s group wins when it has one', P2.getGroup('x', PREVIEW, slowRush.releases, null)['artist-credit'], PREVIEW['artist-credit'])
+  }
+
+  console.log('\non a desktop (2.0.0-player.19): Get and the pressing inline, a table, and the Sources panel following the pressing')
+  {
+    const gets = []
+    const closes = []
+    const onGet = (request, opener) => gets.push([request, opener])
+    const phone = page({ id: slowRush.group.id, preview: PREVIEW, onGet })
+    phone.draw()
+    check('a phone\'s Get says nothing of a panel', 'aria-pressed' in classed('app-rg-get')[0].props, false)
+    const desk = page({ id: slowRush.group.id, preview: PREVIEW, onGet, desktop: true, onCloseSources: () => closes.push(1) })
+    desk.draw()
+    //? the desktop's tracklist is a component of its own (no hooks): drawn here from the page's element
+    const table = () => {
+      const element = find((node) => node.type?.name === 'DeskTracklist')[0]
+      return element ? element.type(element.props) : null
+    }
+    check('Get first, the pressing inline after it, what is already here under both',
+      classed('app-rg-actions')[0]?.props.children.filter(Boolean).map((child) => child.type === 'button' ? child.props.class : child.props?.class ?? child.type?.name),
+      ['app-rg-get', 'PressingPicker', 'app-rg-store'])
+    check('...Get not pressed: the panel isn\'t showing this page\'s sources', classed('app-rg-get')[0].props['aria-pressed'], false)
+    check('the tracklist: "Tracklist", the line, and a table - its "Against the usual tracklist" column, since some pressings differ',
+      [text(find(byClass('app-rg-desk-title'), table())[0]), text(find(byClass('app-rg-summary'), table())[0]), find((node) => node.type === 'th', table()).map(text), classed('app-rg-list').length],
+      ['Tracklist', 'The usual tracklist, shared by 9 of 10 pressings', ['#', 'Title', 'Against the usual tracklist', 'Length'], 0])
+    check('...the usual pressing\'s twelve rows, none marked, their against cells empty',
+      [find(byClass('app-rg-row'), table()).length, find(byClass('is-marked'), table()).length, find(byClass('app-rg-against'), table()).map(text).join('')], [12, 0, ''])
+    const japan = byPrefix(slowRush, '452ccdb4')
+    desk.draw({ release: japan.id })
+    const bonus = find(byClass('is-bonus'), table())[0]
+    check('the Japanese CD: Patience a Bonus row, its chip and note in that column - the board\'s short words, the whole note its tooltip',
+      [text(find(byClass('app-rg-title'), bonus)[0]), text(find(byClass('app-rg-chip'), bonus)[0]), text(find(byClass('app-rg-note'), bonus)[0]),
+        find(byClass('app-rg-against'), bonus)[0].props.title, find(byClass('app-rg-title'), bonus)[0].props.title],
+      ['Patience', 'Bonus', 'only on this pressing', 'Bonus · Only on this pressing', 'Patience'])
+    const singleMix = slowRush.releases.find((release) => /single mix/.test(release.disambiguation ?? ''))
+    desk.draw({ release: singleMix.id })
+    const version = find(byClass('is-version'), table())[0]
+    check('...the single mix: "Other version · usually 3:58" - short enough for the column, the usual length kept',
+      [text(find(byClass('app-rg-chip'), version)[0]), text(find(byClass('app-rg-note'), version)[0]), find(byClass('app-rg-against'), version)[0].props.title],
+      ['Other version', 'usually 3:58', 'Other version · The usual version is 3:58'])
+    check('...an unmarked row\'s against cell has no tooltip', find(byClass('app-rg-row'), table()).filter((row) => !row.props.class.includes('is-marked'))
+      .map((row) => find(byClass('app-rg-against'), row)[0].props.title).filter((title) => title !== undefined), [])
+    //? an album whose pressings are all alike: no such column (DesktopRequest.dc.html)
+    const view = P.pressingsView(slowRush.releases)
+    const usualIds = new Set([...view.shown, ...view.more].filter((row) => row.kind === 'usual').map((row) => row.id))
+    const ALIKE = '00000000-0000-4000-8000-000000000010'
+    answers.push(() => Promise.resolve({ id: ALIKE, releases: slowRush.releases.filter((release) => usualIds.has(release.id)), problem: null }))
+    const alike = page({ id: ALIKE, onGet, desktop: true })
+    alike.draw()
+    await settle()
+    alike.draw()
+    check('every pressing alike: #, Title and Length, no column for differences', find((node) => node.type === 'th', table()).map(text), ['#', 'Title', 'Length'])
+    check('...as anyPressingDiffers says', [P.anyPressingDiffers(view), P.anyPressingDiffers({ shown: [{ kind: 'usual' }], more: [{ kind: 'none' }] }), P.anyPressingDiffers(null)], [true, false, false])
+
+    //? the panel opened by this page's Get, then following the pressing - App hands the page the
+    //? pressing its panel searched for this album (`sourcesPressing`), as a Get's answer becomes it
+    desk.draw({ release: null })
+    const opener = { focus() {} }
+    classed('app-rg-get')[0].props.onClick({ currentTarget: opener })
+    check('Get opens the sources for the chosen pressing, saying which page asked', [gets.length, gets[0]?.[0].from, gets[0]?.[0].again ?? null], [1, slowRush.group.id, null])
+    const usual = gets[0][0].release.release_mbid
+    desk.draw({ sourcesPressing: usual })
+    check('the panel showing this pressing\'s sources: Get pressed', classed('app-rg-get')[0].props['aria-pressed'], true)
+    desk.draw()
+    check('...nothing asked again for the pressing it was opened for', gets.length, 1)
+    classed('app-rg-get')[0].props.ref.current = opener
+    const single = slowRush.releases.find((release) => /single mix/.test(release.disambiguation ?? ''))
+    desk.draw({ release: single.id })
+    check('another pressing chosen beside it: Get no longer pressed (the panel shows the other\'s), and this one asked for - `again`, from this page, focus going back to Get',
+      [classed('app-rg-get')[0].props['aria-pressed'], gets.length, gets[1]?.[0].release.release_mbid, gets[1]?.[0].again, gets[1]?.[0].from, gets[1]?.[1] === opener,
+        gets[1]?.[0].subtitle.startsWith('The Slow Rush · Digital')],
+      [false, 2, single.id, true, slowRush.group.id, true, true])
+    desk.draw()
+    check('...once for each pressing', gets.length, 2)
+    desk.draw({ sourcesPressing: single.id })
+    check('...and pressed again once the panel shows its sources, asking nothing more', [classed('app-rg-get')[0].props['aria-pressed'], gets.length], [true, 2])
+    classed('app-rg-get')[0].props.onClick({ currentTarget: opener })
+    check('Get, pressed, closes the panel - and gets nothing', [closes.length, gets.length], [1, 2])
+    desk.draw({ sourcesPressing: null })
+    desk.draw({ release: japan.id })
+    check('the panel showing something else (or nothing): another pressing asks for nothing, and Get isn\'t pressed', [gets.length, classed('app-rg-get')[0].props['aria-pressed']], [2, false])
+
+    //? (review) the page met again with the panel still open for another pressing of the album - Back to
+    //? Search's results, and the same album again: it comes back at its usual pressing
+    const again = []
+    const back = page({ id: slowRush.group.id, preview: PREVIEW, onGet: (request, opener) => again.push([request, opener]), desktop: true,
+      sourcesPressing: single.id, onCloseSources: () => closes.push(1) })
+    back.draw()
+    check('mounted at the usual pressing with the panel open for the single mix: Get isn\'t pressed, and the panel is asked to follow - `again`, for the pressing on screen',
+      [classed('app-rg-get')[0].props['aria-pressed'], again.length, again[0]?.[0].release.release_mbid, again[0]?.[0].again],
+      [false, 1, usual, true])
+    back.draw({ sourcesPressing: usual })
+    classed('app-rg-get')[0].props.onClick({ currentTarget: opener })
+    check('...the panel following it: Get pressed, and a click closes it rather than searching', [classed('app-rg-get')[0].props['aria-pressed'], closes.length, again.length], [true, 2, 1])
+    //? the same album open on another tab, at another pressing, doesn't show - it never takes a turn
+    const hidden = []
+    const other = page({ id: slowRush.group.id, preview: PREVIEW, release: japan.id, onGet: (request) => hidden.push(request), desktop: true, shown: false,
+      sourcesPressing: usual })
+    other.draw()
+    check('a page of the album that isn\'t showing asks for nothing', hidden.length, 0)
+    other.draw({ shown: true })
+    check('...until it shows: then its own pressing', [hidden.length, hidden[0]?.release.release_mbid, hidden[0]?.again], [1, japan.id, true])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

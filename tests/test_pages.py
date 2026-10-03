@@ -6,8 +6,8 @@ page naming a script the build doesn't make is a blank page with nothing on scre
 each page's `/dist/<name>.js` must be a vite input whose source exists, and each stylesheet it
 links (and each one those import) must be served. The app grows in place at /player/, where James's
 home-screen app is scoped: the manifest's start_url and scope must stay there, or iOS stops
-treating the installed icon as that app. And the app's own stylesheet is revalidated and gzipped,
-like the page around it.
+treating the installed icon as that app. And the app's own stylesheets are revalidated and gzipped,
+like the page around it - since 2.0.0-player.19 the desktop frame's too, linked last.
 """
 
 import json
@@ -107,6 +107,14 @@ def test_the_player_page_links_its_own_stylesheet_after_the_players():
     assert sheets.index("/player/player.css") < sheets.index("/player/app.css")
 
 
+def test_the_desktop_frames_stylesheet_is_linked_last_over_both():
+    """2.0.0-player.19: app-desktop.css restyles player.css's and app.css's rules from 1024px, so it
+    comes after both - an earlier link would lose every tie it was written to win."""
+    sheets = [urljoin("/player/", href) for href in stylesheets(PAGES["/player/"])]
+    assert sheets[-1] == "/player/app-desktop.css"
+    assert sheets.index("/player/app.css") < sheets.index("/player/app-desktop.css")
+
+
 def test_the_app_stays_at_player_where_the_home_screen_app_is_scoped(client):
     page = PAGES["/player/"].read_text()
     assert 'rel="manifest" href="/player/manifest.json"' in page
@@ -118,8 +126,9 @@ def test_the_app_stays_at_player_where_the_home_screen_app_is_scoped(client):
     assert json.loads((INTERFACE / "player" / "manifest.json").read_text())["scope"] == "/player/"
 
 
-def test_the_apps_stylesheet_is_revalidated_and_gzipped(client):
-    response = client.get("/player/app.css", headers={"Accept-Encoding": "gzip"})
+@pytest.mark.parametrize("sheet", ["/player/app.css", "/player/app-desktop.css"])
+def test_the_apps_stylesheet_is_revalidated_and_gzipped(client, sheet):
+    response = client.get(sheet, headers={"Accept-Encoding": "gzip"})
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-cache"

@@ -30,6 +30,20 @@
  *  - All of it end to end: lib/appHistory.ts's router driven against a fake browser history that
  *    keeps entries and their state across a reload, fires popstate and then hashchange on a
  *    traversal, and runs history.go() later, as a browser does.
+ *  - The desktop frame (2.0.0-player.19, lib/appFrame.ts): the phone's below 1024px, the desktop's
+ *    from it - and the desktop frame picks PANELS over sheets: Sources and Info a drawer over the
+ *    page's edge from 1024 to 1279px and a third column from 1280, neither modal, the main area
+ *    making room only for a column; one panel at a time; crossing into the desktop closes Now
+ *    Playing (and what is over it), crossing back the Info panel. The sidebar: its items, the one
+ *    for where the app is, and what a tap on each does - Home, Requests, You and the Library view
+ *    showing as their tabs' buttons, another Library view that view at the Library's root - Songs
+ *    left out where Navidrome lists none, and "Recently added" the desktop's alone - never kept on the
+ *    device, as the Library's store (app/libraryPick.ts) holds it, the view left told before it goes.
+ *    A drawer, showing, lies over the page (`liesOver`: the shell's `.has-drawer`, and the Info drawer
+ *    going as you go to an album). And app/useFrame.ts against a fake matchMedia: the frame the two
+ *    media queries say on the first render, followed as the window crosses 1024 and 1280px, a resize
+ *    within one frame making no new state, a change between the first render and the listening caught
+ *    up, iOS 13's addListener, no matchMedia at all the phone's, and the listeners taken off after.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -43,12 +57,13 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-routes-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/appRoutes.ts', 'src/lib/appHistory.ts', '--outDir', OUT,
+  'src/lib/appRoutes.ts', 'src/lib/appHistory.ts', 'src/lib/appFrame.ts', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' })
 
 const R = require(path.join(OUT, 'appRoutes.js'))
 const H = require(path.join(OUT, 'appHistory.js'))
+const F = require(path.join(OUT, 'appFrame.js'))
 
 let failures = 0
 function check(label, actual, expected) {
@@ -587,6 +602,179 @@ console.log('\nend to end: choosing a pressing on the album you don\'t have')
   d.router.update({ kind: 'album', id: 'rg-1', release: 'r-2' })
   d.router.update({ kind: 'group', id: 'rg-other', release: 'r-2' })
   check('an update for another page does nothing', d.hashes(), ['#/search', '#/search/group/rg-1'])
+}
+
+console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
+{
+  check('the breakpoints: 1024 and 1280, the media queries built from them',
+    [F.DESKTOP_MIN, F.COLUMN_MIN, F.DESKTOP_QUERY, F.COLUMN_QUERY], [1024, 1280, '(min-width: 1024px)', '(min-width: 1280px)'])
+  check('a phone, and a phone on its side, are the phone\'s frame, with sheets',
+    [F.frameFor(390), F.frameFor(844), F.frameFor(1023)], [{ frame: 'phone', panel: 'sheet' }, { frame: 'phone', panel: 'sheet' }, { frame: 'phone', panel: 'sheet' }])
+  check('from 1024px the desktop\'s: a drawer over the page\'s edge up to 1279, a third column from 1280',
+    [F.frameFor(1024), F.frameFor(1279), F.frameFor(1280), F.frameFor(1440)],
+    [{ frame: 'desktop', panel: 'drawer' }, { frame: 'desktop', panel: 'drawer' }, { frame: 'desktop', panel: 'column' }, { frame: 'desktop', panel: 'column' }])
+  check('...the same from the media queries\' answers - and a "column" answer without the desktop one is still the phone\'s',
+    [F.frameOf(false, false), F.frameOf(true, false), F.frameOf(true, true), F.frameOf(false, true)],
+    [{ frame: 'phone', panel: 'sheet' }, { frame: 'desktop', panel: 'drawer' }, { frame: 'desktop', panel: 'column' }, { frame: 'phone', panel: 'sheet' }])
+  check('only a sheet is modal: a drawer and a column leave the page beside them usable',
+    ['sheet', 'drawer', 'column'].map(F.panelIsModal), [true, false, false])
+  check('one panel at a time, and none on a phone - Info the one showing if both were ever open (it is opened over Sources)',
+    [F.sideOf('desktop', { sources: true, info: false }), F.sideOf('desktop', { sources: false, info: true }), F.sideOf('desktop', { sources: false, info: false }),
+      F.sideOf('phone', { sources: true, info: false }), F.sideOf('desktop', { sources: true, info: true })], ['sources', 'info', 'none', 'none', 'info'])
+  check('the main area makes room only for a third column - a drawer lies over it',
+    [F.makesRoom('column', 'sources'), F.makesRoom('column', 'info'), F.makesRoom('column', 'none'), F.makesRoom('drawer', 'sources'), F.makesRoom('sheet', 'sources')],
+    [true, true, false, false, false])
+  check('crossing into the desktop closes Now Playing; back to the phone, the Info panel',
+    [F.closesOnCrossing('desktop'), F.closesOnCrossing('phone')], [{ nowPlaying: true, infoPanel: false }, { nowPlaying: false, infoPanel: true }])
+  check('a drawer, showing, lies over the page - a column makes room instead, and a sheet is no panel',
+    [F.liesOver('drawer', 'sources'), F.liesOver('drawer', 'info'), F.liesOver('drawer', 'none'), F.liesOver('column', 'info'), F.liesOver('sheet', 'sources')],
+    [true, true, false, false, false])
+
+  check('the sidebar: Home and Requests, then the Library\'s views as the board lists them',
+    [F.SIDEBAR_TOP.map((item) => item.label), F.libraryItems(null).map((item) => item.label)],
+    [['Home', 'Requests'], ['Recently added', 'Albums', 'Artists', 'Songs']])
+  check('...Songs left out when Navidrome lists none, kept while that isn\'t known',
+    [F.libraryItems(false).map((item) => item.id), F.libraryItems(true).length], [['recent', 'albums', 'artists'], 4])
+  check('where the app is: its tab - the Library\'s view showing - and none on Search, whose place is the field',
+    [F.sidebarCurrent('home', 'albums', true), F.sidebarCurrent('requests', 'albums', true), F.sidebarCurrent('you', 'artists', true),
+      F.sidebarCurrent('library', 'artists', true), F.sidebarCurrent('library', 'recent', true), F.sidebarCurrent('library', 'songs', false), F.sidebarCurrent('search', 'albums', true)],
+    ['home', 'requests', 'you', 'artists', 'recent', 'albums', null])
+  check('a tap: Home, Requests and You are their tabs\' buttons',
+    ['home', 'requests', 'you'].map((item) => F.sidebarMove(item, 'albums', true)),
+    [{ how: 'tab', tab: 'home' }, { how: 'tab', tab: 'requests' }, { how: 'tab', tab: 'you' }])
+  check('...the Library view showing is the Library\'s button (as left, or back to its root); another is that view',
+    [F.sidebarMove('albums', 'albums', true), F.sidebarMove('artists', 'albums', true), F.sidebarMove('recent', 'albums', true),
+      F.sidebarMove('albums', 'songs', false)],
+    [{ how: 'tab', tab: 'library' }, { how: 'view', tab: 'library', pick: 'artists' }, { how: 'view', tab: 'library', pick: 'recent' },
+      { how: 'tab', tab: 'library' }])
+  check('"Recently added" is the desktop\'s: a phone shows the albums for it, as for Songs with none listed',
+    [F.shownPick('recent', true, 'phone'), F.shownPick('recent', true, 'desktop'), F.shownPick('songs', false, 'desktop'), F.shownPick('songs', null, 'phone'),
+      F.shownPick('artists', true, 'phone')], ['albums', 'recent', 'albums', 'songs', 'artists'])
+  check('each view\'s title on a desktop, the sidebar\'s own words',
+    ['recent', 'albums', 'artists', 'songs'].map((pick) => F.LIBRARY_TITLES[pick]), ['Recently added', 'Albums', 'Artists', 'Songs'])
+
+  //? the Library's store, which the Library's chips and the desktop sidebar both choose from
+  const PICK = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-routes-pick-'))
+  execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
+    'src/app/libraryPick.ts', '--rootDir', 'src', '--outDir', PICK,
+    '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node', '--lib', 'es2022,dom',
+  ], { cwd: UI, stdio: 'inherit' })
+  fs.mkdirSync(path.join(PICK, 'node_modules/preact'), { recursive: true })
+  fs.writeFileSync(path.join(PICK, 'node_modules/preact/hooks.js'), 'exports.useState = () => [0, () => {}]\nexports.useEffect = () => {}\nexports.useCallback = (f) => f\n')
+  const stored = new Map([['deadwax-player-library-view', 'artists']])
+  globalThis.localStorage = { getItem: (key) => (stored.has(key) ? stored.get(key) : null), setItem: (key, value) => stored.set(key, String(value)), removeItem: (key) => stored.delete(key) }
+  const L = require(path.join(PICK, 'app/libraryPick.js'))
+  const left = []
+  L.onLibraryLeaving(() => left.push(L.libraryPick()))
+  check('the Library\'s view: the device\'s to begin with', L.libraryPick(), 'artists')
+  L.chooseLibrary('recent')
+  check('"Recently added" chosen: shown, the view left told before it went - and never kept on the device',
+    [L.libraryPick(), left, stored.get('deadwax-player-library-view')], ['recent', ['artists'], 'artists'])
+  L.chooseLibrary('songs')
+  L.chooseLibrary('songs')
+  check('Albums, Artists or Songs kept, as the chips always were; the same view again changes nothing',
+    [L.libraryPick(), left, stored.get('deadwax-player-library-view')], ['songs', ['artists', 'recent'], 'songs'])
+  check('whether Navidrome lists songs: unknown until the Library has asked', L.librarySongs(), null)
+  L.setLibrarySongs(false)
+  check('...then what it said', L.librarySongs(), false)
+  delete globalThis.localStorage
+
+  //? (review) the frame itself: app/useFrame.ts asks the two media queries the stylesheets use
+  const FRAME = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-routes-frame-'))
+  execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
+    'src/app/useFrame.ts', '--rootDir', 'src', '--outDir', FRAME,
+    '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node', '--lib', 'es2022,dom',
+  ], { cwd: UI, stdio: 'inherit' })
+  fs.mkdirSync(path.join(FRAME, 'node_modules/preact'), { recursive: true })
+  //? one hook's state and one effect, run when the test commits - as Preact runs it after the paint
+  fs.writeFileSync(path.join(FRAME, 'node_modules/preact/hooks.js'), `
+const at = () => globalThis.__frame
+exports.useState = (init) => {
+  if (!at().state) at().state = { v: typeof init === 'function' ? init() : init }
+  const s = at().state
+  return [s.v, (x) => { const next = typeof x === 'function' ? x(s.v) : x; if (!Object.is(next, s.v)) { s.v = next; at().sets += 1 } }]
+}
+exports.useEffect = (f) => { if (!at().effect) at().effect = { f } }
+`)
+  //? a window as wide as the test says, its media queries telling their listeners as an answer changes
+  const screen = { width: 0, lists: [] }
+  const media = (query, { old = false } = {}) => {
+    const min = Number(/min-width: (\d+)px/.exec(query)[1])
+    const list = { query, listeners: [], was: screen.width >= min, get matches() { return screen.width >= min } }
+    if (old) {
+      list.addListener = (fn) => list.listeners.push(fn)
+      list.removeListener = (fn) => { list.listeners = list.listeners.filter((each) => each !== fn) }
+    } else {
+      list.addEventListener = (name, fn) => name === 'change' && list.listeners.push(fn)
+      list.removeEventListener = (name, fn) => { list.listeners = list.listeners.filter((each) => each !== fn) }
+    }
+    screen.lists.push(list)
+    return list
+  }
+  const resize = (width, { tell = true } = {}) => {
+    screen.width = width
+    if (!tell) return
+    for (const list of screen.lists) {
+      if (list.matches !== list.was) { list.was = list.matches; for (const fn of [...list.listeners]) fn({ matches: list.matches }) }
+    }
+  }
+  const mountFrame = ({ old = false } = {}) => {
+    globalThis.__frame = { state: null, effect: null, sets: 0 }
+    screen.lists = []
+    const UF = require(path.join(FRAME, 'app/useFrame.js'))
+    const render = () => UF.useFrame()
+    const commit = () => { const effect = globalThis.__frame.effect; if (effect && !effect.cleanup) effect.cleanup = effect.f() }
+    const unmount = () => globalThis.__frame.effect?.cleanup?.()
+    return { render, commit, unmount, sets: () => globalThis.__frame.sets }
+  }
+  globalThis.window = { matchMedia: (query) => media(query) }
+
+  resize(1440, { tell: false })
+  let frame = mountFrame()
+  check('the first render: the frame the media queries say - 1440px, the desktop\'s, a panel a column', frame.render(), { frame: 'desktop', panel: 'column' })
+  frame.commit()
+  check('...listening to both queries the stylesheets use, and nothing new as it starts', [screen.lists.filter((list) => list.listeners.length).map((list) => list.query).sort(), frame.sets()],
+    [['(min-width: 1024px)', '(min-width: 1280px)'], 0])
+  resize(1100)
+  check('narrowed to 1100px: still the desktop\'s, a panel a drawer', [frame.render(), frame.sets()], [{ frame: 'desktop', panel: 'drawer' }, 1])
+  resize(1200)
+  check('...a resize within the frame: no answer changed, nothing new', [frame.render(), frame.sets()], [{ frame: 'desktop', panel: 'drawer' }, 1])
+  screen.lists.at(-1).listeners.forEach((fn) => fn({}))
+  check('...and a change event with the frame the same (a list re-telling) makes no new state', frame.sets(), 1)
+  resize(800)
+  check('narrowed under 1024px: the phone\'s, with sheets', [frame.render(), frame.sets()], [{ frame: 'phone', panel: 'sheet' }, 2])
+  resize(1280)
+  check('widened to 1280 at a stroke: the desktop\'s, a column', frame.render(), { frame: 'desktop', panel: 'column' })
+  frame.unmount()
+  check('unmounted: no listener left', screen.lists.reduce((sum, list) => sum + list.listeners.length, 0), 0)
+
+  //? a window resized between the first render and the effect that starts listening
+  resize(390, { tell: false })
+  frame = mountFrame()
+  check('a phone on the first render', frame.render(), { frame: 'phone', panel: 'sheet' })
+  resize(1440, { tell: false })
+  frame.commit()
+  check('...widened before it listened: caught up as it starts listening', frame.render(), { frame: 'desktop', panel: 'column' })
+  frame.unmount()
+
+  //? iOS 13's MediaQueryList, with addListener and no addEventListener
+  globalThis.window = { matchMedia: (query) => media(query, { old: true }) }
+  resize(1440, { tell: false })
+  frame = mountFrame()
+  frame.render()
+  frame.commit()
+  resize(900)
+  check('iOS 13\'s addListener followed the same', frame.render(), { frame: 'phone', panel: 'sheet' })
+  frame.unmount()
+  check('...and taken off with removeListener', screen.lists.reduce((sum, list) => sum + list.listeners.length, 0), 0)
+
+  //? no matchMedia at all: the phone's frame, and nothing to listen to
+  globalThis.window = {}
+  frame = mountFrame()
+  check('no matchMedia: the phone\'s frame', frame.render(), { frame: 'phone', panel: 'sheet' })
+  frame.commit()
+  delete globalThis.window
+  delete globalThis.__frame
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

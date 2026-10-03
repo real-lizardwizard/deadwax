@@ -3,9 +3,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { ReleaseGroup } from '../api/types'
+import { me } from '../api/me'
+import { closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
+import { latestOnly } from '../lib/latest'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
@@ -15,6 +18,7 @@ import { navidromeStatus, playedAlbum, sentFormat, type Album, type Artist, type
 import { Library } from '../player/Library'
 import { MiniPlayer } from '../player/MiniPlayer'
 import { NowPlaying } from '../player/NowPlaying'
+import { PlayerBar } from '../player/PlayerBar'
 import { deckReport, onDeckReport, resumeDeckAudio } from '../player/deck'
 import { usePlayer, type Player } from '../player/usePlayer'
 import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerWindDown } from '../state/persisted'
@@ -23,12 +27,15 @@ import { ArtistPage, type ArtistPreview } from './ArtistPage'
 import { ActionsContext, PlayerContext, pickActions } from './context'
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
+import { chooseLibrary, libraryPick, librarySongs, useLibraryPick } from './libraryPick'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { ReleaseGroupPage } from './ReleaseGroupPage'
 import { Requests } from './Requests'
 import { Search } from './Search'
+import { Sidebar } from './Sidebar'
 import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
+import { useFrame } from './useFrame'
 import { useInfoDetails } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
 import { setPinned, usePins } from './usePins'
@@ -141,11 +148,50 @@ function usePageShown(): boolean {
  * played from, taken as the menu OPENS (so no row comes or goes, nor changes album, while it is up) -
  * its tap closes the menu, saves behind it and says what became of it in the app's one notice
  * (PinNotice, drawn here once), and plays nothing.
+ * THE DESKTOP FRAME (2.0.0-player.19, lib/appFrame.ts): from 1024px wide the same app is drawn in a
+ * desktop's frame - a sidebar (Sidebar.tsx) where the tab bar was, the player bar (PlayerBar.tsx)
+ * where the mini player was, and Sources and Info as a side panel beside the page rather than sheets
+ * over it (a third column from 1280px, a drawer over the page's edge below that). The frame is chosen
+ * HERE, below the engine (useFrame, the stylesheets' own media queries): crossing 1024px swaps the
+ * chrome around the panes and nothing else - the tab roots and their pages are the same elements in
+ * the same places (each pane keyed on its tab), the engine's useMemo never runs again, and the one
+ * audio element (two with Gapless) plays on. Into the desktop, Now Playing and what is over it close
+ * (it has no Now Playing sheet: the bar is its player, and the turntable is the phone's alone); back
+ * to the phone, the Info panel does. A side panel is not modal - nothing behind it goes inert, the
+ * page beside it is still the page - and one shows at a time: opening Info puts Sources away and the
+ * other way round. The album you don't have follows the pressing chosen with the Sources panel open
+ * for it (`sourcesGroup`, and the pressing it searched, `sourcesPressing`), searching again for each.
+ * A drawer (1024-1279px) lies over the page's right edge (`.has-drawer`, lib/appFrame.ts liesOver),
+ * and the Info drawer goes as you go to an album or artist from the player, so it isn't over the page
+ * you asked for. The sidebar's search field is Search's own box (searchBox.ts): typing in it shows
+ * Search's results at its root; its Managing shows unless deadwax says this user isn't an admin
+ * (`/deadwax/me`, asked as the desktop frame shows, as You asks it for its own row).
  */
 export function App() {
   const player = usePlayer()
   //? the engine's actions are made once, in its own useMemo, and never change: taken once here
   const actions = useMemo(() => pickActions(player), [])
+  //? the phone's frame or the desktop's (2.0.0-player.19) - chosen here, below the engine
+  const { frame, panel } = useFrame()
+  const desktop = frame === 'desktop'
+  //? what the Library shows, for the desktop sidebar (libraryPick.ts: the Library and the sidebar choose it)
+  const { pick: libraryView, hasSongs } = useLibraryPick()
+  //? the sidebar's Managing shows unless deadwax says this user isn't an admin - with logins off, everyone
+  //? is (You's row asks the same). Asked as the desktop frame shows (a phone has no sidebar); a failed ask
+  //? leaves it as it was
+  const [admin, setAdmin] = useState(true)
+  const meRequests = useMemo(latestOnly, [])
+  useEffect(() => {
+    if (!desktop) return
+    const request = meRequests.begin()
+    me(request.signal).then(
+      (who) => {
+        if (request.current()) setAdmin(who.admin)
+      },
+      () => {},
+    )
+    return () => meRequests.supersede()
+  }, [desktop])
 
   const scrolls = useRef(new Map<string, number>())
   const previews = useRef(new Map<string, Album>())
@@ -178,6 +224,12 @@ export function App() {
   const [getting, setGetting] = useState<GetRequest | null>(null)
   //? what is over Now Playing: its ••• menu, or Info - never both
   const [over, setOver] = useState<'none' | 'menu' | 'info'>('none')
+  //? a desktop's Info: the side panel, opened from the player bar (2.0.0-player.19)
+  const [infoPanel, setInfoPanel] = useState(false)
+  const infoPanelOpen = useRef(false)
+  infoPanelOpen.current = infoPanel
+  //? what the Info panel gives focus back to as it closes: the player bar's Info, taken in its click
+  const infoOpener = useRef<HTMLElement | null>(null)
   const [youSeen, setYouSeen] = useState(nav.tab === 'you')
   const [searchSeen, setSearchSeen] = useState(nav.tab === 'search')
   //? "Now Playing opens as", kept on this device
@@ -350,6 +402,10 @@ export function App() {
     gets.current += 1
     setGetting({ ...request, key: gets.current })
     setSourcesOpen(true)
+    //? one side panel at a time on a desktop: Sources puts Info away, giving focus back to nothing
+    //? (Sources takes it)
+    infoOpener.current = null
+    setInfoPanel(false)
   }, [])
   const closeSources = useCallback(() => setSourcesOpen(false), [])
   //? a download asked for from the sheet: it goes - focus going nowhere it would land - and Requests shows
@@ -388,14 +444,79 @@ export function App() {
   const openInfo = useCallback(() => setOver('info'), [])
   const closeOver = useCallback(() => setOver('none'), [])
 
+  //? A desktop's Info (2.0.0-player.19): the player bar's button opens it as the side panel, and
+  //? closes it again. One panel at a time - it puts Sources away, the search going with it (Sources'
+  //? backstop) and focus given to Info, not back to the Get.
+  const toggleInfo = useCallback((event: MouseEvent) => {
+    if (infoPanelOpen.current) {
+      setInfoPanel(false)
+      return
+    }
+    infoOpener.current = takeOpener(event)
+    sourcesOpener.current = null
+    setSourcesOpen(false)
+    setInfoPanel(true)
+  }, [])
+  const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
+
+  //? Crossing into the other frame (lib/appFrame.ts closesOnCrossing): into the desktop, Now Playing
+  //? and what is over it close - the desktop's player is its bar; back to the phone, the Info panel.
+  //? The Sources sheet stays open across, a panel on one side and a sheet on the other.
+  const lastFrame = useRef(frame)
+  useEffect(() => {
+    if (lastFrame.current === frame) return
+    lastFrame.current = frame
+    const closes = closesOnCrossing(frame)
+    if (closes.nowPlaying) {
+      sheetOpener.current = null
+      moreOpener.current = null
+      setOver('none')
+      setSheetOpen(false)
+    }
+    if (closes.infoPanel) {
+      infoOpener.current = null
+      setInfoPanel(false)
+    }
+  }, [frame])
+
+  //? The desktop sidebar (2.0.0-player.19): Home, Requests and You are their tabs' buttons, and so is
+  //? the Library view showing; another Library view is that view at the Library's root - from another
+  //? tab, or a page on the Library's, opened at its top (lib/appFrame.ts sidebarMove).
+  const chooseFromSidebar = useCallback((item: SidebarId) => {
+    const move = sidebarMove(item, libraryPick(), librarySongs())
+    if (move.how === 'tab') {
+      chooseTab(move.tab)
+      return
+    }
+    const away = router.nav.tab !== 'library' || router.nav.stacks.library.length > 0
+    chooseLibrary(move.pick)
+    if (!away) return
+    scrolls.current.delete(scrollKey({ tab: 'library', page: null }))
+    router.root('library')
+  }, [])
+  //? the sidebar's search field typed into: Search's results, at its root
+  const showSearch = useCallback(() => {
+    if (router.nav.tab === 'search' && !router.nav.stacks.search.length) return
+    router.root('search')
+  }, [])
+
   /**
    * "Go to album" - the menu's row, Now Playing's "Artist — Album" line, Info's album card: every
    * sheet closes and the song's album opens on the tab showing, as a tile there would open it.
    * Drawn from the answer it was played from when that is in hand, so the page has its cover and
    * artist at once. The ••• button is in a sheet that is closing, so focus isn't sent back to it.
    */
+  //? A desktop's Info as a drawer (1024-1279px) lies over the page these open, so it goes too - focus
+  //? given back to nothing, the page opening takes it; as a third column it stays beside the page
+  const leaveInfoDrawer = () => {
+    if (!liesOver(panel, infoPanel ? 'info' : 'none')) return
+    infoOpener.current = null
+    setInfoPanel(false)
+  }
+
   /** Info's artist card: every sheet closes and the artist's page opens on the tab showing. */
   const toArtist = (artist: { id: string; name: string }) => {
+    leaveInfoDrawer()
     moreOpener.current = null
     closeSheet()
     openArtist({ navidrome: artist.id, name: artist.name })
@@ -403,6 +524,7 @@ export function App() {
 
   const goToAlbum = (track: NonNullable<Player['track']>) => {
     if (!track.albumId) return
+    leaveInfoDrawer()
     moreOpener.current = null
     closeSheet()
     openAlbum(
@@ -419,14 +541,20 @@ export function App() {
   //? on what it is handed - Home and Requests on the downloads they draw, so a poll re-renders only
   //? them; Search on whether its root is what shows, so that changing re-renders only Search.
   const arrivingTrouble = downloadsError !== null
+  //? the Sources sheet over the page: a phone's - a desktop's panel leaves the page beside it showing
+  const sourcesOver = sourcesOpen && !desktop
+  //? the album-you-don't-have a desktop's Sources panel is showing a Get of, and the pressing it searched:
+  //? its page shows Get pressed only for that pressing, and follows another chosen (2.0.0-player.19)
+  const sourcesGroup = desktop && sourcesOpen ? getting?.from ?? null : null
+  const sourcesPressing = sourcesGroup ? getting?.release.release_mbid ?? null : null
   //? Search's root is what shows, with nothing over it: a Get chip's lookup still out when it stops
   //? being so is called off, so its late answer opens no sheet over what you went to instead
-  const searchActive = nav.tab === 'search' && nav.stacks.search.length === 0 && !sheetOpen && !sourcesOpen
+  const searchActive = nav.tab === 'search' && nav.stacks.search.length === 0 && !sheetOpen && !sourcesOver
   //? You's tab is the one showing: its Getting albums are asked again each time it is opened
   const youCurrent = nav.tab === 'you'
   //? Requests' root is what shows, with nothing over it: its Done rows' albums are looked for only
   //? then, and a tap's look still out when it stops being so opens nothing
-  const requestsActive = watching === 'requests' && !sourcesOpen
+  const requestsActive = watching === 'requests' && !sourcesOver
   //? why Navidrome can't be asked for an album just now, for a Done row that can't open: unknown
   //? (null) until its status is in
   const navidromeProblem = !status ? null
@@ -495,7 +623,7 @@ export function App() {
         id={page.id}
         preview={artistPreviews.current.get(page.id) ?? null}
         navidromeOk={!!status?.ok}
-        shown={pageShown && nav.tab === tab && !sourcesOpen}
+        shown={pageShown && nav.tab === tab && !sourcesOver}
         onBack={back}
         backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
         onOpenAlbum={openAlbum}
@@ -516,12 +644,15 @@ export function App() {
         id={page.id}
         release={page.release ?? null}
         preview={groupPreviews.current.get(page.id) ?? null}
-        shown={pageShown && nav.tab === tab && !sourcesOpen}
+        shown={pageShown && nav.tab === tab && !sourcesOver}
         onBack={back}
         backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
         onPick={pickPressing}
         onGet={openSources}
         onArtist={openCreditedArtist}
+        desktop={desktop}
+        sourcesPressing={sourcesGroup === page.id ? sourcesPressing : null}
+        onCloseSources={closeSources}
       />
     ) : (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
@@ -553,16 +684,22 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing, sourcesOpen, pageShown],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing],
   )
 
   const playing = player.track
   const toAlbum = playing?.albumId ? () => goToAlbum(playing) : null
   const playedFrom = playing ? playedAlbum(playing.albumId) : null
+  //? Info: a sheet over Now Playing on a phone; on a desktop the side panel the player bar opens
+  const infoOpen = desktop ? infoPanel : sheetOpen && over === 'info'
   //? what fills Info > About in, asked as it opens (2.0.0-player.17)
-  const infoDetails = useInfoDetails(sheetOpen && over === 'info', playing, playedFrom)
-  //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows
-  const covered = sheetOpen || sourcesOpen
+  const infoDetails = useInfoDetails(infoOpen, playing, playedFrom)
+  //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows; a desktop's
+  //? side panel leaves the page beside it as it is
+  const covered = !desktop && (sheetOpen || sourcesOpen)
+  //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
+  //? (lib/appFrame.ts)
+  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel })
 
   //? The ••• menu's pin (2.0.0-player.18): the playing song's album, by its release where the answer
   //? it was played from says it (none at all, "", and it can't be pinned), else by Navidrome's id,
@@ -586,9 +723,20 @@ export function App() {
   return (
     <PlayerContext.Provider value={player}>
       <ActionsContext.Provider value={actions}>
-        <div class={`pl-app app-shell${player.track ? ' has-mini' : ''}`}>
+        <div class={`pl-app app-shell${player.track && !desktop ? ' has-mini' : ''}${desktop ? ' app-desk' : ''}${makesRoom(panel, side) ? ' has-side' : ''}${liesOver(panel, side) ? ' has-drawer' : ''}`}>
           {/* what Now Playing covers: inert while it is open */}
           <div class="app-behind" aria-hidden={covered} inert={covered}>
+            {/* a desktop's sidebar, in the tab bar's place (2.0.0-player.19) - first, as it is on screen */}
+            {desktop && (
+              <Sidebar
+                current={sidebarCurrent(nav.tab, libraryView, hasSongs)}
+                library={libraryItems(hasSongs)}
+                arriving={view.arriving.length}
+                admin={admin}
+                onSelect={chooseFromSidebar}
+                onSearch={showSearch}
+              />
+            )}
             {TABS.map((tab) => {
               const stack = nav.stacks[tab]
               const top = stack[stack.length - 1] ?? null
@@ -600,11 +748,16 @@ export function App() {
               )
             })}
 
-            <MiniPlayer player={player} onOpen={openSheet} />
-            <TabBar current={nav.tab} onSelect={chooseTab} arriving={view.arriving.length} />
+            {/* the player: the mini player over the tab bar, or a desktop's player bar */}
+            {desktop ? (
+              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} />
+            ) : (
+              <MiniPlayer player={player} onOpen={openSheet} />
+            )}
+            {!desktop && <TabBar current={nav.tab} onSelect={chooseTab} arriving={view.arriving.length} />}
           </div>
-          {/* a Get's sources (2.0.0-player.15): over the page, under Now Playing's menu and Info */}
-          <Sources open={sourcesOpen} request={getting} opener={sourcesOpener} onClose={closeSources} onQueued={gotten} />
+          {/* a Get's sources (2.0.0-player.15): over the page, under Now Playing's menu and Info - a desktop's side panel */}
+          <Sources open={sourcesOpen} request={getting} opener={sourcesOpener} onClose={closeSources} onQueued={gotten} panel={panel} />
           <NowPlaying
             player={player}
             open={sheetOpen}
@@ -629,9 +782,9 @@ export function App() {
             onPin={pinPlaying}
           />
           <InfoSheet
-            open={sheetOpen && over === 'info'}
-            opener={moreOpener}
-            onClose={closeOver}
+            open={infoOpen}
+            opener={desktop ? infoOpener : moreOpener}
+            onClose={desktop ? closeInfoPanel : closeOver}
             onAlbum={toAlbum}
             player={player}
             album={playedFrom}
@@ -639,6 +792,7 @@ export function App() {
             turntable={turntableSound}
             details={infoDetails}
             onArtist={toArtist}
+            panel={panel}
           />
           {/* what became of a pin, said over everything (2.0.0-player.18) */}
           <PinNotice />

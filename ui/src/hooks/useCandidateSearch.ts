@@ -61,8 +61,12 @@ export interface CandidateSearchState {
   setQuery: (text: string) => void
   /** why a pick wasn't made, when one was wanted */
   notPicked: string | null
-  /** a fresh Get: search for `release`, and pick if the settings say so */
-  start: (release: DownloadRelease) => void
+  /**
+   * A fresh Get: search for `release`, and pick if the settings say so. `fresh` false (2.0.0-player.19)
+   * is the desktop's Sources panel following the page to another pressing: a search for that one,
+   * never a pick - you are choosing, as with a Re-search.
+   */
+  start: (release: DownloadRelease, fresh?: boolean) => void
   /** search the same release again - with the box's query only when it was edited */
   requery: () => void
   /** let the search go: the sheet closed (which stops it in slskd too) */
@@ -151,11 +155,11 @@ export function useCandidateSearch({ picking, onPicked }: {
     query,
     setQuery,
     notPicked,
-    start(release) {
+    start(release, fresh = true) {
       //? the last album's query, left in the box, would be taken for an edit by Re-search
       setQuery('')
       setShownQuery('')
-      void run(release, '', true)
+      void run(release, '', fresh)
     },
     requery() {
       if (search) void run(search.release, queryOverride(query, shownQuery), false)

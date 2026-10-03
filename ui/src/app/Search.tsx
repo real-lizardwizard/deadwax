@@ -23,6 +23,7 @@ import { ArchiveCover } from './ArchiveCover'
 import { usePlayerActions } from './context'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { keep, kept, usualGet } from './pressingLists'
+import { onSearchSubmitted, onSearchTyped, shareSearchText } from './searchBox'
 import type { GetRequest } from './Sources'
 import { useGetSettings } from './useGetSettings'
 import { ownedNow, refreshOwned, useOwned } from './useOwned'
@@ -332,6 +333,19 @@ export function Search({
     //? the keyboard goes, so the answers have the screen
     input.current?.blur()
   }
+
+  //? The desktop's search field is the sidebar's (2.0.0-player.19, app/searchBox.ts), and this box
+  //? isn't drawn there: what this box says is shared with it, its typing is this box's, and its
+  //? Enter is this form's submit - so the search, its pacing and its guards stay this tab's alone.
+  useEffect(() => shareSearchText(text), [text])
+  useEffect(() => onSearchTyped(setText), [])
+  const submitNow = useRef(() => {})
+  submitNow.current = () => {
+    if (!query) return
+    askLibrary(query)
+    void askMusicBrainz(query)
+  }
+  useEffect(() => onSearchSubmitted(() => submitNow.current()), [])
 
   /** A song's tap: its album from that song when the album is in hand; otherwise open the album. */
   const playSong = (song: Song) => {

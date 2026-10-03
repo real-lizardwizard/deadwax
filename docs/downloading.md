@@ -275,6 +275,19 @@ picks on a **Re-search**, which you're steering by hand - only on Get itself (an
 after slskd couldn't search, which is that Get again). Both settings are kept for you on deadwax -
 see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax).
 
+**On a desktop** (since 2.0.0-player.19; the app in a window 1024 pixels wide or more - see
+[the phone player guide](player.md#on-a-desktop)) the sources open in a **Sources** panel beside the
+album rather than a sheet over it: a third column from 1280 pixels wide, over the right of the page
+below that. They're the same cards, with one more filter, **Signals**: the least each part of the
+match score may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a
+slider each - as the main page's candidates panel has it, with a count on the chip of how many are
+set. Signals is the panel's alone: narrow the window to a phone's with the panel open and its
+minimums stop filtering until it's wide again. **Get the album** sits beside the **Pressing** button
+and shows pressed while the panel shows that pressing's sources (click it again to close them), and
+the page stays usable: **choose another pressing and the sources are searched again for it**,
+keeping your filters - and never picking a source for you, even with **Pick the best source for
+me**, since you're choosing. The panel's close button, or Escape while you're in it, closes it.
+
 ## On the phone: the Requests tab
 
 [The phone app](player.md) at `/player/` shows the same downloads in its **Requests** tab, with

@@ -32,8 +32,10 @@ const DRAG_START_PX = 6
  *
  * A slider to the keyboard and to VoiceOver (whose swipe up and down WebKit sends as arrow keys):
  * arrows move 5 seconds, Page Up and Down 30, Home and End to the ends.
+ *
+ * The desktop's player bar draws this same bar (2.0.0-player.19, PlayerBar.tsx): one way to seek.
  */
-function Scrubber({ player }: { player: Player }) {
+export function Scrubber({ player }: { player: Player }) {
   const position = usePosition(player)
   const bar = useRef<HTMLDivElement>(null)
   //? The drag in a ref as well as in state: a move and the release can both arrive before the

@@ -1,0 +1,110 @@
+import { Cover } from './Cover'
+import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
+import { Scrubber } from './NowPlaying'
+import type { Player } from './usePlayer'
+
+/**
+ * The desktop's player (2.0.0-player.19), a bar along the bottom of every screen as
+ * DesktopLibrary.dc.html draws it - where the phone has the mini player and Now Playing's sheet:
+ *
+ *  - at the left, the song: its cover, its title, and "Artist — Album", which goes to the album on
+ *    the tab showing (App's Go to album), as Now Playing's line does - or the song's failure, in its
+ *    place, as the mini player says it;
+ *  - in the middle, previous, a round play or pause, next, and under them the scrubber - Now
+ *    Playing's own (it seeks as the pointer lets go or a key steps, never on the way), its two
+ *    clocks at its ends;
+ *  - at the right, AirPlay when there is a speaker to send to, and Info, which opens Info as the
+ *    side panel (and closes it). The full-screen visualizer James wants on a desktop comes in a
+ *    later slice, at the end of this row; nothing is drawn for it until there is something for it to
+ *    open. There is no turntable on a desktop (James: "I don't think it makes a lot of sense on
+ *    desktop").
+ *
+ * Its transport calls the player straight from the click - nothing awaited, the gesture rule
+ * (ui/test/app-rules.sim.cjs allows this file toggle, next, previous and showAirPlay). With nothing
+ * playing it keeps its place and says so: a bar that came and went would move the page above it.
+ */
+export function PlayerBar({
+  player,
+  onAlbum,
+  onInfo,
+  infoOpen,
+}: {
+  player: Player
+  /** "Artist — Album": the song's album, on the tab showing; null when the song names none */
+  onAlbum: (() => void) | null
+  /** Info's click - the event, so App can take the button as what the panel gives focus back to */
+  onInfo: (event: MouseEvent) => void
+  /** the Info panel is showing */
+  infoOpen: boolean
+}) {
+  const track = player.track
+  if (!track) {
+    return (
+      <section class="app-playbar" aria-label="Player">
+        <p class="app-playbar-idle">Nothing playing</p>
+      </section>
+    )
+  }
+
+  //? "Artist — Album", as Now Playing has it; either alone when the other isn't known
+  const byline = [track.artist, track.album].filter(Boolean).join(' — ')
+
+  return (
+    <section class="app-playbar" aria-label="Player">
+      <div class="app-playbar-now">
+        <Cover id={track.coverArt} size={120} class="app-playbar-cover" />
+        <span class="app-playbar-text">
+          <span class="app-playbar-title">{track.title}</span>
+          {player.error ? (
+            <span class="app-playbar-byline is-error">{player.error}</span>
+          ) : onAlbum ? (
+            <button type="button" class="app-playbar-byline is-link" onClick={onAlbum} aria-label={`Go to the album: ${byline}`}>
+              {byline}
+            </button>
+          ) : (
+            <span class="app-playbar-byline">{byline}</span>
+          )}
+        </span>
+      </div>
+
+      <div class="app-playbar-middle">
+        <div class="app-playbar-transport">
+          <button type="button" class="app-playbar-button" onClick={() => player.previous()} aria-label="Previous">
+            <PreviousIcon class="app-playbar-icon" />
+          </button>
+          <button
+            type="button"
+            class={`app-playbar-play${player.buffering ? ' is-busy' : ''}`}
+            onClick={() => player.toggle()}
+            aria-label={player.playing ? 'Pause' : 'Play'}
+          >
+            {player.playing ? <PauseIcon class="app-playbar-play-icon" /> : <PlayIcon class="app-playbar-play-icon" />}
+          </button>
+          <button type="button" class="app-playbar-button" onClick={() => player.next()} aria-label="Next">
+            <NextIcon class="app-playbar-icon" />
+          </button>
+        </div>
+        <Scrubber player={player} />
+      </div>
+
+      <div class="app-playbar-tools">
+        {player.airplay && (
+          <button type="button" class="app-playbar-button" onClick={() => player.showAirPlay()} aria-label="AirPlay">
+            <AirPlayIcon class="app-playbar-icon" />
+          </button>
+        )}
+        <button
+          type="button"
+          class={`app-playbar-button${infoOpen ? ' is-on' : ''}`}
+          onClick={onInfo}
+          aria-label="Info"
+          aria-expanded={infoOpen}
+        >
+          <InfoIcon class="app-playbar-icon" />
+        </button>
+        {/* the full-screen visualizer's place, at the end of this row (a later slice): nothing until
+            there is something for it to open */}
+      </div>
+    </section>
+  )
+}

@@ -34,6 +34,12 @@
  *    names what the menu holds: "More: info, go to album, pin" only when App says the menu will have
  *    the pin (`pinnable`) - "More: info, go to album" for an album with no release id, or while
  *    deadwax can't keep pins.
+ *  - On a desktop (2.0.0-player.19) Info is a side panel beside the page: not a modal dialog, no
+ *    scroll lock on the page beside it, focus in to Done and back to the player bar's Info - and
+ *    Escape closes it only from inside it, never from the page beside it. Its box takes focus from a
+ *    click (a tab stop of -1, a sheet's none), so a click on its heading still counts as inside; and
+ *    a panel that becomes a sheet while open (the window crossing 1024px) takes focus back in from the
+ *    page going inert behind it - leaving it be when it is already inside.
  *
  * Run it with:  node ui/test/info.sim.cjs
  */
@@ -121,9 +127,10 @@ const define = (name, value) => Object.defineProperty(globalThis, name, { value,
 define('document', document)
 define('HTMLElement', FakeElement)
 
-/** A key pressed, as the browser sends it to the document: every listener, in the order added. */
-function press(key, { prevented = false } = {}) {
-  const event = { key, defaultPrevented: prevented, preventDefault() { this.defaultPrevented = true } }
+/** A key pressed, as the browser sends it to the document: every listener, in the order added -
+ *  from what has focus, unless the test says where. */
+function press(key, { prevented = false, target = document.activeElement } = {}) {
+  const event = { key, target, defaultPrevented: prevented, preventDefault() { this.defaultPrevented = true } }
   for (const listener of [...(listeners.get('keydown') ?? [])]) listener(event)
   return event
 }
@@ -493,6 +500,62 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   check('closing: what was drawn stays drawn as it slides away, and nothing is asked again',
     [view.find(byClass('app-kv-value')).map(text), formats], [before, 0])
   check('...the scroller is a tab panel named by the tab showing', [one(view, byClass('app-info-scroll')).props.role, one(view, byClass('app-info-scroll')).props['aria-labelledby']], ['tabpanel', 'app-info-tab-debug'])
+}
+
+console.log('\nInfo as a desktop\'s side panel (2.0.0-player.19): beside the page, not over it')
+{
+  const opener = new FakeElement('the player bar\'s Info')
+  const openerRef = { current: null }
+  let closes = 0
+  const view = mount(InfoSheet, 'panel')
+  const draw = (open) => view.render({
+    open, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw', panel: 'column',
+  })
+  document.activeElement = document.body
+  draw(false)
+  opener.focus()
+  openerRef.current = opener
+  draw(true)
+  const layer = one(view, byClass('app-layer'))
+  const dialog = one(view, (node) => node.props?.role === 'dialog')
+  const done = one(view, byClass('app-info-done'))
+  check('a panel - a column here - and no modal dialog', [layer.props.class.split(' ').filter((name) => name.startsWith('is-')), dialog.props['aria-modal']],
+    [['is-open', 'is-panel', 'is-column'], 'false'])
+  check('no scroll lock on the page beside it, and focus in to Done', [locks(), document.activeElement === done.element], [[], true])
+  //? the panel's box holds Done; the page's body is outside it
+  dialog.element.contains = (node) => node === dialog.element || node === done.element
+  check('Escape out in the page beside it is the page\'s: the panel stays', [press('Escape', { target: document.body }).defaultPrevented, closes], [false, 0])
+  check('Escape from inside it closes it', [press('Escape', { target: done.element }).defaultPrevented, closes], [true, 1])
+  draw(false)
+  check('...and focus goes back to the player bar\'s Info', document.activeElement === opener, true)
+  check('its box takes focus from a click on what can\'t (its heading, a tab in Safari): a tab stop of -1', dialog.props.tabIndex, -1)
+}
+
+console.log('\na panel that becomes a sheet while open, and back (review): focus in again, unless already in')
+{
+  const view = mount(InfoSheet, 'crossing')
+  const drawAs = (panel, open = true) => view.render({ open, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw', panel })
+  document.activeElement = document.body
+  drawAs('drawer', false)
+  drawAs('drawer')
+  const done = one(view, byClass('app-info-done'))
+  const dialog = one(view, (node) => node.props?.role === 'dialog')
+  const inside = new Set([dialog.element, done.element])
+  dialog.element.contains = (node) => inside.has(node)
+  check('opened as a panel: focus in to Done', document.activeElement === done.element, true)
+  const field = new FakeElement('the page\'s search field')
+  field.focus()
+  drawAs('drawer')
+  check('...focus moved out to the page beside it, a re-render leaves it there (a panel isn\'t modal)', document.activeElement === field, true)
+  drawAs('sheet')
+  check('the window narrowed: a sheet now, the page behind inert - focus goes in to Done, a sheet\'s box with no tab stop',
+    [document.activeElement === done.element, one(view, (node) => node.props?.role === 'dialog').props.tabIndex], [true, undefined])
+  const tab = one(view, (node) => node.props?.role === 'tab')
+  inside.add(tab.element)
+  tab.element.focus()
+  drawAs('drawer')
+  check('...widened again with focus inside it: left where it is', document.activeElement === tab.element, true)
+  drawAs('drawer', false)
 }
 
 console.log('\nthe ••• menu')

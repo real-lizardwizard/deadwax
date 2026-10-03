@@ -12,7 +12,9 @@ your downloads as they arrive (since 2.0.0-player.12), and **Search** looks in y
 then on MusicBrainz, and shows an album you don't have with each of its pressings' tracklists
 (since 2.0.0-player.13) - and **Get** fetches it: the sources found on Soulseek, to choose from
 (since 2.0.0-player.15). **Home** has the albums and artists you [pin](#home-and-pins) to it, and
-what you haven't played in a while (since 2.0.0-player.18).
+what you haven't played in a while (since 2.0.0-player.18). (since 2.0.0-player.15). On a computer's screen - a window 1024 pixels wide or more - the same app
+has [a desktop's layout](#on-a-desktop) (since 2.0.0-player.19): a sidebar instead of the tabs, a
+player bar along the bottom, and the sources beside an album rather than over it.
 
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
@@ -343,6 +345,80 @@ today, there is one user, so every device sees the same pins; once logins exist,
 their own, and the first admin to sign in takes over the ones pinned before. They're in deadwax's
 database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pins` and
 `POST /deadwax/me/pins/toggle`. Home holds up to 50.
+## On a desktop
+
+Open `/player/` in a window **1024 pixels wide or more** - a computer's browser, or an iPad on its
+side - and the same app is laid out for a desktop (since 2.0.0-player.19). It's the same app, not
+a second one: the same pages, the same addresses (a link or a bookmark opens the same thing at
+either size), the same settings. Make the window narrower than 1024 and it's the phone's layout
+again - and the other way round - without the music stopping: only what's around the pages
+changes. (You's **Now Playing opens as** and **Pause winds the record down** are the phone layout's
+own: there's no now-playing screen on a desktop, so they change nothing there.)
+
+- **A sidebar** down the left instead of the tab bar: **deadwax**, the **search field**, **Home**
+  and **Requests** (with the count of what's arriving, as the tab has), the Library's views -
+  **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
+  songs, as on a phone) - then **Managing**, whose **Open the main page** opens the main page in a new
+  tab (server settings, the albums that need a look, the log and editing are there for now), and
+  **You** at the foot. Where you are is highlighted. Home, Requests and You work as the phone's tabs
+  do: a click shows it as you left it, and a click on the one showing goes back to its first page
+  (and, there, to the top). So does the Library view showing. Another Library view shows that view -
+  where you left it when you were already on the Library's first page, and at its top from anywhere
+  else.
+- **The search field** is Search's box: type in it and Search's results show in the main area -
+  your library first, then MusicBrainz - and Enter asks at once. It keeps saying what you searched
+  for while an album you found is open. (Search's own box isn't drawn on a desktop.)
+- **Recently added** in the sidebar is Navidrome's albums newest first, a view of its own beside
+  **Albums**, so Albums keeps the order you chose for it (Recently added, Recently played, Artist or
+  Title, from the button at the title's right). It's the desktop's alone: a phone shows the albums
+  there, and doesn't remember it.
+- **The Library's albums and Home's Recently added** are a grid, six covers across - fewer while a
+  panel is a column beside them (from 1280 pixels wide), so a cover stays a cover's size. Home's
+  **Arriving** cards sit side by side.
+- **A player bar** along the bottom instead of the mini player: the song's cover, title and "Artist
+  — Album" (click that to go to the album), previous, a round play/pause and next, the scrubber with
+  the time gone and the time left at its ends (click or drag along it; its dot shows when you point
+  at it), and at the right **AirPlay** when there's a speaker to send to, and **Info**. With nothing
+  playing it stays, saying so. There's no now-playing screen and no [turntable](#the-turntable) on a
+  desktop - the bar is the player; a full-screen visualizer comes later.
+- **Info** opens beside the page as a panel, with the same About and Debug as on a phone. **Done**,
+  the Info button again, or Escape while you're in the panel closes it. Going to an album or an
+  artist from the player - the bar's "Artist — Album", or Info's own cards - closes it too when it
+  lies over the page (between 1024 and 1279 pixels wide); as a column beside the page it stays.
+- **An album** has its cover beside its title, **Play** and **Shuffle** in a row, and its songs in
+  a list as on a phone.
+- **The album you don't have** has its cover beside its title, then **Get the album** with the
+  **Pressing** button beside it, what you already have of that pressing under them, and the
+  tracklist as a table - #, Title, Length - with an **Against the usual tracklist** column whenever
+  any pressing of the album differs (the bonus track, the other version, the renamed one, each
+  marked there with a short note: "only on this pressing", "usually 3:58"). A title or note too long
+  for its column ends in "…" - point at it to read it whole. From 1280 pixels wide **Get the album**
+  and **Pressing** sit beside the cover, under the title; narrower, they sit under the cover, so the
+  Sources panel (which lies over the page there) leaves them in view - with it open they keep to the
+  part of the page it doesn't cover, **Pressing** dropping under **Get the album** with its label
+  shortened where there isn't room beside it. **Get the album** opens the **Sources**
+  panel beside the page, and shows pressed while the panel shows that pressing's sources: click it
+  again to close them.
+- **The Sources panel** is the same cards as on a phone - the score, the folder and who it's from,
+  then Speed first, Tracks, Quality, Size and Starts in a row - with **Lossless**, **24-bit**,
+  **Free slot**, **Signals** and the sort. **Signals** sets the least each part of the match score
+  may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a slider each -
+  as the main page's candidates panel does, and its chip counts how many are set. They're the
+  panel's alone: narrow the window to a phone's with the panel open and they stop filtering (there's
+  no Signals chip on a phone), until it's wide again. The page stays usable beside the panel:
+  **choose another pressing and the sources are searched again for it**, keeping the filters you set
+  and never picking one for you (even with **Pick the best source for me**) - and go back and open
+  the same album again with the panel still open, and they're searched for the pressing it shows. A
+  card's **Get** queues it and shows Requests, as on a phone. The close button, or Escape while
+  you're in the panel, closes it.
+- **Where the panel goes**: from 1280 pixels wide it's a third column and the page makes room for
+  it; between 1024 and 1279 it lies over the right of the page, which there isn't room to share. One
+  panel shows at a time: opening Info puts the sources away, and Get puts Info away.
+- **The look** is the desktop's version of the same style: smaller labels and headings, a darker
+  page and cards, and Explorer-style highlights in the sidebar and the pressing list.
+- **On a touch screen** in this layout - an iPad on its side - every control is a finger's size
+  (44 points): the player bar is a little taller, with its buttons above the scrubber, and the
+  sidebar's items, the tracklist's rows, the chips and the buttons grow to match.
 
 ## The turntable
 
@@ -934,6 +1010,9 @@ fixes that.
   section isn't shown.
 - **An album with no MusicBrainz release id can't be pinned** (its pin isn't shown): nothing would
   find it again once it moved.
+- **On a desktop**, the sidebar's **Managing** opens the main page rather than its own screens, and
+  the full-screen visualizer and editing an album in the app aren't built yet; between 1024 and 1279
+  pixels wide a panel lies over the right of the page, the end of a long tracklist under it.
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.

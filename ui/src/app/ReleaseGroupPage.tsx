@@ -1,5 +1,5 @@
 import { Fragment } from 'preact'
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { storeState } from '../api/download'
 import { MusicBrainzUnavailable } from '../api/http'
@@ -10,8 +10,8 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { onAlbumsFiled } from '../lib/libraryEvents'
 import { ownedForGroup } from '../lib/owned'
 import {
-  coverAddresses, getGroup, groupMbid, leftOut, metaLine, pageHeader, pressingLabel, pressingsView, summaryLine, trackRows,
-  type PageRelease,
+  anyPressingDiffers, coverAddresses, getGroup, groupMbid, leftOut, metaLine, pageHeader, pressingLabel, pressingsView, summaryLine,
+  trackRows, type PageRelease, type TrackRow,
 } from '../lib/pressings'
 import { buildDownloadRelease } from '../lib/releasePayload'
 import { soleCredit } from '../lib/artistPage'
@@ -31,6 +31,104 @@ type Trouble = { message: string; unavailable: boolean; final?: boolean }
 
 /** What a link that isn't a MusicBrainz album says, with nothing to try again. */
 export const NOT_AN_ALBUM_LINK = "That isn't a link to an album on MusicBrainz."
+
+//? each page's tracklist heading its own id (a page stays mounted on each tab it was opened on)
+let deskTables = 0
+
+/**
+ * The desktop's tracklist (2.0.0-player.19), as DesktopRequest.dc.html and DesktopRequestBonus draw
+ * it: "Tracklist" with the line saying how this pressing compares, then a table - #, Title, Length -
+ * and, when any pressing of the album differs from the usual tracklist, an "Against the usual
+ * tracklist" column between the title and the length holding each marked track's chip and its note
+ * in the board's short words ("Bonus · only on this pressing", "Other version · usually 3:58" - the
+ * phone's longer ones don't fit its 190px), the row tinted as the phone's is. On every pressing then,
+ * the usual one too, so choosing another moves no column. A title or a note too long for its cell
+ * ends in an ellipsis, and the cell's tooltip has it whole. What it leaves out follows, as on a phone.
+ */
+function DeskTracklist({
+  rows,
+  missing,
+  summary,
+  against,
+  titleId,
+}: {
+  rows: readonly TrackRow[]
+  missing: readonly { title: string; length: string }[]
+  summary: { text: string; differs: boolean } | null
+  against: boolean
+  /** its heading's id: the page's own, since a page stays mounted on each tab it was opened on */
+  titleId: string
+}) {
+  const columns = against ? 4 : 3
+  return (
+    <section class="app-rg-tracks app-rg-desk" aria-labelledby={titleId}>
+      <div class="app-rg-desk-head">
+        <h2 id={titleId} class="app-rg-desk-title">
+          Tracklist
+        </h2>
+        {summary && summary.text && <p class={`app-rg-summary${summary.differs ? ' is-differs' : ''}`}>{summary.text}</p>}
+      </div>
+      <table class={`app-rg-table${against ? ' has-against' : ''}`}>
+        <thead>
+          <tr>
+            <th scope="col" class="app-rg-number">#</th>
+            <th scope="col">Title</th>
+            {against && <th scope="col">Against the usual tracklist</th>}
+            <th scope="col" class="app-rg-length">Length</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <Fragment key={row.key}>
+              {row.heading && (
+                <tr class="app-rg-table-disc">
+                  <th scope="colgroup" colSpan={columns}>
+                    {row.heading}
+                  </th>
+                </tr>
+              )}
+              <tr class={`app-rg-row${row.mark ? ` is-marked is-${row.mark.kind}` : ''}`}>
+                <td class="app-rg-number">{row.number}</td>
+                <td class="app-rg-title" title={row.title}>
+                  {row.title}
+                </td>
+                {against && (
+                  <td class="app-rg-against" title={row.mark ? `${row.mark.chip} · ${row.mark.note}` : undefined}>
+                    {row.mark && (
+                      <>
+                        <span class="app-rg-chip">{row.mark.chip}</span>
+                        <span class="app-rg-note">{row.mark.brief}</span>
+                      </>
+                    )}
+                  </td>
+                )}
+                <td class="app-rg-length">{row.length}</td>
+              </tr>
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+      {missing.length > 0 && (
+        <section class="app-rg-left">
+          <h2 class="app-rg-left-title">Not on this pressing</h2>
+          <table class="app-rg-table">
+            <tbody>
+              {missing.map((track, index) => (
+                <tr key={`${index}:${track.title}`} class="app-rg-row is-left">
+                  <td class="app-rg-number" aria-hidden="true">–</td>
+                  <td class="app-rg-title" title={track.title}>
+                    {track.title}
+                  </td>
+                  <td class="app-rg-length">{track.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+    </section>
+  )
+}
 
 /**
  * The album you don't have (2.0.0-player.13): a MusicBrainz release group at
@@ -75,6 +173,16 @@ export const NOT_AN_ALBUM_LINK = "That isn't a link to an album on MusicBrainz."
  * a release id alone (an m4a deadwax filed: Easy MP4 has no group-id key) still counts, as the main
  * page's card counts it (registerGroupReleases). The id in the address is lowercased and checked
  * first: anything else is said to be no album link, with no Try again that could never work.
+ *
+ * ON A DESKTOP (2.0.0-player.19), as DesktopRequest.dc.html draws it: the cover beside the title
+ * (app-desktop.css), "Get the album" with the pressing dropdown inline after it, and the tracklist
+ * as a table with its "Against the usual tracklist" column (DeskTracklist). Get opens the Sources
+ * PANEL beside the page, which stays usable - so while the panel shows the sources of the pressing
+ * shown (`sourcesPressing`, the pressing App's panel searched for this album), Get is drawn pressed and
+ * a click on it closes them; and while it shows another pressing's of this album - one chosen here, or
+ * the panel left open from this album's page as you went back and came to it again - the page asks App
+ * to search again for the one it shows (`again`: the chips stay as set, nothing is picked for you).
+ * Only the page that shows asks (`shown`): the same album open on two tabs never takes turns.
  */
 export function ReleaseGroupPage({
   id,
@@ -86,6 +194,9 @@ export function ReleaseGroupPage({
   onPick,
   onGet,
   onArtist,
+  desktop = false,
+  sourcesPressing = null,
+  onCloseSources,
 }: {
   id: string
   release: string | null
@@ -101,6 +212,13 @@ export function ReleaseGroupPage({
   onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
   /** the artist's page, by MusicBrainz id (2.0.0-player.17) */
   onArtist?: (artist: { mbid: string; name: string }) => void
+  /** drawn in the desktop's frame (2.0.0-player.19) */
+  desktop?: boolean
+  /** a desktop's Sources panel is showing a Get of this album: the pressing it searched for (null:
+   *  none, or another album's) */
+  sourcesPressing?: string | null
+  /** ...and Get, pressed while that is the pressing shown, closes it */
+  onCloseSources?: () => void
 }) {
   //? the id as MusicBrainz writes it, or null for an address that isn't an album's
   const mbid = groupMbid(id)
@@ -196,10 +314,35 @@ export function ReleaseGroupPage({
   }, [chosen?.id, group?.id, filed, shown])
   const known = store && store.id === chosen?.id ? store.state : null
 
+  //? a desktop's Sources panel shows the sources of the pressing on screen: Get is drawn pressed
+  const sourcesHere = sourcesPressing !== null && sourcesPressing === chosen?.id
+
   const get = (event: MouseEvent) => {
+    //? a desktop's Get, pressed while the panel shows this pressing's sources: a toggle - it closes them
+    if (sourcesHere) {
+      onCloseSources?.()
+      return
+    }
     if (!download || !chosen) return
-    onGet({ release: download.release, subtitle: [header.title, pressingLabel(chosen)].filter(Boolean).join(' · ') }, takeOpener(event))
+    onGet({ release: download.release, subtitle: [header.title, pressingLabel(chosen)].filter(Boolean).join(' · '), from: id }, takeOpener(event))
   }
+
+  //? A DESKTOP's Sources panel follows the pressing (2.0.0-player.19): the page stays usable beside
+  //? it, so while it shows another pressing's sources of this album - one chosen here, or the panel
+  //? left open as you went back and came to this album again - the page shown searches for its own in
+  //? turn: `again`, the chips as set and nothing picked, focus still going back to Get as the panel
+  //? closes. Only the page that shows (`shown`), so the album open on two tabs never takes turns.
+  const getButton = useRef<HTMLButtonElement>(null)
+  const tableTitle = useMemo(() => `app-rg-desk-title-${++deskTables}`, [])
+  useEffect(() => {
+    if (!shown || sourcesPressing === null || !download || !chosen || sourcesPressing === chosen.id) return
+    onGet(
+      { release: download.release, subtitle: [header.title, pressingLabel(chosen)].filter(Boolean).join(' · '), from: id, again: true },
+      getButton.current,
+    )
+  }, [shown, sourcesPressing, chosen?.id])
+
+  const picker = view && <PressingPicker view={view} onPick={(picked) => onPick(id, picked === view.defaultId ? null : picked)} />
 
   return (
     <section class="pl-album-page app-rg">
@@ -226,13 +369,16 @@ export function ReleaseGroupPage({
         {/* where the album page has Play and Shuffle: the pressing, Get, and what's already here of
             it - under Get, where an answer landing late moves nothing a finger is reaching for */}
         <div class="app-rg-actions">
-          {view && <PressingPicker view={view} onPick={(picked) => onPick(id, picked === view.defaultId ? null : picked)} />}
+          {!desktop && picker}
           {download && (
-            <button type="button" class="app-rg-get" onClick={get}>
+            //? a desktop's Get says whether the panel shows its sources: pressed, a click closes them
+            <button ref={getButton} type="button" class="app-rg-get" onClick={get} {...(desktop ? { 'aria-pressed': sourcesHere } : {})}>
               <GetIcon class="app-rg-get-icon" />
               Get the album
             </button>
           )}
+          {/* a desktop's pressing dropdown sits inline after Get, as its board has it */}
+          {desktop && picker}
           <div class="app-rg-store" aria-live="polite">
             {known && <StoreState status={storeStatus(known, 'Requests')} notes={storeNotes(known)} />}
           </div>
@@ -259,6 +405,14 @@ export function ReleaseGroupPage({
         </div>
       ) : !releases.length ? (
         <p class="pl-notice">MusicBrainz lists no pressings of this album.</p>
+      ) : desktop ? (
+        <DeskTracklist
+          rows={rows}
+          missing={missing}
+          summary={summary}
+          against={anyPressingDiffers(view) || rows.some((row) => row.mark)}
+          titleId={tableTitle}
+        />
       ) : (
         <section class="app-rg-tracks" aria-label="Tracklist">
           {summary && summary.text && (

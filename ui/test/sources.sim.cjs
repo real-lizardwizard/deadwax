@@ -34,6 +34,22 @@
  *  - One live region, always there, says each outcome; Try again, Re-search and Clear filters hand
  *    focus to the list before the state they sit in goes; the subtitle has the head's whole width.
  *
+ * And on a desktop (2.0.0-player.19), where it is the side panel beside the page:
+ *
+ *  - Not a modal sheet: its layer says it is a panel (a drawer or a column), it is no modal dialog,
+ *    and the hook is told so - no scroll lock, and Escape only from inside its box.
+ *  - The board's head: "Sources", what they are for under it, and a close button focus goes to.
+ *  - A Signals chip before the sort: the least each signal may score, a count on the chip of how
+ *    many are set, a slider each and Reset - and the minimums filter the cards, and a pick, and are
+ *    cleared with the rest by Clear filters.
+ *  - Searched again for another pressing (`again`, the album page's pressing changed beside it): the
+ *    chips and minimums as they were set, never re-seeded from the floor, and nothing picked - while a
+ *    fresh Get in the panel still picks when told to, and starts with no minimums set.
+ *  - (review) A pick made with a minimum set - set while the search runs - goes by it: the source
+ *    under it is never queued. The minimums filter only where the chip is drawn: carried into a
+ *    phone's sheet (a window narrowed, an iPad turned) they filter nothing, and are back as they were
+ *    on the panel. The panel's box takes focus from a click (a tab stop of -1); a sheet's has none.
+ *
  * Run it with:  node ui/test/sources.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -93,7 +109,7 @@ exports.getSettingsNow = () => globalThis.__sources.settings || { get_mode: 'sou
 fs.writeFileSync(path.join(OUT, 'app/useSheet.js'), `
 exports.useSheet = (options) => { globalThis.__sources.sheet = options }
 `)
-fs.writeFileSync(path.join(OUT, 'player/icons.js'), `exports.ChevronDownIcon = function ChevronDownIcon() { return null }\n`)
+fs.writeFileSync(path.join(OUT, 'player/icons.js'), `exports.ChevronDownIcon = function ChevronDownIcon() { return null }\nexports.CloseIcon = function CloseIcon() { return null }\n`)
 fs.writeFileSync(path.join(OUT, 'state/persisted.js'), `exports.readDownloadDefaults = () => ({ formatPreference: 'prefer_lossless' })\n`)
 
 function deferred() {
@@ -121,7 +137,7 @@ function check(label, actual, expected) {
 }
 
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
-const { Sources } = require(path.join(OUT, 'app/Sources.js'))
+const { Sources, SignalsChip } = require(path.join(OUT, 'app/Sources.js'))
 const { SourceCard } = require(path.join(OUT, 'app/SourceCard.js'))
 const { StoreState } = require(path.join(OUT, 'app/StoreState.js'))
 
@@ -431,6 +447,138 @@ async function main() {
     fresh.draw()
     check('...but a chip already tapped stands: the settings re-seed nothing', chips(), [['Lossless', false], ['24-bit', false], ['Free slot', true]])
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
+  }
+
+  console.log('\na desktop\'s side panel (2.0.0-player.19): the board\'s head, Signals, and searched again for another pressing')
+  {
+    globalThis.__sources.settings = { get_mode: 'pick', quality_floor: 'lossless' }
+    const phone = sheet()
+    phone.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 19 } })
+    check('a phone\'s sheet has no Signals chip, nor the panel\'s head', [find((node) => node.type === SignalsChip).length, classed('app-sources-close').length, classed('app-sources-cancel').length], [0, 0, 1])
+    const sheetBox = find(byClass('app-sources'))[0].props.tabIndex
+    phone.draw({ open: false })
+    const desk = sheet()
+    desk.draw({ open: true, panel: 'column', request: { release: RELEASE, subtitle: 'Third · CD · 2008 · GB · Island', key: 20, from: 'rg-third' } })
+    const layer = find(byClass('app-sources-layer'))[0]
+    check('a panel, not a sheet: its layer says so (a column here), and it is no modal dialog',
+      [layer.props.class.split(' ').filter((name) => name.startsWith('is-')), find(byClass('app-sources'))[0].props['aria-modal']], [['is-open', 'is-panel', 'is-column'], 'false'])
+    check('...the hook told it is not modal (no scroll lock), with its box (Escape only from inside it)',
+      [globalThis.__sources.sheet.modal, globalThis.__sources.sheet.area === find(byClass('app-sources'))[0].props.ref, globalThis.__sources.sheet.lockClass], [false, true, 'app-sources-open'])
+    const close = classed('app-sources-close')[0]
+    check('the board\'s head: "Sources", what they are for under it, a close button focus goes to - and no Cancel',
+      [text(find((node) => node.props?.id === 'app-sources-title')[0]), text(classed('app-sources-subtitle')[0]), close?.props['aria-label'],
+        close?.props.ref === globalThis.__sources.sheet.first, classed('app-sources-cancel').length],
+      ['Sources', 'for Third · CD · 2008 · GB · Island', 'Close the sources', true, 0])
+    const chipRow = find(byClass('app-sources-chips'))[0].props.children.flat().filter(Boolean)
+    check('the chips gain Signals, before the sort', chipRow.map((child) => child.type === SignalsChip ? 'Signals' : child.props?.class?.includes('app-sources-sort') ? 'sort' : text(child)),
+      ['Lossless', '24-bit', 'Free slot', 'Signals', 'sort'])
+    const signalsChip = () => find((node) => node.type === SignalsChip)[0]
+    check('...none set to begin with', Object.values(signalsChip().props.minimums).filter(Boolean).length, 0)
+    check('the panel\'s box takes focus from a click on what can\'t (a tab stop of -1) - a sheet\'s has none',
+      [find(byClass('app-sources'))[0].props.tabIndex, sheetBox], [-1, undefined])
+
+    const FRESH = [
+      source('vinylhead', { score: 0.95 }),
+      source('weak', { score: 0.8, signals: { title_match: 0.4, track_count: 1, duration_match: 1, edition: 0.5, format: 1, peer: 0.2 } }),
+    ]
+    asks.at(-1).resolve(answer(FRESH))
+    await settle()
+    desk.draw()
+    check('a fresh Get in the panel still picks when told to, and hands over', [desk.queued.length, requested.at(-1)?.username], [1, 'vinylhead'])
+
+    //? the panel stays (on a desktop App keeps it while you look): set a chip and a minimum, then the
+    //? album page's pressing changes - searched again, `again`
+    chip('Free slot').props.onClick()
+    signalsChip().props.onChange({ ...signalsChip().props.minimums, title_match: 50 })
+    desk.draw()
+    check('a minimum set: the chip counts it, and the card under it is left out', [Object.values(signalsChip().props.minimums).filter(Boolean).length, cards().map((card) => card.props.candidate.username)],
+      [1, ['vinylhead']])
+    const before = asks.length
+    desk.draw({ request: { release: OTHER, subtitle: 'Third · 2×12" Vinyl · 2008', key: 21, from: 'rg-third', again: true } })
+    check('another pressing chosen beside it: Soulseek asked again, for that pressing', [asks.length - before, asks.at(-1)?.body.release_mbid], [1, 'rel-dummy'])
+    check('...the chips and the minimum as they were set - never re-seeded from the floor',
+      [chips(), signalsChip().props.minimums.title_match], [[['Lossless', true], ['24-bit', false], ['Free slot', true]], 50])
+    asks.at(-1).resolve(answer([source('vinylhead', { score: 0.95 })]))
+    await settle()
+    desk.draw()
+    check('...and nothing picked for you: you are choosing', [desk.queued.length, cards().map((card) => card.props.candidate.username)], [1, ['vinylhead']])
+
+    //? Clear filters takes the minimums with the chips - shown for a minimum alone, no chip pressed
+    chip('Free slot').props.onClick()
+    chip('Lossless').props.onClick()
+    desk.draw({ request: { release: RELEASE, subtitle: 'Third', key: 22, from: 'rg-third', again: true } })
+    asks.at(-1).resolve(answer([source('weak', { score: 0.8, signals: { title_match: 0.4, track_count: 1, duration_match: 1, edition: 0.5, format: 1, peer: 0.2 } })]))
+    await settle()
+    desk.draw()
+    const clear = find((node) => node.type === 'button' && text(node) === 'Clear filters')[0]
+    check('none passing, no chip pressed: Clear filters all the same, the minimum counted as a chip pressed', [chips().filter(([, on]) => on).length, !!clear], [0, true])
+    clear.props.onClick()
+    desk.draw()
+    check('...which clears the minimum too', [Object.values(signalsChip().props.minimums).filter(Boolean).length, cards().length], [0, 1])
+
+    //? (review) a minimum set while a fresh Get's search runs: the pick goes by it, as the cards do
+    const WEAK_ONLY = [source('weak', { score: 0.95, signals: { title_match: 0.4, track_count: 1, duration_match: 1, edition: 0.5, format: 1, peer: 0.2 } })]
+    const queuedBefore = desk.queued.length
+    const requestedBefore = requested.length
+    desk.draw({ request: { release: RELEASE, subtitle: 'Third', key: 23, from: 'rg-third' } })
+    signalsChip().props.onChange({ ...signalsChip().props.minimums, title_match: 50 })
+    desk.draw()
+    asks.at(-1).resolve(answer(WEAK_ONLY))
+    await settle()
+    desk.draw()
+    check('a pick with a minimum set: the source under it is never queued - nothing qualifies, and the cards say so',
+      [desk.queued.length - queuedBefore, requested.length - requestedBefore, cards().length], [0, 0, 0])
+    //? (review) and the next fresh Get starts with none
+    desk.draw({ request: { release: OTHER, subtitle: 'Dummy', key: 24, from: 'rg-dummy' } })
+    check('a fresh Get afterwards (not `again`): every minimum off again', Object.values(signalsChip().props.minimums).filter(Boolean).length, 0)
+    asks.at(-1).resolve(answer([]))
+    await settle()
+
+    //? (review) the minimums filter only where the chip is drawn: the panel carried into a phone's sheet
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
+    const TWO = [source('vinylhead', { score: 0.95 }), ...WEAK_ONLY.map((one) => ({ ...one, score: 0.8 }))]
+    desk.draw({ request: { release: RELEASE, subtitle: 'Third', key: 25, from: 'rg-third' } })
+    asks.at(-1).resolve(answer(TWO))
+    await settle()
+    desk.draw()
+    signalsChip().props.onChange({ ...signalsChip().props.minimums, title_match: 50 })
+    desk.draw()
+    check('on the panel, a minimum leaves out the card under it', cards().map((card) => card.props.candidate.username), ['vinylhead'])
+    desk.draw({ panel: 'sheet' })
+    check('...the window narrowed into a phone\'s sheet: no Signals chip, and nothing filtered by it - every card, the footer saying so',
+      [find((node) => node.type === SignalsChip).length, cards().map((card) => card.props.candidate.username), text(classed('app-sources-footer')[0]), globalThis.__sources.sheet.modal],
+      [0, ['vinylhead', 'weak'], 'Searched Soulseek for “Portishead Third” · 2 folders, all match your filters', true])
+    desk.draw({ panel: 'drawer' })
+    check('...and back on the panel the minimum is as it was set', [signalsChip().props.minimums.title_match, cards().map((card) => card.props.candidate.username)], [50, ['vinylhead']])
+    desk.draw({ open: false, panel: 'column' })
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
+
+    console.log('\nthe Signals chip, drawn')
+    const changes = []
+    const render = hooks.root(SignalsChip)
+    const props = { minimums: { title_match: 0, track_count: 60, duration_match: 0, edition: 0, format: 0, peer: 0 }, onChange: (next) => changes.push(next) }
+    tree = render(props)
+    const button = find((node) => node.type === 'button' && node.props['aria-controls'])[0]
+    check('the chip: pressed with a minimum set, counting it, and closed', [text(button), button.props.class.includes('is-on'), button.props['aria-expanded'], find((node) => node.props?.role === 'group')[0].props.hidden],
+      ['Signals · 1', true, false, true])
+    button.props.onClick()
+    tree = render(props)
+    const rows = classed('app-signals-row')
+    check('opened: a slider each - the score\'s six signals - with what it is set to', [find((node) => node.props?.role === 'group')[0].props.hidden,
+      rows.map((row) => [text(row.props.children[0]), text(row.props.children[2])])],
+      [false, [['Titles', 'any'], ['Count', '60'], ['Lengths', 'any'], ['Edition', 'any'], ['Format', 'any'], ['Peer', 'any']]])
+    rows[0].props.children[1].props.onInput({ currentTarget: { value: '75' } })
+    check('...a slider moved: that minimum, the rest kept', changes.at(-1), { title_match: 75, track_count: 60, duration_match: 0, edition: 0, format: 0, peer: 0 })
+    const reset = classed('app-signals-reset')[0]
+    reset.props.onClick()
+    check('Reset: every minimum off - and it can\'t be pressed with none set', [Object.values(changes.at(-1)).filter(Boolean).length, reset.props.disabled,
+      (() => { tree = render({ ...props, minimums: { title_match: 0 } }); return classed('app-signals-reset')[0].props.disabled })()], [0, false, true])
+    const keys = []
+    const escape = { key: 'Escape', preventDefault: () => keys.push('prevented') }
+    tree = render(props)
+    find(byClass('app-signals'))[0].props.onKeyDown(escape)
+    tree = render(props)
+    check('Escape closes it, taken here so the panel stays open', [keys, find((node) => node.props?.role === 'group')[0].props.hidden], [['prevented'], true])
   }
 
   console.log('\nthe store\'s box, drawn')

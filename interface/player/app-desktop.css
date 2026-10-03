@@ -1,0 +1,1034 @@
+/*
+  The desktop's frame at /player/ (2.0.0-player.19): the same app, from 1024px wide, drawn as
+  DesktopLibrary.dc.html, DesktopRequest.dc.html and DesktopRequestBonus.dc.html draw it - a sidebar
+  down the left, the page in the main area, a player bar along the bottom, and Sources and Info as a
+  side panel beside the page (a third column from 1280px, a drawer over the page's right edge below
+  that). ui/src/lib/appFrame.ts holds the rules; App puts `.app-desk` on the shell in that frame,
+  `.has-side` while a panel is a third column, and `.has-drawer` while one is a drawer over the page.
+
+  EVERY RULE HERE IS INSIDE A MEDIA QUERY FROM 1024px, and every selector but html's and :root's is
+  under `.app-desk`: below 1024px the phone app is exactly what it was - its rules, classes and
+  order untouched (tests/test_app_desktop_css.py holds the file to that). The desktop's values for
+  the look's own tokens (labels 11px, headings 13px, cards #1e1c26 ...) are theme.css section 10's,
+  redefined there in the same media query; this file adds the frame's layout, as tokens, and the
+  rules that use them. Tokens only, as app.css.
+
+  The document stays the scroller, as on a phone - so the per-tab scroll App keeps and puts back, the
+  Library's pages and every sticky bar work unchanged: the sidebar, the bar and a panel are fixed,
+  and the shell keeps room for them.
+*/
+
+@media (min-width: 1024px) {
+    :root {
+        /* the frame */
+        --app-desk-side: 232px;           /* the sidebar */
+        --app-desk-bar: 72px;             /* the player bar */
+        --app-desk-panel: 470px;          /* a side panel: Sources, Info */
+        --app-z-desk-frame: 8;            /* the sidebar and the bar: over the page, under a panel */
+        /* the main area: the page's sides (every phone rule's edge reads these), and its top */
+        --pl-edge-left: 32px;
+        --pl-edge-right: 32px;
+        --app-desk-top: 28px;
+        --app-desk-content-max: 760px;    /* a list drawn for a phone - You, Requests, Search - kept readable */
+        --app-desk-text: 14px;            /* the sidebar's items, a desktop row's words */
+        --app-desk-text-sm: 13px;         /* a desktop table's words, the meta and the bar's byline */
+        --app-desk-gap: 20px;             /* between the main area's parts */
+        --app-desk-control: 34px;         /* Get the album, the pressing, Play and Shuffle */
+        --app-desk-control-pad: 18px;
+        --app-desk-control-pad-sm: 12px;
+        --app-desk-hover: var(--dw-pressed);
+
+        /* the sidebar, as the board draws it */
+        --app-desk-side-pad-y: 20px;
+        --app-desk-side-pad-x: 12px;
+        --app-desk-side-gap: 18px;
+        --app-desk-item: 32px;
+        --app-desk-item-pad: 10px;
+        --app-desk-item-gap: 2px;
+        --app-desk-label-pad: 6px;        /* a group's label to its first item */
+        --app-desk-brand: 20px;
+        --app-desk-field: 32px;
+        --app-desk-field-icon: 15px;
+        --app-desk-field-gap: 8px;
+        --app-desk-field-text: 13px;
+        --app-desk-badge: 20px;
+        --app-desk-badge-pad: 4px;
+        --app-desk-you: 44px;
+        --app-desk-avatar: 26px;
+        --app-desk-avatar-icon: 16px;
+
+        /* the player bar */
+        --app-desk-bar-pad: 20px;
+        --app-desk-bar-side: 240px;       /* the song and the tools, at 1024-1279; 320px from 1280 */
+        --app-desk-bar-gap: 24px;
+        --app-desk-bar-cover: 48px;
+        --app-desk-bar-inner: 12px;
+        --app-desk-bar-lines: 1px;
+        --app-desk-bar-rows: 6px;         /* the transport to the scrubber */
+        --app-desk-transport-gap: 22px;
+        --app-desk-transport-icon: 22px;
+        --app-desk-play: 34px;
+        --app-desk-play-icon: 16px;
+        --app-desk-tool: 32px;
+        --app-desk-tool-icon: 18px;
+        --app-desk-tools-gap: 6px;
+        --app-desk-scrub-max: 520px;
+        --app-desk-scrub-hit: 16px;       /* the bar's own target: a pointer, not a thumb */
+        --app-desk-clock-gap: 10px;
+        --app-desk-clock: 11px;
+        --pl-scrub-track: 6px;            /* the board's thin sunken bar */
+        --pl-scrub-track-held: 8px;
+        --pl-scrub-thumb: 10px;
+
+        /* the album pages: the cover beside the title */
+        --app-desk-hero-cover: 180px;
+        --app-desk-hero-gap: 24px;
+        --app-desk-hero-lines: 6px;
+        --app-desk-actions-gap: 10px;
+        --app-desk-crumb-icon: 18px;
+
+        /* a desktop table: the board's head, its rows, and the tracklist's columns */
+        --app-desk-th: 30px;
+        --app-desk-row: 36px;
+        --app-desk-cell-pad: 10px;
+        /* the columns' words, as the board sizes them - each cell's padding added round them */
+        --app-desk-number: 32px;
+        --app-desk-against: 190px;
+        --app-desk-length: 60px;
+        --app-desk-chip: 20px;
+        --app-desk-chip-pad: 7px;
+        --app-desk-cell-gap: 8px;
+        --app-desk-picker-list: 380px;
+        --app-desk-option-pad-y: 5px;
+        --app-desk-option-pad-x: 9px;
+
+        /* the grids: Library's albums and Home's shelf, six covers across - and Arriving's three cards.
+           Beside a third column (470px of the page gone) as many as fit at the least size, never more */
+        --app-desk-columns: 6;
+        --app-desk-jobs: 3;
+        --app-desk-tile-min: 150px;       /* a cover, as small as a phone's grid draws one */
+        --app-desk-job-min: 220px;        /* an Arriving card */
+        --app-desk-grid-gap-x: 24px;
+        --app-desk-grid-gap-y: 22px;
+        --app-desk-tile-lines: 17px;
+
+        /* a side panel, as the board draws Sources */
+        --app-desk-panel-pad: 20px;
+        --app-desk-panel-gap: 14px;
+        --app-desk-close: 28px;
+        --app-desk-close-icon: 12px;
+        --app-desk-chips-gap: 6px;
+        --app-desk-chip-h: 26px;
+        --app-desk-chip-pad-x: 10px;
+        --app-desk-chip-text: 12px;
+        --app-desk-signals: 260px;
+        --app-desk-signals-gap: 8px;
+        --app-desk-signals-name: 64px;
+        --app-desk-signals-value: 30px;
+        /* a source, as its board draws it: the facts in five columns, Speed the first */
+        --app-desk-source-pad-top: 10px;
+        --app-desk-source-pad-x: 12px;
+        --app-desk-source-pad-bottom: 12px;
+        --app-desk-source-gap: 10px;
+        --app-desk-source-score-w: 34px;
+        --app-desk-source-score-h: 26px;
+        --app-desk-source-get: 26px;
+        --app-desk-source-get-pad: 16px;
+        --app-desk-source-name-gap: 8px;
+        --app-desk-facts: 1.4fr 0.85fr 1.25fr 0.75fr 0.55fr;
+        --app-desk-facts-gap: 12px;
+        --app-desk-fact-lines: 4px;
+        --app-desk-speed-text: 14px;
+        --app-desk-speed-bar: 7px;
+    }
+
+    /* keyboard focus scrolls clear of the bar - not of a tab bar that isn't there - and of the album
+       pages' back link, a breadcrumb here (its gap above, its tap target) */
+    html {
+        scroll-padding-top: calc(var(--app-desk-gap) + var(--pl-hit));
+        scroll-padding-bottom: var(--app-desk-bar);
+    }
+
+    /* ===== the frame: room for the sidebar, the bar, and a panel that is a third column ===== */
+
+    .app-desk.app-shell { padding: 0 0 var(--app-desk-bar) var(--app-desk-side); }
+    .app-desk.app-shell.has-side { padding-right: var(--app-desk-panel); }
+
+    /* ===== the sidebar ===== */
+
+    .app-desk .app-side {
+        position: fixed;
+        top: 0;
+        bottom: var(--app-desk-bar);
+        left: 0;
+        z-index: var(--app-z-desk-frame);
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-side-gap);
+        width: var(--app-desk-side);
+        padding: var(--app-desk-side-pad-y) var(--app-desk-side-pad-x);
+        overflow-x: hidden;
+        overflow-y: auto;
+        border-right: var(--dw-hairline) solid var(--dw-frame-border);
+        background: var(--dw-sidebar);
+    }
+
+    .app-desk .app-side-brand {
+        margin: 0;
+        padding: 0 var(--app-desk-item-pad);
+        font-size: var(--app-desk-brand);
+        font-weight: var(--dw-weight-bold);
+        letter-spacing: var(--dw-tracking-title);
+    }
+
+    /* the search field: a well, its edge the best match's purple while it has focus */
+    .app-desk .app-side-field {
+        display: flex;
+        align-items: center;
+        gap: var(--app-desk-field-gap);
+        height: var(--app-desk-field);
+        padding: 0 var(--app-desk-item-pad);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-well);
+        box-shadow: var(--dw-well-inset);
+        color: var(--dw-text-2);
+    }
+
+    .app-desk .app-side-field:focus-within { border-color: var(--dw-best); }
+    .app-desk .app-side-field-icon { flex: none; width: var(--app-desk-field-icon); height: var(--app-desk-field-icon); color: var(--dw-field-icon); }
+
+    .app-desk .app-side-input {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--dw-text);
+        font: inherit;
+        font-size: var(--app-desk-field-text);
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .app-desk .app-side-input::placeholder { color: var(--dw-text-2); }
+
+    .app-desk .app-side-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-item-gap);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .app-desk .app-side-group { display: flex; flex-direction: column; }
+
+    .app-desk .app-side-label {
+        margin: 0;
+        padding: 0 var(--app-desk-item-pad) var(--app-desk-label-pad);
+        color: var(--dw-text-label-color);
+        font-size: var(--dw-text-label);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-side-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--app-desk-item-pad);
+        width: 100%;
+        height: var(--app-desk-item);
+        padding: 0 var(--app-desk-item-pad);
+        border: var(--dw-hairline) solid transparent;
+        border-radius: var(--dw-radius-control);
+        color: var(--dw-text);
+        font-size: var(--app-desk-text);
+        text-align: left;
+        text-decoration: none;
+    }
+
+    .app-desk .app-side-item:hover { background: var(--app-desk-hover); }
+
+    /* where the app is: Explorer's selection */
+    .app-desk .app-side-item.is-current {
+        border-color: var(--dw-selection-border);
+        background: var(--dw-selection-bg);
+        color: var(--dw-selected-text);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-side-item:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring-inset);
+    }
+
+    .app-desk .app-side-item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Requests' count, STYLE.md's purple badge */
+    .app-desk .app-side-badge {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--app-desk-badge);
+        height: var(--app-desk-badge);
+        padding: 0 var(--app-desk-badge-pad);
+        border: var(--dw-hairline) solid var(--dw-badge-purple-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-badge-purple-bg);
+        color: var(--dw-accent-text);
+        font-size: var(--dw-text-label);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    /* You, at the foot, under a rule */
+    .app-desk .app-side-you {
+        flex: none;
+        justify-content: flex-start;
+        height: var(--app-desk-you);
+        margin-top: auto;
+        border-top-color: var(--dw-frame-border);
+        border-radius: 0;
+    }
+
+    .app-desk .app-side-you.is-current { border-radius: var(--dw-radius-control); }
+
+    .app-desk .app-side-avatar {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: var(--app-desk-avatar);
+        height: var(--app-desk-avatar);
+        border-radius: var(--dw-radius-round);
+        background: var(--dw-avatar);
+        color: var(--dw-text);
+    }
+
+    .app-desk .app-side-avatar-icon { width: var(--app-desk-avatar-icon); height: var(--app-desk-avatar-icon); }
+
+    /* ===== the player bar ===== */
+
+    .app-desk .app-playbar {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: var(--app-z-desk-frame);
+        display: grid;
+        grid-template-columns: minmax(0, var(--app-desk-bar-side)) minmax(0, 1fr) minmax(0, var(--app-desk-bar-side));
+        align-items: center;
+        gap: var(--app-desk-bar-gap);
+        height: var(--app-desk-bar);
+        padding: 0 var(--app-desk-bar-pad);
+        border-top: var(--dw-hairline) solid var(--dw-frame-border);
+        background: var(--dw-player-bar);
+    }
+
+    .app-desk .app-playbar-idle {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: var(--dw-text-3);
+        font-size: var(--app-desk-text-sm);
+        text-align: center;
+    }
+
+    .app-desk .app-playbar-now { display: flex; align-items: center; gap: var(--app-desk-bar-inner); min-width: 0; }
+
+    .app-desk .app-playbar-cover {
+        flex: none;
+        width: var(--app-desk-bar-cover);
+        height: var(--app-desk-bar-cover);
+        object-fit: cover;
+        border-radius: var(--dw-radius-cover);
+        background: var(--dw-empty-cover);
+    }
+
+    .app-desk .app-playbar-text { display: flex; flex-direction: column; gap: var(--app-desk-bar-lines); min-width: 0; }
+
+    .app-desk .app-playbar-title,
+    .app-desk .app-playbar-byline {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        line-height: var(--dw-leading-label);
+        text-align: left;
+    }
+
+    .app-desk .app-playbar-title { font-size: var(--app-desk-text); font-weight: var(--dw-weight-medium); }
+    .app-desk .app-playbar-byline { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-playbar-byline.is-link:hover { color: var(--dw-accent-text); }
+    .app-desk .app-playbar-byline.is-error { color: var(--dw-danger-text); }
+
+    .app-desk .app-playbar-byline.is-link:focus-visible,
+    .app-desk .app-playbar-button:focus-visible,
+    .app-desk .app-playbar-play:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring);
+        border-radius: var(--dw-radius-control);
+    }
+
+    .app-desk .app-playbar-play:focus-visible { border-radius: var(--dw-radius-round); }
+
+    .app-desk .app-playbar-middle {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--app-desk-bar-rows);
+        min-width: 0;
+    }
+
+    .app-desk .app-playbar-transport { display: flex; align-items: center; gap: var(--app-desk-transport-gap); }
+
+    .app-desk .app-playbar-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--dw-text);
+    }
+
+    .app-desk .app-playbar-icon { width: var(--app-desk-transport-icon); height: var(--app-desk-transport-icon); }
+
+    /* play and pause: round and white, as the board has it */
+    .app-desk .app-playbar-play {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--app-desk-play);
+        height: var(--app-desk-play);
+        border-radius: var(--dw-radius-round);
+        background: var(--dw-text);
+        color: var(--dw-bg);
+    }
+
+    .app-desk .app-playbar-play.is-busy { opacity: var(--app-job-busy); }
+    .app-desk .app-playbar-play-icon { width: var(--app-desk-play-icon); height: var(--app-desk-play-icon); }
+
+    /* Now Playing's own scrubber, its clocks at its ends: one row, the board's thin bar */
+    .app-desk .app-playbar .pl-scrubber {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: var(--app-desk-clock-gap);
+        width: 100%;
+        max-width: var(--app-desk-scrub-max);
+        margin: 0;
+    }
+
+    .app-desk .app-playbar .pl-clocks { display: contents; font-size: var(--app-desk-clock); }
+    .app-desk .app-playbar .pl-clocks > :first-child { grid-row: 1; grid-column: 1; }
+    .app-desk .app-playbar .pl-scrub { grid-row: 1; grid-column: 2; height: var(--app-desk-scrub-hit); }
+    .app-desk .app-playbar .pl-clocks > :last-child { grid-row: 1; grid-column: 3; }
+    /* the thumb shows under the pointer, held, or with keyboard focus - the board draws none at rest */
+    .app-desk .app-playbar .pl-scrub-thumb { visibility: hidden; }
+
+    .app-desk .app-playbar .pl-scrub:hover .pl-scrub-thumb,
+    .app-desk .app-playbar .pl-scrub.is-held .pl-scrub-thumb,
+    .app-desk .app-playbar .pl-scrub:focus-visible .pl-scrub-thumb { visibility: visible; }
+
+    .app-desk .app-playbar-tools {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--app-desk-tools-gap);
+        min-width: 0;
+    }
+
+    .app-desk .app-playbar-tools .app-playbar-button {
+        width: var(--app-desk-tool);
+        height: var(--app-desk-tool);
+        border-radius: var(--dw-radius-control);
+        color: var(--dw-text-2);
+    }
+
+    .app-desk .app-playbar-tools .app-playbar-button:hover { background: var(--app-desk-hover); color: var(--dw-text); }
+    .app-desk .app-playbar-tools .app-playbar-button.is-on { color: var(--dw-accent); }
+    .app-desk .app-playbar-tools .app-playbar-icon { width: var(--app-desk-tool-icon); height: var(--app-desk-tool-icon); }
+
+    /* ===== the main area: every tab's page, in the desktop's measure ===== */
+
+    .app-desk .pl-large-header { padding-top: var(--app-desk-top); }
+
+    /* You's cards at the main area's edge, as every other page's words */
+    .app-desk .app-you { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+
+    /* lists drawn for a phone stay a readable width */
+    .app-desk .app-you,
+    .app-desk .app-requests,
+    .app-desk .app-search { max-width: var(--app-desk-content-max); }
+
+    /* the Search tab's box is the sidebar's field on a desktop (app/searchBox.ts) */
+    .app-desk .app-search-form { display: none; }
+
+    /* ===== Home: its sections down the main area; the shelf a grid, six covers across ===== */
+
+    .app-desk .app-shelf {
+        display: grid;
+        grid-template-columns: repeat(var(--app-desk-columns), minmax(0, 1fr));
+        gap: var(--app-desk-grid-gap-y) var(--app-desk-grid-gap-x);
+        overflow: visible;
+        scroll-snap-type: none;
+    }
+
+    .app-desk .app-shelf-item { width: auto; }
+
+    .app-desk .app-tile-title,
+    .app-desk .app-tile-artist { line-height: var(--app-desk-tile-lines); }
+
+    /* Arriving's cards side by side */
+    .app-desk .app-arriving .app-jobs {
+        display: grid;
+        grid-template-columns: repeat(var(--app-desk-jobs), minmax(0, 1fr));
+        gap: var(--app-desk-grid-gap-x);
+    }
+
+    /* a third column beside the page takes 470px of it, and six covers in what is left were thumbnails
+       (66px at 1280): as many as fit at a cover's least size, and never more than six - each column the
+       larger of that size and a sixth of the row (and Arriving's cards, of three) */
+    .app-desk.has-side .pl-grid,
+    .app-desk.has-side .app-shelf {
+        grid-template-columns: repeat(auto-fill, minmax(max(var(--app-desk-tile-min),
+            (100% - (var(--app-desk-columns) - 1) * var(--app-desk-grid-gap-x)) / var(--app-desk-columns)), 1fr));
+    }
+
+    .app-desk.has-side .app-arriving .app-jobs {
+        grid-template-columns: repeat(auto-fill, minmax(max(var(--app-desk-job-min),
+            (100% - (var(--app-desk-jobs) - 1) * var(--app-desk-grid-gap-x)) / var(--app-desk-jobs)), 1fr));
+    }
+
+    /* ===== the Library: the view's name, its sort and count on the title's row, the grid six across ===== */
+
+    .app-desk .pl-library {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+    }
+
+    .app-desk .pl-library > * { grid-column: 1 / -1; }
+    .app-desk .pl-library > .pl-large-header { grid-column: 1; }
+    /* the views are the sidebar's */
+    .app-desk .pl-library > .app-library-views { display: none; }
+
+    .app-desk .pl-library > .app-library-bar {
+        grid-column: 2;
+        gap: var(--app-desk-control-pad-sm);
+        padding: var(--app-desk-top) var(--pl-edge-right) var(--pl-gap-xs) 0;
+    }
+
+    .app-desk .app-library-count { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+
+    /* the sort: STYLE.md's secondary button, holding the platform's own picker */
+    .app-desk .app-sort {
+        height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad-sm);
+        border: var(--dw-hairline) solid var(--dw-secondary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-secondary-bg);
+        box-shadow: var(--dw-highlight);
+        color: var(--dw-text-on-secondary);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .pl-grid {
+        grid-template-columns: repeat(var(--app-desk-columns), minmax(0, 1fr));
+        gap: var(--app-desk-grid-gap-y) var(--app-desk-grid-gap-x);
+        padding-top: var(--app-desk-gap);
+    }
+
+    .app-desk .pl-album-title,
+    .app-desk .pl-album-artist { line-height: var(--app-desk-tile-lines); }
+
+    .app-desk .app-library-list { max-width: var(--app-desk-content-max); }
+
+    /* ===== the album pages - the one you have and the one you don't: the cover beside the title ===== */
+
+    /* the back link, a breadcrumb at the top of the main area */
+    .app-desk .pl-nav-bar { padding: var(--app-desk-gap) var(--pl-edge-right) 0 var(--pl-edge-left); }
+    .app-desk .pl-back { font-size: var(--app-desk-text); }
+    .app-desk .pl-back-icon { width: var(--app-desk-crumb-icon); height: var(--app-desk-crumb-icon); }
+
+    /* the words beside the cover, at its foot as the board sets them */
+    .app-desk .pl-album-hero {
+        position: relative;
+        justify-content: flex-end;
+        align-items: flex-start;
+        gap: var(--app-desk-hero-lines);
+        min-height: calc(var(--app-desk-hero-cover) + 2 * var(--app-desk-gap));
+        padding: var(--app-desk-gap) var(--pl-edge-right) var(--app-desk-gap)
+            calc(var(--pl-edge-left) + var(--app-desk-hero-cover) + var(--app-desk-hero-gap));
+        text-align: left;
+    }
+
+    .app-desk .pl-hero-cover {
+        position: absolute;
+        bottom: var(--app-desk-gap);
+        left: var(--pl-edge-left);
+        width: var(--app-desk-hero-cover);
+    }
+
+    .app-desk .pl-hero-title,
+    .app-desk .pl-hero-meta { margin: 0; }
+    .app-desk .pl-hero-title { letter-spacing: var(--dw-tracking-title); }
+    .app-desk .pl-hero-meta { font-size: var(--app-desk-text-sm); }
+
+    /* Play and Shuffle, a row of the board's 34px buttons */
+    .app-desk .pl-hero-actions {
+        display: flex;
+        gap: var(--app-desk-actions-gap);
+        width: auto;
+        max-width: none;
+        margin-top: var(--app-desk-actions-gap);
+    }
+
+    .app-desk .pl-pill {
+        height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad);
+        font-size: var(--app-desk-text);
+    }
+
+    .app-desk .pl-tracks { margin-top: var(--app-desk-gap); }
+    .app-desk .pl-track { min-height: var(--app-desk-row); }
+    .app-desk .pl-track-title { font-size: var(--app-desk-text); }
+
+    .app-desk .pl-track-number,
+    .app-desk .pl-track-time { font-size: var(--dw-text-data); }
+
+    /* ===== the album you don't have: Get, the pressing inline after it, and the table ===== */
+
+    /* Its header is a grid - the cover, and beside it the title, the artist and the line - so Get and the
+       pressing can sit UNDER the cover, at the main area's edge: a drawer (1024-1279px) covers the page
+       from 322px in at 1024, and beside the cover they start at 236px. From 1280px the panel is a column
+       the page makes room for, and they go back beside the cover under the line, as the board draws them. */
+    .app-desk .app-rg .pl-album-hero {
+        display: grid;
+        grid-template-columns: var(--app-desk-hero-cover) minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto auto auto auto;
+        justify-content: normal;
+        justify-items: start;
+        column-gap: var(--app-desk-hero-gap);
+        row-gap: var(--app-desk-hero-lines);
+        padding-left: var(--pl-edge-left);
+    }
+
+    .app-desk .app-rg .pl-hero-cover {
+        position: static;
+        grid-column: 1;
+        grid-row: 1 / 5;
+        align-self: end;
+        width: 100%;
+    }
+
+    .app-desk .app-rg .pl-hero-title { grid-column: 2; grid-row: 2; }
+    .app-desk .app-rg .pl-hero-artist { grid-column: 2; grid-row: 3; }
+    .app-desk .app-rg .pl-hero-meta { grid-column: 2; grid-row: 4; }
+    .app-desk .app-rg .app-rg-actions { grid-column: 1 / -1; grid-row: 5; justify-self: stretch; }
+
+    /* a drawer open over the page: they keep to the part left in view (the hero's width, less the
+       drawer's reach into it and a gap) - the pressing wrapping under Get, its label shortened, and its
+       list as wide as it is */
+    .app-desk.has-drawer .app-rg .app-rg-actions {
+        max-width: calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap));
+    }
+
+    .app-desk.has-drawer .app-rg .app-picker { flex: 1 1 auto; }
+    .app-desk.has-drawer .app-rg .app-picker-popover { right: 0; width: auto; }
+
+    .app-desk .app-rg-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        align-self: stretch;
+        gap: var(--app-desk-actions-gap);
+        width: auto;
+        max-width: none;
+        margin-top: var(--app-desk-actions-gap);
+    }
+
+    /* what is already here of the pressing: under both, the row's whole width */
+    .app-desk .app-rg-store { flex-basis: 100%; }
+    .app-desk .app-rg-store:empty { margin-top: calc(-1 * var(--app-desk-actions-gap)); }
+
+    .app-desk .app-rg-get {
+        width: auto;
+        min-height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad);
+        font-size: var(--app-desk-text);
+    }
+
+    .app-desk .app-rg-get-icon { display: none; }
+
+    /* pressed while the panel shows its sources: the toggled tint - the best match's Get is then the
+       screen's one solid purple button */
+    .app-desk .app-rg-get[aria-pressed="true"] {
+        border-color: var(--dw-toggled-border);
+        background: var(--dw-toggled-bg);
+        box-shadow: none;
+        color: var(--dw-accent-text);
+    }
+
+    /* the pressing: "Pressing CD · 2020 · Island" on one line, its list a desktop list under it - and
+       never wider than its row: a flex item is otherwise as wide as its whole label, and the label's
+       ellipsis never comes */
+    .app-desk .app-picker { min-width: 0; max-width: 100%; }
+
+    .app-desk .app-picker-button {
+        min-height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad-sm);
+    }
+
+    .app-desk .app-picker-button .app-picker-text { flex-direction: row; align-items: baseline; gap: var(--app-desk-field-gap); }
+    .app-desk .app-picker-label { font-size: var(--app-desk-text-sm); }
+    .app-desk .app-picker-value { font-size: var(--app-desk-text-sm); }
+
+    .app-desk .app-picker-popover {
+        right: auto;
+        width: var(--app-desk-picker-list);
+    }
+
+    .app-desk .app-picker-option {
+        min-height: var(--pl-hit);
+        padding: var(--app-desk-option-pad-y) var(--app-desk-option-pad-x);
+        border: var(--dw-hairline) solid transparent;
+    }
+
+    .app-desk .app-picker-option:hover { background: var(--app-desk-hover); }
+    .app-desk .app-picker-option.is-selected { border-color: var(--dw-selection-border); background: var(--dw-selected-row); }
+    .app-desk .app-picker-option-label { font-size: var(--app-desk-text); }
+
+    /* the tracklist: "Tracklist" and how this pressing compares, then the table */
+    .app-desk .app-rg-desk { padding-top: var(--app-desk-gap); }
+
+    .app-desk .app-rg-desk-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--pl-gap-xs) var(--app-desk-control-pad-sm);
+        padding-bottom: var(--app-desk-cell-gap);
+    }
+
+    .app-desk .app-rg-desk-title {
+        margin: 0;
+        color: var(--dw-text-heading-color);
+        font-size: var(--dw-text-heading);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-rg-desk .app-rg-summary { padding: 0; font-size: var(--dw-text-label); }
+
+    .app-desk .app-rg-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-rg-table th,
+    .app-desk .app-rg-table td {
+        padding: 0 var(--app-desk-cell-pad);
+        overflow: hidden;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-desk .app-rg-table thead th {
+        height: var(--app-desk-th);
+        border-bottom: var(--dw-hairline) solid var(--dw-border);
+        color: var(--dw-text-label-color);
+        font-size: var(--dw-text-label);
+        font-weight: var(--dw-weight-regular);
+    }
+
+    .app-desk .app-rg-table td { height: var(--app-desk-row); border-bottom: var(--dw-hairline) solid var(--dw-row-border); }
+
+    .app-desk .app-rg-table .app-rg-number {
+        width: calc(var(--app-desk-number) + 2 * var(--app-desk-cell-pad));
+        color: var(--dw-text-3);
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-data);
+        text-align: right;
+    }
+
+    .app-desk .app-rg-table .app-rg-length {
+        width: calc(var(--app-desk-length) + 2 * var(--app-desk-cell-pad));
+        color: var(--dw-text-2);
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-data);
+    }
+
+    .app-desk .app-rg-table.has-against thead th:nth-child(3) { width: calc(var(--app-desk-against) + 2 * var(--app-desk-cell-pad)); }
+    .app-desk .app-rg-table .app-rg-title { font-size: var(--app-desk-text-sm); }
+
+    /* the chip a box, and the note plain text after it - never a box of its own, which an ellipsis
+       would hide whole rather than shorten (the cell's title holds the whole note) */
+    .app-desk .app-rg-against .app-rg-chip {
+        display: inline-flex;
+        vertical-align: middle;
+        height: var(--app-desk-chip);
+        margin-right: var(--app-desk-cell-gap);
+        padding: 0 var(--app-desk-chip-pad);
+        border-radius: var(--dw-radius-tag);
+        font-size: var(--dw-text-label);
+    }
+
+    .app-desk .app-rg-against .app-rg-note { display: inline; color: var(--dw-text-2); font-size: var(--dw-text-label); }
+
+    /* a marked track's row, tinted as on a phone - and its chip green for a Bonus track */
+    .app-desk .app-rg-row.is-bonus td { background: var(--dw-tint-green); }
+
+    .app-desk .app-rg-row.is-version td,
+    .app-desk .app-rg-row.is-renamed td { background: var(--dw-tint-amber); }
+
+    .app-desk .app-rg-row.is-bonus .app-rg-chip {
+        border-color: var(--dw-badge-green-border);
+        background: var(--dw-badge-green-bg);
+        color: var(--dw-badge-green-text);
+    }
+
+    .app-desk .app-rg-row.is-left .app-rg-title { color: var(--dw-text-3); }
+
+    .app-desk .app-rg-table-disc th {
+        height: var(--app-desk-row);
+        color: var(--dw-text-2);
+        font-size: var(--dw-text-label);
+        font-weight: var(--dw-weight-semibold);
+        vertical-align: bottom;
+    }
+
+    .app-desk .app-rg-left-title { margin-bottom: var(--app-desk-cell-gap); }
+
+    /* ===== a side panel: Sources and Info beside the page, never over it as a sheet ===== */
+
+    .app-desk .app-layer.is-panel {
+        inset: 0 0 var(--app-desk-bar) auto;
+        width: var(--app-desk-panel);
+        max-width: 100%;
+    }
+
+    /* a third column appears in its place, the page making room; a drawer slides over the page's edge */
+    .app-desk .app-layer.is-column { transition: none; }
+    .app-desk .app-layer.is-panel .app-backdrop { display: none; }
+
+    .app-desk .app-layer.is-panel .app-sources,
+    .app-desk .app-layer.is-panel .app-info {
+        inset: 0;
+        max-width: none;
+        margin: 0;
+        padding: var(--app-desk-panel-pad) var(--app-desk-panel-pad) 0;
+        border-left: var(--dw-hairline) solid var(--dw-frame-border);
+        border-radius: 0;
+        background: var(--dw-side-panel);
+        box-shadow: none;
+        transform: translateX(100%);
+    }
+
+    .app-desk .app-layer.is-panel.is-open .app-sources,
+    .app-desk .app-layer.is-panel.is-open .app-info { transform: none; }
+
+    /* the box takes focus from a click on something in it that can't (so Escape there is from inside
+       it) - a click, never a ring: it isn't in the tab order */
+    .app-desk .app-layer.is-panel .app-sources:focus,
+    .app-desk .app-layer.is-panel .app-info:focus { outline: none; }
+
+    .app-desk .app-layer.is-column .app-sources,
+    .app-desk .app-layer.is-column .app-info { transition: none; }
+
+    .app-desk .app-layer.is-panel .app-sources { gap: var(--app-desk-panel-gap); }
+
+    /* the board's head: "Sources", what they are for under it, and a close button */
+    .app-desk .app-sources-head.is-panel {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--app-desk-panel-gap);
+    }
+
+    .app-desk .app-sources-heading { display: flex; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+
+    .app-desk .app-sources-head.is-panel .app-sources-title {
+        color: var(--dw-text-heading-color);
+        font-size: var(--dw-text-heading);
+        text-align: left;
+    }
+
+    .app-desk .app-sources-head.is-panel .app-sources-subtitle {
+        font-size: var(--dw-text-label);
+        text-align: left;
+    }
+
+    .app-desk .app-sources-close {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: var(--app-desk-close);
+        height: var(--app-desk-close);
+        border: var(--dw-hairline) solid var(--dw-secondary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-secondary-bg);
+        box-shadow: var(--dw-highlight);
+        color: var(--dw-text-on-secondary);
+    }
+
+    .app-desk .app-sources-close:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring);
+    }
+
+    .app-desk .app-sources-close-icon { width: var(--app-desk-close-icon); height: var(--app-desk-close-icon); }
+
+    /* the chips, the board's 26px */
+    .app-desk .app-layer.is-panel .app-sources-chips { column-gap: var(--app-desk-chips-gap); }
+
+    .app-desk .app-layer.is-panel .app-chip {
+        height: var(--app-desk-chip-h);
+        padding: 0 var(--app-desk-chip-pad-x);
+        font-size: var(--app-desk-chip-text);
+    }
+
+    /* Signals: the chip, and its sliders under it */
+    .app-desk .app-signals { position: relative; }
+
+    .app-desk .app-signals-popover {
+        position: absolute;
+        top: calc(100% + var(--app-picker-drop));
+        right: 0;
+        z-index: var(--app-z-popover);
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-signals-gap);
+        width: var(--app-desk-signals);
+        padding: var(--app-desk-source-gap);
+        border: var(--dw-hairline) solid var(--dw-popover-border);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-popover);
+        box-shadow: var(--dw-highlight), var(--dw-shadow);
+    }
+
+    .app-desk .app-signals-row {
+        display: grid;
+        grid-template-columns: var(--app-desk-signals-name) minmax(0, 1fr) var(--app-desk-signals-value);
+        align-items: center;
+        gap: var(--app-desk-signals-gap);
+        font-size: var(--app-desk-chip-text);
+    }
+
+    .app-desk .app-signals-name { color: var(--dw-text-2); }
+    .app-desk .app-signals-range { width: 100%; accent-color: var(--dw-accent); }
+    .app-desk .app-signals-value { color: var(--dw-text-on-secondary); text-align: right; }
+
+    .app-desk .app-signals-reset {
+        align-self: flex-end;
+        color: var(--dw-accent);
+        font-size: var(--app-desk-chip-text);
+    }
+
+    .app-desk .app-signals-reset:focus-visible,
+    .app-desk .app-signals-range:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring);
+    }
+
+    /* a source, as its board draws it: the folder and its peer on one line, then the facts in five
+       columns under a rule - Speed the first of them, its number, its bar and what it is */
+    .app-desk .app-layer.is-panel .app-source {
+        display: grid;
+        grid-template-columns: var(--app-desk-facts);
+        gap: var(--app-desk-source-gap) var(--app-desk-facts-gap);
+        padding: var(--app-desk-source-pad-top) var(--app-desk-source-pad-x) var(--app-desk-source-pad-bottom);
+    }
+
+    .app-desk .app-layer.is-panel .app-source-top {
+        grid-column: 1 / -1;
+        gap: var(--app-desk-source-gap);
+        padding-bottom: var(--app-desk-source-gap);
+        border-bottom: var(--dw-hairline) solid var(--dw-border);
+    }
+
+    .app-desk .app-layer.is-panel .app-source-score {
+        width: var(--app-desk-source-score-w);
+        height: var(--app-desk-source-score-h);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-layer.is-panel .app-source-name { flex-direction: row; align-items: baseline; gap: var(--app-desk-source-name-gap); }
+    .app-desk .app-layer.is-panel .app-source-folder { font-size: var(--app-desk-text-sm); }
+    .app-desk .app-layer.is-panel .app-source-peer { flex: none; font-size: var(--dw-text-label); }
+
+    .app-desk .app-layer.is-panel .app-source-get {
+        height: var(--app-desk-source-get);
+        padding: 0 var(--app-desk-source-get-pad);
+    }
+
+    .app-desk .app-layer.is-panel .app-source-speed {
+        grid-row: 2;
+        grid-column: 1;
+        gap: var(--app-desk-fact-lines);
+        padding: 0;
+        background: none;
+    }
+
+    .app-desk .app-layer.is-panel .app-source-speed-line,
+    .app-desk .app-layer.is-panel .app-source-speed-value,
+    .app-desk .app-layer.is-panel .app-source-facts { display: contents; }
+
+    .app-desk .app-layer.is-panel .app-source-speed .app-source-label { order: 1; }
+    .app-desk .app-layer.is-panel .app-source-speed-text { order: 2; font-size: var(--app-desk-speed-text); }
+    .app-desk .app-layer.is-panel .app-source-bar { order: 3; height: var(--app-desk-speed-bar); }
+    .app-desk .app-layer.is-panel .app-source-speed-note { order: 4; }
+
+    /* each column at least its value's longest word (the phone's `min-width: 0` lets a column shrink
+       under its words, and they ran over the next one and out of the card), and a value longer than
+       its column wraps between words, as the board's Quality does - "FLAC 16-24/44.1-96", "12 ahead" */
+    .app-desk .app-layer.is-panel .app-source-fact { grid-row: 2; gap: var(--app-desk-fact-lines); min-width: auto; }
+
+    .app-desk .app-layer.is-panel .app-source-value {
+        font-size: var(--dw-text-data);
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+    .app-desk .app-layer.is-panel .app-source-missing { grid-column: 1 / -1; font-size: var(--dw-text-data); }
+}
+
+/* A FINGER, NOT A POINTER YOU AIM: an iPad on its side is 1024px wide and more, and gets this frame.
+   The board's sizes are a mouse's - a 16px scrubber 6px under a 22px Previous - so where the pointer
+   is coarse every target is Apple's 44px (the phone's --pl-hit): the bar's transport, its scrubber and
+   its tools, the sidebar's items, a table's and a tracklist's rows, Get and the pressing, a panel's
+   close button, chips and a source's Get. The bar grows to hold the transport over the scrubber, each
+   a whole target and neither lying over the other, and keeps clear of the home indicator. And the
+   sidebar's field stays at the phone's 17px, or iOS zooms the page into it. */
+@media (min-width: 1024px) and (pointer: coarse) {
+    :root {
+        --app-desk-bar-touch: 100px;      /* the transport's 44px over the scrubber's 44px, and room round them */
+        --app-desk-bar: calc(var(--app-desk-bar-touch) + var(--pl-safe-bottom));
+        --app-desk-bar-rows: 0px;
+        --app-desk-scrub-hit: var(--pl-hit);
+        --app-desk-play: var(--pl-hit);
+        --app-desk-tool: var(--pl-hit);
+        --app-desk-item: var(--pl-hit);
+        --app-desk-row: var(--pl-hit);
+        --app-desk-control: var(--pl-hit);
+        --app-desk-close: var(--pl-hit);
+        --app-desk-chip-h: var(--pl-hit);
+        --app-desk-source-get: var(--pl-hit);
+    }
+
+    .app-desk .app-side-input { font-size: var(--dw-text-body); }
+    .app-desk .app-playbar { padding-bottom: var(--pl-safe-bottom); }
+    /* Previous and Next: their 22px glyph in a box a finger can find */
+    .app-desk .app-playbar-transport .app-playbar-button { min-width: var(--pl-hit); min-height: var(--pl-hit); }
+}
+
+/* from 1280px the bar's two sides have the board's room, and a panel is a third column (App's
+   `.has-side`, `.is-column`) - so the album you don't have's Get and pressing go back beside the cover,
+   under the line, the cover's foot level with theirs */
+@media (min-width: 1280px) {
+    :root { --app-desk-bar-side: 320px; }
+
+    .app-desk .app-rg .pl-hero-cover { grid-row: 1 / -1; }
+    .app-desk .app-rg .app-rg-actions { grid-column: 2; }
+}

@@ -94,6 +94,20 @@
  *    moment) so Pinned landing moves nothing; Not played in a while draws only the newest answer
  *    (latestOnly). The menu's pin closes the menu and saves. Edit's drag is the grip's alone and never
  *    reorders the list under the pointer.
+ *  - The desktop frame (2.0.0-player.19): from 1024px the same App draws a sidebar, a player bar
+ *    and side panels - chosen BELOW the engine (useFrame, after usePlayer), so crossing 1024px swaps
+ *    the chrome around the panes (each keyed on its tab, in the same place) and never runs the engine
+ *    again. The player bar is the one more file on the list below (player/PlayerBar.tsx: its
+ *    transport, from the click). Into the desktop Now Playing closes, and nothing on a desktop opens
+ *    it - the mini player is its only opener and isn't drawn there - so the turntable is the phone's
+ *    alone. Sources and Info are side panels there, NOT modal: nothing behind them goes inert and no
+ *    scroll lock is taken (useSheet's `modal`), Escape closes one only from inside it, and one shows
+ *    at a time - the player bar's Info, pressed again, closing its own; which shows makes room for a
+ *    column (`.has-side`) or marks a drawer (`.has-drawer`), and the Info drawer goes as Go to album
+ *    or Info's artist opens a page under it. The album you don't have follows the pressing with the
+ *    panel open for it, searching again for each (`again`: no pick) - App handing it the pressing the
+ *    panel searched, not just the album. The sidebar's Managing reads /deadwax/me (latestOnly). The sidebar reaches no playback action, and its one link
+ *    opens beside the app.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -170,6 +184,8 @@ const ALLOWED = {
   'app/ArtistPage.tsx': ['playTracks'],
   //? a Done row's ▶ on Requests, since 2.0.0-player.17: its album, in hand, else it opens it
   'app/Requests.tsx': ['playTracks'],
+  //? the desktop's player bar, since 2.0.0-player.19: its transport and AirPlay, from the click
+  'player/PlayerBar.tsx': ['toggle', 'next', 'previous', 'showAirPlay'],
   //? names them for ActionsContext and calls none (pickActions)
   'app/context.ts': ['playTracks', 'toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
 }
@@ -245,6 +261,7 @@ console.log('\nthe playback actions only from the files allowed')
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
     'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
+    'player/PlayerBar.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
     'player/Turntable.tsx': ['toggle'],
   })
   check('app/context.ts names them and calls none',
@@ -293,8 +310,9 @@ console.log('\nan album page is memoised on what it reads of the player')
   const app = code(read('app/App.tsx'))
   //? usePlayer returns a new object on every render, so a memo keyed on `player` held for no poll
   check('the pages are memoised on the playing song and whether it plays - never the whole player',
-    //? (2.0.0-player.15: and the Sources sheet and whether the app is in front, which the group page's `shown` reads)
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? (2.0.0-player.15: and the Sources sheet and whether the app is in front, which the group page's `shown` reads;
+    //? 2.0.0-player.19: and the frame, and which album - and pressing - a desktop's Sources panel shows)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -323,9 +341,10 @@ console.log('\na link out of the app opens beside it')
 {
   const out = files.filter(APP_SIDE).flatMap((file) => linksOut(code(read(file))).map((tag) => [file, tag]))
   check('every one opens in a new tab, rel="noopener"', out.filter(([, tag]) => !opensBeside(tag)), [])
-  //? the Search placeholder's link went with it in 2.0.0-player.13 (Requests' in .12)
-  check('...and there are links to look at (You, the gate)',
-    [...new Set(out.map(([file]) => file))].sort(), ['app/NeedsNavidrome.tsx', 'app/You.tsx'])
+  //? the Search placeholder's link went with it in 2.0.0-player.13 (Requests' in .12); the desktop
+  //? sidebar's Managing link came in 2.0.0-player.19
+  check('...and there are links to look at (You, the gate, the desktop sidebar)',
+    [...new Set(out.map(([file]) => file))].sort(), ['app/NeedsNavidrome.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -335,7 +354,8 @@ console.log('\nNow Playing covers everything behind it')
   const behind = /<div class="app-behind" aria-hidden=\{covered\} inert=\{covered\}>([\s\S]*?)<\/div>\s*(?:\{(?:\/\*[\s\S]*?\*\/)?\}\s*)?<Sources\b[^\n]*\/>\s*<NowPlaying/.exec(app)
   check('the panes, the mini player and the tab bar are inside one inert wrapper',
     [!!behind, /TABS\.map/.test(behind?.[1] ?? ''), /<MiniPlayer\b/.test(behind?.[1] ?? ''), /<TabBar\b/.test(behind?.[1] ?? '')], [true, true, true, true])
-  check('...inert while Now Playing or the Sources sheet shows', /const covered = sheetOpen \|\| sourcesOpen\b/.test(app), true)
+  //? 2.0.0-player.19: on a phone - a desktop's side panel leaves the page beside it as it is
+  check('...inert while Now Playing or the Sources sheet shows, on a phone', /const covered = !desktop && \(sheetOpen \|\| sourcesOpen\)/.test(app), true)
   check('...which the Sources sheet, Now Playing, its menu and Info are not in',
     /<\/div>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<Sources\b[^\n]*\/>\s*<NowPlaying\b[\s\S]*?\/>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<ActionMenu\b[\s\S]*?\/>\s*<InfoSheet\b[\s\S]*?\/>\s*<\/div>\s*<\/ActionsContext/.test(read('app/App.tsx')), true)
   const sheet = code(read('player/NowPlaying.tsx'))
@@ -363,12 +383,16 @@ console.log('\nevery sheet is a sheet by the one hook')
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
   check('the menu, Info and the sources close on their backdrop',
     ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true])
-  check('the hook: the lock on <html>, focus in, focus back, Escape for the one on top',
-    [/document\.documentElement\.classList\.toggle\(lockClass, open\)/.test(hook),
+  //? (2.0.0-player.19: a desktop's side panel is no sheet over the page - no lock - and Escape closes
+  //? it only from inside it; a sheet is modal unless it says otherwise)
+  check('the hook: the lock on <html> (a sheet\'s, never a panel\'s), focus in, focus back, Escape for the one on top',
+    [/document\.documentElement\.classList\.toggle\(lockClass, open && modal\)/.test(hook) && /modal = true,/.test(hook),
       /first\.current\?\.focus\(/.test(hook),
       /opener\?\.current\?\.focus\(/.test(hook),
       /if \(!open \|\| covered\) return/.test(hook) && /event\.key !== 'Escape'/.test(hook)], [true, true, true, true])
   check('an opener focuses itself before it is taken (the WebKit rule)', /target\.focus\(\{ preventScroll: true \}\)\s*return target/.test(hook), true)
+  check('a panel beside the page closes on Escape only from inside it (2.0.0-player.19)',
+    /if \(!modal && area\?\.current && !area\.current\.contains\(event\.target as Node \| null\)\) return/.test(hook), true)
   const app = code(read('app/App.tsx'))
   //? each element's own props, up to its `/>`, so a check can't be answered by the NEXT element's
   //? props (App's props for these hold no '>'; one that did would fail here, loudly)
@@ -379,10 +403,13 @@ console.log('\nevery sheet is a sheet by the one hook')
   check('the ••• button is the menu\'s opener and Info\'s',
     [/const openMenu = useCallback\(\(event: MouseEvent\) => \{\s*moreOpener\.current = takeOpener\(event\)/.test(app),
       has('ActionMenu', /\bopener=\{over === 'info' \? undefined : moreOpener\}/),
-      has('InfoSheet', /\bopener=\{moreOpener\}/)], [true, true, true])
-  check('never both over Now Playing, and neither without it',
-    [has('ActionMenu', /\bopen=\{sheetOpen && over === 'menu'\}/), has('InfoSheet', /\bopen=\{sheetOpen && over === 'info'\}/),
-      has('NowPlaying', /\bcovered=\{over !== 'none'\}/)], [true, true, true])
+      //? 2.0.0-player.19: a desktop's Info panel gives focus back to the player bar's Info
+      has('InfoSheet', /\bopener=\{desktop \? infoOpener : moreOpener\}/)], [true, true, true])
+  //? 2.0.0-player.19: on a desktop Info is the side panel the player bar opens, with no Now Playing
+  check('never both over Now Playing, and neither without it - on a phone',
+    [has('ActionMenu', /\bopen=\{sheetOpen && over === 'menu'\}/), has('InfoSheet', /\bopen=\{infoOpen\}/),
+      /const infoOpen = desktop \? infoPanel : sheetOpen && over === 'info'/.test(app),
+      has('NowPlaying', /\bcovered=\{over !== 'none'\}/)], [true, true, true, true])
   //? "Go to album", from the menu, the album line and Info's card alike: every sheet closes (with no
   //? focus sent back to ••• in a sheet that is going), and the album opens on the tab showing
   const going = /const goToAlbum = \(track[^)]*\) => \{([\s\S]*?)\n  \}/.exec(app)?.[1] ?? ''
@@ -624,8 +651,8 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
     [true, true, true, true, true])
   check('a download asked for: the sheet goes, focus with nowhere to land, and Requests shows at its root',
     /const gotten = useCallback\(\(\) => \{\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*router\.root\('requests'\)/.test(app), true)
-  check('...the Sources element handed that, its opener and its own open',
-    /<Sources open=\{sourcesOpen\} request=\{getting\} opener=\{sourcesOpener\} onClose=\{closeSources\} onQueued=\{gotten\} \/>/.test(app), true)
+  check('...the Sources element handed that, its opener, its own open and how it is drawn (2.0.0-player.19)',
+    /<Sources open=\{sourcesOpen\} request=\{getting\} opener=\{sourcesOpener\} onClose=\{closeSources\} onQueued=\{gotten\} panel=\{panel\} \/>/.test(app), true)
   check('a card\'s Get asks for the download, then hands over - in the tap, nothing awaited',
     [/onClick=\{\(\) => onGet\(candidate\)\}/.test(card), /const get = \(candidate: Candidate\) => \{\s*if \(state\.download\(candidate, shown\)\) onQueued\(\)\s*\}/.test(sheet)], [true, true])
   const ask = /function ask\([^)]*\): boolean \{([\s\S]*?)\n  \}/.exec(hook)?.[1] ?? ''
@@ -652,7 +679,9 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
       /const top = sortCandidates\(passing, 'score'\)\[0\]/.test(sheet), /best=\{index === 0\}/.test(sheet), /is-primary|app-primary/.test(sheet)], [true, true, true, false, false])
   //? review: the two sheets never stack, however late a chip's lookup lands
   check('a chip\'s lookup is called off when Search\'s root stops being what shows, and Sources never opens over Now Playing',
-    [/const searchActive = nav\.tab === 'search' && nav\.stacks\.search\.length === 0 && !sheetOpen && !sourcesOpen/.test(app), /<Search\b[^>]*\bactive=\{searchActive\}/.test(app),
+    //? (2.0.0-player.19: the Sources SHEET - a phone's; a desktop's panel leaves Search's root showing)
+    [/const searchActive = nav\.tab === 'search' && nav\.stacks\.search\.length === 0 && !sheetOpen && !sourcesOver/.test(app) && /const sourcesOver = sourcesOpen && !desktop/.test(app),
+      /<Search\b[^>]*\bactive=\{searchActive\}/.test(app),
       /useEffect\(\(\) => \{\s*if \(!active\) standDown\(\)\s*\}, \[active\]\)/.test(search), /function standDown\(\) \{\s*getRequests\.supersede\(\)\s*setResolving\(null\)/.test(search),
       /const openSources = useCallback\([^)]*\) => \{\s*if \(nowPlayingOpen\.current\) return/.test(app), /nowPlayingOpen\.current = sheetOpen/.test(app)],
     [true, true, true, true, true, true])
@@ -660,7 +689,7 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
     [/const onClose = \(\) => \{\s*state\.stop\(\)\s*closeSheet\(\)\s*\}/.test(sheet), /useSheet\(\{ open, onClose, lockClass: 'app-sources-open'/.test(sheet),
       /onClose: closeSheet,/.test(sheet), /if \(!open\) state\.stop\(\)/.test(sheet)], [true, true, true, true])
   check('the album page is told whether it is what shows, and asks the store again as it comes back - Get above what is already here',
-    [/shown=\{pageShown && nav\.tab === tab && !sourcesOpen\}/.test(app), /\}, \[chosen\?\.id, group\?\.id, filed, shown\]\)/.test(page), /if \(!shown\) return/.test(page),
+    [/shown=\{pageShown && nav\.tab === tab && !sourcesOver\}/.test(app), /\}, \[chosen\?\.id, group\?\.id, filed, shown\]\)/.test(page), /if \(!shown\) return/.test(page),
       page.indexOf('class="app-rg-get"') < page.indexOf('class="app-rg-store"'), /setStore\(null\)/.test(page)], [true, true, true, true, false])
 }
 
@@ -688,7 +717,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   const app = code(read('app/App.tsx'))
   check('App: an artist Navidrome knows inside the gate, one MusicBrainz knows outside it, told whether it shows',
     [/return page\.id\.startsWith\(MB_PREFIX\) \? artist : \(\s*<NeedsNavidrome\b/.test(app), /page\.kind === 'artist' \? artistView\(tab, page\)/.test(app),
-      /<ArtistPage\b[\s\S]*?shown=\{pageShown && nav\.tab === tab && !sourcesOpen\}[\s\S]*?onGet=\{openSources\}/.test(app)],
+      /<ArtistPage\b[\s\S]*?shown=\{pageShown && nav\.tab === tab && !sourcesOver\}[\s\S]*?onGet=\{openSources\}/.test(app)],
     [true, true, true])
 
   const requests = code(read('app/Requests.tsx'))
@@ -701,7 +730,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   check('...the first few asked for ahead (KEPT), only while the tab\'s root shows - never as the app starts - and looked for again when due',
     [/const request = period\.current\s*if \(!active \|\| !request \|\| !ahead\.length\) return\s*const \{ look, songs, nextIn \} = doneLooks\(/.test(requests),
       /prefetchAlbum\(album, true, fresh\)/.test(requests), /setTimeout\(\(\) => setDue\(\(count\) => count \+ 1\), nextIn\)/.test(requests),
-      /active=\{requestsActive\}/.test(app), /const requestsActive = watching === 'requests' && !sourcesOpen/.test(app), /requestsSeen/.test(app)],
+      /active=\{requestsActive\}/.test(app), /const requestsActive = watching === 'requests' && !sourcesOver/.test(app), /requestsSeen/.test(app)],
     [true, true, true, true, true, false])
   check('...a tap\'s look called off as the tab stops showing, and one answering late opens nothing',
     [/\} else \{\s*aheadRequests\.supersede\(\)\s*period\.current = null\s*openRequests\.supersede\(\)\s*setOpening\(null\)/.test(requests), /if \(showing\.current\) onOpenAlbum\(/.test(requests)],
@@ -730,7 +759,8 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   check('Library\'s rows navigate: nothing there reaches a playback action, as a tile', [actionsIn(code(read('player/Library.tsx'))), actionsIn(code(read('app/LibraryViews.tsx')))], [[], []])
   const library = code(read('player/Library.tsx'))
   check('Songs only where Navidrome\'s empty search lists songs: asked once, for one, the chip left out on an empty answer (and the albums shown)',
-    [/librarySongs\(0, 1, request\.signal\)\.then\(\s*\(songs\) => \{\s*if \(request\.current\(\)\) setHasSongs\(songs\.length > 0\)/.test(library),
+    //? (2.0.0-player.19: told to the Library's store, app/libraryPick.ts, which the desktop sidebar reads too)
+    [/librarySongs\(0, 1, request\.signal\)\.then\(\s*\(songs\) => \{\s*if \(request\.current\(\)\) setLibrarySongs\(songs\.length > 0\)/.test(library),
       /const views = VIEWS\.filter\(\(entry\) => entry\.id !== 'songs' \|\| hasSongs !== false\)/.test(library),
       /const showing: LibraryView = view === 'songs' && hasSongs === false \? 'albums' : view/.test(library)],
     [true, true, true])
@@ -806,6 +836,90 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
   check('...and the ••• button promises the pin only then', /pinnable=\{menuPinNow\.current !== null\}/.test(app), true)
   check('the app\'s one notice for pins, drawn once - by App', [(app.match(/<PinNotice \/>/g) ?? []).length,
     files.filter((file) => file !== 'app/App.tsx' && /<PinNotice\b/.test(code(read(file))))], [1, []])
+}
+
+console.log('\nthe desktop frame: chosen below the engine, panels beside the page, the turntable the phone\'s')
+{
+  const app = code(read('app/App.tsx'))
+  check('the frame is chosen in App, after the engine is made - so crossing 1024px never makes it again',
+    [/export function App\(\) \{\s*const player = usePlayer\(\)\s*\/\/[^\n]*\n\s*const actions = useMemo\(\(\) => pickActions\(player\), \[\]\)\s*\/\/[^\n]*\n\s*const \{ frame, panel \} = useFrame\(\)/.test(read('app/App.tsx')),
+      /const desktop = frame === 'desktop'/.test(app)], [true, true])
+  //? the chrome around the panes swaps; the panes - each keyed on its tab, in the same place - don't
+  const behind = /<div class="app-behind"[^>]*>([\s\S]*?)<\/div>\s*(?:\{(?:\/\*[\s\S]*?\*\/)?\}\s*)?<Sources\b/.exec(app)?.[1] ?? ''
+  const at = (needle) => behind.search(needle)
+  check('the sidebar, then the panes, then the player - the mini player or the bar - then the tab bar, each in its own slot',
+    [at(/\{desktop && \(\s*<Sidebar\b/), at(/\{TABS\.map\(/), at(/\{desktop \? \(\s*<PlayerBar\b[^>]*\/>\s*\) : \(\s*<MiniPlayer\b[^>]*\/>\s*\)\}/), at(/\{!desktop && <TabBar\b/)]
+      .every((place, index, all) => place !== -1 && (index === 0 || place > all[index - 1])), true)
+  check('...each pane keyed on its tab', /<div key=\{tab\} class="app-pane" data-tab=\{tab\}/.test(behind), true)
+  //? Now Playing - and its turntable - opens only from the mini player, which a desktop doesn't draw
+  check('nothing on a desktop opens Now Playing: openSheet is the mini player\'s alone, and crossing into the desktop closes it',
+    [(app.match(/\bopenSheet\b/g) ?? []).length, /<MiniPlayer player=\{player\} onOpen=\{openSheet\} \/>/.test(app),
+      /const closes = closesOnCrossing\(frame\)\s*if \(closes\.nowPlaying\) \{[\s\S]*?setOver\('none'\)\s*setSheetOpen\(false\)/.test(app),
+      /if \(closes\.infoPanel\) \{[\s\S]*?setInfoPanel\(false\)/.test(app)],
+    [2, true, true, true])
+  check('...and nothing but Now Playing draws the turntable', files.filter((file) => /<Turntable\s/.test(code(read(file)))), ['player/NowPlaying.tsx'])
+  //? a side panel is no sheet over the page: Sources and Info take how they are drawn from App, and
+  //? are modal only as a sheet
+  const sheet = code(read('app/Sources.tsx'))
+  const info = code(read('app/InfoSheet.tsx'))
+  check('Sources and Info: modal only as a sheet, the page beside a panel left as it is',
+    [/<InfoSheet\b[^>]*\bpanel=\{panel\}/.test(app.replace(/\n\s*/g, ' ')),
+      [sheet, info].map((text) => /const modal = panelIsModal\(panel\)/.test(text) && /useSheet\(\{[^}]*\bmodal, area: box \}\)/.test(text)),
+      /export function panelIsModal\(panel: PanelStyle\): boolean \{\s*return panel === 'sheet'\s*\}/.test(code(read('lib/appFrame.ts')))],
+    [true, [true, true], true])
+  check('one side panel at a time: Sources puts Info away, and Info Sources',
+    [/setSourcesOpen\(true\)[\s\S]{0,200}?infoOpener\.current = null\s*setInfoPanel\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
+      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*setInfoPanel\(true\)/.test(app)],
+    [true, true])
+  //? (review) the player bar's Info closes the panel it opened - "the Info button again"
+  check('...and the player bar\'s Info, pressed again, closes it',
+    /const toggleInfo = useCallback\(\(event: MouseEvent\) => \{\s*if \(infoPanelOpen\.current\) \{\s*setInfoPanel\(false\)\s*return\s*\}/.test(app), true)
+  //? (review) which panel shows feeds both the shell's classes: room made for a column, a drawer over the page
+  check('what the panel shows - Sources or Info - makes room for a column (`.has-side`) and marks a drawer (`.has-drawer`)',
+    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel \}\)/.test(app),
+      /\$\{makesRoom\(panel, side\) \? ' has-side' : ''\}\$\{liesOver\(panel, side\) \? ' has-drawer' : ''\}/.test(app)],
+    [true, true])
+  //? (review) a drawer lies over the page Go to album and Info's artist open: the Info drawer goes with them
+  const leave = /const leaveInfoDrawer = \(\) => \{([\s\S]*?)\n  \}/.exec(app)?.[1] ?? ''
+  check('Go to album and an artist from Info close the Info drawer first - a column stays beside the page',
+    [/if \(!liesOver\(panel, infoPanel \? 'info' : 'none'\)\) return\s*infoOpener\.current = null\s*setInfoPanel\(false\)/.test(leave),
+      /const goToAlbum = \(track[^)]*\) => \{\s*if \(!track\.albumId\) return\s*leaveInfoDrawer\(\)\s*moreOpener\.current = null/.test(app),
+      /const toArtist = \(artist[^)]*\) => \{\s*leaveInfoDrawer\(\)\s*moreOpener\.current = null/.test(app)],
+    [true, true, true])
+  //? (review) the sidebar's Managing reads deadwax's answer, as You's row does
+  check('the sidebar\'s Managing follows /deadwax/me: asked as the desktop frame shows, through latestOnly(), and handed over',
+    [/const meRequests = useMemo\(latestOnly, \[\]\)/.test(app),
+      /if \(!desktop\) return\s*const request = meRequests\.begin\(\)\s*me\(request\.signal\)\.then\(\s*\(who\) => \{\s*if \(request\.current\(\)\) setAdmin\(who\.admin\)/.test(app),
+      /<Sidebar\b[\s\S]*?admin=\{admin\}/.test(app), /\{admin && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">/.test(code(read('app/Sidebar.tsx')))],
+    [true, true, true, true])
+  //? the player bar's transport, straight from the click, nothing awaited
+  const bar = code(read('player/PlayerBar.tsx'))
+  check('the player bar calls the player straight from the click',
+    ['previous', 'toggle', 'next', 'showAirPlay'].map((name) => new RegExp(`onClick=\\{\\(\\) => player\\.${name}\\(\\)\\}`).test(bar)).concat(/\bawait\b|\.then\(/.test(bar)),
+    [true, true, true, true, false])
+  check('...and the sidebar reaches none, nor any context', [actionsIn(code(read('app/Sidebar.tsx'))), /useContext|usePlayerActions|PlayerContext/.test(code(read('app/Sidebar.tsx')))], [[], false])
+  //? the album you don't have follows the pressing chosen while a desktop's panel shows its Get
+  const page = code(read('app/ReleaseGroupPage.tsx'))
+  //? (review: the album's group alone said Get was pressed for any pressing of it - now the pressing searched too)
+  check('a desktop\'s Sources panel follows the pressing: searched again as another is chosen - `again`, no pick',
+    [/const sourcesGroup = desktop && sourcesOpen \? getting\?\.from \?\? null : null\s*const sourcesPressing = sourcesGroup \? getting\?\.release\.release_mbid \?\? null : null/.test(app),
+      /sourcesPressing=\{sourcesGroup === page\.id \? sourcesPressing : null\}/.test(app),
+      /if \(!shown \|\| sourcesPressing === null \|\| !download \|\| !chosen \|\| sourcesPressing === chosen\.id\) return\s*onGet\(\s*\{[^}]*from: id, again: true \},\s*getButton\.current,\s*\)\s*\}, \[shown, sourcesPressing, chosen\?\.id\]\)/.test(page),
+      /if \(request\.again\) \{\s*state\.start\(request\.release, false\)\s*return\s*\}/.test(sheet),
+      /start\(release, fresh = true\) \{[\s\S]*?void run\(release, '', fresh\)/.test(code(read('hooks/useCandidateSearch.ts')))],
+    [true, true, true, true, true])
+  //? the sidebar: its field types into Search's box and shows Search's results; its Library views are
+  //? the Library's own store; the Library, on a desktop, titled by its view
+  const side = code(read('app/Sidebar.tsx'))
+  check('the sidebar\'s field is Search\'s box: typing goes to it and shows Search\'s results, Enter asks it',
+    [/setText\(next\)\s*typeSearch\(next\)\s*if \(next\.trim\(\)\) onSearch\(\)/.test(side), /onSearch\(\)\s*submitSearch\(\)/.test(side),
+      /<Sidebar\b[\s\S]*?onSearch=\{showSearch\}/.test(app), /const showSearch = useCallback\(\(\) => \{\s*if \(router\.nav\.tab === 'search' && !router\.nav\.stacks\.search\.length\) return\s*router\.root\('search'\)/.test(app)],
+    [true, true, true, true])
+  const library = code(read('player/Library.tsx'))
+  check('the Library reads its view from the store the sidebar chooses from, titled by it on a desktop, Recently added the albums newest first',
+    [/const \{ pick, hasSongs \} = useLibraryPick\(\)/.test(library), /<h1 class="pl-large-title">\{desktop \? LIBRARY_TITLES\[drawn\] : 'Library'\}<\/h1>/.test(library),
+      /<div hidden=\{drawn !== 'recent'\}>\s*<AlbumsView order="newest"/.test(library), /const choose = \(next: LibraryView\) => \{\s*if \(next !== showing\) chooseLibrary\(next\)/.test(library)],
+    [true, true, true, true])
 }
 
 console.log('\nApp moves history only through the router')

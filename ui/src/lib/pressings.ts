@@ -231,10 +231,24 @@ export function summaryLine(view: PressingsView, releaseCount: number): { text: 
   return { text: `This pressing ${said}`, differs: true }
 }
 
+/**
+ * Whether any pressing of the album differs from the usual tracklist (2.0.0-player.19): the desktop's
+ * tracklist then has its "Against the usual tracklist" column (DesktopRequestBonus.dc.html) - on
+ * every pressing, the usual one too, so choosing another moves no column - and with every pressing
+ * alike it has none (DesktopRequest.dc.html).
+ */
+export function anyPressingDiffers(view: Pick<PressingsView, 'shown' | 'more'> | null): boolean {
+  return !!view && [...view.shown, ...view.more].some((row) => row.kind === 'differs')
+}
+
 export interface TrackMark {
   kind: 'bonus' | 'version' | 'renamed'
   chip: string
+  /** the phone's line under the title: "Only on this pressing", "The usual version is 3:58" */
   note: string
+  /** the same in the desktop table's words (2.0.0-player.19, DesktopRequestBonus.dc.html) - short
+   *  enough to sit beside the chip in its 190px column: "only on this pressing", "usually 3:58" */
+  brief: string
 }
 
 export interface TrackRow {
@@ -277,9 +291,9 @@ export function trackRows(release: PageRelease | null, diff: TracklistDiff | nul
       const seconds = typeof ms === 'number' && Number.isFinite(ms) ? Math.round(ms / 1000) : null
       const version = versions.get(position)
       const rename = renamed.get(position)
-      const mark: TrackMark | null = bonus.has(position) ? { kind: 'bonus', chip: 'Bonus', note: 'Only on this pressing' }
-        : version ? { kind: 'version', chip: 'Other version', note: `The usual version is ${formatSeconds(version.from)}` }
-        : rename ? { kind: 'renamed', chip: 'Renamed', note: `Usually “${rename.from}”` }
+      const mark: TrackMark | null = bonus.has(position) ? { kind: 'bonus', chip: 'Bonus', note: 'Only on this pressing', brief: 'only on this pressing' }
+        : version ? { kind: 'version', chip: 'Other version', note: `The usual version is ${formatSeconds(version.from)}`, brief: `usually ${formatSeconds(version.from)}` }
+        : rename ? { kind: 'renamed', chip: 'Renamed', note: `Usually “${rename.from}”`, brief: `usually “${rename.from}”` }
         : null
       rows.push({
         key: `${disc}:${onDisc}`,

@@ -144,6 +144,14 @@ export function CloseIcon({ class: cls }: IconProps) {
   )
 }
 
+/** An "i" in a circle - the desktop player bar's Info, as DesktopLibrary.dc.html draws it. */
+export const InfoIcon = thin(
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 11v5.5M12 7.8v.2" />
+  </>,
+)
+
 /** A row's "goes somewhere" mark. */
 export const ChevronRightIcon = line(<path d="m9 6 6 6-6 6" />)
 

@@ -214,7 +214,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    with the player inside them - see "The one app". player/deck.ts is the
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts) - see
                    "The turntable, part two".
-tests/             2180 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2202 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -3981,7 +3981,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
     name, and the deck calls no action itself), Search (playTracks, a song
     found, its album in hand, since 2.0.0-player.13), ArtistPage (playTracks, Play and Shuffle with
     every album of theirs you have in hand) and Requests (playTracks, a Done row's ▶ with its album
-    in hand), both since 2.0.0-player.17, and `app/context.ts`, which names them and
+    in hand), both since 2.0.0-player.17, PlayerBar (toggle, next, previous, showAirPlay - the
+    desktop's player bar, since 2.0.0-player.19), and `app/context.ts`, which names them and
     calls none. Adding a file is a deliberate edit to the sim, like the Navidrome
     route list.
   - Nothing outside `app/` and `player/` imports usePlayer, the contexts or App.
@@ -3991,7 +3992,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
   - Nothing in `app/` contains setActionHandler, `new Audio`, `<audio`, `.src =`, srcObject or
     `.load(` - comments included, so don't name them in a comment there.
   - **A link out of the app opens beside it** (`target="_blank" rel="noopener"`, review): the
-    Search card (until 2.0.0-player.13, and Requests' until .12), You's Managing row and the gate's settings link. Followed in the
+    Search card (until 2.0.0-player.13, and Requests' until .12), You's Managing row, the gate's settings link and
+    (since 2.0.0-player.19) the desktop sidebar's "Open the main page". Followed in the
     same page, `/` unloads the player - the audio element, any stream and the queue, which
     nothing keeps. From the home-screen app it opens outside the app's scope either way (Safari
     or a browser view over it; not seen on the phone). The sim fails on any `<a href>` in app/ or
@@ -5449,7 +5451,8 @@ and the sources are for; "Get the album" is the screen's ONE solid purple button
   own lock `app-sources-open`, focus in to Cancel and back to the Get; App holds it - `sourcesOpen`,
   `getting` (the last Get, kept as it slides away), a new `key` per Get so the same album got twice
   searches twice - and the page behind is inert while it shows: `covered = sheetOpen ||
-  sourcesOpen`. It is never open with Now Playing: each covers what would open the other, a chip's
+  sourcesOpen` (since 2.0.0-player.19 `!desktop && (...)`: a desktop's side panel is not modal - see
+  "The desktop frame"). It is never open with Now Playing: each covers what would open the other, a chip's
   late lookup is called off before it can open (above), and `openSources` refuses while Now Playing
   is open - `nowPlayingOpen`, a ref set in openSheet's tap and every render - the backstop). Cancel
   and "Choose a source" on one row (`1fr auto 1fr`, the title centred and one line at 320px), the
@@ -5580,7 +5583,8 @@ and the sources are for; "Get the album" is the screen's ONE solid purple button
   sort; and, after review, the two sheets can't stack (`searchActive`, Search's `standDown`,
   `openSources`' Now Playing guard), Cancel lets the search go in the gesture, and the album page's
   `shown` (asked again as it shows, Get above the store line, no clearing). The pages memo is keyed
-  on `sourcesOpen` and `pageShown` too, for that `shown`. No playback action is reached from any
+  on `sourcesOpen` and `pageShown` too, for that `shown` (since 2.0.0-player.19 also `desktop`,
+  `sourcesGroup` and `sourcesPressing`, and `shown` reads `sourcesOver` - see "The desktop frame"). No playback action is reached from any
   new file (the allowlist is unchanged).
 - **Style** (tokens only): theme.css section 10 gains `--dw-bar-green` (a measured speed's fill) and
   `--dw-best` (#7e4bb8, the best match's edge); app.css gains `--app-rg-get-*`, `--app-store-*`,
@@ -6067,6 +6071,191 @@ said Home "looks a bit empty" and accepted that these two are what fill it.
   notice at the top over Now Playing, one column of cards at 320, an artist opened from a long-titled
   album keeping its chip in the hero), and everything on the iPhone: the drag under a real finger with
   the page still, VoiceOver's focus after an unpin, and whether 0.64.2 sends `played`.
+### The desktop frame (2.0.0-player.19)
+
+Slice 8 of the one app (`uplan/slices.md` S8, numbered .19: built beside .18's pins, on
+player-spike, and rebased onto it). The boards are `DesktopLibrary.dc.html` (the frame: sidebar,
+grid, player bar), `DesktopRequest.dc.html` and `DesktopRequestBonus.dc.html` (getting an album on a
+desktop) and `Main.dc.html`; `DesktopSourcesTable` is the alternative James rejected ("choosing a
+source uses CARDS on phone AND desktop"), `DesktopManage` is S9 and `DesktopVisualizer` later.
+James's decisions it carries: desktop is "the same app with a desktop frame, not a second app"; the
+album you don't have shows its tracklist with a pressing dropdown on both; the turntable is
+phone-only ("I don't think it makes a lot of sense on desktop"), a full-screen visualizer comes
+later; "Managing links to / for now".
+
+- **THE BREAKPOINT: 1024px, and 1280px for a third column** (`lib/appFrame.ts`, pure, pinned by
+  `routes.sim.cjs`: `DESKTOP_MIN`, `COLUMN_MIN`, `frameFor`/`frameOf`). `app/useFrame.ts` asks the
+  same two media queries through matchMedia (addListener before iOS 14), so the markup's frame and
+  the stylesheets' can't disagree; `tests/test_app_desktop_css.py` reads the constants and holds every
+  `@media` in app-desktop.css to them. An iPad on its side (1024px and up) gets the desktop frame.
+- **THE FRAME IS CHOSEN IN App, BELOW THE ENGINE**: `useFrame()` right after `usePlayer()` and
+  `pickActions`. Crossing 1024px swaps the chrome around the panes and nothing else: the sidebar is
+  `{desktop && <Sidebar/>}` before the panes, the player `{desktop ? <PlayerBar/> : <MiniPlayer/>}`
+  after them, the tab bar `{!desktop && <TabBar/>}` - each in its own slot, so the panes (each keyed
+  on its tab) and their memoised roots and pages stay mounted, the engine's useMemo never runs again,
+  and the one audio element (two with Gapless) plays on. Below 1024px the DOM is exactly the phone's
+  (a false in a slot renders nothing; `has-mini` only off a desktop). app-rules pins the order and
+  the slots.
+- **THE PANEL RULE**: Sources and Info are sheets on a phone and a SIDE PANEL on a desktop - a third
+  column from 1280px (the shell's `.has-side` makes room: `makesRoom`), a drawer over the main area's
+  right edge between 1024 and 1279 (1024 - 232 - 470 = 322px would leave no tracklist). **A panel is
+  not modal** (`panelIsModal`): `covered = !desktop && (sheetOpen || sourcesOpen)`, so nothing behind
+  goes inert; `useSheet` takes `modal` (no scroll lock when false) and `area` (Escape closes a
+  non-modal panel only from inside its box - Escape in the page is the page's: a search field, the
+  pressing list); focus still goes in as it opens and back as it closes; no backdrop (CSS);
+  `aria-modal="false"`. **One panel at a time**: `openSources` puts Info away (its opener cleared, so
+  focus lands in Sources), the player bar's Info (`toggleInfo`) puts Sources away (its opener cleared,
+  the search stopped by Sources' backstop). `sideOf` says which shows. Info on a desktop is
+  `infoOpen = desktop ? infoPanel : sheetOpen && over === 'info'`, its opener the bar's Info button.
+  **Crossing frames** (`closesOnCrossing`): into the desktop Now Playing and what is over it close;
+  back to the phone the Info panel does; the Sources sheet stays open across, a panel one side and a
+  sheet the other. Search's root and the album pages count as "shown" beside a desktop panel
+  (`sourcesOver = sourcesOpen && !desktop` in `searchActive`, `requestsActive` and the pages' `shown`).
+  A drawer showing marks the shell `.has-drawer` (`liesOver`): what the page needs beside it keeps to
+  the part left in view (the album you don't have's Get and pressing, below), and the Info drawer
+  closes as you go to an album or artist from the player (`leaveInfoDrawer` in `goToAlbum` and
+  `toArtist`: the bar's byline, Info's cards) - a column stays. A panel's box is a tab stop of -1, so
+  a click on its heading or the chips' row (or, in Safari, on a chip, which WebKit never focuses)
+  focuses it and Escape there still counts as inside; a sheet's box has no tabindex. And a panel that
+  becomes a sheet while open (or back) takes focus in again (`useSheet`'s `modal` effect) unless it
+  is already inside - the page going inert behind a sheet, the head's button another one.
+- **THE TURNTABLE IS THE PHONE'S ALONE**: Now Playing (and so the turntable) opens only from the
+  mini player (`openSheet` - app-rules counts its two mentions), which a desktop doesn't draw; the
+  player bar is a desktop's player. Nothing draws `<Turntable` but NowPlaying.
+- **The sidebar** (`app/Sidebar.tsx`, a leaf): the wordmark, the search field, Home and Requests (the
+  tab's badge, `badgeText`), the Library's views (`SIDEBAR_LIBRARY`: Recently added, Albums, Artists,
+  Songs - Songs left out when Navidrome lists none, `libraryItems`), Managing ("Open the main page",
+  opening BESIDE the app; the links-out list in app-rules gained it; shown unless deadwax says this
+  user isn't an admin - nobody, with logins off: App asks `/deadwax/me` through a latestOnly() as the
+  desktop frame shows and hands `admin` down, true until it answers, as You's rows; and no badge,
+  since the review-queue count needs the Managing slice's route), and You at the foot. `sidebarCurrent` highlights where the app is
+  (`aria-current`; none on Search, whose place is the field); `sidebarMove` is what a click does -
+  Home, Requests, You and the Library view showing are tab buttons (selectTab: as left, or back to
+  the root), another Library view is that view at the Library's root, opened at its top (App deletes
+  the Library root's kept scroll and `router.root('library')` when it was away).
+- **The search field is Search's own box** (`app/searchBox.ts`, a module): Search shares its text
+  (`shareSearchText` in an effect), takes the sidebar's typing as its own (`onSearchTyped(setText)`)
+  and answers its Enter as its form's submit (`submitSearch`) - so the search, its pacing and its
+  guards stay Search's. The sidebar's typing also shows Search's results (`showSearch`:
+  `router.root('search')` unless at Search's root). Search's own form is `display: none` on a desktop.
+  `search.sim.cjs` pins the three.
+- **The Library's view is a store** (`app/libraryPick.ts`): the phone's chips and the sidebar both
+  choose from it, and both leave Songs out by its `hasSongs` (the Library's one-song probe reports
+  there - `setLibrarySongs`). **"Recently added" is the desktop's**: a view of its own (the albums,
+  newest first - a second `AlbumsView order="newest"`), so Albums keeps the order chosen for it; never
+  kept on the device (deadwax-player-library-view keeps albums, artists or songs), and a phone shows
+  the albums for it (`shownPick`). The view being left is told first (`onLibraryLeaving`), and the
+  Library keeps its scroll only while its tab is on screen (`getClientRects`) - the sidebar can choose
+  from another tab, whose page owns the document's scroll then. On a desktop the Library's title is
+  the view's name (`LIBRARY_TITLES`), its chips hidden, its sort and count on the title's row.
+  `routes.sim.cjs` drives the store (what is kept, the leaving call before the change).
+- **The player bar** (`player/PlayerBar.tsx`, classes `app-playbar*` - not `app-bar`, which is a job's
+  progress track: the review found every Arriving card's and Requests row's bar fixed across the foot
+  of the screen by the bar's rules, and `test_the_desktops_own_parts_have_class_names_of_their_own`
+  now fails on any class the bar or the sidebar shares - the one more file on app-rules' allowlist: toggle,
+  next, previous, showAirPlay, each straight from the click): the cover, title and "Artist — Album"
+  (Go to album), previous, a round white play/pause and next, Now Playing's own scrubber (`Scrubber`,
+  now exported - seek on release, keys; its clocks at its ends by `display: contents`, its thumb shown
+  on hover, held or focus), AirPlay when there's a speaker, and Info. The visualizer's place is left
+  at the end of the tools, empty. "Nothing playing" holds its place with no song.
+- **The album you don't have, desktop** (`ReleaseGroupPage`'s `desktop`): the cover beside the title,
+  Get FIRST and the pressing inline after it (the same one `class="app-rg-get"` app-rules counts), the
+  store line under both, and the tracklist as a table (`DeskTracklist`: #, Title, Length, and an
+  **"Against the usual tracklist"** column holding each marked track's chip and its note whenever any
+  pressing differs - `anyPressingDiffers`, on every pressing so a choice moves no column; none when
+  all are alike, as DesktopRequest draws it). The note is the board's short one (`TrackMark.brief`:
+  "only on this pressing", "usually 3:58", `usually “X”` - the phone's `note` didn't fit 190px), drawn
+  as plain inline text so an ellipsis shortens it (an inline-flex box was hidden whole: "Other version
+  …"), the whole note and every title in the cell's `title`. **Its header is a grid** (app-desktop.css,
+  `.app-rg` only - the album you have keeps the absolute cover): the cover in column 1, title, artist
+  and line in column 2, and until 1280px Get and the pressing in a row UNDER the cover across both
+  columns, at the main area's edge - beside the cover they start 236px in, and a 1024px drawer covers
+  everything past 322px; with a drawer open (`.has-drawer`) the row keeps to the part left in view, the
+  pressing (`flex: 1 1 auto`, its list as wide as it) wrapping under Get with its label shortened -
+  the desktop `.app-picker` is `min-width: 0; max-width: 100%`, or its ellipsis never comes. From 1280
+  the row goes back to column 2 and the cover spans every row, as the board draws it. **The Sources
+  panel follows the pressing**: Get sends `from` (the page's id); App's `sourcesGroup` (only on a
+  desktop, only while Sources shows) and `sourcesPressing` (the release the panel searched) give the
+  page `sourcesPressing` when the panel shows a Get of THIS album; Get is `aria-pressed` - and a click
+  closes the panel - only while that is the pressing on screen (the review: matched on the album
+  alone, a page met again at its usual pressing with the panel still open for another read pressed,
+  and its first click closed the panel); and while the panel shows another pressing's of this album -
+  one chosen here, or the panel left open as you went back and came to the album again - the page
+  asks App again with `again: true` for the pressing on screen, focus still going back to Get
+  (`getButton`). Only the page that shows asks (`shown`), so the album open on two tabs never takes
+  turns. `group.sim.cjs` pins it, and that a phone's Get has no pressed state.
+- **The Sources panel** (`Sources`' `panel`): the board's head ("Sources", "for <subtitle>", a ✕ that
+  takes focus) instead of Cancel and "Choose a source"; the SAME SourceCards, laid out by CSS as the
+  board's (folder and peer inline; the facts a five-column grid, Speed first: `display: contents` on
+  the speed's lines and the facts list); and a **Signals** chip before the sort (`SignalsChip`: a
+  slider per signal of `SIGNAL_LABELS`, 0 for any, a count on the chip, Reset, Escape taken there so
+  the panel stays). The minimums go through `candidateFilters(filters, minSignals)` - the cards and a
+  pick - and `pressedCount` counts them, so Clear filters shows for a minimum alone and clears them.
+  **Only where the chip is drawn**: `minimums = modal ? undefined : signals` - carried into a phone's
+  sheet (a window narrowed with the panel open, an iPad turned upright) they are kept but filter
+  nothing, and are back on the panel (the review: they went on hiding cards with no chip on screen).
+  **`again`** searches with `start(release, false)` - `useCandidateSearch`'s new `fresh` - keeping the
+  chips and minimums and never picking, even with "Pick the best source for me" (you are choosing);
+  a fresh Get in the panel re-seeds the chips and picks as on a phone. `sources.sim.cjs` pins it all.
+- **Style**: `interface/player/app-desktop.css`, linked LAST (test_pages), revalidated and gzipped
+  like app.css. EVERY rule inside `@media (min-width: 1024px)` (or 1280px, or 1024px and a coarse
+  pointer) and every selector but `html`/`:root` under `.app-desk` - the phone app can't be reached
+  by it (`test_nothing_reaches_the_phone`). Tokens only (`--app-desk-*` in the media query's
+  `:root`, which also points `--pl-edge-left`/`-right` at the desktop's 32px and the scrub track at
+  6px). theme.css section 10 gains the frame's surfaces (`--dw-sidebar`, `--dw-side-panel`,
+  `--dw-player-bar`, `--dw-frame-border`, `--dw-row-border`, Explorer's `--dw-selection-*`,
+  `--dw-selected-text`) and, in its own `@media (min-width: 1024px)` `:root`, the desktop's values
+  for the look's tokens: labels 11px, headings 13px, data 12px, titles 28/30px, the album's artist
+  18px, cards #1e1c26 on #0b0a10, the pressing list a desktop list. **`--dw-text-body` is NOT
+  redefined**: text fields read it, and an iPad on its side is a desktop where iOS zooms into a field
+  under 16px - the sidebar's field takes the board's 13px only for a fine pointer.
+  **A coarse pointer gets a finger's targets** (the review: the board's 16px scrubber sat 6px under a
+  22px Previous on an iPad): in `@media (min-width: 1024px) and (pointer: coarse)` the scrubber, play,
+  the transport's boxes, the bar's tools, the sidebar's items, the rows, Get and the pressing, a
+  panel's close button, chips and a source's Get are all `--pl-hit`, and the bar is
+  `--app-desk-bar-touch` (100px: the transport's 44 over the scrubber's 44, no gap) plus the home
+  indicator's `--pl-safe-bottom`. **Beside a third column** (`.has-side`) the grids are `auto-fill`
+  at `--app-desk-tile-min` (150px, the phone grid's), never more than six (each column the larger of
+  that and a sixth of the row; Arriving's cards: three) - six in 514px were 66px covers at 1280. **A
+  source's facts** in the panel are `min-width: auto` and wrap between words (the phone's
+  `min-width: 0` let "FLAC 16-24/44.1-96" run over Size and "12 ahead" out of the card).
+- **The phone app below 1024px is unchanged**: no phone rule, class or DOM order touched (the
+  orchestrator compares 390x844 screenshots of 2.0.0-player.17 with this). Home, AlbumPage,
+  ArtistPage and NowPlaying are edited only as layout needs (Home and ArtistPage not at all;
+  AlbumPage not at all - its desktop header is CSS; NowPlaying exports `Scrubber`), so .18's rebase
+  stays small.
+- **Not built, on purpose**: pins (.18, in parallel); the visualizer (later - its place is left);
+  the turntable on a desktop; the desktop editor (S9, DesktopManage); the comparison table (rejected);
+  "Mine / Everything in the store" (logins are off); the sidebar's "Needs a look" count, Settings and
+  Log as their own items (one "Open the main page" link until the Managing slice); Lyrics and Queue in
+  the bar (nothing for them to open); a desktop Now Playing; "Results for …" as the breadcrumb (the
+  back label stays the tab's name). You's "Now Playing opens as" and "Pause winds the record down"
+  still show on a desktop - they are this device's phone settings, and an iPad turns between frames.
+- **Verified**: 2133 Python tests (22 new: `test_app_desktop_css.py` 20, two in `test_pages.py`),
+  pyflakes, tsc, and all 35 sims (`routes` 182, `app-rules` 156, `sources` 89, `group` 91, `info` 127
+  and `search` 71 extended, `pressings`' marks given their short note); 67 mutations, one or more per rule pinned, each caught and
+  restored byte for byte - three first survived (the panel precedence when both were open, Clear
+  filters for a minimum alone, and a guard in the follow effect that turned out unreachable and was
+  removed) and gained the checks that catch them. The engine guard is empty and `player.sim.cjs`
+  untouched. **After review** (22 findings confirmed, 17 once duplicates are merged, and a class clash
+  a skeptic found - all fixed, each testable one with a check that fails without it, mutated and
+  restored - 39 mutations, all caught): the `app-bar` class clash; a finger's targets on a coarse pointer; the
+  against column's short notes, inline and with tooltips; the pressing's width; the facts' columns;
+  the grids beside a column; Get and the pressing under the cover, clear of a drawer; Get pressed only
+  for the pressing the panel searched, and the page met again following it; Signals filtering only
+  on the panel; a panel's box focusable by a click; focus in again across 1024px; the Info drawer
+  closing on Go to album; the sidebar's Managing on `/me`; useFrame itself driven against a fake
+  matchMedia in `routes.sim.cjs`, with app-rules holding toggleInfo's close and the shell's classes;
+  the two Signals rules sources.sim claimed and didn't pin (a pick with a minimum set, a fresh Get
+  clearing them); and the guides' wording (no boards or slices, the sliders' own names, You's two
+  phone-only settings, the Library view's click).
+  **NOT verified here**: the real page (the orchestrator builds the bundle and checks at 1440x900,
+  1280x800 and 1024x768 against the stubs, resizes across 1024 while playing - one audio element, the
+  music carrying on - compares the 390x844 screenshots, and runs the overflow audit); the drawer and
+  column's look; the Signals popover's place at the panel's edge; an iPad on its side (the coarse
+  pointer's 44px targets and taller bar); the group page's grid header at 1024-1279 and its row clear
+  of a drawer; the grids' column count beside a panel; a source's facts wrapping; and the boards'
+  exact spacing, which the CSS follows from the boards' numbers but nobody has seen drawn.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -7428,7 +7617,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2180 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2202 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -7460,19 +7649,19 @@ node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (Web
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
 node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player, Now Playing opens as and its key, Pause winds the record down and its key
-node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history
-node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element
+node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history; the desktop frame (panels over sheets, a drawer over the page, the sidebar's moves, the Library's store, useFrame against a fake matchMedia)
+node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
 node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions, Getting albums and their store (seeded once, asked again, saves in turn)
 node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Navidrome sent
-node ui/test/info.sim.cjs       # Info > About's rows (whose artist card it is), the albums played from (an artist's whole queue), what Info asks for and when it draws it, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape
+node ui/test/info.sim.cjs       # Info > About's rows (whose artist card it is), the albums played from (an artist's whole queue), what Info asks for and when it draws it, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape; Info as a desktop panel, its box a tab stop, focus in again across 1024px
 node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button; with the deck's sound, the press, release, wind-down and the arm during a coast
 node ui/test/requests.sim.cjs   # the Requests tab and Home's Arriving - grouping, every row's words, one primary, Arriving = the badge, asking again, the ✕'s question, what a screen reader hears; Done rows opening and playing their album, why one can't, and looking again (doneLooks, and with effects running)
 node ui/test/searchQuery.sim.cjs # the app's one search box - an artist at either end, an artist alone, va, the brackets before a type filter, what's left out
 node ui/test/pressings.sim.cjs  # the album you don't have - the default pressing, the dropdown's list and fold, the line above the tracklist, Bonus rows, disc titles
-node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, Try again, the session's cache, a pick, the listbox, focus going nowhere, Get and what's already here of the pressing (under Get, asked again as the page shows)
+node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, Try again, the session's cache, a pick, the listbox, focus going nowhere, Get and what's already here of the pressing (under Get, asked again as the page shows); its desktop variant (the table, the Against column's short notes and tooltips, Get pressed for the pressing the panel searched, the panel following the pressing - met again too, only from the page showing)
 node ui/test/payload.sim.cjs    # the ONE download payload builder, deep-equal to what the main page's two Find buttons sent before the move (8 captured cases, labels too), and which credit each field comes from
-node ui/test/sources.sim.cjs    # the Sources sheet and its cards rendered - only the newest search, Cancel letting it go in the gesture, a Get from the tap with its runners-up, the best match whatever the sort, the chips, a pick for you and when it isn't made, Re-search, slskd's words, the store's box, the live region, focus kept in the sheet
+node ui/test/sources.sim.cjs    # the Sources sheet and its cards rendered - only the newest search, Cancel letting it go in the gesture, a Get from the tap with its runners-up, the best match whatever the sort, the chips, a pick for you and when it isn't made, Re-search, slskd's words, the store's box, the live region, focus kept in the sheet; the desktop panel, Signals (a pick by them, a fresh Get clearing them, none in a phone's sheet), its box a tab stop, and searching again for another pressing
 node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch; the rows' Get chips, and their lookups called off when you move on
 node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the main-thread voice where there is no worklet, the deck against fakes (its windows, coasts, handovers, wind-downs, when a press is its own)
 node ui/test/artist.sim.cjs     # the artist page's order and who-is-who (Navidrome's artist <-> MusicBrainz's), Library > Artists' sort, the id bridge's "Also" chips, "This pressing" and the folder; the page rendered - rows drawn once with steady keys, Play waiting for the library, a few albums at a time, the session's answers, late lookups opening nothing
@@ -7498,7 +7687,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2180 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2202 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

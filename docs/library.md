@@ -7,7 +7,8 @@ This page is about the main page's Library tab, the one for looking after the li
 app at `/player/` has a Library tab of its own, for listening - **Albums**, **Artists** and
 **Songs** from Navidrome, and an [artist page](player.md#artist-pages) with their albums from
 MusicBrainz and Play and Shuffle over the ones you have - which the [phone player
-guide](player.md#what-it-does) covers.
+guide](player.md#what-it-does) covers. [The app on a desktop](#the-app-on-a-desktop), below, says
+how that Library is laid out in a window 1024 pixels wide or more.
 
 ## Opening it
 
@@ -248,6 +249,27 @@ guide](player.md#artist-pages) has it): the square `artist.*` picture saved here
 Navidrome serves it, and the MusicBrainz artist ids deadwax writes into your files are how it
 finds the artist's discography when Navidrome doesn't say who they are. An album filed by
 another tool, without those ids, still shows there - just without MusicBrainz's albums beside it.
+
+## The app on a desktop
+
+The app at `/player/` (not this page) has a desktop layout since 2.0.0-player.19, in a window 1024
+pixels wide or more - [the phone player guide](player.md#on-a-desktop) has all of it. For the
+Library:
+
+- **Its views are in the sidebar**: **Recently added**, **Albums**, **Artists** and **Songs**, the
+  one showing highlighted - and its title is that view's name ("Albums"), with the sort and the count
+  at the title's right. **Recently added** is Navidrome's albums newest first, a view of its own, so
+  **Albums** keeps the order you chose for it; it's the desktop's alone, and isn't remembered on the
+  device (a phone shows the albums for it). **Songs** is left out when Navidrome won't list songs,
+  as on a phone.
+- **Albums** are a grid six covers across (fewer while a panel is a column beside it, so a cover
+  stays a cover's size); **Artists** and **Songs** are the phone's lists, kept a readable width.
+- Clicking the view that's showing works like the phone's Library tab: from elsewhere in the app it
+  shows the Library as you left it (an album you opened from it still open), and on the Library it
+  goes back to its first page (and, there, to the top). Another view shows that view - where you
+  left it if you were already on the Library's first page, at its top from anywhere else.
+- **Editing an album** - this page's metadata editor, tag editor, covers, lyrics and delete - isn't
+  in the app yet: the sidebar's **Managing** opens this page in a new tab.
 
 ## Deleting an album
 

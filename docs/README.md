@@ -18,7 +18,7 @@ Everything deadwax does, explained for someone opening it for the first time. Th
 | [Downloading](downloading.md) | the Soulseek candidates panel, what the scores mean, quality filters, the downloads panel, cancelling, and retrying a failed download |
 | [Organizing](organizing.md) | what happens when a download finishes: dry run, copy or move, folder names and templates, editions, tags, covers, lyrics, and clean-up |
 | [The library](library.md) | the library tab, the review queue, the metadata editor, editing tags by hand, covers, CD art, lyrics, artist pages, deleting |
-| [The phone player](player.md) | playing your library on an iPhone from Navidrome, through deadwax: setting it up, adding it to the home screen, how plays are counted, and what it can't do yet |
+| [The phone player](player.md) | playing your library on an iPhone from Navidrome, through deadwax: setting it up, adding it to the home screen, how plays are counted, the same app on a desktop, and what it can't do yet |
 | [How matching works](matching.md) | the six signals a candidate is scored on, and why edition is never a filter |
 | [Troubleshooting](troubleshooting.md) | what to do when something doesn't work, by symptom |
 
@@ -68,6 +68,8 @@ For listening, there's also [the phone player](player.md) at `/player/`: a separ
 plays your library from Navidrome, made to be added to an iPhone's home screen. It has tabs of its
 own (Home, Library, Search, Requests and You), and is growing into the one app for all of deadwax:
 its Requests tab already follows your downloads (see [downloading](downloading.md#on-the-phone-the-requests-tab)).
+In a window 1024 pixels wide or more it has [a desktop's layout](player.md#on-a-desktop): a sidebar
+for the tabs, a player bar along the bottom, and an album's sources beside it.
 
 <p>
 <img src="../assets/images/mobile.png" width="280" alt="Searching on a phone">

@@ -126,6 +126,12 @@ a row of albums you don't have, or **Get the album** on an album's page, opens t
 Soulseek to choose from - see [Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source) -
 and the app's Requests tab follows the download from there.
 
+On a desktop (since 2.0.0-player.19; a window 1024 pixels wide or more) the box is the sidebar's
+**search field**: typing there shows these results in the main area, and Enter asks both halves at
+once, as **Search** on the keyboard does. An album you don't have shows its tracklist as a table there,
+with an **Against the usual tracklist** column whenever any pressing differs - see
+[the phone player guide](player.md#on-a-desktop).
+
 ### The box
 
 Type an artist, an album, a song, or an artist and an album ("portishead third"), up to 200
