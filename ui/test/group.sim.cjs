@@ -193,6 +193,8 @@ async function main() {
     check('the header: title, artist, and what it is - and nothing about the library before it answers',
       [text(classed('pl-hero-title')[0]), text(classed('pl-hero-artist')[0]), text(classed('pl-hero-meta')[0])],
       ['The Slow Rush', 'Tame Impala', '2020 · Album'])
+    check('...an artist that isn\'t a link (here no MusicBrainz id) drawn plain, not in the link\'s colour (2.0.0-player.17)',
+      [classed('pl-hero-artist')[0].type, classed('pl-hero-artist')[0].props.class], ['p', 'pl-hero-artist app-hero-plain'])
     globalThis.__group.owned = owning([{ path: 'Portishead/Dummy (1994)', release_group_mbid: dummy.group.id }])
     draw()
     check('...then, once it has, "not in your library"', text(classed('pl-hero-meta')[0]), '2020 · Album · not in your library')

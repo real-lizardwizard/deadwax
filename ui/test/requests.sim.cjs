@@ -30,6 +30,18 @@
  *    a refusal drawn under the reason; Clear done is disabled with nothing to clear; a spinner, not
  *    "Nothing requested yet", until deadwax first answers; a cover that fails is the plain tile;
  *    the tab's badge.
+ *  - Done rows and the id bridge (2.0.0-player.17): a download whose album is in the library (filed,
+ *    partly filed, already there) carries its release, so its row OPENS the album - a button - and
+ *    one this download filed has the round ▶ too (named "Play <album>"), none for anything else; a
+ *    tap with Navidrome's album not known yet asks the bridge for it, opens it on this tab when it
+ *    comes - faded while it looks - and says why when it can't: Navidrome not having found it yet,
+ *    no folder tagged with its release, Navidrome not set up or not answering - never playing from
+ *    there; the note goes once a later look finds it, and that tap asks for the songs, so the next
+ *    ▶ plays. A tap's look that answers after the tab stopped showing opens nothing; another row's
+ *    tap calls it off. What the tab looks for ahead (doneLooks): an album filed while you watch,
+ *    not before Navidrome can have scanned it, and again, backing off, until it is found; the songs
+ *    again when a later download of the release may have added to them, or the tab comes back
+ *    after a while - and, with effects running, the tab doing just that.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -64,12 +76,53 @@ exports.useState = (v) => { const s = slot(() => ({ v: typeof v === 'function' ?
 exports.useMemo = (f, deps) => { const s = slot(() => ({})); if (changed(s.deps, deps)) { s.v = f(); s.deps = deps } return s.v }
 exports.useRef = (v) => slot(() => ({ current: v }))
 exports.useCallback = (f) => f
-exports.useEffect = exports.useLayoutEffect = () => {}
+//? effects run only where a test asks for them (globalThis.__effects), on its commit - and never
+//? layout effects, which reach for a document this stand-in hasn't got
+exports.useLayoutEffect = () => {}
+exports.useEffect = (f, deps) => {
+  const s = slot(() => ({}))
+  if (globalThis.__effects && changed(s.deps, deps)) { s.deps = deps; current.effects.push(s); s.f = f }
+}
 exports.root = (component) => {
-  const root = { slots: [], cursor: 0 }
-  return (props) => { const outer = current; current = root; root.cursor = 0; try { return component(props) } finally { current = outer } }
+  const root = { slots: [], cursor: 0, effects: [] }
+  const render = (props) => { const outer = current; current = root; root.cursor = 0; try { return component(props) } finally { current = outer } }
+  render.commit = () => { for (const s of root.effects.splice(0)) { if (typeof s.cleanup === 'function') s.cleanup(); s.cleanup = s.f() } }
+  return render
 }
 `)
+
+//? the player's actions, as a page reads them from App (Requests plays a Done row's album, 2.0.0-player.17),
+//? and the id bridge, answered as the test says
+fs.writeFileSync(path.join(OUT, 'app/context.js'), `exports.usePlayerActions = () => globalThis.__requests.actions\n`)
+fs.writeFileSync(path.join(OUT, 'api/store.js'), `exports.storeAlbum = (by, signal) => globalThis.__requests.bridge(by.release_mbid, signal)\n`)
+//? the player's calls Requests and Home make: an album's songs asked for when the test says
+fs.writeFileSync(path.join(OUT, 'player/api.js'), `
+exports.albumPage = () => new Promise(() => {})
+exports.dropPrefetch = () => {}
+exports.prefetchAlbum = (id, keep, fresh) => globalThis.__requests.songs(id, !!fresh)
+exports.rememberPlayed = (album) => globalThis.__requests.remembered.push(album.id)
+exports.toQueueTrack = (song, album) => ({ id: song.id, albumId: album.id })
+`)
+globalThis.__requests = {
+  plays: [],
+  asked: [],
+  answers: [],
+  songAsks: [],
+  songAnswers: [],
+  remembered: [],
+  actions: { playTracks: (...args) => globalThis.__requests.plays.push(args) },
+  bridge(release) {
+    globalThis.__requests.asked.push(release)
+    return new Promise((resolve, reject) => globalThis.__requests.answers.push({ resolve, reject, release }))
+  },
+  songs(id, fresh) {
+    globalThis.__requests.songAsks.push([id, fresh])
+    return new Promise((resolve, reject) => globalThis.__requests.songAnswers.push({ resolve, reject, id }))
+  },
+}
+//? the bridge's answer for the oldest look out: Navidrome's id (or none), and the store's folders
+const bridgeSays = (navidrome_id, present = [{ path: 'Massive Attack/Heligoland (2010)' }]) =>
+  globalThis.__requests.answers.shift().resolve({ release_mbid: null, release_group_mbid: null, navidrome_id, present, other_pressings: [] })
 
 //? a page's storage, as the components read it - and a window.confirm() that counts: the app
 //? must never call it (a blocking dialog holds the page that plays the music)
@@ -84,6 +137,9 @@ globalThis.window = { confirm: (words) => { confirms.push(words); return true } 
 globalThis.console.error = () => {}
 
 const V = require(path.join(OUT, 'lib/requestsView.js'))
+const Q = require(path.join(OUT, 'app/Requests.js'))
+const Q_SETTLE = V.DONE_SCAN_SETTLE_MS
+const Q_RETRY = V.DONE_RETRY_MS
 const O = require(path.join(OUT, 'lib/downloadOverlay.js'))
 const { Requests } = require(path.join(OUT, 'app/Requests.js'))
 const Cards = require(path.join(OUT, 'app/JobCard.js'))
@@ -134,6 +190,10 @@ const byClass = (tree, name) => all(tree, hasClass(name))
 const NOW = Date.parse('2026-09-30T12:00:00Z')
 const ago = (seconds) => new Date(NOW - seconds * 1000).toISOString().replace('.000Z', '+00:00')
 
+//? checks that wait for an answer to land: run in turn, each after the promises before it have settled
+const later = []
+const await_ = (fn) => later.push(fn)
+
 let nextId = 1
 function job(status, more = {}) {
   return {
@@ -155,6 +215,197 @@ function input(jobs, more = {}) {
 const view = (jobs, more) => V.requestsView(input(jobs, more), NOW)
 const keys = (rows) => rows.map((row) => row.key)
 const MB = 1024 * 1024
+
+/* ========================================================================== */
+console.log('\nDone rows open, and play, their album (2.0.0-player.17)')
+{
+  const R1 = '11111111-1111-4111-8111-111111111111'
+  const doneOf = (status, more) => view([job(status, { release_mbid: R1, ...more })]).sections.done[0]
+  const filed = doneOf('organized', { outcome: 'filed' })
+  check('filed: its release, and it plays', [filed.release, filed.plays, filed.album], [R1, true, 'Heligoland'])
+  check('partly filed: its release, and it plays what landed', [doneOf('complete', { outcome: 'partly_filed', error: 'x' }).release, doneOf('complete', { outcome: 'partly_filed', error: 'x' }).plays], [R1, true])
+  check('already there: its release - the album is in the library - but nothing of this download to play',
+    [doneOf('complete', { outcome: 'already_there', error: 'already in the store: x' }).release, doneOf('complete', { outcome: 'already_there', error: 'x' }).plays], [R1, false])
+  check('interrupted, or not filed: no album to open',
+    [doneOf('complete', { outcome: 'interrupted', error: 'x' }).release, doneOf('complete', { error: 'Not filed: dry run' }).release], [null, null])
+  check('no release id: nothing to open', [view([job('organized', { outcome: 'filed' })]).sections.done[0].release], [null])
+  check('...and nothing still going carries one', view([job('downloading', { release_mbid: R1 })]).sections.downloading[0].release, null)
+
+  const drawn = (row, more = {}) => deep(H.root(Cards.DoneRow)({ row, onOpen() {}, onPlay() {}, ...more }))
+  const filedRow = drawn(filed)
+  check('a filed row: the row a button that opens it, and the round ▶ named for the album',
+    [all(filedRow, (n) => n.type === 'button' && n.props.class === 'app-done-open').length, all(filedRow, (n) => n.props.class === 'app-done-play').map((n) => n.props['aria-label'])],
+    [1, ['Play Heligoland']])
+  const there = drawn(doneOf('complete', { outcome: 'already_there', error: 'x' }))
+  check('already there: it opens, with no ▶', [all(there, (n) => n.type === 'button').map((n) => n.props.class)], [['app-done-open']])
+  const plain = drawn(view([job('organized', { outcome: 'filed' })]).sections.done[0])
+  check('no album to open: no button at all', all(plain, (n) => n.type === 'button').length, 0)
+  check('the note when it can\'t be opened, in amber', byClass(drawn(filed, { note: 'gone' }), 'app-job-line').map((n) => [text(n), n.props.class]),
+    [[byClass(filedRow, 'app-job-line').map(text)[0], 'app-job-line'], ['gone', 'app-job-line is-warning']])
+
+  //? the page: a tap before the album's songs are in hand opens it, through the bridge - never plays.
+  //? Run after everything synchronous, in order, each step after the answers before it have landed
+  await_(async () => {
+    const tick = () => new Promise((resolve) => setImmediate(() => setImmediate(resolve)))
+    const opened = []
+    const R = globalThis.__requests
+    R.asked.length = 0; R.answers.length = 0; R.songAsks.length = 0; R.songAnswers.length = 0; R.plays.length = 0; R.remembered.length = 0
+    const v = view([job('organized', { outcome: 'filed', release_mbid: R1 })])
+    const props = (more = {}) => ({ view: v, trackingEnabled: true, error: null, active: true, onCancel: async () => {}, onRetry: async () => {}, onClear: async () => {}, onOpenAlbum: (album) => opened.push(album), ...more })
+    const openButtons = (tree) => all(tree, (n) => typeof n.props.class === 'string' && n.props.class.split(' ')[0] === 'app-done-open')
+    const notes = (tree) => byClass(tree, 'app-job-line').map(text).slice(1)
+
+    const live = H.root(Requests)
+    const draw = (more) => deep(live(props(more)))
+    all(draw(), (n) => n.props.class === 'app-done-play')[0].props.onClick()
+    check('the ▶ with nothing in hand: the bridge asked for the album, nothing played', [R.asked, R.plays.length], [[R1], 0])
+    check('...the row busy - and faded - meanwhile', [openButtons(draw())[0].props['aria-busy'], openButtons(draw())[0].props.class], [true, 'app-done-open is-busy'])
+    bridgeSays('nd-heligoland')
+    await tick()
+    check('...and it opens on this tab when Navidrome\'s album comes, by its own name', opened, [{ id: 'nd-heligoland', name: 'Heligoland', artist: 'Massive Attack' }])
+    check('...its songs asked for as it opens, so the next ▶ plays', R.songAsks, [['nd-heligoland', false]])
+    R.songAnswers.shift().resolve({ id: 'nd-heligoland', name: 'Heligoland', song: [{ id: 's1' }, { id: 's2' }] })
+    await tick()
+    all(draw(), (n) => n.props.class === 'app-done-play')[0].props.onClick()
+    check('...and it does: the album remembered, then played from the top - nothing asked', [R.remembered, R.plays.map((play) => [play[0].map((t) => t.id), play[1]]), R.asked.length],
+      [['nd-heligoland'], [[['s1', 's2'], 0]], 1])
+    openButtons(draw())[0].props.onClick()
+    check('a tap opens it at once, asking nothing', [opened.length, R.asked.length], [2, 1])
+
+    const R2 = '22222222-2222-4222-8222-222222222222'
+    const lost = H.root(Requests)
+    const drawLost = (more = {}) => deep(lost(props({ view: view([job('organized', { outcome: 'filed', release_mbid: R2 })]), ...more })))
+    openButtons(drawLost())[0].props.onClick()
+    bridgeSays(null)
+    await tick()
+    check('Navidrome hasn\'t got it: the row says so, and opens nothing', [notes(drawLost()), opened.length], [["Navidrome hasn't found it yet - it may still be scanning"], 2])
+    openButtons(drawLost())[0].props.onClick()
+    bridgeSays('nd-lost')
+    await tick()
+    check('...a later tap that finds it opens it, and the note goes', [opened.slice(-1).map((album) => album.id), notes(drawLost())], [['nd-lost'], []])
+
+    const R3 = '33333333-3333-4333-8333-333333333333'
+    const untagged = H.root(Requests)
+    const drawThere = (more = {}) => deep(untagged(props({ view: view([job('complete', { outcome: 'already_there', error: 'already in the store: x', release_mbid: R3 })]), ...more })))
+    openButtons(drawThere())[0].props.onClick()
+    bridgeSays(null, [])
+    await tick()
+    check('no folder of the library tagged with its release (an untagged copy it matched): said so - no scan will help', notes(drawThere()), [Q.NOT_IN_STORE])
+    const down = "Navidrome isn't answering just now, so deadwax can't open the album here"
+    openButtons(drawThere({ navidromeProblem: down }))[0].props.onClick()
+    bridgeSays(null)
+    await tick()
+    check('Navidrome not answering: said so, not "still scanning"', notes(drawThere()), [down])
+    openButtons(drawThere())[0].props.onClick()
+    R.answers.shift().reject(new Error('deadwax away'))
+    await tick()
+    check('deadwax not answering the look: said so', notes(drawThere()), [Q.NOT_LOOKED_UP])
+
+    const R4 = '44444444-4444-4444-8444-444444444444'
+    const away = H.root(Requests)
+    const drawAway = (more = {}) => deep(away(props({ view: view([job('organized', { outcome: 'filed', release_mbid: R4 })]), ...more })))
+    const before = opened.length
+    openButtons(drawAway())[0].props.onClick()
+    drawAway({ active: false })
+    bridgeSays('nd-away')
+    await tick()
+    check('the tab left before the look answered: nothing opened on whichever tab you went to', opened.length, before)
+
+    const both = H.root(Requests)
+    const twoView = view([job('organized', { outcome: 'filed', release_mbid: R4, album: 'Known' }), job('organized', { outcome: 'filed', release_mbid: '55555555-5555-4555-8555-555555555555', album: 'Slow' })])
+    const rows = () => openButtons(deep(both(props({ view: twoView }))))
+    rows()[0].props.onClick()
+    bridgeSays('nd-known')
+    await tick()
+    rows()[1].props.onClick()
+    rows()[0].props.onClick()
+    bridgeSays('nd-slow')
+    await tick()
+    check('a tap on another row calls a look still out off: only the rows tapped open', opened.slice(before).map((album) => album.id), ['nd-known', 'nd-known'])
+  })
+}
+
+console.log('\nwhat the tab looks for ahead (doneLooks)')
+{
+  const NOW = 1_000_000
+  const none = { ids: new Map(), asked: new Map(), misses: new Map(), inFlight: new Set(), activeSince: NOW }
+  check('a row done before the page loaded: looked up at once', V.doneLooks([{ release: 'a', since: 0 }], none, NOW), { look: ['a'], songs: [], nextIn: null })
+  check('a row filed just now: not before Navidrome can have scanned it',
+    V.doneLooks([{ release: 'a', since: NOW - 2000 }], none, NOW), { look: [], songs: [], nextIn: V.DONE_SCAN_SETTLE_MS - 2000 })
+  const missed = { ...none, misses: new Map([['a', { count: 1, at: NOW - 1000 }]]) }
+  check('a look that found nothing: again after DONE_RETRY_MS', V.doneLooks([{ release: 'a', since: 0 }], missed, NOW).nextIn, V.DONE_RETRY_MS - 1000)
+  check('...doubling, to DONE_RETRY_MAX_MS', [
+    V.doneLooks([{ release: 'a', since: 0 }], { ...none, misses: new Map([['a', { count: 3, at: NOW }]]) }, NOW).nextIn,
+    V.doneLooks([{ release: 'a', since: 0 }], { ...none, misses: new Map([['a', { count: 20, at: NOW }]]) }, NOW).nextIn,
+  ], [4 * V.DONE_RETRY_MS, V.DONE_RETRY_MAX_MS])
+  check('...and once due, looked up', V.doneLooks([{ release: 'a', since: 0 }], missed, NOW + V.DONE_RETRY_MS).look, ['a'])
+  const found = { ...none, ids: new Map([['a', 'nd-a']]) }
+  check('found: its songs asked for', V.doneLooks([{ release: 'a', since: 0 }], found, NOW), { look: [], songs: ['a'], nextIn: null })
+  const asked = { ...found, asked: new Map([['a', NOW - 1000]]) }
+  check('...asked lately: nothing more', V.doneLooks([{ release: 'a', since: 0 }], asked, NOW), { look: [], songs: [], nextIn: null })
+  check('...a later download of the release, filed just now: asked again once Navidrome can have scanned it',
+    [V.doneLooks([{ release: 'a', since: 0 }, { release: 'a', since: NOW - 500 }], asked, NOW).nextIn, V.doneLooks([{ release: 'a', since: NOW - 500 }], asked, NOW + V.DONE_SCAN_SETTLE_MS).songs],
+    [V.DONE_SCAN_SETTLE_MS - 500, ['a']])
+  check('...asked long before the tab last came back: asked again',
+    V.doneLooks([{ release: 'a', since: 0 }], { ...asked, asked: new Map([['a', NOW - V.DONE_FRESH_MS - 1]]) }, NOW).songs, ['a'])
+  check('asked now: nothing again until it answers', V.doneLooks([{ release: 'a', since: 0 }], { ...none, inFlight: new Set(['a']) }, NOW), { look: [], songs: [], nextIn: null })
+}
+
+console.log('\nthe tab looking ahead, effects running')
+await_(async () => {
+  const tick = () => new Promise((resolve) => setImmediate(() => setImmediate(resolve)))
+  globalThis.__effects = true
+  const R = globalThis.__requests
+  R.asked.length = 0; R.answers.length = 0; R.songAsks.length = 0; R.songAnswers.length = 0; R.plays.length = 0
+  const timers = []
+  const realSetTimeout = globalThis.setTimeout
+  const realClear = globalThis.clearTimeout
+  const realNow = Date.now
+  globalThis.setTimeout = (fn, ms) => { const timer = { fn, ms, live: true }; timers.push(timer); return timer }
+  globalThis.clearTimeout = (timer) => { if (timer && timer.fn) timer.live = false; else realClear(timer) }
+  const fire = () => { for (const timer of timers.splice(0)) if (timer.live) timer.fn() }
+  try {
+    const R5 = '66666666-6666-4666-8666-666666666666'
+    const tab = H.root(Requests)
+    let current = view([])
+    const draw = (more = {}) => {
+      const tree = deep(tab({ view: current, trackingEnabled: true, error: null, active: true, onCancel: async () => {}, onRetry: async () => {}, onClear: async () => {}, onOpenAlbum() {}, ...more }))
+      tab.commit()
+      return tree
+    }
+    draw()
+    current = view([job('organized', { outcome: 'filed', release_mbid: R5 })])
+    draw()
+    check('a download filed while the tab shows: not looked up straight away (Navidrome hasn\'t scanned it)', [R.asked, timers.filter((t) => t.live).map((t) => t.ms <= Q_SETTLE)], [[], [true]])
+    Date.now = () => realNow() + Q_SETTLE + 1
+    fire()
+    draw()
+    check('...then looked up', R.asked, [R5])
+    bridgeSays(null)
+    await tick()
+    draw()
+    check('nothing found yet: looked at again later, not given up on', timers.filter((t) => t.live).length, 1)
+    Date.now = () => realNow() + Q_SETTLE + 1 + Q_RETRY + 1
+    fire()
+    draw()
+    check('...looked up again', R.asked, [R5, R5])
+    bridgeSays('nd-five')
+    await tick()
+    draw()
+    check('...found: its songs asked for (kept)', R.songAsks, [['nd-five', false]])
+    R.songAnswers.shift().resolve({ id: 'nd-five', name: 'Five', song: [{ id: 'f1' }] })
+    await tick()
+    const tree = draw()
+    all(tree, (n) => n.props.class === 'app-done-play')[0].props.onClick()
+    check('...and its ▶ plays it, from the tap', R.plays.slice(-1).map((play) => play[0].map((t) => t.id)), [['f1']])
+  } finally {
+    globalThis.setTimeout = realSetTimeout
+    globalThis.clearTimeout = realClear
+    Date.now = realNow
+    globalThis.__effects = false
+  }
+})
+
 
 /* ========================================================================== */
 console.log('\ngrouping: which heading each download goes under')
@@ -633,5 +884,11 @@ console.log('\nthe Requests tab as a whole')
 }
 
 /* ========================================================================== */
-console.log(failures ? `\n${failures} FAILED` : '\nall passed')
-process.exit(failures ? 1 : 0)
+;(async () => {
+  for (const fn of later) {
+    await new Promise((resolve) => setImmediate(resolve))
+    await fn()
+  }
+  console.log(failures ? `\n${failures} FAILED` : '\nall passed')
+  process.exit(failures ? 1 : 0)
+})()

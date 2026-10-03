@@ -98,6 +98,19 @@ def test_a_new_address_with_the_password_is_saved_and_the_client_rebuilt(app, st
     assert (row["value"], row["overridden"], row["status"]) == ("http://music-box:4533", True, "ok")
 
 
+def test_a_new_address_forgets_the_album_ids_the_old_one_gave(app, store, cached_client):
+    """
+    The id bridge keeps the Navidrome album found for a release (2.0.0-player.17): another Navidrome
+    has other ids, so a new address - another server, or another account on it - forgets them.
+    """
+    from src.routes import store_album
+
+    store_album._keep("11111111-1111-4111-8111-111111111111", "old-server-album")
+    save(app, NAVIDROME_URL="http://music-box:4533", NAVIDROME_PASSWORD=NEW_PASSWORD)
+
+    assert store_album._kept("11111111-1111-4111-8111-111111111111") is None
+
+
 def test_a_new_address_without_the_password_is_refused(app, store, cached_client):
     """What anyone who can reach deadwax could otherwise do: collect the saved password's token."""
     response = save(app, NAVIDROME_URL="http://collector.example:9999")

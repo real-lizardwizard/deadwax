@@ -24,12 +24,18 @@ export interface Album {
   id: string
   name: string
   artist?: string
+  /** the album artist's Navidrome id: what the album page's artist line opens (2.0.0-player.17) */
+  artistId?: string
   coverArt?: string
   songCount?: number
   /** seconds */
   duration?: number
   year?: number
   genre?: string
+  /** OpenSubsonic: the release's MusicBrainz id, as Navidrome read it from the files ('' for none) */
+  musicBrainzId?: string
+  /** OpenSubsonic: the labels the files name - Info's album line (2.0.0-player.17) */
+  recordLabels?: { name?: string }[]
 }
 
 export interface Song {
@@ -38,6 +44,8 @@ export interface Song {
   album?: string
   albumId?: string
   artist?: string
+  /** the song's own artist's Navidrome id */
+  artistId?: string
   track?: number
   discNumber?: number
   /** seconds */
@@ -51,6 +59,12 @@ export interface Song {
   samplingRate?: number
   bitDepth?: number
   channelCount?: number
+  /** how many times it has been played - omitted by Navidrome until it has been (2.0.0-player.17) */
+  playCount?: number
+  /** OpenSubsonic: who wrote it, as one line ('' for nobody) */
+  displayComposer?: string
+  /** OpenSubsonic: everyone credited on it, by role - composers among them */
+  contributors?: { role?: string; artist?: { name?: string } }[]
 }
 
 /** One disc's own title - MusicBrainz's medium title, which deadwax writes as `discsubtitle` and
@@ -85,12 +99,20 @@ export async function albumPage(
   return page.albums
 }
 
-/** An artist as search3 answers: what the Search tab's top result shows. */
+/** An artist as Navidrome answers - search3, getArtists, getArtist: what the Search tab's top
+ *  result, Library > Artists and the artist page show. */
 export interface Artist {
   id: string
   name: string
   albumCount?: number
   coverArt?: string
+  /** OpenSubsonic: the album artist's MusicBrainz id, from the files' musicbrainz_albumartistid */
+  musicBrainzId?: string
+}
+
+/** getArtist: the artist and the albums Navidrome has of theirs. */
+export interface ArtistWithAlbums extends Artist {
+  album?: Album[]
 }
 
 /** The library half of the Search tab: Navidrome's search3, as deadwax's route passes it on. */
@@ -111,6 +133,57 @@ export function searchLibrary(query: string, signal?: AbortSignal): Promise<Libr
   const params = new URLSearchParams({ q: query })
   for (const [name, count] of Object.entries(SEARCH_COUNTS)) params.set(name, String(count))
   return get<LibraryResults>(`/navidrome/search?${params}`, signal)
+}
+
+/**
+ * Every artist in the library (2.0.0-player.17), in Navidrome's order - getArtists through deadwax's
+ * route, flattened from its index by initial. Kept for the page's life once answered, since the
+ * artist page reads it to find an artist opened from MusicBrainz; `fresh` asks again (Library >
+ * Artists, as it is opened, and the artist page when a kept list doesn't have who it looks for -
+ * an artist new to the library since: artistIndexAge says how old the kept one is).
+ */
+let artistIndex: Promise<Artist[]> | null = null
+let artistIndexAt = 0
+
+export function libraryArtists(fresh = false): Promise<Artist[]> {
+  if (fresh || !artistIndex) {
+    const asking = get<{ artists: Artist[] }>('/navidrome/artists').then((answer) => answer.artists ?? [])
+    //? a failed ask isn't kept: the next one asks again
+    asking.catch(() => {
+      if (artistIndex === asking) artistIndex = null
+    })
+    artistIndex = asking
+    artistIndexAt = Date.now()
+  }
+  return artistIndex
+}
+
+/** How long ago the kept list of artists was asked for, in ms - Infinity when none is kept. */
+export function artistIndexAge(): number {
+  return artistIndex ? Date.now() - artistIndexAt : Infinity
+}
+
+/** One artist and the albums Navidrome has of theirs (getArtist) - the artist page. */
+export function artistAlbums(id: string, signal?: AbortSignal): Promise<ArtistWithAlbums> {
+  return get<ArtistWithAlbums>(`/navidrome/artists/${encodeURIComponent(id)}`, signal)
+}
+
+/** One song as Navidrome has it now (getSong) - Info's play count and writers. */
+export function songDetails(id: string, signal?: AbortSignal): Promise<Song> {
+  return get<Song>(`/navidrome/songs/${encodeURIComponent(id)}`, signal)
+}
+
+/** How many songs Library > Songs asks for at a time. */
+export const SONGS_PAGE = 100
+
+/**
+ * A page of every song in the library (2.0.0-player.17's Library > Songs): search3 with an EMPTY
+ * query, which Navidrome answers with everything, a page at a time - no artists or albums asked.
+ */
+export async function librarySongs(offset: number, count: number = SONGS_PAGE, signal?: AbortSignal): Promise<Song[]> {
+  const params = new URLSearchParams({ q: '', artistCount: '0', albumCount: '0', songCount: String(count), songOffset: String(offset) })
+  const found = await get<LibraryResults>(`/navidrome/search?${params}`, signal)
+  return found.songs ?? []
 }
 
 /** How long an album asked for ahead of its page opening is worth using. */
@@ -140,19 +213,26 @@ const albumPath = (id: string) => `/navidrome/albums/${encodeURIComponent(id)}`
  * calls it off (dropPrefetch) - which, on an ask Search was waiting for, would have left that
  * album's songs opening the album instead of playing, with nothing asking again (review). So a
  * kept ask is never called off, whoever asked first.
+ *
+ * `fresh` (2.0.0-player.17): asked anew whatever is held - Requests asking again for an album it
+ * asked for before Navidrome could have scanned what a download filed into it.
  */
-export function prefetchAlbum(id: string, keep = false): Promise<AlbumWithSongs> {
+export function prefetchAlbum(id: string, keep = false, fresh = false): Promise<AlbumWithSongs> {
   const now = Date.now()
   for (const [key, held] of prefetched) if (now - held.at >= PREFETCH_KEEP_MS) prefetched.delete(key)
-  const held = prefetched.get(id)
+  const held = fresh ? undefined : prefetched.get(id)
   if (held) {
     if (keep) held.kept = true
     return held.answer
   }
   const controller = typeof AbortController === 'function' ? new AbortController() : null
   const answer = get<AlbumWithSongs>(albumPath(id), controller?.signal)
-  //? an ask nobody takes must not report an unhandled rejection; album() hands the answer on as it is
-  answer.catch(() => {})
+  //? an ask nobody takes must not report an unhandled rejection; album() hands the answer on as it is.
+  //? A FAILED ask is let go (2.0.0-player.17), so the next asks afresh - the album page opening, or
+  //? the artist page's Try again - rather than being handed the same failure for the rest of 30 s
+  answer.catch(() => {
+    if (prefetched.get(id)?.answer === answer) prefetched.delete(id)
+  })
   prefetched.set(id, { at: now, answer, controller, kept: keep })
   //? Search keeps the answer it is handed (2.0.0-player.13), so a song's tap plays with its album in
   //? hand; the album page still takes the ask here once, as it opens
@@ -186,6 +266,15 @@ const played = createPlayedAlbums<AlbumWithSongs>()
  */
 export function rememberPlayed(album: AlbumWithSongs): void {
   played.remember(album)
+}
+
+/**
+ * The album answers a queue of SEVERAL albums is about to be played from (2.0.0-player.17: an
+ * artist's Play and Shuffle), in the order they play - every one kept until the next queue starts,
+ * so Info and the turntable know each song's album whichever plays. In the tap, like rememberPlayed.
+ */
+export function rememberQueue(albums: readonly AlbumWithSongs[]): void {
+  played.rememberQueue(albums)
 }
 
 /** The answer a song's album was played from, exactly as Navidrome sent it; null when not in hand. */

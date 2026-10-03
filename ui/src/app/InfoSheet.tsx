@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
-import { aboutRows, type About, type AboutAlbumFields } from '../lib/aboutRows'
+import { aboutRows, type About, type AboutAlbumFields, type AboutDetails } from '../lib/aboutRows'
 import type { DeckReport } from '../lib/deckVoice'
 import { debugSections, type DebugSection } from '../lib/debugRows'
 import type { QueueTrack } from '../lib/playQueue'
@@ -26,8 +26,12 @@ interface Drawn {
  * Info: a sheet over Now Playing, opened from its ••• menu (2.0.0-player.10), with two tabs.
  *
  * - ABOUT: the song, its album and its artist, from what the app already has (lib/aboutRows.ts) -
- *   the queue's copy of the song and the album answer it was played from. A field Navidrome didn't
- *   send is left out, never invented. The album's card goes to the album, like "Go to album".
+ *   the queue's copy of the song and the album answer it was played from - and, since
+ *   2.0.0-player.17, what App asks for as Info opens (`details`, app/useInfoDetails.ts): the play
+ *   count, the writers, the label, "This pressing" and the folder, and who the artist is. A field
+ *   Navidrome didn't send is left out, never invented. The album's card goes to the album, like "Go
+ *   to album", and the artist's to their page. The folder is a row of its own at the end ("In your
+ *   library"), outside every link: a path is the one thing here people copy (review).
  * - DEBUG: what used to be two lines on the now-playing screen - how the song was sent, how the
  *   last song changes and the last seek went - as labelled rows (lib/debugRows.ts), the turntable's
  *   own sound (2.0.0-player.14: ready, or off and why), and the names of the fields Navidrome sent
@@ -56,6 +60,8 @@ export function InfoSheet({
   album,
   sentFormat,
   turntable = null,
+  details = null,
+  onArtist = null,
 }: {
   open: boolean
   opener?: { current: HTMLElement | null } | undefined
@@ -68,6 +74,10 @@ export function InfoSheet({
   sentFormat: (track: QueueTrack) => 'raw' | 'mp3' | null
   /** the turntable's sound (2.0.0-player.14), for Debug's "Turntable sound": null while none shows */
   turntable?: DeckReport | null
+  /** what App asked for as Info opened (2.0.0-player.17): null until it answers */
+  details?: AboutDetails | null
+  /** close everything and open the artist's page, by Navidrome's id for them; null for none */
+  onArtist?: ((artist: { id: string; name: string }) => void) | null
 }) {
   const done = useRef<HTMLButtonElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -83,7 +93,7 @@ export function InfoSheet({
   const track = player.track
   if (open && track) {
     if (tab === 'about') {
-      drawn.current = { about: aboutRows(track, album), debug: null }
+      drawn.current = { about: aboutRows(track, album, details), debug: null }
     } else {
       const answer = album as Readonly<Record<string, unknown>> | null
       const song = album?.song?.find((candidate) => candidate.id === track.id) ?? null
@@ -176,6 +186,7 @@ export function InfoSheet({
                         {line}
                       </p>
                     ))}
+                    {about.song.writtenBy && <p class="app-info-line">Written by {about.song.writtenBy}</p>}
                   </div>
                 </div>
               </section>
@@ -191,6 +202,7 @@ export function InfoSheet({
                       <span class="app-info-text">
                         <span class="app-info-name">{about.album.title}</span>
                         {about.album.line && <span class="app-info-line">{about.album.line}</span>}
+                        {about.album.pressing && <span class="app-info-line">{about.album.pressing}</span>}
                       </span>
                       <ChevronRightIcon class="app-chevron" />
                     </button>
@@ -200,6 +212,7 @@ export function InfoSheet({
                       <div class="app-info-text">
                         <p class="app-info-name">{about.album.title}</p>
                         {about.album.line && <p class="app-info-line">{about.album.line}</p>}
+                        {about.album.pressing && <p class="app-info-line">{about.album.pressing}</p>}
                       </div>
                     </div>
                   )}
@@ -211,12 +224,43 @@ export function InfoSheet({
                   <h3 id="app-info-artist" class="app-section-title">
                     The artist
                   </h3>
-                  <div class="app-card app-info-card">
-                    <div class="app-info-text">
-                      <p class="app-info-name">{about.artist.name}</p>
-                      {about.artist.note && <p class="app-info-line">{about.artist.note}</p>}
+                  {about.artist.id && onArtist ? (
+                    <button type="button" class="app-card app-info-card is-link" onClick={() => onArtist({ id: about.artist!.id!, name: about.artist!.pageName ?? about.artist!.name })}>
+                      <span class="app-info-text">
+                        <span class="app-info-name">{about.artist.name}</span>
+                        {about.artist.facts && <span class="app-info-line">{about.artist.facts}</span>}
+                        {about.artist.count && <span class="app-info-line">{about.artist.count}</span>}
+                        {about.artist.note && <span class="app-info-line">{about.artist.note}</span>}
+                      </span>
+                      <ChevronRightIcon class="app-chevron" />
+                    </button>
+                  ) : (
+                    <div class="app-card app-info-card">
+                      <div class="app-info-text">
+                        <p class="app-info-name">{about.artist.name}</p>
+                        {about.artist.facts && <p class="app-info-line">{about.artist.facts}</p>}
+                        {about.artist.count && <p class="app-info-line">{about.artist.count}</p>}
+                        {about.artist.note && <p class="app-info-line">{about.artist.note}</p>}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                </section>
+              )}
+
+              {/* the album's folder, last: a path to copy (never inside the album's link, where it
+                  couldn't be selected and was read out with every press), and a line landing late
+                  here moves no card a finger is reaching for */}
+              {about.album?.folder && (
+                <section class="app-info-section" aria-labelledby="app-info-where">
+                  <h3 id="app-info-where" class="app-section-title">
+                    In your library
+                  </h3>
+                  <dl class="app-group app-kv">
+                    <div class="app-kv-row">
+                      <dt class="app-kv-label">Folder</dt>
+                      <dd class="app-kv-value app-mono app-info-folder">{about.album.folder}</dd>
+                    </div>
+                  </dl>
                 </section>
               )}
             </>

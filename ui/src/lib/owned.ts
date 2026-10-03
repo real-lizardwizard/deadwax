@@ -25,6 +25,9 @@ export interface OwnedAlbum {
   release_group_mbid?: string | null
   formats?: string[] | null
   track_count?: number | null
+  /** WHO the album is by, as MusicBrainz ids (2.0.0-player.17): one for one artist, several for a
+   *  collaboration, none for a folder not tagged with any - absent from an older server */
+  albumartist_mbids?: string[] | null
 }
 
 export interface OwnedIndex {

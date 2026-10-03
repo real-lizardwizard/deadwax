@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { MusicBrainzUnavailable } from '../api/http'
 import { fullySearch, getReleaseGroup } from '../api/musicbrainz'
+import { navidromeAlbumFor } from '../api/store'
 import type { ReleaseGroup, ReleaseGroupResponse } from '../api/types'
+import { heldReleases } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
-import { coverAddresses, pressingLabel, type PageRelease } from '../lib/pressings'
-import { buildDownloadRelease, usualPressing } from '../lib/releasePayload'
+import { coverAddresses } from '../lib/pressings'
+import { creditName } from '../lib/release'
 import {
   LIBRARY_SETTLE_MS, MUSICBRAINZ_SETTLE_MS, SEARCH_MAX_CHARS, artistNames, asksMusicBrainzBySettling, musicBrainzOnTyping, searchQuery,
   type SearchPlan,
@@ -13,14 +15,14 @@ import {
 import { albumsToPrefetch, artistLine, groupHeld, groupLine, notInLibrary, songIndex, topArtist } from '../lib/searchResults'
 import {
   dropPrefetch, prefetchAlbum, rememberPlayed, searchLibrary, toQueueTrack,
-  type Album, type AlbumWithSongs, type LibraryResults, type NavidromeStatus, type Song,
+  type Album, type AlbumWithSongs, type Artist, type LibraryResults, type NavidromeStatus, type Song,
 } from '../player/api'
 import { Cover } from '../player/Cover'
 import { PlayIcon, SearchIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import { usePlayerActions } from './context'
 import { NeedsNavidrome } from './NeedsNavidrome'
-import { keep, kept } from './pressingLists'
+import { keep, kept, usualGet } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { useGetSettings } from './useGetSettings'
 import { ownedNow, refreshOwned, useOwned } from './useOwned'
@@ -52,9 +54,9 @@ type Musicbrainz =
  * you do". The boards are Search.dc.html (this) and Request.dc.html (the album you don't have).
  *
  *  - THE LIBRARY HALF is Navidrome's search3 (deadwax's /navidrome/search), LIBRARY_SETTLE_MS after
- *    typing stops. An artist whose name is what was typed is the Top result - not a link: there is
- *    no artist page yet, and a row that went somewhere else would be a lie. Then albums, which open
- *    their page (asking for its songs as the finger lands, as a tile does), and songs.
+ *    typing stops. An artist whose name is what was typed is the Top result; then the other artists
+ *    found, albums, which open their page (asking for its songs as the finger lands, as a tile
+ *    does), and songs. An artist - the top result or a row - opens their page (2.0.0-player.17).
  *  - A SONG PLAYS WITHIN ITS ALBUM once that album is in hand: the first SONG_ALBUMS_PREFETCHED
  *    distinct albums of the songs found are asked for as the answer lands (the album page's own
  *    prefetch), and a song's tap then plays its album from that song - playTracks straight from
@@ -71,7 +73,9 @@ type Musicbrainz =
  *    waits up to OWNED_WAIT_MS for the library's, asked beside it - and a later answer marks a row
  *    held rather than taking it away from under a finger. A box cut back below
  *    MUSICBRAINZ_MIN_CHARS drops what the longer text found (musicBrainzOnTyping). A tap opens the
- *    album you don't have.
+ *    album you don't have - or, on a row found held after it was drawn, the album you have
+ *    (2.0.0-player.17's id bridge: Navidrome's album for a release you hold, through its own
+ *    latestOnly), the album you don't have when Navidrome hasn't found it.
  *  - A GET CHIP on each of those rows (2.0.0-player.15): the usual pressing of the album - the one
  *    its page opens on, and a main-page card's Find downloads (representativeRelease over every
  *    pressing, from /search_musicbrainz/release_group or the session's lists, through its own
@@ -97,6 +101,7 @@ export function Search({
   onRetry,
   onOpenAlbum,
   onOpenGroup,
+  onOpenArtist,
   onGet,
 }: {
   /** the tab has been shown at least once: what the library holds is asked then */
@@ -107,6 +112,8 @@ export function Search({
   onRetry: () => void
   onOpenAlbum: (album: Album) => void
   onOpenGroup: (group: ReleaseGroup) => void
+  /** an artist's page (2.0.0-player.17) */
+  onOpenArtist: (artist: Artist) => void
   /** a row's Get: open the Sources sheet for its usual pressing, focus given back to `opener` */
   onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
 }) {
@@ -131,6 +138,9 @@ export function Search({
   //? a Get chip's lookup of the album's pressings: only the newest tap opens the sheet
   const getRequests = useMemo(latestOnly, [])
   const [resolving, setResolving] = useState<string | null>(null)
+  //? a row found held after it was drawn: the album you have, asked of the id bridge
+  const heldRequests = useMemo(latestOnly, [])
+  const [opening, setOpening] = useState<string | null>(null)
   //? what each half was last asked, so Enter and the pause after it don't ask twice
   const asked = useRef<string | null>(null)
   const libraryAsked = useRef<string | null>(null)
@@ -235,10 +245,13 @@ export function Search({
     if (status?.ok && query) askLibrary(query)
   }, [status?.ok])
 
-  /** A Get chip's lookup still out is called off, and its chip says Get again. */
+  /** A Get chip's lookup still out is called off, and its chip says Get again - and so is a held
+   *  row's look for the album you have, which would otherwise open it wherever you had gone. */
   function standDown() {
     getRequests.supersede()
     setResolving(null)
+    heldRequests.supersede()
+    setOpening(null)
   }
 
   //? the tab's root no longer what shows - another tab, a page over it, Now Playing or the sheet:
@@ -252,7 +265,38 @@ export function Search({
     libraryRequests.supersede()
     musicRequests.supersede()
     getRequests.supersede()
+    heldRequests.supersede()
   }, [])
+
+  /**
+   * A MusicBrainz row the library turned out to hold: Navidrome's album for a release of it you
+   * hold - the album you have - else, Navidrome not having found it (or not answering), the album you
+   * don't have, which says "in your library".
+   */
+  function openGroup(group: ReleaseGroup) {
+    const releases = heldReleases(owned?.index ?? null, group.id)
+    if (!releases.length) {
+      onOpenGroup(group)
+      return
+    }
+    const request = heldRequests.begin()
+    setOpening(group.id)
+    navidromeAlbumFor(releases, request.signal).then(
+      (album) => {
+        if (!request.current()) return
+        setOpening(null)
+        //? drawn with its credited artist, so the album page's artist line holds its place as it loads
+        const artist = creditName(group['artist-credit'])
+        if (album) onOpenAlbum({ id: album, name: group.title ?? '', ...(artist ? { artist } : {}) })
+        else onOpenGroup(group)
+      },
+      (reason: unknown) => {
+        if (!request.current() || isAbort(reason)) return
+        setOpening(null)
+        onOpenGroup(group)
+      },
+    )
+  }
 
   /**
    * A row's Get: the album's usual pressing - from the session's lists, else asked of MusicBrainz -
@@ -277,13 +321,7 @@ export function Search({
     }
     if (!request.current()) return
     setResolving(null)
-    const usual = pressings ? usualPressing(pressings.releases as PageRelease[]) : null
-    const pressing = usual ? pressings!.releases.find((release) => release.id === usual.id) ?? null : null
-    const built = buildDownloadRelease(group, pressing)
-    onGet({
-      release: built.release,
-      subtitle: [group.title, usual ? pressingLabel(usual) : 'the album as a whole'].filter(Boolean).join(' · '),
-    }, opener)
+    onGet(usualGet(group, pressings), opener)
   }
 
   const submit = (event: Event) => {
@@ -316,6 +354,7 @@ export function Search({
 
   const results = library?.results
   const top = results ? topArtist(results.artists, library!.text) : null
+  const artists = (results?.artists ?? []).filter((artist) => artist !== top)
   const found = musicbrainz.state === 'done' ? musicbrainz.shown : []
 
   return (
@@ -364,19 +403,30 @@ export function Search({
                 {top && (
                   <section class="app-section app-search-section" aria-labelledby="app-search-top">
                     <h2 id="app-search-top" class="app-section-title app-search-title">Top result</h2>
-                    <div class="app-result is-artist">
+                    <button type="button" class="app-result is-artist" onClick={() => onOpenArtist(top)}>
                       <Cover id={top.coverArt} size={112} class="app-result-cover is-round" />
                       <span class="app-result-text">
                         <span class="app-result-title is-large">{top.name}</span>
                         <span class="app-result-line">{artistLine(top.albumCount)}</span>
                       </span>
-                    </div>
+                    </button>
                   </section>
                 )}
                 <section class="app-section app-search-section" aria-labelledby="app-search-library">
                   <h2 id="app-search-library" class="app-section-title app-search-title">In your library</h2>
-                  {results.albums.length || results.songs.length ? (
+                  {artists.length || results.albums.length || results.songs.length ? (
                     <ul class="app-results">
+                      {artists.map((artist) => (
+                        <li key={`artist:${artist.id}`}>
+                          <button type="button" class="app-result" onClick={() => onOpenArtist(artist)}>
+                            <Cover id={artist.coverArt} size={96} class="app-result-cover is-round is-small" />
+                            <span class="app-result-text">
+                              <span class="app-result-title">{artist.name}</span>
+                              <span class="app-result-line">{artistLine(artist.albumCount)}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
                       {results.albums.map((album) => (
                         <li key={`album:${album.id}`}>
                           <button
@@ -446,7 +496,7 @@ export function Search({
                   const asking = resolving === group.id
                   return (
                     <li key={group.id} class="app-result-row">
-                      <button type="button" class="app-result" onClick={() => onOpenGroup(group)}>
+                      <button type="button" class={`app-result${opening === group.id ? ' is-busy' : ''}`} aria-busy={opening === group.id} onClick={() => (held ? openGroup(group) : onOpenGroup(group))}>
                         <ArchiveCover addresses={coverAddresses(null, group.id, 250)} class="app-result-cover" />
                         <span class="app-result-text">
                           <span class="app-result-title">{group.title ?? ''}</span>

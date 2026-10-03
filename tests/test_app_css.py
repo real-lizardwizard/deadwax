@@ -68,6 +68,26 @@ And for Get and the Sources sheet (2.0.0-player.15):
   last - has the head's whole width and wraps, never an ellipsis, while the title stays on one line,
   centred, at 320px; the list takes focus a button that ended its state hands it, with no ring; and
   the asking bar of a sheet closed mid-search stops moving.
+
+And for artists and the two libraries joined (2.0.0-player.17):
+
+- The artist page as its board draws it: a 240px hero in its own colour, the picture under it filling
+  it, a scrim over the picture only, the back link and the name over that; every row and the back
+  link a tap target.
+- An album page's artist line, a link, reaches 44px to a finger; its "In your library" row is ONE line,
+  so an "Also" chip landing in it moves nothing below and a long edition gives way with an ellipsis -
+  the chip's own reach never clipped.
+- The Library's chips are the board's 32px, reaching 44, wrapping with room between rows; its sort's
+  picker covers the sort whole, unseen, and is never small enough for iOS to zoom.
+- A Done row opens its album from the whole row, and its round play button is a 32px face in a 44px
+  target.
+- Info's folder is a path, broken anywhere, a folder per line.
+- After review: the artist page's scrim keeps white words legible over a white sky - the name 3:1
+  (on one line or two), the line under it 4.5:1; the line under Play and the albums' heading hold
+  their height from the first frame; a row looking for its album fades as a Get chip does; an
+  artist's name that isn't a link isn't drawn in the link's colour, and an album page's artist line
+  holds its place before the album answers; Info's folder can be selected; and the order chips the
+  Library's chips replaced are gone, rules and tokens.
 """
 
 import re
@@ -678,3 +698,147 @@ def test_what_is_already_here_of_a_pressing_breaks_anywhere():
     assert declarations(APP, ".app-rg-store:empty") == {"margin-top": "calc(-1 * var(--app-rg-get-gap))"}
     assert declarations(APP, ".app-rg-actions")["gap"] == "var(--app-rg-get-gap)"
 
+
+
+# ---------------------------------------------------------------- artists and the id bridge (2.0.0-player.17)
+
+def test_the_artist_page_is_drawn_as_its_board_has_it():
+    hero = declarations(APP, ".app-artist-hero")
+    assert (hero["min-height"], hero["background"], hero["position"], hero["overflow"]) == (
+        "var(--app-artist-hero)", "var(--dw-artist-hero)", "relative", "hidden")
+    assert px("--app-artist-hero") == 240 and ALL_TOKENS["--dw-artist-hero"] == "#3a2530"
+    #? clear of the status bar and placed by the insets, never padded by both
+    assert hero["padding"].startswith("calc(var(--pl-safe-top) + var(--app-artist-hero-pad)) var(--pl-edge-right)")
+    picture = declarations(APP, ".app-artist-picture")
+    assert (picture["position"], picture["inset"], picture["object-fit"]) == ("absolute", "0", "cover")
+    #? the scrim only over a picture: a hero in its own colour stays that colour
+    scrim = declarations(APP, ".app-artist-hero:has(img.app-artist-picture)::after")
+    assert scrim["background"] == "var(--dw-artist-scrim)" and scrim["position"] == "absolute"
+    assert declarations(APP, ".app-artist-picture.is-empty") == {"display": "none"}
+    assert declarations(APP, ".app-artist-names")["z-index"] == "var(--app-z-hero-words)"
+    #? the back link and every row a tap target; a row's words give way
+    assert declarations(APP, ".app-artist-back")["min-height"] == "var(--pl-hit)"
+    assert declarations(APP, ".app-artist-album")["min-height"] == "var(--app-artist-row)" and px("--app-artist-row") >= px("--pl-hit")
+    assert declarations(APP, ".app-artist-album")["min-width"] == "0"
+    words = declarations(APP, ".app-artist-line-text")
+    assert (words["overflow"], words["text-overflow"], words["white-space"], words["min-width"]) == ("hidden", "ellipsis", "nowrap", "0")
+
+
+def test_an_album_pages_artist_link_and_also_chips():
+    link = declarations(APP, ".app-hero-link::before")
+    assert link["top"] == link["bottom"] == "calc(-1 * var(--app-hero-link-reach))"
+    assert ALL_TOKENS["--app-hero-link-reach"] == "calc((var(--pl-hit) - 1.25em) / 2)"
+    #? one line, from the first frame: no wrap, so a chip landing never pushes Play down a row
+    chips = declarations(APP, ".app-album-chips")
+    assert chips["display"] == "flex" and "flex-wrap" not in chips
+    assert declarations(APP, ".app-album-chips > *")["min-width"] == "0"
+    label = declarations(APP, ".app-also-label")
+    assert (label["overflow"], label["text-overflow"], label["white-space"]) == ("hidden", "ellipsis", "nowrap")
+    #? the chip itself keeps no overflow, so its 44px reach isn't clipped (it is an .app-chip)
+    assert "overflow" not in declarations(APP, ".app-also")
+    badge = declarations(APP, ".app-held-badge")
+    assert (badge["flex"], badge["height"], badge["color"], badge["background"]) == (
+        "none", "var(--app-chip)", "var(--dw-badge-green-text)", "var(--dw-badge-green-bg)")
+
+
+def test_the_librarys_chips_and_sort():
+    hit, hairline = px("--pl-hit"), px("--dw-hairline")
+    assert px("--app-library-view") == 32  # as the board draws them
+    assert declarations(APP, ".app-chip.app-library-view")["height"] == "var(--app-library-view)"
+    before = declarations(APP, ".app-chip.app-library-view::before")
+    assert before["top"] == before["bottom"] == "calc(-1 * var(--app-library-view-reach))"
+    assert ALL_TOKENS["--app-library-view-reach"] == "calc((var(--pl-hit) - var(--app-library-view)) / 2 + var(--dw-hairline))"
+    assert px("--app-library-view") - 2 * hairline + 2 * ((hit - px("--app-library-view")) / 2 + hairline) >= hit
+    views = declarations(APP, ".app-library-views")
+    assert views["flex-wrap"] == "wrap" and views["gap"] == "calc(2 * var(--app-library-view-reach)) var(--app-library-gap)"
+    assert declarations(APP, ".app-sort")["min-height"] == "var(--pl-hit)"
+    select = declarations(APP, ".app-sort-select")
+    assert (select["position"], select["inset"], select["opacity"], select["font-size"]) == (
+        "absolute", "0", "var(--app-chip-select)", "var(--dw-text-body)")
+    assert px("--dw-text-body") >= 16
+
+
+def test_a_done_row_opens_from_the_whole_row_and_plays_from_its_round_button():
+    assert declarations(APP, ".app-done-open")["min-height"] == "var(--app-done-row)"
+    assert declarations(APP, ".app-done-open")["flex"] == "1"
+    play = declarations(APP, ".app-done-play")
+    assert (play["width"], play["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
+    face = declarations(APP, ".app-done-play-face")
+    assert (face["width"], face["border-radius"]) == ("var(--app-done-play-face)", "var(--dw-radius-round)")
+    assert px("--app-done-play-face") == 32
+
+
+def test_infos_folder_is_a_path_a_folder_a_line():
+    folder = declarations(APP, ".app-info-folder")
+    assert folder["white-space"] == "pre-line"
+    assert declarations(APP, ".app-kv-value")["overflow-wrap"] == "anywhere"
+    #? the one string on the sheet people copy (review: inside the album's button it couldn't be)
+    assert folder["user-select"] == folder["-webkit-user-select"] == "text"
+
+
+# ---------------------------------------------------------------- after review (2.0.0-player.17)
+
+def _srgb_luminance(value: float) -> float:
+    channel = value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+    return channel  # grey: every channel the same
+
+
+def _contrast_over_white(alpha: float, text: float) -> float:
+    """White (or a light grey `text`, 0-1) words over a pure white photo under black at `alpha`."""
+    under = _srgb_luminance(1 - alpha)
+    over = _srgb_luminance(text)
+    return (max(under, over) + 0.05) / (min(under, over) + 0.05)
+
+
+def test_the_artist_heros_scrim_keeps_the_words_legible_over_a_white_sky():
+    """Over a white part of a photo: the name 3:1 (large text) on one line or two, the facts 4.5:1.
+    Positions from the hero's own tokens - the name and the facts sit at its foot."""
+    stops = [(float(pct), float(alpha)) for alpha, pct in
+             re.findall(r"rgba\(0, 0, 0, ([\d.]+)\) (\d+)%", ALL_TOKENS["--dw-artist-scrim"])]
+    assert stops and stops[0][0] == 0 and stops[-1][0] == 100 and stops[0][1] >= 0.4  # the back link's dark
+
+    def alpha(pct: float) -> float:
+        for (p0, a0), (p1, a1) in zip(stops, stops[1:]):
+            if p0 <= pct <= p1:
+                return a0 + (a1 - a0) * (pct - p0) / (p1 - p0)
+        return stops[-1][1]
+
+    hero = px("--app-artist-hero")
+    foot = px("--app-artist-hero-foot")
+    facts = px("--dw-text-footnote") * float(ALL_TOKENS["--dw-leading-note"])
+    name = px("--dw-text-large-title") * float(ALL_TOKENS["--dw-leading-title"])
+    facts_top = hero - foot - facts
+    name_bottom = facts_top - px("--app-line-gap")
+    two_lines_top = name_bottom - 2 * name
+    light = int(ALL_TOKENS["--dw-text-on-secondary"][1:3], 16) / 255
+
+    def worst(top: float, bottom: float, text: float) -> float:
+        return min(_contrast_over_white(alpha(100 * y / hero), text) for y in range(int(top), int(bottom) + 1))
+
+    assert worst(two_lines_top, name_bottom, 1.0) >= 3
+    assert worst(facts_top, hero - foot, light) >= 4.5
+
+
+def test_what_lands_late_on_the_artist_page_moves_nothing():
+    #? the line under Play and Shuffle holds a line whatever it says, or doesn't
+    assert declarations(APP, ".app-artist-plays")["min-height"] == "var(--app-artist-plays-line)"
+    assert ALL_TOKENS["--app-artist-plays-line"] == "calc(var(--dw-text-footnote) * var(--dw-leading-note))"
+    #? "Albums" as tall as the Studio only chip that comes once the artist's id is known
+    assert declarations(APP, ".app-artist-albums-head")["min-height"] == "var(--app-chip)"
+    #? an album page's artist line holds its line before the album answers
+    assert declarations(APP, ".app-shell .pl-hero-artist")["min-height"] == "var(--app-hero-artist-line)"
+    assert ALL_TOKENS["--app-hero-artist-line"] == "1.25em"
+    assert declarations(PLAYER_CSS, ".pl-hero-artist")["line-height"] == "1.25"
+
+
+def test_a_row_looking_for_its_album_fades_and_a_name_that_isnt_a_link_isnt_the_links_colour():
+    for row in (".app-artist-album.is-busy", ".app-result.is-busy", ".app-done-open.is-busy"):
+        assert declarations(APP, row) == {"opacity": "var(--app-job-busy)"}, row
+    assert declarations(APP, ".app-hero-plain") == {"color": "var(--dw-text-2)"}
+    assert declarations(PLAYER_CSS, ".pl-hero-artist")["color"] == "var(--pl-accent)"
+
+
+def test_the_order_chips_the_librarys_chips_replaced_are_gone():
+    selectors = {selector.strip() for _, found, _ in rules(PLAYER_CSS) for selector in found.split(",")}
+    assert not [selector for selector in selectors if re.search(r"\.pl-orders?\b", selector)]
+    assert not [token for token in ("--pl-chip-pad", "--pl-toggled-bg", "--pl-toggled-edge") if token in ALL_TOKENS]

@@ -73,6 +73,17 @@
  *    being what shows and calls a chip's lookup off, and openSources refuses while Now Playing is
  *    open; the sheet's Cancel, backdrop and Escape let the search go in the gesture; and the album
  *    page is told whether it is what shows, so its store line is asked again as it comes back.
+ *  - Artists, and the id bridge (2.0.0-player.17): the artist page's Play and Shuffle call playTracks
+ *    straight from the tap - the one more file on the list below, app/ArtistPage.tsx - and only once
+ *    every album they play has had its songs asked for (KEPT) and answered, and the library has said
+ *    which are copies of one: disabled until then; every album played remembered for Info. A
+ *    Requests Done row's ▶ - app/Requests.tsx, the other new file - plays its album only with its
+ *    songs already in hand (the first few asked for while the tab's root is what shows, never as the
+ *    app starts, and looked for again until found), and otherwise opens it. Every new fetch that
+ *    draws - the artist page's seven, the album page's store answer, Search's held row, Requests'
+ *    Done rows, Info's details - goes through a latestOnly() of its own, and a row's look still out
+ *    when its page or tab stops showing opens nothing. An artist Navidrome knows is drawn inside the
+ *    gate, one MusicBrainz knows outside it.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -145,6 +156,10 @@ const ALLOWED = {
   'player/Turntable.tsx': ['toggle'],
   //? a song found by Search, since 2.0.0-player.13: its tap plays its album from it, the album in hand
   'app/Search.tsx': ['playTracks'],
+  //? an artist's Play and Shuffle, since 2.0.0-player.17: every album of theirs you have, all in hand
+  'app/ArtistPage.tsx': ['playTracks'],
+  //? a Done row's ▶ on Requests, since 2.0.0-player.17: its album, in hand, else it opens it
+  'app/Requests.tsx': ['playTracks'],
   //? names them for ActionsContext and calls none (pickActions)
   'app/context.ts': ['playTracks', 'toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
 }
@@ -212,7 +227,9 @@ console.log('\nthe playback actions only from the files allowed')
   const outside = reached.filter(([file, found]) => found.some((name) => !(ALLOWED[file] ?? []).includes(name)))
   check('no file reaches one it isn\'t allowed', outside, [])
   check('where they are reached', Object.fromEntries(reached), {
+    'app/ArtistPage.tsx': ['playTracks'],
     'app/GaplessChoice.tsx': ['setGapless'],
+    'app/Requests.tsx': ['playTracks'],
     'app/Search.tsx': ['playTracks'],
     'app/context.ts': ['next', 'playTracks', 'previous', 'setGapless', 'showAirPlay', 'toggle'],
     'player/AlbumPage.tsx': ['playTracks'],
@@ -634,6 +651,78 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
   check('the album page is told whether it is what shows, and asks the store again as it comes back - Get above what is already here',
     [/shown=\{pageShown && nav\.tab === tab && !sourcesOpen\}/.test(app), /\}, \[chosen\?\.id, group\?\.id, filed, shown\]\)/.test(page), /if \(!shown\) return/.test(page),
       page.indexOf('class="app-rg-get"') < page.indexOf('class="app-rg-store"'), /setStore\(null\)/.test(page)], [true, true, true, true, false])
+}
+
+console.log('\nArtists and the id bridge: Play from the tap with every album in hand; the newest answer only')
+{
+  const page = code(read('app/ArtistPage.tsx'))
+  const play = /const play = \(shuffle: boolean\) => \{([\s\S]*?)\n  \}/.exec(page)?.[1] ?? ''
+  check('the artist\'s Play and Shuffle play straight from the tap: every album remembered at once, then playTracks - nothing fetched or awaited',
+    [/if \(!playable\) return/.test(play), /rememberQueue\(albums\)\s*actions\.playTracks\(tracks, shuffle \? null : 0, shuffle\)/.test(play),
+      /\bawait\b|\.then\(|fetch|prefetchAlbum|artistAlbums/.test(play)],
+    [true, true, false])
+  check('...disabled until every album they play has answered, the library has said which are copies of one, and one has its songs',
+    [/const settled = playing\.every\(\(album\) => ready\.has\(album\) \|\| unsent\.has\(album\)\)/.test(page) && /const wanted = ownedKnown \? playing\.filter/.test(page), /const playable = settled && inHand\.length > 0/.test(page),
+      (page.match(/disabled=\{!playable\}/g) ?? []).length, /onClick=\{\(\) => play\(false\)\}/.test(page), /onClick=\{\(\) => play\(true\)\}/.test(page)],
+    [true, true, 2, true, true])
+  check('...their songs asked for KEPT as the albums are known, a few at a time, only the newest set kept',
+    /const request = prefetches\.begin\(\)\s*inTurns\(wanted, PREFETCH_AT_ONCE, \(album\) => prefetchAlbum\(album, true\)\.then\(\s*\(answer\) => \{\s*if \(request\.current\(\)\) setReady[\s\S]*?\(\) => request\.current\(\)\)/.test(page), true)
+  const begins = ['findRequests', 'libraryRequests', 'factsRequests', 'discRequests', 'prefetches', 'openRequests', 'getRequests']
+  check('every fetch on the page through a latestOnly() of its own', begins.map((name) =>
+    new RegExp(`const ${name} = useMemo\\(latestOnly, \\[\\]\\)`).test(page) && new RegExp(`${name}\\.begin\\(\\)`).test(page)), begins.map(() => true))
+  check('a row\'s Get and a row\'s bridge: the opener taken in the tap, both lookups called off when the page stops being what shows - and a late answer opens nothing',
+    [/const opener = takeOpener\(event\)\s*const request = getRequests\.begin\(\)/.test(page),
+      /if \(!shown\) \{\s*getRequests\.supersede\(\)\s*setResolving\(null\)\s*openRequests\.supersede\(\)\s*setOpening\(null\)/.test(page),
+      (page.match(/if \(!showing\.current\) return/g) ?? []).length], [true, true, 2])
+  const app = code(read('app/App.tsx'))
+  check('App: an artist Navidrome knows inside the gate, one MusicBrainz knows outside it, told whether it shows',
+    [/return page\.id\.startsWith\(MB_PREFIX\) \? artist : \(\s*<NeedsNavidrome\b/.test(app), /page\.kind === 'artist' \? artistView\(tab, page\)/.test(app),
+      /<ArtistPage\b[\s\S]*?shown=\{pageShown && nav\.tab === tab && !sourcesOpen\}[\s\S]*?onGet=\{openSources\}/.test(app)],
+    [true, true, true])
+
+  const requests = code(read('app/Requests.tsx'))
+  const playRow = /const playRow = \(row: RequestRow\) => \{([\s\S]*?)\n  \}/.exec(requests)?.[1] ?? ''
+  check('a Done row\'s ▶ plays its album only with its songs in hand - nothing awaited - and opens it otherwise',
+    [/const album = row\.release \? ready\.get\(row\.release\)\?\.answer : undefined/.test(playRow),
+      /if \(album && album\.song\?\.length\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(album\.song\.map\(\(song\) => toQueueTrack\(song, album\)\), 0\)\s*return\s*\}\s*openRow\(row\)/.test(playRow),
+      /\bawait\b|\.then\(|fetch|navidromeAlbumFor|prefetchAlbum/.test(playRow)],
+    [true, true, false])
+  check('...the first few asked for ahead (KEPT), only while the tab\'s root shows - never as the app starts - and looked for again when due',
+    [/const request = period\.current\s*if \(!active \|\| !request \|\| !ahead\.length\) return\s*const \{ look, songs, nextIn \} = doneLooks\(/.test(requests),
+      /prefetchAlbum\(album, true, fresh\)/.test(requests), /setTimeout\(\(\) => setDue\(\(count\) => count \+ 1\), nextIn\)/.test(requests),
+      /active=\{requestsActive\}/.test(app), /const requestsActive = watching === 'requests' && !sourcesOpen/.test(app), /requestsSeen/.test(app)],
+    [true, true, true, true, true, false])
+  check('...a tap\'s look called off as the tab stops showing, and one answering late opens nothing',
+    [/\} else \{\s*aheadRequests\.supersede\(\)\s*period\.current = null\s*openRequests\.supersede\(\)\s*setOpening\(null\)/.test(requests), /if \(showing\.current\) onOpenAlbum\(/.test(requests)],
+    [true, true])
+  check('...each look through a latestOnly() of its own', ['aheadRequests', 'openRequests'].map((name) =>
+    new RegExp(`const ${name} = useMemo\\(latestOnly, \\[\\]\\)`).test(requests) && new RegExp(`${name}\\.begin\\(\\)`).test(requests)), [true, true])
+
+  const album = code(read('player/AlbumPage.tsx'))
+  check('the album page\'s store answer, Search\'s held row and Info\'s details: each through a latestOnly() of its own',
+    [/const storeRequests = useMemo\(latestOnly, \[\]\)/.test(album), /storeAlbum\(\{ navidrome_id: id \}, request\.signal\)\.then\(\s*\(answer\) => \{\s*if \(request\.current\(\)\) setStore/.test(album),
+      /const request = heldRequests\.begin\(\)/.test(code(read('app/Search.tsx'))), /const request = requests\.begin\(\)/.test(code(read('app/useInfoDetails.ts')))],
+    [true, true, true, true])
+  check('...a held row\'s look called off with the chip\'s, when the box changes or the root stops showing',
+    /function standDown\(\) \{\s*getRequests\.supersede\(\)\s*setResolving\(null\)\s*heldRequests\.supersede\(\)/.test(code(read('app/Search.tsx'))), true)
+  check('the album page\'s chip row is drawn from the first frame, so a chip landing moves nothing below it',
+    /<div class="app-album-chips">\s*<span class="app-held-badge">/.test(album), true)
+  check('Search\'s held row opens the album you have with its credited artist, so the page\'s artist line holds its place',
+    /const artist = creditName\(group\['artist-credit'\]\)\s*if \(album\) onOpenAlbum\(\{ id: album, name: group\.title \?\? '', \.\.\.\(artist \? \{ artist \} : \{\}\) \}\)/.test(code(read('app/Search.tsx'))), true)
+  check('an artist\'s name that isn\'t a link is drawn plain: on an album page only once the album has said so, never in a flash',
+    [/<p class=\{`pl-hero-artist\$\{album \? ' app-hero-plain' : ''\}`\}>\{artistName\}<\/p>/.test(album), /<p class="pl-hero-artist app-hero-plain">\{header\.artist\}<\/p>/.test(code(read('app/ReleaseGroupPage.tsx')))],
+    [true, true])
+  check('a row looking for its album fades: an artist\'s, Search\'s, a Done row',
+    [/class=\{`app-artist-album\$\{opening === row\.key \? ' is-busy' : ''\}`\}/.test(page), /class=\{`app-result\$\{opening === group\.id \? ' is-busy' : ''\}`\}/.test(code(read('app/Search.tsx'))),
+      /class=\{`app-done-open\$\{opening \? ' is-busy' : ''\}`\}/.test(code(read('app/JobCard.tsx')))],
+    [true, true, true])
+  check('Library\'s rows navigate: nothing there reaches a playback action, as a tile', [actionsIn(code(read('player/Library.tsx'))), actionsIn(code(read('app/LibraryViews.tsx')))], [[], []])
+  const library = code(read('player/Library.tsx'))
+  check('Songs only where Navidrome\'s empty search lists songs: asked once, for one, the chip left out on an empty answer (and the albums shown)',
+    [/librarySongs\(0, 1, request\.signal\)\.then\(\s*\(songs\) => \{\s*if \(request\.current\(\)\) setHasSongs\(songs\.length > 0\)/.test(library),
+      /const views = VIEWS\.filter\(\(entry\) => entry\.id !== 'songs' \|\| hasSongs !== false\)/.test(library),
+      /const showing: LibraryView = view === 'songs' && hasSongs === false \? 'albums' : view/.test(library)],
+    [true, true, true])
 }
 
 console.log('\nApp moves history only through the router')

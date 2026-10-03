@@ -87,6 +87,13 @@ export interface RequestRow {
   dimmed: boolean
   /** counted by the badge and on Home: see ARRIVING above */
   arriving: boolean
+  /** the album's own name, without the edition - what an album page opened from the row says first */
+  album: string
+  /** Done (2.0.0-player.17): the release it was, when the album it brought is in the library - filed,
+   *  partly filed, or already there - so the row opens it (the id bridge finds Navidrome's album) */
+  release: string | null
+  /** ...and it was filed by this download: the row's ▶ plays it */
+  plays: boolean
 }
 
 export interface RequestsInput {
@@ -186,15 +193,20 @@ export function sectionOf(job: Pick<DownloadJob, 'status' | 'progress'>): Sectio
   return 'done'
 }
 
-const blank = (key: string, jobId: number | null, section: Section, title: string, artist: string): RequestRow => ({
+const blank = (key: string, jobId: number | null, section: Section, title: string, artist: string, album = ''): RequestRow => ({
   key, jobId, section, title, artist, cover: null, line: '', lineTone: 'plain', reason: null, problem: null,
   progress: 0, data: null, brief: '', cancel: null, nextPeer: null, askAgain: null, busy: false, dimmed: false,
-  arriving: false,
+  arriving: false, album, release: null, plays: false,
 })
+
+/** The endings whose album is in the library (2.0.0-player.17): a Done row of one opens it... */
+const IN_THE_LIBRARY = new Set(['filed', 'partly_filed', 'already_there'])
+/** ...and the ones this download filed, which its ▶ plays. */
+const FILED = new Set(['filed', 'partly_filed'])
 
 function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow {
   const section = sectionOf(job)
-  const row = blank(`job-${job.id}`, job.id, section, titleOf(job.album, job.edition), job.artist || '')
+  const row = blank(`job-${job.id}`, job.id, section, titleOf(job.album, job.edition), job.artist || '', job.album || '')
   row.cover = jobCoverUrl(job.release_mbid)
   const cancelling = input.cancelling.has(job.id)
   const done = job.files_done ?? 0
@@ -256,12 +268,18 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
   row.line = age ? `${outcome.text} · ${age}` : outcome.text
   row.lineTone = outcome.tone
   row.progress = 100
+  //? the album it brought, where the library has it: the row opens it, and plays what was filed
+  const release = (job.release_mbid ?? '').trim()
+  if (release && job.outcome && IN_THE_LIBRARY.has(job.outcome)) {
+    row.release = release
+    row.plays = FILED.has(job.outcome)
+  }
   return row
 }
 
 function pendingRow(pending: PendingDownload): RequestRow {
   const refused = pending.error !== undefined
-  const row = blank(pending.key, null, refused ? 'attention' : 'waiting', titleOf(pending.album), pending.artist || '')
+  const row = blank(pending.key, null, refused ? 'attention' : 'waiting', titleOf(pending.album), pending.artist || '', pending.album || '')
   if (refused) {
     row.line = who(row.artist, pending.username, 'refused')
     row.reason = pending.error || 'slskd refused it'
@@ -422,4 +440,79 @@ export function changes(before: RequestsView | null, now: RequestsView): { said:
 export function asksAgain(before: Watching, now: Watching): boolean {
   if (now === before || now === 'hidden' || now === 'requests' || before === 'requests') return false
   return now === 'home' || before === 'hidden'
+}
+
+/**
+ * How long after a Done row first shows Navidrome is taken to have scanned what it filed: its watcher
+ * waits about 5 s after a folder changes, then scans it (a second or so for one album).
+ */
+export const DONE_SCAN_SETTLE_MS = 10_000
+/** Songs asked for longer ago than this, before the tab was last come back to, are asked again. */
+export const DONE_FRESH_MS = 30_000
+/** A look that found no album: the next after this, doubling, to DONE_RETRY_MAX_MS. */
+export const DONE_RETRY_MS = 5_000
+export const DONE_RETRY_MAX_MS = 60_000
+
+/** What the Requests tab holds of its Done rows' albums, by release, for doneLooks. */
+export interface DoneHeld {
+  /** Navidrome's album id, once the id bridge found it */
+  ids: ReadonlyMap<string, string>
+  /** when the album's songs were last asked for (ms, this device's clock) */
+  asked: ReadonlyMap<string, number>
+  /** looks in a row that found no album: how many, and when the last was */
+  misses: ReadonlyMap<string, { count: number; at: number }>
+  /** asked for now: not asked again until it answers */
+  inFlight: ReadonlySet<string>
+  /** when the tab last came into view (ms): songs asked long before it are asked again */
+  activeSince: number
+}
+
+/**
+ * What the Requests tab asks about its first Done rows' albums now, and when it should look again
+ * (2.0.0-player.17, review). Each row is its release and when it first showed as done (`since`, this
+ * device's clock - never the server's, whose clock can differ: 0 for a row already done as the page
+ * loaded). For each release, the newest row's:
+ *
+ *  - no Navidrome id yet: `look` it up (the id bridge) - but not before Navidrome can have scanned
+ *    what the row filed, and after a look that found nothing, again only after DONE_RETRY_MS,
+ *    doubling to DONE_RETRY_MAX_MS. The first look straight after filing always missed, and nothing
+ *    ever asked again, so a ▶ on an album filed while you watched only ever opened it;
+ *  - an id: its `songs` asked for when never asked, when asked before Navidrome can have scanned
+ *    what the newest row filed (a second download of the release filling the first's gaps), and
+ *    when asked longer ago than DONE_FRESH_MS before the tab last came into view - so a ▶ plays the
+ *    album as Navidrome has it, not as it was an hour ago.
+ *
+ * `nextIn`: how long until the soonest look falls due (a miss backing off, an ask too early), or
+ * null for none - the tab looks again then, while it shows. Pure; requests.sim.cjs pins it.
+ */
+export function doneLooks(
+  rows: readonly { release: string; since: number }[], held: DoneHeld, now: number,
+): { look: string[]; songs: string[]; nextIn: number | null } {
+  const since = new Map<string, number>()
+  for (const row of rows) since.set(row.release, Math.max(since.get(row.release) ?? 0, row.since))
+  const look: string[] = []
+  const songs: string[] = []
+  let due: number | null = null
+  const later = (at: number) => {
+    due = due === null ? at : Math.min(due, at)
+  }
+  for (const [release, at] of since) {
+    if (held.inFlight.has(release)) continue
+    const scanned = at + DONE_SCAN_SETTLE_MS
+    if (!held.ids.has(release)) {
+      const miss = held.misses.get(release)
+      const backoff = miss ? miss.at + Math.min(DONE_RETRY_MS * 2 ** Math.max(0, miss.count - 1), DONE_RETRY_MAX_MS) : 0
+      const when = Math.max(scanned, backoff)
+      if (now >= when) look.push(release)
+      else later(when)
+      continue
+    }
+    const asked = held.asked.get(release)
+    if (asked === undefined || asked < held.activeSince - DONE_FRESH_MS) songs.push(release)
+    else if (asked < scanned) {
+      if (now >= scanned) songs.push(release)
+      else later(scanned)
+    }
+  }
+  return { look, songs, nextIn: due === null ? null : Math.max(0, due - now) }
 }

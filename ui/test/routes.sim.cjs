@@ -24,6 +24,9 @@
  *    written; the pressing is in the address but not part of the page's identity, so choosing
  *    another REPLACES the entry (never a page pushed over it), keeps the page's scroll, and back
  *    still leaves the page; back and forward land on the pressing the entry names.
+ *  - An artist (2.0.0-player.17): `#/<tab>/artist/<id>` read and written - Navidrome's id, or
+ *    `mb:<mbid>` - its id round-tripping, never taking a pressing, a page of its own beside an album
+ *    of the same id, and an album opened from it going back to it, named on the back button.
  *  - All of it end to end: lib/appHistory.ts's router driven against a fake browser history that
  *    keeps entries and their state across a reload, fires popstate and then hashchange on a
  *    traversal, and runs history.go() later, as a browser does.
@@ -106,6 +109,23 @@ check('...and not where its scroll is kept', [R.scrollKey({ tab: 'search', page:
   nav = R.openPage(picked, album('al-1', 'Dummy'))
   const back = R.followRoute(nav, R.parseHash('#/search/group/rg-1?release=r-4').route)
   check('back onto it shows the pressing its entry names, label kept', back.stacks.search, [group('rg-1', 'r-4', 'Third')])
+}
+
+console.log('\nan artist (2.0.0-player.17)')
+{
+  const artist = (id, label) => (label ? { kind: 'artist', id, label } : { kind: 'artist', id })
+  check('an artist pushed on Library', R.parseHash('#/library/artist/ar-1'), { route: { tab: 'library', page: artist('ar-1') }, canonical: '#/library/artist/ar-1' })
+  check('...one known only by MusicBrainz, its id kept whole', R.parseHash('#/search/artist/mb%3A8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11').route.page,
+    artist('mb:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11'))
+  check('...and written back escaped', R.formatRoute({ tab: 'search', page: artist('mb:x y') }), '#/search/artist/mb%3Ax%20y')
+  check('an artist takes no pressing', [R.parseHash('#/library/artist/ar-1?release=r-2').canonical, R.formatRoute({ tab: 'library', page: { ...artist('ar-1'), release: 'r-2' } })],
+    ['#/library/artist/ar-1', '#/library/artist/ar-1'])
+  check('an artist with no id is its tab\'s root', R.parseHash('#/library/artist/').canonical, '#/library')
+  check('an artist is not an album of the same id', R.samePage(artist('x'), album('x')), false)
+  let nav = R.openPage(R.startNav({ tab: 'library', page: null }), artist('ar-1', 'Portishead'))
+  nav = R.openPage(nav, album('al-1', 'Dummy'))
+  check('an album opened from the artist page: back names the artist', [R.backLabel(nav), R.addressesBelow(nav)], ['Portishead', ['#/library/artist/ar-1', '#/library']])
+  check('...and back lands on the artist', R.currentRoute(R.popPage(nav)).page, artist('ar-1', 'Portishead'))
 }
 
 console.log('\nthe player\'s old links, and an empty hash')

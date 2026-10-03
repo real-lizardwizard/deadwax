@@ -1,5 +1,7 @@
 import { ApiError, MusicBrainzUnavailable, get } from './http'
-import type { FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse } from './types'
+import type {
+  ArtistFactsLight, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse,
+} from './types'
 
 /**
  * Search release groups, plus the releases of the best match.
@@ -81,6 +83,36 @@ export async function getReleaseGroup(releaseGroupMbid: string, signal?: AbortSi
 
   try {
     return await get<ReleaseGroupResponse>(`/search_musicbrainz/release_group?${params}`, signal)
+  } catch (error) {
+    throw asUnavailable(error)
+  }
+}
+
+/**
+ * Every ALBUM credited to an artist (2.0.0-player.17's artist page): MusicBrainz's browse of their
+ * release groups of primary type album, complete - not a search's best matches. `studioOnly` leaves
+ * out live albums, compilations and the rest, AFTER the browse (the server's rule: filtering a
+ * complete set throws nothing away). The browse's pages are cached on the server, so the other
+ * choice of Studio only costs nothing more of MusicBrainz. A `problem` in the answer means it broke
+ * off: the list is not the artist's whole discography.
+ */
+export async function getDiscography(artistMbid: string, studioOnly: boolean, signal?: AbortSignal): Promise<DiscographyResponse> {
+  const params = new URLSearchParams({ artist_mbid: artistMbid, types: 'album' })
+  if (studioOnly) params.set('studio_only', 'true')
+
+  try {
+    return await get<DiscographyResponse>(`/search_musicbrainz/discography?${params}`, signal)
+  } catch (error) {
+    throw asUnavailable(error)
+  }
+}
+
+/** Who an artist is (2.0.0-player.17): MusicBrainz's light facts, cached on the server. */
+export async function getArtistFacts(artistMbid: string, signal?: AbortSignal): Promise<ArtistFactsLight> {
+  const params = new URLSearchParams({ mbid: artistMbid })
+
+  try {
+    return await get<ArtistFactsLight>(`/search_musicbrainz/artist?${params}`, signal)
   } catch (error) {
     throw asUnavailable(error)
   }

@@ -502,6 +502,45 @@ export interface ReleaseGroupResponse {
   problem: string | null
 }
 
+/** GET /search_musicbrainz/discography: every release group credited to an artist - a BROWSE,
+ *  complete unless `truncated` says otherwise; `problem` set means MusicBrainz failed part way. */
+export interface DiscographyResponse {
+  'release-group-count'?: number
+  'release-groups'?: ReleaseGroup[]
+  truncated?: boolean
+  'total-available'?: number
+  problem?: string | null
+}
+
+/** GET /search_musicbrainz/artist (2.0.0-player.17): who an artist is - ArtistFacts without the
+ *  links and members, which the light route leaves out. */
+export type ArtistFactsLight = Omit<ArtistFacts, 'links' | 'members'>
+
+/** One folder of the store index (2.0.0-player.17's id bridge), as GET /store/album answers it. */
+export interface StoreRow {
+  /** store_album.id: stays put through a re-file or a merge */
+  id: number
+  /** relative to LIBRARY_PATH */
+  path: string
+  release_mbid: string | null
+  artist: string
+  album: string
+  edition: string
+  year: string
+  formats: string[]
+  track_count: number
+}
+
+/** GET /store/album?release_mbid=|navidrome_id= (2.0.0-player.17): one album across its ids. */
+export interface StoreAlbumResponse {
+  release_mbid: string | null
+  release_group_mbid: string | null
+  /** Navidrome's album for the release; null when Navidrome doesn't have it or can't be asked */
+  navidrome_id: string | null
+  present: StoreRow[]
+  other_pressings: (StoreRow & { navidrome_id: string | null })[]
+}
+
 /** GET /library/owned: every album, reduced to what says which album and edition it is. */
 export interface OwnedResponse {
   albums: import('../lib/owned').OwnedAlbum[]

@@ -192,6 +192,25 @@ download, and the progress as slskd reports it.
 - **A download started on the main page doesn't show**: the app looks again when Home or Requests
   comes into view and when you come back to it. Switch to Requests, or pull it back up from the
   background.
+- **A done download says "Navidrome hasn't found it yet - it may still be scanning"** when tapped:
+  deadwax asked Navidrome for the album by the pressing's MusicBrainz id, and by its title, and
+  Navidrome has no album carrying that id yet. Navidrome scans a few seconds after a folder changes,
+  so tap it again in a moment (the note goes once it opens; with Requests open, the app keeps
+  looking by itself). If it never opens: Navidrome may not have rescanned yet (start a scan from
+  Navidrome's own pages), or the account deadwax uses can't see that library folder.
+- **A done download says "deadwax can't tell which album in your library this is"**: no folder in
+  your library is tagged with that pressing's MusicBrainz release id. That happens to **Already in
+  your library, nothing filed** when the tracks were already in a folder deadwax didn't file and
+  that has no MusicBrainz tags (an old rip): nothing was written into it, so nothing ties it to the
+  release, and a rescan won't change that. Apply the release to that album in the main page's
+  metadata editor and the row opens it. It can also mean the album's folder has gone since.
+- **A done download says "Navidrome isn't set up" or "isn't answering just now"**: the album can't
+  be opened in the app until it is - see [below](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
+  **"Couldn't look it up just now"** means deadwax itself didn't answer: tap it again.
+- **A done download has no ▶**: only a download that filed something has one. "Already in your
+  library, nothing filed" opens the album you already had - when its folder is tagged with the
+  pressing, as above - with no ▶; an interrupted or unfiled download has neither, as nothing of it
+  is known to be in the library.
 
 ## MusicBrainz is slow, or searches fail
 
@@ -365,6 +384,43 @@ renamed at the end of the 90 seconds, as a fixed wait would have done.
 Behind a reverse proxy with a short timeout (60 seconds is common), an apply that waits the full
 90 seconds can outlast it, and the page shows an error although the apply finished. Reopen the
 album to see where it stands.
+
+## An artist's page has no albums from MusicBrainz, or the wrong artist's
+
+The app's [artist page](player.md#artist-pages) lists an artist's albums from MusicBrainz, which
+needs to know which MusicBrainz artist it is.
+
+- **"MusicBrainz doesn't know who this is from your files, so only the albums you have are
+  here."**: neither Navidrome nor your files say. Navidrome reads an artist's MusicBrainz id from
+  the album artist's `musicbrainz_albumartistid` tag, which deadwax writes on every album it files
+  or you apply a release to (since v0.6.15); albums tagged by something else, or long ago, may lack
+  it. Applying the album's release in the main page's metadata editor writes it, and the page
+  finds them once Navidrome has rescanned.
+- **"MusicBrainz isn't answering just now"**, with **Try again**: MusicBrainz is slow or down (see
+  [below](#musicbrainz-is-slow-or-searches-fail)). The albums you have are still listed.
+- **An artist opened from an album you don't have shows none of your albums**: deadwax looks for
+  them as the Navidrome artist carrying that MusicBrainz id, else the artist your library files
+  their albums under, else - only for an artist Navidrome has no id for - one whose name is
+  MusicBrainz's, and only when exactly one goes by it. Two artists in your library with the same
+  name and no ids can't be told apart, so neither is shown.
+- **Play and Shuffle stay grey**: they wait until every album of theirs you have has come from
+  Navidrome, and until your library has said which of Navidrome's albums are copies of one album
+  (so both of a pressing you hold twice aren't played). If Navidrome didn't send some, the line
+  under them says so, with **Try again**; "Navidrome has none of their albums to play" means just
+  that - an album only your library has, Navidrome hasn't found yet.
+- **An album on an artist's page says neither "in" nor "not in your library", with no Get**: your
+  library hasn't answered yet (the first look after deadwax restarts walks the whole library). It
+  says once it does.
+- **An artist's page says it couldn't ask Navidrome, with Try again**: deadwax couldn't reach
+  Navidrome to find the artist; tap Try again.
+
+## The app's Library has no Songs
+
+The **Songs** chip is left out when Navidrome answers an empty search with no songs, which is how
+the app lists them; it asks once, as the app starts (once Navidrome answers) - reload the app to
+ask again. A Navidrome that answers an empty
+search with nothing (an older one, or one set up to) can't list songs this way, and the Library
+shows Albums and Artists only. The albums of the songs are all in Albums.
 
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 

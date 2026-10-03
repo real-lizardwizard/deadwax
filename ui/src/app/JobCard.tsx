@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks'
 
 import type { RequestRow } from '../lib/requestsView'
-import { CloseIcon } from '../player/icons'
+import { CloseIcon, PlayIcon } from '../player/icons'
 
 /**
  * A download, drawn as the Requests board draws it (2.0.0-player.12): a card for one on its way or
@@ -210,15 +210,53 @@ export function AttentionCard({
   )
 }
 
-/** Done: a plain row - how it ended and how long ago. Not a link yet: that needs the id bridge. */
-export function DoneRow({ row }: { row: RequestRow }) {
-  return (
-    <div class="app-done-row">
+/**
+ * Done: how it ended and how long ago. Since 2.0.0-player.17, a download whose album is in the library
+ * (`row.release`: filed, partly filed, or already there) OPENS it - the row is a button - and one this
+ * download filed (`row.plays`) has the board's round ▶, which plays it: the page decides, in the tap,
+ * whether the album's songs are in hand to play, and opens the album otherwise. `note` is the page's
+ * own word for a row it couldn't open ("Navidrome hasn't found it yet"); `opening` while it looks,
+ * faded so the tap shows it was taken.
+ */
+export function DoneRow({
+  row,
+  onOpen,
+  onPlay,
+  opening = false,
+  note = null,
+}: {
+  row: RequestRow
+  onOpen?: (row: RequestRow) => void
+  onPlay?: (row: RequestRow) => void
+  opening?: boolean
+  note?: string | null
+}) {
+  const body = (
+    <>
       <JobCover src={row.cover} />
-      <div class="app-job-body">
+      <span class="app-job-body">
         <span class="app-job-title">{row.title}</span>
         <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
-      </div>
+        {note && <span class="app-job-line is-warning">{note}</span>}
+      </span>
+    </>
+  )
+  return (
+    <div class="app-done-row">
+      {row.release && onOpen ? (
+        <button type="button" class={`app-done-open${opening ? ' is-busy' : ''}`} aria-busy={opening} onClick={() => onOpen(row)}>
+          {body}
+        </button>
+      ) : (
+        <div class="app-done-open">{body}</div>
+      )}
+      {row.release && row.plays && onPlay && (
+        <button type="button" class="app-done-play" aria-label={`Play ${row.title}`} onClick={() => onPlay(row)}>
+          <span class="app-done-play-face">
+            <PlayIcon class="app-done-play-icon" />
+          </span>
+        </button>
+      )}
     </div>
   )
 }

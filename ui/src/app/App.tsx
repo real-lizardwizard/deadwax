@@ -7,9 +7,10 @@ import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
+import { MB_PREFIX, artistPageId } from '../lib/artistPage'
 import type { Look } from '../lib/turntable'
 import { AlbumPage } from '../player/AlbumPage'
-import { navidromeStatus, playedAlbum, sentFormat, type Album, type NavidromeStatus } from '../player/api'
+import { navidromeStatus, playedAlbum, sentFormat, type Album, type Artist, type NavidromeStatus } from '../player/api'
 import { Library } from '../player/Library'
 import { MiniPlayer } from '../player/MiniPlayer'
 import { NowPlaying } from '../player/NowPlaying'
@@ -17,6 +18,7 @@ import { deckReport, onDeckReport, resumeDeckAudio } from '../player/deck'
 import { usePlayer, type Player } from '../player/usePlayer'
 import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerWindDown } from '../state/persisted'
 import { ActionMenu } from './ActionMenu'
+import { ArtistPage, type ArtistPreview } from './ArtistPage'
 import { ActionsContext, PlayerContext, pickActions } from './context'
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
@@ -26,6 +28,7 @@ import { Requests } from './Requests'
 import { Search } from './Search'
 import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
+import { useInfoDetails } from './useInfoDetails'
 import { takeOpener } from './useSheet'
 import { You } from './You'
 
@@ -117,6 +120,17 @@ function usePageShown(): boolean {
  * page is told whether it is what shows (its tab current, the sheet closed, the app in front), so
  * what it says is already here of a pressing is asked again as you come back to it - after a Get,
  * or a download cancelled in Requests.
+ *
+ * Artists (2.0.0-player.17): an artist's page (openArtist) is pushed on the tab showing, from Search's
+ * artist rows and top result, Library > Artists, the artist on both album pages, and Info's artist
+ * card - by Navidrome's id for them, or `mb:<mbid>` for one known only by MusicBrainz (the album you
+ * don't have). One Navidrome knows is drawn inside the gate, like an album you have; one MusicBrainz
+ * knows outside it, its albums-you-have half asked only while Navidrome answers. Requests is told
+ * when its root is what shows (`requestsActive`: watching it, no sheet over it), and only then looks
+ * for its Done rows' albums, so their ▶ plays - looking again until Navidrome has scanned what was
+ * filed - and calls a tap's look off when it stops being so; it is told why Navidrome can't be asked
+ * (`navidromeProblem`), for a row that can't open. Info asks for what fills its About in as it opens
+ * (useInfoDetails).
  */
 export function App() {
   const player = usePlayer()
@@ -127,6 +141,8 @@ export function App() {
   const previews = useRef(new Map<string, Album>())
   //? the albums you don't have, as Search showed them: a group page's header before its pressings
   const groupPreviews = useRef(new Map<string, ReleaseGroup>())
+  //? the artists opened this session, as the row that opened them knew them: a page's hero at once
+  const artistPreviews = useRef(new Map<string, ArtistPreview>())
   const router: Router = useMemo(
     () =>
       createRouter({
@@ -271,6 +287,30 @@ export function App() {
     router.open(page)
   }, [])
 
+  /**
+   * An artist's page (2.0.0-player.17), on the tab showing: by Navidrome's id for them, or - known only
+   * by MusicBrainz - `mb:<mbid>`. Drawn at once from what the row that opened it knew.
+   */
+  const openArtist = useCallback((artist: { navidrome?: string | null; mbid?: string | null; name?: string; coverArt?: string | null }) => {
+    const id = artistPageId(artist)
+    if (!id) return
+    artistPreviews.current.delete(id)
+    artistPreviews.current.set(id, { ...(artist.name ? { name: artist.name } : {}), ...(artist.coverArt ? { coverArt: artist.coverArt } : {}) })
+    if (artistPreviews.current.size > PREVIEWS_KEPT) {
+      const [oldest] = artistPreviews.current.keys()
+      if (oldest !== undefined) artistPreviews.current.delete(oldest)
+    }
+    const page: Page = { kind: 'artist', id, ...(artist.name ? { label: artist.name } : {}) }
+    const address = scrollKey({ tab: router.nav.tab, page })
+    if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
+    router.open(page)
+  }, [])
+  //? an artist from Navidrome's answers - Search's rows, Library > Artists
+  const openLibraryArtist = useCallback((artist: Artist) => openArtist({ navidrome: artist.id, name: artist.name, coverArt: artist.coverArt ?? null }), [])
+  //? from an album page: Navidrome's album artist, or MusicBrainz's sole credited artist
+  const openAlbumArtist = useCallback((artist: { id: string; name: string }) => openArtist({ navidrome: artist.id, name: artist.name }), [])
+  const openCreditedArtist = useCallback((artist: { mbid: string; name: string }) => openArtist({ mbid: artist.mbid, name: artist.name }), [])
+
   /** A pressing chosen on a group page: the page's address replaced - the default takes it out. */
   const pickPressing = useCallback((groupId: string, release: string | null) => {
     router.update({ kind: 'group', id: groupId, ...(release ? { release } : {}) })
@@ -339,6 +379,13 @@ export function App() {
    * Drawn from the answer it was played from when that is in hand, so the page has its cover and
    * artist at once. The ••• button is in a sheet that is closing, so focus isn't sent back to it.
    */
+  /** Info's artist card: every sheet closes and the artist's page opens on the tab showing. */
+  const toArtist = (artist: { id: string; name: string }) => {
+    moreOpener.current = null
+    closeSheet()
+    openArtist({ navidrome: artist.id, name: artist.name })
+  }
+
   const goToAlbum = (track: NonNullable<Player['track']>) => {
     if (!track.albumId) return
     moreOpener.current = null
@@ -362,6 +409,15 @@ export function App() {
   const searchActive = nav.tab === 'search' && nav.stacks.search.length === 0 && !sheetOpen && !sourcesOpen
   //? You's tab is the one showing: its Getting albums are asked again each time it is opened
   const youCurrent = nav.tab === 'you'
+  //? Requests' root is what shows, with nothing over it: its Done rows' albums are looked for only
+  //? then, and a tap's look still out when it stops being so opens nothing
+  const requestsActive = watching === 'requests' && !sourcesOpen
+  //? why Navidrome can't be asked for an album just now, for a Done row that can't open: unknown
+  //? (null) until its status is in
+  const navidromeProblem = !status ? null
+    : !status.configured ? "Navidrome isn't set up, so deadwax can't open the album here"
+    : !status.ok ? "Navidrome isn't answering just now, so deadwax can't open the album here"
+    : null
   const home = useMemo(
     () => (
       <Home
@@ -382,23 +438,26 @@ export function App() {
         answered={answered.current}
         trackingEnabled={trackingEnabled}
         error={downloadsError}
+        active={requestsActive}
+        navidromeProblem={navidromeProblem}
         onCancel={cancel}
         onRetry={retry}
         onClear={clearFinished}
+        onOpenAlbum={openAlbum}
       />
     ),
-    [view, answered.current, trackingEnabled, downloadsError, cancel, retry, clearFinished],
+    [view, answered.current, trackingEnabled, downloadsError, cancel, retry, clearFinished, requestsActive, navidromeProblem],
   )
   const library = useMemo(
     () => (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
-        <Library onOpen={openAlbum} />
+        <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} />
       </NeedsNavidrome>
     ),
     [status],
   )
   const search = useMemo(
-    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onGet={openSources} />,
+    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenArtist={openLibraryArtist} onGet={openSources} />,
     [status, searchSeen, searchActive],
   )
   const you = useMemo(
@@ -410,8 +469,30 @@ export function App() {
   //? an album you don't have needs no Navidrome, so it is drawn outside the gate. It is told whether
   //? it is what shows - its tab current, no Sources sheet over it, the app in front - and asks the
   //? store again as it comes back to that
+  //? an artist: one Navidrome knows inside the gate, one MusicBrainz knows outside it
+  const artistView = (tab: Tab, page: Page) => {
+    const artist = (
+      <ArtistPage
+        id={page.id}
+        preview={artistPreviews.current.get(page.id) ?? null}
+        navidromeOk={!!status?.ok}
+        shown={pageShown && nav.tab === tab && !sourcesOpen}
+        onBack={back}
+        backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
+        onOpenAlbum={openAlbum}
+        onOpenGroup={openGroup}
+        onGet={openSources}
+      />
+    )
+    return page.id.startsWith(MB_PREFIX) ? artist : (
+      <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
+        {artist}
+      </NeedsNavidrome>
+    )
+  }
+
   const pageView = (tab: Tab, page: Page, player: Player) =>
-    page.kind === 'group' ? (
+    page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
@@ -421,6 +502,7 @@ export function App() {
         backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
         onPick={pickPressing}
         onGet={openSources}
+        onArtist={openCreditedArtist}
       />
     ) : (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
@@ -430,6 +512,8 @@ export function App() {
           player={player}
           onBack={back}
           backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
+          onArtist={openAlbumArtist}
+          onOpenAlbum={openAlbum}
         />
       </NeedsNavidrome>
     )
@@ -455,6 +539,9 @@ export function App() {
 
   const playing = player.track
   const toAlbum = playing?.albumId ? () => goToAlbum(playing) : null
+  const playedFrom = playing ? playedAlbum(playing.albumId) : null
+  //? what fills Info > About in, asked as it opens (2.0.0-player.17)
+  const infoDetails = useInfoDetails(sheetOpen && over === 'info', playing, playedFrom)
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows
   const covered = sheetOpen || sourcesOpen
 
@@ -506,9 +593,11 @@ export function App() {
             onClose={closeOver}
             onAlbum={toAlbum}
             player={player}
-            album={playing ? playedAlbum(playing.albumId) : null}
+            album={playedFrom}
             sentFormat={sentFormat}
             turntable={turntableSound}
+            details={infoDetails}
+            onArtist={toArtist}
           />
         </div>
       </ActionsContext.Provider>

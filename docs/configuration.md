@@ -158,7 +158,7 @@ These are stored in your browser, so each browser and device has its own. They'r
 
 ## The phone player's settings (per device)
 
-[The phone player](player.md) at `/player/` keeps five settings of its own, on the device, in the
+[The phone player](player.md) at `/player/` keeps six settings of its own, on the device, in the
 app's own storage: a home-screen app keeps its storage apart from Safari's, so set them in the app
 itself. None of them is on the main page's Settings tab.
 
@@ -168,7 +168,8 @@ itself. None of them is on the main page's Settings tab.
 | Gapless | off | **You** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback-experimental). A checkbox; until 2.0.0-player.10 it was a switch on the now-playing screen, and it keeps the setting it had there. |
 | Now Playing opens as | Cover | **You** → Playback | whether the now-playing screen opens as the cover or as [the turntable](player.md#the-turntable). The button at the screen's top right switches between them for as long as it's open, without changing this. |
 | Pause winds the record down | on | **You** → Playback | whether pausing from [the turntable](player.md#the-turntable) slows the song's sound to a stop with the record over about a second (on), or stops it at once. The turntable's only: the cover's pause, the lock screen's and a song ending are always instant. A checkbox. |
-| Library order | Recently added | **Library**, above the grid | Recently added, Recently played, Artist or Title |
+| Library view | Albums | **Library**, the chips under the title | Albums, Artists or Songs (since 2.0.0-player.17). Songs is left out where Navidrome won't list songs, and the albums show instead. |
+| Library order | Recently added | **Library**, the sort under the chips, on Albums | Recently added, Recently played, Artist or Title. (Artists has its own sort - Name or Most albums - which isn't kept.) |
 
 The Requests tab's **✕** asks before cancelling, by **Confirm before cancelling** above - in the
 card itself (**Keep it** or **Cancel download**), never as a pop-up, which would hold up the music.

@@ -184,3 +184,67 @@ def test_release_group_refuses_anything_but_an_mbid(app_client, musicbrainz, bad
 
     assert app_client.get("/deadwax/search_musicbrainz/release_group", params={"release_group_mbid": bad}).status_code == 422
     assert fake.calls == []
+
+
+# ---------------------------------------------------------------- /artist (2.0.0-player.17)
+
+PORTISHEAD = "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11"
+
+PORTISHEAD_ANSWER = {
+    "id": PORTISHEAD, "name": "Portishead", "sort-name": "Portishead", "type": "Group",
+    "country": "GB", "area": {"name": "United Kingdom"}, "begin-area": {"name": "Bristol"},
+    "life-span": {"begin": "1991", "ended": False},
+    "genres": [{"name": "trip hop", "count": 9}, {"name": "electronic", "count": 3}],
+    "aliases": [{"name": "Portis Head", "type": "Search hint"}],
+    "relations": [{"type": "official homepage", "url": {"resource": "https://portishead.co.uk/"}}],
+}
+
+
+class Artist:
+    """MusicBrainz's artist lookup: one answer, or a refusal; every request kept."""
+
+    def __init__(self, payload=None, status_code=200):
+        self.payload = payload
+        self.status_code = status_code
+        self.calls = []
+
+    async def get(self, endpoint, params=None):
+        self.calls.append((endpoint, dict(params or {})))
+        return Answer(self.payload, status_code=self.status_code)
+
+
+def test_artist_is_the_light_facts(app_client, musicbrainz):
+    fake = Artist(PORTISHEAD_ANSWER)
+    musicbrainz[1]["fake"] = fake
+
+    answer = app_client.get(f"/deadwax/search_musicbrainz/artist?mbid={PORTISHEAD}")
+
+    assert answer.status_code == 200
+    facts = answer.json()
+    assert (facts["name"], facts["type"], facts["begin_area"], facts["began"], facts["ended"], facts["genres"]) == (
+        "Portishead", "Group", "Bristol", "1991", False, ["trip hop", "electronic"])
+    #? light: who they are, and nothing a page would need more requests for
+    assert "links" not in facts and "members" not in facts
+    [(endpoint, params)] = fake.calls
+    assert endpoint == f"artist/{PORTISHEAD}"
+
+
+def test_artist_is_cached_and_its_failure_is_not(app_client, musicbrainz):
+    musicbrainz[1]["fake"] = Artist(status_code=403)
+
+    assert app_client.get(f"/deadwax/search_musicbrainz/artist?mbid={PORTISHEAD}").status_code == 503
+
+    recovered = Artist(PORTISHEAD_ANSWER)
+    musicbrainz[1]["fake"] = recovered
+    for _ in range(2):
+        assert app_client.get(f"/deadwax/search_musicbrainz/artist?mbid={PORTISHEAD}").json()["name"] == "Portishead"
+    assert len(recovered.calls) == 1, "the failure wasn't kept, and the success was"
+
+
+@pytest.mark.parametrize("bad", ["", "portishead", PORTISHEAD.upper(), f"{PORTISHEAD}x", f"{PORTISHEAD}?inc=aliases"])
+def test_artist_refuses_anything_but_an_mbid(app_client, musicbrainz, bad):
+    fake = Artist(PORTISHEAD_ANSWER)
+    musicbrainz[1]["fake"] = fake
+
+    assert app_client.get("/deadwax/search_musicbrainz/artist", params={"mbid": bad}).status_code == 422
+    assert fake.calls == []

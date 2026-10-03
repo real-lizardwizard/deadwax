@@ -3,6 +3,12 @@
 The **Library** tab shows what's in your music folder (`LIBRARY_PATH`): every album, including
 ones deadwax never downloaded. It flags what's wrong with them and lets you fix it.
 
+This page is about the main page's Library tab, the one for looking after the library. The phone
+app at `/player/` has a Library tab of its own, for listening - **Albums**, **Artists** and
+**Songs** from Navidrome, and an [artist page](player.md#artist-pages) with their albums from
+MusicBrainz and Play and Shuffle over the ones you have - which the [phone player
+guide](player.md#what-it-does) covers.
+
 ## Opening it
 
 The first time, the tab reads the tags off every file, which takes a while for a big library.
@@ -236,6 +242,12 @@ folder that holds tracks is refused, since an `artist.jpg` there would mean some
 says **Now: …**. If their albums are filed under two folder names, **Move albums to …** moves
 them all under the current name, with a preview first. It rewrites the album-artist tag, leaves
 each track's credited artist alone, and removes the old folder once it's empty.
+
+**In the phone app** an artist has a page too (since 2.0.0-player.17; [the phone player
+guide](player.md#artist-pages) has it): the square `artist.*` picture saved here is its hero, as
+Navidrome serves it, and the MusicBrainz artist ids deadwax writes into your files are how it
+finds the artist's discography when Navidrome doesn't say who they are. An album filed by
+another tool, without those ids, still shows there - just without MusicBrainz's albums beside it.
 
 ## Deleting an album
 

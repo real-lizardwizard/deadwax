@@ -14,6 +14,7 @@ import {
   type PageRelease,
 } from '../lib/pressings'
 import { buildDownloadRelease } from '../lib/releasePayload'
+import { soleCredit } from '../lib/artistPage'
 import { ChevronLeftIcon, GetIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import { PressingPicker } from './PressingPicker'
@@ -35,8 +36,9 @@ export const NOT_AN_ALBUM_LINK = "That isn't a link to an album on MusicBrainz."
  * The album you don't have (2.0.0-player.13): a MusicBrainz release group at
  * `#/<tab>/group/<rgid>?release=<mbid>`, opened like an album you do have - James: "an album you
  * don't have opens like one you do". So its header is the album page's: back, the centred cover
- * (from the Cover Art Archive - the pressing's front, else the album's), the title, the artist (not
- * a link: there is no artist page yet), and "{year} · {kind} · not in your library". Where the album
+ * (from the Cover Art Archive - the pressing's front, else the album's), the title, the artist (a
+ * link to their page since 2.0.0-player.17, when the album is credited to one artist MusicBrainz
+ * knows), and "{year} · {kind} · not in your library". Where the album
  * page has Play and Shuffle, this has the Pressing dropdown, and under it (2.0.0-player.15) "Get the
  * album", the screen's ONE solid purple button, and under that what the library and the downloads
  * already have of the pressing chosen - POST /download/store_state, which searches nothing
@@ -83,6 +85,7 @@ export function ReleaseGroupPage({
   backLabel,
   onPick,
   onGet,
+  onArtist,
 }: {
   id: string
   release: string | null
@@ -96,6 +99,8 @@ export function ReleaseGroupPage({
   onPick: (groupId: string, releaseId: string | null) => void
   /** Get: open the Sources sheet for the chosen pressing, focus given back to `opener` as it closes */
   onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
+  /** the artist's page, by MusicBrainz id (2.0.0-player.17) */
+  onArtist?: (artist: { mbid: string; name: string }) => void
 }) {
   //? the id as MusicBrainz writes it, or null for an address that isn't an album's
   const mbid = groupMbid(id)
@@ -153,6 +158,9 @@ export function ReleaseGroupPage({
   const rows = trackRows(chosen, diff)
   const missing = leftOut(diff)
   const summary = view ? summaryLine(view, releases.length) : null
+  //? the artist, a link to their page when the album is credited to ONE artist MusicBrainz knows
+  const credited = preview ?? releases.find((each) => each['release-group'])?.['release-group'] ?? null
+  const artistLink = onArtist ? soleCredit(credited?.['artist-credit']?.length ? credited['artist-credit'] : chosen?.['artist-credit']) : null
 
   //? What Get would download: the chosen pressing, as the one payload builder makes it from the
   //? album's group - and what the library and the downloads already have of it, asked of the store
@@ -205,7 +213,13 @@ export function ReleaseGroupPage({
       <div class="pl-album-hero">
         <ArchiveCover addresses={mbid ? coverAddresses(chosen?.id ?? release, mbid) : []} class="pl-hero-cover" />
         <h1 class="pl-hero-title">{header.title}</h1>
-        <p class="pl-hero-artist">{header.artist}</p>
+        {artistLink ? (
+          <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist?.(artistLink)}>
+            {header.artist}
+          </button>
+        ) : (
+          <p class="pl-hero-artist app-hero-plain">{header.artist}</p>
+        )}
         {/* said once something is known - a cold link has nothing to say until the pressings come */}
         <p class="pl-hero-meta">{preview || answer ? metaLine(header, held) : ''}</p>
 

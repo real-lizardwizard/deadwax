@@ -147,9 +147,11 @@ and searched again, is dropped.
 Navidrome's own search of your library, in three parts:
 
 - **Top result**: an artist whose name is exactly what you typed, with how many of their albums
-  you have ("Artist · 2 albums in your library"). It isn't a link yet: artist pages come later.
-- **In your library**: albums ("Album · Portishead · 1994"), which open the album, and songs ("Song
-  · Portishead · Dummy"). Up to 8 albums and 12 songs.
+  you have ("Artist · 2 albums in your library"). Tap it for [their page](player.md#artist-pages)
+  (since 2.0.0-player.17).
+- **In your library**: the other artists found (up to 5 in all, each opening their page), albums
+  ("Album · Portishead · 1994"), which open the album, and songs ("Song · Portishead · Dummy"). Up
+  to 8 albums and 12 songs.
 - **A song** plays straight away, from that song through the rest of its album, once its album is
   in hand: as the answer arrives, the songs' albums are fetched - the first five different ones -
   and a song whose album has arrived shows a play mark (▶) at its right. Tap one without it, and
@@ -176,7 +178,10 @@ and what it is, who by and when ("Live album · Portishead · 1998"). Tap one to
 [the album you don't have](#the-album-you-dont-have). **Get**, at the end of the row, gets the
 album's usual pressing without opening it (it reads "Get…" while it asks MusicBrainz for the
 album's pressings, which an album opened before already has, and gives up if you type, open
-something or switch tab meanwhile); a row that turns out to be in your library has none.
+something or switch tab meanwhile); a row that turns out to be in your library has none, and a tap
+on it opens **the album you have** (since 2.0.0-player.17: deadwax looks up which album Navidrome
+holds for the pressing you have) - or, while Navidrome hasn't found it, the album you don't have,
+which says "in your library".
 
 How the box is read, since there's only one:
 
@@ -200,7 +205,9 @@ that.
 ### The album you don't have
 
 It opens like an album you have: back, the cover in the middle (the Cover Art Archive's, for the
-pressing shown, else for the album), the title, the artist (not a link yet), and "2008 · Album ·
+pressing shown, else for the album), the title, the artist (since 2.0.0-player.17 a link to
+[their page](player.md#artist-pages) when the album is credited to one artist; a collaboration's
+names stay plain), and "2008 · Album ·
 not in your library" - "in your library" if you have some pressing of it after all. That last part
 appears once deadwax has said what you have, never before, so it can't claim you don't have an
 album you do; and it counts a folder tagged with any of the album's pressings, the .m4a albums

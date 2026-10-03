@@ -1056,8 +1056,11 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
 
     if "navidrome" in invalidate:
         from src.api.navidrome_endpoint import navidrome
+        from src.routes.store_album import forget_navidrome_ids
 
         await navidrome.close_client()
+        #? another Navidrome (or another account on it) has other album ids (2.0.0-player.17)
+        forget_navidrome_ids()
         logger.info("Navidrome client dropped, it will rebuild with the new address")
 
     if "library" in invalidate:

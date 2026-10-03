@@ -198,12 +198,14 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
             return streamed(200, JPEG, {"content-type": "image/jpeg"})
         if endpoint == "stream":
             return streamed(200, JPEG, {"content-type": "audio/mpeg"})
-        return httpx.Response(200, json=ok(searchResult3={}, albumList2={}, album={}))
+        return httpx.Response(200, json=ok(searchResult3={}, albumList2={}, album={}, artists={}, artist={}, song={}))
 
     state["handler"] = answer
     paths = [
         "/deadwax/navidrome/status", "/deadwax/navidrome/albums", "/deadwax/navidrome/albums/al-1",
         f"{SEARCH}?q=x", "/deadwax/navidrome/cover/al-1", "/deadwax/navidrome/stream/so-1?format=mp3",
+        #? 2.0.0-player.17: the artists, one artist, one song
+        "/deadwax/navidrome/artists", "/deadwax/navidrome/artists/ar-1", "/deadwax/navidrome/songs/so-1",
     ]
     for path in paths:
         client.get(path)
@@ -216,7 +218,7 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
     #? as the stream's wrap=mp4 does - one MP4 serves every phone - so like that path it asks Navidrome
     #? through the cache's own client, and step 6 checks a user's access at the route
     assert "/scrub/{song_id}" in {route.path for route in navidrome_routes.router.routes}
-    assert len({route.path for route in navidrome_routes.router.routes}) == 8
+    assert len({route.path for route in navidrome_routes.router.routes}) == 11
 
 
 def test_the_turntables_internal_call_asks_through_client_for(monkeypatch, tmp_path, configured):

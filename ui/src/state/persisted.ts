@@ -36,6 +36,9 @@ export const STORAGE_KEYS = {
   settingsTab: 'deadwax-settings-tab',
   /** Which order the player's album grid is in - a Subsonic album list type. */
   playerOrder: 'deadwax-player-order',
+  /** What the app's Library tab shows (2.0.0-player.17): 'artists' or 'songs', anything else the
+   *  albums (the default). Per device, like the order. */
+  playerLibraryView: 'deadwax-player-library-view',
   /** Whether the player's gapless switch is on: 'on', or anything else for off (the default). */
   playerGapless: 'deadwax-player-gapless',
   /** The player's "Maximum quality": '48000' (the default, and anything unknown) or 'original'.
@@ -227,6 +230,20 @@ export function readPlayerOrder(): string | null {
 
 export function writePlayerOrder(order: string): void {
   writeRaw(STORAGE_KEYS.playerOrder, order)
+}
+
+/* ===== deadwax-player-library-view ===== */
+
+export type LibraryView = 'albums' | 'artists' | 'songs'
+
+/** What the Library tab shows: anything but 'artists' or 'songs' is the albums. */
+export function readPlayerLibraryView(): LibraryView {
+  const saved = readRaw(STORAGE_KEYS.playerLibraryView)
+  return saved === 'artists' || saved === 'songs' ? saved : 'albums'
+}
+
+export function writePlayerLibraryView(view: LibraryView): void {
+  writeRaw(STORAGE_KEYS.playerLibraryView, view)
 }
 
 /* ===== deadwax-player-gapless ===== */

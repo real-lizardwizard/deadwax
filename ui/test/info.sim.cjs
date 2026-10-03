@@ -12,7 +12,14 @@
  *    the album's year, format and song count, the album's own artist when it isn't the song's -
  *    and each left out when it wasn't sent, never guessed. An album not in hand leaves only what
  *    the queue knows.
- *  - The albums played from are kept, the newest last, and only PLAYED_KEPT of them.
+ *  - The albums played from are kept, the newest last, and only PLAYED_KEPT of them - but every album
+ *    of an artist's Play (a queue of several, up to QUEUE_ALBUMS_KEPT), the first to play kept
+ *    longest, until the next queue starts (2.0.0-player.17, review).
+ *  - About filled in (2.0.0-player.17): the card goes to the song's own artist - the album's only when
+ *    that is the same person - and draws only that artist's facts and count; the folder is a row of
+ *    its own at the end, in no button. useInfoDetails (app/useInfoDetails.ts) holds the song's and
+ *    the store's answers back for each other (or INFO_SETTLE_MS), and of two artists says the
+ *    album's is the card's only when their MusicBrainz ids are one.
  *  - Every sheet is a sheet (app/useSheet.ts): its own class on <html> while open, focus in as it
  *    opens, focus BACK to what opened it as it closes - by Done, Escape or the backdrop - Escape
  *    for the sheet on top only, and inert while closed. The menu doesn't give focus back when it
@@ -169,9 +176,9 @@ const one = (view, test) => view.find(test)[0]
 /* ===== the songs ===== */
 
 const DOT = String.fromCharCode(0xb7)
-const { aboutRows } = require(path.join(OUT, 'lib/aboutRows.js'))
+const { aboutRows, writtenBy, playedLine, labelLine } = require(path.join(OUT, 'lib/aboutRows.js'))
 const { sharedFormat } = require(path.join(OUT, 'lib/format.js'))
-const { createPlayedAlbums, PLAYED_KEPT } = require(path.join(OUT, 'lib/playedAlbums.js'))
+const { createPlayedAlbums, PLAYED_KEPT, QUEUE_ALBUMS_KEPT } = require(path.join(OUT, 'lib/playedAlbums.js'))
 
 function queueTrack(overrides = {}) {
   return {
@@ -234,6 +241,62 @@ console.log('\nAbout: the album and the artist')
   check('the one format every song is in, or none', [sharedFormat([{ suffix: 'flac' }, { suffix: 'FLAC' }]), sharedFormat([{ suffix: 'flac' }, {}]), sharedFormat([])], ['FLAC', null, null])
 }
 
+console.log('\nAbout filled in (2.0.0-player.17): what Info asks for as it opens')
+const WITH_IDS = { ...EXPERIENCE, artistId: 'ar-floyd', recordLabels: [{ name: 'Harvest' }, { name: ' Harvest ' }, { name: 'EMI' }] }
+const DETAILS = {
+  song: { id: 'd2t3', playCount: 12, displayComposer: 'Roger Waters, David Gilmour' },
+  store: { present: [{ edition: 'Experience edition', year: '2011', formats: ['flac'], path: 'Pink Floyd/Wish You Were Here (1975) [Experience edition]' }] },
+  artist: { id: 'ar-floyd', albumCount: 4 },
+  facts: { type: 'Group', area: 'United Kingdom', begin_area: 'London', country: 'GB', began: '1965', ended: true, ended_on: '2014', disambiguation: '' },
+}
+{
+  const full = aboutRows(queueTrack(), WITH_IDS, DETAILS)
+  check('the song: "played 12 times" on its first line, and who wrote it', [full.song.lines[0], full.song.writtenBy],
+    [`Track 3 of 6 ${DOT} 5:08 ${DOT} played 12 times`, 'Roger Waters, David Gilmour'])
+  check('the album: its labels after the year, each once; this pressing; its folder', [full.album.line, full.album.pressing, full.album.folder],
+    [`1975 ${DOT} Harvest / EMI ${DOT} FLAC ${DOT} 11 songs`, `This pressing: Experience edition ${DOT} 2011 ${DOT} FLAC`, 'Pink Floyd/Wish You Were Here (1975) [Experience edition]'])
+  check('the artist: whose page the card goes to, who they are, how many of theirs you have', full.artist,
+    { name: 'Pink Floyd', note: null, id: 'ar-floyd', pageName: 'Pink Floyd', facts: `Group ${DOT} London ${DOT} 1965 to 2014`, count: '4 albums in your library' })
+  const renamed = { ...WITH_IDS, artist: 'Ye', song: WITH_IDS.song.map((each) => ({ ...each, artist: 'Kanye West' })) }
+  check('a renamed artist\'s old credit: the card names the song\'s artist, and goes to the album\'s, by its name',
+    [aboutRows(queueTrack({ artist: 'Kanye West' }), renamed).artist.name, aboutRows(queueTrack({ artist: 'Kanye West' }), renamed).artist.pageName, aboutRows(queueTrack({ artist: 'Kanye West' }), renamed).artist.note],
+    ['Kanye West', 'Ye', 'The album is by Ye'])
+  check('the song\'s details are this song\'s only', aboutRows(queueTrack(), WITH_IDS, { ...DETAILS, song: { id: 'other', playCount: 99, displayComposer: 'X' } }).song,
+    { title: 'Wish You Were Here (Live at Wembley)', artist: 'Pink Floyd', lines: [`Track 3 of 6 ${DOT} 5:08`, `Disc 2 ${DOT} Unreleased Tracks`] })
+  check('...the album answer\'s count as it was at the tap, until Navidrome answers', aboutRows(queueTrack(), { ...WITH_IDS, song: WITH_IDS.song.map((each) => (each.id === 'd2t3' ? { ...each, playCount: 1 } : each)) }).song.lines[0],
+    `Track 3 of 6 ${DOT} 5:08 ${DOT} played once`)
+  check('...and Navidrome\'s answer over it, even one saying fewer', aboutRows(queueTrack(), { ...WITH_IDS, song: WITH_IDS.song.map((each) => (each.id === 'd2t3' ? { ...each, playCount: 5 } : each)) }, { song: { id: 'd2t3' } }).song.lines[0],
+    `Track 3 of 6 ${DOT} 5:08`)
+  check('the count of another artist is not this one\'s', aboutRows(queueTrack(), WITH_IDS, { ...DETAILS, artist: { id: 'ar-x', albumCount: 9 } }).artist.count, undefined)
+  check('nothing sent: none of it - no "played 0 times", no empty pressing, no "unknown"',
+    JSON.stringify(aboutRows(queueTrack(), EXPERIENCE, { song: { id: 'd2t3', playCount: 0, displayComposer: ' ' }, store: { present: [] }, artist: null, facts: null })),
+    JSON.stringify(aboutRows(queueTrack(), EXPERIENCE)))
+  //? whose card it is (review): the song's own artist, the album's only when that is them
+  const compilation = { ...WITH_IDS, artist: 'Various Artists', artistId: 'ar-va', song: WITH_IDS.song.map((each) => (each.id === 'd2t3' ? { ...each, artist: 'Portishead', artistId: 'ar-portishead' } : each)) }
+  const portishead = queueTrack({ artist: 'Portishead' })
+  check('a compilation\'s track: the card is the song\'s artist\'s - their page, their name - the album\'s artist a note',
+    [aboutRows(portishead, compilation).artist.id, aboutRows(portishead, compilation).artist.pageName, aboutRows(portishead, compilation).artist.note],
+    ['ar-portishead', 'Portishead', 'The album is by Various Artists'])
+  check('...and only their facts and count: the album artist\'s never drawn under the song\'s name', [
+    aboutRows(portishead, compilation, { ...DETAILS, artist: { id: 'ar-portishead', albumCount: 3 } }).artist.count,
+    aboutRows(portishead, compilation, { ...DETAILS, artist: { id: 'ar-other', albumCount: 37 } }).artist,
+  ], ['3 albums in your library', { name: 'Portishead', note: 'The album is by Various Artists', id: 'ar-portishead', pageName: 'Portishead' }])
+  const yeAlbum = { ...WITH_IDS, artist: 'Ye', artistId: 'ar-ye', song: WITH_IDS.song.map((each) => ({ ...each, artist: 'Kanye West', artistId: 'ar-kanye' })) }
+  const kanye = queueTrack({ artist: 'Kanye West' })
+  check('a renamed artist\'s old credit, two Navidrome artists: the song\'s until Info has asked, Ye\'s once it says they are one',
+    [aboutRows(kanye, yeAlbum).artist.id, aboutRows(kanye, yeAlbum, { artist: { id: 'ar-ye', albumCount: 2 } }).artist.id, aboutRows(kanye, yeAlbum, { artist: { id: 'ar-ye', albumCount: 2 } }).artist.pageName],
+    ['ar-kanye', 'ar-ye', 'Ye'])
+  check('the card goes to the album\'s own artist, else the song\'s; neither, no id', [
+    aboutRows(queueTrack(), { ...WITH_IDS, song: WITH_IDS.song.map((each) => ({ ...each, artistId: 'ar-song' })) }).artist.id,
+    aboutRows(queueTrack(), { ...EXPERIENCE, song: EXPERIENCE.song.map((each) => (each.id === 'd2t3' ? { ...each, artistId: 'ar-song' } : each)) }).artist.id,
+    'id' in aboutRows(queueTrack(), EXPERIENCE).artist], ['ar-floyd', 'ar-song', false])
+  check('the writers: the one line, else the composers among the contributors, each once',
+    [writtenBy({ displayComposer: ' Geoff Barrow ' }), writtenBy({ contributors: [{ role: 'composer', artist: { name: 'A' } }, { role: 'lyricist', artist: { name: 'B' } }, { role: 'Composer', artist: { name: 'A' } }] }), writtenBy(null)],
+    ['Geoff Barrow', 'A', ''])
+  check('the plays and the labels', [playedLine(1), playedLine(2), playedLine(0), playedLine(undefined), labelLine([{ name: '' }]), labelLine(undefined)],
+    ['played once', 'played 2 times', '', '', '', ''])
+}
+
 console.log('\nthe albums played from')
 {
   const played = createPlayedAlbums()
@@ -243,6 +306,20 @@ console.log('\nthe albums played from')
   played.remember({ id: 'b' })
   check('played from again, it is the newest - the next one out is another', [played.get('a2')?.again, played.get('a3')], [true, null])
   check('no id is no album', [played.get(null), played.get(undefined), played.get('')], [null, null, null])
+
+  //? 2.0.0-player.17: an artist's Play queues every album of theirs at once
+  const queue = createPlayedAlbums()
+  const twelve = Array.from({ length: PLAYED_KEPT + 4 }, (_, n) => ({ id: `q${n + 1}` }))
+  queue.rememberQueue(twelve)
+  check(`an artist's Play: every album it queues kept, past ${PLAYED_KEPT} - the first to play among them`,
+    twelve.map((album) => queue.get(album.id)?.id ?? null), twelve.map((album) => album.id))
+  queue.remember({ id: 'next' })
+  check(`...until the next queue starts: back to ${PLAYED_KEPT}, the queue's first to play kept longest`,
+    [queue.get('next')?.id, queue.get('q1')?.id, queue.get(`q${PLAYED_KEPT}`), queue.get(`q${PLAYED_KEPT - 1}`)?.id],
+    ['next', 'q1', null, `q${PLAYED_KEPT - 1}`])
+  const small = createPlayedAlbums(2, 3)
+  small.rememberQueue([{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }, { id: 'b4' }, { id: 'b5' }])
+  check(`...and never more than QUEUE_ALBUMS_KEPT (${QUEUE_ALBUMS_KEPT}) of one: the first to play kept`, ['b1', 'b2', 'b3', 'b4', 'b5'].map((id) => !!small.get(id)), [true, true, true, false, false])
 }
 
 /* ===== the sheets ===== */
@@ -325,6 +402,25 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   card.props.onClick()
   check('...the album\'s card goes to the album (App closes the sheets as it opens it)', [card.props.onClick === albumTaps.handler, albumTaps.count, closes - closesBefore], [true, 1, 0])
   check('About never asks how the song was sent', formats, 0)
+
+  //? 2.0.0-player.17: filled in, the artist's card goes to their page - App closes the sheets as it opens it
+  const artistTaps = []
+  view.render({
+    open: true, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: WITH_IDS,
+    sentFormat: () => 'raw', details: DETAILS, onArtist: (artist) => artistTaps.push(artist),
+  })
+  const links = view.find((node) => node.type === 'button' && byClass('is-link')(node))
+  check('filled in: the album\'s card and the artist\'s are both links', links.length, 2)
+  links[1].props.onClick()
+  check('...the artist\'s opens their page, by Navidrome\'s id, named as the card names them', artistTaps, [{ id: 'ar-floyd', name: 'Pink Floyd' }])
+  check('...and the card says who they are and what you have of theirs', view.find(byClass('app-info-line')).map(text).filter((line) => /Group|in your library|Written|pressing/.test(line)),
+    ['Written by Roger Waters, David Gilmour', `This pressing: Experience edition ${DOT} 2011 ${DOT} FLAC`, `Group ${DOT} London ${DOT} 1965 to 2014`, '4 albums in your library'])
+  check('...the folder in monospace, a row of its own at the end - in no button, so it can be copied',
+    [view.find(byClass('app-info-folder')).map((node) => [node.type, text(node), /app-mono/.test(node.props.class)]),
+      links.flatMap((link) => view.find(byClass('app-info-folder')).filter((folder) => JSON.stringify(link).includes(JSON.stringify(folder.props.children)))).length,
+      view.find((node) => node.type === 'h3').map(text)],
+    [[['dd', 'Pink Floyd/Wish You Were Here (1975) [Experience edition]', true]], 0, ['The song', 'The album', 'The artist', 'In your library']])
+  draw(true)
 
   tabs()[1].props.onClick()
   reopen()
@@ -473,5 +569,113 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   check('a failure is drawn above the title, never under it', titles.map((node) => node.props.class.split(' ')[0]), ['pl-sheet-error', 'pl-sheet-title', 'pl-sheet-artist'])
 }
 
-console.log(failures ? `\n${failures} FAILED` : '\nall passed')
-process.exit(failures ? 1 : 0)
+/* ===== what Info asks for as it opens: app/useInfoDetails.ts, with every answer given by hand ===== */
+
+const DETAILS_OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-info-details-'))
+execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
+  'src/app/useInfoDetails.ts', '--rootDir', 'src', '--outDir', DETAILS_OUT,
+  '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
+  '--lib', 'es2022,dom,dom.iterable',
+], { cwd: UI, stdio: 'inherit' })
+fs.mkdirSync(path.join(DETAILS_OUT, 'node_modules/preact'), { recursive: true })
+fs.copyFileSync(path.join(OUT, 'node_modules/preact/hooks.js'), path.join(DETAILS_OUT, 'node_modules/preact/hooks.js'))
+fs.writeFileSync(path.join(DETAILS_OUT, 'api/musicbrainz.js'), 'exports.getArtistFacts = (mbid) => globalThis.__info.ask("facts", mbid)\n')
+fs.writeFileSync(path.join(DETAILS_OUT, 'api/store.js'), 'exports.storeAlbum = (by) => globalThis.__info.ask("store", by.navidrome_id)\n')
+fs.writeFileSync(path.join(DETAILS_OUT, 'player/api.js'), `
+exports.songDetails = (id) => globalThis.__info.ask('song', id)
+exports.artistAlbums = (id) => globalThis.__info.ask('artist', id)
+`)
+fs.writeFileSync(path.join(DETAILS_OUT, 'app/useOwned.js'), 'exports.ownedNow = () => null\n')
+
+const I = globalThis.__info = {
+  asks: [], open: [],
+  ask(name, arg) {
+    I.asks.push([name, arg])
+    return new Promise((resolve, reject) => I.open.push({ name, arg, resolve, reject }))
+  },
+}
+const reply = (name, value, arg) => {
+  const at = I.open.findIndex((one) => one.name === name && (arg === undefined || one.arg === arg))
+  if (at < 0) throw new Error(`nothing asked of ${name} ${arg ?? ''}`)
+  I.open.splice(at, 1)[0].resolve(value)
+}
+const timers = []
+const realSetTimeout = globalThis.setTimeout
+globalThis.setTimeout = (fn) => { const timer = { fn, live: true }; timers.push(timer); return timer }
+globalThis.clearTimeout = (timer) => { if (timer) timer.live = false }
+const settle = () => new Promise((resolve) => setImmediate(() => setImmediate(resolve)))
+const detailsHooks = require(path.join(DETAILS_OUT, 'node_modules/preact/hooks.js'))
+const { useInfoDetails, INFO_SETTLE_MS } = require(path.join(DETAILS_OUT, 'app/useInfoDetails.js'))
+
+/** The hook in a component of its own: what it hands back, drawn after each answer lands. */
+function detailsOf(album, track) {
+  const render = detailsHooks.root((props) => useInfoDetails(props.open, props.track, props.album))
+  let out = null
+  const draw = () => { out = render({ open: true, track, album }); render.commit(); return out }
+  return { draw, async after() { await settle(); draw(); return draw() } }
+}
+
+async function details() {
+  console.log('\nwhat Info asks for as it opens, and when it is drawn')
+  {
+    I.asks.length = 0; I.open.length = 0; timers.length = 0
+    const album = { ...WITH_IDS, id: 'wywh' }
+    const track = queueTrack({ albumId: 'wywh' })
+    const info = detailsOf(album, track)
+    info.draw()
+    check('the song, the store and the artist asked for as it opens', I.asks.map((one) => one[0]).sort(), ['artist', 'song', 'store'])
+    reply('song', { id: 'd2t3', playCount: 12 })
+    check('the song\'s answer held back for the store\'s: nothing drawn yet', await info.after(), null)
+    reply('store', { present: [{ path: 'Pink Floyd/Wish You Were Here (1975)' }] })
+    const both = await info.after()
+    check('...both drawn together once the store answers', [both?.song?.playCount, both?.store?.present.length], [12, 1])
+    reply('artist', { id: 'ar-floyd', albumCount: 4, musicBrainzId: '83d91898-7763-47d7-b03b-b92132375c47' })
+    const theirs = await info.after()
+    check('the artist\'s answer drawn as it lands, then who they are asked of MusicBrainz', [theirs?.artist, I.asks.filter((one) => one[0] === 'facts').length], [{ id: 'ar-floyd', albumCount: 4 }, 1])
+
+    I.asks.length = 0; I.open.length = 0
+    const slow = detailsOf(album, queueTrack({ id: 'd2t3', albumId: 'wywh' }))
+    slow.draw()
+    reply('song', { id: 'd2t3', playCount: 3 })
+    await slow.after()
+    for (const timer of timers.splice(0)) if (timer.live) timer.fn()
+    check(`a store answer slower than ${INFO_SETTLE_MS} ms: the song's drawn when the wait is over`, (await slow.after())?.song?.playCount, 3)
+    reply('store', { present: [] })
+    check('...and the store\'s as it lands after', (await slow.after())?.store?.present, [])
+  }
+  {
+    I.asks.length = 0; I.open.length = 0
+    const YE_ID = '164f0d73-1234-4e2c-8743-d77bf2191051'
+    const yeAlbum = { ...WITH_IDS, id: 'donda', artist: 'Ye', artistId: 'ar-ye', song: WITH_IDS.song.map((each) => ({ ...each, artist: 'Kanye West', artistId: 'ar-kanye' })) }
+    const renamed = detailsOf(yeAlbum, queueTrack({ artist: 'Kanye West', albumId: 'donda' }))
+    renamed.draw()
+    check('two artists of different names and ids: both asked about', I.asks.filter((one) => one[0] === 'artist').map((one) => one[1]).sort(), ['ar-kanye', 'ar-ye'])
+    reply('artist', { id: 'ar-kanye', name: 'Kanye West', musicBrainzId: YE_ID, album: [] }, 'ar-kanye')
+    reply('artist', { id: 'ar-ye', name: 'Ye', musicBrainzId: YE_ID, albumCount: 2, album: [] }, 'ar-ye')
+    await renamed.after()
+    for (const timer of timers.splice(0)) if (timer.live) timer.fn()
+    check('...one MusicBrainz id: the card is the album\'s artist\'s, Ye', (await renamed.after())?.artist, { id: 'ar-ye', albumCount: 2 })
+
+    I.asks.length = 0; I.open.length = 0
+    const various = { ...WITH_IDS, id: 'comp', artist: 'Various Artists', artistId: 'ar-va', song: WITH_IDS.song.map((each) => ({ ...each, artist: 'Portishead', artistId: 'ar-portishead' })) }
+    const comp = detailsOf(various, queueTrack({ artist: 'Portishead', albumId: 'comp' }))
+    comp.draw()
+    reply('artist', { id: 'ar-portishead', name: 'Portishead', musicBrainzId: '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', albumCount: 3, album: [] }, 'ar-portishead')
+    reply('artist', { id: 'ar-va', name: 'Various Artists', musicBrainzId: '89ad4ac3-39f7-470e-963a-56509c546377', albumCount: 37, album: [] }, 'ar-va')
+    await comp.after()
+    for (const timer of timers.splice(0)) if (timer.live) timer.fn()
+    check('...two people: the card is the song\'s artist\'s, Portishead - never Various Artists\'', [(await comp.after())?.artist, I.asks.filter((one) => one[0] === 'facts').map((one) => one[1])],
+      [{ id: 'ar-portishead', albumCount: 3 }, ['8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11']])
+
+    I.asks.length = 0; I.open.length = 0
+    const unsure = { ...WITH_IDS, id: 'comp2', artist: 'Various Artists', artistId: 'ar-va', song: WITH_IDS.song.map((each) => ({ ...each, artist: 'Portishead' })) }
+    detailsOf(unsure, queueTrack({ artist: 'Portishead', albumId: 'comp2' })).draw()
+    check('...no song artist known and the names differ: nobody\'s details asked for, to draw under the wrong name', I.asks.filter((one) => one[0] === 'artist').length, 0)
+  }
+  globalThis.setTimeout = realSetTimeout
+}
+
+details().then(() => {
+  console.log(failures ? `\n${failures} FAILED` : '\nall passed')
+  process.exit(failures ? 1 : 0)
+})

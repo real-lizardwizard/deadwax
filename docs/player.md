@@ -95,9 +95,16 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   app keeps asking until it answers. Then **Recently
   added**, Navidrome's 20 newest albums in a row you swipe along. Tap one to open it. (Pinned
   albums and what you haven't played in a while come later.)
-- **Library**: your albums, in a grid, in one of four orders: **Recently added**, **Recently
-  played**, **Artist** or **Title**. The order you pick is remembered on that device. More albums
-  load as you scroll.
+- **Library**: **Albums**, **Artists** or **Songs**, chosen by the chips under the title, with a
+  sort under them (tap it for the phone's own picker) and how many there are beside it once the
+  whole list is in. **Albums** is a grid in one of four orders - **Recently added**, **Recently
+  played**, **Artist** or **Title** - more loading as you scroll. **Artists** is every artist
+  Navidrome has, by **Name** or **Most albums**, each opening [their page](#artist-pages); an
+  artist who renamed is one row, under the name deadwax files them under (Ye, not Kanye West).
+  **Songs** is every song, a page at a time; a song opens its album, where you play it. The Songs
+  chip isn't there at all when Navidrome won't list songs that way (it is asked once, for a single
+  song). What you're looking at and the albums' order are remembered on that device, and each view
+  keeps its place when you switch between them.
 - **An album**: its cover, **Play** and **Shuffle**, and its songs, under "Disc 1", "Disc 2"
   headings for a set. A disc with a title of its own shows it beside its number: "Disc 4 · Live at
   Wembley". The titles are the ones deadwax writes into your files from MusicBrainz (or you set by
@@ -106,7 +113,10 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   disc, and deadwax writes no disc number for a one-disc release. Files tagged by Picard ("1/1")
   have one; for others, set **Disc** to 1 along with **Disc title** in the tag editor. Tap a song
   to play the album from there. Shuffle plays the album's songs in a random order. The back button
-  names the tab it goes back to.
+  names the tab it goes back to. The artist's name under the title opens [their page](#artist-pages).
+  Under it, **In your library**, and an **Also: …** chip for each other pressing of the album you
+  have that Navidrome has found ("Also: 20th Anniversary Reissue 180gram", or the year when a
+  pressing has no edition of its own) - tap it for that pressing's page.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
 - **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
@@ -129,14 +139,22 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   download moving to another heading. The tab carries a count of what's on its way. Covers come
   from the Cover Art Archive, so a phone with no internet shows plain squares. A **Get** lands here,
   showing from the tap. [Downloading](downloading.md#on-the-phone-the-requests-tab) has every state
-  and what each button does.
+  and what each button does. A **Done** download whose album is in your library opens it with a
+  tap, and one it filed has a round **▶** that plays it - at once for the five newest, whose songs
+  are fetched while Requests shows (an album filed while you watch once Navidrome has had a few
+  seconds to scan it, looked for again until it has), and otherwise by opening the album, where you
+  play it. A row that can't be opened says why: Navidrome hasn't found the album yet, no folder in
+  your library is tagged with its release, or Navidrome isn't set up or answering.
 - **Search**: one box, your library first, then MusicBrainz. **In your library** lists the
-  artist you typed (as the **Top result**), albums and songs; an album opens it, and a song plays
+  artist you typed (as the **Top result**), the other artists found, albums and songs; an artist
+  opens [their page](#artist-pages), an album opens it, and a song plays
   from there through its album once that album has been fetched (a ▶ at its right says so - the
   first five albums of the songs found are fetched as the answer arrives), and otherwise opens its
   album. **Not in your library yet** is MusicBrainz's albums, less the ones you have, asked when
-  you press Search on the keyboard or a moment after you stop typing. Tap one for **the album you
-  don't have**: laid out like an album you have, with a **Pressing** button where Play would be,
+  you press Search on the keyboard or a moment after you stop typing (one your library turns out
+  to hold after the list is drawn says "in your library", and opens the album you have). Tap one
+  for **the album you don't have**: laid out like an album you have - its artist a link to their
+  page when it's credited to one artist - with a **Pressing** button where Play would be,
   starting on the usual pressing, and that pressing's tracklist, with its bonus tracks, other
   versions and renamed or missing tracks marked. MusicBrainz isn't asked for anything until you
   search, and the album page works with Navidrome down. [Finding music](finding-music.md#on-the-phone-the-apps-search-tab)
@@ -169,14 +187,23 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   the now-playing screen and opens the song's album in the tab you're on, as if you'd tapped it
   there.
 - **Info** is a sheet over the now-playing screen, with two tabs. **About** is the song, the album
-  and the artist, from what the player already has from Navidrome, asking nothing new: the song's
-  title and artist, "Track 3 of 6 · 5:08" (counted on its own disc), and its disc's title when the
-  album has disc titles ("Disc 2 · Unreleased Tracks", as the album page heads it); the album's
-  cover, title, year, format and number of songs (tap it to go to the album); and the artist, with
-  the album's own artist beside it when that's someone else, as on a compilation. Anything
-  Navidrome didn't send is left out, never guessed. **Debug** is how the song is being played, in
-  labelled rows: see [Info → Debug](#info--debug). **Done**, Escape or a tap above the sheet closes
-  it.
+  and the artist: the song's title and artist, "Track 3 of 6 · 5:08 · played 12 times" (counted on
+  its own disc; the plays as Navidrome counts them now), its disc's title when the album has disc
+  titles ("Disc 2 · Unreleased Tracks", as the album page heads it), and **Written by** whoever
+  Navidrome says wrote it; the album's cover, title, year, label, format and number of songs, then
+  **This pressing:** its edition, year and format as deadwax holds it (tap the card to go to the
+  album); the artist - who they are, from MusicBrainz ("Group · London · 1965 to 2014"), and how
+  many of their albums you have - with the album's own artist beside it when that's someone else,
+  as on a compilation; tap it for their page. It's the song's own artist: a Portishead track on a
+  compilation goes to Portishead, not Various Artists, and only an old credit of a renamed artist
+  (Kanye West on a Ye album, one MusicBrainz artist under two names) goes to the page the album is
+  filed under. Last, **In your library → Folder**: where the album is on disk, a folder a line for
+  a set kept one folder per disc - text you can select and copy. Info asks Navidrome, deadwax and
+  MusicBrainz for these as it opens, so they appear a moment after it does (the song's and the
+  pressing's together, so a card doesn't grow under your finger). Anything not sent is left out,
+  never guessed. **Debug** is how the song is
+  being played, in labelled rows: see [Info → Debug](#info--debug). **Done**, Escape or a tap above
+  the sheet closes it.
 - **The scrubber** is the whole bar: tap anywhere along it to jump there, or drag from anywhere on
   it and it follows your finger, seeking when you let go. It works from the keyboard too (arrows
   move 5 seconds, Page Up and Page Down 30, Home and End to the ends), and VoiceOver's swipe up
@@ -199,6 +226,46 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **The look** is deadwax's own, the same "touch of Windows 7" as its other screens: Noto Sans,
   with monospace for track numbers and times, square-ish corners, no blur. It's drawn from the
   same fonts deadwax serves itself, so it needs no internet.
+
+## Artist pages
+
+An artist's page (since 2.0.0-player.17) opens from Search (the **Top result** and the other
+artists), **Library → Artists**, the artist's name on an album you have and on the album you don't
+have, and Info's artist card.
+
+- **At the top**, their picture - the one Navidrome has for them, which is the `artist.jpg` the main
+  page's [artist images](library.md#artist-pages) saves into their folder - or a plain coloured
+  band, with their name at its foot and who they are under it ("Group · Bristol · since 1991",
+  from MusicBrainz).
+- **Play** and **Shuffle** play every album of theirs you have, one copy of each (the plain edition
+  when you have several), in the order the page lists them. They wait - greyed - until every
+  album's songs have come from Navidrome - fetched a few at a time as soon as the page knows them -
+  so a tap plays at once; the line under them says what they'll play, that Navidrome is still being asked or has
+  none of theirs, or that it didn't send some (with **Try again**). They're there from the moment
+  the page opens, whenever Navidrome could have albums of theirs, so nothing moves when it answers.
+- **Albums** is their albums as MusicBrainz lists them - every one, not a search's best matches -
+  oldest first, those with no date last: the ones you have marked **✓ in your library** (and "2
+  editions" when you have more than one pressing), the others **not in your library** with a
+  **Get** chip that opens the sources for the album's usual pressing, as Search's does. Every album
+  of theirs you have that MusicBrainz's list doesn't match (an untagged rip, an EP, a live album) is
+  listed too, one row per album, so nothing you have is left off. The list waits a moment for
+  Navidrome, MusicBrainz and your library to answer and is then drawn once - "Looking in your
+  library…" or "Asking MusicBrainz…" meanwhile - and what isn't in your library is only said once
+  your library has answered. **Studio only** (on to begin with) leaves out MusicBrainz's live
+  albums, compilations and the like - never one you have; toggling it keeps the list on screen
+  until the new one comes. An album you have opens; one you don't opens the album you don't have.
+  Back to the page from an album draws it at once, where you left it.
+- **A renamed artist** is one page: Ye's has Donda (credited to Kanye West) and BULLY (credited to
+  Ye) side by side, since MusicBrainz lists an artist's albums under every name they've used.
+- **Which artist** it is on MusicBrainz comes from Navidrome (the album artist's MusicBrainz id it
+  reads from your files), else from the MusicBrainz ids deadwax wrote into the albums of theirs you
+  have. With neither - files tagged by something else, or not at all - the page says MusicBrainz
+  doesn't know who this is and lists only what you have. An artist opened from MusicBrainz is
+  matched to Navidrome's the same way, and by name only when exactly one artist in your library
+  goes by it.
+- The page works with Navidrome down for an artist opened from MusicBrainz (their albums, without
+  what you have); one opened from your library needs Navidrome, like an album you have. If deadwax
+  couldn't ask Navidrome for them, the page says why, with **Try again**.
 
 ## The turntable
 
@@ -784,12 +851,13 @@ fixes that.
   [troubleshooting](troubleshooting.md#after-a-long-pause-play-on-the-lock-screen-does-nothing-until-the-app-is-opened).
 - **CarPlay**: not something a web page can offer.
 - **Offline**: nothing is kept on the phone for listening without a connection.
-- **Artist pages**: an artist in Search, or on an album, isn't a link yet.
+- **Pins** - an album or an artist pinned to Home - come next; the artist page's top right is
+  kept for one.
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
 - **The rest of deadwax**: editing, the albums that need a look and the server settings are on the
-  main page, which also works on a phone. Tapping a finished download doesn't open its album yet.
+  main page, which also works on a phone.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata
@@ -853,6 +921,12 @@ question the whole player existed to answer. Still to find out:
   (it hasn't been tried against a real Navidrome yet), a song's tap starting its album, the
   pressing list scrolling under a finger without the page moving, and the Cover Art Archive's
   covers over your VPN;
+- **Artists and the id bridge** (2.0.0-player.17) against your Navidrome: whether it sends each
+  artist's MusicBrainz id (the artist page's albums from MusicBrainz depend on it, or on the ids
+  deadwax wrote into your files), whether its search finds an album by its MusicBrainz release id
+  (deadwax asks that first, then by the album's title), what its empty search lists for **Songs**,
+  whether it sends a song's play count and writers and an album's label (Info → About), and an
+  artist's picture as the page's hero;
 - **Get** (2.0.0-player.15) against your slskd and real Soulseek folders: the sources sheet
   scrolling under a finger without the page behind it moving, a tap above it closing it, the sort's
   picker (iOS's own wheel), the cards' words for real folders and users, a download showing in

@@ -239,12 +239,19 @@ def test_there_is_no_general_proxy():
     song, cut from deadwax's own cache of it, with Navidrome asked only the version check every
     MP4 answer makes - nothing passed on, and only `at`, `seconds` and `max_rate` (the stream's own
     cap, 48000 or nothing) taken (test_scrub_window.py).
+
+    `/artists` (getArtists), `/artists/{artist_id}` (getArtist) and `/songs/{song_id}` (getSong)
+    joined it in 2.0.0-player.17, deliberately: the app's Library > Artists, its artist page, and
+    Info's play count and writers. Each READS the library the account can see, as every Subsonic app
+    does; getArtists takes nothing from the page, and the other two only an id, bounded, passed as
+    Navidrome's `id` parameter - see test_navidrome_artists.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 
     assert paths == [
-        "/albums", "/albums/{album_id}", "/cover/{cover_id}", "/scrobble/{song_id}",
-        "/scrub/{song_id}", "/search", "/status", "/stream/{song_id}",
+        "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
+        "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/songs/{song_id}", "/status",
+        "/stream/{song_id}",
     ]
 
 

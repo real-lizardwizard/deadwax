@@ -1,11 +1,14 @@
 import { Fragment } from 'preact'
 import { useEffect, useMemo, useState } from 'preact/hooks'
 
+import { storeAlbum } from '../api/store'
+import type { StoreAlbumResponse } from '../api/types'
 import { discHeadings } from '../lib/discTitles'
 import { formatDuration, sharedFormat, trackTime } from '../lib/format'
+import { alsoChips } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
 import { album as fetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
-import { ChevronLeftIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
 import type { Player } from './usePlayer'
 
@@ -25,6 +28,13 @@ import type { Player } from './usePlayer'
  *
  * Play remembers the album's answer for Info (rememberPlayed - the queue's songs carry only what
  * playing needs) and then calls the player, both in the tap: nothing is awaited between them.
+ *
+ * Since 2.0.0-player.17 the artist's name is a link to their page (Navidrome's album artist - the
+ * artist the album is filed under), and under the meta line, where Album.dc.html draws it, a row
+ * says "In your library" with an "Also: <edition> ›" chip for each other pressing of the album you
+ * hold that Navidrome has - the id bridge (GET /store/album, asked as the page opens, through its
+ * own latestOnly) says which. The row is drawn from the first frame, so a chip arriving moves
+ * nothing a finger is reaching for; a chip opens that pressing's page over this one.
  */
 export function AlbumPage({
   id,
@@ -32,16 +42,25 @@ export function AlbumPage({
   player,
   onBack,
   backLabel,
+  onArtist,
+  onOpenAlbum,
 }: {
   id: string
   preview: Album | null
   player: Player
   onBack: () => void
   backLabel: string
+  /** the artist's page, by Navidrome's id for them (2.0.0-player.17) */
+  onArtist?: (artist: { id: string; name: string }) => void
+  /** another pressing's page, from its "Also" chip */
+  onOpenAlbum?: (album: Album) => void
 }) {
   const [album, setAlbum] = useState<AlbumWithSongs | null>(null)
   const [error, setError] = useState<string | null>(null)
   const requests = useMemo(latestOnly, [])
+  //? what the store holds of this album, and its other pressings - the id bridge
+  const [store, setStore] = useState<StoreAlbumResponse | null>(null)
+  const storeRequests = useMemo(latestOnly, [])
 
   useEffect(() => {
     const request = requests.begin()
@@ -59,12 +78,30 @@ export function AlbumPage({
     return () => requests.supersede()
   }, [id, requests])
 
+  useEffect(() => {
+    const request = storeRequests.begin()
+    setStore(null)
+    storeAlbum({ navidrome_id: id }, request.signal).then(
+      (answer) => {
+        if (request.current()) setStore(answer)
+      },
+      () => {
+        //? a check that can't be made draws no chip
+      },
+    )
+    return () => storeRequests.supersede()
+  }, [id, storeRequests])
+
   const shown: Album | null = album ?? (preview?.id === id ? preview : null)
   const songs = album?.song ?? []
   const tracks = useMemo(() => (album ? songs.map((song) => toQueueTrack(song, album)) : []), [album])
   const headings = discHeadings(songs, album?.discTitles)
   const format = sharedFormat(songs)
   const total = songs.reduce((sum, song) => sum + (song.duration ?? 0), 0)
+
+  const chips = alsoChips(store, id)
+  const artistId = shown?.artistId ?? album?.artistId
+  const artistName = shown?.artist ?? ''
 
   const play = (start: number | null, shuffle = false) => {
     if (!album || !tracks.length) return
@@ -84,10 +121,37 @@ export function AlbumPage({
       <div class="pl-album-hero">
         <Cover id={shown?.coverArt} size={800} class="pl-hero-cover" />
         <h1 class="pl-hero-title">{shown?.name ?? ''}</h1>
-        <p class="pl-hero-artist">{shown?.artist ?? ''}</p>
+        {artistId && artistName && onArtist ? (
+          <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist({ id: artistId, name: artistName })}>
+            {artistName}
+          </button>
+        ) : (
+          //? not a link: drawn plain once the album has said it names no artist to go to - never while
+          //? it might still be one, which would flash from grey to the link's colour
+          <p class={`pl-hero-artist${album ? ' app-hero-plain' : ''}`}>{artistName}</p>
+        )}
         <p class="pl-hero-meta">
           {[shown?.genre, shown?.year, format].filter(Boolean).join(' · ')}
         </p>
+
+        {/* drawn from the first frame: an "Also" chip landing in it moves nothing below */}
+        <div class="app-album-chips">
+          <span class="app-held-badge">
+            <CheckIcon class="app-held-badge-icon" />
+            In your library
+          </span>
+          {chips.map((chip) => (
+            <button
+              key={chip.navidromeId}
+              type="button"
+              class="app-chip app-also"
+              onClick={() => onOpenAlbum?.({ id: chip.navidromeId, name: shown?.name ?? '', ...(artistName ? { artist: artistName } : {}) })}
+            >
+              <span class="app-also-label">{chip.label}</span>
+              <ChevronRightIcon class="app-chip-icon" />
+            </button>
+          ))}
+        </div>
 
         <div class="pl-hero-actions">
           <button type="button" class="pl-pill is-primary" disabled={!tracks.length} onClick={() => play(0)}>

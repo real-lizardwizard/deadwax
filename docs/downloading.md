@@ -311,6 +311,20 @@ since 2.0.0-player.15 so does starting one ([above](#on-the-phone-get-and-choosi
   not filed** when organizing is off - `ORGANIZE_MODE` set to `off`, or `LIBRARY_PATH` or
   `SLSKD_DOWNLOAD_PATH` not set (Settings → Library names which; see
   [troubleshooting](troubleshooting.md#downloads-finish-but-nothing-appears-in-my-library)).
+  Since 2.0.0-player.17 a done download whose album is in your library - filed, partly filed, or
+  already there - **opens that album** when you tap it, and one it filed has a round **▶** that
+  plays it. The five newest of those have their songs fetched while Requests shows, so their ▶
+  plays at once: an album filed while you watch is looked for once Navidrome has had a few seconds
+  to scan it, and again, less and less often, until it has; one a later download of the same
+  pressing added to is fetched again. Any other ▶ opens the album, where Play is one tap away.
+  Which album Navidrome holds for a download is looked up by deadwax (by the pressing's
+  MusicBrainz id, which is on the download). A row that can't be opened says why, and a later tap
+  tries again: **Navidrome hasn't found it yet - it may still be scanning** (it scans a moment
+  after a filing); **deadwax can't tell which album in your library this is - its folder has no
+  MusicBrainz release id** (an "already there" download whose tracks were in a folder deadwax
+  didn't file, with no MusicBrainz tags - no scan changes that); **Navidrome isn't set up** or
+  **isn't answering just now**; or **Couldn't look it up just now** when deadwax itself didn't
+  answer.
 - **Clear done**, at the top, does what **Clear finished** does: it removes every finished, failed
   and cancelled download, the ones under Needs attention included.
 

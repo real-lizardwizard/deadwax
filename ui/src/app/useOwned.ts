@@ -41,6 +41,8 @@ let hearing = false
 const listeners = new Set<() => void>()
 //? who is waiting on the NEXT ask to land: the ask out now may predate what they asked about
 let waiting: (() => void)[] = []
+//? ...and who is waiting on the ask out NOW, whichever question it answers (whenOwned)
+let landing: (() => void)[] = []
 
 function tell(): void {
   for (const listener of [...listeners]) listener()
@@ -50,6 +52,7 @@ function ask(): void {
   asking = true
   const settles = waiting
   waiting = []
+  landing = settles
   owned().then(
     (answer) => {
       const artists = [...new Set(answer.albums.map((album) => (album.artist ?? '').trim()).filter(Boolean))]
@@ -79,6 +82,18 @@ export function refreshOwned(): Promise<void> {
   if (asking) again = true
   else ask()
   return settled
+}
+
+/**
+ * Resolves once the library has answered at least once - or the ask that would have has failed:
+ * at once when an answer is in hand, when the ask out now lands, else after one asked now. Asks
+ * nothing new while one is out. The artist page waits on it before saying an album is NOT in your
+ * library, or that MusicBrainz doesn't know who someone is (2.0.0-player.17, review).
+ */
+export function whenOwned(): Promise<void> {
+  if (held) return Promise.resolve()
+  if (asking) return new Promise<void>((resolve) => landing.push(resolve))
+  return refreshOwned()
 }
 
 /** What the library holds right now - for code that has awaited and must not read a render's copy. */

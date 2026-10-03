@@ -6,7 +6,9 @@
   2.0.0-player.12, the Requests tab, Home's Arriving and the Requests tab's badge; since
   2.0.0-player.13, the Search tab and the album you don't have, with its pressing dropdown; since
   2.0.0-player.15, Get on that page and on Search's rows, what is already here of a pressing, the
-  Sources sheet and its cards, and You's Getting albums. Loaded
+  Sources sheet and its cards, and You's Getting albums; since 2.0.0-player.17, the artist page, the
+  Library's Albums / Artists / Songs and its sort, an album page's artist link and "Also" chips, a
+  Done row's play button and Info's folder. Loaded
   after player.css, which draws the player itself (the library grid, the
   album page, the mini player and Now Playing) and whose mechanics - safe areas, edges, tap targets
   - these rules build on.
@@ -199,6 +201,43 @@
     --app-source-bar: 8px;           /* the speed bar's sunken track */
     --app-source-facts-pad: 2px;
     --app-source-lines: 2px;         /* a fact's label to its value */
+    /* the artist page (2.0.0-player.17), as Artist.dc.html draws it */
+    --app-artist-hero: 240px;        /* the hero's height, its picture under it */
+    --app-artist-hero-pad: 8px;      /* above the back link, under the status bar; the board's 52px in all */
+    --app-artist-hero-foot: 18px;    /* under the name */
+    --app-z-hero-words: 1;           /* the back link and the name, over the picture's scrim */
+    --app-artist-body-top: 16px;
+    --app-artist-gap: 22px;          /* between the body's parts */
+    --app-artist-play-gap: 8px;      /* Play and Shuffle to the line under them */
+    --app-artist-actions-gap: 12px;
+    --app-artist-head-gap: 8px;      /* "Albums" to its first row */
+    --app-artist-row: 72px;
+    --app-artist-cover: 56px;
+    --app-artist-row-gap: 12px;
+    --app-artist-held: 13px;         /* the tick before "in your library" */
+    --app-artist-line-gap: 4px;
+    /* the line under Play and Shuffle, held at its height whatever it says (or doesn't) */
+    --app-artist-plays-line: calc(var(--dw-text-footnote) * var(--dw-leading-note));
+    /* an album page's artist line, held from the first frame: a name arriving with the album moves
+       nothing below it (review) - player.css's line height for it */
+    --app-hero-artist-line: 1.25em;
+    /* an album page's artist line, a link: 44px to a finger, reaching over the title above it and
+       the meta line below, which take no taps */
+    --app-hero-link-reach: calc((var(--pl-hit) - 1.25em) / 2);
+    --app-album-chips-gap: 14px;     /* the meta line to "In your library" */
+    --app-held-badge-gap: 5px;
+    --app-held-badge-icon: 13px;
+    /* the Library's chips, as Library.dc.html draws them: 32px, reaching 44 */
+    --app-library-view: 32px;
+    --app-library-view-pad: 14px;
+    --app-library-view-reach: calc((var(--pl-hit) - var(--app-library-view)) / 2 + var(--dw-hairline));
+    --app-library-gap: 8px;
+    --app-library-bar-bottom: 14px;  /* the sort to the grid */
+    --app-sort-gap: 4px;
+    --app-sort-icon: 14px;
+    /* a Done row's round play button, as Requests.dc.html draws it: 32px in a 44px target */
+    --app-done-play-face: 32px;
+    --app-done-play-icon: 16px;
 }
 
 /* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
@@ -2331,4 +2370,312 @@ button.app-result:active { background: var(--dw-pressed); }
     font-size: var(--dw-text-footnote);
     line-height: var(--dw-leading-note);
     overflow-wrap: anywhere;
+}
+
+/* ===== Artists, and the two libraries joined (2.0.0-player.17) ===== */
+
+/* the artist page's hero: the picture under it, its own colour in place of one; the back link at
+   the top (with room at its right for a pin, which comes later), the name at the foot */
+.app-artist-hero {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    min-height: var(--app-artist-hero);
+    padding: calc(var(--pl-safe-top) + var(--app-artist-hero-pad)) var(--pl-edge-right) var(--app-artist-hero-foot) var(--pl-edge-left);
+    overflow: hidden;
+    background: var(--dw-artist-hero);
+}
+
+.app-artist-picture {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* a picture that couldn't be had leaves the hero its own colour */
+.app-artist-picture.is-empty { display: none; }
+
+.app-artist-hero:has(img.app-artist-picture)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--dw-artist-scrim);
+}
+
+.app-artist-top,
+.app-artist-names { position: relative; z-index: var(--app-z-hero-words); }
+
+.app-artist-top { display: flex; align-items: center; justify-content: space-between; min-height: var(--pl-hit); }
+
+.app-artist-back {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    min-height: var(--pl-hit);
+    color: var(--dw-text);
+    font-size: var(--dw-text-body);
+}
+
+.app-artist-back:focus-visible,
+.app-hero-link:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-artist-name {
+    margin: 0;
+    font-size: var(--dw-text-large-title);
+    font-weight: var(--dw-weight-bold);
+    line-height: var(--dw-leading-title);
+    letter-spacing: var(--dw-tracking-title);
+    overflow-wrap: anywhere;
+}
+
+.app-artist-facts {
+    margin: var(--app-line-gap) 0 0;
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-artist-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-artist-gap);
+    padding: var(--app-artist-body-top) var(--pl-edge-right) 0 var(--pl-edge-left);
+}
+
+.app-artist-play { display: flex; flex-direction: column; gap: var(--app-artist-play-gap); }
+.app-artist-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--app-artist-actions-gap); }
+.app-artist-plays { min-height: var(--app-artist-plays-line); margin: 0; color: var(--dw-text-2); font-size: var(--dw-text-footnote); line-height: var(--dw-leading-note); }
+.app-artist-again { align-self: flex-start; padding: 0; }
+
+/* as tall as the Studio only chip from the first frame: the chip comes once the artist's
+   MusicBrainz id is known, and moves nothing as it does */
+.app-artist-albums-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-artist-row-gap);
+    min-height: var(--app-chip);
+    padding-bottom: var(--app-artist-head-gap);
+}
+
+.app-artist-albums-title { margin: 0; }
+.app-artist-rows { margin: 0; padding: 0; list-style: none; }
+
+.app-artist-row {
+    display: flex;
+    align-items: center;
+    gap: var(--app-artist-row-gap);
+    min-height: var(--app-artist-row);
+    border-bottom: var(--dw-hairline) solid var(--dw-border);
+}
+
+.app-artist-album {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--app-artist-row-gap);
+    min-width: 0;
+    min-height: var(--app-artist-row);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+.app-artist-album:active { background: var(--dw-pressed); }
+
+/* a row whose album is being looked for (the id bridge) - an artist's, Search's, a Done row - faded
+   while it looks, as a Get chip is, so the tap shows it was taken */
+.app-artist-album.is-busy,
+.app-result.is-busy,
+.app-done-open.is-busy { opacity: var(--app-job-busy); }
+
+.app-artist-album:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-artist-cover {
+    flex: none;
+    width: var(--app-artist-cover);
+    height: var(--app-artist-cover);
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+    object-fit: cover;
+}
+
+/* "✓ 1994 · in your library · 2 editions": the tick held, the words giving way with an ellipsis */
+.app-result-line.app-artist-line { display: flex; align-items: center; gap: var(--app-artist-line-gap); }
+.app-artist-held { flex: none; width: var(--app-artist-held); height: var(--app-artist-held); color: var(--dw-green-icon); }
+.app-artist-line-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* an album page's artist, a link to their page - the same look, 44px to a finger */
+.app-hero-link { position: relative; max-width: 100%; }
+
+/* ...one that isn't a link - a collaboration, an album naming no artist to go to - isn't drawn in
+   the link's colour beside the ones that are */
+.app-hero-plain { color: var(--dw-text-2); }
+
+.app-shell .pl-hero-artist { min-height: var(--app-hero-artist-line); }
+
+.app-hero-link::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--app-hero-link-reach));
+    right: 0;
+    bottom: calc(-1 * var(--app-hero-link-reach));
+    left: 0;
+}
+
+/* "In your library" and an "Also: <edition> ›" chip for each other pressing, as Album.dc.html draws
+   them, on ONE line drawn from the first frame: a chip landing in it moves nothing below, and a long
+   edition gives way with an ellipsis rather than wrapping the row onto a second line */
+.app-album-chips {
+    display: flex;
+    justify-content: center;
+    gap: var(--app-chip-gap);
+    width: 100%;
+    margin-top: var(--app-album-chips-gap);
+}
+
+.app-album-chips > * { min-width: 0; }
+
+.app-held-badge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--app-held-badge-gap);
+    box-sizing: border-box;
+    height: var(--app-chip);
+    padding: 0 var(--app-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-green-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-badge-green-bg);
+    color: var(--dw-badge-green-text);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-semibold);
+    white-space: nowrap;
+}
+
+.app-held-badge-icon { flex: none; width: var(--app-held-badge-icon); height: var(--app-held-badge-icon); }
+.app-also { max-width: 100%; }
+.app-also-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-chip-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
+
+/* the Library's chips - Albums, Artists, Songs - and the sort under them, with the count */
+.app-library-views {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(2 * var(--app-library-view-reach)) var(--app-library-gap);
+    padding: var(--app-library-view-reach) var(--pl-edge-right) var(--app-library-view-reach) var(--pl-edge-left);
+}
+
+.app-chip.app-library-view {
+    height: var(--app-library-view);
+    padding: 0 var(--app-library-view-pad);
+    font-size: var(--dw-text-heading);
+}
+
+.app-chip.app-library-view::before {
+    top: calc(-1 * var(--app-library-view-reach));
+    bottom: calc(-1 * var(--app-library-view-reach));
+}
+
+.app-library-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-library-gap);
+    padding: 0 var(--pl-edge-right) var(--app-library-bar-bottom) var(--pl-edge-left);
+}
+
+/* the board's "Recently added ▾": a line in the accent holding the platform's own picker, laid
+   over it unseen - 17px, or iOS zooms the page as it is tapped */
+.app-sort {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-sort-gap);
+    min-height: var(--pl-hit);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-heading);
+}
+
+.app-sort-icon { flex: none; width: var(--app-sort-icon); height: var(--app-sort-icon); }
+
+.app-sort-select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    opacity: var(--app-chip-select);
+    font-size: var(--dw-text-body);
+}
+
+.app-sort:has(.app-sort-select:focus-visible) {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-library-count { color: var(--dw-text-2); white-space: nowrap; }
+.app-library-list { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+
+/* Search's other artists: round, the size of an album's cover */
+.app-result-cover.is-round.is-small { width: var(--app-result-cover); height: var(--app-result-cover); }
+
+/* a Done row: the row opens the album, the round play button plays it */
+.app-done-open {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--app-job-inner);
+    min-width: 0;
+    min-height: var(--app-done-row);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+button.app-done-open:active { background: var(--dw-pressed); }
+
+.app-done-open:focus-visible,
+.app-done-play:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-done-play {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+}
+
+.app-done-play-face {
+    display: grid;
+    place-items: center;
+    width: var(--app-done-play-face);
+    height: var(--app-done-play-face);
+    border-radius: var(--dw-radius-round);
+    background: var(--dw-play-face);
+    color: var(--dw-accent-text);
+}
+
+.app-done-play:active .app-done-play-face { background: var(--dw-toggled-bg); }
+.app-done-play-icon { width: var(--app-done-play-icon); height: var(--app-done-play-icon); }
+
+/* Info's folder: a path, broken anywhere, each folder of a set on its own line - and the one string
+   on the sheet people copy, so it can be selected (it sits in no button) */
+.app-info-folder {
+    -webkit-user-select: text;
+    user-select: text;
+    white-space: pre-line;
 }

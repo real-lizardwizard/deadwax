@@ -653,6 +653,14 @@
     --dw-bar-green:  linear-gradient(to bottom, #5ee39a, #34c47f);  /* a speed deadwax measured */
     --dw-best:       #7e4bb8;   /* the best match's card edge: STYLE.md's "selected / best match" */
 
+    /* --- Artists (2.0.0-player.17), as Artist.dc.html draws them --------- */
+    --dw-artist-hero:  #3a2530;   /* the hero's own colour, under a picture or in place of one */
+    /* over a picture: enough dark at the top for the back link, and from halfway down for the name
+       and the line under it - white on a white sky still 3:1 for the name (one line or two) and
+       4.5:1 for the facts (review: the first scrim gave the name under 2:1 there) */
+    --dw-artist-scrim: linear-gradient(to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.8) 100%);
+    --dw-play-face:    rgba(192, 132, 252, 0.2);   /* a Done row's round play button */
+
     /* --- the turntable (2.0.0-player.11), as its board draws it ------- */
     --dw-tt-plinth:       #19171e;
     --dw-tt-platter:      #2a2730;

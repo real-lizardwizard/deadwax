@@ -10,6 +10,9 @@
  *   #/<tab>/group/<rgid>?release=<mbid>                an album you don't have (2.0.0-player.13):
  *                                                      a MusicBrainz release group, and the pressing
  *                                                      shown when it isn't the default
+ *   #/<tab>/artist/<id>                                an artist (2.0.0-player.17): Navidrome's
+ *                                                      artist id, or `mb:<mbid>` for one known only
+ *                                                      by MusicBrainz (lib/artistPage.ts reads it)
  *
  * The player's old `#/album/<id>` links still open: they are the Library's album, and the address
  * is rewritten to `#/library/album/<id>` in place. An empty hash is Home.
@@ -43,11 +46,11 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
   you: 'You',
 }
 
-/** What a page can be: an album in the library (Navidrome's id), or a MusicBrainz release group -
- *  the album you don't have (2.0.0-player.13). */
-export type PageKind = 'album' | 'group'
+/** What a page can be: an album in the library (Navidrome's id), a MusicBrainz release group -
+ *  the album you don't have (2.0.0-player.13) - or an artist (2.0.0-player.17). */
+export type PageKind = 'album' | 'group' | 'artist'
 
-const PAGE_KINDS: readonly PageKind[] = ['album', 'group']
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist']
 
 /** A page pushed on a tab. `label` names it on the back button of a page pushed over it - never
  *  part of the address, and never part of what makes two pages the same one. `release` is a group

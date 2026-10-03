@@ -10,6 +10,7 @@ from typing import Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import Path as PathParam
 from fastapi.responses import Response, StreamingResponse
 from starlette.background import BackgroundTask
 
@@ -265,6 +266,65 @@ async def search(
         "albums": found.get("album") or [],
         "songs": found.get("song") or [],
     }
+
+
+#? The longest id the three by-id routes below pass on. Navidrome's are 22-character ids (or 32 hex
+#? from an older scan); anything far longer is no id of Navidrome's, and is refused (422) rather
+#? than sent.
+ID_MAX = 256
+
+
+@router.get("/artists")
+async def artists(request: Request):
+    """
+    Every artist in the library, in Navidrome's own order (by name, a leading "The" ignored) -
+    Subsonic's getArtists, for the app's Library > Artists (2.0.0-player.17).
+
+    Takes NOTHING: getArtists' one parameter, a music folder, is never passed on - the call is the
+    same whoever asks, and the login is laid over it as for every route. Navidrome answers an index
+    by initial ({index: [{name: "P", artist: [...]}]}); it is flattened into one list, in that order,
+    each artist as Navidrome sent it (id, name, albumCount, coverArt, musicBrainzId - the album
+    artist's MusicBrainz id, which is how the artist page finds the artist's discography).
+    """
+    try:
+        body = await client_for(request).call("getArtists")
+    except NavidromeError as e:
+        raise _fail(e)
+
+    index = (body.get("artists") or {}).get("index") or []
+    return {"artists": [artist for initial in index if isinstance(initial, dict)
+                        for artist in (initial.get("artist") or []) if isinstance(artist, dict)]}
+
+
+@router.get("/artists/{artist_id}")
+async def artist(request: Request, artist_id: str = PathParam(..., min_length=1, max_length=ID_MAX)):
+    """
+    One artist and their albums - Subsonic's getArtist, for the app's artist page (2.0.0-player.17):
+    the albums you have of theirs, which its Play and Shuffle play, and their MusicBrainz id, which
+    its discography is browsed by. Only the id is passed on (Navidrome's `id` parameter, never part
+    of a path), and Navidrome's answer goes back as it is.
+    """
+    try:
+        body = await client_for(request).call("getArtist", {"id": artist_id})
+    except NavidromeError as e:
+        raise _fail(e)
+
+    return body.get("artist") or {}
+
+
+@router.get("/songs/{song_id}")
+async def song(request: Request, song_id: str = PathParam(..., min_length=1, max_length=ID_MAX)):
+    """
+    One song, as Navidrome has it NOW - Subsonic's getSong, for Info > About (2.0.0-player.17): how
+    many times it has been played and who wrote it, which the album answer a queue was played from
+    holds only as they were at the tap. Only the id is passed on, and the answer goes back as it is.
+    """
+    try:
+        body = await client_for(request).call("getSong", {"id": song_id})
+    except NavidromeError as e:
+        raise _fail(e)
+
+    return body.get("song") or {}
 
 
 @router.get("/cover/{cover_id}")

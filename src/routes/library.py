@@ -275,8 +275,11 @@ async def albums(request: Request, snapshot: bool = False):
 
 #? What the search view needs to mark an album as held - and nothing else. The full scan
 #? carries every track of every album, which is far more than "do I have this" wants.
+#? `albumartist_mbids` (2.0.0-player.17): WHO each album is by, as MusicBrainz ids - what the app's
+#? artist page finds an artist's discography by when Navidrome doesn't say, and the Navidrome artist
+#? for an artist opened from MusicBrainz.
 OWNED_FIELDS = ("path", "artist", "album", "year", "edition", "release_mbid",
-                "release_group_mbid", "formats", "track_count")
+                "release_group_mbid", "formats", "track_count", "albumartist_mbids")
 
 
 @router.get("/owned")

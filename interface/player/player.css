@@ -41,7 +41,7 @@
     --pl-card-edge: var(--dw-border);
     --pl-highlight: var(--dw-highlight);
     /* buttons: the primary purple for Play, the faint secondary gradient for the rest, and the
-       toggled tint for a chosen chip */
+       toggled tint's text for a link pressed */
     --pl-primary-bg: var(--dw-primary-bg);
     --pl-primary-edge: var(--dw-primary-border);
     --pl-primary-highlight: var(--dw-primary-highlight);
@@ -50,8 +50,6 @@
     --pl-secondary-bg-active: var(--dw-secondary-bg-active);
     --pl-secondary-edge: var(--dw-secondary-border);
     --pl-secondary-text: var(--dw-text-on-secondary);
-    --pl-toggled-bg: var(--dw-toggled-bg);
-    --pl-toggled-edge: var(--dw-toggled-border);
     --pl-toggled-text: var(--dw-accent-text);
     --pl-hairline: var(--dw-hairline);
     /* the scrub bar: a thin sunken well with a grey fill, and a round thumb (STYLE allows it) */
@@ -88,7 +86,6 @@
     --pl-hit: 44px;            /* Apple's minimum tap target */
     --pl-row: 50px;
     --pl-pill-height: 48px;
-    --pl-chip-pad: 7px 14px;
     --pl-mini-height: 64px;
     --pl-mini-cover: 44px;
     --pl-mini-inset: 8px;
@@ -249,35 +246,6 @@ img { display: block; }
 }
 
 .pl-large-header .pl-large-title { min-width: 0; }
-
-.pl-orders {
-    display: flex;
-    gap: var(--pl-gap-sm);
-    overflow-x: auto;
-    padding: var(--pl-gap-sm) var(--pl-edge-right) 14px var(--pl-edge-left);
-    scrollbar-width: none;
-}
-
-.pl-orders::-webkit-scrollbar { display: none; }
-
-.pl-order {
-    flex: none;
-    padding: var(--pl-chip-pad);
-    border: var(--pl-hairline) solid var(--pl-secondary-edge);
-    border-radius: var(--pl-radius-control);
-    background: var(--pl-secondary-bg);
-    box-shadow: var(--pl-highlight);
-    color: var(--pl-secondary-text);
-    font-size: var(--pl-text-subhead);
-    font-weight: var(--pl-weight-medium);
-}
-
-.pl-order.is-active {
-    border-color: var(--pl-toggled-edge);
-    background: var(--pl-toggled-bg);
-    box-shadow: none;
-    color: var(--pl-toggled-text);
-}
 
 .pl-grid {
     display: grid;

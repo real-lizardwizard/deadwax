@@ -496,7 +496,8 @@ async function main() {
   {
     const fetches = []
     globalThis.fetch = (url, init) => new Promise((resolve, reject) => {
-      const entry = { url, aborted: false, answer: () => resolve({ ok: true, status: 200, json: async () => ({ id: url.split('/').pop(), song: [] }) }) }
+      const entry = { url, aborted: false, answer: () => resolve({ ok: true, status: 200, json: async () => ({ id: url.split('/').pop(), song: [] }) }),
+        fail: () => resolve({ ok: false, status: 503, json: async () => ({ detail: 'Navidrome is busy' }) }) }
       init?.signal?.addEventListener('abort', () => { entry.aborted = true; const error = new Error('aborted'); error.name = 'AbortError'; reject(error) })
       fetches.push(entry)
     })
@@ -520,6 +521,14 @@ async function main() {
     check('the album page takes a kept ask once, asking nothing more', [api.album('page') === kept, fetches.length], [true, 4])
     api.album('page')
     check('...and asks afresh after', fetches.length, 5)
+    //? 2.0.0-player.17: a FAILED kept ask is let go, so the next asks afresh - the artist page's Try
+    //? again, or the album page opening - rather than being handed the same failure for 30 s
+    const flaky = api.prefetchAlbum('flaky', true)
+    flaky.catch(() => {})
+    check('a kept ask still out is the one handed back', [api.prefetchAlbum('flaky', true) === flaky, fetches.length], [true, 6])
+    fetches[5].fail()
+    await settle()
+    check('...and once it has failed, it is let go: the next asks afresh', [api.prefetchAlbum('flaky', true) === flaky, fetches.length], [false, 7])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

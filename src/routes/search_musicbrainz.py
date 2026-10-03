@@ -1,4 +1,5 @@
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
+from src.artists import artist_facts
 from fastapi import APIRouter, HTTPException, Query, Request
 from src.logger import logger
 
@@ -144,6 +145,42 @@ async def release_group(
     except Exception as e:
         logger.error(f"Exception in /release_group endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving pressings from MusicBrainz: {e}")
+
+
+#? What an artist's facts carry to the app - who they are, and nothing a page of theirs would need
+#? more requests to show: no pictures (those are the main page's artist page, and three hosts deep),
+#? no links or members.
+ARTIST_FACT_FIELDS = ("mbid", "name", "sort_name", "type", "disambiguation", "country", "area",
+                      "begin_area", "began", "ended_on", "ended", "genres", "aliases")
+
+
+@router.get("/artist")
+async def artist(
+    request: Request,
+    mbid: str = Query(..., pattern=MBID_PATTERN),
+):
+    """
+    Who an artist is, by their MusicBrainz id - the LIGHT facts (2.0.0-player.17): type, where
+    they're from, when they began and ended, their genres and the names they also go by, as
+    artists.artist_facts shapes them. For the app's artist page (under their name) and Info > About's
+    artist card ("Group · Bristol · 1991 to now").
+
+    One request (get_artist, the main page's artist page's own, so the two share a cache entry),
+    cached for the process like every MusicBrainz answer - SUCCESSES only: request_with_retries
+    stores nothing else, and a failure here is a 503 saying so, never facts made of an error.
+    """
+    try:
+        found = await request.app.state.musicbrainz_client.get_artist(mbid)
+    except MusicBrainzUnavailable as e:
+        raise HTTPException(status_code=503, detail=f"MusicBrainz is unreachable right now ({e})")
+
+    #? request_with_retries answers a failure with an error dict rather than raising
+    if not isinstance(found, dict) or found.get("status") == "failed" or "error" in found or not found.get("id"):
+        problem = found.get("error") if isinstance(found, dict) else None
+        raise HTTPException(status_code=503, detail=f"MusicBrainz is unreachable right now ({problem or 'no answer'})")
+
+    facts = artist_facts(found)
+    return {field: facts[field] for field in ARTIST_FACT_FIELDS}
 
 
 @router.get("/release")

@@ -82,8 +82,33 @@ def test_owned_carries_only_what_says_which_album_and_edition(tmp_path, monkeypa
     assert answer["albums"] == [{
         "path": ALBUM, "artist": "Tame Impala", "album": "The Slow Rush", "year": "2020",
         "edition": "", "release_mbid": "rel-1", "release_group_mbid": "rg-1",
-        "formats": ["flac"], "track_count": 2,
+        "formats": ["flac"], "track_count": 2, "albumartist_mbids": [],
     }]
+
+
+def test_owned_says_who_each_album_is_by(tmp_path, monkeypatch):
+    """
+    2.0.0-player.17: the album artist's MusicBrainz ids ride along - what the app's artist page
+    finds an artist's discography by when Navidrome doesn't say, and the Navidrome artist for an
+    artist opened from MusicBrainz. One id for one artist; a collaboration's several, in order;
+    none for a folder not tagged with any.
+    """
+    from mutagen.flac import FLAC
+
+    seed(tmp_path, musicbrainz_albumid="rel-1", musicbrainz_albumartistid="ar-tame")
+    throne = seed(tmp_path, artist="JAY-Z & Ye", folder="Watch the Throne (2011)", album="Watch the Throne",
+                  musicbrainz_albumid="rel-2")
+    for path in throne.glob("*.flac"):
+        audio = FLAC(str(path))
+        audio["musicbrainz_albumartistid"] = ["ar-jay", "ar-ye"]
+        audio.save()
+    seed(tmp_path, artist="Portishead", folder="Dummy (1994)", album="Dummy")
+    note_library_changed()
+
+    answer = owned(monkeypatch, tmp_path)
+
+    by_album = {album["album"]: album["albumartist_mbids"] for album in answer["albums"]}
+    assert by_album == {"The Slow Rush": ["ar-tame"], "Watch the Throne": ["ar-jay", "ar-ye"], "Dummy": []}
 
 
 def test_owned_answers_from_the_saved_scan_when_nothing_has_changed(tmp_path, monkeypatch):
