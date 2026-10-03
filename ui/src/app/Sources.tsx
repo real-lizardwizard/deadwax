@@ -166,6 +166,7 @@ export function Sources({
   onClose: closeSheet,
   onQueued,
   panel = 'sheet',
+  covered = false,
 }: {
   open: boolean
   request: GetRequest | null
@@ -175,6 +176,9 @@ export function Sources({
   onQueued: () => void
   /** how it is drawn: a sheet (a phone), or a desktop's side panel - a drawer or a third column */
   panel?: PanelStyle
+  /** something over the whole screen - the desktop's visualizer (2.0.0-player.20): a panel left open
+   *  under it is inert, and out of what a screen reader can reach, until it goes */
+  covered?: boolean
 }) {
   const modal = panelIsModal(panel)
   const cancel = useRef<HTMLButtonElement>(null)
@@ -214,7 +218,7 @@ export function Sources({
     state.stop()
     closeSheet()
   }
-  useSheet({ open, onClose, lockClass: 'app-sources-open', first: cancel, opener, modal, area: box })
+  useSheet({ open, covered, onClose, lockClass: 'app-sources-open', first: cancel, opener, modal, area: box })
 
   //? every Get searches afresh, its chips the quality floor again - but the desktop panel following
   //? the page to another pressing (`again`) searches for that one with the chips as you left them,
@@ -274,7 +278,7 @@ export function Sources({
     : ''
 
   return (
-    <div class={`app-layer app-sources-layer${open ? ' is-open' : ''}${modal ? '' : ` is-panel is-${panel}`}`} aria-hidden={!open} inert={!open}>
+    <div class={`app-layer app-sources-layer${open ? ' is-open' : ''}${modal ? '' : ` is-panel is-${panel}`}`} aria-hidden={!open || covered} inert={!open || covered}>
       <div class="app-backdrop" onClick={onClose} />
       {/* a panel's box takes focus from a click anywhere in it that lands on nothing focusable (its
           heading, the chips' row - and in Safari a chip, which it never focuses), so Escape there is

@@ -108,6 +108,16 @@
  *    panel open for it, searching again for each (`again`: no pick) - App handing it the pressing the
  *    panel searched, not just the album. The sidebar's Managing reads /deadwax/me (latestOnly). The sidebar reaches no playback action, and its one link
  *    opens beside the app.
+ *  - The desktop visualizer (2.0.0-player.20, player/Visualizer.tsx): NOTHING IN THE APP - no file
+ *    under ui/src at all - calls createMediaElementSource; what it sees is a silent, separately decoded
+ *    copy of the song (player/vizAudio.ts: the turntable's FLAC window, through an analyser into a
+ *    gain of 0), and none of its files touches a media element. It is the one more file on the list
+ *    below: its play/pause is the player's own toggle, called only in its onToggle - from the button's
+ *    click and the Space key - and none of its files reaches any other action. Its audio context is
+ *    made only in wakeVisualizerAudio, from the click that opens it (App's openVisualizer, handed to
+ *    the player bar, which only a desktop draws), and closed with it; nothing of it needs a secure
+ *    page (no AudioWorklet), nothing of it is random, its frame loop stops while the page is hidden,
+ *    and everything behind it is inert while it shows. Crossing back to a phone's width closes it.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -186,6 +196,8 @@ const ALLOWED = {
   'app/Requests.tsx': ['playTracks'],
   //? the desktop's player bar, since 2.0.0-player.19: its transport and AirPlay, from the click
   'player/PlayerBar.tsx': ['toggle', 'next', 'previous', 'showAirPlay'],
+  //? the desktop's visualizer, since 2.0.0-player.20: its play/pause, from the click or the Space key
+  'player/Visualizer.tsx': ['toggle'],
   //? names them for ActionsContext and calls none (pickActions)
   'app/context.ts': ['playTracks', 'toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
 }
@@ -263,6 +275,7 @@ console.log('\nthe playback actions only from the files allowed')
     'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
     'player/PlayerBar.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
     'player/Turntable.tsx': ['toggle'],
+    'player/Visualizer.tsx': ['toggle'],
   })
   check('app/context.ts names them and calls none',
     [...code(read('app/context.ts')).matchAll(/\.(playTracks|toggle|next|previous|setGapless|showAirPlay)\s*\(/g)].map((m) => m[1]), [])
@@ -285,8 +298,12 @@ console.log('\nthe downloads are watched once, in App')
   const app = code(read('app/App.tsx'))
   check('...fast only while the Requests tab\'s root shows, or a failed look left something arriving; and taking this page\'s download requests',
     [/useDownloadJobs\(watching === 'requests' \|\| stalled\)/.test(app), /useEffect\(\(\) => handleDownloadRequests\(enqueue\), \[enqueue\]\)/.test(app)], [true, true])
-  check('...what it watches worked out by watchingOf, from the tab, its stack, Now Playing and the page being shown',
-    /const watching = watchingOf\(\{ shown: pageShown, tab: nav\.tab, depth: nav\.stacks\[nav\.tab\]\.length, sheetOpen \}\)/.test(app), true)
+  //? (2.0.0-player.20: the desktop's visualizer covers the screen as Now Playing does a phone's - nothing
+  //? behind it is watched, and Requests' fast poll stops under it)
+  check('...what it watches worked out by watchingOf, from the tab, its stack, Now Playing or the desktop\'s visualizer, and the page being shown',
+    [/const watching = watchingOf\(\{ shown: pageShown, tab: nav\.tab, depth: nav\.stacks\[nav\.tab\]\.length, sheetOpen: sheetOpen \|\| \(desktop && visualizing\) \}\)/.test(app),
+      app.indexOf('const [visualizing, setVisualizing] = useState(false)') >= 0 && app.indexOf('const [visualizing, setVisualizing] = useState(false)') < app.indexOf('const watching = watchingOf(')],
+    [true, true])
   check('...a failed look keeps it asking while something is arriving (stallsOn), turned off by the next answer',
     [/const stalls = stallsOn\(watching, downloadsError, view\.arriving\.length\)/.test(app), /useEffect\(\(\) => setStalled\(stalls\), \[stalls\]\)/.test(app)], [true, true])
   check('...asked again as Home comes into view or the app comes back - the last look moved on each time - never on a timer of its own',
@@ -355,7 +372,16 @@ console.log('\nNow Playing covers everything behind it')
   check('the panes, the mini player and the tab bar are inside one inert wrapper',
     [!!behind, /TABS\.map/.test(behind?.[1] ?? ''), /<MiniPlayer\b/.test(behind?.[1] ?? ''), /<TabBar\b/.test(behind?.[1] ?? '')], [true, true, true, true])
   //? 2.0.0-player.19: on a phone - a desktop's side panel leaves the page beside it as it is
-  check('...inert while Now Playing or the Sources sheet shows, on a phone', /const covered = !desktop && \(sheetOpen \|\| sourcesOpen\)/.test(app), true)
+  //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
+  check('...inert while Now Playing or the Sources sheet shows, on a phone - or the visualizer, on a desktop',
+    [/const visualizerShown = desktop && visualizing\s*const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen\)\) \|\| visualizerShown/.test(app)], [true])
+  //? (2.0.0-player.20) ...and a desktop's Sources or Info panel left open goes inert under the visualizer
+  //? too - outside that wrapper, each takes it as `covered`, as Now Playing takes what is over it
+  check('...and a desktop\'s Sources and Info panels, outside it, are inert under the visualizer',
+    [/<Sources\b[^\n]*\bcovered=\{visualizerShown\}[^\n]*\/>/.test(app), /<InfoSheet\b[^>]*\bcovered=\{visualizerShown\}/.test(app),
+      ...['app/Sources.tsx', 'app/InfoSheet.tsx'].flatMap((file) => [/aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(code(read(file))),
+        /useSheet\(\{ open, covered, onClose/.test(code(read(file)))])],
+    [true, true, true, true, true, true])
   check('...which the Sources sheet, Now Playing, its menu and Info are not in',
     /<\/div>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<Sources\b[^\n]*\/>\s*<NowPlaying\b[\s\S]*?\/>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<ActionMenu\b[\s\S]*?\/>\s*<InfoSheet\b[\s\S]*?\/>\s*<\/div>\s*<\/ActionsContext/.test(read('app/App.tsx')), true)
   const sheet = code(read('player/NowPlaying.tsx'))
@@ -520,7 +546,8 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
     'player/Turntable.tsx: onRelease: wakeDeckAudio',
   ])
   const made = files.filter((file) => /\bnew\s+(?:Context|AudioContext|webkitAudioContext)\b/.test(code(read(file))))
-  check('...and made in one place, the deck', made, ['player/deck.ts'])
+  //? (2.0.0-player.20: and the desktop visualizer's, its own - see "the desktop visualizer" below)
+  check('...and made in two places, the deck and the visualizer\'s silent copy', made, ['player/deck.ts', 'player/vizAudio.ts'])
   //? 2.0.0-player.16: the main-thread voice (a page with no AudioWorklet) and the audio session it sets
   //? while it lives are the deck's too - nothing else makes a node or touches the page's session
   check('...as are its main-thread voice and the page\'s audio session (2.0.0-player.16)',
@@ -651,8 +678,8 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
     [true, true, true, true, true])
   check('a download asked for: the sheet goes, focus with nowhere to land, and Requests shows at its root',
     /const gotten = useCallback\(\(\) => \{\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*router\.root\('requests'\)/.test(app), true)
-  check('...the Sources element handed that, its opener, its own open and how it is drawn (2.0.0-player.19)',
-    /<Sources open=\{sourcesOpen\} request=\{getting\} opener=\{sourcesOpener\} onClose=\{closeSources\} onQueued=\{gotten\} panel=\{panel\} \/>/.test(app), true)
+  check('...the Sources element handed that, its opener, its own open and how it is drawn (2.0.0-player.19), and the visualizer over it (.20)',
+    /<Sources open=\{sourcesOpen\} request=\{getting\} opener=\{sourcesOpener\} onClose=\{closeSources\} onQueued=\{gotten\} panel=\{panel\} covered=\{visualizerShown\} \/>/.test(app), true)
   check('a card\'s Get asks for the download, then hands over - in the tap, nothing awaited',
     [/onClick=\{\(\) => onGet\(candidate\)\}/.test(card), /const get = \(candidate: Candidate\) => \{\s*if \(state\.download\(candidate, shown\)\) onQueued\(\)\s*\}/.test(sheet)], [true, true])
   const ask = /function ask\([^)]*\): boolean \{([\s\S]*?)\n  \}/.exec(hook)?.[1] ?? ''
@@ -686,7 +713,7 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
       /const openSources = useCallback\([^)]*\) => \{\s*if \(nowPlayingOpen\.current\) return/.test(app), /nowPlayingOpen\.current = sheetOpen/.test(app)],
     [true, true, true, true, true, true])
   check('Cancel, the backdrop and Escape let the search go in the gesture, the effect a backstop',
-    [/const onClose = \(\) => \{\s*state\.stop\(\)\s*closeSheet\(\)\s*\}/.test(sheet), /useSheet\(\{ open, onClose, lockClass: 'app-sources-open'/.test(sheet),
+    [/const onClose = \(\) => \{\s*state\.stop\(\)\s*closeSheet\(\)\s*\}/.test(sheet), /useSheet\(\{ open, covered, onClose, lockClass: 'app-sources-open'/.test(sheet),
       /onClose: closeSheet,/.test(sheet), /if \(!open\) state\.stop\(\)/.test(sheet)], [true, true, true, true])
   check('the album page is told whether it is what shows, and asks the store again as it comes back - Get above what is already here',
     [/shown=\{pageShown && nav\.tab === tab && !sourcesOver\}/.test(app), /\}, \[chosen\?\.id, group\?\.id, filed, shown\]\)/.test(page), /if \(!shown\) return/.test(page),
@@ -920,6 +947,153 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
     [/const \{ pick, hasSongs \} = useLibraryPick\(\)/.test(library), /<h1 class="pl-large-title">\{desktop \? LIBRARY_TITLES\[drawn\] : 'Library'\}<\/h1>/.test(library),
       /<div hidden=\{drawn !== 'recent'\}>\s*<AlbumsView order="newest"/.test(library), /const choose = \(next: LibraryView\) => \{\s*if \(next !== showing\) chooseLibrary\(next\)/.test(library)],
     [true, true, true, true])
+}
+
+console.log('\nthe desktop visualizer: a silent copy, never the player\'s element; its toggle from the click')
+{
+  const VIZ = ['player/Visualizer.tsx', 'player/vizAudio.ts', 'player/vizDraw.ts', 'player/vizGl.ts', 'lib/vizSync.ts', 'lib/musicFeel.ts', 'lib/visualizer.ts', 'lib/vizShaders.ts']
+  check('its files are all there', VIZ.filter((file) => !files.includes(file)), [])
+  //? the one hard rule: createMediaElementSource reroutes the song through Web Audio (and breaks locked
+  //? playback on an iPhone) - not one file under ui/src may call it, the old page's included
+  const ROUTES_THE_SONG = /createMediaElementSource|createMediaStreamSource/
+  check('nothing in the app calls createMediaElementSource - no file at all', files.filter((file) => ROUTES_THE_SONG.test(code(read(file)))), [])
+  check('...found where it is (the check sees one)', ROUTES_THE_SONG.test(code('const tap = context.createMediaElementSource(element)')), true)
+  const TOUCHES = [
+    ['an element looked up', /querySelector\(\s*['"]audio|getElementsByTagName/],
+    ['a media element', /HTMLMediaElement|HTMLAudioElement|new\s+Audio\b|<audio\b/],
+    ['.src =', /\.src\s*=(?!=)/],
+    ['srcObject', /srcObject/],
+    ['.load(', /\.load\s*\(/],
+    ['.play(', /\.play\s*\(/],
+    ['.pause(', /\.pause\s*\(/],
+  ]
+  check('none of its files touches a media element: nothing looked up, set, loaded, played or paused',
+    VIZ.flatMap((file) => TOUCHES.filter(([, pattern]) => pattern.test(code(read(file)))).map(([name]) => `${file}: ${name}`)), [])
+  //? James opens deadwax over plain http: nothing that only a secure page has
+  const SECURE_ONLY = /audioWorklet|AudioWorkletNode|randomUUID|crypto\.subtle|navigator\.clipboard|getUserMedia|serviceWorker/
+  check('nothing of it needs a secure page (no AudioWorklet, nothing else only HTTPS has)', VIZ.filter((file) => SECURE_ONLY.test(code(read(file)))), [])
+  check('nothing of it is random - the styles rotate in a fixed order', VIZ.filter((file) => /Math\.random|getRandomValues/.test(code(read(file)))), [])
+
+  const screen = code(read('player/Visualizer.tsx'))
+  check('its files reach no playback action but the screen\'s toggle',
+    VIZ.map((file) => [file, actionsIn(code(read(file)))]).filter(([, found]) => found.length), [['player/Visualizer.tsx', ['toggle']]])
+  const toggle = /const onToggle = \(\) => \{([\s\S]*?)\n  \}/.exec(screen)?.[1] ?? ''
+  check('...called only in onToggle, nothing awaited - from the button\'s click and the Space key',
+    [(screen.match(/\.toggle\(\)/g) ?? []).length, /player\.toggle\(\)/.test(toggle), /\bawait\b|\.then\(/.test(toggle),
+      /<button type="button" class="app-viz-play" onClick=\{onToggle\}/.test(screen),
+      /if \(key === ' ' \|\| key === 'Spacebar' \|\| event\.code === 'Space'\) \{\s*event\.preventDefault\(\)\s*if \(event\.repeat\) return\s*onToggle\(\)/.test(screen)],
+    [1, true, false, true, true])
+  //? one press, one toggle: a held Space's repeats would play and pause the song over and over
+  check('...a held Space\'s repeats ignored - the one key handler that reaches onToggle',
+    [(screen.match(/\bonToggle\(\)/g) ?? []).length, (screen.match(/event\.repeat/g) ?? []).length], [1, 1])
+
+  //? its audio context: made only in wakeVisualizerAudio, which only the click that opens it calls
+  const audio = code(read('player/vizAudio.ts'))
+  const inAudio = [...audio.matchAll(/\n(export )?function (\w+)\([^)]*\)[^{]*\{[\s\S]*?\n\}/g)]
+  check('its audio context is made only inside wakeVisualizerAudio', inAudio.filter((fn) => /\bnew Context\(/.test(fn[0])).map((fn) => fn[2]), ['wakeVisualizerAudio'])
+  //? ...by the one constructor contextClass() finds, looked up there alone - nor made any other way:
+  //? no `new (something)()`, no AudioContext named anywhere else in the file
+  check('...the constructor looked up only there, named only where it is found, and nothing built from an expression',
+    [inAudio.filter((fn) => /\bcontextClass\(\)/.test(fn[0]) && fn[2] !== 'contextClass').map((fn) => fn[2]),
+      inAudio.filter((fn) => /\b(?:webkit)?AudioContext\b(?!\s*[|>)])/.test(fn[0].replace(/:\s*AudioContext\b/g, ''))).map((fn) => fn[2]),
+      /\bnew\s*\((?!\))/.test(audio)],
+    [['wakeVisualizerAudio'], ['contextClass'], false])
+  //? ...and nowhere in the WHOLE file - the class's methods included, which the function scan above
+  //? doesn't reach: contextClass() defined and called once (in wakeVisualizerAudio), AudioContext named
+  //? only where contextClass looks it up (and as a type), and nothing made with `new` but the one
+  //? context, typed arrays and errors
+  const wakeBody = inAudio.find((fn) => fn[2] === 'wakeVisualizerAudio')?.[0] ?? ''
+  const madeWithNew = [...audio.matchAll(/\bnew\s+([A-Za-z_$][\w$]*)\s*[<(]/g)].map((m) => m[1])
+    .filter((name) => !/^(?:Uint8Array|Float32Array|Uint8ClampedArray|Int16Array|Float64Array|Map|Set|Error|ApiError)$/.test(name))
+  const contextBody = inAudio.find((fn) => fn[2] === 'contextClass')?.[0] ?? ''
+  check('...the whole file: contextClass() once besides its own name, AudioContext named only in it, `new Context(` the only thing made, inside wakeVisualizerAudio',
+    [(audio.match(/\bcontextClass\(\)/g) ?? []).length, /\bcontextClass\(\)/.test(wakeBody),
+      (audio.replace(contextBody, '').replace(/:\s*(?:AudioContext|ContextClass)\b(?:\s*\|\s*null)?/g, '').replace(/type ContextClass = new \(\) => AudioContext/, '').match(/\b(?:webkit)?AudioContext\b/g) ?? []).length,
+      madeWithNew, /\bnew Context\(\)/.test(wakeBody)],
+    [2, true, 0, ['Context'], true])
+  check('...found where it is (the whole-file check sees a context made in a method)',
+    [...code('class X { tick() { const C = contextClass(); if (C) audio.context = new C() } }').matchAll(/\bnew\s+([A-Za-z_$][\w$]*)\s*[<(]/g)].map((m) => m[1]), ['C'])
+  const enclosing = (text, at) => {
+    const blocks = [...text.matchAll(/\n( *)const (\w+) = [^\n]*=> \{[\s\S]*?\n\1\}/g)]
+    return blocks.filter((block) => block.index <= at && at < block.index + block[0].length).at(-1)?.[2] ?? null
+  }
+  const wakes = files.filter((file) => file !== 'player/vizAudio.ts').flatMap((file) => {
+    const text = code(read(file))
+    return [...text.matchAll(/\bwakeVisualizerAudio\(\)/g)].map((match) => `${file}: ${enclosing(text, match.index)}`)
+  })
+  check('...and wakeVisualizerAudio is called only from App\'s openVisualizer - the player bar\'s click', wakes, ['app/App.tsx: openVisualizer'])
+  const app = code(read('app/App.tsx'))
+  check('...which takes the button as where focus goes back, wakes the audio and opens it - in the click',
+    /const openVisualizer = useCallback\(\(event: MouseEvent\) => \{\s*visualizerOpener\.current = takeOpener\(event\)\s*wakeVisualizerAudio\(\)\s*setVisualizing\(true\)\s*\}, \[\]\)/.test(app), true)
+  const bar = code(read('player/PlayerBar.tsx'))
+  check('the entry is the player bar\'s button - and only a desktop draws the bar', [/<button type="button" class="app-playbar-button" onClick=\{onVisualizer\} aria-label="Full-screen visualizer">/.test(bar),
+    /<PlayerBar\b[^>]*\bonVisualizer=\{openVisualizer\}[^>]*\/>/.test(app), /\{desktop \? \(\s*<PlayerBar\b/.test(app),
+    files.filter((file) => /\bonVisualizer\b/.test(code(read(file)))).sort()], [true, true, true, ['app/App.tsx', 'player/PlayerBar.tsx']])
+  check('...and the screen is drawn by App alone, only on a desktop, closed as the window crosses to a phone\'s width',
+    [files.filter((file) => /<Visualizer\b/.test(code(read(file)))), /<Visualizer open=\{visualizerShown\} player=\{player\} opener=\{visualizerOpener\} onClose=\{closeVisualizer\} \/>/.test(app),
+      /const visualizerShown = desktop && visualizing/.test(app), /if \(closes\.infoPanel\) \{[^}]*setVisualizing\(false\)/.test(app),
+      /export function Visualizer\([^)]*\) \{\s*if \(!open\) return null/.test(code(read('player/Visualizer.tsx')).replace(/\{ open, player, opener, onClose \}: \{[\s\S]*?\}\)/, '{ open, player, opener, onClose })'))],
+    [['app/App.tsx'], true, true, true, true])
+
+  //? the silent copy: through an analyser into a gain of 0 - nothing of it reaches the speakers
+  check('the copy plays into the analyser, the analyser into a gain of 0, and only that gain reaches the destination',
+    [/node\.connect\(this\.analyser\)/.test(audio), /analyser\.connect\(silent\)/.test(audio), /silent\.gain\.value = 0/.test(audio),
+      (audio.match(/\.connect\(context\.destination\)/g) ?? []).length, /silent\.connect\(context\.destination\)/.test(audio)],
+    [true, true, true, 1, true])
+  //? ...however it is spelled: `destination` named once in the whole file (so no other node reaches it
+  //? through a variable or another context), and the gain written once, to 0 - nothing ramps it, sets it
+  //? at a time, or assigns it again
+  const GAIN_WRITES = /\.gain\s*\.\s*(?:value\s*=(?!=)|setValueAtTime|linearRampToValueAtTime|exponentialRampToValueAtTime|setTargetAtTime|setValueCurveAtTime|cancelScheduledValues|cancelAndHoldAtTime)|\.gain\s*=(?!=)|\bconnect\([^)]*\.gain\b/g
+  check('...the destination named once in the whole file, and the gain written once - to 0',
+    [(audio.match(/\bdestination\b/g) ?? []).length, audio.match(GAIN_WRITES) ?? [], (audio.match(/\.gain\.value = 0\b/g) ?? []).length],
+    [1, ['.gain.value ='], 1])
+  check('...found where it is (the checks see another way to the destination, and a gain ramped up)',
+    [(code('const out = this.madeFor!.destination; node.connect(out)').match(/\bdestination\b/g) ?? []).length,
+      code('silent.gain.value = 0; silent.gain.setValueAtTime(1, 0)').match(GAIN_WRITES)],
+    [1, ['.gain.value =', '.gain.setValueAtTime']])
+  check('...its windows the turntable\'s (scrubWindow), only the newest asked and decoded',
+    [/await scrubWindow\(song\.id, from, VIZ_WINDOW_S, request\.signal, song\.maxRate\)/.test(audio), /const request = this\.requests\.begin\(\)/.test(audio),
+      /if \(!request\.current\(\)\) return/.test(audio), /const ticket = this\.decodes\.begin\(\)/.test(audio)],
+    [true, true, true, true])
+  check('the screen asks for the queue\'s next song too, so its first window is fetched ahead (lib/vizSync.ts prefetch)',
+    [/const after = nextIndex\(p\.queue\)/.test(screen), /listener\.tick\(song, following \? syncSong\(following, following\.duration, p\.maxRate\) : null, playing && !p\.buffering, p\.position\(\)\)/.test(screen),
+      /else if \(plan\.prefetch !== null && following\) void this\.fetchWindow\(following, plan\.prefetch\)/.test(audio), /const taken = takeAhead\(this\.held, this\.ahead, this\.current, following\?\.id \?\? null\)/.test(audio)],
+    [true, true, true, true])
+  //? a tap on a touch screen (an iPad on its side is a desktop frame) moves no pointer: a press brings
+  //? the faded controls back, and its click is swallowed so it presses nothing hidden under it
+  check('a press brings the faded controls back, and only that - its click swallowed while they were hidden',
+    [/const onPointerDown = \(event: PointerEvent\) => \{\s*wokeByPress\.current = latest\.current\.visible \? 0 : performance\.now\(\)\s*wake\(\)/.test(screen),
+      /if \(woke && performance\.now\(\) - woke < WAKE_CLICK_MS\) \{\s*event\.stopPropagation\(\)\s*event\.preventDefault\(\)/.test(screen),
+      /onClickCapture=\{onClickCapture\}/.test(screen), /onPointerDown=\{onPointerDown\}/.test(screen)],
+    [true, true, true, true])
+  //? a control that goes with focus on it - the style list's option, the Style button leaving with
+  //? Ambient - leaves focus on <body>, where none of the screen's keys reach: focus comes back
+  check('focus never falls out of it: after every render, back to the screen; the list closed by a pick or Escape gives it to its button',
+    [/useLayoutEffect\(\(\) => \{\s*const element = root\.current\s*if \(element && !element\.contains\(document\.activeElement\)\) element\.focus\(\{ preventScroll: true \}\)\s*\}\)/.test(screen),
+      /const closeMenu = \(\) => \{\s*setMenuOpen\(false\)\s*styleButton\.current\?\.focus\(\{ preventScroll: true \}\)\s*\}/.test(screen),
+      /if \(menuOpen\) closeMenu\(\)\s*else onClose\(\)/.test(screen), /setChoice\(next\)\s*closeMenu\(\)/.test(screen)],
+    [true, true, true, true])
+  //? closed while still full screen (Leave full screen, V..., an Escape the page gets), Chromium keeps the
+  //? page outside the full-screen element inert until it has left: focus given back then goes nowhere
+  check('focus goes back to the player bar\'s button - again once the browser has left full screen',
+    [/const giveBack = \(\) => opener\.current\?\.focus\(\{ preventScroll: true \}\)/.test(screen),
+      /const left = \(\) => \{\s*doc\.removeEventListener\('fullscreenchange', left\)\s*doc\.removeEventListener\('webkitfullscreenchange', left\)\s*clearTimeout\(giveUp\)\s*giveBack\(\)\s*\}/.test(screen),
+      /doc\.addEventListener\('fullscreenchange', left\)/.test(screen), (screen.match(/\bgiveBack\(\)/g) ?? []).length],
+    [true, true, true, 2])
+  check('the page behind doesn\'t scroll while it shows - its own class on <html>, taken off as it goes',
+    /useLayoutEffect\(\(\) => \{\s*const page = document\.documentElement\s*page\.classList\.add\(SCROLL_LOCK\)\s*return \(\) => page\.classList\.remove\(SCROLL_LOCK\)\s*\}, \[\]\)/.test(screen), true)
+  //? the cover's colours and Halo's record stay until the next song's come: asked for only as their
+  //? own address changes, nothing cleared before the answer
+  check('the pictures asked for only as their own address changes, the last kept until the next has come',
+    [/\}, \[coverAddress\]\)/.test(screen), /\}, \[discAddress\]\)/.test(screen), /track\?\.id\]/.test(screen),
+      /const request = coverRequests\.begin\(\)\s*if \(!coverAddress/.test(screen), /if \(!art\) noDiscArt\.current\.add\(discAddress\)/.test(screen)],
+    [true, true, false, true, true])
+  check('...stopped, let go and its context closed as the screen goes',
+    /useEffect\(\(\) => \(\) => \{\s*listener\.destroy\(\)\s*closeVisualizerAudio\(\)/.test(screen), true)
+  check('its frame loop runs only while the page shows: hidden, it stops and the audio context is suspended',
+    /if \(document\.visibilityState === 'hidden'\) \{\s*stop\(\)\s*suspendVisualizerAudio\(\)\s*\} else \{\s*resumeVisualizerAudio\(\)\s*start\(\)/.test(screen), true)
+  check('...and the only frame loops in the app are the deck\'s and the visualizer\'s',
+    files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['player/Visualizer.tsx', 'player/deck.ts'])
 }
 
 console.log('\nApp moves history only through the router')

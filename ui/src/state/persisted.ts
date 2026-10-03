@@ -3,6 +3,7 @@ import { useCallback, useState } from 'preact/hooks'
 import type { FormatPreference } from '../api/types'
 import type { MaxRate } from '../lib/streamWrap'
 import type { Look } from '../lib/turntable'
+import type { AmbientChoice, Colours, Effect } from '../lib/visualizer'
 
 /**
  * localStorage-backed state.
@@ -50,6 +51,13 @@ export const STORAGE_KEYS = {
   /** "Pause winds the record down" (2.0.0-player.14): 'off', or anything else for on (the default).
    *  Per device, like the three above. */
   playerWindDown: 'deadwax-player-wind-down',
+  /** The desktop visualizer's choices (2.0.0-player.20), per device like the four above: its effect
+   *  ('bars', 'scope', 'halo' or 'ambient', the default), its colours ('cover', the default, or
+   *  'purple') and its Ambient style ('rotate' or one of lib/visualizer.ts's AMBIENT_STYLES -
+   *  'mandala' by default). Anything else stored reads as the default. */
+  playerVizEffect: 'deadwax-player-viz-effect',
+  playerVizColours: 'deadwax-player-viz-colours',
+  playerVizStyle: 'deadwax-player-viz-style',
 } as const
 
 /*
@@ -304,6 +312,49 @@ export function readPlayerWindDown(): boolean {
 
 export function writePlayerWindDown(on: boolean): void {
   writeRaw(STORAGE_KEYS.playerWindDown, on ? 'on' : 'off')
+}
+
+/* ===== deadwax-player-viz-effect, -colours, -style ===== */
+
+/**
+ * The desktop visualizer's three choices (2.0.0-player.20), per device like the player's other
+ * settings, each validated on read: only a value the visualizer offers today is taken, and anything
+ * else - nothing stored, an old or mistyped value, storage that can't be read - is the board's own
+ * opening: Ambient, from the cover, the Mandala.
+ *
+ * The lists are lib/visualizer.ts's, spelled out here rather than imported: this module is shared by
+ * the main page's bundle, which has no visualizer to carry (ui/test/visualizer.sim.cjs holds every
+ * effect and style offered to reading back as itself).
+ */
+const VIZ_EFFECTS: readonly Effect[] = ['bars', 'scope', 'halo', 'ambient']
+const VIZ_COLOURS: readonly Colours[] = ['cover', 'purple']
+const VIZ_STYLES: readonly AmbientChoice[] = ['rotate', 'mandala', 'waves', 'liquid', 'burst', 'ribbons', 'smoke', 'rings', 'embers']
+
+export function readVizEffect(): Effect {
+  const saved = readRaw(STORAGE_KEYS.playerVizEffect)
+  return (VIZ_EFFECTS as readonly string[]).includes(saved ?? '') ? (saved as Effect) : 'ambient'
+}
+
+export function writeVizEffect(effect: Effect): void {
+  writeRaw(STORAGE_KEYS.playerVizEffect, effect)
+}
+
+export function readVizColours(): Colours {
+  const saved = readRaw(STORAGE_KEYS.playerVizColours)
+  return (VIZ_COLOURS as readonly string[]).includes(saved ?? '') ? (saved as Colours) : 'cover'
+}
+
+export function writeVizColours(colours: Colours): void {
+  writeRaw(STORAGE_KEYS.playerVizColours, colours)
+}
+
+export function readVizStyle(): AmbientChoice {
+  const saved = readRaw(STORAGE_KEYS.playerVizStyle)
+  return (VIZ_STYLES as readonly string[]).includes(saved ?? '') ? (saved as AmbientChoice) : 'mandala'
+}
+
+export function writeVizStyle(choice: AmbientChoice): void {
+  writeRaw(STORAGE_KEYS.playerVizStyle, choice)
 }
 
 /* ===== deadwax-preferences ===== */

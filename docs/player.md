@@ -12,9 +12,11 @@ your downloads as they arrive (since 2.0.0-player.12), and **Search** looks in y
 then on MusicBrainz, and shows an album you don't have with each of its pressings' tracklists
 (since 2.0.0-player.13) - and **Get** fetches it: the sources found on Soulseek, to choose from
 (since 2.0.0-player.15). **Home** has the albums and artists you [pin](#home-and-pins) to it, and
-what you haven't played in a while (since 2.0.0-player.18). (since 2.0.0-player.15). On a computer's screen - a window 1024 pixels wide or more - the same app
-has [a desktop's layout](#on-a-desktop) (since 2.0.0-player.19): a sidebar instead of the tabs, a
-player bar along the bottom, and the sources beside an album rather than over it.
+what you haven't played in a while (since 2.0.0-player.18). On a computer's screen - a window 1024
+pixels wide or more - the same app has [a desktop's layout](#on-a-desktop) (since 2.0.0-player.19): a
+sidebar instead of the tabs, a player bar along the bottom, and the sources beside an album rather
+than over it - and, from the player bar, [a full-screen visualizer](#the-visualizer) (since
+2.0.0-player.20).
 
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
@@ -378,9 +380,10 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **A player bar** along the bottom instead of the mini player: the song's cover, title and "Artist
   — Album" (click that to go to the album), previous, a round play/pause and next, the scrubber with
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point
-  at it), and at the right **AirPlay** when there's a speaker to send to, and **Info**. With nothing
-  playing it stays, saying so. There's no now-playing screen and no [turntable](#the-turntable) on a
-  desktop - the bar is the player; a full-screen visualizer comes later.
+  at it), and at the right **AirPlay** when there's a speaker to send to, **Info**, and the
+  [visualizer](#the-visualizer)'s button (five bars). With nothing playing it stays, saying so.
+  There's no now-playing screen and no [turntable](#the-turntable) on a desktop - the bar is the
+  player, and the visualizer is the desktop's full-screen view of it.
 - **Info** opens beside the page as a panel, with the same About and Debug as on a phone. **Done**,
   the Info button again, or Escape while you're in the panel closes it. Going to an album or an
   artist from the player - the bar's "Artist — Album", or Info's own cards - closes it too when it
@@ -419,6 +422,79 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **On a touch screen** in this layout - an iPad on its side - every control is a finger's size
   (44 points): the player bar is a little taller, with its buttons above the scrubber, and the
   sidebar's items, the tracklist's rows, the chips and the buttons grow to match.
+
+### The visualizer
+
+Since 2.0.0-player.20 the desktop layout has a full-screen visualizer: the music drawn as it plays,
+in place of the phone's turntable. Click the **five bars** at the right end of the player bar. It
+takes the whole screen (or, where the browser won't allow that, the whole window), and **Leave full
+screen**, **Escape**, or leaving full screen any other way closes it, back to where you were. The
+music carries on throughout - the visualizer only watches it.
+
+- **Effects**: **Bars** (the spectrum as bars, the lows in the middle, with falling peaks and a
+  reflection), **Scope** (the waveform as a glowing line, its last half-second hanging behind it),
+  **Halo** (a ring of spectrum spokes round the album's record - its CD art turning, when deadwax has
+  some, or a black record with the cover as its label) and **Ambient**.
+- **Ambient** is a family of styles, chosen from the **Style** list beside the effects: **Mandala** (a
+  kaleidoscope whose mirrors swing and whose shapes morph through polygons, lattices, flowers and
+  circles), **Waves** (ridges of the spectrum flying towards you, the heading drifting as if you were
+  flying over them), **Liquid** (ink curling in water), and the **Media Player style** five, after
+  Windows Media Player's: **Burst**, **Ribbons**, **Smoke**, **Rings** and **Embers**. **Rotate all**
+  goes through all eight in that order - each for 30 seconds of playing (a pause doesn't count),
+  fading from one into the next, starting on the Mandala when the visualizer opens on it, or, chosen
+  while another style shows, carrying on from that one - and nothing about it is random.
+  The Mandala, Waves and Liquid shift and flow with the music rather than flashing on the beat; the
+  Media Player five answer it as Media Player's did (Rings strikes a ring on each kick). Under the
+  **Style** button it says how it hears the music - **feel: smooth**, **in between** or
+  **aggressive**, and the tempo it has found - and, with Rotate all, which style is showing (on a
+  window 1280 pixels wide or more).
+- **The music shapes it**: aggressive music (metal, say) brings sharp, spiky, fast-twisting figures;
+  smooth music rounder, slower, flowing ones, changing as a song changes; and the tempo sets how fast
+  the styles move.
+- **Colour**: **From the cover** takes its colours from the playing album's cover (a black-and-white
+  cover gives grey); **Purple** is deadwax's own.
+- **The controls** - the song at the top left, the effect, style, colour and Leave full screen at the
+  top right, and play/pause at the foot - fade out after a few seconds while the music plays and you
+  don't move the pointer, and come back when you move it, click or tap anywhere, or press a key (a
+  click or tap that brings them back does only that - it never presses a control that was hidden
+  under it). They stay while it's paused. **Space** plays and pauses (holding it down doesn't keep
+  toggling), **V** goes to the next effect (**Shift+V** the one before), and **Escape** leaves. The
+  **Style** list opens on the style chosen; the arrow keys, Home and End move through it, Enter picks
+  one, and Escape closes it. On a touch screen - an iPad on its side - every control is a finger's
+  size.
+- **Kept on this computer**: the effect, the colour and the Ambient style you chose, as the player's
+  other settings are (Ambient, From the cover and the Mandala until you choose).
+
+**What it listens to.** The visualizer never touches the song you hear. It fetches its own copy of
+the stretch that's playing - the same FLAC stretch deadwax cuts for the turntable's sound - decodes
+it, and plays it silently, at volume zero, in time with the song, to measure it. So the song plays
+exactly as it always does, and nothing of the copy is ever heard. The next song's first stretch is
+fetched in the last few seconds of the one before, so one song flows into the next without the
+visualizer standing still (one you skip to, or jump to, can be still for a moment). It all works
+over a plain `http://` address.
+
+What that copy costs while the visualizer shows: 40 seconds of the song fetched for every 32 played,
+and one stretch of each next song. And deadwax cuts each stretch from the copy of the song that
+[the player's cache](configuration.md#paths) keeps (the MP4 Safari plays, or the gapless stream's):
+a Mac's Safari, the gapless stream and a resampled hi-res song have it made already, but a browser that plays the FLAC as it is - Chrome, Firefox or Edge with Gapless off, the
+default - doesn't, so the first stretch of each song has deadwax make it: the whole song fetched from
+Navidrome once more (a few seconds' wait for that first stretch) and its copy kept in the cache,
+counted against `PLAYER_CACHE_MB` like any other. An evening of listening with the visualizer open
+on such a browser fills the cache with those songs, and clears the songs played longest ago to make
+room - an iPhone's included, which then wait a moment to be made again the next time they play.
+
+**"This song can't be seen".** Only FLAC songs have that copy, and a song the visualizer can't hear
+runs the effects from a calm, slow idle pattern instead, with a plain note at the bottom right
+saying why (a long one wraps in its corner): the song isn't a FLAC file; deadwax couldn't send its
+sound just now (it tries again after ten seconds); this browser couldn't read its sound; or this
+browser can't analyse sound at all.
+[Troubleshooting](troubleshooting.md#the-visualizer-doesnt-move-with-the-music-or-says-a-song-cant-be-seen)
+has what to do.
+
+**Without WebGL** - a browser that doesn't have it, or has it turned off - Ambient shows a simpler
+version (soft drifting colours), and a line at the bottom right says so; the other three effects
+don't need it. **With Reduce Motion on** (your system's accessibility setting), everything moves slowly and
+calmly, and nothing jumps with the beat.
 
 ## The turntable
 
@@ -1011,8 +1087,10 @@ fixes that.
 - **An album with no MusicBrainz release id can't be pinned** (its pin isn't shown): nothing would
   find it again once it moved.
 - **On a desktop**, the sidebar's **Managing** opens the main page rather than its own screens, and
-  the full-screen visualizer and editing an album in the app aren't built yet; between 1024 and 1279
-  pixels wide a panel lies over the right of the page, the end of a long tracklist under it.
+  editing an album in the app isn't built yet; between 1024 and 1279 pixels wide a panel lies over the
+  right of the page, the end of a long tracklist under it. The [visualizer](#the-visualizer) sees FLAC
+  songs only; its play/pause is its one control of the music (skip and seek from the player bar, after
+  leaving it).
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.

@@ -1032,3 +1032,347 @@
     .app-desk .app-rg .pl-hero-cover { grid-row: 1 / -1; }
     .app-desk .app-rg .app-rg-actions { grid-column: 2; }
 }
+
+/* ===== The desktop visualizer (2.0.0-player.20), as DesktopVisualizer.dc.html draws it =====
+   player/Visualizer.tsx: the whole screen - requestFullscreen on its own element, or, refused, this
+   fixed layer over the whole window, over everything the app draws (the pin notice included). The
+   effects fill it; over them the controls - the song at the top left, the effect, the Ambient style,
+   the colours and Leave full screen at the top right, play/pause at the foot, the keys and any note in
+   the corners - over a dark scrim at the top and the foot. While the music plays and the pointer is
+   still they fade (`.is-still`), the pointer with them. Its colours are theme.css section 10's
+   (`--dw-viz-*`); its sizes are here, as tokens, and every rule is a desktop's, as above. */
+@media (min-width: 1024px) {
+    :root {
+        --app-z-viz: 50;                  /* over everything: Now Playing's sheets, a panel, the pin notice (40) */
+        --app-z-viz-list: 5;              /* the style list, over the controls beside it */
+        --app-viz-edge: 32px;             /* the controls' distance from the screen's edges */
+        --app-viz-top: 28px;
+        --app-viz-tools-drop: 12px;       /* the choices sit a little lower than the song, as drawn */
+        --app-viz-top-gap: 24px;
+        --app-viz-song-min: 200px;        /* the song gives way to the choices no further than this */
+        --app-viz-gap: 14px;
+        --app-viz-row-gap: 10px;          /* the choices' rows, wrapped at a narrow desktop */
+        --app-viz-cover: 56px;
+        --app-viz-title: 17px;
+        --app-viz-artist: 14px;
+        --app-viz-album: 13px;
+        --app-viz-lines: 19px;
+        --app-viz-control: 32px;
+        --app-viz-well: var(--app-viz-control);   /* the effect and colour pickers' well */
+        --app-viz-well-pad: 2px;
+        --app-viz-segment-gap: 2px;
+        --app-viz-segment-pad: 12px;
+        --app-viz-text: 13px;
+        --app-viz-small: 11px;
+        --app-viz-small-lines: 14px;
+        --app-viz-chevron: 12px;
+        --app-viz-leave-icon: 14px;
+        --app-viz-button-gap: 6px;
+        --app-viz-leave-gap: 7px;
+        --app-viz-colour-gap: 8px;
+        --app-viz-readout-drop: 36px;     /* "now:" and "feel:" under the style button */
+        --app-viz-list: 190px;
+        --app-viz-list-drop: 38px;
+        --app-viz-list-pad: 6px;
+        --app-viz-option: 30px;
+        --app-viz-option-pad: 9px;
+        --app-viz-option-gap: 8px;
+        --app-viz-tick: 14px;
+        --app-viz-heading-gap: 5px;
+        --app-viz-heading-pad: 8px 9px 4px;
+        --app-viz-scrim-top: 170px;
+        --app-viz-scrim-bottom: 210px;
+        --app-viz-play-w: 58px;
+        --app-viz-play-h: 40px;
+        --app-viz-play-icon: 20px;
+        --app-viz-play-bottom: 84px;
+        --app-viz-hint-bottom: 54px;      /* the keys at the bottom left, a note at the bottom right */
+        --app-viz-hint: 12px;
+        --app-viz-hint-lines: 16px;
+        --app-viz-notes-gap: 4px;
+        --app-viz-shown: 1;
+        --app-viz-hidden: 0;
+        --app-viz-fade: calc(var(--duration-slow) * 1.8);   /* about half a second; nothing under reduced motion */
+    }
+
+    .app-desk .app-viz {
+        position: fixed;
+        inset: 0;
+        z-index: var(--app-z-viz);
+        overflow: hidden;
+        background: var(--dw-viz-bg);
+        color: var(--dw-text);
+        font-family: var(--dw-font);
+        cursor: default;
+    }
+    .app-desk .app-viz:focus { outline: none; }
+    .app-desk .app-viz.is-still { cursor: none; }
+    .app-desk .app-viz-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+    .app-desk .app-viz-canvas.is-gl { background: var(--dw-viz-bg); }
+    .app-desk .app-viz-canvas[hidden] { display: none; }
+
+    /* the controls: drawn over the picture, taking no pointer but where there is a control */
+    .app-desk .app-viz-chrome {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: var(--app-viz-shown);
+        transition: opacity var(--app-viz-fade) var(--ease-out);
+    }
+    .app-desk .app-viz.is-still .app-viz-chrome { opacity: var(--app-viz-hidden); }
+    .app-desk .app-viz [data-chrome] { pointer-events: auto; }
+    .app-desk .app-viz.is-still [data-chrome] { pointer-events: none; }
+    .app-desk .app-viz-scrim {
+        position: absolute;
+        left: 0;
+        right: 0;
+    }
+    .app-desk .app-viz-scrim.is-top { top: 0; height: var(--app-viz-scrim-top); background: var(--dw-viz-scrim-top); }
+    .app-desk .app-viz-scrim.is-bottom { bottom: 0; height: var(--app-viz-scrim-bottom); background: var(--dw-viz-scrim-bottom); }
+    .app-desk .app-viz button:focus-visible { outline: var(--dw-hairline) solid var(--dw-accent); outline-offset: var(--dw-hairline); }
+
+    .app-desk .app-viz-top {
+        position: absolute;
+        left: var(--app-viz-edge);
+        right: var(--app-viz-edge);
+        top: var(--app-viz-top);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: var(--app-viz-top-gap);
+    }
+    /* the song takes what the choices leave - never less than its minimum - so the choices keep one
+       row wherever that minimum allows (from 1280px always), and only a narrow desktop wraps them; a
+       long title is cut short with an ellipsis, never the choices */
+    .app-desk .app-viz-song {
+        flex: 1 1 0;
+        min-width: var(--app-viz-song-min);
+        display: flex;
+        align-items: center;
+        gap: var(--app-viz-gap);
+    }
+    .app-desk .app-viz-cover {
+        display: block;
+        width: var(--app-viz-cover);
+        height: var(--app-viz-cover);
+        flex-shrink: 0;
+        box-sizing: border-box;
+        border-radius: var(--dw-radius-cover);
+        border: var(--dw-hairline) solid var(--dw-border-cover);
+        background: var(--dw-empty-cover);
+        object-fit: cover;
+    }
+    .app-desk .app-viz-song-text {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        line-height: var(--app-viz-lines);
+    }
+    .app-desk .app-viz-title,
+    .app-desk .app-viz-artist,
+    .app-desk .app-viz-album {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .app-desk .app-viz-title { font-size: var(--app-viz-title); font-weight: var(--dw-weight-semibold); }
+    .app-desk .app-viz-artist { font-size: var(--app-viz-artist); color: var(--dw-viz-artist); }
+    .app-desk .app-viz-album { font-size: var(--app-viz-album); color: var(--dw-text-2); }
+
+    .app-desk .app-viz-tools {
+        flex: 0 1 auto;
+        margin-top: var(--app-viz-tools-drop);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: var(--app-viz-row-gap) var(--app-viz-gap);
+        font-size: var(--app-viz-text);
+    }
+    .app-desk .app-viz-segmented {
+        height: var(--app-viz-well);
+        padding: var(--app-viz-well-pad);
+        box-sizing: border-box;
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-viz-well);
+        border: var(--dw-hairline) solid var(--dw-border);
+        box-shadow: var(--dw-well-inset);
+        display: flex;
+        gap: var(--app-viz-segment-gap);
+    }
+    .app-desk .app-viz-segment {
+        padding: 0 var(--app-viz-segment-pad);
+        box-sizing: border-box;
+        border: var(--dw-hairline) solid transparent;
+        border-radius: var(--dw-radius-tag);
+        background: transparent;
+        color: var(--dw-text-on-secondary);
+        font-weight: var(--dw-weight-medium);
+        white-space: nowrap;
+    }
+    .app-desk .app-viz-segment.is-on {
+        border-color: var(--dw-toggled-border);
+        background: var(--dw-toggled-bg);
+        color: var(--dw-accent-text);
+    }
+    .app-desk .app-viz-button {
+        height: var(--app-viz-control);
+        padding: 0 var(--app-viz-segment-pad);
+        box-sizing: border-box;
+        border: var(--dw-hairline) solid var(--dw-secondary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-secondary-bg);
+        box-shadow: var(--dw-highlight);
+        color: var(--dw-text-on-secondary);
+        font-size: var(--app-viz-text);
+        display: flex;
+        align-items: center;
+        gap: var(--app-viz-button-gap);
+        white-space: nowrap;
+    }
+    .app-desk .app-viz-button.is-leave { gap: var(--app-viz-leave-gap); }
+    .app-desk .app-viz-button-label { color: var(--dw-text-label-color); }
+    .app-desk .app-viz-button-value { font-weight: var(--dw-weight-semibold); }
+    .app-desk .app-viz-chevron { width: var(--app-viz-chevron); height: var(--app-viz-chevron); }
+    .app-desk .app-viz-leave-icon { width: var(--app-viz-leave-icon); height: var(--app-viz-leave-icon); }
+
+    /* the Ambient style: its button, what it hears under it, and the list */
+    .app-desk .app-viz-menu { position: relative; }
+    .app-desk .app-viz-readout {
+        position: absolute;
+        left: var(--dw-hairline);
+        top: var(--app-viz-readout-drop);
+        display: none;
+        flex-direction: column;
+        font-size: var(--app-viz-small);
+        line-height: var(--app-viz-small-lines);
+        color: var(--dw-text-3);
+        white-space: nowrap;
+        pointer-events: none;
+    }
+    .app-desk .app-viz-list {
+        position: absolute;
+        left: 0;
+        top: var(--app-viz-list-drop);
+        z-index: var(--app-z-viz-list);
+        width: var(--app-viz-list);
+        box-sizing: border-box;
+        padding: var(--app-viz-list-pad);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-card);
+        border: var(--dw-hairline) solid var(--dw-border);
+        box-shadow: var(--dw-highlight), var(--dw-shadow);
+        display: flex;
+        flex-direction: column;
+    }
+    .app-desk .app-viz-list-heading {
+        margin-top: var(--app-viz-heading-gap);
+        padding: var(--app-viz-heading-pad);
+        border-top: var(--dw-hairline) solid var(--dw-border);
+        font-size: var(--app-viz-small);
+        font-weight: var(--dw-weight-semibold);
+        color: var(--dw-text-label-color);
+    }
+    .app-desk .app-viz-option {
+        height: var(--app-viz-option);
+        flex-shrink: 0;
+        box-sizing: border-box;
+        padding: 0 var(--app-viz-option-pad);
+        border: var(--dw-hairline) solid transparent;
+        border-radius: var(--dw-radius-control);
+        background: transparent;
+        color: var(--dw-text);
+        font-size: var(--app-viz-text);
+        display: flex;
+        align-items: center;
+        gap: var(--app-viz-option-gap);
+        text-align: left;
+    }
+    .app-desk .app-viz-option.is-on { border-color: var(--dw-selection-border); background: var(--dw-selection-bg); }
+    .app-desk .app-viz-tick {
+        width: var(--app-viz-tick);
+        height: var(--app-viz-tick);
+        flex-shrink: 0;
+        display: flex;
+        color: var(--dw-accent);
+    }
+    .app-desk .app-viz-tick-icon { width: var(--app-viz-tick); height: var(--app-viz-tick); }
+    .app-desk .app-viz-colours { display: flex; align-items: center; gap: var(--app-viz-colour-gap); }
+    .app-desk .app-viz-label { font-size: var(--app-viz-small); color: var(--dw-text-label-color); }
+
+    /* play/pause, at the foot, in the middle */
+    .app-desk .app-viz-transport {
+        position: absolute;
+        left: 50%;
+        bottom: var(--app-viz-play-bottom);
+        transform: translateX(-50%);
+    }
+    .app-desk .app-viz-play {
+        width: var(--app-viz-play-w);
+        height: var(--app-viz-play-h);
+        box-sizing: border-box;
+        border: var(--dw-hairline) solid var(--dw-primary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-primary-bg);
+        box-shadow: var(--dw-primary-highlight);
+        color: var(--dw-text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .app-desk .app-viz-play-icon { width: var(--app-viz-play-icon); height: var(--app-viz-play-icon); }
+
+    /* the keys at the bottom left; at the bottom right why a song can't be seen, and the plain Ambient's note */
+    .app-desk .app-viz-hint,
+    .app-desk .app-viz-notes {
+        position: absolute;
+        bottom: var(--app-viz-hint-bottom);
+        margin: 0;
+        font-size: var(--app-viz-hint);
+        line-height: var(--app-viz-hint-lines);
+        color: var(--dw-text-3);
+    }
+    .app-desk .app-viz-hint { left: var(--app-viz-edge); }
+    /* a note keeps to its corner: clear of play/pause in the middle (and so of the keys at the left),
+       a long one - deadwax's own words after "can't be seen -" - wrapping there rather than running
+       across the foot */
+    .app-desk .app-viz-notes {
+        right: var(--app-viz-edge);
+        max-width: calc(50% - var(--app-viz-edge) - var(--app-viz-play-w) / 2 - var(--app-viz-gap));
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: var(--app-viz-notes-gap);
+        text-align: right;
+    }
+    .app-desk .app-viz-note { margin: 0; }
+}
+
+/* A finger on the visualizer too: an iPad on its side draws it (the frame's rule above), so its
+   controls are 44px where the pointer is coarse - the pickers' segments inside a well that much taller,
+   the Style and Leave buttons, the style list's options and play/pause - and what hangs under the
+   Style button ("now:" and "feel:", the list) hangs under the taller button. */
+@media (min-width: 1024px) and (pointer: coarse) {
+    :root {
+        --app-viz-control: var(--pl-hit);
+        --app-viz-well: calc(var(--pl-hit) + 2 * (var(--app-viz-well-pad) + var(--dw-hairline)));
+        --app-viz-option: var(--pl-hit);
+        --app-viz-play-h: var(--pl-hit);
+        --app-viz-play-w: 64px;           /* the board's shape round a finger's height */
+        --app-viz-readout-drop: 48px;     /* the button's 44px and the 4px under it */
+        --app-viz-list-drop: 50px;        /* the button's 44px and the 6px under it */
+    }
+}
+
+/* From 1280px the choices hold one row beside the song (the song taking only what they leave), and
+   there is room under the style button for what the visualizer hears ("now:" under Rotate all,
+   "feel:"); narrower, they wrap, and it isn't drawn. */
+@media (min-width: 1280px) {
+    .app-desk .app-viz-readout { display: flex; }
+}

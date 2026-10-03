@@ -214,7 +214,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    with the player inside them - see "The one app". player/deck.ts is the
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts) - see
                    "The turntable, part two".
-tests/             2202 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2207 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -3982,7 +3982,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
     found, its album in hand, since 2.0.0-player.13), ArtistPage (playTracks, Play and Shuffle with
     every album of theirs you have in hand) and Requests (playTracks, a Done row's ▶ with its album
     in hand), both since 2.0.0-player.17, PlayerBar (toggle, next, previous, showAirPlay - the
-    desktop's player bar, since 2.0.0-player.19), and `app/context.ts`, which names them and
+    desktop's player bar, since 2.0.0-player.19), Visualizer (toggle - the desktop visualizer's
+    play/pause, from its click or the Space key, since 2.0.0-player.20), and `app/context.ts`, which names them and
     calls none. Adding a file is a deliberate edit to the sim, like the Navidrome
     route list.
   - Nothing outside `app/` and `player/` imports usePlayer, the contexts or App.
@@ -6157,7 +6158,7 @@ later; "Managing links to / for now".
   (Go to album), previous, a round white play/pause and next, Now Playing's own scrubber (`Scrubber`,
   now exported - seek on release, keys; its clocks at its ends by `display: contents`, its thumb shown
   on hover, held or focus), AirPlay when there's a speaker, and Info. The visualizer's place is left
-  at the end of the tools, empty. "Nothing playing" holds its place with no song.
+  at the end of the tools, empty (filled in 2.0.0-player.20: the visualizer's button). "Nothing playing" holds its place with no song.
 - **The album you don't have, desktop** (`ReleaseGroupPage`'s `desktop`): the cover beside the title,
   Get FIRST and the pressing inline after it (the same one `class="app-rg-get"` app-rules counts), the
   store line under both, and the tracklist as a table (`DeskTracklist`: #, Title, Length, and an
@@ -6224,7 +6225,8 @@ later; "Managing links to / for now".
   ArtistPage and NowPlaying are edited only as layout needs (Home and ArtistPage not at all;
   AlbumPage not at all - its desktop header is CSS; NowPlaying exports `Scrubber`), so .18's rebase
   stays small.
-- **Not built, on purpose**: pins (.18, in parallel); the visualizer (later - its place is left);
+- **Not built, on purpose**: pins (.18, in parallel); the visualizer (later - its place is left; built in
+  2.0.0-player.20, see "The desktop visualizer");
   the turntable on a desktop; the desktop editor (S9, DesktopManage); the comparison table (rejected);
   "Mine / Everything in the store" (logins are off); the sidebar's "Needs a look" count, Settings and
   Log as their own items (one "Open the main page" link until the Managing slice); Lyrics and Queue in
@@ -6256,6 +6258,248 @@ later; "Managing links to / for now".
   pointer's 44px targets and taller bar); the group page's grid header at 1024-1279 and its row clear
   of a drawer; the grids' column count beside a panel; a source's facts wrapping; and the boards'
   exact spacing, which the CSS follows from the boards' numbers but nobody has seen drawn.
+
+### The desktop visualizer (2.0.0-player.20)
+
+James, deciding the one-app structure (2026-09-29 to 09-30): the desktop gets "some sort of cool
+fullscreen visualizer with a few options for effects" instead of a turntable. The spec is the session
+scratchpad's `uplan/slice-visualizer.md` (there is no slices.md section); the reference implementation
+is the canvas board `DesktopVisualizer.dc.html`, ported. Built beside 2.0.0-player.21 (editing an
+album on desktop, S9), which is rebased onto this. His decisions, each binding: effects Bars, Scope,
+Halo and Ambient ("stars is junk" - Stars was dropped); colours from the cover or purple; Ambient a
+family of styles from a dropdown or "Rotate all" in a FIXED order ("the style selector shouldn't be
+random, it should be consistent"); the ambient styles SHIFT AND FLOW, never pulse ("the mandala is
+still pulsing, I'd like it to not pulse, just to shift, and a little bit quicker"); the Mandala MORPHS
+like a kaleidoscope, never a crossfade; Waves fly toward you with the heading shifting; a Windows Media
+Player-like family from one parametric shader, our own code and names ("stick to our own" - no
+butterchurn or preset libraries); shapes follow the music's feel, speed its tempo.
+
+- **THE SILENT COPY - and why createMediaElementSource is banned, everywhere.** The player's audio
+  element is NEVER connected to Web Audio: a createMediaElementSource reroutes the song through Web
+  Audio, which breaks locked playback on an iPhone and puts processing between the file and the
+  speakers - James's rule is audio fidelity first, "the tap must be measured to change nothing".
+  `app-rules.sim.cjs` holds EVERY file under ui/src (the old page's included) to never naming it in
+  code. What the visualizer sees is its own copy (`player/vizAudio.ts`): the turntable's FLAC window
+  (`GET /deadwax/navidrome/scrub/{id}?at=&seconds=40[&max_rate=48000]`, `player/api.ts` scrubWindow -
+  the same route, untouched, cut from the very copy the page plays), decoded by decodeAudioData, played
+  by an AudioBufferSourceNode into an AnalyserNode and on into a GainNode at 0 - connected to the
+  destination only because a node nobody pulls is never run. Nothing of it is heard. app-rules pins
+  the chain (source -> analyser -> a gain of 0 -> the one connection to the destination - however it
+  is spelled: `destination` named once in the file, the gain written once, to 0) and that none
+  of the visualizer's eight files touches a media element. deck.ts, deckVoice.ts and Turntable.tsx are
+  untouched - the window logic is NOT shared: the deck's lives in its class beside the voice, and
+  pulling it out would have changed the turntable; the visualizer's is its own pure module.
+- **Keeping it in time** (`lib/vizSync.ts`, pure, `vizsync.sim.cjs`): each animation frame,
+  `planSync` takes what the element is doing (song, playing and not buffering, position) and what is
+  held (the decoded window, one on its way, the copy running and where it has got to) and answers
+  stop / start-at / fetch-from. Paused or stalled: stopped. Playing inside the window: started at the
+  playhead when none runs, it is another song's or window's (a fresh decode is taken up at once), or
+  it is more than DRIFT_S (0.25 s) from the element - a seek, a stall; left alone otherwise. Outside
+  the window, or within END_GUARD_S of its end: stopped. A window is VIZ_WINDOW_S (40 s) from
+  VIZ_BACK_S (2 s) before the playhead on a 2 s grid, asked again VIZ_AHEAD_S (6 s) before its end
+  (never past the song's end), one at a time (`pending`), and a refresh must move on from the window
+  it replaces - with the margins shrinking for a window deadwax cut short (a hi-res song's), so a
+  short window never asks for itself. A failure waits VIZ_RETRY_MS (10 s); a 415 or a window the
+  browser couldn't decode is refused for that song for this opening - each song's refusal, failure
+  and window length its own (`refused` and `failed` are lists, kept per song in the listener), so the
+  next song's never stands for this one's. **The next song's first window** (`prefetch`, the queue's
+  `nextIndex`) is asked in this one's last VIZ_AHEAD_S, once this one needs nothing and nothing is
+  on its way - even while this one can't be seen - and held as `ahead` until its song starts
+  (`takeAhead`): a gapless album's copy runs from the next song's first frame (the sim plays two
+  songs back to back). Not for a next song that isn't a FLAC, is refused, failed under 10 s ago or is
+  in hand. A skip or a seek still waits for its window. Only the newest fetch and the newest decode
+  count (two latestOnly()s, pinned).
+- **Cost**: 40 s fetched for every 32 s played while it shows (the sim plays a 4-minute song through
+  it: eight windows), plus one window of each next song. AND ON THE SERVER: a window is cut from the
+  MP4 the player's cache keeps (`_window_source`), so in a browser that plays the FLAC as it is -
+  Chrome, Firefox or Edge with Gapless off, the default, a CD-rate song - the first window of each
+  song has deadwax make that MP4: the whole song fetched from Navidrome again, kept in the cache and
+  counted against PLAYER_CACHE_MB, clearing the songs played longest ago (an iPhone's MP4s among
+  them) - and that first window waits for the make. Before this slice a Gapless-off desktop never
+  wrote to the cache for a CD-rate song. Found in review and DOCUMENTED, not changed (player.md "What
+  it listens to", troubleshooting.md, configuration.md's PLAYER_CACHE_MB): cutting a window straight
+  from the FLAC by range would be a new source for the scrub route - the turntable's too - and the
+  turntable was to stay exactly as it is. The prefetch hides the make's wait at a song change.
+- **"Can't be seen"**: not a FLAC, a window that can't be had, a refusal, no Web Audio - the effects
+  run from a calm idle signal (`idleSignal`: a soft slope across the bands and a gentle wave, changing
+  slowly, no beat) and one plain note at the bottom right says why ("This song can't be seen - it isn't
+  a FLAC file.", "...just now - deadwax couldn't send its sound.", "This browser can't analyse sound,
+  so the song can't be seen."), no error styling - kept to its corner (a max-width clear of play/pause
+  and so of the keys line at the left), a long one (deadwax's 415 reason for a FLAC it couldn't
+  repackage) wrapping there. A context still starting (a resume on its way) says
+  nothing; while a window is on its way the signal is silence. The feel is never read from the idle
+  signal - it holds, so an unseen song never reads as "smooth".
+- **Nothing needs a secure page** (James opens deadwax over plain http): an AudioContext, an
+  AnalyserNode, decodeAudioData and requestFullscreen all work there; no AudioWorklet. app-rules fails
+  on audioWorklet, AudioWorkletNode, randomUUID, crypto.subtle, clipboard, getUserMedia or a service
+  worker in any of the visualizer's files.
+- **The audio context** is made only in `wakeVisualizerAudio()`, called only from App's
+  `openVisualizer` - the player bar's click, the gesture a browser lets it run from (pinned: made only
+  there, the constructor looked up only there, nothing built from an expression, called from that one
+  handler - over the WHOLE file, the listener's methods included, and nothing else made with `new`
+  but typed arrays, maps and errors). Suspended while the page is hidden, resumed as it shows (and from a click or keyup in the
+  visualizer, for a browser that wants a gesture), closed as the visualizer closes. It is the
+  turntable's rule ("made in one place") widened to two: the deck's and this.
+- **The port of the board.** `lib/musicFeel.ts` is its musicFeel() and tempoFromOnsets() unchanged in
+  behaviour (onset density, centroid, high share, flatness, crest -> aggr; an 8 s onset envelope,
+  smoothed over 80 ms, autocorrelated 60-200 bpm with a 100-130 preference and the "faster reading wins
+  when dense" rule -> bpm, conf, tempo 0.65-1.5, beats halved into 0.9-2.2; silence or a pause below
+  the 0.03 floor holds EVERYTHING). `musicfeel.sim.cjs` drives it with the board's own three
+  synthetic songs - the "Mock signal", which ships nowhere else - taken across as a fixture: smooth
+  reads 0.00 (63 bpm), aggressive 0.86 (180, its fast pulse), the song that builds rises second by
+  second through 58-68 s and falls through 124-134; clicks at 90/120/150 and busy 8ths at 170 read
+  within 3 bpm. `lib/visualizer.ts` holds the rest of the pure maths: the effects and styles, the
+  rotation, the colours, feedbackStyles (Burst, Ribbons, Smoke, Rings, Embers - one shader, a set of
+  numbers each, the tempo scaling warp and drift), mandalaFlow/mandalaMorph, wavesCamera, liquidFlow,
+  hueStep, the signal's shaping and the size caps. `lib/vizShaders.ts` is the board's GLSL extracted
+  byte for byte (WebGL 1). `player/vizDraw.ts` is Bars, Scope, Halo and the plain Ambient in Canvas
+  2D, `player/vizGl.ts` the WebGL side (ping-pong feedback, two slots for a crossfade, a composite).
+  The board's fixed 1440x900 became "900 units high, as wide as the screen's shape": x positions keep
+  their share of the width, heights and radii are the board's.
+- **What a real song gives that the board's synthetic one knew**: the 64 bands come from
+  getByteFrequencyData (FFT 2048, -90..-22 dB, the analyser's own smoothing off - the effects smooth and
+  the feel needs the raw flux) through `bandLayout`/`bandsFromBins` (log-spaced 30 Hz-16 kHz; the
+  loudest bin a band covers, or read between bins for a band narrower than one); the waveform is the
+  last 28 ms of getFloatTimeDomainData as 384 points, through a slow automatic gain (so a quiet
+  recording still draws a line), tanh-limited and tapered; the KICK - the board's songs knew theirs -
+  is the low bands jumping above their own 0.25 s level, dying over 120 ms (`shapeSignal`).
+- **THE FIXED ROTATION** (`AMBIENT_STYLES`: mandala, waves, liquid, burst, ribbons, smoke, rings,
+  embers; `rotationTick`): Rotate all starts on the first, holds each HOLD_MS (30 s) of PLAYING time,
+  crossfades over FADE_MS (2.6 s) - the rotation itself lets the outgoing style go when the fade is
+  done (in the board the composite pass did) - never starts another mid-fade, wraps to the first. A
+  picked style holds; Rotate all again carries on from what shows with a fresh 30 s. app-rules fails on
+  Math.random or getRandomValues in any of the visualizer's files; `visualizer.sim.cjs` holds the order,
+  the 30 s steps, the paused time, the fade, two runs identical.
+- **Colours**: `coverPalette` reads the playing album's cover (fetched as bytes and decoded by
+  createImageBitmap - no image element - drawn 40x40): its strongest hues, each with its neighbours'
+  colour, put in hue order from the widest gap, made vivid (saturation 0.45, value 0.78 at least); a
+  black-and-white cover is a ramp of its own grey; no opaque pixels or no cover yet -> the purple. The
+  Mandala's five parts are derived from it (`rolesFrom`); in purple they are the board's. Halo's record
+  is the album's CD art (the turntable's `/library/disc_art/navidrome`) when deadwax has it, else a
+  black record with the COVER as its label - the board's prism stand-in made real.
+- **The screen** (`player/Visualizer.tsx`): drawn by App over everything (`<Visualizer
+  open={visualizerShown} ... />`, `visualizerShown = desktop && visualizing`; the screen and every part
+  of it exist only while open). requestFullscreen on its own element (and the webkit spelling);
+  refused, it is already a fixed layer over the window (z 50, over the pin notice's 40). Escape, Leave
+  full screen, or leaving full screen (fullscreenchange after it was entered) closes it; focus goes in
+  as it opens and back to the player bar's button as it closes (again once the browser has left full
+  screen - until then Chromium keeps the page inert); Tab stays inside it; everything behind
+  it is inert while it shows (`covered` gained `|| visualizerShown` - and a desktop's Sources or Info
+  panel left open beside it, outside that wrapper, takes `covered={visualizerShown}` as Now Playing
+  takes what is over it); nothing behind it counts as watched (`watchingOf` gets `sheetOpen: sheetOpen
+  || (desktop && visualizing)`, so Requests' 500 ms poll stops under it); the page behind doesn't
+  scroll (`html.app-viz-open`, its own lock class, as each sheet has); a window narrowed to a phone's
+  width closes it (in the crossing effect's Info branch) and it never reopens by itself. Its chrome is
+  the board's - the song (cover, title, artist, album), the effect picker, the Style dropdown (only for
+  Ambient with WebGL; "now:" and "feel:" under it from 1280px), the colours, Leave full screen,
+  play/pause, the keys line, and the notes - fading after CHROME_IDLE_MS (3 s) of stillness while
+  playing (never paused, over the controls or with the list open), the pointer hidden with it - and
+  back on a move, a key or a PRESS: a tap on a touch screen fires no pointermove, so a still tap never
+  woke it (an iPad on its side is a desktop frame); a press that wakes it has its click swallowed
+  (`onClickCapture` within WAKE_CLICK_MS), so a tap where a hidden control was presses nothing. Space
+  plays or pauses - `player.toggle()` called only in `onToggle`, from the button's click and the
+  key, nothing awaited, a held key's repeats ignored (`event.repeat`: they played and paused it at the
+  repeat rate), the file on app-rules' allowlist for `toggle` alone; V / Shift+V the effects. Focus
+  never falls out of it: in Chromium a clicked button takes focus, and the style list's option (as the
+  list closes) or the Style button (as Ambient goes) left it on <body>, where the root's key handlers
+  never ran - Space, V and the fallback layer's Escape all dead until a click. A layout effect after
+  every render puts focus back on the root when it is outside; a pick or Escape gives it to the Style
+  button. The list is a listbox: it opens on the chosen style; the arrows, Home and End move in it.
+  The cover's colours and Halo's record are asked for only as their own address changes (not per
+  song), the last kept until the next has come - they flashed to purple and a plain record at every
+  song change - and a CD-art 404 isn't asked again this opening.
+  NOT drawn, on purpose: the board's previous/next, seek bar and Sensitivity slider (the spec lists
+  the chrome without them, and only the toggle is allowed - skip and seek stay the player bar's).
+- **Choices per device** (`state/persisted.ts`; configuration.md's per-device table, now nine
+  settings): `deadwax-player-viz-effect`, `-colours`, `-style`,
+  each validated against what is offered; anything else is the board's opening - Ambient, From the
+  cover, the Mandala. persisted.ts spells the lists out rather than importing lib/visualizer.ts: it is
+  shared by the main page's bundle, and the import put the visualizer's tables in the chunk both
+  entries load (seen in a local rolldown build); `visualizer.sim.cjs` holds every effect, colour and
+  style offered to reading back as itself.
+- **Cost on screen**: the frame loop runs only while it shows and the page is visible (hidden: stopped
+  and the context suspended - pinned); the 2D canvas is drawn at no more than 2880x1800 pixels and
+  the WebGL at no more than 1800x1125 (`backingScale`, MAX_2D_PIXELS and MAX_GL_PIXELS: a 1440x900
+  laptop at 2x is sharp, a 5K screen isn't asked for 5K); the WebGL context is let go on close. No
+  WebGL (or a shader that won't build) -> Ambient is the board's plain 2D version, said in one line
+  while Ambient shows (tried once per opening).
+  **Reduced Motion**: every clock at CALM_PACE (0.35), the bands rising and falling slowly, no kick,
+  the tempo held under 0.8 - a calm, slow version, stated in the guide.
+- **Style**: the colours are theme.css section 10's `--dw-viz-*`, the sizes `--app-viz-*` in
+  app-desktop.css's own block at its end (every rule from 1024px under `.app-desk`, as the frame's);
+  `test_app_desktop_css.py` holds the layer, the fade (a token on section 7's duration, so reduced
+  motion collapses it), the pointer only on controls, the wrap below 1280 and the readout from it.
+  The song is `flex: 1 1 0` (with its 200px minimum) and the choices `0 1 auto`: the song takes what
+  the choices leave, so they hold one row wherever that minimum allows - from 1280px always. Both at
+  `0 1 auto` shrank in proportion, and a long title (a classical movement) wrapped the choices at 1280
+  and over, "feel:" drawing over Leave full screen. A coarse pointer gets a finger's targets in a
+  coarse block of its own AFTER the visualizer's (the frame's earlier one would lose to it): the
+  pickers' well, Style, Leave, the options and play/pause at 44px, the readout and the list hung
+  under the taller button.
+- **Verified**: 2207 Python tests (five new in `test_app_desktop_css.py`, the visualizer's lock in
+  `test_app_css.py`), pyflakes, tsc, and all 40 sims (`musicfeel` 28, `vizsync` 54 and `visualizer` 72
+  new; `app-rules` 206 - the visualizer's section, the allowlist, `covered`, the context made in two
+  places). 68 mutations, one or more per
+  rule pinned, each restored byte for byte: 65 caught at once; three first got past and gained checks
+  - a context built from an expression (`new (contextClass())()`, past the `new Context(` regex), the
+  envelope's 80 ms smoothing (the board's songs read the same without it; a busy 8th-note click reads
+  half-time), and the song check on a running copy (window numbers never repeat, so the case is
+  defensive). The engine guard is empty and `player.sim.cjs`, `deck.sim.cjs` and `turntable.sim.cjs`
+  pass untouched.
+- **After review** (27 findings, merged to 19, every one fixed or documented): the server-side cost
+  above (documented); Space's repeats; a tap waking the controls, and the tap only waking them; focus
+  falling to <body>; the panels and the poll behind it; the pictures flashing per song; the next
+  song's window fetched ahead; the song/choices row and the note's corner; coarse targets; the scroll
+  lock; configuration.md's three per-device rows ("nine settings"); "Rotate all" carrying on rather
+  than "always starting on the Mandala" in the guide; and the tests that claimed more than they held,
+  strengthened - app-rules' context pin over the WHOLE vizAudio.ts (a method making `new C()` got
+  past the function scan), the destination named once and the gain written once (other spellings got
+  past), `visualizer.sim`'s tempo scaling on Smoke (Burst's turbulence and drift are 0), Liquid's
+  travel against the bass and the waveform's exact 4x cap, `vizsync.sim` holding each song's refusal,
+  failure, span, pending and held window to their own song, `musicfeel.sim`'s word edges and neutral
+  110 bpm pace. 50 mutations of the fixes and the strengthened checks (the sims) and 6 of the CSS
+  (the Python tests), each restored byte for byte: all 56 caught. One more found while checking them:
+  closed while still full screen (Leave full screen, V..., an Escape the page gets), focus never went
+  back to the player bar's button - Chromium keeps everything outside the full-screen element inert
+  until it has left, so it goes back again on that `fullscreenchange` (FULL_SCREEN_LEAVE_MS at most).
+  **Checked in headless Brave** (driven over `--remote-debugging-pipe`, no port, with real mouse, key
+  and touch input, against a file:// harness of the real Visualizer, the real stylesheets and a fake
+  player - no server): the list opening on the chosen style, the arrows and End in it, a mouse pick
+  leaving focus on the Style button and Space and V working after it, V leaving Ambient with focus
+  kept, a held Space toggling once, the page behind not scrolling (full screen and refused), a still
+  click and a still TAP on play/pause bringing the controls back and pressing nothing (the second
+  pressing it), Escape and Leave full screen closing it with focus back on the opener, Escape after a
+  pick in the refused layer, a long title keeping the choices to one row at 1280 and 1440 with "feel:"
+  over nothing (two rows and the song at 200px at 1024), and a long note wrapping in its corner clear
+  of the keys and of play/pause at 1024 and 1440 - 30 checks.
+- **Verified in the real page** (headless Brave against the stubs on :8081, real mouse and keys,
+  42 checks, then again on `http://deadwax.test:8081`, not a secure context - 42 there too): it opens
+  from the bar into real full screen covering the window, the page behind inert and focus inside; the
+  silent copy fetches a scrub window and the picture moves; a FLAC is seen; Bars, Scope, Halo and
+  Ambient each chosen and moving; the list offering the eight styles and Rotate all, Escape in it
+  closing only the list; every style picked by mouse with focus kept and moving; Rotate all saying
+  "now:" and "feel:" at 1440; Purple; the controls fading after a still moment while playing and back
+  on a move; Space pausing and playing with nothing but `pause` reaching the element (no waiting,
+  seeking or emptied) and one audio element throughout; V to the next effect; Escape and Leave full
+  screen closing it with focus back on the bar's button and the song carrying on; everything inside the
+  window at 1280 and 1024; no button on a phone; no console errors. The phone screens matched .19's
+  (the group page's Archive cover arrives from a different archive.org mirror run to run).
+  **The Mandala tore** along the left horizontal whenever its mirror count was between whole numbers
+  - every morph from one count to the next. The board's shader added the spin and twist AFTER
+  `atan`, which moved atan's wrap at +-pi off a mirror line; the fold is even, so measured from a
+  plane turned first (`rot(spin + twist) * w`, then `atan`) it meets itself there and whole counts draw
+  exactly as before. Measured by comparing the rows 3px either side of the centre line on the left
+  with the same rows on the right over 24 frames: up to 6.5x more difference on the left before, 1.35x
+  at most after. `visualizer.sim.cjs` pins the turned measurement and shows the old way jump at 6.5
+  mirrors (it fails with the old line put back).
+- **NOT verified here**: that a real FLAC's analysis looks like the board's synthetic songs (the dB
+  range and the kick were chosen, not tuned against James's music - the stub library is tones);
+  WebKit's requestFullscreen from the layout effect after the click (Chrome and Firefox allow it for
+  5 s after a click); an iPad on its side, which is a desktop frame and so draws the button - whether a
+  second AudioContext there leaves the element's playback as it was is unknown, and whether WebKit's
+  synthetic click after a waking tap lands inside WAKE_CLICK_MS; the next song's window arriving
+  before a real gapless join; a song that can't be seen (the stub library is all FLAC; the sims hold
+  it); and how it feels with James's music.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -7617,7 +7861,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2202 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2207 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -7650,7 +7894,7 @@ node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream 
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
 node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player, Now Playing opens as and its key, Pause winds the record down and its key
 node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history; the desktop frame (panels over sheets, a drawer over the page, the sidebar's moves, the Library's store, useFrame against a fake matchMedia)
-node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin
+node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin; the visualizer - no createMediaElementSource anywhere, its silent copy's chain however spelled, its toggle from the click (a held Space's repeats ignored), its context only from the bar's click, nothing secure-only or random, a press waking it and nothing more, focus kept in it, the panels inert and the poll stopped behind it, its scroll lock, its pictures per address
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
 node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions, Getting albums and their store (seeded once, asked again, saves in turn)
 node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Navidrome sent
@@ -7667,6 +7911,9 @@ node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physi
 node ui/test/artist.sim.cjs     # the artist page's order and who-is-who (Navidrome's artist <-> MusicBrainz's), Library > Artists' sort, the id bridge's "Also" chips, "This pressing" and the folder; the page rendered - rows drawn once with steady keys, Play waiting for the library, a few albums at a time, the session's answers, late lookups opening nothing
 node ui/test/home.sim.cjs       # Home finished - "Not played in a while" (more than 30 days, oldest first, up to 20, none under 4 or without played), Pinned first then Recently added then Not played, the shelves waiting for the pins (counted while Home shows), all in the gate
 node ui/test/pins.sim.cjs       # pins - which pin is the thing on screen (names folded as the server folds them), a card's words, what a toggle sends, Edit's operations and the drag; the store (asked when asked, changes in turn, Edit's PUT with known, refusals put back and said where made); Pinned and its Edit rendered (focus kept, Not saved under the list); the notice; the pin control
+node ui/test/musicfeel.sim.cjs  # the desktop visualizer's feel and tempo - the board's three synthetic songs (smooth, aggressive, one that builds), click tracks, silence holding everything, the neutral pace, the words' edges
+node ui/test/vizsync.sim.cjs    # the visualizer's silent copy kept in time - started, paused, re-synced past 0.25 s, the next window asked ahead, each song's state its own, the next song's first window fetched ahead, a whole song and two songs back to back through a fake copy
+node ui/test/visualizer.sim.cjs # the visualizer's pure parts - the FIXED rotation order, the choices kept per device, the cover's colours, the bands and waveform, the idle signal, the size caps
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -7687,7 +7934,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2202 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2207 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

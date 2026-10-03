@@ -70,6 +70,7 @@ export function InfoSheet({
   details = null,
   onArtist = null,
   panel = 'sheet',
+  covered = false,
 }: {
   open: boolean
   opener?: { current: HTMLElement | null } | undefined
@@ -88,6 +89,9 @@ export function InfoSheet({
   onArtist?: ((artist: { id: string; name: string }) => void) | null
   /** how it is drawn: a sheet over Now Playing (a phone), or a desktop's side panel */
   panel?: PanelStyle
+  /** something over the whole screen - the desktop's visualizer (2.0.0-player.20): a panel left open
+   *  under it is inert, and out of what a screen reader can reach, until it goes */
+  covered?: boolean
 }) {
   const modal = panelIsModal(panel)
   const done = useRef<HTMLButtonElement>(null)
@@ -95,7 +99,7 @@ export function InfoSheet({
   const box = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<InfoTab>('about')
   const drawn = useRef<Drawn>({ about: null, debug: null })
-  useSheet({ open, onClose, lockClass: 'app-info-open', first: done, opener, modal, area: box })
+  useSheet({ open, covered, onClose, lockClass: 'app-info-open', first: done, opener, modal, area: box })
 
   //? the list from its top, whichever song and tab it opens on - Format and Sent as, not the end
   useLayoutEffect(() => {
@@ -140,7 +144,7 @@ export function InfoSheet({
   }
 
   return (
-    <div class={`app-layer app-info-layer${open ? ' is-open' : ''}${modal ? '' : ` is-panel is-${panel}`}`} aria-hidden={!open} inert={!open}>
+    <div class={`app-layer app-info-layer${open ? ' is-open' : ''}${modal ? '' : ` is-panel is-${panel}`}`} aria-hidden={!open || covered} inert={!open || covered}>
       <div class="app-backdrop" onClick={onClose} />
       {/* a panel's box takes focus from a click on anything in it that can't (its heading, and in
           Safari a tab), so Escape there is still from inside it */}

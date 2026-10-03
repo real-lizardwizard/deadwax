@@ -1,5 +1,5 @@
 import { Cover } from './Cover'
-import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from './icons'
+import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, VisualizerIcon } from './icons'
 import { Scrubber } from './NowPlaying'
 import type { Player } from './usePlayer'
 
@@ -13,11 +13,12 @@ import type { Player } from './usePlayer'
  *  - in the middle, previous, a round play or pause, next, and under them the scrubber - Now
  *    Playing's own (it seeks as the pointer lets go or a key steps, never on the way), its two
  *    clocks at its ends;
- *  - at the right, AirPlay when there is a speaker to send to, and Info, which opens Info as the
- *    side panel (and closes it). The full-screen visualizer James wants on a desktop comes in a
- *    later slice, at the end of this row; nothing is drawn for it until there is something for it to
- *    open. There is no turntable on a desktop (James: "I don't think it makes a lot of sense on
- *    desktop").
+ *  - at the right, AirPlay when there is a speaker to send to, Info, which opens Info as the side
+ *    panel (and closes it), and - since 2.0.0-player.20, at the end of the row as DesktopLibrary.dc.html
+ *    draws it - the full-screen visualizer (player/Visualizer.tsx), which App opens from its click:
+ *    the click is the gesture its audio context and full screen need. There is no turntable on a
+ *    desktop (James: "I don't think it makes a lot of sense on desktop") - the visualizer is the
+ *    desktop's.
  *
  * Its transport calls the player straight from the click - nothing awaited, the gesture rule
  * (ui/test/app-rules.sim.cjs allows this file toggle, next, previous and showAirPlay). With nothing
@@ -28,6 +29,7 @@ export function PlayerBar({
   onAlbum,
   onInfo,
   infoOpen,
+  onVisualizer,
 }: {
   player: Player
   /** "Artist — Album": the song's album, on the tab showing; null when the song names none */
@@ -36,6 +38,8 @@ export function PlayerBar({
   onInfo: (event: MouseEvent) => void
   /** the Info panel is showing */
   infoOpen: boolean
+  /** the visualizer's click - the event, so App can take the button as what focus goes back to */
+  onVisualizer: (event: MouseEvent) => void
 }) {
   const track = player.track
   if (!track) {
@@ -102,8 +106,9 @@ export function PlayerBar({
         >
           <InfoIcon class="app-playbar-icon" />
         </button>
-        {/* the full-screen visualizer's place, at the end of this row (a later slice): nothing until
-            there is something for it to open */}
+        <button type="button" class="app-playbar-button" onClick={onVisualizer} aria-label="Full-screen visualizer">
+          <VisualizerIcon class="app-playbar-icon" />
+        </button>
       </div>
     </section>
   )

@@ -712,10 +712,13 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 /* ===== what opens over Now Playing: its menu, and Info ===== */
 
 /* Each sheet stops the page behind scrolling with a class of its own on <html> (useSheet.ts), as
-   Now Playing does with pl-sheet-open: whichever closes first takes only its own away. */
+   Now Playing does with pl-sheet-open: whichever closes first takes only its own away. The desktop's
+   visualizer (2.0.0-player.20, player/Visualizer.tsx) takes its own too: a key it doesn't use would
+   otherwise scroll the page unseen, and in its fixed layer the page's scrollbar would show. */
 html.app-menu-open,
 html.app-info-open,
-html.app-sources-open { overflow: hidden; }
+html.app-sources-open,
+html.app-viz-open { overflow: hidden; }
 
 /* the whole screen: a dimmed backdrop, which closes on a tap, and the sheet over it. Hidden - and
    inert - while closed; visibility waits for the slide down to finish */

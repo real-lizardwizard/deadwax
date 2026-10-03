@@ -19,6 +19,8 @@ import { Library } from '../player/Library'
 import { MiniPlayer } from '../player/MiniPlayer'
 import { NowPlaying } from '../player/NowPlaying'
 import { PlayerBar } from '../player/PlayerBar'
+import { Visualizer } from '../player/Visualizer'
+import { wakeVisualizerAudio } from '../player/vizAudio'
 import { deckReport, onDeckReport, resumeDeckAudio } from '../player/deck'
 import { usePlayer, type Player } from '../player/usePlayer'
 import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerWindDown } from '../state/persisted'
@@ -166,6 +168,14 @@ function usePageShown(): boolean {
  * you asked for. The sidebar's search field is Search's own box (searchBox.ts): typing in it shows
  * Search's results at its root; its Managing shows unless deadwax says this user isn't an admin
  * (`/deadwax/me`, asked as the desktop frame shows, as You asks it for its own row).
+ *
+ * THE VISUALIZER (2.0.0-player.20, player/Visualizer.tsx): the desktop's full-screen visualizer, opened
+ * from the player bar's button and drawn over everything - on a desktop only, closed as the window
+ * crosses back to a phone's width. Its audio context is made in that click (openVisualizer: the gesture
+ * a browser wants), and it analyses a silent copy of the song, never the player's own element. While
+ * it shows, everything behind it is inert - the page, and a desktop's Sources or Info panel left open
+ * beside it (`covered`) - and nothing behind it counts as watched (the downloads' fast poll stops, as
+ * it does behind Now Playing).
  */
 export function App() {
   const player = usePlayer()
@@ -286,9 +296,13 @@ export function App() {
     if (nav.tab === 'search') setSearchSeen(true)
   }, [nav.tab])
 
-  //? What's showing, as far as the downloads go: a tab's ROOT, with Now Playing not over it
+  //? the desktop's visualizer showing (2.0.0-player.20) - see openVisualizer below
+  const [visualizing, setVisualizing] = useState(false)
+
+  //? What's showing, as far as the downloads go: a tab's ROOT, with Now Playing not over it - nor the
+  //? desktop's visualizer, which covers the whole screen as Now Playing does a phone's
   const pageShown = usePageShown()
-  const watching = watchingOf({ shown: pageShown, tab: nav.tab, depth: nav.stacks[nav.tab].length, sheetOpen })
+  const watching = watchingOf({ shown: pageShown, tab: nav.tab, depth: nav.stacks[nav.tab].length, sheetOpen: sheetOpen || (desktop && visualizing) })
   //? a failed look while something was on its way: keep asking until deadwax answers (stallsOn)
   const [stalled, setStalled] = useState(false)
   const downloads = useDownloadJobs(watching === 'requests' || stalled)
@@ -459,6 +473,17 @@ export function App() {
   }, [])
   const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
 
+  //? The desktop's visualizer (2.0.0-player.20): the player bar's button opens it - its audio context
+  //? made in this click, the gesture a browser lets it run from - and focus goes back to that button
+  //? as it closes
+  const visualizerOpener = useRef<HTMLElement | null>(null)
+  const openVisualizer = useCallback((event: MouseEvent) => {
+    visualizerOpener.current = takeOpener(event)
+    wakeVisualizerAudio()
+    setVisualizing(true)
+  }, [])
+  const closeVisualizer = useCallback(() => setVisualizing(false), [])
+
   //? Crossing into the other frame (lib/appFrame.ts closesOnCrossing): into the desktop, Now Playing
   //? and what is over it close - the desktop's player is its bar; back to the phone, the Info panel.
   //? The Sources sheet stays open across, a panel on one side and a sheet on the other.
@@ -476,6 +501,8 @@ export function App() {
     if (closes.infoPanel) {
       infoOpener.current = null
       setInfoPanel(false)
+      //? the visualizer is a desktop's: a phone's width closes it, and it doesn't come back by itself
+      setVisualizing(false)
     }
   }, [frame])
 
@@ -696,7 +723,9 @@ export function App() {
   const infoDetails = useInfoDetails(infoOpen, playing, playedFrom)
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows; a desktop's
   //? side panel leaves the page beside it as it is
-  const covered = !desktop && (sheetOpen || sourcesOpen)
+  //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
+  const visualizerShown = desktop && visualizing
+  const covered = (!desktop && (sheetOpen || sourcesOpen)) || visualizerShown
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)
   const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel })
@@ -750,14 +779,14 @@ export function App() {
 
             {/* the player: the mini player over the tab bar, or a desktop's player bar */}
             {desktop ? (
-              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} />
+              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} onVisualizer={openVisualizer} />
             ) : (
               <MiniPlayer player={player} onOpen={openSheet} />
             )}
             {!desktop && <TabBar current={nav.tab} onSelect={chooseTab} arriving={view.arriving.length} />}
           </div>
           {/* a Get's sources (2.0.0-player.15): over the page, under Now Playing's menu and Info - a desktop's side panel */}
-          <Sources open={sourcesOpen} request={getting} opener={sourcesOpener} onClose={closeSources} onQueued={gotten} panel={panel} />
+          <Sources open={sourcesOpen} request={getting} opener={sourcesOpener} onClose={closeSources} onQueued={gotten} panel={panel} covered={visualizerShown} />
           <NowPlaying
             player={player}
             open={sheetOpen}
@@ -793,9 +822,12 @@ export function App() {
             details={infoDetails}
             onArtist={toArtist}
             panel={panel}
+            covered={visualizerShown}
           />
           {/* what became of a pin, said over everything (2.0.0-player.18) */}
           <PinNotice />
+          {/* the desktop's full-screen visualizer, over everything (2.0.0-player.20) */}
+          <Visualizer open={visualizerShown} player={player} opener={visualizerOpener} onClose={closeVisualizer} />
         </div>
       </ActionsContext.Provider>
     </PlayerContext.Provider>

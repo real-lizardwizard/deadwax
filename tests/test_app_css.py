@@ -281,7 +281,7 @@ def px(token: str) -> float:
 
 def test_each_sheet_has_its_own_scroll_lock():
     assert declarations(PLAYER_CSS, "html.pl-sheet-open")["overflow"] == "hidden"
-    for lock in ("html.app-menu-open", "html.app-info-open", "html.app-sources-open"):
+    for lock in ("html.app-menu-open", "html.app-info-open", "html.app-sources-open", "html.app-viz-open"):
         assert declarations(APP, lock)["overflow"] == "hidden", lock
     #? the classes the sheets put on <html> are exactly these four (Sources since 2.0.0-player.15)
     ui = Path(__file__).resolve().parent.parent / "ui" / "src"
@@ -289,6 +289,10 @@ def test_each_sheet_has_its_own_scroll_lock():
               "app/Sources.tsx": "app-sources-open"}
     for file, lock in sheets.items():
         assert f"lockClass: '{lock}'" in (ui / file).read_text(), file
+    #? the desktop's visualizer (2.0.0-player.20) isn't a sheet, and puts its own on as it shows
+    visualizer = (ui / "player" / "Visualizer.tsx").read_text()
+    assert "export const SCROLL_LOCK = 'app-viz-open'" in visualizer
+    assert re.search(r"page\.classList\.add\(SCROLL_LOCK\)\s*return \(\) => page\.classList\.remove\(SCROLL_LOCK\)", visualizer)
 
 
 def test_infos_scroller_opts_out_of_now_playings_touch_action():

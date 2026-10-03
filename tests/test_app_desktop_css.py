@@ -24,12 +24,20 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   hides; the pressing never wider than its row; a source's facts never over each other; the grids
   keeping a cover's size beside a third column; the album you don't have's Get and pressing under
   its cover, clear of a drawer, until 1280px; and a panel's box focusable by a click, with no ring.
+- The full-screen visualizer (2.0.0-player.20) as DesktopVisualizer.dc.html draws it: a fixed layer
+  over the whole window and over everything the app draws, its canvases filling it (one hidden by the
+  attribute); its controls over a scrim at the top and the foot, taking the pointer only where there is
+  a control, fading together - the pointer too - as the screen goes still, in about half a second (and
+  at once under reduced motion); the song taking only what the choices leave, so they keep one row
+  from 1280px and wrap only at a narrow desktop, leaving "now:" and "feel:" out until 1280px; play/pause
+  a primary button at the foot; a note at the foot kept to its corner, clear of play/pause and the keys;
+  and its controls a finger's size where the pointer is coarse.
 """
 
 import re
 from pathlib import Path
 
-from tests.test_app_css import LOOK_PROPERTIES, RAW_LENGTH, declarations, rules
+from tests.test_app_css import LOOK_PROPERTIES, RAW_LENGTH, declarations, rules, tokens
 
 REPO = Path(__file__).resolve().parent.parent
 DESKTOP = (REPO / "interface" / "player" / "app-desktop.css").read_text()
@@ -291,3 +299,102 @@ def test_the_album_you_dont_have_keeps_get_and_the_pressing_clear_of_a_drawer():
 def test_a_panels_box_takes_focus_without_a_ring():
     for selector in (".app-desk .app-layer.is-panel .app-sources:focus", ".app-desk .app-layer.is-panel .app-info:focus"):
         assert declarations(DESKTOP, selector, DESK)["outline"] == "none", selector
+
+
+def test_the_visualizer_is_the_whole_screen_over_everything():
+    layer = declarations(DESKTOP, ".app-desk .app-viz", DESK)
+    assert (layer["position"], layer["inset"], layer["overflow"], layer["background"]) == ("fixed", "0", "hidden", "var(--dw-viz-bg)")
+    desk = media_tokens(DESKTOP, DESK)
+    assert layer["z-index"] == "var(--app-z-viz)"
+    #? over the pin notice (40), the highest thing the app draws, and so over Now Playing's sheets and a panel
+    assert int(desk["--app-z-viz"]) > int(tokens(APP)["--app-z-notice"])
+    assert declarations(DESKTOP, ".app-desk .app-viz:focus", DESK)["outline"] == "none"
+    canvas = declarations(DESKTOP, ".app-desk .app-viz-canvas", DESK)
+    assert (canvas["position"], canvas["inset"], canvas["width"], canvas["height"]) == ("absolute", "0", "100%", "100%")
+    #? the 2D canvas or the WebGL one, by the attribute - a display rule of its own must not undo it
+    assert declarations(DESKTOP, ".app-desk .app-viz-canvas[hidden]", DESK)["display"] == "none"
+    #? the board's own colours
+    theme = tokens(THEME)
+    assert (theme["--dw-viz-bg"], theme["--dw-viz-well"], theme["--dw-viz-artist"]) == ("#050408", "rgba(13, 12, 18, 0.74)", "#c9c9d6")
+
+
+def test_the_visualizers_controls_fade_together_and_take_the_pointer_only_where_there_is_one():
+    chrome = declarations(DESKTOP, ".app-desk .app-viz-chrome", DESK)
+    assert (chrome["pointer-events"], chrome["opacity"]) == ("none", "var(--app-viz-shown)")
+    assert chrome["transition"] == "opacity var(--app-viz-fade) var(--ease-out)"
+    #? about half a second, built on section 7's duration so reduced motion collapses it
+    assert media_tokens(DESKTOP, DESK)["--app-viz-fade"] == "calc(var(--duration-slow) * 1.8)"
+    assert declarations(DESKTOP, ".app-desk .app-viz.is-still .app-viz-chrome", DESK)["opacity"] == "var(--app-viz-hidden)"
+    assert (media_tokens(DESKTOP, DESK)["--app-viz-shown"], media_tokens(DESKTOP, DESK)["--app-viz-hidden"]) == ("1", "0")
+    assert declarations(DESKTOP, ".app-desk .app-viz [data-chrome]", DESK)["pointer-events"] == "auto"
+    assert declarations(DESKTOP, ".app-desk .app-viz.is-still [data-chrome]", DESK)["pointer-events"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-viz.is-still", DESK)["cursor"] == "none"
+    #? the scrims the board draws behind the controls
+    assert declarations(DESKTOP, ".app-desk .app-viz-scrim.is-top", DESK)["background"] == "var(--dw-viz-scrim-top)"
+    assert declarations(DESKTOP, ".app-desk .app-viz-scrim.is-bottom", DESK)["background"] == "var(--dw-viz-scrim-bottom)"
+
+
+def test_the_visualizers_choices_wrap_at_a_narrow_desktop_and_the_readout_waits_for_1280():
+    top = declarations(DESKTOP, ".app-desk .app-viz-top", DESK)
+    assert (top["display"], top["justify-content"], top["left"], top["right"]) == ("flex", "space-between", "var(--app-viz-edge)", "var(--app-viz-edge)")
+    #? the song takes only what the choices leave (its basis 0, growing into the rest) and never goes
+    #? under its minimum: a long title is cut short, while the choices - their own size - keep one row
+    #? wherever that minimum leaves them room. Shrinking both in proportion (`0 1 auto` on each) let a
+    #? long title wrap the choices at 1280px and over, and "feel:" then drew over Leave full screen.
+    song = declarations(DESKTOP, ".app-desk .app-viz-song", DESK)
+    assert (song["flex"], song["min-width"]) == ("1 1 0", "var(--app-viz-song-min)")
+    assert declarations(DESKTOP, ".app-desk .app-viz-tools", DESK)["flex"] == "0 1 auto"
+    #? ...and from 1280px that is always so: the edges, the gap, the song's minimum and the widest the
+    #? choices get (Ambient, "Style: Rotate all": about 833px at the board's sizes) fit
+    desk = media_tokens(DESKTOP, DESK)
+    px = lambda token: int(re.match(r"(\d+)px", desk[token]).group(1))
+    assert constant("COLUMN_MIN") - 2 * px("--app-viz-edge") - px("--app-viz-top-gap") - px("--app-viz-song-min") >= 850
+    assert declarations(DESKTOP, ".app-desk .app-viz-title", DESK)["text-overflow"] == "ellipsis"
+    tools = declarations(DESKTOP, ".app-desk .app-viz-tools", DESK)
+    assert (tools["flex-wrap"], tools["justify-content"]) == ("wrap", "flex-end")
+    assert declarations(DESKTOP, ".app-desk .app-viz-readout", DESK)["display"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-viz-readout", COLUMN)["display"] == "flex"
+    #? the segmented pickers and the style list as the board draws them
+    assert declarations(DESKTOP, ".app-desk .app-viz-segment.is-on", DESK)["background"] == "var(--dw-toggled-bg)"
+    assert declarations(DESKTOP, ".app-desk .app-viz-option.is-on", DESK)["background"] == "var(--dw-selection-bg)"
+    assert media_tokens(DESKTOP, DESK)["--app-viz-list"] == "190px"
+    play = declarations(DESKTOP, ".app-desk .app-viz-play", DESK)
+    assert (play["background"], play["width"], play["height"]) == ("var(--dw-primary-bg)", "var(--app-viz-play-w)", "var(--app-viz-play-h)")
+
+
+def test_a_note_at_the_visualizers_foot_keeps_to_its_corner():
+    """Why a song can't be seen is deadwax's own words after the dash, and can run long (a FLAC it
+    couldn't repackage, with the reason): kept to the right of play/pause, it wraps in its corner rather
+    than running across the foot over the keys at the left or under the button."""
+    notes = declarations(DESKTOP, ".app-desk .app-viz-notes", DESK)
+    assert notes["right"] == "var(--app-viz-edge)"
+    assert notes["max-width"] == "calc(50% - var(--app-viz-edge) - var(--app-viz-play-w) / 2 - var(--app-viz-gap))"
+    assert notes["text-align"] == "right"
+    assert "white-space" not in declarations(DESKTOP, ".app-desk .app-viz-note", DESK)
+    #? the keys at the left, on the same line, are on the other side of the middle
+    assert declarations(DESKTOP, ".app-desk .app-viz-hint", DESK)["left"] == "var(--app-viz-edge)"
+
+
+def test_the_visualizers_controls_are_a_fingers_where_the_pointer_is_coarse():
+    """An iPad on its side draws the visualizer (its button is in the bar, 44px there): its own controls
+    are 44px too - the pickers' segments (a well that much taller round them), Style and Leave full
+    screen, the style list's options, play/pause - and the readout and the list hang under the taller
+    button, not over it."""
+    coarse = media_tokens(DESKTOP, COARSE)
+    for token in ("--app-viz-control", "--app-viz-option", "--app-viz-play-h"):
+        assert coarse[token] == "var(--pl-hit)", token
+    assert coarse["--app-viz-well"] == "calc(var(--pl-hit) + 2 * (var(--app-viz-well-pad) + var(--dw-hairline)))"
+    assert declarations(DESKTOP, ".app-desk .app-viz-segmented", DESK)["height"] == "var(--app-viz-well)"
+    assert declarations(DESKTOP, ".app-desk .app-viz-button", DESK)["height"] == "var(--app-viz-control)"
+    assert declarations(DESKTOP, ".app-desk .app-viz-option", DESK)["height"] == "var(--app-viz-option)"
+    hit = int(re.search(r"--pl-hit: (\d+)px", (REPO / "interface" / "player" / "player.css").read_text()).group(1))
+    number = lambda value: int(re.match(r"(\d+)px", value).group(1))
+    desk = media_tokens(DESKTOP, DESK)
+    #? what hangs under the button keeps the board's distance from its foot
+    for token in ("--app-viz-readout-drop", "--app-viz-list-drop"):
+        assert number(coarse[token]) - hit == number(desk[token]) - number(desk["--app-viz-control"]), token
+    assert number(coarse["--app-viz-play-w"]) >= hit
+    #? and the coarse block comes after the visualizer's own, so it wins
+    assert DESKTOP.rindex("@media (min-width: 1024px) and (pointer: coarse)") > DESKTOP.index("--app-viz-control: 32px")
+    #? a pointer you aim keeps the board's sizes
+    assert (desk["--app-viz-control"], desk["--app-viz-option"], desk["--app-viz-play-h"]) == ("32px", "30px", "40px")

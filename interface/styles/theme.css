@@ -672,6 +672,13 @@
     --dw-selection-border: rgba(192, 132, 252, 0.5);
     --dw-selected-text:    #e9d5ff;
 
+    /* --- the desktop visualizer (2.0.0-player.20), as DesktopVisualizer.dc.html draws it --- */
+    --dw-viz-bg:           #050408;   /* behind the effects */
+    --dw-viz-well:         rgba(13, 12, 18, 0.74);   /* the effect and colour pickers' well, over the picture */
+    --dw-viz-scrim-top:    linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+    --dw-viz-scrim-bottom: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
+    --dw-viz-artist:       #c9c9d6;   /* the song's artist, under its title */
+
     /* --- the turntable (2.0.0-player.11), as its board draws it ------- */
     --dw-tt-plinth:       #19171e;
     --dw-tt-platter:      #2a2730;

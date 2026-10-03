@@ -662,6 +662,54 @@ no AudioWorklet`. On HTTPS it says `On its own audio thread (an AudioWorklet)`.
 Turning the record never touches the song's own playback: if it's silent, the music still plays
 exactly as it did when you let go.
 
+## The visualizer doesn't move with the music, or says a song can't be seen
+
+[The visualizer](player.md#the-visualizer) (the five bars at the right of the desktop's player bar)
+measures its own silent copy of the stretch of the song playing - never the song you hear - and when
+it can't, it runs the effects from a calm, slow idle pattern and says why in a plain note at the
+bottom right of the screen (move the pointer, or click or tap, if the controls have faded):
+
+- **"This song can't be seen - it isn't a FLAC file."** Only FLAC songs have that copy, as only they
+  have the turntable's sound. An MP3, AAC or any other song always shows the idle pattern.
+- **"This song can't be seen just now - deadwax couldn't send its sound."** deadwax cuts the copy
+  from the copy of the song the player's cache keeps - making that first, when the page plays the
+  FLAC as it is - and couldn't just then: Navidrome not answering, or the cache unusable or its disk
+  short of space (see [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which
+  covers the cache). It tries again after ten seconds by itself.
+- **"This song can't be seen - …"** with deadwax's own words after the dash (a song deadwax won't cut
+  a stretch from - too big to hold, say) or **"this browser couldn't read its sound"**: that song stays
+  unseen until you leave the visualizer and open it again; other songs are unaffected.
+- **"This browser can't analyse sound, so the song can't be seen."** The browser has no Web Audio, or
+  wouldn't make it - every song shows the idle pattern there.
+
+**It moves, but a moment late after a seek, after opening it, or on a song you skipped to**: the
+copy is fetched as the song plays - about a second's wait for each new stretch on a home network -
+so the first second after opening it, after a seek or after a skip can be still. One song flowing
+into the next doesn't wait: the next song's first stretch is fetched in the last few seconds of the
+one before. In Chrome, Firefox or Edge with Gapless off (the default), the first stretch of a song
+can take a few seconds more: deadwax first makes that song's copy in the player's cache (Safari, the
+gapless stream and a resampled hi-res song have it made already). **It stops moving while the music
+plays on**: the browser may have suspended its sound with the page in the background; a click
+anywhere on the visualizer, or any key, starts it again.
+
+**The player's cache fills up faster, and iPhone songs take a moment to start again, after an
+evening with the visualizer open**: in a browser that plays the FLAC as it is (Chrome, Firefox or
+Edge with Gapless off), every song the visualizer shows has its copy made and kept in the player's
+cache, as Safari's would be - the whole song fetched from Navidrome once more - and counts against
+[`PLAYER_CACHE_MB`](configuration.md#paths) like any other. The songs played longest ago are cleared
+to make room, an iPhone's among them, and wait a moment to be made again the next time they play.
+Raise `PLAYER_CACHE_MB` if you have the space, or close the visualizer when you aren't watching it.
+
+**The colours aren't the cover's**: until the cover has loaded, and for an album with no cover, **From
+the cover** uses the purple. A black-and-white cover gives grey - that is its colour.
+
+**"WebGL isn't available here, so Ambient is showing the simple version."** Your browser has no WebGL,
+or has it turned off (some do when the graphics driver is blocked): Ambient shows its plain version;
+Bars, Scope and Halo don't need WebGL.
+
+**It didn't take the whole screen**: a browser can refuse to go full screen; the visualizer then fills
+the window instead, and works the same.
+
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
 [Gapless](player.md#gapless-playback-experimental) (in **You**, under **Playback**) is an

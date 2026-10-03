@@ -152,6 +152,13 @@ export const InfoIcon = thin(
   </>,
 )
 
+/** Five bars of a spectrum - the desktop player bar's full-screen visualizer (2.0.0-player.20), as
+ *  DesktopLibrary.dc.html draws it. */
+export const VisualizerIcon = thin(<path d="M4 14v-4M8 18V6M12 15V9M16 20V4M20 14v-4" />)
+
+/** Four corners turned in - the visualizer's "Leave full screen", as DesktopVisualizer.dc.html draws it. */
+export const LeaveFullScreenIcon = line(<path d="M9 3.5V9H3.5M15 3.5V9h5.5M9 20.5V15H3.5M15 20.5V15h5.5" />)
+
 /** A row's "goes somewhere" mark. */
 export const ChevronRightIcon = line(<path d="m9 6 6 6-6 6" />)
 

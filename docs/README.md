@@ -69,7 +69,8 @@ plays your library from Navidrome, made to be added to an iPhone's home screen. 
 own (Home, Library, Search, Requests and You), and is growing into the one app for all of deadwax:
 its Requests tab already follows your downloads (see [downloading](downloading.md#on-the-phone-the-requests-tab)).
 In a window 1024 pixels wide or more it has [a desktop's layout](player.md#on-a-desktop): a sidebar
-for the tabs, a player bar along the bottom, and an album's sources beside it.
+for the tabs, a player bar along the bottom, an album's sources beside it, and a full-screen
+[visualizer](player.md#the-visualizer) from the player bar.
 
 <p>
 <img src="../assets/images/mobile.png" width="280" alt="Searching on a phone">
