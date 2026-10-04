@@ -615,6 +615,10 @@ below.
     motor's run back to speed and the wind-down are timed the same smooth way, and are as far behind
     too; the song itself, and where it's moved to when you let go, are just as before. A busy moment
     that loses a few of your touches doesn't stop the sound.
+    Since 2.0.0-player.29 a slowed or sped-up record is the song and nothing else: the sound between
+    the song's own samples is worked out through a proper filter, where the short curve used before
+    left a thin, fizzy copy of the high notes on top of a slowed song and folded them back over a
+    sped-up one.
     (2.0.0-player.24 played 50 ms behind and read each touch's speed from the newest edge of a short
     curve whenever your hand's speed was changing - which carried the jitter straight into the pitch:
     a fast flutter, "like a dragonfly sound on top of the music". 2.0.0-player.27 traded 70 ms more

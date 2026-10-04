@@ -4980,7 +4980,8 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   media element at all (no createMediaElementSource, no element looked up, nothing set, loaded, played
   or paused on one) and the deck to calling no playback action.
 - **The voice** (`lib/deckVoice.ts`, pure): reads the window at a SIGNED, fractional rate with
-  four-point (Catmull-Rom) interpolation - 1 the song, 0 silence, negative backwards - steering towards
+  four-point (Catmull-Rom) interpolation (a windowed sinc since 2.0.0-player.29 - "A digital artifact on
+  top") - 1 the song, 0 silence, negative backwards - steering towards
   a position and a rate the deck posts each frame (`drive`: where the record is, how fast, and for a
   coast how fast that changes, `accel`, so it follows a curve between frames). (**Corrected by
   2.0.0-player.24**: that was the HAND's sound too, one drive a frame, each stamped with a fresh
@@ -5848,6 +5849,49 @@ song", and "would this be better in an actual app vs web app?"
   timing; frames under a hand with a 136 ms stall counted; counted afresh as it shows), debug.sim (the
   row's words in four states); mutations of the frame judge, the timing and the slow-frame count each
   caught. **NOT verified**: anything on the iPhone - which is what the row is for.
+
+#### A digital artifact on top (2.0.0-player.29)
+
+James, after .28: "it might be an artifact due to the digital nature of the speed variation that I'm
+hearing, would that make sense? it's not just the audio slowing or speeding up, but a digital artifact on
+top". It does, and it was measurable all along - .28's notes called it "35-48 dB below the song" and
+moved on, which was the wrong reading: in a band where the slowed song has NOTHING, 35 dB down is heard.
+
+- **A record turned slower or faster than the song is the song RESAMPLED, sample by sample**, and since
+  2.0.0-player.14 the window was read with a curve through four samples (Catmull-Rom). That is a poor
+  filter for it. Slowed, it leaves mirror IMAGES of the song's top above where the slowed song ends: a 15
+  kHz tone read at a quarter speed came out as 3.75 kHz with a second tone at 8.25 kHz only 16.6 dB under
+  it. Sped up, nothing keeps out what no longer fits: a 15 kHz tone at twice the speed (30 kHz, above
+  anything a speaker is sent) FOLDED BACK to 18 kHz at full level. On real music (two tracks, 4 s each,
+  through the real renderVoice against soxr's VHQ resample of the same stretch): at 0.25x and 0.5x the
+  sound above the slowed song's top was 35-37 dB under the song on a funk track and 48 on a metal one; at
+  2x and 4x the top bands carried 3-8 dB more than the ideal - the fold.
+- **The fix** (lib/deckVoice.ts): the window is read through a KERNEL - a sinc under a Kaiser window
+  (beta 7, about 70 dB), 12 zero crossings either side, tabulated at 128 entries a crossing and read
+  between them (`state.kernel`, built in newVoiceState, since the voice's functions name nothing outside
+  themselves). At the song's speed or slower it joins the window's own samples up and lets nothing above
+  the song's top through (25 taps a sample); for a record turning faster it is STRETCHED by how many of
+  the window's samples go by in one of ours, so its cutoff comes down by as much and what would fold is
+  left out - up to 4x (97 taps), past which everything is a squeal anyway. Each sample's weights are made
+  once (`state.taps`) and summed per channel, normalised by their own sum, so a steady level reads as
+  itself whatever the stretch. Nothing else moved: the path, the delay, the smoothing and the DC blocker
+  are .27's.
+- **Measured after**: the tones - the image at a quarter speed 80.9 dB under the tone (16.6 before), the
+  fold at twice the speed 74 dB under (0 before), levels kept within a dB (2 dB at 8x). The music - above
+  the slowed song's top, 57 dB under the song on the funk track and 89-92 on the metal one; at 2x and 4x
+  the top bands within 0.3 dB of the ideal; at the song's own speed the top octave is no longer dulled
+  (16-22 kHz: -22.2 dB against the ideal's -21.8, where four points gave -24.1). In the real page the
+  recorded voice has no clicks and the rate follows the hand as in .27 (15-45 Hz: 0.06-0.07%).
+- **The cost**: the main-thread voice's renderVoice is 1.7% of the main thread while scrubbing on this
+  machine (0.4% before), 10% with the CPU slowed 6x, every frame still kept. On the audio thread it is
+  nothing the page sees.
+- **The pin** (`deck.sim.cjs`, "a record turned slower or faster than the song adds nothing of its own"):
+  the two tones above through today's voice and through 2.0.0-player.24's frozen one (the same four
+  points) - the image more than 60 dB under, the fold more than 50 dB under, levels within 1 dB (3 at 8x);
+  the old voice fails both.
+- **NOT verified**: James's ears, on his iPhone - whether this was the "extra sound". The gaps a busy main
+  thread would put in the sound over plain http are a different artifact, and Debug's "Turntable timing"
+  (.28) counts them.
 
 ### Sources and Get (2.0.0-player.15)
 

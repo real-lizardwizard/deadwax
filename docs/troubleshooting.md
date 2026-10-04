@@ -692,6 +692,12 @@ pitch followed the jitter in the phone's touch readings. It now works each touch
 touches either side of it and plays about an eighth of a second behind your hand (120 ms; about 163
 over plain `http://`) instead of a twentieth. If you still hear it:
 
+- **A thin, metallic or fizzy sound on top of the slowed or sped-up song** - "a digital artifact on
+  top" - was real until 2.0.0-player.29: slowing or speeding the record's sound means working out the
+  sound between the song's own samples, and the short curve it used left a faint mirror copy of the
+  song's high notes above the slowed song (a slowed 15 kHz tone came with a second tone at 8 kHz, only
+  17 dB quieter), and folded the highs back down over a sped-up one. It is read through a proper filter
+  now: those are 60 to 80 dB down.
 - **A slow wobble** as you turn is your hand: the pitch follows the record's speed, as on a real deck.
 - **Clicks or crackle**, rather than a wobble, on a page opened over plain `http://`: the sound is made
   on the page's main thread there (**Info** > **Debug** > **Turntable sound** says "On the main

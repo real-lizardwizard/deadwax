@@ -360,8 +360,8 @@ console.log('\na change of speed is smoothed, and never jumps the sound')
 console.log('\nthe song at its own speed is not dulled')
 {
   //? a 12 kHz tone read at speed 1, half a sample off its own samples - where the tone itself is at
-  //? 0.5 sin(45 degrees) at most: four-point interpolation keeps it near that (0.88 of it), where reading
-  //? straight between two samples would take it to 0.71
+  //? 0.5 sin(45 degrees) at most: the kernel keeps it there (four points, until 2.0.0-player.29, kept 0.88
+  //? of it), where reading straight between two samples would take it to 0.71
   const hz = 12000
   const data = new Float32Array(SR * 4)
   for (let i = 0; i < data.length; i++) data[i] = 0.5 * Math.sin((2 * Math.PI * hz * i) / SR)
@@ -371,6 +371,54 @@ console.log('\nthe song at its own speed is not dulled')
   const out = render(state, 0.5, 0).left
   const level = peak(out, SR / 4) / (0.5 * Math.sin(Math.PI / 4))
   check('a 12 kHz tone, half a sample off: at 0.85 of its level or more (linear would be 0.71)', level >= 0.85, true)
+}
+
+console.log('\na record turned slower or faster than the song adds nothing of its own (2.0.0-player.29)')
+{
+  //? James: "it's not just the audio slowing or speeding up, but a digital artifact on top". A record
+  //? turned slower or faster is the song resampled, and until 2.0.0-player.29 the window was read with a
+  //? curve through four samples - a poor filter: slowed, it left a mirror image of the song's top above
+  //? where the slowed song ends; sped up, it folded the top back down over the rest. Tones through the
+  //? voice, and through the voice as it was (2.0.0-player.24's, frozen in fixtures/ - the same four points)
+  const before = require(path.join(__dirname, 'fixtures/deckVoice-2.0.0-player.24.cjs'))
+  const tone = (hz) => {
+    const data = new Float32Array(SR * 6)
+    for (let i = 0; i < data.length; i++) data[i] = 0.5 * Math.sin((2 * Math.PI * hz * i) / SR)
+    return data
+  }
+  const read = (lib, hz, rate) => {
+    const state = lib.newVoiceState()
+    lib.voiceCommand(state, { type: 'window', channels: [tone(hz)], start: 0, rate: SR }, 0, SR)
+    lib.voiceCommand(state, { type: 'take', at: 1, rate, time: 0, until: 100 }, 0, SR)
+    const out = [new Float32Array(SR)]
+    lib.renderVoice(state, out, SR, SR, 0)
+    return out[0]
+  }
+  //? how loud a tone of `hz` is in what was read: its amplitude, over the last three quarters of a second
+  const level = (data, hz) => {
+    const from = SR / 4, n = data.length - from
+    let re = 0, im = 0
+    for (let i = 0; i < n; i++) {
+      const hann = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n)
+      re += data[from + i] * hann * Math.cos((2 * Math.PI * hz * i) / SR)
+      im += data[from + i] * hann * Math.sin((2 * Math.PI * hz * i) / SR)
+    }
+    return (4 * Math.hypot(re, im)) / n
+  }
+  const db = (a, b) => Math.round(20 * Math.log10(Math.max(a, 1e-9) / b) * 10) / 10
+  //? slowed to a quarter, a 15 kHz tone is a 3.75 kHz tone - and its mirror image falls at 12 - 3.75 = 8.25 kHz
+  const slow = read(voice, 15000, 0.25), slowBefore = read(before, 15000, 0.25)
+  check(`slowed to a quarter, a 15 kHz tone is heard at 3.75 kHz at its own level, within 1 dB (${db(level(slow, 3750), 0.5)} dB)`, Math.abs(db(level(slow, 3750), 0.5)) <= 1, true)
+  check(`...and its mirror image at 8.25 kHz is more than 60 dB under it (${db(level(slow, 8250), level(slow, 3750))} dB) - four points left it at ${db(level(slowBefore, 8250), level(slowBefore, 3750))} dB, a tone of its own on top`,
+    [db(level(slow, 8250), level(slow, 3750)) < -60, db(level(slowBefore, 8250), level(slowBefore, 3750)) > -30], [true, true])
+  //? at twice the speed the same tone would be 30 kHz - nothing a speaker is sent - and folds back to 18 kHz
+  const fast = read(voice, 15000, 2), fastBefore = read(before, 15000, 2)
+  check(`at twice the speed the 15 kHz tone is left out, not folded back down to 18 kHz: more than 50 dB under the tone it was (${db(level(fast, 18000), 0.5)} dB) - four points played it at ${db(level(fastBefore, 18000), 0.5)} dB`,
+    [db(level(fast, 18000), 0.5) < -50, db(level(fastBefore, 18000), 0.5) > -6], [true, true])
+  check(`...while a 5 kHz tone at twice the speed is a 10 kHz tone at its own level, within 1 dB (${db(level(read(voice, 5000, 2), 10000), 0.5)} dB), and a 1 kHz tone at the song's own speed is itself, within a tenth (${db(level(read(voice, 1000, 1), 1000), 0.5)} dB)`,
+    [Math.abs(db(level(read(voice, 5000, 2), 10000), 0.5)) <= 1, Math.abs(db(level(read(voice, 1000, 1), 1000), 0.5)) <= 0.1], [true, true])
+  //? faster than the kernel stretches to (4x): what is left folds - but the tone itself, where it can be played, is there
+  check(`at 8x a 2 kHz tone is a 16 kHz tone, within 3 dB of its level (${db(level(read(voice, 2000, 8), 16000), 0.5)} dB)`, Math.abs(db(level(read(voice, 2000, 8), 16000), 0.5)) <= 3, true)
 }
 
 console.log('\nsilence: held still, and outside the window')

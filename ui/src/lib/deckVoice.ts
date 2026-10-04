@@ -53,7 +53,8 @@
  *  - A DC blocker (10 Hz) on the way out: a record held still reads one sample over and over, a
  *    constant, which this takes down to silence - and anything a slow turn pitches down below
  *    hearing goes with it.
- *  - Read with four-point (Catmull-Rom) interpolation, so the song at speed 1 - the handover after a
+ *  - Read through a windowed sinc (2.0.0-player.29; four-point Catmull-Rom before - see newVoiceState's
+ *    kernel), so the song at speed 1 - the handover after a
  *    coast, the start of a wind-down - sounds as the song does, not dulled.
  *
  * The four functions the worklet runs - newVoiceState, voiceCommand, renderVoice and voiceReport - are
@@ -127,6 +128,15 @@ export interface VoiceState {
   end: number
   cursor: number
   window: VoiceWindow | null
+  /**
+   * What the window is read through (2.0.0-player.29): a sinc under a Kaiser window, `kernelZeros` zero
+   * crossings either side, `kernelSteps` entries a crossing (one more at the end, and a zero after it,
+   * for reading between entries) - and room for one sample's weights (`taps`).
+   */
+  kernel: Float32Array
+  kernelZeros: number
+  kernelSteps: number
+  taps: Float32Array
   /** the DC blocker's last input and output, per channel */
   lastIn: number[]
   lastOut: number[]
@@ -164,12 +174,38 @@ export function newVoiceState(): VoiceState {
   //? the path's knots: 64 is more than half a second of a hand sampled at 120 Hz - more than the fit (0.12
   //? s back, 0.09 on) and the delay ever look over; at 240 Hz a fit takes what the ring still holds
   const KNOTS = 64
+  //? THE KERNEL the window is read through (renderVoice): a sinc, 12 zero crossings either side, under a
+  //? Kaiser window (beta 7: what leaks past it is about 70 dB down), 128 entries a crossing and read
+  //? between them. A record turned slower or faster than the song is the song RESAMPLED, sample by
+  //? sample, and a short curve through four samples (2.0.0-player.14 to .28) is a poor filter for that:
+  //? slowed, it left mirror images of the song's top above where the slowed song ends - 35-48 dB under
+  //? the song, in a band with nothing else in it - and sped up it folded the top back down over the rest.
+  //? James: "a digital artifact on top". WIDEST is how far the kernel is stretched for a record turning
+  //? faster than the song (its cutoff lowered to keep the fold out): 4x, past which everything is a
+  //? squeal anyway - and what `taps` has room for.
+  const ZEROS = 12, STEPS = 128, WIDEST = 4, BETA = 7
+  const bessel = (x: number) => {
+    let sum = 1, term = 1
+    for (let k = 1; k < 32; k++) {
+      term *= (x / (2 * k)) * (x / (2 * k))
+      sum += term
+    }
+    return sum
+  }
+  const kernel = new Float32Array(ZEROS * STEPS + 2)
+  for (let i = 0; i <= ZEROS * STEPS; i++) {
+    const x = i / STEPS
+    const sinc = i === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x)
+    const edge = x / ZEROS
+    kernel[i] = sinc * (bessel(BETA * Math.sqrt(Math.max(0, 1 - edge * edge))) / bessel(BETA))
+  }
   return {
     pos: 0, rate: 0, gain: 0, gainTarget: 0, gainAlpha: 0.01, driving: false, delay: 0.12,
     knotTime: new Float64Array(KNOTS), knotAt: new Float64Array(KNOTS), knotPos: new Float64Array(KNOTS),
     knotRate: new Float64Array(KNOTS), knotAccel: new Float64Array(KNOTS), knotUntil: new Float64Array(KNOTS),
     knotHand: new Uint8Array(KNOTS), knotSteady: new Float64Array(KNOTS), first: 0, end: 0, cursor: 0,
-    window: null, lastIn: [0, 0], lastOut: [0, 0], counted: 0,
+    window: null, kernel, kernelZeros: ZEROS, kernelSteps: STEPS, taps: new Float32Array(2 * ZEROS * WIDEST + 2),
+    lastIn: [0, 0], lastOut: [0, 0], counted: 0,
   }
 }
 
@@ -379,7 +415,8 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
  * `frames` samples of the record's sound into `outputs` (one Float32Array a channel), from context
  * time `now`. Each sample: where the path has the record `delay` before it, how fast, and how fast that
  * is changing; the rate steered towards that and smoothed, the read head moved by it, the window read
- * there with four-point interpolation (silence outside it, faded at its edges), the gain smoothed, and
+ * there through the kernel - a windowed sinc, stretched for a record turning faster than the song -
+ * (silence outside it, faded at its edges), the gain smoothed, and
  * the DC blocker.
  */
 export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: number, sampleRate: number, now: number): void {
@@ -405,6 +442,7 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
   const size = state.knotTime.length
   const kt = state.knotTime, kp = state.knotPos, kr = state.knotRate, ka = state.knotAccel, ku = state.knotUntil, kh = state.knotHand
   const ks = state.knotSteady
+  const kernel = state.kernel, taps = state.taps, zeros = state.kernelZeros, steps = state.kernelSteps
   for (let i = 0; i < frames; i++) {
     const t = now + i * dt
     let desired = 0
@@ -477,21 +515,42 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
       const edge = Math.min(index, last - index) / (EDGE_S * win.rate)
       shape = edge <= 0 ? 0 : edge >= 1 ? 1 : edge
     }
+    //? this sample's weights: the kernel centred on where the read head is, over the window's samples
+    //? either side - as it is for a record at the song's speed or slower (the window's own samples
+    //? joined up, nothing above the song's top let through), stretched for one turning faster (how many
+    //? of the window's samples go by in one of ours: the cutoff comes down by as much, so what would
+    //? fold back is left out), no further than the taps have room for. Normalised by their sum, so a
+    //? steady level reads as itself whatever the stretch
+    let first = 0, used = 0, norm = 0
+    if (shape > 0 && win) {
+      const stride = (Math.abs(state.rate) * win.rate) / sampleRate
+      const widest = (taps.length - 2) / (2 * zeros)
+      const squeeze = stride > 1 ? Math.max(1 / stride, 1 / widest) : 1
+      const reach = zeros / squeeze
+      const scale = squeeze * steps
+      first = Math.ceil(index - reach)
+      used = Math.floor(index + reach) - first + 1
+      let total = 0
+      for (let j = 0; j < used; j++) {
+        const u = Math.abs(index - (first + j)) * scale
+        const whole = Math.floor(u)
+        const weight = kernel[whole]! + (kernel[whole + 1]! - kernel[whole]!) * (u - whole)
+        taps[j] = weight
+        total += weight
+      }
+      norm = total !== 0 ? (shape * state.gain) / total : 0
+    }
     for (let c = 0; c < count; c++) {
       let value = 0
-      if (shape > 0 && win) {
+      if (used > 0 && win) {
         const data = win.channels[c % win.channels.length]!
         const last = win.length - 1
-        const at = Math.floor(index)
-        const f = index - at
-        const y0 = data[at - 1 < 0 ? 0 : at - 1]!
-        const y1 = data[at < 0 ? 0 : at > last ? last : at]!
-        const y2 = data[at + 1 > last ? last : at + 1]!
-        const y3 = data[at + 2 > last ? last : at + 2]!
-        const c1 = 0.5 * (y2 - y0)
-        const c2 = y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3
-        const c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2)
-        value = (((c3 * f + c2) * f + c1) * f + y1) * shape * state.gain
+        //? past either end of the window there is nothing: silence, which the fade at its edges meets
+        const from = first < 0 ? -first : 0
+        const to = first + used - 1 > last ? last - first + 1 : used
+        let sum = 0
+        for (let j = from; j < to; j++) sum += data[first + j]! * taps[j]!
+        value = sum * norm
       }
       //? the DC blocker: y = x - x[-1] + pole y[-1]
       const out = value - (state.lastIn[c] ?? 0) + pole * (state.lastOut[c] ?? 0)
