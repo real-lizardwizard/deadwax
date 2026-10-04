@@ -605,19 +605,22 @@ below.
     (about half as much again for a hi-res song played as it is, whose stretches are shorter), and
     nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns as
     before 2.0.0-player.14: silently, and with no momentum.
-  - **It's a twentieth of a second behind your hand**, always the same (since 2.0.0-player.24): the
-    record's sound follows every touch your phone reports, each at the moment it was made, and plays
-    the path they trace 50 ms later - late enough that the next touch has always arrived, so it never
-    has to guess where your hand is going. That's what makes a steady turn sound steady: before, it
-    was told where the record was once a frame, timed by the audio's own clock - which on an iPhone
-    moves in steps of about 21 milliseconds - so every frame's timing was off by up to a step, and the
-    pitch swung by that much, many times a second. The coasts, the motor's run back to speed and the
-    wind-down are timed the same smooth way, and are 50 ms behind too; the song itself, and where it's
-    moved to when you let go, are just as before. A finger's own jitter is smoothed out of the pitch
-    while you turn steadily - as much as the jitter deadwax measures in your own touches calls for, so
-    a heavier finger, or a grip near the middle of the record, still sounds steady; as you speed up,
-    slow down or turn back, it follows your hand closely instead. A busy moment that loses a couple of
-    your touches doesn't stop the sound. Taking hold of a playing record, or pausing it with a
+  - **It's about an eighth of a second behind your hand**, always the same: the record's sound
+    follows every touch your phone reports, each at the moment it was made, and plays the path they
+    trace 120 ms later (about 163 ms over plain `http://`, where the sound is made on the page's main
+    thread) - late enough that the touches either side of each moment have arrived, so it never has to
+    guess where your hand is going. Each touch's place and speed are worked out from the touches
+    around it, before and after, and the speed is smoothed, so a finger's own jitter stays out of the
+    pitch whether your hand is steady or speeding up, slowing down or turning back. The coasts, the
+    motor's run back to speed and the wind-down are timed the same smooth way, and are as far behind
+    too; the song itself, and where it's moved to when you let go, are just as before. A busy moment
+    that loses a few of your touches doesn't stop the sound.
+    (2.0.0-player.24 played 50 ms behind and read each touch's speed from the newest edge of a short
+    curve whenever your hand's speed was changing - which carried the jitter straight into the pitch:
+    a fast flutter, "like a dragonfly sound on top of the music". 2.0.0-player.27 traded 70 ms more
+    delay for a steady pitch; if the record now feels late under your finger, say so - the two pull
+    against each other.)
+    Taking hold of a playing record, or pausing it with a
     wind-down, plays the song's last twentieth of a second again as the record's sound starts; and
     letting go of a playing record at about its own speed - when the song plays on straight from your
     hand - skips that twentieth: the record's sound stops as you let go, that much behind, and the song

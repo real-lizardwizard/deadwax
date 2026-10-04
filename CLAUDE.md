@@ -5527,7 +5527,7 @@ scratchpad's `uplan/slice-turntable-sound.md`.
   (`lib/deckVoice.ts`) keeps the path as KNOTS in a ring of 64 (`knotTime`/`knotAt`/`knotPos`/
   `knotRate`/`knotAccel`/`knotUntil`/`knotSteady` - Float64Arrays - and `knotHand`, a Uint8Array, all
   made in `newVoiceState`; `first`, `end`, `cursor` counted from the first ever) and plays it
-  HAND_DELAY_S (50 ms, the literal `delay` in newVoiceState, held equal by deck.sim) behind: per sample
+  HAND_DELAY_S (50 ms then; 120 since 2.0.0-player.27 - "The warble" below - the literal `delay` in newVoiceState, held equal by deck.sim) behind: per sample
   `tau = t - delay`, the knot found by a MOVING cursor (`while kt[c] > tau c--; while kt[c+1] <= tau c++`
   - amortised O(1)), and between two knots a cubic HERMITE through their places and speeds. A take
   resets the ring; `pos` starts where the path was `delay` before (`at + rate * (now - delay - time)`) -
@@ -5740,6 +5740,64 @@ scratchpad's `uplan/slice-turntable-sound.md`.
   readings after a resume (if not, the first grab holds an error of up to a step - latency, never a
   jump); what ten readings a second cost on a phone while the turntable shows; and the first grab of a
   paused record after reopening the screen, on James's iPhone over plain http.
+
+#### The warble (2.0.0-player.27)
+
+James, on his iPhone with 2.0.0-player.24: "I can hear the song when I scrub, but it's as if there's an
+extra sound effect added as well" ... "it just kind of sounds warbly, like theres a dragonfly sound on top
+of the music while scrubing".
+
+- **Not reproducible with a steady hand, which is all .24's checks ever turned.** Recorded off the voice in
+  the real page, a hand at an exact 1x gave one clean tone on both hosts, whole-pixel touches included
+  (everything else 54-70 dB down, no clicks). The flutter appears when the hand's speed CHANGES, as every
+  real hand's does: a hand at 1x give or take 10% (1.3 Hz) with a finger's jitter (1.5 ms of time, 1 ms of
+  the song's place) read with a rate error of 2.2% rms at 4-12 Hz and 2.2% at 12-45 Hz - the buzz - where
+  the same jitter on a steady hand gave 0.36 / 0.27 (the offline bench: the real voice fed a hand of known
+  speed, `/home/tokay/deadwax-scratch/ttmeasure/bench.cjs`).
+- **The cause**: .24's fit was adaptive. A steady hand got long straight lines; a changing one fell back to
+  a 0.1 s parabola read at its NEWEST end (20 ms of samples after it), and the end of a curve carries
+  jitter several times over into its slope. The 40 ms position steering then made what jitter was left in
+  the knots' PLACES into rate as well.
+- **The fix** (lib/deckVoice.ts; deck.ts and the hosts unchanged):
+  - ONE fit for every hand sample, steady or not: a tricube-weighted parabola by least squares over the
+    samples within `FIT_S` (0.12 s) either side of it, as many after as have come (`SMOOTH_AFTER_S` 0.09) -
+    CENTRED, so its slope is as quiet as a line's and it still follows a hand speeding up, slowing or
+    turning back. The lines, `SPANS`, `AGREE` and the measured-jitter estimate are gone. `knotSteady` is now
+    only "a hand sample fitted to its neighbours" (1) or not (0).
+  - `HAND_DELAY_S` 0.12 (was 0.05): the voice plays far enough behind that every sample a knot is fitted to
+    has arrived by the time it is played. On the main-thread voice its lag is on top: 163 ms (was 93).
+  - The fit's curvature is each knot's change of speed (`knotAccel`), fed AHEAD of the 10 ms rate smoothing
+    (`desired = v + SMOOTH_S * g + ...`), so the smoothing doesn't lag a hand that speeds up or stops dead.
+    Between two fitted hand knots the speed is theirs, interpolated - the chord between their places is only
+    jitter; where a knot was SAID (a take, a drive, a rest) it is the cubic's own slope, exactly.
+  - `FOLLOW_S` 0.1 (was 0.04): the steering to the path's place is slow enough not to turn place jitter
+    into pitch. (Three smoothing poles in a row were tried first: quieter still above 12 Hz, but three poles lag
+    a hand that stops dead; the feed-ahead doesn't.)
+- **Measured after** (same bench): the changing hand 0.55% (4-12 Hz) and 0.10% (12-45 Hz); steady 0.53 /
+  0.10; at 120 touches a second 0.34 / 0.10. In the real page (headless Chromium against the dev stand-ins,
+  the record turned by real touch events at 1x give or take 10%, whole pixels, 2 ms and 0.3 px of jitter,
+  the voice's output recorded and its rate read back): the 15-45 Hz band 0.06% on the worklet and 0.07% on
+  the main-thread voice (1.6% before, in the harsher 8 ms / 1 px case; 0.25% now there).
+- **The cost, and it is James's to judge**: the record's sound trails the hand by 120 ms (163 on plain
+  http) instead of 50 (93) - coasts, the motor, the wind-down and the handover as far behind too; a steady
+  hand's slow wobble is a little higher than .24's 0.4 s lines gave (the 60 px grip at 0.5x: 83-97% of
+  cycles within 3% where it was 93-98%, held at 80%). Smoothness and delay pull against each other: less
+  look-ahead means the fit sits nearer the end of its curve again.
+- **The pin** (`decksound.sim.cjs`, "THE WARBLE"): hands whose speed changes (1x give or take 10% at 1.3 Hz;
+  0.4x to 1.6x and back), a finger's jitter (Gaussian 1.5 ms / 1 ms; whole pixels), both hosts and both
+  clocks, through the REAL Turntable, deck, clock and voice: the rate's error against the hand's own speed
+  by band - 12-45 Hz under 0.15% (0.03-0.11 measured), 4-12 Hz under 1.1%, above 45 Hz under 0.01%. And
+  2.0.0-player.24's voice, frozen in `ui/test/fixtures/deckVoice-2.0.0-player.24.cjs`, in the same harness:
+  a buzz of 0.8-3.3%, past 0.5% on every hand. Checks that encoded the old numbers were re-measured, each
+  saying its before and after (the delay's literal; a drive settling in 250 ms where it was 150; the sound
+  stopping `HAND_DELAY_S` short of a release; three missed samples now inside the delay).
+- **How it was built**: the orchestrator found the cause and the centred fit; a background agent reworked
+  the smoothing (the feed-ahead in place of three poles) and the sims, and was cut off by the session's
+  usage limit before the docs; the orchestrator audited its diff check by check, re-measured, wrote this
+  and shipped it without the usual four-lens review - James: "I want to make sure the turntable fix gets
+  pushed before I run out of usage for the week". **A review pass is still owed.**
+- **NOT verified**: James's iPhone - whether the dragonfly is gone under a real finger, how real touch
+  jitter compares with the 1.5 ms / 1 ms assumed, and how 120 ms (163 over plain http) feels.
 
 ### Sources and Get (2.0.0-player.15)
 
@@ -8957,7 +9015,7 @@ node ui/test/sources.sim.cjs    # the Sources sheet and its cards rendered - onl
 node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch; the rows' Get chips, and their lookups called off when you move on
 node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the main-thread voice where there is no worklet, the deck against fakes (its windows, coasts, handovers, wind-downs, when a press is its own, the timer it reads the clock on)
 node ui/test/deckclock.sim.cjs  # the turntable's one time base - currentTime's steps mapped smoothly (5.8 and 21.3 ms, late readings), held through a gesture from its first reading (a mapping just started, young or not yet moving, or made young by stale readings - never a jump), kept through a rest (and let go of when a drifting clock made them stale), followed for minutes read ten times a second, started again when its clock stood still, nothing kept from a clock standing still as it starts, its step even read once a frame; event times and a move's coalesced samples
-node ui/test/decksound.sim.cjs  # the record's sound following the hand through the REAL Turntable, deck, clock and voice - cycle by cycle at 1x, 0.5x, 2x and backwards on both hosts and clocks, harder hands (Gaussian jitter, grips near the spindle, whole pixels), the old page side failing in the same harness, letting go (no stall, no swing back after a rest, the 1x skip), the first grab of a still record after a resume (stamped steadily, sounding as any grab from still), the deck's own clock timer, Debug's step on a desktop clock, the path's edges (stops, late and missing samples, stalls, turns back, rests, a coast caught by an older sample, a ring overrun)
+node ui/test/decksound.sim.cjs  # the record's sound following the hand through the REAL Turntable, deck, clock and voice - cycle by cycle at 1x, 0.5x, 2x and backwards on both hosts and clocks, harder hands (Gaussian jitter, grips near the spindle, whole pixels), the old page side failing in the same harness, letting go (no stall, no swing back after a rest, the 1x skip), the first grab of a still record after a resume (stamped steadily, sounding as any grab from still), the deck's own clock timer, Debug's step on a desktop clock, the path's edges (stops, late and missing samples, stalls, turns back, rests, a coast caught by an older sample, a ring overrun); the warble: hands whose speed changes, with a finger's jitter - the rate's error by band, and 2.0.0-player.24's frozen voice failing it
 node ui/test/artist.sim.cjs     # the artist page's order and who-is-who (Navidrome's artist <-> MusicBrainz's), Library > Artists' sort, the id bridge's "Also" chips, "This pressing" and the folder; the page rendered - rows drawn once with steady keys, Play waiting for the library, a few albums at a time, the session's answers, late lookups opening nothing
 node ui/test/home.sim.cjs       # Home finished - "Not played in a while" (more than 30 days, oldest first, up to 20, none under 4 or without played), Pinned first then Recently added then Not played, the shelves waiting for the pins (counted while Home shows), all in the gate
 node ui/test/pins.sim.cjs       # pins - which pin is the thing on screen (names folded as the server folds them), a card's words, what a toggle sends, Edit's operations and the drag; the store (asked when asked, changes in turn, Edit's PUT with known, refusals put back and said where made); Pinned and its Edit rendered (focus kept, Not saved under the list); the notice; the pin control

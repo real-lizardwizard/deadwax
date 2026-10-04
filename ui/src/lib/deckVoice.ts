@@ -21,26 +21,33 @@
  *    sound was taken up (`take`). Every time on it is mapped onto the context's clock by ONE smooth
  *    mapping (lib/deckClock.ts) - never a `currentTime` read per message, whose steps were what made the
  *    sound warble. The voice keeps them as knots in a small ring and plays the path a FIXED delay behind
- *    (HAND_DELAY_S, 50 ms: `delay`), so the next knot has always arrived - it interpolates between real
- *    ones rather than guessing ahead. Between two knots the path's place is a cubic Hermite through their
- *    places and speeds - continuous in speed. A hand sample's place and speed are fitted to its
- *    neighbours (voiceCommand's `place`): the longest straight line back over SPANS that still agrees
- *    with every shorter one and with a parabola over CURVE_S, to within AGREE of the spread the jitter
- *    measured in the samples gives - so a finger's jitter (a millisecond or so of the song, which straight
- *    through would be a few per cent of pitch) averages out while the hand is steady, however heavy the
- *    finger or near the spindle, and a hand that changes is followed closely; a coast's are exact. The
- *    speed it reads at is the path's: its two knots' speeds between them, and what the chord between
- *    their places asks beyond that as much as the hand wasn't steady there (`knotSteady`) - where it was,
- *    that ask is only jitter. Past the last knot: a drive runs on along its own curve until it runs out
+ *    (HAND_DELAY_S, 120 ms since 2.0.0-player.27: `delay`), so the next knot has always arrived, and the
+ *    samples each knot is fitted to - it interpolates between real ones rather than guessing ahead.
+ *    Between two knots the path's place is a cubic Hermite through their places and speeds - continuous
+ *    in speed. A hand sample's place, speed and change of speed are fitted to its neighbours
+ *    (voiceCommand's `place`): ONE weighted parabola over the samples within FIT_S either side of it,
+ *    centred on it (2.0.0-player.27) - so a finger's jitter (a millisecond or so of the song, which
+ *    straight through would be a few per cent of pitch) averages out, and a hand that speeds up, slows
+ *    or turns back is followed, with the same fit for both. (2.0.0-player.24 took the longest straight
+ *    line back that still agreed with the samples, else a parabola read at its NEWEST end - and an end
+ *    of a curve carries jitter several times over into its slope: the pitch buzzed whenever the hand's
+ *    speed changed, which any real hand's does - James's "dragonfly sound on top of the music".) A
+ *    coast's knots are exact. The speed it reads at is the path's: its two knots' speeds between them -
+ *    between two fitted hand samples (`knotSteady`) that alone, the chord between their places only
+ *    jitter; wherever a knot was said (a take, a drive), also what that chord asks beyond them, the
+ *    exact cubic. Past the last knot: a drive runs on along its own curve until it runs out
  *    (`until`); a hand runs on EXTRAPOLATE_S, slowing to still, then holds - a hand that stops sends
  *    nothing, and a record held still is silent. A hand that stayed still past REST_S and moves again
  *    starts from where the path stopped - unless it is where its speed would have had it, samples having
  *    gone missing (MISSED_S, KEPT_ON); a plan after a rest sets off from there too. A hand sample older
  *    than the record's own motion the path has after it (a coast's frames) takes the path from its moment.
- *  - The rate it reads at is steered to the path: the path's speed and how far the read head is from
- *    the path's place (FOLLOW_S), smoothed by a one-pole filter of SMOOTH_S (10 ms) a sample -
- *    critically damped together - so a change of speed never steps; and the read head is a running sum
- *    of it, so nothing ever jumps.
+ *  - The rate it reads at is steered to the path: the path's speed, how far the read head is from the
+ *    path's place (FOLLOW_S, 0.1 s - slow enough that what is left of the jitter in the knots' places
+ *    isn't made into pitch), and SMOOTH_S times how fast the path's speed is changing (the knots' own
+ *    fitted change of speed, a drive's, or the cubic's - so the smoothing follows a hand that speeds up,
+ *    slows or stops dead without lagging it: 2.0.0-player.27) - smoothed by a one-pole filter of
+ *    SMOOTH_S (10 ms) a sample, so a change of speed never steps; and the read head is a running sum of
+ *    it, so nothing ever jumps.
  *  - Its loudness fades in and out (`take`, `fade`, `stop`) rather than switching, and fades at the
  *    window's two edges (EDGE_S).
  *  - A DC blocker (10 Hz) on the way out: a record held still reads one sample over and over, a
@@ -63,14 +70,16 @@ export const VOICE_PROCESSOR = 'deadwax-deck-voice'
 export const REPORTS_PER_SECOND = 30
 
 /**
- * How far behind the record's path the voice plays, in seconds (2.0.0-player.24): long enough that at
- * 60 pointer samples a second, with their delivery and the sample after them for the fit, the knot after
- * any moment it plays has always arrived - so it interpolates between real samples, never guesses ahead
- * of them - and short enough to be a latency, not an echo. A constant: the record's sound is this much
- * later than the hand, the coast and the wind-down alike, and nothing else moves. The literal is in
- * newVoiceState (the voice's functions name nothing outside themselves); deck.sim holds the two equal.
+ * How far behind the record's path the voice plays, in seconds (2.0.0-player.24; 120 ms since
+ * 2.0.0-player.27, 50 before): long enough that at 60 pointer samples a second the knot after any moment
+ * it plays has always arrived, and with it every sample that knot is fitted to - SMOOTH_AFTER_S (90 ms)
+ * of them after it, and their delivery - so it interpolates between real samples, fitted once and for
+ * all, never guesses ahead of them; and short enough to be a latency, not an echo. A constant: the
+ * record's sound is this much later than the hand, the coast and the wind-down alike (and on the main
+ * thread SCRIPT_LAG_BLOCKS more: 163 ms in all), and nothing else moves. The literal is in newVoiceState
+ * (the voice's functions name nothing outside themselves); deck.sim holds the two equal.
  */
-export const HAND_DELAY_S = 0.05
+export const HAND_DELAY_S = 0.12
 
 /** A stretch of the song, decoded: its channels at `rate` samples a second, from `start` (song s). */
 export interface VoiceWindow {
@@ -98,11 +107,13 @@ export interface VoiceState {
    * next free at `end` (both counted from the first ever, a slot being the count modulo the length),
    * and `cursor` the knot the path is on as the voice last played it. Each knot: its time (context s),
    * where the record is (song s) as said (`knotAt`) and as followed (`knotPos` - a hand sample's fitted
-   * to its neighbours, a drive's as said), how fast (`knotRate`), and for a drive or a take how that is
-   * changing (`knotAccel`) and until when it holds (`knotUntil`); its kind (`knotHand`): 1 a hand's
-   * sample, 0 anything said (a take, a drive, where a resting hand's path stopped or a plan after a rest
-   * set off), 2 where a resting hand set off again; and for a hand's sample how steady the hand was there
-   * (`knotSteady`, 0 to 1: which of SPANS its fitted line is - 0 for the curve, and for anything said).
+   * to its neighbours, a drive's as said), how fast (`knotRate`), how that is changing
+   * (`knotAccel` - a drive's or a take's as said, a hand sample's from its fit) and until when it holds
+   * (`knotUntil`); its kind (`knotHand`): 1 a hand's sample, 0 anything said (a take, a drive, where a
+   * resting hand's path stopped or a plan after a rest set off), 2 where a resting hand set off again;
+   * and whether it is a hand's sample fitted to its neighbours (`knotSteady`: 1 - its speed is the fit's,
+   * and the chord to the next fitted one is only jitter - 0 for anything said, and for a run's first
+   * sample until a second comes).
    */
   knotTime: Float64Array
   knotAt: Float64Array
@@ -150,11 +161,11 @@ export interface VoiceHeard {
 
 /** A voice at rest: silent, nowhere in particular, nothing to play, no path. */
 export function newVoiceState(): VoiceState {
-  //? the path's knots: 64 is more than half a second of a hand sampled at 120 Hz - more than the fit (0.4
-  //? s at most) and the delay ever look back over; at 240 Hz a fit takes what the ring still holds
+  //? the path's knots: 64 is more than half a second of a hand sampled at 120 Hz - more than the fit (0.12
+  //? s back, 0.09 on) and the delay ever look over; at 240 Hz a fit takes what the ring still holds
   const KNOTS = 64
   return {
-    pos: 0, rate: 0, gain: 0, gainTarget: 0, gainAlpha: 0.01, driving: false, delay: 0.05,
+    pos: 0, rate: 0, gain: 0, gainTarget: 0, gainAlpha: 0.01, driving: false, delay: 0.12,
     knotTime: new Float64Array(KNOTS), knotAt: new Float64Array(KNOTS), knotPos: new Float64Array(KNOTS),
     knotRate: new Float64Array(KNOTS), knotAccel: new Float64Array(KNOTS), knotUntil: new Float64Array(KNOTS),
     knotHand: new Uint8Array(KNOTS), knotSteady: new Float64Array(KNOTS), first: 0, end: 0, cursor: 0,
@@ -168,16 +179,11 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
   const alpha = (seconds: number) => 1 - Math.exp(-1 / (Math.max(seconds, 1e-4) * sampleRate))
   //? a fade in or a stop: a few milliseconds, so it never clicks
   const QUICK_S = 0.003
-  //? a hand sample is fitted to the samples up to this far after it (which must have come before the
-  //? voice plays it: delay - a sample's spacing - its delivery); to a curve over the last CURVE_S, and to
-  //? straight lines back over each of SPANS, shortest first, each kept while it agrees with every
-  //? shorter one (and the curve) to within AGREE of that one's own spread - the spread worked out from
-  //? the jitter measured in the samples themselves, never below JITTER_FLOOR_S (`place`)
-  const SMOOTH_AFTER_S = 0.02
-  const CURVE_S = 0.1
-  const SPANS = [0.1, 0.15, 0.2, 0.3, 0.4]
-  const AGREE = 3.5
-  const JITTER_FLOOR_S = 0.0001
+  //? a hand sample is fitted to the samples within FIT_S of it either side - after it, up to
+  //? SMOOTH_AFTER_S, which have all come by the time the voice plays it (the delay, less a sample's
+  //? spacing and its delivery) - weighted the nearer the more (`place`)
+  const SMOOTH_AFTER_S = 0.09
+  const FIT_S = 0.12
   //? a hand sample further than this after the one before it: the hand rested between them - unless, no
   //? more than MISSED_S after it, it is where the hand's speed would have it by then, to within KEPT_ON of
   //? how far that is (or KEPT_S): then samples went missing, and the hand kept moving through them
@@ -224,25 +230,16 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
     const lead = rate[k]! * ahead > 0 ? Math.min(RESUME_S, (3 * ahead) / rate[k]!) : 0
     t[j % size] = Math.max(t[(j - 1) % size]!, t[k]! - lead)
   }
-  //? A hand sample's place and speed, from it and its neighbours - and how steady the hand was there
-  //? (`knotSteady`). A least-squares line over a long stretch averages a finger's jitter out of the
-  //? pitch, but reads a hand that speeds up, slows or turns back late; a short one, or a curve, follows
-  //? that and carries the jitter. So it takes the LONGEST that is still true to the hand (review of
-  //? 2.0.0-player.24: the line was kept or dropped on a fixed 3 ms, so jitter a little past it - a
-  //? heavier finger, a grip nearer the spindle - fell to a 0.1 s parabola and the pitch wavered): the
-  //? curve over the last CURVE_S, then lines back over each of SPANS, shortest first, each kept while its
-  //? place and speed lie within AGREE spreads of every shorter one's - a spread worked out from the
-  //? jitter measured in these very samples (each one's distance from the line between its neighbours),
-  //? so it scales with the finger and the radius rather than switching on a number. A hand that is
-  //? steady keeps the longest; one that is changing stops at the stretch that still agrees, or the curve.
-  //? The hand's own samples only: back no further than the knot its run began from (a take, a coast's
-  //? last frame - the record's motion before the hand). Steadiness is which of SPANS the line chosen is,
-  //? 0 for the shortest to 1 for the longest - 0 for the curve, and for a run's first sample
+  //? A hand sample's place, speed and change of speed, from it and its neighbours - the hand's own
+  //? samples only: back no further than the knot its run began from (a take, a coast's last frame - the
+  //? record's motion before the hand). Re-fitted as each later sample within SMOOTH_AFTER_S comes, so it
+  //? is final by the time the voice plays it. Marked fitted (`knotSteady` 1) - but a run's first sample,
+  //? alone, which is still until more come
   const place = (i: number) => {
     const k = i % size
     const ti = t[k]!
     let from = i
-    for (let j = i - 1; j >= state.first && hand[j % size] === 1 && ti - t[j % size]! <= SPANS[SPANS.length - 1]!; j--) from = j
+    for (let j = i - 1; j >= state.first && hand[j % size] === 1 && ti - t[j % size]! <= FIT_S; j--) from = j
     let to = i
     for (let j = i + 1; j < state.end && hand[j % size] === 1 && t[j % size]! - ti <= SMOOTH_AFTER_S; j++) to = j
     steady[k] = 0
@@ -250,85 +247,54 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
       //? its run's only sample (the hand's first, as it takes the record): still, until more come
       pos[k] = at[k]!
       rate[k] = 0
+      accel[k] = 0
       return
     }
-    //? the jitter: for jitter alone, a sample's distance from the line between its neighbours has
-    //? 1 + w^2 + (1 - w)^2 times its variance
-    let e2 = 0, ne = 0
-    for (let j = from + 1; j < to; j++) {
-      const t0 = t[(j - 1) % size]!, t2 = t[(j + 1) % size]!
-      const w = (t2 - t[j % size]!) / (t2 - t0)
-      const e = at[j % size]! - (w * at[(j - 1) % size]! + (1 - w) * at[(j + 1) % size]!)
-      e2 += (e * e) / (1 + w * w + (1 - w) * (1 - w))
-      ne += 1
-    }
-    const jitter = Math.max(JITTER_FLOOR_S * JITTER_FLOOR_S, ne > 0 ? e2 / ne : 0)
-    //? what a longer stretch must agree with: every shorter estimate's place and speed, give or take AGREE
-    //? of its spread - the intersection of those, as it narrows
-    let lowP = -Infinity, highP = Infinity, lowV = -Infinity, highV = Infinity
-    let found = false
-    //? the curve: x = a + b u + c u^2 by least squares, u the time from this sample in CURVE_S - with four
-    //? samples or more to mean anything
+    //? ONE fit, the same for a steady hand and a changing one (2.0.0-player.27): x = a + b u + c u^2 by
+    //? weighted least squares over the samples within FIT_S either side (as many after as have come -
+    //? by the time the voice plays this sample, all of them), each weighted by how near it is (tricube),
+    //? u the time from this sample in FIT_S. Centred, a curve's slope is as quiet as a line's (on even
+    //? ground the u^2 term takes nothing from it) and still follows a hand speeding up, slowing or
+    //? turning back; and its curvature is how fast the hand's speed is changing, which renderVoice feeds
+    //? ahead of its smoothing. 2.0.0-player.24 fell back from long straight lines to a 0.1 s parabola
+    //? read at its NEWEST end whenever the hand's speed changed - and the end of a curve carries a
+    //? finger's jitter several times over into its slope: 2% of pitch, buzzing at 12-45 Hz (James:
+    //? "warbly, like there's a dragonfly sound on top of the music"; 0.1% now)
     let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, x0 = 0, x1 = 0, x2 = 0
     for (let j = from; j <= to; j++) {
-      const u = (t[j % size]! - ti) / CURVE_S
-      if (u < -1) continue
-      const x = at[j % size]!
+      const u = (t[j % size]! - ti) / FIT_S
+      const d = Math.abs(u)
+      if (d >= 1) continue
+      const w3 = 1 - d * d * d
+      const w = w3 * w3 * w3
+      const x = at[j % size]! - at[k]!
       const u2 = u * u
-      s0 += 1
-      s1 += u
-      s2 += u2
-      s3 += u2 * u
-      s4 += u2 * u2
-      x0 += x
-      x1 += u * x
-      x2 += u2 * x
+      s0 += w
+      s1 += w * u
+      s2 += w * u2
+      s3 += w * u2 * u
+      s4 += w * u2 * u2
+      x0 += w * x
+      x1 += w * u * x
+      x2 += w * u2 * x
     }
-    if (s0 >= 4) {
-      const m0 = s2 * s4 - s3 * s3, m1 = s1 * s4 - s2 * s3, m2 = s1 * s3 - s2 * s2
-      const det = s0 * m0 - s1 * m1 + s2 * m2
-      if (Math.abs(det) > 1e-9) {
-        const p = (x0 * m0 - s1 * (x1 * s4 - s3 * x2) + s2 * (x1 * s3 - s2 * x2)) / det
-        const v = (s0 * (x1 * s4 - s3 * x2) - x0 * m1 + s2 * (s1 * x2 - x1 * s2)) / det / CURVE_S
-        const spreadP = Math.sqrt((jitter * m0) / det), spreadV = Math.sqrt((jitter * (s0 * s4 - s2 * s2)) / det) / CURVE_S
-        pos[k] = p
-        rate[k] = v
-        found = true
-        lowP = p - AGREE * spreadP
-        highP = p + AGREE * spreadP
-        lowV = v - AGREE * spreadV
-        highV = v + AGREE * spreadV
-      }
+    steady[k] = 1
+    const m0 = s2 * s4 - s3 * s3, m1 = s1 * s4 - s2 * s3, m2 = s1 * s3 - s2 * s2
+    const det = s0 * m0 - s1 * m1 + s2 * m2
+    const lineDet = s0 * s2 - s1 * s1
+    accel[k] = 0
+    if (to - from + 1 >= 4 && Math.abs(det) > 1e-9 * s0 * s0 * s0) {
+      pos[k] = at[k]! + (x0 * m0 - s1 * (x1 * s4 - s3 * x2) + s2 * (x1 * s3 - s2 * x2)) / det
+      rate[k] = (s0 * (x1 * s4 - s3 * x2) - x0 * m1 + s2 * (s1 * x2 - x1 * s2)) / det / FIT_S
+      accel[k] = (2 * (s0 * (s2 * x2 - s3 * x1) - s1 * (s1 * x2 - s2 * x1) + x0 * m2)) / det / (FIT_S * FIT_S)
+    } else if (lineDet > 1e-12) {
+      //? two or three samples: the line through them
+      pos[k] = at[k]! + (s2 * x0 - s1 * x1) / lineDet
+      rate[k] = (s0 * x1 - s1 * x0) / lineDet / FIT_S
+    } else {
+      pos[k] = at[k]!
+      rate[k] = 0
     }
-    //? the lines, their sums gathered newest sample first, so each longer stretch adds to the last
-    let sw = 0, ss = 0, sss = 0, sx = 0, ssx = 0
-    let j = to
-    for (let n = 0; n < SPANS.length; n++) {
-      for (; j >= from && ti - t[j % size]! <= SPANS[n]!; j--) {
-        const sj = t[j % size]! - ti
-        const x = at[j % size]!
-        sw += 1
-        ss += sj
-        sss += sj * sj
-        sx += x
-        ssx += sj * x
-      }
-      const det = sw * sss - ss * ss
-      if (!(det > 1e-12)) continue
-      const p = (sss * sx - ss * ssx) / det
-      const v = (sw * ssx - ss * sx) / det
-      if (p < lowP || p > highP || v < lowV || v > highV) break
-      pos[k] = p
-      rate[k] = v
-      found = true
-      steady[k] = n / (SPANS.length - 1)
-      const spreadP = Math.sqrt((jitter * sss) / det), spreadV = Math.sqrt((jitter * sw) / det)
-      lowP = Math.max(lowP, p - AGREE * spreadP)
-      highP = Math.min(highP, p + AGREE * spreadP)
-      lowV = Math.max(lowV, v - AGREE * spreadV)
-      highV = Math.min(highV, v + AGREE * spreadV)
-    }
-    if (!found) steady[k] = 0
   }
   //? a knot coming after a hand's last sample, further on than REST_S: the hand rested since. The path ran
   //? on from that sample and stopped (renderVoice's run-on, exactly) - a knot there says so, so what comes
@@ -411,14 +377,17 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
 
 /**
  * `frames` samples of the record's sound into `outputs` (one Float32Array a channel), from context
- * time `now`. Each sample: where the path has the record `delay` before it, and how fast; the rate
- * steered towards that and smoothed, the read head moved by it, the window read there with four-point
- * interpolation (silence outside it, faded at its edges), the gain smoothed, and the DC blocker.
+ * time `now`. Each sample: where the path has the record `delay` before it, how fast, and how fast that
+ * is changing; the rate steered towards that and smoothed, the read head moved by it, the window read
+ * there with four-point interpolation (silence outside it, faded at its edges), the gain smoothed, and
+ * the DC blocker.
  */
 export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: number, sampleRate: number, now: number): void {
-  //? the rate's smoothing, and the steering to the path - critically damped together (FOLLOW = 4 SMOOTH)
+  //? the rate's smoothing, and the steering to the path's place - slow (2.0.0-player.27: 0.04 s before),
+  //? so what jitter is left in the knots' places isn't made into pitch; the path's change of speed is fed
+  //? ahead of the smoothing instead, so it doesn't lag a hand that speeds up, slows or stops
   const SMOOTH_S = 0.01
-  const FOLLOW_S = 0.04
+  const FOLLOW_S = 0.1
   //? the fastest it reads, either way, in the song's own speeds
   const MAX_RATE = 24
   //? the fade at the window's edges, and the DC blocker's corner
@@ -448,40 +417,51 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
       state.cursor = c
       const a = c % size
       const ta = kt[a]!
-      let x = 0, v = 0, follow = true
+      //? where the path has the record, how fast, and how fast that is changing
+      let x = 0, v = 0, g = 0, follow = true
       if (tau < ta) {
         //? before its first knot: where the take's motion had it
         x = kp[a]! + kr[a]! * (tau - ta)
         v = kr[a]!
       } else if (c + 1 < state.end) {
-        //? between two knots: the cubic through their places and speeds - its slope their two speeds,
-        //? between them, and what the chord between their places asks beyond that (the last term). Where
-        //? the hand was steady at both, that ask is a finger's jitter (a fraction of a ms of place a
-        //? sample's spacing apart - a few per cent of pitch) and goes, as much as it was steady: the
-        //? speeds are long lines' own, and the steering keeps the place (review of 2.0.0-player.24)
+        //? between two knots: the cubic through their places and speeds - its place. Its speed: between two
+        //? fitted hand samples, their two speeds between them, and its change of speed theirs - what the
+        //? chord between their places asks beyond that is a finger's jitter (a fraction of a ms of place a
+        //? sample's spacing apart - a few per cent of pitch), and the steering keeps the place (review of
+        //? 2.0.0-player.24); anywhere a knot was said (a take, a drive, a rest), the cubic's own slope and
+        //? its change, exactly
         const b = (c + 1) % size
         const h = kt[b]! - ta
         const s = (tau - ta) / h
         const s2 = s * s, s3 = s2 * s
         x = (2 * s3 - 3 * s2 + 1) * kp[a]! + (s3 - 2 * s2 + s) * h * kr[a]! + (3 * s2 - 2 * s3) * kp[b]! + (s3 - s2) * h * kr[b]!
-        const ask = 6 * (s - s2) * ((kp[b]! - kp[a]!) / h - (kr[a]! + kr[b]!) / 2)
-        v = (1 - s) * kr[a]! + s * kr[b]! + (1 - Math.min(ks[a]!, ks[b]!)) * ask
+        if (ks[a] === 1 && ks[b] === 1) {
+          v = (1 - s) * kr[a]! + s * kr[b]!
+          g = (1 - s) * ka[a]! + s * ka[b]!
+        } else {
+          const chord = (kp[b]! - kp[a]!) / h - (kr[a]! + kr[b]!) / 2
+          v = (1 - s) * kr[a]! + s * kr[b]! + 6 * (s - s2) * chord
+          g = (kr[b]! - kr[a]! + 6 * (1 - 2 * s) * chord) / h
+        }
       } else if (kh[a] === 1) {
         //? past a hand's last sample: on along its speed, slowing to still over EXTRAPOLATE_S, then held
         const since = Math.min(tau - ta, EXTRAPOLATE_S)
         x = kp[a]! + kr[a]! * (since - (since * since) / (2 * EXTRAPOLATE_S))
         v = kr[a]! * (1 - since / EXTRAPOLATE_S)
+        g = since < EXTRAPOLATE_S ? -kr[a]! / EXTRAPOLATE_S : 0
       } else if (tau <= ku[a]!) {
         //? past a drive: along its own curve, until it runs out
         const since = tau - ta
         x = kp[a]! + kr[a]! * since + 0.5 * ka[a]! * since * since
         v = kr[a]! + ka[a]! * since
+        g = ka[a]!
       } else {
         //? run out (a page stalled, a tab hidden): nothing to follow - it slows to still where it is
         follow = false
       }
       if (follow) {
-        desired = v + (x - state.pos) / FOLLOW_S
+        //? the path's speed, SMOOTH_S ahead (what the one-pole smoothing would lag by), and the steering
+        desired = v + SMOOTH_S * g + (x - state.pos) / FOLLOW_S
         if (desired > MAX_RATE) desired = MAX_RATE
         else if (desired < -MAX_RATE) desired = -MAX_RATE
       }

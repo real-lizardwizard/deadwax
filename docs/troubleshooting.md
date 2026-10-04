@@ -657,6 +657,21 @@ shows when it can't find one. In the order to check:
   button at the top right. (A picture replaced by hand can take up to five minutes to change: the
   phone keeps one that long.)
 
+## The turntable's sound warbles or buzzes as you turn the record
+
+Until 2.0.0-player.27 the record's sound had a fast flutter on it whenever your hand's speed was
+changing, which is nearly always: "warbly, like there's a dragonfly sound on top of the music". The
+pitch followed the jitter in the phone's touch readings. It now works each touch's speed out from the
+touches either side of it and plays about an eighth of a second behind your hand (120 ms; about 163
+over plain `http://`) instead of a twentieth. If you still hear it:
+
+- **A slow wobble** as you turn is your hand: the pitch follows the record's speed, as on a real deck.
+- **Clicks or crackle**, rather than a wobble, on a page opened over plain `http://`: the sound is made
+  on the page's main thread there (**Info** > **Debug** > **Turntable sound** says "On the main
+  thread"), and a very busy phone can make it late. Say so if you hear it.
+- **The record feels late under your finger**: that is the eighth of a second. It can be shortened, at
+  the cost of some of the steadiness.
+
 ## The turntable makes no sound when you turn the record
 
 Since 2.0.0-player.14 [the turntable](player.md#the-turntable) has its own sound: turning the record

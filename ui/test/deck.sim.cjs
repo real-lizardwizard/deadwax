@@ -286,7 +286,7 @@ const DELAY = voice.HAND_DELAY_S
 console.log('\nthe voice: its position is the sum of its rate')
 {
   const state = voice.newVoiceState()
-  check('it plays its path HAND_DELAY_S (50 ms) behind - the literal in newVoiceState, the voice naming nothing outside itself', [DELAY, state.delay], [0.05, 0.05])
+  check('it plays its path HAND_DELAY_S (120 ms since 2.0.0-player.27, 50 before) behind - the literal in newVoiceState, the voice naming nothing outside itself', [DELAY, state.delay], [0.12, 0.12])
   voice.voiceCommand(state, sine(30), 0, SR)
   voice.voiceCommand(state, { type: 'take', at: 12, rate: 1, time: 0, until: 100 }, 0, SR)
   render(state, 1, 0)
@@ -324,12 +324,15 @@ console.log('\na change of speed is smoothed, and never jumps the sound')
   }
   const steps = rates.slice(1).map((r, i) => Math.abs(r - rates[i]))
   check('1 to -1 in an instant: the rate it reads at moves no more than a few thousandths a sample', Math.max(...steps) < 0.005, true)
-  for (let i = 0; i < 4800; i++) {
+  for (let i = 0; i < 9600; i++) {
     voice.renderVoice(state, [new Float32Array(1), new Float32Array(1)], 1, SR, t)
     rates.push(state.rate)
     t += 1 / SR
   }
-  check('...and settles at -1 within about 150 ms of reaching it on its path (catching up the position it was told on the way)', near(rates.at(-1), -1, 0.01), true)
+  //? the drive moves the path it had already started playing (the take's straight line) onto the curve to
+  //? -1, 38 ms of the song further on: the steering takes that up over FOLLOW_S - 0.1 s since
+  //? 2.0.0-player.27 (0.04 before), so within 1% about 240 ms after reaching -1 on its path, where it was 150
+  check('...and settles at -1 within about 250 ms of reaching it on its path (catching up the position it was told on the way)', near(rates.at(-1), -1, 0.01), true)
   const swing = voice.newVoiceState()
   voice.voiceCommand(swing, sine(30), 0, SR)
   voice.voiceCommand(swing, { type: 'take', at: 15, rate: 1, time: 0, until: 100 }, 0, SR)
@@ -380,16 +383,25 @@ console.log('\nsilence: held still, and outside the window')
   check('...however loud the sample it rests on', Math.abs(held.window.channels[0][Math.round((held.pos - 10) * SR)]) > 0.01, true)
   const turned = voice.newVoiceState()
   voice.voiceCommand(turned, sine(30), 0, SR)
-  voice.voiceCommand(turned, { type: 'take', at: 15, rate: 1, time: 0, until: 100 }, 0, SR)
-  render(turned, 0.2, 0)
-  voice.voiceCommand(turned, { type: 'drive', at: turned.pos, rate: 0, time: 0.2, until: 100 }, 0.2, SR)
+  voice.voiceCommand(turned, { type: 'take', at: 15, rate: 1, time: 0, until: 0.12 }, 0, SR)
+  //? turned at 1x, told a frame at a time as the deck tells it, then the finger rests at 0.2 s: where the
+  //? record is then, still (told only once at 0.2, after the delay had started playing the take's own
+  //? line past it, the path stepped onto the stop 19 ms of the song on - and the steering's creep back to it
+  //? made a sound for as long as it took: unnoticed with 2.0.0-player.24's FOLLOW_S of 40 ms, not with
+  //? 2.0.0-player.27's 0.1 s)
+  for (let frame = 1; frame <= 12; frame++) {
+    const time = frame / 60
+    render(turned, 1 / 60, time - 1 / 60)
+    voice.voiceCommand(turned, { type: 'drive', at: 15 + Math.min(time, 0.2), rate: time < 0.2 - 1e-9 ? 1 : 0, time, until: time + 0.12 }, time, SR)
+  }
   const stopped = render(turned, 0.6, 0.2).left
   check('turned, then the finger rests: silent once it has stopped', peak(stopped, Math.round(0.4 * SR)) < 1e-4, true)
   const outside = voice.newVoiceState()
   voice.voiceCommand(outside, sine(2, 440, 10), 0, SR)
   voice.voiceCommand(outside, { type: 'take', at: 11.9, rate: 1, time: 0, until: 100 }, 0, SR)
   const across = render(outside, 0.4, 0).left
-  check('read on past the window\'s end: silent after it', peak(across, Math.round(0.2 * SR)) < 1e-4, true)
+  //? taken 0.1 s short of the end, the delay behind: at the edge 0.1 s plus the delay on
+  check('read on past the window\'s end: silent after it', peak(across, Math.round((0.15 + DELAY) * SR)) < 1e-4, true)
   check('...the edge faded, not cut: no step bigger than the signal\'s own', biggestStep(across.slice(20)) <= SIGNAL_STEP * 1.2, true)
   const none = voice.newVoiceState()
   voice.voiceCommand(none, { type: 'take', at: 5, rate: 1, time: 0, until: 100 }, 0, SR)

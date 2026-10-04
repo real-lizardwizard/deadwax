@@ -16,11 +16,17 @@
  *    late, half a pixel of jitter on each at 120 px from the spindle, with the audio's clock stepping
  *    5.8 ms (desktop Brave) and 21.3 ms (an iPhone), on the worklet and on the main thread: at least 90%
  *    of cycles within 3% of the hand's speed in the steady part, and the read position where the hand
- *    was HAND_DELAY_S before - within a few ms, plus the main thread's constant lag there. A hand that
- *    speeds up and slows down, and one that turns back and forth, followed within a few ms.
+ *    was HAND_DELAY_S (120 ms) before - within a few ms, plus the main thread's constant lag there. A
+ *    hand that speeds up and slows down, and one that turns back and forth, followed within a few ms.
  *  - THE OLD WAY FAILS IN THE SAME HARNESS: the page side as it was before 2.0.0-player.24 - each sample
  *    timed when its handler ran, one drive a frame at the hand's speed over its last 40 ms taken at the
  *    frame's time, stamped with a fresh `currentTime` - into today's voice: nowhere near 90%.
+ *  - THE WARBLE (2.0.0-player.27): hands whose speed CHANGES - 1x give or take 10% 1.3 times a second,
+ *    and 0.4x to 1.6x and back - with a finger's jitter (Gaussian, 1.5 ms of the sample's own time and 1
+ *    ms of the song's place; and whole-pixel positions), on both hosts and clocks: the pitch's error
+ *    against the hand's speed by band, the buzz (12-45 Hz, James's "dragonfly sound on top of the
+ *    music") under 0.15% and the slow wobble (4-12 Hz) under 1.1%. And 2.0.0-player.24's own voice,
+ *    frozen in fixtures/deckVoice-2.0.0-player.24.cjs, in the same harness: a buzz of 0.8-3.3%.
  *  - WHAT TURNTABLE HANDS THE DECK: every sample a move carries - each of getCoalescedEvents(), in order
  *    - with its own time, never when the handler ran; the record taken at the time of the sample that
  *    crossed a tap's few pixels; and each sample reaching the voice as a 'hand' knot - no drive a frame.
@@ -31,8 +37,8 @@
  *    was taken), a hand that rests and moves on, a release after a rest (nothing swung across the gap),
  *    the window's edge, a ring overrun by 240 samples a second, and samples out of order.
  *  - ITS REVIEW: harder hands - Gaussian jitter of 0.5 and 1 px, a grip 60 and 80 px from the spindle,
- *    whole-pixel positions - still at least 90% within 3%, the fit's lines kept by the jitter measured
- *    rather than a fixed threshold; a hand changing speed followed at 80%; letting go of a moving record
+ *    whole-pixel positions - still at least 90% within 3% (80% for the 60 px grip since 2.0.0-player.27's
+ *    one fit, whose window is shorter than .24's longest lines); a hand changing speed followed at 80%; letting go of a moving record
  *    0-30 ms after its last move with no stall (the plan from the last sample's moment), and 45-60 ms
  *    after with the sound still meanwhile and no swing back; letting go at 1x, the record's sound
  *    stopping HAND_DELAY_S short of where the song plays on; a coast caught by a sample older than its
@@ -195,8 +201,15 @@ define('fetch', async (url) => {
 })
 define('AudioContext', FakeContext)
 
+//? the voice as it was in 2.0.0-player.24, frozen (fixtures/), for "the warble": while `oldVoice` is in
+//? use, deck.js and the hosts here make, tell and render that one instead - everything else the same
+const ownVoice = { newVoiceState: voice.newVoiceState, voiceCommand: voice.voiceCommand, renderVoice: voice.renderVoice }
+const oldVoice = require(path.join(__dirname, 'fixtures/deckVoice-2.0.0-player.24.cjs'))
+let voiceInUse = ownVoice
+voice.newVoiceState = () => voiceInUse.newVoiceState()
+voice.voiceCommand = (...args) => voiceInUse.voiceCommand(...args)
 //? the main-thread voice's renders, spied where deck.js reaches them, for where its read head is
-const realRender = voice.renderVoice
+const realRender = (...args) => voiceInUse.renderVoice(...args)
 voice.renderVoice = (state, outputs, frames, rate, now) => {
   realRender(state, outputs, frames, rate, now)
   if (world?.host === 'script') world.positions.push([now + frames / rate, state.pos])
@@ -371,7 +384,7 @@ const RADIANS_PER_SECOND_OF_SONG = (2 * Math.PI) / tt.SECONDS_PER_TURN
  * a second (coalesced two to a frame at 120), for `ms`, then let go. Returns what came out, and what it
  * should have been.
  */
-async function handRun({ host, rate, step, songAt, speedAt, hz = 60, ms = 3000, noise = 0.5, noiseKind = 'uniform', radius = RADIUS_PX, whole = false, paused = false, liftGap = null, rest = 0, cold = null }) {
+async function handRun({ host, rate, step, songAt, speedAt, hz = 60, ms = 3000, noise = 0.5, noiseKind = 'uniform', radius = RADIUS_PX, whole = false, paused = false, liftGap = null, rest = 0, cold = null, timeJitterMs = 0, placeJitterS = 0 }) {
   real += 500
   timers = []
   frames = []
@@ -429,8 +442,17 @@ async function handRun({ host, rate, step, songAt, speedAt, hz = 60, ms = 3000, 
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random()) * noise
   }
   const pixel = (value) => (whole ? Math.round(value) : value)
+  //? and, where asked, the sample's place in the song off by a Gaussian `placeJitterS` along the circle,
+  //? and its place that of a moment off its own time by a Gaussian `timeJitterMs` (a finger's touch read
+  //? a little early or late)
+  const gauss = () => {
+    let u = 0
+    while (u === 0) u = random()
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random())
+  }
   const sample = (time) => {
-    const theta = angle0 + songAt(time - start) * RADIANS_PER_SECOND_OF_SONG
+    const off = timeJitterMs ? gauss() * timeJitterMs : 0
+    const theta = angle0 + (songAt(time - start + off) + (placeJitterS ? gauss() * placeJitterS : 0)) * RADIANS_PER_SECOND_OF_SONG
     return {
       pointerId: 1, isPrimary: true, pointerType: 'touch', button: 0, timeStamp: time,
       clientX: pixel(CENTRE.x + radius * Math.cos(theta) + jitter()),
@@ -471,7 +493,7 @@ async function handRun({ host, rate, step, songAt, speedAt, hz = 60, ms = 3000, 
   const taken = calls.takeOver[0]
   const report = deckModule.deckReport()
   view.unmount()
-  return { live, deck, start, ms, offset, taken, songAt, speedAt, report, world, first, lift, lastMove, player, resumedAt }
+  return { live, deck, start, ms, offset, taken, songAt, speedAt, report, world, first, lift, lastMove, player, resumedAt, delay: voiceInUse === oldVoice ? oldVoice.HAND_DELAY_S : DELAY }
 }
 
 /**
@@ -509,6 +531,59 @@ function listen(run, { from = 500, to = 150 } = {}) {
   const errors = cycles.map((cycle) => cycle.rate / cycle.want - 1)
   const sd = Math.sqrt(errors.reduce((sum, e) => sum + e * e, 0) / Math.max(1, errors.length))
   return { cycles: cycles.length, within: round(within), sd: round(sd, 4), worstMs: round(worst * 1000, 2) }
+}
+
+/**
+ * How far the pitch strays from the hand's own speed, split by how fast it wavers (THE WARBLE): each
+ * cycle of the tone, its rate over the hand's speed at the moment of the hand it stands for (the run's
+ * own delay, the main thread's lag, the clock's mapping), less 1 - laid on an even grid of `hz` a second,
+ * 1024 of them (2.56 s of the steady part) under a Hann window - and the RMS of that error, in per cent of
+ * the hand's speed, in each band: under 4 Hz (the hand's own swings, and the fit's lag on them), 4-12 (a
+ * slow wobble), 12-45 (the buzz James heard - a "dragonfly sound on top of the music") and 45 up.
+ */
+function rateBands(run, { from = 500, to = 150, hz = 400 } = {}) {
+  const { world, start, ms, offset, taken, speedAt, delay } = run
+  const lag = world.host === 'script' ? (deckModule.SCRIPT_LAG_BLOCKS * 1024) / world.rate : 0
+  const handFor = (t) => (t - delay - lag - offset) * 1000
+  const data = world.output
+  const points = []
+  let last = null
+  for (let i = 1; i < data.length; i++) {
+    if (data[i - 1] < 0 && data[i] >= 0) {
+      const t = (i - 1 + -data[i - 1] / (data[i] - data[i - 1])) / world.rate
+      if (last !== null) {
+        const page = handFor((t + last) / 2)
+        if (page >= taken.args[0] + from && page <= start + ms - to) points.push([page, 1 / (440 * (t - last)) / Math.abs(speedAt(page - start)) - 1])
+      }
+      last = t
+    }
+  }
+  const n = 1024, every = 1000 / hz
+  if (!points.length || points.at(-1)[0] - points[0][0] < n * every) return null
+  const grid = new Float64Array(n)
+  let j = 0
+  for (let i = 0; i < n; i++) {
+    const page = points[0][0] + i * every
+    while (j + 2 < points.length && points[j + 1][0] < page) j++
+    const [p0, e0] = points[j], [p1, e1] = points[j + 1]
+    grid[i] = (e0 + ((e1 - e0) * (page - p0)) / (p1 - p0)) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n))
+  }
+  const cos = Float64Array.from({ length: n }, (_, i) => Math.cos((2 * Math.PI * i) / n))
+  const power = new Float64Array(n / 2)
+  for (let k = 1; k < n / 2; k++) {
+    let re = 0, im = 0
+    for (let i = 0; i < n; i++) {
+      re += grid[i] * cos[(k * i) % n]
+      im -= grid[i] * cos[(k * i + (3 * n) / 4) % n]
+    }
+    power[k] = re * re + im * im
+  }
+  const band = (lo, hi) => {
+    let sum = 0
+    for (let k = 1; k < n / 2; k++) if ((k * hz) / n >= lo && (k * hz) / n < hi) sum += power[k]
+    return round(Math.sqrt((sum * 2) / (n * n) / 0.375) * 100, 3)
+  }
+  return { under4: band(0, 4), slow: band(4, 12), buzz: band(12, 45), above: band(45, hz / 2) }
 }
 
 /**
@@ -613,12 +688,18 @@ async function main() {
     //? degrades with the finger rather than falling off a fixed threshold (review of 2.0.0-player.24:
     //? Gaussian jitter of 0.5 px at 0.5x was 59-77% within 3%, of 1 px at 1x 37-52%, a 60 px grip at
     //? 0.5x 54-77% - the line dropped for a 0.1 s parabola, and the chord between places carried the rest)
+    //? Since 2.0.0-player.27 every sample is fitted over the same 0.12 s either side (centred, so no end of a
+    //? curve carries jitter into the pitch - the dragonfly James heard), where .24 averaged a steady hand
+    //? over lines up to 0.4 s long. The cost is in the slow wobble of the heaviest jitter: the 60 px grip at
+    //? 0.5x - half a pixel there is 2.4 ms of the song, against the hand's 8 ms a sample - was 93-98% within
+    //? 3% under .24 and is 83-97% now, so it is held to 80%; the rest still to 90% (.24: 95-100%). What the
+    //? warble was - rate error above 12 Hz - is held by the band pin below
     const harder = [
-      ['Gaussian jitter, 0.5 px each axis, at 0.5x', { speed: 0.5, noiseKind: 'gauss', noise: 0.5 }],
-      ['Gaussian jitter, 1 px each axis, at 1x', { speed: 1, noiseKind: 'gauss', noise: 1 }],
-      ['a grip 60 px from the spindle, at 0.5x', { speed: 0.5, radius: 60 }],
-      ['a grip 80 px from the spindle, at 0.5x', { speed: 0.5, radius: 80 }],
-      ['whole-pixel positions and no jitter, 90 px out, at 0.5x', { speed: 0.5, radius: 90, whole: true, noise: 0 }],
+      ['Gaussian jitter, 0.5 px each axis, at 0.5x', { speed: 0.5, noiseKind: 'gauss', noise: 0.5 }, 0.9],
+      ['Gaussian jitter, 1 px each axis, at 1x', { speed: 1, noiseKind: 'gauss', noise: 1 }, 0.9],
+      ['a grip 60 px from the spindle, at 0.5x', { speed: 0.5, radius: 60 }, 0.8],
+      ['a grip 80 px from the spindle, at 0.5x', { speed: 0.5, radius: 80 }, 0.9],
+      ['whole-pixel positions and no jitter, 90 px out, at 0.5x', { speed: 0.5, radius: 90, whole: true, noise: 0 }, 0.9],
     ]
     const rows = []
     for (const host of ['worklet', 'script']) {
@@ -629,9 +710,9 @@ async function main() {
         }
       }
     }
-    for (const [name] of harder) {
+    for (const [name, , least] of harder) {
       const mine = rows.filter((row) => row.name === name)
-      check(`${name}, both hosts and clocks: at least 90% of cycles within 3% of the hand's speed - ${mine.map((row) => Math.round(row.within * 100)).join(', ')}%`, mine.every((row) => row.within >= 0.9), true)
+      check(`${name}, both hosts and clocks: at least ${Math.round(least * 100)}% of cycles within 3% of the hand's speed - ${mine.map((row) => Math.round(row.within * 100)).join(', ')}%`, mine.every((row) => row.within >= least), true)
     }
   }
 
@@ -645,6 +726,58 @@ async function main() {
     console.log(`    (${host}: speeding up and slowing down ${JSON.stringify(heardSwing)}; back and forth ${JSON.stringify(heardScratch)})`)
     check(`${host === 'worklet' ? 'the worklet' : 'the main thread'}: from 0.4x to 1.6x and back - the read head within 5 ms of where the hand was, and 80% of cycles within 3% of its speed (as it changes, the knots' own speeds from the stretch that still agrees, the chord between them where it isn't steady - 72-75% before review); turned back and forth at up to 1.5x, once a second - within 6`,
       [heardSwing.worstMs <= 5, heardSwing.within >= 0.8, heardScratch.worstMs <= 6], [true, true, true])
+  }
+
+  console.log('\nTHE WARBLE: a hand whose speed is changing, as every real hand\'s is - no buzz on top of the music (2.0.0-player.27)')
+  {
+    //? James, on 2.0.0-player.24: scrubbing "sounds warbly, like there's a dragonfly sound on top of the
+    //? music". A steady hand at an exact speed - every run above - never showed it: .24 averaged a steady
+    //? hand over long straight lines, and fell back to a 0.1 s parabola read at its NEWEST end whenever the
+    //? hand's speed changed, which carried the finger's jitter several times over into the pitch. So: hands
+    //? whose speed changes (1x give or take 10% 1.3 times a second; 0.4x to 1.6x and back every 2 s), with
+    //? a finger's jitter (Gaussian, 1.5 ms of its own time and 1 ms of the song's place, on every sample;
+    //? and, apart, whole-pixel positions 120 px out), on both hosts and both clocks - and the pitch's error
+    //? against the hand's own speed, by band (rateBands). Today's: the buzz (12-45 Hz) under 0.15% of the
+    //? hand's speed (0.03-0.11% measured), the slow wobble (4-12 Hz) under 1.1% (0.21-0.97), and what is
+    //? above 45 Hz - the knots' own rate, 60 a second - under 0.01% (0.002-0.006: each knot's change of
+    //? speed is its fit's, not the jump between two knots' speeds, 0.007-0.021). The voice as
+    //? it was in 2.0.0-player.24 (frozen in fixtures/), the same hands and harness: a buzz of 0.8-3.3%
+    const hands = [
+      ['1x give or take 10%, 1.3 times a second', (ms) => ms / 1000 + (0.1 / (2 * Math.PI * 1.3)) * (1 - Math.cos((2 * Math.PI * 1.3 * ms) / 1000)), (ms) => 1 + 0.1 * Math.sin((2 * Math.PI * 1.3 * ms) / 1000)],
+      ['0.4x to 1.6x and back', (ms) => ms / 1000 + (0.6 / Math.PI) * Math.sin((Math.PI * ms) / 1000), (ms) => 1 + 0.6 * Math.cos((Math.PI * ms) / 1000)],
+    ]
+    const fingers = [
+      ['Gaussian jitter of 1.5 ms and 1 ms of the song', { noise: 0, timeJitterMs: 1.5, placeJitterS: 0.001 }],
+      ['whole pixels', { noise: 0, whole: true }],
+    ]
+    const measure = async (which) => {
+      voiceInUse = which
+      const rows = []
+      try {
+        for (const host of ['worklet', 'script']) {
+          for (const [rate, step] of [[44100, 256], [48000, 1024]]) {
+            for (const [hand, songAt, speedAt] of hands) {
+              for (const [finger, how] of fingers) {
+                const run = await handRun({ host, rate, step, ms: 4000, songAt, speedAt, ...how })
+                rows.push({ host, step, hand, finger, ...rateBands(run) })
+              }
+            }
+          }
+        }
+      } finally {
+        voiceInUse = ownVoice
+      }
+      return rows
+    }
+    const today = await measure(ownVoice)
+    console.log('    ' + today.map((row) => JSON.stringify(row)).join('\n    '))
+    const worst = (rows, key) => Math.max(...rows.map((row) => row[key]))
+    check(`today: the buzz (12-45 Hz) under 0.15% of the hand's speed, the slow wobble (4-12 Hz) under 1.1%, and above 45 Hz (the touches' own rate) under 0.01%, on every hand, finger, host and clock (worst ${worst(today, 'buzz')}%, ${worst(today, 'slow')}% and ${worst(today, 'above')}%)`,
+      today.filter((row) => !(row.buzz < 0.15 && row.slow < 1.1 && row.above < 0.01)).map((row) => JSON.stringify(row)), [])
+    const before = await measure(oldVoice)
+    console.log('    ' + before.map((row) => JSON.stringify(row)).join('\n    '))
+    check(`2.0.0-player.24's voice, the same hands and harness: the buzz past 0.5% on every one - the dragonfly (${Math.min(...before.map((row) => row.buzz))}% to ${worst(before, 'buzz')}%)`,
+      before.filter((row) => !(row.buzz > 0.5)).map((row) => JSON.stringify(row)), [])
   }
 
   console.log('\nletting go of a moving record: the sound carries on with the platter as the finger lifts - no stall, and after a rest no swing back')
@@ -687,8 +820,11 @@ async function main() {
       rows.push({ host, kind: release.motion.kind, played: release.result.play, skippedMs: round((release.result.seek - heardTo) * 1000, 1), lagMs: round(lag * 1000, 1) })
     }
     console.log('    ' + rows.map((row) => JSON.stringify(row)).join('\n    '))
-    check('turned at 1x and let go 8 ms after the last move: the song played from where the hand let go, in the release; the record\'s sound stopped there too, short of it by about HAND_DELAY_S less the 8 ms (30-50 ms of the song) - on the main thread, as much as its lag more (the stop waits for the next block, which plays a block on: 0-50 ms more than the lag)',
-      rows.map((row) => [row.kind, row.played, row.skippedMs >= (row.lagMs ? 0 : 30) + row.lagMs && row.skippedMs <= 50 + row.lagMs]), rows.map(() => ['turning', true, true]))
+    //? (30-50 ms of the song while the delay was 50 ms; 92-120 since 2.0.0-player.27's 120 - measured 113.7,
+    //? and 132.2 on the main thread with its 42.7 ms lag)
+    const delayMs = DELAY * 1000
+    check('turned at 1x and let go 8 ms after the last move: the song played from where the hand let go, in the release; the record\'s sound stopped there too, short of it by about HAND_DELAY_S less the 8 ms (HAND_DELAY_S less 20 ms to HAND_DELAY_S of the song) - on the main thread, as much as its lag more (the stop waits for the next block, which plays a block on: 0 to HAND_DELAY_S more than the lag)',
+      rows.map((row) => [row.kind, row.played, row.skippedMs >= (row.lagMs ? 0 : delayMs - 20) + row.lagMs && row.skippedMs <= delayMs + row.lagMs]), rows.map(() => ['turning', true, true]))
   }
 
   console.log('\nthe first grab of a still record after its context was suspended and resumed: stamped steadily, sounding as any grab from still does')
@@ -1047,7 +1183,10 @@ async function main() {
         const samples = samplesOf((t) => 20 + speed * t, 1.2).filter((sample) => !gone(sample.time))
         let worst = 0, fastest = 0, slowest = Infinity
         feed(state, samples, 1.2, (t, s) => {
-          if (t > 0.2) {
+          //? from 0.3 s after the voice reaches the hand's path (the take is at 1x, the hand at its own
+          //? speed: what the steering takes up there is the take's, not the gap's - 0.15 s after it before
+          //? 2.0.0-player.27, whose FOLLOW_S of 40 ms settled it sooner than 0.1 s does)
+          if (t > DELAY + 0.3) {
             worst = Math.max(worst, Math.abs(s.pos - (20 + speed * (t - DELAY))))
             fastest = Math.max(fastest, s.rate / speed)
             slowest = Math.min(slowest, s.rate / speed)
@@ -1059,8 +1198,8 @@ async function main() {
     console.log('    ' + rows.map((row) => JSON.stringify(row)).join('\n    '))
     check('two of a moving hand\'s samples gone missing (a 50 ms gap) at 0.5x, 1x and 2x: not a rest - the path runs on through the gap, the speed within 4% of the hand\'s and the read head within a millisecond of it (review of 2.0.0-player.24: read as a stop - 0.14x, then 2.2x, 20-40 ms astray)',
       rows.filter((row) => row.missing === 2 && !(row.worstMs <= 1 && row.fastest <= 1.04 && row.slowest >= 0.96)).map((row) => JSON.stringify(row)), [])
-    check('...three (67 ms, longer than the delay holds): the voice runs out of path and its run-on slows it, but it is caught up gently - never faster than 1.2x the hand, never more than 10 ms of the song per 1x astray (as a stop: 3.2x, 38 ms at 1x)',
-      rows.filter((row) => row.missing === 3 && !(row.fastest <= 1.2 && row.worstMs <= 10 * row.speed)).map((row) => JSON.stringify(row)), [])
+    check('...three (67 ms): since 2.0.0-player.27 the delay (120 ms) holds that too - the same as two: within a millisecond and 4% (under 2.0.0-player.24\'s 50 ms the voice ran out of path, its run-on slowing it to 0.34x and 9 ms astray at 1x; as a stop: 3.2x, 38 ms at 1x)',
+      rows.filter((row) => row.missing === 3 && !(row.worstMs <= 1 && row.fastest <= 1.04 && row.slowest >= 0.96)).map((row) => JSON.stringify(row)), [])
     //? two gone from a hand speeding up, 1x to 3x in half a second: where the samples resume isn't where its
     //? speed at the last would have put it - 5 ms further - yet it kept moving (KEPT_ON: within a quarter of
     //? the way it went)
@@ -1117,7 +1256,7 @@ async function main() {
     feed(state, samples, 1.3, (t, s) => {
       if (t > 0.5 && t < 0.85 + DELAY) furthest = Math.max(furthest, s.pos)
       if (t > 0.85 + DELAY - 0.02 && t < 1 + DELAY) slowest = Math.min(slowest, s.rate)
-      if (t > 1.1) worst = Math.max(worst, Math.abs(s.pos - x(t - DELAY)))
+      if (t > 0.85 + DELAY + 0.25) worst = Math.max(worst, Math.abs(s.pos - x(t - DELAY)))
     })
     check('a hand that eases to rest: it stops where the hand did - past it by no more than the voice\'s own smoothing lags a stop that brisk (3 ms) - not run on past it',
       round(furthest - 20.475, 4) <= 0.003, true)
