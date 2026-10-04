@@ -665,10 +665,11 @@ row (**•••** on the now-playing screen, then **Info**, then **Debug**) say
 - **`Off: this browser couldn't decode its window - …`**: the phone refused the stretch of the song
   deadwax sent. The words after the dash are the browser's own: they are what to report.
 - **`Off: deadwax didn't send it - …`**: deadwax cuts the stretch from the copy of the song the phone
-  plays (the one it keeps in the player's cache), and couldn't just then - the cache unusable or its
-  disk short of space (see
-  [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which covers the cache), or
-  Navidrome not answering. It asks again after ten seconds.
+  plays - the one it keeps in the player's cache, or for a song the phone plays as the FLAC it is, the
+  FLAC itself on Navidrome - and couldn't just then: Navidrome not answering, or breaking off, or a
+  copy that had to be made and couldn't - the cache unusable or its disk short of space (see
+  [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which covers the cache). It
+  asks again after ten seconds.
 - **`Off: this browser has neither an AudioWorklet nor a ScriptProcessorNode to play it`**, **`no
   Web Audio`**, **`the sound couldn't start - …`** or **`the sound's ScriptProcessorNode couldn't be
   made - …`**: the browser can't play it - the words after the dash are its own.
@@ -700,12 +701,13 @@ bottom right of the screen (move the pointer, or click or tap, if the controls h
 - **"This song can't be seen - it isn't a FLAC file."** Only FLAC songs have that copy, as only they
   have the turntable's sound. An MP3, AAC or any other song always shows the idle pattern.
 - **"This song can't be seen just now - deadwax couldn't send its sound."** deadwax cuts the copy
-  from the copy of the song the player's cache keeps - making that first, when the page plays the
-  FLAC as it is - and couldn't just then: Navidrome not answering, or the cache unusable or its disk
-  short of space (see [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which
-  covers the cache). It tries again after ten seconds by itself.
+  from the copy of the song the player's cache keeps, or - when the page plays the FLAC as it is -
+  straight from the FLAC on Navidrome, and couldn't just then: Navidrome not answering or breaking
+  off, or a copy that had to be made and couldn't - the cache unusable or its disk short of space (see
+  [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which covers the cache). It
+  tries again after ten seconds by itself.
 - **"This song can't be seen - …"** with deadwax's own words after the dash (a song deadwax won't cut
-  a stretch from - too big to hold, say) or **"this browser couldn't read its sound"**: that song stays
+  a stretch from - a file cut short, say) or **"this browser couldn't read its sound"**: that song stays
   unseen until you leave the visualizer and open it again; other songs are unaffected.
 - **"This browser can't analyse sound, so the song can't be seen."** The browser has no Web Audio, or
   wouldn't make it - every song shows the idle pattern there.
@@ -714,19 +716,28 @@ bottom right of the screen (move the pointer, or click or tap, if the controls h
 copy is fetched as the song plays - about a second's wait for each new stretch on a home network -
 so the first second after opening it, after a seek or after a skip can be still. One song flowing
 into the next doesn't wait: the next song's first stretch is fetched in the last few seconds of the
-one before. In Chrome, Firefox or Edge with Gapless off (the default), the first stretch of a song
-can take a few seconds more: deadwax first makes that song's copy in the player's cache (Safari, the
-gapless stream and a resampled hi-res song have it made already). **It stops moving while the music
-plays on**: the browser may have suspended its sound with the page in the background; a click
-anywhere on the visualizer, or any key, starts it again.
+one before. **It stops moving while the music plays on**: the browser may have suspended its sound
+with the page in the background; a click anywhere on the visualizer, or any key, starts it again.
 
-**The player's cache fills up faster, and iPhone songs take a moment to start again, after an
-evening with the visualizer open**: in a browser that plays the FLAC as it is (Chrome, Firefox or
-Edge with Gapless off), every song the visualizer shows has its copy made and kept in the player's
-cache, as Safari's would be - the whole song fetched from Navidrome once more - and counts against
-[`PLAYER_CACHE_MB`](configuration.md#paths) like any other. The songs played longest ago are cleared
-to make room, an iPhone's among them, and wait a moment to be made again the next time they play.
-Raise `PLAYER_CACHE_MB` if you have the space, or close the visualizer when you aren't watching it.
+**The player's cache fills up after an evening with the visualizer open**: it shouldn't, since
+2.0.0-player.23. In a browser that plays the FLAC as it is (Chrome, Firefox or Edge with Gapless off),
+deadwax reads each stretch the visualizer shows straight out of the FLAC on Navidrome, a little at a
+time, and keeps nothing of it in the player's cache (until then each song shown had a copy made and
+kept there, counted against [`PLAYER_CACHE_MB`](configuration.md#paths), pushing an iPhone's songs
+out). Where it can't, deadwax's log says so once for each song - `a window of song … can't be cut
+straight from its FLAC - …` - and that song's stretches are cut from a copy made in the cache, as
+before (when the cache itself can't be used, the line ends `its windows can't be had` instead, and
+the visualizer says the song can't be seen just now). The words after the dash say why: a FLAC laid
+out unusually (dozens of large pictures in front of its audio, say, or a seek table that points at
+the wrong places), or something in front of Navidrome - a proxy - answering a request for part of a
+file with another part, or with more than was asked for, or with the whole file once the request is
+longer than a few bytes. (Words beginning `reading it went wrong` are a fault in deadwax itself, not
+in the file - worth reporting, with the line; the stretches still come from the copy.) A proxy should
+pass those requests on to Navidrome as they are. One that ignores every request for part of a file
+shows differently, and in more places: every FLAC song's visualizer says **"This song can't be seen -
+Navidrome didn't answer a range of the file"**, the phone's turntable is silent, Safari and iPhones
+are sent FLAC songs as they are (so their seeks land off again), and the gapless stream plays each
+song the ordinary way - nothing is made in the cache at all. The fix is the same.
 
 **The colours aren't the cover's**: until the cover has loaded, and for an album with no cover, **From
 the cover** uses the purple. A black-and-white cover gives grey - that is its colour.

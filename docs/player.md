@@ -489,14 +489,17 @@ visualizer standing still (one you skip to, or jump to, can be still for a momen
 over a plain `http://` address.
 
 What that copy costs while the visualizer shows: 40 seconds of the song fetched for every 32 played,
-and one stretch of each next song. And deadwax cuts each stretch from the copy of the song that
-[the player's cache](configuration.md#paths) keeps (the MP4 Safari plays, or the gapless stream's):
-a Mac's Safari, the gapless stream and a resampled hi-res song have it made already, but a browser that plays the FLAC as it is - Chrome, Firefox or Edge with Gapless off, the
-default - doesn't, so the first stretch of each song has deadwax make it: the whole song fetched from
-Navidrome once more (a few seconds' wait for that first stretch) and its copy kept in the cache,
-counted against `PLAYER_CACHE_MB` like any other. An evening of listening with the visualizer open
-on such a browser fills the cache with those songs, and clears the songs played longest ago to make
-room - an iPhone's included, which then wait a moment to be made again the next time they play.
+and one stretch of each next song. deadwax cuts each stretch from the copy of the song that
+[the player's cache](configuration.md#paths) keeps where there is one (the MP4 Safari plays, or the
+gapless stream's - a Mac's Safari, the gapless stream and a resampled hi-res song have it made
+already), which costs Navidrome nothing but a quick check of which file it has. A browser that plays
+the FLAC as it is - Chrome, Firefox or Edge with Gapless off, the default - has no such copy, and
+since 2.0.0-player.23 deadwax reads each stretch straight out of the FLAC on Navidrome instead: the
+start and the last few hundred bytes of the file once a song, then about the stretch's own size (a
+little more while it finds its place in a long song with no seek table) - never the whole song, and
+nothing made or kept in the cache, so the visualizer doesn't push anyone's songs out of it. (Until then the
+first stretch of each song had deadwax fetch the whole song again and keep a copy of it in the cache.)
+The stretch is the same, byte for byte, either way - the song's own audio, untouched.
 
 **"This song can't be seen".** Only FLAC songs have that copy, and a song the visualizer can't hear
 runs the effects from a calm, slow idle pattern instead, with a plain note at the bottom right
@@ -589,7 +592,9 @@ below.
     of the song the phone plays - for a hi-res song under **Maximum quality**'s **Up to 48 kHz**, the
     48 kHz copy, so the record sounds just as loud as the song - and sends as a small FLAC file of its
     own while the turntable shows and the song plays, once a tap has started the sound. An iPhone has
-    asked for that copy already, to play the song; otherwise deadwax makes it the first time. That
+    asked for that copy already, to play the song; a phone that plays the FLAC as it is gets its
+    stretches read straight out of the FLAC (since 2.0.0-player.23 - nothing made or kept), and a
+    resampled song has its copy made the first time. That
     costs about a third more data than the song itself while the turntable shows and the song plays
     (about half as much again for a hi-res song played as it is, whose stretches are shorter), and
     nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns as

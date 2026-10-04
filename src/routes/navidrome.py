@@ -470,14 +470,19 @@ async def scrub(
     what the song is playing on.
 
     Cut by deadwax from the MP4 its cache keeps of the song (src/player_cache.py, src/flac_window.py),
-    so it needs nothing from Navidrome but the version check every MP4 answer makes: the frames that
-    cover the stretch, untouched, renumbered from 0 under a STREAMINFO of their own. `max_rate=48000`,
-    as the stream route takes it, when the page plays the song resampled: the window is cut from that
-    very copy, so it sounds as the song does - its rate, its level - and nothing more is made. The answer says
+    which needs nothing from Navidrome but the version check every MP4 answer makes - or, with no MP4
+    kept of the song as it is (a page playing the FLAC as it is), straight from the FLAC on Navidrome,
+    a few byte ranges of `stream` with `format=raw` - its head, the frames that cover the stretch -
+    with nothing made or kept (2.0.0-player.23, src/flac_ranges.py; the plain MP4 made as before only
+    where that can't be done): the frames that cover the stretch, untouched, renumbered from 0 under a
+    STREAMINFO of their own, the same bytes either way. Nothing the page sends is passed on.
+    `max_rate=48000`, as the stream route takes it, when the page plays the song resampled: the window
+    is cut from that very copy, so it sounds as the song does - its rate, its level. The answer says
     exactly where in the song it sits, `X-Deadwax-Window: <first sample>/<samples>/<rate>`, since it
     starts on a frame (or a fragment of about a second) at or before `at` and a hi-res song's window
     is shorter than asked (WINDOW_MAX_BYTES). A song that isn't a FLAC is a 415 saying so - the
-    turntable is silent for it - a start past the end a 416, and a cache that can't be used a 503.
+    turntable is silent for it - a start past the end a 416, Navidrome breaking off a 503, and a cache
+    that can't be used a 503 when the window can't be cut from the FLAC either.
 
     Only `at`, `seconds` and `max_rate`: anything else is refused (422), as everything out of their
     bounds is, and any cap but 48000.

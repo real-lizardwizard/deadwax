@@ -358,22 +358,33 @@ def _frame_header(data: bytes, pos: int, info: StreamInfo):
     return number, block_size, p + 1 - pos
 
 
-def _audio_ends(data: bytes, start: int) -> list[int]:
+#? The most of the end of a file _audio_ends() reads: an APEv2 footer (32 bytes) before an ID3v1 tag
+#? (128) and its "TAG+" extension (227).
+TRAILER_MAX = 32 + 128 + 227
+
+
+def _audio_ends(data: bytes, start: int, tail: tuple[bytes, int] | None = None) -> list[int]:
     """Where the last frame could end: the end of the file, or before a tag appended to it.
 
     ID3v1 (and its "TAG+" extension) and APEv2 are the tags that turn up at the end of FLAC
     files. Each is only a candidate - the last frame's CRC-16 decides (`_last_frame_end`) - so a
     frame whose last bytes happen to spell "TAG" is not cut short by it.
+
+    `tail`, for a stretch that stops before the end of the file (2.0.0-player.23,
+    src/flac_ranges.py): the file's last bytes - TRAILER_MAX of them, or all of them from before
+    `start` - and where they begin, counted as `data`'s places are. The ends are then the file's,
+    found exactly as in the whole file, in those places. Left out, `data` is the file to its end.
     """
-    ends = [len(data)]
-    end = len(data)
-    if end - 128 > start and data[end - 128:end - 125] == b"TAG":
+    view, base = (data, 0) if tail is None else tail
+    end = base + len(view)
+    ends = [end]
+    if end - 128 > start and view[end - 128 - base:end - 125 - base] == b"TAG":
         end -= 128
-        if end - 227 > start and data[end - 227:end - 223] == b"TAG+":
+        if end - 227 > start and view[end - 227 - base:end - 223 - base] == b"TAG+":
             end -= 227
         ends.append(end)
-    if end - 32 > start and data[end - 32:end - 24] == b"APETAGEX":
-        size, flags = struct.unpack("<I4xI", data[end - 20:end - 8])
+    if end - 32 > start and view[end - 32 - base:end - 24 - base] == b"APETAGEX":
+        size, flags = struct.unpack("<I4xI", view[end - 20 - base:end - 8 - base])
         ape = size + (32 if flags & 0x80000000 else 0)
         if end - ape > start:
             ends.append(end - ape)
@@ -384,7 +395,8 @@ def _audio_ends(data: bytes, start: int) -> list[int]:
 _SYNCS = (b"\xff\xf8", b"\xff\xf9")
 
 
-def _last_frame_end(data: bytes, start: int, reach: int, checks: _Checksums) -> int | None:
+def _last_frame_end(data: bytes, start: int, reach: int, checks: _Checksums,
+                    tail: tuple[bytes, int] | None = None) -> int | None:
     """Where the frame at `start` ends if it is the last one; None if it can't be.
 
     Nothing after the last frame says where it ends, so its CRC-16 does: summed from its start,
@@ -412,11 +424,16 @@ def _last_frame_end(data: bytes, start: int, reach: int, checks: _Checksums) -> 
     Anything else appended that sums to zero and doesn't start with a sync code still gets in,
     as long as the last sample stays within the reach: one in 65,536 by chance, every time by
     design.
+
+    With `tail` (_audio_ends), `data` may stop before the end of the file, but never before the
+    furthest of those places within the reach: it is refused when it does, rather than summed short.
     """
-    ends = [end for end in _audio_ends(data, start) if end - start <= reach]
+    ends = [end for end in _audio_ends(data, start, tail) if end - start <= reach]
     if not ends:
         return None
     furthest = max(ends)
+    if furthest > len(data):
+        raise Unsupported("the stretch stops before where the last frame could end")
     syncs = []
     for sync in _SYNCS:
         at = data.find(sync, start + 1, furthest)
@@ -437,7 +454,37 @@ def _last_frame_end(data: bytes, start: int, reach: int, checks: _Checksums) -> 
     return end
 
 
-def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
+#? The longest a frame header can be: the sync code and two bytes of codes, a number of up to seven
+#? bytes, a block size and a rate of up to two each read from its end, and the CRC-8.
+HEADER_MAX = 16
+
+
+def _certain(data: bytes, info: StreamInfo, starts: list[int], blocks: list[int], fixed: bool,
+             reach: int) -> FlacFrames:
+    """
+    The frames of a stretch that stops short of the end of the file (_split_frames with `to_the_end`
+    False) whose end is certain: each one followed by the next frame's header, with at least a
+    frame's reach and a header of the stretch after its start.
+
+    Why that much: were the header taken for the next frame a false one inside this frame's audio,
+    the real next header would begin within a frame's reach of this frame's start - no frame of the
+    stream is longer - and so would be in the stretch, and found out exactly as in a whole file
+    (the number already given, the frame's CRC-16). Short of that, a later read could still move
+    the boundary, so the frame isn't answered yet. `end` is where the last certain frame ends (the
+    next one's start), or `starts[0]` when none is: there is more to read.
+    """
+    sure = 0
+    while sure + 1 < len(starts) and starts[sure] + reach + HEADER_MAX <= len(data):
+        sure += 1
+    #? none of these is the stream's last frame - another follows each - so in a fixed-block
+    #? stream every one has the same block size
+    if fixed and any(size != blocks[0] for size in blocks[:sure]):
+        raise Unsupported("a fixed-block-size stream whose frames change size")
+    return FlacFrames(info=info, starts=tuple(starts[:sure]), end=starts[sure], block_sizes=tuple(blocks[:sure]))
+
+
+def _split_frames(data: bytes, first: int, info: StreamInfo, first_number: int = 0,
+                  to_the_end: bool = True, tail: tuple[bytes, int] | None = None) -> FlacFrames:
     """Every audio frame from `first` on, found without a single false split.
 
     A frame begins with a sync code (0xFFF8, or 0xFFF9 in a variable-block-size stream), and the
@@ -476,6 +523,22 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
     The LAST frame is always checksummed, since nothing after it says where it ends: that is how
     a tag appended to the file is left out, and how a file cut short, or with something else
     appended, is refused (`_last_frame_end`).
+
+    A STRETCH of a file, too (2.0.0-player.23: the turntable's windows cut straight from the FLAC
+    on Navidrome, src/flac_ranges.py): `first` is then a frame the caller takes to begin there,
+    carrying `first_number` - its frame number, or its first sample in a variable-block stream - rather
+    than frame 0 where the metadata ends, and the rules above run from it as they do from frame 0
+    (which they never second-guess); the caller then checks that frame by its own CRC-16, to the next
+    frame found, before believing any of it.
+    With `to_the_end` False, `data` stops short of the end of the file, and nothing after the last
+    frame found says where it ends - so the frames answered are only those whose end is CERTAIN
+    (`_certain`), and the whole file's rules (the last frame's checksum, STREAMINFO's total) are
+    left to the caller. With `tail` (_audio_ends), `data` runs to where the audio can end and the
+    tags after it are given by the file's last bytes alone - a cover of megabytes in an APEv2 tag is
+    never read - and the last frame is checked against the file's own ends exactly as in the whole
+    file; the tags' bytes are then all that goes unread (in the whole file a sync code in a tag is
+    looked at, and a header there carrying the next number refuses the file). Called as it always
+    was - frame 0, to the end - it answers exactly as before.
     """
     if data[first:first + 1] != b"\xff" or data[first + 1:first + 2] not in (b"\xf8", b"\xf9"):
         raise Unsupported("no audio frame where the metadata ends")
@@ -483,10 +546,10 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
     fixed = sync == b"\xff\xf8"
     reach = _reach(info)
     got = _frame_header(data, first, info)
-    if got is None or got[0] != 0:
+    if got is None or got[0] != first_number:
         raise Unsupported("the first audio frame's header isn't valid")
     _, block_size, header_length = got
-    starts, blocks, numbers = [first], [block_size], [0]
+    starts, blocks, numbers = [first], [block_size], [first_number]
     search = first + header_length
     budget = FALSE_SYNC_BUDGET[0] + len(data) // FALSE_SYNC_BUDGET[1]
     checks = _Checksums(data)
@@ -540,22 +603,25 @@ def _split_frames(data: bytes, first: int, info: StreamInfo) -> FlacFrames:
             search = at + header_length
         elif not kept:
             raise Unsupported(f"two frames claim to be number {number}, and neither checks out")
-    shortest = min(_audio_ends(data, starts[-1])) - starts[-1]
+    if not to_the_end:
+        return _certain(data, info, starts, blocks, fixed, reach)
+    shortest = min(_audio_ends(data, starts[-1], tail)) - starts[-1]
     if shortest > reach:
         raise Unsupported(f"the last frame would be {shortest} bytes, larger than any frame of this "
                           f"stream can be ({reach}) - something is appended to the audio, or a "
                           "frame's header is damaged")
-    end = _last_frame_end(data, starts[-1], reach, checks)
+    end = _last_frame_end(data, starts[-1], reach, checks, tail)
     if end is None and len(starts) > 1:
         #? the last header found may have been audio data in the real last frame, numbered as
         #? if a frame followed it: then the frame before it checks out to the end of the file
-        end = _last_frame_end(data, starts[-2], reach, checks)
+        end = _last_frame_end(data, starts[-2], reach, checks, tail)
         if end is not None:
             del starts[-1], blocks[-1], numbers[-1]
     if end is None:
         raise Unsupported("the last frame's checksum is wrong - the file may be cut short")
     total = sum(blocks)
-    if info.total_samples and total != info.total_samples:
+    #? only a run from the stream's very start can hold every sample STREAMINFO counts
+    if first_number == 0 and info.total_samples and total != info.total_samples:
         raise Unsupported(f"the frames hold {total} samples where STREAMINFO says {info.total_samples}")
     if fixed and any(size != blocks[0] for size in blocks[:-1]):
         raise Unsupported("a fixed-block-size stream whose frames change size")

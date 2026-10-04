@@ -237,8 +237,9 @@ def test_there_is_no_general_proxy():
 
     `/scrub/{song_id}` joined it in 2.0.0-player.14, deliberately: the turntable's window of a
     song, cut from deadwax's own cache of it, with Navidrome asked only the version check every
-    MP4 answer makes - nothing passed on, and only `at`, `seconds` and `max_rate` (the stream's own
-    cap, 48000 or nothing) taken (test_scrub_window.py).
+    MP4 answer makes - or since 2.0.0-player.23, with no MP4 kept, byte ranges of the song's own
+    stream that deadwax chooses (test_flac_ranges.py) - nothing the page sent passed on, and only
+    `at`, `seconds` and `max_rate` (the stream's own cap, 48000 or nothing) taken (test_scrub_window.py).
 
     `/artists` (getArtists), `/artists/{artist_id}` (getArtist) and `/songs/{song_id}` (getSong)
     joined it in 2.0.0-player.17, deliberately: the app's Library > Artists, its artist page, and

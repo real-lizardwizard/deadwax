@@ -1,13 +1,15 @@
 """
 A stretch of a song as a FLAC file of its own, cut from deadwax's own MP4s - the turntable's sound
-(2.0.0-player.14).
+(2.0.0-player.14), and the desktop visualizer's silent copy (2.0.0-player.20).
 
 The phone's turntable plays the record's own sound while a hand turns it, while a flick coasts and
 while a pause winds it down: a stretch of the song round the playhead, decoded, and read by an
 AudioWorklet at any speed, backwards too (ui/src/lib/deckVoice.ts). The browser decodes it with
 decodeAudioData, which takes a whole file and never a piece of one - so deadwax takes the frames
 that cover the stretch out of the MP4 its cache already keeps of the song (src/player_cache.py) and
-makes them a FLAC of their own:
+makes them a FLAC of their own. With no MP4 kept of the song as it is, the same frames are read
+straight out of the FLAC on Navidrome by byte ranges instead (src/flac_ranges.py, 2.0.0-player.23)
+and made a FLAC of their own here the same way (flac_of_frames) - so the two give the very same bytes:
 
 - 'fLaC', then STREAMINFO as the only metadata block, rewritten for the window: its total samples,
   its own frames' smallest and largest sizes, and the MD5 zeroed (which FLAC reads as "not known").

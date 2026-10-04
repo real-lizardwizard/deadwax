@@ -14,11 +14,13 @@
  * next window - and for the next song's first window, in this one's last seconds, so a song change
  * carries straight on; this does what it says.
  *
- * WHAT A WINDOW COSTS deadwax: it is cut from the MP4 of the song the player's cache keeps. Safari and
- * the gapless stream have that copy made already; a page playing the FLAC as it is (Chrome, Firefox or
- * Edge with Gapless off - the default) doesn't, and the first window of each song has deadwax make it:
- * the whole song fetched from Navidrome once more and its MP4 kept in the cache, counted against
- * PLAYER_CACHE_MB like any other (docs/player.md "What it listens to").
+ * WHAT A WINDOW COSTS deadwax: it is cut from the MP4 of the song the player's cache keeps, where
+ * there is one - Safari and the gapless stream have that copy made already, as has a resampled song.
+ * A page playing the FLAC as it is (Chrome, Firefox or Edge with Gapless off - the default) has none,
+ * and since 2.0.0-player.23 its windows are cut straight from the FLAC on Navidrome by byte ranges -
+ * the song's head once, then about each window's own size - with nothing made or kept in the cache
+ * (src/flac_ranges.py; docs/player.md "What it listens to"). Until then the first window of each song
+ * had deadwax fetch the whole song again and keep its MP4, against PLAYER_CACHE_MB.
  *
  * NOTHING HERE NEEDS A SECURE PAGE (James opens deadwax over plain http): an AudioContext,
  * decodeAudioData and an AnalyserNode are all there without one; no AudioWorklet is used.
