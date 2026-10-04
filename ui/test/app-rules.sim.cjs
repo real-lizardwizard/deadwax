@@ -1394,5 +1394,22 @@ console.log('\nthe checks themselves')
     [opensBeside('<a href="/" target="_blank" rel="noopener">'), opensBeside('<a href="/" target="_blank">'), opensBeside('<a href="/" rel="noopener">')], [true, false, false])
 }
 
+//? LOADING (the audit): the Library asks Navidrome for nothing until its tab has been shown once, and a
+//? cover is asked for at one of three sizes, so the screens share what they fetch
+{
+  const app = code(read('app/App.tsx'))
+  const api = read('player/api.ts')
+  check('the Library is drawn - and so asks for its albums, covers and songs - only once its tab has shown',
+    [/\{librarySeen && <Library onOpen=\{openAlbum\}/.test(app), /if \(nav\.tab === 'library'\) setLibrarySeen\(true\)/.test(app),
+      /useState\(nav\.tab === 'library'\)/.test(app), (app.match(/<Library /g) || []).length], [true, true, true, 1])
+  const sizes = JSON.parse(/export const COVER_SIZES: readonly number\[\] = (\[[^\]]+\])/.exec(api)[1])
+  const step = (size) => sizes.find((s) => s >= size) ?? sizes[sizes.length - 1]
+  check('covers come in three sizes', sizes, [128, 400, 1024])
+  check('...every place a cover is drawn asking for the step that covers it: rows and the mini player one, tiles and the turntable\'s label one, the album page, Now Playing and the lock screen one',
+    [96, 112, 120, 260, 300, 400, 512, 800, 1000, 4000].map(step), [128, 128, 128, 400, 400, 400, 1024, 1024, 1024, 1024])
+  check('...and coverUrl asks through it, nothing else building a cover\'s address',
+    [/size=\$\{coverSize\(size\)\}/.test(api), /COVER_SIZES\.find\(\(step\) => step >= size\) \?\? COVER_SIZES\[COVER_SIZES\.length - 1\]/.test(api)], [true, true])
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

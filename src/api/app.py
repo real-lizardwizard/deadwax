@@ -1,9 +1,10 @@
+import re
 import asyncio
 from pathlib import Path
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
@@ -99,13 +100,18 @@ def start() -> FastAPI:
     #? Vite writes these with a content hash in the filename, so a given URL's contents can
     #? never change. Revalidating them would be pure waste, and caching them hard is what
     #? makes the hashing worth doing at all.
-    IMMUTABLE_PREFIXES = ("/dist/assets/",)
+    #? ...and the bundled font files: a font that changed would be a new file under a new name
+    IMMUTABLE_PREFIXES = ("/dist/assets/", "/styles/font/")
+    #? the app's icons: small, asked for on every launch, and changed about never - a day
+    DAY_PREFIXES = ("/player/icon",)
 
     #? Everything whose URL stays the same while its contents change: the hand-written
     #? interface files, and the Vite entry bundle - deliberately unhashed so the static
     #? index.html can name it (see ui/vite.config.ts), which is exactly what makes it mutable.
     #? The player's page and manifest belong here for the same reason: an installed web app
     #? revalidates on launch like any page, and a cached page is an old app.
+    #? what the app's page names with a stamp (see stamped_page): its own stylesheets and its bundle
+    STAMPED_PREFIXES = ("/player/", "/dist/", "/styles/")
     REVALIDATE_PREFIXES = ("/scripts/", "/styles/", "/assets/", "/dist/", "/player/")
 
     class RevalidateInterfaceAssets:
@@ -140,6 +146,12 @@ def start() -> FastAPI:
             #? checked first - /dist/assets/x-HASH.js matches both tuples
             if path.startswith(IMMUTABLE_PREFIXES):
                 policy = b"public, max-age=31536000, immutable"
+            elif path.startswith(STAMPED_PREFIXES) and b"v=" in scope.get("query_string", b""):
+                #? named with its own stamp by the app's page (stamped_page below): another file
+                #? would be another address, so this one never needs asking about again
+                policy = b"public, max-age=31536000, immutable"
+            elif path.startswith(DAY_PREFIXES):
+                policy = b"public, max-age=86400"
             elif path == "/" or path.startswith(REVALIDATE_PREFIXES):
                 policy = b"no-cache"
             else:
@@ -272,6 +284,34 @@ def start() -> FastAPI:
 
     logger.info("mounting static interface files")
     interface_path = Path(__file__).parent.parent.parent / "interface"
+    #? The app's page, with each stylesheet and script it names stamped with that file's own size and
+    #? time of writing (`?v=`). The page itself is still asked for on every launch (no-cache, above);
+    #? what it names is then kept for good, because a file that changed has another stamp and so
+    #? another address. Until this an installed app re-asked about every one of them on every launch -
+    #? a round trip each, over the phone's connection - to be told nothing had changed. A stamp is
+    #? read from the disk per request (a stat a file), so a new build is seen without a restart.
+    STAMPED = re.compile(r'''(?P<attr>href|src)="(?P<path>/(?:player|dist|styles)/[^"?#]+\.(?:css|js))"''')
+
+    def stamped_page() -> Response:
+        html = (interface_path / "player" / "index.html").read_text(encoding="utf-8")
+
+        def stamp(match: re.Match) -> str:
+            try:
+                found = (interface_path / match["path"].lstrip("/")).stat()
+            except OSError:
+                return match[0]
+            return f'{match["attr"]}="{match["path"]}?v={found.st_mtime_ns:x}-{found.st_size:x}"'
+
+        return Response(STAMPED.sub(stamp, html), media_type="text/html")
+
+    @app.get("/player/")
+    async def serve_app():
+        return stamped_page()
+
+    @app.get("/player/index.html")
+    async def serve_app_by_name():
+        return stamped_page()
+
     app.mount("/", StaticFiles(directory=interface_path, html=True), name="interface")
     logger.info("adding root endpoint to serve index.html")
     @app.get("/")

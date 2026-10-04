@@ -223,7 +223,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    turntable, part two" and "The record's sound follows the hand".
                    app/NeedsALook.tsx is the review queue on a desktop, its rules the pure
                    lib/needsLook.ts and its count app/useQueueSummary.ts - see "Needs a look".
-tests/             2350 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2354 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -7496,6 +7496,53 @@ on a step counter"); LibraryView.tsx, `ui/src/components/` and `ui/src/hooks/` h
     cleared answer, each alone and together), all caught, each file restored byte for byte.
     `needslook` 104 checks, `app-rules` 250.
 
+### Loading, audited (2.0.0-player.26)
+
+James: "it seems like things aren't loading very quickly ... can we just do a full audit of loading times
+and optimize as much as possible?" Measured first: every request the app makes across a cold launch, a
+relaunch, the Library, an album, Play, Search and You, on a throttled link (60 ms a round trip), in
+headless Chromium against the dev stand-ins (`/home/tokay/deadwax-scratch/work/perf/net.cjs`). Three
+things it found, each fixed:
+
+- **The hidden Library tab loaded at every launch.** It is mounted from the start (hidden, to keep its
+  scroll), and asked Navidrome for its first 60 albums, whether songs can be listed, and - once drawn -
+  their covers, beside what Home was waiting for. App now draws `<Library>` only once its tab has shown
+  (`librarySeen`, as `searchSeen` and `youSeen`); a desktop's sidebar shows Songs until the probe has
+  answered, as it did while it was pending. app-rules pins it.
+- **One album's cover came down at up to seven sizes** - 96, 112, 120, 260, 300, 400, 512, 800, 1000 by
+  where it was drawn - each its own download. `coverUrl()` (player/api.ts) now asks at one of
+  `COVER_SIZES` (128, 400, 1024: the smallest that covers the size asked), so Home's tile is the Library's
+  and the turntable's label, a row's is the mini player's, and the album page's is Now Playing's and the
+  lock screen's (the engine asks 512 through the same function - usePlayer.ts has no diff). Opening an
+  album and playing it fetched its cover four times; now twice (128 and 1024), the second from the
+  browser's cache when the page was opened first. Home's tiles are 400 where they were 260: sharper,
+  and a little larger each.
+- **Nothing static was kept.** Every stylesheet, the bundle, the font and the icons were `no-cache`, so
+  every launch of the installed app re-asked about each - ten round trips to be told nothing changed.
+  Now (src/api/app.py): `/player/` is served by `stamped_page()`, which appends `?v=<mtime>-<size>` (the
+  FILE's own, read per request, so a new build needs no restart) to each stylesheet and script the page
+  names; a request under `/player/`, `/dist/` or `/styles/` carrying `v=` is `immutable` for a year. The
+  page itself and the manifest are still `no-cache`, so an upgrade is seen at the next launch - a file
+  that changed has another stamp and so another address, which is what keeps "I upgraded and nothing
+  changed" from coming back. **Don't make the page cacheable, and don't stamp with the version**: a dev
+  build changes files without changing the version. theme.css is LINKED by the page now (stamped, and
+  loading beside the others) instead of `@import`-ed from player.css (fetched only after it, unstamped);
+  the Latin font file is preloaded; `/styles/font/` is immutable (a changed font would be a new file) and
+  `/player/icon*` kept a day. The main page at `/` is unchanged.
+- **Measured** (same link): a relaunch re-checked 10 static files and now re-checks 1 (the manifest), and
+  fetches 0 of the Library's requests where it made 3 plus its covers; album-then-play cover downloads
+  4 -> 2. The lab's covers are tiny (7 KB) and its Navidrome local, so the seconds saved on James's
+  phone are NOT measured - only the requests and round trips.
+- **Looked at and left**: the 110 KB (gzipped) bundle holds the desktop's visualizer and editors too -
+  splitting them out would save a phone's first-ever download only, since it is now kept; Home's "Not
+  played in a while" asks for 500 albums at launch (one request, last on the page); a cover that is a
+  404 is asked for again on each screen; `/library/owned` and `/me/preferences` are each asked twice as
+  Search first shows; and the first play of a FLAC in Safari waits for deadwax to make its MP4 (see
+  "FLAC in an MP4, for Safari").
+- **Verified**: 2354 Python tests (four new in tests/test_pages.py: the stamps, another address for a file written again, what is kept
+  and what is still asked about), app-rules.sim (the deferred Library, the three sizes), and the real
+  page before and after with the request log above.
+
 ### Artists who have renamed (v0.6.18)
 
 James: "so Ye shows up as Kanye, that seems like a gap somewhere" - and then "I want to make
@@ -8862,7 +8909,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2350 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2354 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -8938,7 +8985,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2350 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2354 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

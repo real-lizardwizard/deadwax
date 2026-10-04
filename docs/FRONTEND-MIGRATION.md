@@ -142,7 +142,7 @@ so a stale `interface/dist` left by a local build is overwritten rather than shi
 `/dist/assets/` (hashed, content-addressed) is served `immutable, max-age=31536000`, while
 `/dist/` (the unhashed entry bundles) joins `/scripts/`, `/styles/`, `/assets/` on `no-cache`.
 Leaving the middleware alone would have reintroduced "I upgraded and nothing changed" for
-precisely the ported half of the interface. Since 1.0.3 `/player/` is on `no-cache` too - the
+precisely the ported half of the interface. Since 2.0.0-player.26 the app's page names its stylesheets and bundle with a stamp of each file (`?v=`, `stamped_page()` in `src/api/app.py`) and a stamped request is kept for good, so only the page itself is re-asked on launch. Since 1.0.3 `/player/` is on `no-cache` too - the
 player's page, manifest and icons - since an app on a phone's home screen is exactly the tab
 that never gets reloaded.
 

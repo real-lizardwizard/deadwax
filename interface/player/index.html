@@ -17,6 +17,11 @@
     <!-- iOS takes the home screen icon from here, not the manifest, and it has to be a PNG -->
     <link rel="apple-touch-icon" href="/player/icon-180.png">
     <link rel="icon" href="/player/icon.svg" type="image/svg+xml">
+    <!-- the one font file nearly every screen needs, asked for at once rather than when the stylesheets
+         have been read (the other scripts' files are fetched only when a name needs them) -->
+    <link rel="preload" href="/styles/font/noto-sans/noto-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <!-- the tokens every stylesheet below reads - linked here, not @import-ed, so it loads beside them -->
+    <link rel="stylesheet" href="/styles/theme.css">
     <link rel="stylesheet" href="/player/player.css">
     <!-- the app's own chrome - the tab bar, Home, You - after the player's, whose mechanics it builds on -->
     <link rel="stylesheet" href="/player/app.css">

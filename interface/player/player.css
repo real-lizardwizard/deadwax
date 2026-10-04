@@ -18,7 +18,9 @@
   Dark only, like the rest of deadwax.
 */
 
-@import url('../styles/theme.css');
+/* theme.css is linked by the page itself (index.html), before this file - not @import-ed here: an
+   import is fetched only after this file has arrived, one more trip in a row on a cold launch, and
+   it can't carry the stamp that lets the browser keep it (see stamped_page in src/api/app.py). */
 
 :root {
     /* the look, from theme.css section 10: Noto Sans for words, monospace for data */

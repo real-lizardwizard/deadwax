@@ -288,6 +288,10 @@ export function App() {
   const infoOpener = useRef<HTMLElement | null>(null)
   const [youSeen, setYouSeen] = useState(nav.tab === 'you')
   const [searchSeen, setSearchSeen] = useState(nav.tab === 'search')
+  //? the Library asks Navidrome for nothing - its albums, their covers, whether songs can be listed -
+  //? until its tab has been shown once: mounted hidden from the start, it fetched all of that at every
+  //? launch, beside what Home was waiting for. (A desktop's sidebar shows Songs until it is known.)
+  const [librarySeen, setLibrarySeen] = useState(nav.tab === 'library')
   //? "Now Playing opens as", kept on this device
   const [opensAs, setOpensAs] = useState<Look>(readPlayerOpensAs)
   const chooseOpensAs = useCallback((look: Look) => {
@@ -340,6 +344,7 @@ export function App() {
   useEffect(() => {
     if (nav.tab === 'you') setYouSeen(true)
     if (nav.tab === 'search') setSearchSeen(true)
+    if (nav.tab === 'library') setLibrarySeen(true)
   }, [nav.tab])
 
   //? the desktop's visualizer showing (2.0.0-player.20) - see openVisualizer below
@@ -823,10 +828,10 @@ export function App() {
   const library = useMemo(
     () => (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
-        <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} />
+        {librarySeen && <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} />}
       </NeedsNavidrome>
     ),
-    [status],
+    [status, librarySeen],
   )
   const search = useMemo(
     () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenArtist={openLibraryArtist} onGet={openSources} />,

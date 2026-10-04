@@ -11,6 +11,7 @@ like the page around it - since 2.0.0-player.19 the desktop frame's too, linked 
 """
 
 import json
+import os
 import re
 from pathlib import Path
 from urllib.parse import urljoin
@@ -143,3 +144,62 @@ def test_no_page_or_stylesheet_loads_a_font_from_the_internet():
     for path in shipped:
         text = path.read_text()
         assert "fonts.googleapis.com" not in text and "fonts.gstatic.com" not in text, path
+
+
+# ---- loading: what the app's page names is kept for good; the page itself is always asked for ----
+
+def test_the_app_page_names_each_stylesheet_and_script_with_that_files_own_stamp(client):
+    """Until this the installed app re-asked about every stylesheet and script on every launch
+    (no-cache: a round trip each to be told nothing changed). The page stamps each with the file's
+    size and time of writing, so a file that changed is another address."""
+    response = client.get("/player/")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["content-type"].startswith("text/html")
+
+    named = re.findall(r'(?:href|src)="(/(?:player|dist|styles)/[^"?]+\.(?:css|js)(?:\?[^"]*)?)"', response.text)
+    assert [n.split("?")[0] for n in named] == [
+        "/styles/theme.css", "/player/player.css", "/player/app.css", "/player/app-desktop.css", "/dist/deadwax-player.js"]
+    for address in named:
+        path, _, query = address.partition("?")
+        file = INTERFACE / path.lstrip("/")
+        if not file.exists():  # the bundle, in a checkout that hasn't been built
+            assert query == ""
+            continue
+        found = file.stat()
+        assert query == f"v={found.st_mtime_ns:x}-{found.st_size:x}"
+    #? the manifest and the icons keep their plain addresses: the home-screen app is scoped by them
+    assert 'href="/player/manifest.json"' in response.text
+    assert client.get("/player/index.html").text == response.text
+
+
+def test_a_stamped_file_is_kept_for_good_and_a_plain_one_still_asked_about(client):
+    stamped = client.get("/player/app.css?v=abc-123", headers={"Accept-Encoding": "gzip"})
+    assert stamped.status_code == 200
+    assert stamped.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert stamped.headers.get("content-encoding") == "gzip"
+    assert client.get("/player/app.css").headers["cache-control"] == "no-cache"
+    #? the old page's files take no stamp from anything, and a query alone makes nothing else immutable
+    assert client.get("/deadwax/me?v=1").headers.get("cache-control") != "public, max-age=31536000, immutable"
+
+
+def test_a_file_written_again_gets_another_address(client):
+    sheet = INTERFACE / "player" / "app.css"
+    before = re.search(r'/player/app\.css\?v=([0-9a-f-]+)', client.get("/player/").text)[1]
+    found = sheet.stat()
+    os.utime(sheet, ns=(found.st_atime_ns, found.st_mtime_ns + 1_000_000_000))
+    try:
+        after = re.search(r'/player/app\.css\?v=([0-9a-f-]+)', client.get("/player/").text)[1]
+    finally:
+        os.utime(sheet, ns=(found.st_atime_ns, found.st_mtime_ns))
+    assert after != before
+
+
+def test_the_font_is_kept_for_good_and_the_icons_for_a_day(client):
+    font = client.get("/styles/font/noto-sans/noto-sans-latin.woff2")
+    assert font.status_code == 200
+    assert font.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert client.get("/player/icon-192.png").headers["cache-control"] == "public, max-age=86400"
+    assert client.get("/player/icon.svg").headers["cache-control"] == "public, max-age=86400"
+    #? the manifest is the app's scope and name: still asked about
+    assert client.get("/player/manifest.json").headers["cache-control"] == "no-cache"

@@ -286,11 +286,27 @@ export function playedAlbum(id: string | null | undefined): AlbumWithSongs | nul
 }
 
 /**
+ * The sizes covers are asked for at - three, not one per place a cover is drawn. A cover is a
+ * download per SIZE: asked for at 260 for Home, 400 for the Library, 800 for its page, 1000 for
+ * Now Playing, 120 for the mini player and 512 for the lock screen, one album came down six times
+ * over the phone's connection. Asked for at the step that covers it, the tile Home fetched is the
+ * Library's, the album page's cover is Now Playing's and the lock screen's, and a row's is the mini
+ * player's - already in the browser's cache when the next screen wants it.
+ */
+export const COVER_SIZES: readonly number[] = [128, 400, 1024]
+
+/** The step a cover drawn at `size` is asked for at: the smallest that covers it, else the largest. */
+export function coverSize(size: number): number {
+  return COVER_SIZES.find((step) => step >= size) ?? COVER_SIZES[COVER_SIZES.length - 1]!
+}
+
+/**
  * A cover at a size Navidrome resizes to. Asked for at twice the size it is drawn, because every
- * phone this is for has a 2x or 3x screen and a 1x cover looks soft beside the text.
+ * phone this is for has a 2x or 3x screen and a 1x cover looks soft beside the text - and then at
+ * one of COVER_SIZES, so the screens share what they fetch.
  */
 export function coverUrl(id: string | null | undefined, size: number): string | null {
-  return id ? url(`/navidrome/cover/${encodeURIComponent(id)}?size=${size}`) : null
+  return id ? url(`/navidrome/cover/${encodeURIComponent(id)}?size=${coverSize(size)}`) : null
 }
 
 /**
