@@ -5799,6 +5799,56 @@ of the music while scrubing".
 - **NOT verified**: James's iPhone - whether the dragonfly is gone under a real finger, how real touch
   jitter compares with the 1.5 ms / 1 ms assumed, and how 120 ms (163 over plain http) feels.
 
+#### The handover's echo, and what the phone says (2.0.0-player.28)
+
+James, after 2.0.0-player.27: "the turntable player just feels like it hangs a lot, especially when
+scrubbing", "And it still seems like there's an extra sound added when scrubbing that isn't part of the
+song", and "would this be better in an actual app vs web app?"
+
+- **Measured, and NOT reproduced here** (headless Chromium over plain http, so the main-thread voice):
+  with the turntable showing and the song playing the page's main thread is 95% idle, 90% while a hand
+  scrubs back and forth, and kept every frame in a run with the CPU slowed 8x (a 4x run, on a machine busy
+  with other jobs, dropped 5%) - the deck, the voice and Preact together are a few per cent. What the voice ADDS to real music at a steady 0.25x and 0.5x (the
+  interpolation's images above the slowed song's top) is 35-48 dB below the song; a hand that stops is 40
+  dB down within 150 ms. So neither the page's own code nor the interpolation is the hang or the extra
+  sound, on this machine. What an iPhone does differently can't be seen from here: painting the record
+  each frame, the main-thread voice under real touch handling, and how long its audio element takes to
+  start again after a seek.
+- **One real added sound, found and cut: an echo after every let-go.** The handover (the record's sound
+  holding speed 1 until the song is really playing, then fading) judged "really playing" only as the
+  player REPORTED its position - about four times a second - so the record's sound played on up to a
+  quarter of a second over the song it had handed back to, and since .27 it is 120 ms (163) behind it:
+  after a release the two were heard together for about half a second. `handOver`'s test is now also
+  asked every FRAME the platter turns (`handoverJudge`, from `onFrame`, on `host.position()`): measured in
+  the real page, the overlap after an 8x flick fell from about 520 ms to about 330 as the recording tap
+  reads it (which is itself ~100 ms late). What is left is the 40 ms fade, the main-thread voice's lag and
+  the 20 ms the song must have moved. NOT done: starting the record's sound where the song IS at a grab
+  rather than `HAND_DELAY_S` behind it (a repeat of 120 ms as you take a playing record, and the same
+  skipped as you let go) - that moves what `heardNow`, the seeks and a dozen pins mean, and wants the
+  full review.
+- **The phone says the rest: Info > Debug's "Turntable timing"** (`DeckHealth` on the deck's report,
+  `turntableTimingRow` in lib/debugRows.ts), counted since the turntable last showed: how long the song
+  took to come back after the last let-go of a playing record and how much of that was the record's run
+  back to speed (`noteBack`, from the release - `letGo` - to the song's position moving past where it was
+  sought); for the main-thread voice, blocks asked for AFTER they were due (`context.currentTime` past
+  the block's `playbackTime` - a gap in the sound) and the worst; frames under a hand, those more than
+  `SLOW_FRAME_MS` (34) after the one before, and the longest gap; let-goes after which the song hadn't
+  started within the handover's wait; and times the context went 'interrupted'. A report is made as a
+  hold ends and as the song comes back, not per frame.
+- **What a let-go costs by design** (said to James, his to change): the record's run back to speed is 0.4
+  s from still and about 0.8 s after a hard flick - the momentum he asked for - and the song starts only
+  then, plus however long the browser takes to start an element it has just sought. Scrubbed in short
+  strokes, that is a wait after every stroke.
+- **Native or web** (answered, not built): the two things a native app would do better are exactly these -
+  the sound on a real-time audio thread whatever the page is doing, and no pause-seek-play of a media
+  element at every grab and let-go. The first is available to the web app too, over HTTPS: an
+  AudioWorklet needs a secure page, and James's `http://` address is why his phone runs the main-thread
+  voice at all.
+- **Verified**: deck.sim (the fade at the next frame without the player's report, and once; the let-go's
+  timing; frames under a hand with a 136 ms stall counted; counted afresh as it shows), debug.sim (the
+  row's words in four states); mutations of the frame judge, the timing and the slow-frame count each
+  caught. **NOT verified**: anything on the iPhone - which is what the row is for.
+
 ### Sources and Get (2.0.0-player.15)
 
 Slice 5 of the one app (`uplan/slices.md` S5, numbered .15 because the turntable took .11 and .14).

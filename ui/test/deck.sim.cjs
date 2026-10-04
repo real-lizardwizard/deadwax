@@ -926,6 +926,9 @@ async function main() {
     const plan = platter.motor(at, speed, 425)
     const releasedAt = clock
     const released = deck.release(clock, 'up')
+    //? ...and Turntable seeks the song there in the release itself: the player's position is the seek's
+    //? target from then on (the handover's test reads it every frame since 2.0.0-player.28)
+    host.at = released.seek
     const start = portMessages.at(-1)
     check('the release says where to seek - where the motor has it back at speed - now; and not to play yet: there is a coast',
       [round(released.seek, 6), released.play], [round(plan.x, 6), false])
@@ -951,8 +954,41 @@ async function main() {
     const fades = posted('fade').length
     host.moveTo(plan.x + 0.01)
     check('the song\'s clock not moving yet: no fade', posted('fade').length, fades)
-    host.moveTo(plan.x + 0.05)
-    check('really playing: the record\'s sound fades out over a few tens of ms', [posted('fade').length - fades, posted('fade').at(-1).seconds], [1, deckModule.HANDOVER_FADE_S])
+    //? the song's clock moving - seen by the next FRAME, before the player's own report of it (which comes
+    //? about four times a second): on the report alone the record's sound played on up to a quarter of a
+    //? second over the song it had handed back to, the voice's delay behind it - an echo after every
+    //? let-go (2.0.0-player.28)
+    host.at = plan.x + 0.05
+    check('the player hasn\'t reported it and no frame has run: still no fade', posted('fade').length, fades)
+    runFrames(1)
+    check('really playing: the record\'s sound fades out over a few tens of ms - at the next frame, not waiting for the player\'s report', [posted('fade').length - fades, posted('fade').at(-1)?.seconds], [1, deckModule.HANDOVER_FADE_S])
+    host.moveTo(plan.x + 0.3)
+    runFrames(2)
+    check('...once: the report that follows, and the frames after, fade nothing more', posted('fade').length - fades, 1)
+    const health = deckModule.deckReport().health
+    check('Debug is told how long the song took to come back after the let-go, and how much of that was the record\'s run back to speed (2.0.0-player.28)',
+      [health.backMs >= plan.duration * 1000 && health.backMs < plan.duration * 1000 + 400, Math.round(health.motorMs), health.notBack], [true, Math.round(plan.duration * 1000), 0])
+    check('...and how the frames kept up while the hand held the record: counted, none late on this clock', [health.frames >= 0, health.slowFrames, typeof health.blocks], [true, 0, 'number'])
+    deck.destroy()
+  }
+
+  console.log('\na page that stalls under the hand: counted for Debug (2.0.0-player.28)')
+  {
+    const { deck } = await fresh()
+    runFrames(10)
+    deck.pressed(clock)
+    deck.takeOver()
+    runFrames(5)
+    //? the page busy for 120 ms: no frame in that time, then the next
+    clock += 120
+    runFrames(3)
+    deck.release(clock, 'up')
+    const health = deckModule.deckReport().health
+    check('frames while the hand held the record: each counted, the one that came 136 ms after the one before counted late, and the longest gap kept - told as the hold ends',
+      [health.frames, health.slowFrames, Math.round(health.worstFrameMs)], [7, 1, 136])
+    deck.setShowing(false)
+    deck.setShowing(true)
+    check('...counted afresh each time the turntable shows', [deckModule.deckReport().health.frames, deckModule.deckReport().health.slowFrames, deckModule.deckReport().health.backMs], [0, 0, null])
     deck.destroy()
   }
 

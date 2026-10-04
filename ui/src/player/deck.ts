@@ -88,7 +88,7 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { clockReading, clockSettled, contextTimeAt, newDeckClock, resetDeckClock } from '../lib/deckClock'
 import {
   REPORTS_PER_SECOND, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
-  type DeckReport, type VoiceHeard, type VoiceMessage,
+  type DeckHealth, type DeckReport, type VoiceHeard, type VoiceMessage,
 } from '../lib/deckVoice'
 import {
   DEGREES_PER_SECOND, RELEASE_TAIL_MS, VELOCITY_WINDOW_MS, acceleration, coast, degreesFor, motor, phaseAt, planAt, releaseSpeed, voiceRate,
@@ -135,6 +135,9 @@ export const CLOCK_TICK_MS = 100
  *  platter spins down. */
 export const HANDOVER_MAX_S = 3
 export const HANDOVER_FADE_S = 0.04
+/** A frame that came this long after the one before, while a hand holds the record, is counted late in
+ *  Debug: more than two frames of a 60 Hz screen. */
+export const SLOW_FRAME_MS = 34
 /** A coast back to speed this short plays the song in the release's own gesture, in seconds. */
 export const RESUME_IN_GESTURE_S = 0.05
 /** A pause the turntable didn't ask for (a song ending, the lock screen) spins the platter down only
@@ -282,6 +285,9 @@ let heardListener: ((heard: VoiceHeard) => void) | null = null
 //? the page's audio session kind before the deck set it to 'playback', while the deck lives; null when
 //? the deck hasn't set it
 let sessionBefore: string | null = null
+//? how the sound is keeping up, counted for Info > Debug's "Turntable timing" (2.0.0-player.28): the
+//? main-thread voice's blocks asked for after they were due, and the context's interruptions
+const soundHealth = { blocks: 0, lateBlocks: 0, worstBlockMs: 0, interruptions: 0 }
 //? the turntable was hidden while its context was still starting or resuming (a tap's, and the page
 //? hidden before it settled): suspended as soon as it runs, since nothing else would - a gesture asking
 //? for the sound, or the turntable showing again, lets that go (review of 2.0.0-player.16)
@@ -390,6 +396,13 @@ function startScript(context: AudioContext, why: string): void {
       const channels: Float32Array[] = []
       for (let channel = 0; channel < out.numberOfChannels; channel++) channels.push(out.getChannelData(channel))
       const at = Number.isFinite(event.playbackTime) ? event.playbackTime : context.currentTime
+      //? asked for after it was due to play: the page was busy, and what was heard had a gap in it
+      const lateBy = context.currentTime - at
+      soundHealth.blocks += 1
+      if (lateBy > 0) {
+        soundHealth.lateBlocks += 1
+        soundHealth.worstBlockMs = Math.max(soundHealth.worstBlockMs, lateBy * 1000)
+      }
       for (const said of held.splice(0)) voiceCommand(state, said, at, context.sampleRate)
       renderVoice(state, channels, out.length, context.sampleRate, at)
       const heard = voiceReport(state, out.length, context.sampleRate, at, REPORTS_PER_SECOND)
@@ -459,6 +472,9 @@ export function wakeDeckAudio(): void {
       resetDeckClock(clock)
       //? suspended or resumed, its clock stood still meanwhile: the mapping starts again
       context.addEventListener?.('statechange', () => resetDeckClock(clock))
+      context.addEventListener?.('statechange', () => {
+        if ((context.state as string) === 'interrupted') soundHealth.interruptions += 1
+      })
       context.addEventListener?.('statechange', audioChanged)
       startVoice(context)
       audioChanged()
@@ -623,6 +639,19 @@ export class Deck {
   private stampedTo = -Infinity
   //? the audio clock's step as Debug was last told it
   private reportedStep = 0
+  //? a let-go that means the song to play: where it was sought, when (page ms) and how long the record's
+  //? run back to speed is - until the song's own playback is seen moving from there (noteBack)
+  private letGo: { at: number; since: number; motor: number } | null = null
+  private backMs: number | null = null
+  private motorMs: number | null = null
+  private notBack = 0
+  //? frames while a hand holds the record: the last one's time, and the count
+  private heldFrame = 0
+  private frames = 0
+  private slowFrames = 0
+  private worstFrameMs = 0
+  //? the handover's test of the song's position, asked every frame as well as when the player says
+  private handoverJudge: ((seconds: number) => void) | null = null
   private songId: string
 
   constructor(host: DeckHost) {
@@ -711,6 +740,10 @@ export class Deck {
       sleepOnceRunning = false
       this.since = now()
       this.fetched = 0
+      //? and how it keeps up, counted afresh too
+      this.frames = this.slowFrames = this.worstFrameMs = this.notBack = 0
+      this.backMs = this.motorMs = null
+      soundHealth.blocks = soundHealth.lateBlocks = soundHealth.worstBlockMs = soundHealth.interruptions = 0
       this.lastFetchAt = 0
       this.positionOff = this.host.onPosition(this.onPosition)
       this.keepHere()
@@ -820,6 +853,8 @@ export class Deck {
    *  past a tap (Turntable calls takeOver) or rests longer than one (HOLD_MS). */
   pressed(time: number): void {
     this.dropPress()
+    //? a new press before the song was back: that let-go isn't timed
+    this.letGo = null
     this.press = { taken: false, anchor: 0, at: 0, intent: 'pause', samples: [{ time, turned: 0 }] }
     this.holdTimer = setTimeout(() => {
       this.holdTimer = undefined
@@ -957,6 +992,8 @@ export class Deck {
     this.holdTimer = undefined
     this.press = null
     if (!press || !press.taken) return { seek: null, play: false }
+    //? what the hold was like (its frames, the main thread's blocks) is told as it ends
+    this.report()
     const song = this.host.song()
     const length = song?.length ?? 0
     if (how === 'cancel') {
@@ -987,8 +1024,10 @@ export class Deck {
         this.motion = { kind: 'turning', since: now(), from: this.angleNow() }
         this.host.show(null, false)
         this.loop()
+        this.letGo = { at: plan.x, since: now(), motor: 0 }
         return { seek: plan.x, play: true }
       }
+      this.letGo = { at: plan.x, since: now(), motor: plan.duration * 1000 }
       this.startPlan(plan, 'handover', press.at, this.sounding(press.at), since)
       this.keepPath(plan)
       return { seek: plan.x, play: false }
@@ -1183,15 +1222,21 @@ export class Deck {
       this.endHandover()
       this.post({ type: 'fade', seconds: HANDOVER_FADE_S })
     }
-    this.handoverOff = this.host.onPosition((seconds) => {
+    //? asked as the player reports its position (about four times a second) AND every frame the platter
+    //? turns (onFrame): on the report alone the record's sound played on up to a quarter of a second over
+    //? the song it had handed back to, the delay behind it - an echo after every let-go (2.0.0-player.28)
+    const judge = (seconds: number) => {
       if (Math.abs(seconds - at) > SOUGHT_ELSEWHERE_S || (this.host.playing() && seconds > at + 0.02)) done()
-    })
+    }
+    this.handoverJudge = judge
+    this.handoverOff = this.host.onPosition(judge)
     this.handoverTimer = setTimeout(done, HANDOVER_MAX_S * 1000)
   }
 
   private endHandover(): void {
     this.handoverOff?.()
     this.handoverOff = null
+    this.handoverJudge = null
     clearTimeout(this.handoverTimer)
     this.handoverTimer = undefined
   }
@@ -1239,6 +1284,21 @@ export class Deck {
     //? the clock read once a frame while anything moves - and on the deck's own timer whatever the record
     //? does (keepClock): a still record runs no frames, and its grab must find the mapping settled too
     this.readClock()
+    //? the song's own position, read once a frame while a handover or a let-go waits on it
+    if (this.handoverJudge || this.letGo) {
+      const seconds = this.host.position()
+      this.handoverJudge?.(seconds)
+      this.noteBack(seconds)
+    }
+    if (press?.taken) {
+      if (this.heldFrame) {
+        const gap = time - this.heldFrame
+        this.frames += 1
+        if (gap > SLOW_FRAME_MS) this.slowFrames += 1
+        if (gap > this.worstFrameMs) this.worstFrameMs = gap
+      }
+      this.heldFrame = time
+    } else this.heldFrame = 0
     if (press?.taken) {
       //? the hand's samples went to the voice as they came (hand): only what it is heard playing to show
       this.host.show(this.heardNow() ?? press.at, true)
@@ -1354,7 +1414,23 @@ export class Deck {
     return !!song && !!window && window.song === song.id && at >= window.start && at + Math.max(0, ahead) <= window.end
   }
 
+  /** The song's own playback seen moving again after a let-go: how long that took, for Debug - or that
+   *  it never did within the handover's wait. */
+  private noteBack(seconds: number): void {
+    const letGo = this.letGo
+    if (!letGo) return
+    const waited = now() - letGo.since
+    if (this.host.playing() && seconds > letGo.at + 0.02 && Math.abs(seconds - letGo.at) < SOUGHT_ELSEWHERE_S + waited / 1000) {
+      this.backMs = waited
+      this.motorMs = letGo.motor
+    } else if (waited > letGo.motor + HANDOVER_MAX_S * 1000) this.notBack += 1
+    else return
+    this.letGo = null
+    this.report()
+  }
+
   private readonly onPosition = (seconds: number) => {
+    this.noteBack(seconds)
     const motion = this.motion
     //? the song sought somewhere the deck didn't put it, while a coast, a run back to speed or a
     //? wind-down has the record: Previous restarting it, a key on the arm - the record's sound has
@@ -1552,6 +1628,14 @@ export class Deck {
 
   /* ----- for Info > Debug ----- */
 
+  private health(): DeckHealth {
+    return {
+      ...soundHealth,
+      frames: this.frames, slowFrames: this.slowFrames, worstFrameMs: this.worstFrameMs,
+      backMs: this.backMs, motorMs: this.motorMs, notBack: this.notBack,
+    }
+  }
+
   private report(): void {
     const song = this.host.song()
     const context = audio.context
@@ -1570,6 +1654,7 @@ export class Deck {
       fetched: this.fetched,
       lastFetchAt: this.lastFetchAt,
       clockStep: clock.step,
+      health: this.health(),
     })
     this.reportedStep = clock.step
   }

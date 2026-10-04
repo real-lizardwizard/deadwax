@@ -657,6 +657,33 @@ shows when it can't find one. In the order to check:
   button at the top right. (A picture replaced by hand can take up to five minutes to change: the
   phone keeps one that long.)
 
+## The turntable hangs, or the song is slow to come back after you turn the record
+
+Turning the record pauses the song and plays the record's own sound; letting go brings the record back
+to speed (0.4 s from still, up to about 0.8 s after a hard flick) and then starts the song again from
+there. How long that really takes, and whether the page kept up while your finger was down, is counted
+on your device: turn the record a few times, then open **•••** > **Info** > **Debug** and read
+**Turntable timing**.
+
+- **`The song was back N s after the last let-go`**: the whole wait from lifting your finger to the
+  song's own playback moving, with how much of it was the record's run back to speed. What is left is
+  your browser starting the song again after a seek - on an iPhone that can be several tenths of a
+  second, and a web page can't shorten it.
+- **`N of M blocks late`** (only where the row above says the sound is "On the main thread", which is
+  every page opened over plain `http://`): the record's sound is made by the same thread that draws the
+  page there, and each late block is a gap or a click in it. Over `https://` (or `localhost`) the
+  browser gives it a thread of its own and this can't happen.
+- **`N frames, K late, the longest gap G ms`**: how the picture kept up while your finger held the
+  record. Late frames are the page itself stalling.
+- **`let-goes after which the song didn't start`**: the browser refused to start the song without a
+  tap, or it took more than three seconds to load. Tap play.
+- **`The sound interrupted N times`**: something else on the phone took the audio (a call, another
+  app).
+
+Since 2.0.0-player.28 the record's sound also stops as soon as the song is back: before, the two
+overlapped for up to a few tenths of a second after every let-go, the record's sound a little behind
+the song - an echo.
+
 ## The turntable's sound warbles or buzzes as you turn the record
 
 Until 2.0.0-player.27 the record's sound had a fast flutter on it whenever your hand's speed was

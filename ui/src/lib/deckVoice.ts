@@ -584,4 +584,33 @@ export interface DeckReport {
    *  lib/deckClock's `step`): the audio's own render - about 21 ms on an iPhone, 5.8 in desktop Brave -
    *  which the one clock maps smoothly over; 0 or absent until it has been seen to move twice */
   clockStep?: number
+  /** how the turntable is keeping up on this device (2.0.0-player.28) - see DeckHealth */
+  health?: DeckHealth
+}
+
+/**
+ * How the turntable is keeping up on this device, counted since it last showed - what Info > Debug's
+ * "Turntable timing" says, so a phone can report what a lab can't see (James: "the turntable player just
+ * feels like it hangs a lot, especially when scrubbing").
+ */
+export interface DeckHealth {
+  /** the main-thread voice's blocks: how many it has been asked for, how many were asked for after they
+   *  were due to play (the page was busy: a gap in the sound), and the worst of those, ms late */
+  blocks: number
+  lateBlocks: number
+  worstBlockMs: number
+  /** frames drawn while a hand held the record: how many, how many came more than two frames after the
+   *  one before (34 ms), and the longest gap, ms */
+  frames: number
+  slowFrames: number
+  worstFrameMs: number
+  /** the last let-go of a playing record: ms from the release to the song's own playback moving again,
+   *  and how much of that the record's run back to speed was; null until one has been measured */
+  backMs: number | null
+  motorMs: number | null
+  /** let-goes after which the song hadn't started within the handover's wait (a play the browser
+   *  refused, or a song that took that long to load) */
+  notBack: number
+  /** times the browser interrupted the sound's audio context (a call, another app's audio) */
+  interruptions: number
 }

@@ -298,6 +298,35 @@ export function turntableRow(report: DeckReport | null | undefined): DebugRow {
   return withNotes({ label, value: 'Off: no window yet - a press scrubs silently; one is fetched while the song plays, or as the record is pressed' })
 }
 
+/**
+ * How the turntable is keeping up on this device (2.0.0-player.28, the deck's DeckHealth): how long the
+ * song took to come back after the last let-go, and - in the note - whether the sound, made on the main
+ * thread, had gaps, how the frames kept up under a hand, and what else got in the way. James: "the
+ * turntable player just feels like it hangs a lot, especially when scrubbing" - nothing a lab's browser
+ * shows, so the phone says it here.
+ */
+export function turntableTimingRow(report: DeckReport | null | undefined): DebugRow {
+  const label = 'Turntable timing'
+  const health = report?.health
+  if (!health) return { label, value: 'Not known' }
+  const seconds = (ms: number) => `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`
+  const value = health.backMs === null
+    ? 'No let-go of a playing record timed yet'
+    : `The song was back ${seconds(health.backMs)} after the last let-go${health.motorMs ? ` - ${seconds(health.motorMs)} of it the record's run back to speed` : ''}`
+  const notes: string[] = []
+  if (report.voice === 'script') {
+    notes.push(health.blocks
+      ? `The sound, on the main thread: ${health.lateBlocks} of ${health.blocks} blocks late${health.lateBlocks ? `, the worst by ${Math.round(health.worstBlockMs)} ms` : ''}`
+      : 'The sound, on the main thread: no block played yet')
+  }
+  notes.push(health.frames
+    ? `Under a hand: ${health.frames} frames, ${health.slowFrames} late${health.slowFrames ? `, the longest gap ${Math.round(health.worstFrameMs)} ms` : ''}`
+    : 'Under a hand: no frames yet')
+  if (health.notBack) notes.push(`${health.notBack} ${health.notBack === 1 ? 'let-go' : 'let-goes'} after which the song didn't start`)
+  if (health.interruptions) notes.push(`The sound interrupted ${health.interruptions} ${health.interruptions === 1 ? 'time' : 'times'}`)
+  return { label, value, note: notes.join(' · ') }
+}
+
 type Answer = Readonly<Record<string, unknown>>
 
 /** The names of the fields an answer carries, sorted as plain strings - the same order on every
@@ -368,7 +397,7 @@ export function debugSections(input: DebugInput): DebugSection[] {
     { title: 'The file', rows: [formatRow(input.track)] },
     { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), whyRow(input), gaplessRow(input)] },
     { title: 'Last song change and seek', rows: [gapRow(input.gaps), seekRow(input.lastSeek)] },
-    { title: 'The turntable', rows: [turntableRow(input.turntable)] },
+    { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable)] },
     {
       title: 'Navidrome sent',
       rows: [sentRow('Song', input.song), otherSongsRow(input.song, input.album), sentRow('Album', input.album)],

@@ -90,7 +90,7 @@ console.log('\nthe layout: five sections, their rows in order')
   const sections = rows.debugSections(input())
   check('sections', sections.map((section) => section.title), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
   check('rows', sections.map((section) => section.rows.map((row) => row.label)), [
-    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless'], ['Gap', 'Last seek'], ['Turntable sound'], ['Song', 'On other songs', 'Album'],
+    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless'], ['Gap', 'Last seek'], ['Turntable sound', 'Turntable timing'], ['Song', 'On other songs', 'Album'],
   ])
 }
 
@@ -157,6 +157,24 @@ console.log('\nTurntable sound (2.0.0-player.16): which voice plays it, and why'
     [`On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet ${DOT} 3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in`,
       "On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet"])
   check('...and none named while there is none', turntable({ ...ready, voice: null, voiceWhy: null, window: null }).note, undefined)
+}
+
+console.log('\nTurntable timing (2.0.0-player.28): how the turntable keeps up on this device, for a phone to say')
+{
+  const base = { context: 'running', problem: null, voice: 'script', voiceWhy: "this page isn't on HTTPS, so the browser has no AudioWorklet", window: null, loading: false, refused: null, failed: null, fetched: 0, lastFetchAt: 0 }
+  const health = { blocks: 3400, lateBlocks: 12, worstBlockMs: 37.6, frames: 310, slowFrames: 4, worstFrameMs: 118.2, backMs: 1240, motorMs: 400, notBack: 0, interruptions: 0 }
+  check('nothing to say without a report, or from a deck that sent none', [rows.turntableTimingRow(null).value, rows.turntableTimingRow(base).value], ['Not known', 'Not known'])
+  check('the last let-go, and what the page was like under the hand - the main thread\'s sound, the frames',
+    rows.turntableTimingRow({ ...base, health }),
+    { label: 'Turntable timing', value: "The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed",
+      note: 'The sound, on the main thread: 12 of 3400 blocks late, the worst by 38 ms · Under a hand: 310 frames, 4 late, the longest gap 118 ms' })
+  check('nothing late, nothing timed yet, on the audio thread: said plainly, and no word of blocks (the worklet has none on the main thread)',
+    rows.turntableTimingRow({ ...base, voice: 'worklet', voiceWhy: null, health: { ...health, lateBlocks: 0, slowFrames: 0, backMs: null, motorMs: null } }),
+    { label: 'Turntable timing', value: 'No let-go of a playing record timed yet', note: 'Under a hand: 310 frames, 0 late' })
+  check('a let-go played in its own gesture has no run back to speed to name; a song that never started and an interruption are counted',
+    rows.turntableTimingRow({ ...base, health: { ...health, blocks: 0, frames: 0, backMs: 180, motorMs: 0, notBack: 2, interruptions: 1 } }),
+    { label: 'Turntable timing', value: 'The song was back 0.18 s after the last let-go',
+      note: "The sound, on the main thread: no block played yet · Under a hand: no frames yet · 2 let-goes after which the song didn't start · The sound interrupted 1 time" })
 }
 
 console.log('\nTurntable sound (2.0.0-player.24): how far the audio\'s clock moves at a time')
