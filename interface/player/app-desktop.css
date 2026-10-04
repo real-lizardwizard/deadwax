@@ -1366,6 +1366,11 @@
     .app-desk .app-edit .columns-toggle-button:hover:not(:disabled),
     .app-desk .app-edit .win-button:hover:not(:disabled) { background: var(--dw-secondary-bg-active); }
 
+    /* opened from Needs a look (2.0.0-player.25): the editor's place in the queue, and its Previous and
+       skip a pair of buttons with the actions' own gap between them */
+    .app-desk .app-edit .metadata-queue-nav { display: inline-flex; gap: var(--app-desk-edit-lines); }
+    .app-desk .app-edit .metadata-queue-position { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+
     /* a Get that failed: still a button to press again, its words amber */
     .app-desk .app-edit .app-edit-button.failed { color: var(--dw-amber-text); }
 
@@ -2290,4 +2295,218 @@
    "feel:"); narrower, they wrap, and it isn't drawn. */
 @media (min-width: 1280px) {
     .app-desk .app-viz-readout { display: flex; }
+}
+
+/* ===== Needs a look (2.0.0-player.25): the review queue's page, app/NeedsALook.tsx =====
+   There is no board for it; it is the desktop frame's own parts and STYLE.md: a page under You with
+   its title, a line saying what it is, the Library's chips as facets, and a list of rows at the
+   frame's row height - each a button with the folder's cover, the album, the artist (and edition),
+   and its chips (New, and each outstanding issue). A row opened in the Edit panel takes Explorer's
+   selection; an album a session has dealt with is faded, its word (Fixed, Ignored, Deleted) kept at
+   full strength. The chips give way before the album's name. The page has no solid purple button -
+   Apply in the panel is the screen's one. A drawer open over the page (1024-1279px) keeps the list to
+   the part it leaves in view, as the album you don't have's Get does. The sidebar's "Needs a look"
+   is a sidebar item like the rest, its count Requests' badge; You's row draws the same badge. */
+@media (min-width: 1024px) {
+    :root {
+        --app-desk-queue-cover: 28px;     /* a row's cover, inside the frame's 36px row */
+        --app-desk-queue-gap: 12px;       /* between a row's parts */
+        --app-desk-queue-pad: 4px;        /* a row's padding, above and below the cover */
+        --app-desk-queue-text-min: 120px; /* the album's name, the last to give way */
+        --app-desk-queue-chip: 20px;      /* a chip in a row: STYLE.md's small badge */
+        --app-desk-queue-chip-pad: 7px;
+        --app-desk-queue-chips-gap: 6px;
+        --app-desk-queue-lines: 12px;     /* between the line, the facets and the list */
+        --app-desk-queue-done: 0.55;      /* a row dealt with: its cover and words, never its word */
+        --app-desk-queue-give: 1000;      /* how much faster the chips give way than the name */
+    }
+
+    .app-desk .app-queue-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-queue-lines);
+        max-width: calc(var(--app-desk-content-max) + var(--pl-edge-left) + var(--pl-edge-right));
+        padding: 0 var(--pl-edge-right) var(--app-desk-gap) var(--pl-edge-left);
+    }
+
+    /* a drawer over the page's edge: the list keeps to the part left in view */
+    .app-desk.has-drawer .app-queue-body {
+        max-width: calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap));
+    }
+
+    .app-desk .app-queue-line,
+    .app-desk .app-queue-state {
+        margin: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+    }
+
+    .app-desk .app-queue-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-desk-queue-lines); }
+
+    .app-desk .app-queue-facets { padding-right: 0; padding-left: 0; }
+    .app-desk .app-queue-count { color: var(--dw-text-2); }
+
+    /* always there and a row tall, empty or saying "Checking the library…" - so its going moves no
+       row (a read that failed, said here with Try again, may take more) */
+    .app-desk .app-queue-checking {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--app-desk-queue-chips-gap);
+        min-height: var(--app-desk-row);
+        margin: 0;
+        color: var(--dw-text-3);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-queue-list {
+        margin: 0;
+        padding: 0;
+        border-top: var(--dw-hairline) solid var(--dw-row-border);
+        list-style: none;
+    }
+
+    .app-desk .app-queue-list > li { border-bottom: var(--dw-hairline) solid var(--dw-row-border); }
+
+    .app-desk .app-queue-row {
+        display: flex;
+        align-items: center;
+        gap: var(--app-desk-queue-gap);
+        width: 100%;
+        min-height: var(--app-desk-row);
+        padding: var(--app-desk-queue-pad) var(--app-desk-cell-pad);
+        border: var(--dw-hairline) solid transparent;
+        border-radius: var(--dw-radius-control);
+        color: var(--dw-text);
+        font-size: var(--app-desk-text);
+        text-align: left;
+    }
+
+    .app-desk .app-queue-row:hover { background: var(--app-desk-hover); }
+
+    /* the album the Edit panel has open: Explorer's selection */
+    .app-desk .app-queue-row.is-current {
+        border-color: var(--dw-selection-border);
+        background: var(--dw-selection-bg);
+        color: var(--dw-selected-text);
+    }
+
+    .app-desk .app-queue-row:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring-inset);
+    }
+
+    .app-desk .app-queue-cover {
+        flex: none;
+        width: var(--app-desk-queue-cover);
+        height: var(--app-desk-queue-cover);
+        border-radius: var(--dw-radius-cover);
+        object-fit: cover;
+    }
+
+    .app-desk .app-queue-cover.is-empty {
+        border: var(--dw-hairline) solid var(--dw-border);
+        background: var(--dw-empty-cover);
+    }
+
+    /* the name gives way last: the chips shrink far faster, and to nothing */
+    .app-desk .app-queue-text {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-width: min(var(--app-desk-queue-text-min), 100%);
+    }
+
+    .app-desk .app-queue-album,
+    .app-desk .app-queue-artist {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-desk .app-queue-album { font-weight: var(--dw-weight-semibold); }
+    .app-desk .app-queue-artist { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+
+    /* one line of whole chips: those that no longer fit wrap out of it and out of sight, so a chip is
+       never cut to a stub - one alone wider than the room left ellipsizes */
+    .app-desk .app-queue-chips {
+        display: flex;
+        flex: 0 var(--app-desk-queue-give) auto;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: var(--app-desk-queue-chips-gap);
+        min-width: 0;
+        height: var(--app-desk-queue-chip);
+        overflow: hidden;
+    }
+
+    .app-desk .app-queue-chip,
+    .app-desk .app-queue-mark {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        max-width: 100%;
+        height: var(--app-desk-queue-chip);
+        padding: 0 var(--app-desk-queue-chip-pad);
+        overflow: hidden;
+        border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-badge-amber-bg);
+        color: var(--dw-amber-text);
+        font-size: var(--dw-text-label);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-desk .app-queue-chip.is-new {
+        border-color: var(--dw-badge-purple-border);
+        background: var(--dw-badge-purple-bg);
+        color: var(--dw-accent-text);
+    }
+
+    .app-desk .app-queue-mark {
+        border-color: var(--dw-badge-green-border);
+        background: var(--dw-badge-green-bg);
+        color: var(--dw-badge-green-text);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    /* an album the session dealt with: faded - its word stays at full strength */
+    .app-desk .app-queue-row.is-done .app-queue-cover,
+    .app-desk .app-queue-row.is-done .app-queue-text { opacity: var(--app-desk-queue-done); }
+
+    /* the session over and its rows held while the fresh scan lands: a tap refused, and seen to be
+       (aria-disabled, so focus stays on the row) - the rows may move once it has landed */
+    .app-desk .app-queue-row[aria-disabled='true'] { opacity: var(--app-job-busy); cursor: progress; }
+    .app-desk .app-queue-row[aria-disabled='true']:hover { background: transparent; }
+
+    /* where focus goes when what had it has gone (a Try again that worked): no ring of its own */
+    .app-desk .app-queue-body:focus { outline: none; }
+
+    /* You's row: the count beside its words, Requests' badge */
+    .app-desk .app-queue-link-row { width: 100%; text-align: left; }
+    .app-desk .app-queue-link-row .app-row-label { flex: 1 1 auto; }
+
+    .app-desk .app-queue-badge {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--app-desk-badge);
+        height: var(--app-desk-badge);
+        padding: 0 var(--app-desk-badge-pad);
+        border: var(--dw-hairline) solid var(--dw-badge-purple-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-badge-purple-bg);
+        color: var(--dw-accent-text);
+        font-size: var(--dw-text-label);
+        font-weight: var(--dw-weight-semibold);
+    }
+}
+
+/* a finger where the pointer is coarse: a row (the frame's row is already 44px there) and a facet */
+@media (min-width: 1024px) and (pointer: coarse) {
+    .app-desk .app-queue-row { min-height: var(--pl-hit); }
+    .app-desk .app-queue-facet { min-height: var(--pl-hit); }
 }

@@ -28,7 +28,7 @@
  * tokens): tests/test_app_desktop_css.py reads these constants and holds every @media there to them.
  */
 
-import type { Tab } from './appRoutes'
+import type { Page, Tab } from './appRoutes'
 
 /** From this width (CSS px, the viewport's - as a media query reads it) the desktop frame. */
 export const DESKTOP_MIN = 1024
@@ -118,7 +118,8 @@ export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: b
  */
 export type LibraryPick = 'recent' | 'albums' | 'artists' | 'songs'
 
-export type SidebarId = 'home' | 'requests' | LibraryPick | 'you'
+/** The sidebar's items - `queue` is Managing's "Needs a look" (2.0.0-player.25), an admin's. */
+export type SidebarId = 'home' | 'requests' | LibraryPick | 'queue' | 'you'
 
 export interface SidebarItem {
   id: SidebarId
@@ -147,6 +148,9 @@ export const LIBRARY_TITLES: Readonly<Record<LibraryPick, string>> = {
   songs: 'Songs',
 }
 
+/** Managing's own item (2.0.0-player.25): the review queue, above the link to the main page. */
+export const SIDEBAR_QUEUE: SidebarItem = { id: 'queue', label: 'Needs a look' }
+
 /** The Library's views the sidebar lists: Songs left out when Navidrome's empty search lists none,
  *  as the phone leaves out its chip (null: not known yet, so it stays). */
 export function libraryItems(hasSongs: boolean | null): SidebarItem[] {
@@ -162,8 +166,10 @@ export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Fr
 }
 
 /** The sidebar item for where the app is: its tab - and in the Library, the view showing. Search has
- *  none: its place is the field, which says what it is searching for. */
-export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null): SidebarId | null {
+ *  none: its place is the field, which says what it is searching for. Needs a look is its own item
+ *  while its page is the one on top (`page`, the tab's top page), whatever tab it was pushed on. */
+export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null): SidebarId | null {
+  if (page?.kind === 'queue') return 'queue'
   if (tab === 'search') return null
   if (tab === 'library') return shownPick(pick, hasSongs, 'desktop')
   return tab
@@ -174,9 +180,14 @@ export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | 
  * the tab as it was left, or back to its root when it is showing (lib/appRoutes.ts's selectTab).
  * So is the Library view that is showing. Another Library view is that view, at the Library's root.
  */
-export type SidebarMove = { how: 'tab'; tab: Tab } | { how: 'view'; tab: 'library'; pick: LibraryPick }
+export type SidebarMove =
+  | { how: 'tab'; tab: Tab }
+  | { how: 'view'; tab: 'library'; pick: LibraryPick }
+  /** Needs a look: its page, on You (App's openQueue) */
+  | { how: 'queue'; tab: 'you' }
 
 export function sidebarMove(item: SidebarId, pick: LibraryPick, hasSongs: boolean | null): SidebarMove {
+  if (item === 'queue') return { how: 'queue', tab: 'you' }
   if (item === 'home' || item === 'requests' || item === 'you') return { how: 'tab', tab: item }
   if (item === shownPick(pick, hasSongs, 'desktop')) return { how: 'tab', tab: 'library' }
   return { how: 'view', tab: 'library', pick: item }

@@ -6,18 +6,19 @@ import { storeAlbum } from '../api/store'
 import type { LibraryAlbum, StoreAlbumResponse } from '../api/types'
 import { DeleteAlbumDialog } from '../components/DeleteAlbumDialog'
 import { GetArtButton, GetDiscArtButton, GetLyricsButton } from '../components/LibraryParts'
-import { MetadataEditor } from '../components/MetadataEditor'
+import { MetadataEditor, type QueueContext } from '../components/MetadataEditor'
 import { TrackTagEditor } from '../components/TrackTagEditor'
 import { useLibrary } from '../hooks/useLibrary'
 import { useTrackDetails } from '../hooks/useTrackDetails'
 import {
-  EDIT_SETTLE_MS, EDIT_SLIDE_MS, EDIT_TABS, FOLLOW_LOOKS_MS, deletesAll, editFolders, editStatus, followRelease, followsTo, needsChoice,
+  EDIT_SETTLE_MS, EDIT_SLIDE_MS, EDIT_TABS, FOLLOW_LOOKS_MS, deletesAll, editFolders, editStatus, folderOnly, followRelease, followsTo, needsChoice,
   tabAfter, trackLabel,
   type EditAlbum, type EditTab,
 } from '../lib/albumEdit'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import { albumArtUrl, trackTime } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
+import type { FolderChange } from '../lib/needsLook'
 import { tickTracks } from '../lib/tagEdit'
 import { CloseIcon } from '../player/icons'
 import { useSheet } from './useSheet'
@@ -27,7 +28,28 @@ import { useSheet } from './useSheet'
 export interface EditRequest {
   album: EditAlbum
   key: number
+  folder?: undefined
 }
+
+/**
+ * An album opened from Needs a look (2.0.0-player.25): a FOLDER, by the scan's path - known, so no id
+ * bridge and no name guess - and where it sits in the queue, which the release editor is given as its
+ * own `queue` (QueueContext: "3 of 17", Previous, Next, Apply becoming Next). A new number each time,
+ * a step through the queue included, so each album starts afresh. `reread`: the library read again
+ * underneath (the first album of a session; a step between two isn't, the scan in hand is the one the
+ * session began on). `onChange`: what became of the album, told to the page that opened it.
+ */
+export interface FolderRequest {
+  folder: string
+  key: number
+  queue?: QueueContext | undefined
+  reread: boolean
+  onChange?: ((change: FolderChange & { wrote: boolean }) => void) | undefined
+  album?: undefined
+}
+
+export const isFolderRequest = (request: EditRequest | FolderRequest | null | undefined): request is FolderRequest =>
+  !!request && request.folder !== undefined
 
 /**
  * What became of the album, for App - each about the Navidrome album id it names:
@@ -42,6 +64,9 @@ export type AlbumChange =
   | { kind: 'settled'; id: string }
   | { kind: 'moved'; id: string; to: string }
   | { kind: 'deleted'; id: string; last: boolean }
+  /** an album opened by its folder (Needs a look): a write (`wrote` - a file changed, not only a review
+   *  row) or a delete, by path - there is no album page to follow */
+  | { kind: 'folder'; from: string; path: string | null; wrote: boolean }
 
 /** Ticked tracks, for editing their tags together - of one folder, cleared when it changes. */
 interface Ticked {
@@ -118,6 +143,13 @@ function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean })
  *  - LYRICS: how many tracks have a .lrc, and Get lyrics.
  *  - DELETE: the main page's confirmation, with the folder's contents read as the tab opens.
  *
+ * OPENED FROM NEEDS A LOOK (2.0.0-player.25) the request names a FOLDER (FolderRequest): no bridge
+ * and no name guess, the album taken from the scan by its path; the release editor given where it sits
+ * in the queue (its own `queue`, QueueContext - "3 of 17", Previous, Next, Apply becoming Next); the
+ * library read again underneath only for a session's first album; and what became of it told by path
+ * (`toFolder`): to the page that opened it, and to App (`kind: 'folder'`). A delete there leaves the
+ * panel open, saying so, with Next album to go on. The album-page path below is unchanged.
+ *
  * WHICH FOLDER comes from the id bridge (GET /deadwax/store/album, by the page's Navidrome id) and,
  * where the store has none, the library's scan (lib/albumEdit.ts editFolders) - asked through one
  * latestOnly(), its answer counting only for the Edit it was asked for; the scan is the main page's
@@ -157,7 +189,7 @@ export function EditPanel({
   covered = false,
 }: {
   open: boolean
-  request: EditRequest | null
+  request: EditRequest | FolderRequest | null
   opener?: { current: HTMLElement | null } | undefined
   onClose: () => void
   onChanged: (change: AlbumChange) => void
@@ -245,8 +277,16 @@ export function EditPanel({
   })
   const toTab = (which: EditTab) => () => tablist.current?.querySelector<HTMLElement>(`[data-tab="${which}"]`)
 
-  /** The id bridge asked which folders the album is - by the page's Navidrome id. */
-  const lookUp = (at: EditRequest) => {
+  /** The id bridge asked which folders the album is - by the page's Navidrome id. An album opened by
+   *  its folder needs nothing asked: the folder is known. */
+  const lookUp = (at: EditRequest | FolderRequest) => {
+    if (isFolderRequest(at)) {
+      //? an earlier album-page Edit's lookup still out must not land on this folder's request
+      lookups.supersede()
+      setAnswer(null)
+      setAskedFor(at.key)
+      return
+    }
     const ticket = lookups.begin()
     setAskedFor(null)
     storeAlbum({ navidrome_id: at.album.id }, ticket.signal).then(
@@ -273,6 +313,13 @@ export function EditPanel({
   useEffect(() => {
     if (!open || !request || lookedUp.current === request.key) return
     lookedUp.current = request.key
+    //? a step through the queue (skip, Previous, Next album) takes the editor that had focus away with
+    //? the album it was on: focus goes on to the Release tab once the swap has drawn, never to the page
+    //? (2.0.0-player.25 review) - only when it was in the panel, or nowhere (a click in WebKit)
+    if (isFolderRequest(request)) {
+      const active = document.activeElement
+      if (!active || active === document.body || box.current?.contains(active)) focusNext.current = toTab('release')
+    }
     setAnswer(null)
     setSubject(null)
     setSession((n) => n + 1)
@@ -283,6 +330,8 @@ export function EditPanel({
     setDeleted(null)
     lookUp(request)
     if (!library.loaded || library.loading) return
+    //? a step through the queue: the scan in hand is the one the session began on
+    if (isFolderRequest(request) && !request.reread) return
     const key = request.key
     const since = writes.current
     void library.reload(false).then((fresh) => {
@@ -325,7 +374,9 @@ export function EditPanel({
   }, [])
 
   const folders = useMemo(
-    () => (request && asked && libraryReady ? editFolders(answer, library.albums, request.album) : null),
+    () => (request && asked && libraryReady
+      ? (isFolderRequest(request) ? folderOnly(request.folder) : editFolders(answer, library.albums, request.album))
+      : null),
     [request, asked, libraryReady, answer, library.albums],
   )
 
@@ -360,7 +411,10 @@ export function EditPanel({
   }
 
   /** The id the Edit a write was made under names the album by now: App moves it with the page. */
-  const idOf = (at: EditRequest) => (requestNow.current?.key === at.key ? requestNow.current.album.id : at.album.id)
+  const idOf = (at: EditRequest) => {
+    const now = requestNow.current
+    return now?.key === at.key && !isFolderRequest(now) ? now.album.id : at.album.id
+  }
 
   /** Navidrome asked again once it has had time to scan what a write changed: the page asked once more. */
   const settleLater = (at: EditRequest) => {
@@ -369,6 +423,14 @@ export function EditPanel({
       if (ticket.current()) changed.current({ kind: 'settled', id: idOf(at) })
     })
     return ticket
+  }
+
+  /** What became of an album opened by its folder (Needs a look): told to the page that opened it, by
+   *  the path it had, and to App (the library's listeners, the count) - by path, there being no album
+   *  page to follow. */
+  const toFolder = (at: FolderRequest, from: string, album: LibraryAlbum | null, wrote: boolean, deleted = false) => {
+    at.onChange?.({ from, album, deleted, wrote })
+    changed.current({ kind: 'folder', from, path: deleted ? null : album?.path ?? from, wrote })
   }
 
   /** After a write: App told, the folders asked again, the page again once Navidrome has scanned -
@@ -418,24 +480,33 @@ export function EditPanel({
 
   //? the release editor's apply: the album followed to where it lives now (the same folder unless
   //? it was renamed), and - when its release changed - its new id in Navidrome looked for
-  const releaseApplied = (at: EditRequest, album: LibraryAlbum) => async (newPath: string) => {
+  const releaseApplied = (at: EditRequest | FolderRequest, album: LibraryAlbum) => async (newPath: string) => {
     writes.current += 1
     const fresh = await library.reload(false)
     const updated = follow(fresh, album.path, newPath)
+    if (isFolderRequest(at)) {
+      toFolder(at, album.path, updated, true)
+      return
+    }
     const release = updated?.release_mbid || null
     afterWrite(at, release, followRelease(album.release_mbid, release))
   }
 
+  //? an ignore or an un-ignore changes no file - only the review row, and so the count
   const ignoreAlbum = async (album: LibraryAlbum, issues: string[]) => {
+    const at = requestNow.current
     await libraryApi.ignoreIssues(album.path, issues)
     writes.current += 1
-    follow(await library.reload(false), album.path)
+    const updated = follow(await library.reload(false), album.path)
+    if (isFolderRequest(at)) toFolder(at, album.path, updated, false)
   }
 
   const unignoreAlbum = async (album: LibraryAlbum) => {
+    const at = requestNow.current
     await libraryApi.unignoreAlbum(album.path)
     writes.current += 1
-    follow(await library.reload(false), album.path)
+    const updated = follow(await library.reload(false), album.path)
+    if (isFolderRequest(at)) toFolder(at, album.path, updated, false)
   }
 
   //? tags, a cover, CD art, lyrics: the folder stays, and so does the release
@@ -445,16 +516,31 @@ export function EditPanel({
     afterWrite(at, album.release_mbid || null, null)
   }
 
+  //? ...and for an album opened by its folder: the page that opened it told, by path
+  const wroteFolder = (at: FolderRequest, album: LibraryAlbum) => async () => {
+    writes.current += 1
+    const updated = follow(await library.reload(false), album.path)
+    toFolder(at, album.path, updated, true)
+  }
+
+  const written = (at: EditRequest | FolderRequest, album: LibraryAlbum) =>
+    isFolderRequest(at) ? wroteFolder(at, album) : wrote(at, album)
+
   //? deleted: App closes the panel, and goes back from the page when nothing of the album is left in
   //? Navidrome (`last`); after one folder of several the page stays, asked again now and once Navidrome
   //? has scanned the folder gone
-  const albumDeleted = (at: EditRequest, album: LibraryAlbum, last: boolean) => () => {
+  const albumDeleted = (at: EditRequest | FolderRequest, album: LibraryAlbum, last: boolean) => () => {
     if (requestNow.current?.key === at.key) {
       setDeleted(album.path)
       setEditingTags(null)
     }
     writes.current += 1
     void library.reload(false)
+    //? opened from Needs a look: the panel stays - the row says Deleted, and Next goes on
+    if (isFolderRequest(at)) {
+      toFolder(at, album.path, null, true, true)
+      return
+    }
     changed.current({ kind: 'deleted', id: idOf(at), last })
     if (!last) settleLater(at)
   }
@@ -517,10 +603,13 @@ export function EditPanel({
     asked,
     folders,
     holding: !!subject,
-    release: answer?.release_mbid ?? request.album.musicBrainzId ?? null,
+    listed: !!folders && folders.paths.length === 1 && library.albums.some((album) => album.path === folders.paths[0]),
+    release: answer?.release_mbid ?? request.album?.musicBrainzId ?? null,
   }) : null
 
   const choosing = !!folders && needsChoice(folders) && !subject && !deleted
+  //? where the album sits in the queue, when it was opened from Needs a look
+  const queue = isFolderRequest(request) ? request.queue : undefined
 
   return (
     <div class={`app-layer app-edit-layer${open ? ' is-open' : ''} is-panel is-${panel}`} aria-hidden={!open || covered} inert={!open || covered}>
@@ -588,6 +677,12 @@ export function EditPanel({
                   Open the main page
                 </a>
               )}
+              {/* deleted from Needs a look: the queue goes on from here */}
+              {deleted && queue && queue.position < queue.total && (
+                <button type="button" class="app-edit-button" onClick={queue.onNext}>
+                  Next album ▷
+                </button>
+              )}
             </div>
           )}
 
@@ -623,6 +718,7 @@ export function EditPanel({
                   key={session}
                   album={subject}
                   issueTypes={library.issueTypes}
+                  queue={queue}
                   onClose={closeFromEditor}
                   onApplied={releaseApplied(request, subject)}
                   onIgnore={ignoreAlbum}
@@ -638,7 +734,7 @@ export function EditPanel({
                     filenames={editingTags.filenames}
                     details={details}
                     onClose={closeTagEditor}
-                    onApplied={wrote(request, subject)}
+                    onApplied={written(request, subject)}
                   />
                 ) : (
                   <TagsList
@@ -652,11 +748,11 @@ export function EditPanel({
               </div>
 
               <div id="app-edit-panel-artwork" class="app-edit-pane" role="tabpanel" aria-labelledby="app-edit-tab-artwork" hidden={tab !== 'artwork'}>
-                <ArtworkTab album={subject} onDone={wrote(request, subject)} />
+                <ArtworkTab album={subject} onDone={written(request, subject)} />
               </div>
 
               <div id="app-edit-panel-lyrics" class="app-edit-pane" role="tabpanel" aria-labelledby="app-edit-tab-lyrics" hidden={tab !== 'lyrics'}>
-                <LyricsTab album={subject} onDone={wrote(request, subject)} />
+                <LyricsTab album={subject} onDone={written(request, subject)} />
               </div>
 
               {/* drawn only while it shows: what the folder holds is read as it opens, never kept */}

@@ -2,7 +2,7 @@ import { fetchOk, get, post } from './http'
 import type {
   ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
   DeletionSummary,
-  LibraryAlbum, LibraryResponse, LyricsSummary, NewImportsResponse, OwnedResponse, RetagPlan,
+  LibraryAlbum, LibraryResponse, LyricsSummary, NewImportsResponse, OwnedResponse, QueueSummaryResponse, RetagPlan,
   RetagRelease, RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackLyrics,
   TrackTagEdit,
 } from './types'
@@ -178,6 +178,15 @@ export function owned(signal?: AbortSignal): Promise<OwnedResponse> {
  */
 export function newImports(): Promise<NewImportsResponse> {
   return get<NewImportsResponse>('/library/queue/new_imports')
+}
+
+/**
+ * How many albums need a look (2.0.0-player.25) - the app's count beside "Needs a look". Answered
+ * from the saved scan and the review rows, never a walk of the disk, so it is safe to ask whenever
+ * the count could have moved (app/useQueueSummary.ts).
+ */
+export function queueSummary(signal?: AbortSignal): Promise<QueueSummaryResponse> {
+  return get<QueueSummaryResponse>('/library/queue/summary', signal)
 }
 
 /**

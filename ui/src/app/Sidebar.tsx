@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 
-import { SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
+import { SIDEBAR_QUEUE, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
+import { needsLookLabel } from '../lib/needsLook'
 import { badgeLabel, badgeText } from '../lib/requestsView'
 import { SEARCH_MAX_CHARS } from '../lib/searchQuery'
 import { SearchIcon, YouIcon } from '../player/icons'
@@ -20,11 +21,13 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
  * the first key goes in (`onSearch`); Enter asks both halves at once. It keeps saying what was
  * searched for while an album found by it is open, as DesktopRequest.dc.html draws it.
  *
- * MANAGING links to the main page for now (James: "Managing links to / for now"): server settings,
- * the albums that need a look, the log and editing an album are there until the app has them. It
- * opens BESIDE the app, as every link out does - in the same tab it would unload the player. Shown
- * unless deadwax says this user isn't an admin (`admin`: App asks /deadwax/me as the desktop frame
- * shows); with logins off, everyone is - as You's row, which asks the same.
+ * MANAGING (shown unless deadwax says this user isn't an admin - `admin`: App asks /deadwax/me as
+ * the desktop frame shows; with logins off, everyone is, as You's row, which asks the same): "Needs a
+ * look" first (2.0.0-player.25), the review queue's page, with how many albums need one
+ * (`needsLook`, app/useQueueSummary.ts - no badge while that isn't known, never a 0 over an unknown);
+ * then the link to the main page (James: "Managing links to / for now"), for what the app doesn't
+ * have yet - server settings, the log, the bulk runs, artist images. It opens BESIDE the app, as
+ * every link out does - in the same tab it would unload the player.
  *
  * A leaf: props, and the search box's store.
  */
@@ -33,6 +36,7 @@ export function Sidebar({
   library,
   arriving,
   admin = true,
+  needsLook = null,
   onSelect,
   onSearch,
 }: {
@@ -44,6 +48,8 @@ export function Sidebar({
   arriving: number
   /** deadwax's /me says this user is an admin (true until it has answered, as You's rows) */
   admin?: boolean
+  /** how many albums need a look (null: not known yet) - Needs a look's count */
+  needsLook?: number | null
   onSelect: (item: SidebarId) => void
   /** something typed, or Enter: Search's results shown */
   onSearch: () => void
@@ -53,14 +59,14 @@ export function Sidebar({
 
   const item = ({ id, label }: SidebarItem) => {
     const chosen = id === current
-    const badge = id === 'requests' ? badgeText(arriving) : ''
+    const badge = id === 'requests' ? badgeText(arriving) : id === 'queue' ? badgeText(needsLook ?? 0) : ''
     return (
       <li key={id}>
         <button
           type="button"
           class={`app-side-item${chosen ? ' is-current' : ''}`}
           {...(chosen ? { 'aria-current': 'page' as const } : {})}
-          {...(badge ? { 'aria-label': badgeLabel(label, arriving) } : {})}
+          {...(badge ? { 'aria-label': id === 'queue' ? needsLookLabel(label, needsLook) : badgeLabel(label, arriving) } : {})}
           onClick={() => onSelect(id)}
         >
           <span class="app-side-item-label">{label}</span>
@@ -126,13 +132,14 @@ export function Sidebar({
             Managing
           </h2>
           <ul class="app-side-list">
+            {item(SIDEBAR_QUEUE)}
             <li>
               <a
                 class="app-side-item"
                 href="/"
                 target="_blank"
                 rel="noopener"
-                title="Server settings, albums that need a look, the log and editing an album - on the main page for now"
+                title="Server settings, the log, the bulk runs and artist images - on the main page for now"
               >
                 <span class="app-side-item-label">Open the main page</span>
               </a>

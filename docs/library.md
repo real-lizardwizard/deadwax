@@ -125,6 +125,8 @@ bootleg that will never be on MusicBrainz, say), **It's fine as it is** stops it
 for the issues it has now. It's still flagged if something new goes wrong, such as the cover
 going missing.
 
+The app has the same queue on a desktop, as **Needs a look** ([below](#needs-a-look-in-the-app)).
+
 ## The metadata editor
 
 **Edit metadata…** opens the editor on an album, already searching MusicBrainz using its artist
@@ -271,9 +273,10 @@ Library:
   left it if you were already on the Library's first page, at its top from anywhere else.
 - **Editing an album** - this page's metadata editor, tag editor, covers, lyrics and delete - is on
   the album's own page, its **Edit** button (since 2.0.0-player.21; [below](#editing-an-album-in-the-app)).
-  The albums that need a look (**Review N**), the bulk runs (**Get covers · N** and the rest), an
-  artist's pictures and **Move albums to …** are still this page's: the sidebar's **Managing** opens
-  it in a new tab.
+  The albums that need a look are the sidebar's **Needs a look**, under **Managing** (since
+  2.0.0-player.25; [below](#needs-a-look-in-the-app)). The bulk runs (**Get covers · N** and the
+  rest), an artist's pictures, **Move albums to …**, the server settings and the log are still this
+  page's: **Managing**'s **Open the main page** opens it in a new tab.
 
 ## Editing an album in the app
 
@@ -330,6 +333,42 @@ to a phone's. The close button, or Escape while you're in the panel, closes it -
 the delete confirmation, Escape closes that first, back to its tab; Escape out in the page (in the
 search field, say) is the page's. Between 1024 and 1279 pixels wide, while it lies over the page, the
 album's **Play**, **Shuffle** and **Edit** move under its cover, so **Edit** stays in view to close it.
+
+## Needs a look in the app
+
+In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), the sidebar's **Managing**
+starts with **Needs a look** (since 2.0.0-player.25), with how many albums need one beside it - and
+You's **Managing deadwax** has **Albums that need a look**, with the same count. It's there for an
+admin, which with logins off is everyone. It's this page's review queue (**Review N**), not a copy:
+
+- **The same albums, in the same order**: every album with an issue you haven't accepted, and every
+  album deadwax filed that nobody has looked at yet - those first, then the worst first, then by
+  artist and album. The count is that list's length: deadwax works it out from the library's saved
+  scan, without reading the disk (an album filed since the last scan is counted too, as the list
+  shows it once it has scanned).
+- **Chips narrow it**: **All**, **Newly added** (when there is one), and one for each kind of issue
+  that has an album, with how many. The chip you press is in the page's address, so a reload keeps
+  it; one whose last album gets fixed falls back to **All**.
+- **A row** shows the album's cover, name, artist and edition, **New** for an album just filed, and
+  its outstanding issues (hover one for what it means). The list is read the first time you open the
+  page - the saved scan at once, then the disk, with *Checking the library…* meanwhile.
+
+**Click a row** and the **Edit album** panel opens on that album's folder, beside the list - the same
+panel as an album page's **Edit**, all five tabs ([above](#editing-an-album-in-the-app)), the row
+highlighted. **Release** says where the album is in the queue (*3 of 17*), with **◁** and **skip ▷**,
+and after **Apply** its button becomes **Next album ▷**, so you can work through the queue without going
+back to the list - or click another row. While the panel is open the list doesn't move: an album you
+fix, accept (**It's fine as it is**) or delete stays where it was, faded, saying **Fixed**, **Ignored**
+or **Deleted** (after a delete the panel stays open, saying so, with **Next album ▷**). Moving on from an album - Next, Previous, another row, closing the panel - counts as
+having looked at it, which is what clears **New** (it keeps its issues). Closing the panel, choosing
+another chip or leaving the page ends the run: the list is then read again and drawn as it is now.
+The chips hold still for the whole run too, counts and all. Until that read has landed the rows stay
+as they were, faded, and a click on one does nothing - click again once they are back to full
+strength.
+
+On a phone the page says fixing albums needs a wider screen for now, with a link to this page; there's
+no editor on a phone yet. An album page showing the same album elsewhere in the app isn't asked again
+after an edit made from **Needs a look** - go back to it, or reload, to see the change.
 
 ## Deleting an album
 

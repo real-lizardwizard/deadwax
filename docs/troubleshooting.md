@@ -493,6 +493,26 @@ finds it](library.md#editing-an-album-in-the-app)). What it says when it can't:
 **Edit** itself is missing on a phone (there's no editor there yet), in a window under 1024 pixels
 wide, and for someone deadwax says isn't an admin - with logins off, nobody.
 
+## The app's "Needs a look" count changes when you open it, or has none
+
+The count beside **Needs a look** (the desktop sidebar's **Managing**, and You's **Albums that need a
+look**) is worked out from the library's **saved scan**, never by reading the disk, so it costs
+nothing to keep asking. While the page is open it shows the page's own count instead, from a fresh
+scan - so if the music changed since the library was last read (an album copied in, retagged or
+removed by another program), the number moves as the page opens. They count the same albums: every
+album with an issue you haven't accepted, and every album deadwax filed that nobody has looked at.
+
+- **No number at all**: nothing needs a look - or deadwax hasn't answered yet. A count is only drawn
+  once deadwax has said one, never a 0 standing in for "not known".
+- **Only the new albums are counted** until the library at `LIBRARY_PATH` has been read (open **Needs a
+  look**, or the main page's Library tab): with no saved scan of that folder there is nothing else to
+  count from. That is so on a new database, after `LIBRARY_PATH` is pointed somewhere new, and when the
+  last read found no albums there at all (an unmounted share, say).
+- **An album filed a moment ago** counts at once, before any scan has seen its folder; it appears on
+  the page once the page has read the library.
+- **The page is missing on a phone**: it's a short note there, pointing at the main page, which has
+  the same queue (**Review N**). There's no editor on a phone yet.
+
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
 The [phone player](player.md) shows one of these on Home and in the Library tab, in place of your

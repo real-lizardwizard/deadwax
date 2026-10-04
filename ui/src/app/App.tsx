@@ -6,7 +6,7 @@ import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
 import { closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
-import { TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type Tab } from '../lib/appRoutes'
+import { QUEUE_ID, QUEUE_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
@@ -29,10 +29,11 @@ import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerW
 import { ActionMenu } from './ActionMenu'
 import { ArtistPage, type ArtistPreview } from './ArtistPage'
 import { ActionsContext, PlayerContext, pickActions } from './context'
-import { EditPanel, type AlbumChange, type EditRequest } from './EditPanel'
+import { EditPanel, isFolderRequest, type AlbumChange, type EditRequest, type FolderRequest } from './EditPanel'
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
 import { chooseLibrary, libraryPick, librarySongs, useLibraryPick } from './libraryPick'
+import { NeedsALook } from './NeedsALook'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { ReleaseGroupPage } from './ReleaseGroupPage'
 import { Requests } from './Requests'
@@ -44,6 +45,7 @@ import { useFrame } from './useFrame'
 import { useInfoDetails } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
 import { setPinned, usePins } from './usePins'
+import { askQueueSummary, useQueueSummary } from './useQueueSummary'
 import { takeOpener } from './useSheet'
 import { You } from './You'
 
@@ -192,6 +194,17 @@ function usePageShown(): boolean {
  * remembered (`moves`), so a page of the old id that comes back on top - back to it, forward to it,
  * another tab showing it - becomes the new one's too; and a deleted album's page is gone back from
  * when nothing of the album is left in Navidrome.
+ *
+ * NEEDS A LOOK (2.0.0-player.25, NeedsALook.tsx): the review queue's page, pushed on You
+ * (`#/you/queue/all`, its facet in the address - pickFacet replaces it), opened from the desktop
+ * sidebar's Managing or You's row (openQueue). Its rows open the same Edit panel on a FOLDER
+ * (openFolderEdit, a FolderRequest: the queue's place, the page's own listener), by the same rules -
+ * one panel at a time, the page's own (it closes as the queue page stops being on top). What the panel
+ * writes from there comes back by path (`folder`): the library's listeners told of a write, the count
+ * asked again; an album PAGE of the same album elsewhere in the stacks is not followed - nothing keys
+ * it on a folder. How many albums need a look is useQueueSummary.ts's store, asked here as the desktop
+ * frame shows for an admin and as the app comes back to the front, and after every change the panel
+ * reports - never on a timer; the sidebar and You draw it. A phone draws the page as a short note.
  */
 export function App() {
   const player = usePlayer()
@@ -255,8 +268,9 @@ export function App() {
   const [editOpen, setEditOpen] = useState(false)
   const editOpenNow = useRef(false)
   editOpenNow.current = editOpen
-  const [edit, setEdit] = useState<EditRequest | null>(null)
-  const editNow = useRef<EditRequest | null>(null)
+  //? (2.0.0-player.25: or an album opened by its folder from Needs a look - FolderRequest)
+  const [edit, setEdit] = useState<EditRequest | FolderRequest | null>(null)
+  const editNow = useRef<EditRequest | FolderRequest | null>(null)
   editNow.current = edit
   const editOpener = useRef<HTMLElement | null>(null)
   const editKeys = useRef(0)
@@ -366,6 +380,15 @@ export function App() {
 
   const stalls = stallsOn(watching, downloadsError, view.arriving.length)
   useEffect(() => setStalled(stalls), [stalls])
+
+  //? How many albums need a look (2.0.0-player.25, useQueueSummary.ts): the desktop sidebar's count
+  //? and You's - an admin's. Asked as the desktop frame first shows for one, and as the page comes back
+  //? from hidden; after that, the Edit panel's changes and the queue page's reviews ask again (and a
+  //? filed album, by itself). Never at start-up on a phone, and no timer
+  const needsLook = useQueueSummary()
+  useEffect(() => {
+    if (desktop && admin && pageShown) askQueueSummary()
+  }, [desktop, admin, pageShown])
 
   const openAlbum = useCallback((album: Album) => {
     previews.current.delete(album.id)
@@ -524,7 +547,7 @@ export function App() {
   //? so it starts afresh - and pressed again on the album it shows, closed. One panel at a time: it
   //? puts Sources (and its search, by Sources' backstop) and Info away, focus going to the panel.
   const toggleEdit = useCallback((event: MouseEvent, album: EditAlbum) => {
-    if (editOpenNow.current && editNow.current?.album.id === album.id) {
+    if (editOpenNow.current && editNow.current?.album?.id === album.id) {
       setEditOpen(false)
       return
     }
@@ -538,6 +561,36 @@ export function App() {
     setInfoPanel(false)
   }, [])
   const closeEdit = useCallback(() => setEditOpen(false), [])
+
+  //? Needs a look's rows (2.0.0-player.25): the Edit panel on a FOLDER, by the same one-panel rule -
+  //? a new request each album, a step through the queue included; `opener` the row it gives focus
+  //? back to (undefined: kept as it was)
+  const openFolderEdit = useCallback((request: Omit<FolderRequest, 'key'>, opener: HTMLElement | null | undefined) => {
+    if (opener !== undefined) editOpener.current = opener
+    editKeys.current += 1
+    setEdit({ ...request, key: editKeys.current })
+    setEditOpen(true)
+    sourcesOpener.current = null
+    setSourcesOpen(false)
+    infoOpener.current = null
+    setInfoPanel(false)
+  }, [])
+
+  //? Needs a look (2.0.0-player.25), from the sidebar or You's row: its page, on You - the tab shown
+  //? as it was left and the page pushed over it, or nothing when it is already the page on top there
+  const openQueue = useCallback(() => {
+    const stack = router.nav.stacks.you
+    const onTop = stack[stack.length - 1]?.kind === 'queue'
+    if (router.nav.tab !== 'you') router.tab('you')
+    if (!onTop) {
+      scrolls.current.delete(scrollKey({ tab: 'you', page: QUEUE_PAGE }))
+      router.open(QUEUE_PAGE)
+    }
+  }, [])
+  //? a facet chosen there: the page's address replaced, as a pressing chosen on a group page
+  const pickFacet = useCallback((facet: string | null) => {
+    router.update({ kind: 'queue', id: QUEUE_ID, ...(facet ? { facet } : {}) })
+  }, [])
 
   //? Crossing into the other frame (lib/appFrame.ts closesOnCrossing): into the desktop, Now Playing
   //? and what is over it close - the desktop's player is its bar; back to the phone, the Info panel.
@@ -566,9 +619,10 @@ export function App() {
   }, [frame])
 
   //? The Edit panel is the album page's: as that page stops being the one showing - another page, a
-  //? tab, the sidebar - it closes, focus given back to nothing (the Edit it came from is gone)
+  //? tab, the sidebar - it closes, focus given back to nothing (the Edit it came from is gone). Opened
+  //? from Needs a look, it is that page's, by the same rule
   const topNow = nav.stacks[nav.tab][nav.stacks[nav.tab].length - 1] ?? null
-  const editShown = edit !== null && topNow?.kind === 'album' && topNow.id === edit.album.id
+  const editShown = edit !== null && (isFolderRequest(edit) ? topNow?.kind === 'queue' : topNow?.kind === 'album' && topNow.id === edit.album.id)
   useEffect(() => {
     if (!editOpen || editShown) return
     editOpener.current = null
@@ -584,6 +638,14 @@ export function App() {
    * and the page is gone back from when that was the album's only folder.
    */
   const albumChanged = useCallback((change: AlbumChange) => {
+    //? every change the panel reports may move how many albums need a look
+    askQueueSummary()
+    //? an album opened from Needs a look: the library's listeners told of a write - the page that
+    //? opened it hears the rest itself (FolderRequest's onChange)
+    if (change.kind === 'folder') {
+      if (change.wrote) announceAlbumsFiled()
+      return
+    }
     //? the album asked again under the id it has now - a write's `settled` can land after its move
     const ask = (id: string) => {
       const now = movedTo(moves.current, id) ?? id
@@ -599,7 +661,7 @@ export function App() {
     if (change.kind === 'moved') {
       noteMove(moves.current, change.id, change.to)
       const at = editNow.current
-      if (at && at.album.id === change.id) setEdit({ ...at, album: { ...at.album, id: change.to } })
+      if (at && !isFolderRequest(at) && at.album.id === change.id) setEdit({ ...at, album: { ...at.album, id: change.to } })
       const preview = previews.current.get(change.id)
       if (preview) previews.current.set(change.to, { ...preview, id: change.to })
       //? not showing (the page left during the rename's wait): the page becomes it when it is back on top
@@ -610,7 +672,7 @@ export function App() {
     }
     //? deleted: the panel closes - focus back to Edit while its page stays, to nothing when it goes
     announceAlbumsFiled()
-    if (editNow.current?.album.id === change.id) {
+    if (editNow.current?.album?.id === change.id) {
       if (change.last) editOpener.current = null
       setEditOpen(false)
     }
@@ -645,6 +707,10 @@ export function App() {
     const move = sidebarMove(item, libraryPick(), librarySongs())
     if (move.how === 'tab') {
       chooseTab(move.tab)
+      return
+    }
+    if (move.how === 'queue') {
+      openQueue()
       return
     }
     const away = router.nav.tab !== 'library' || router.nav.stacks.library.length > 0
@@ -767,8 +833,20 @@ export function App() {
     [status, searchSeen, searchActive],
   )
   const you = useMemo(
-    () => <You shown={youSeen} current={youCurrent} opensAs={opensAs} onOpensAs={chooseOpensAs} windDown={windDown} onWindDown={chooseWindDown} />,
-    [youSeen, youCurrent, opensAs, windDown],
+    () => (
+      <You
+        shown={youSeen}
+        current={youCurrent}
+        opensAs={opensAs}
+        onOpensAs={chooseOpensAs}
+        windDown={windDown}
+        onWindDown={chooseWindDown}
+        desktop={desktop}
+        needsLook={needsLook}
+        onNeedsLook={openQueue}
+      />
+    ),
+    [youSeen, youCurrent, opensAs, windDown, desktop, needsLook],
   )
   const roots: Record<Tab, JSX.Element> = { library, search, you, home, requests }
 
@@ -797,8 +875,25 @@ export function App() {
     )
   }
 
+  //? Needs a look (2.0.0-player.25): the review queue, a desktop's - on a phone a short note, asking
+  //? nothing. Its rows open the Edit panel on their folder; it is told which folder the panel has open
+  //? for it (`editing`), and whether it is what shows
+  const queueView = (tab: Tab, page: Page) => (
+    <NeedsALook
+      desktop={desktop}
+      shown={pageShown && nav.tab === tab}
+      facet={page.facet ?? null}
+      onFacet={pickFacet}
+      onBack={back}
+      backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
+      editing={editOpen && isFolderRequest(edit) ? edit.folder : null}
+      onEdit={openFolderEdit}
+      onCloseEdit={closeEdit}
+    />
+  )
+
   const pageView = (tab: Tab, page: Page, player: Player) =>
-    page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
+    page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
@@ -824,7 +919,7 @@ export function App() {
           onArtist={openAlbumArtist}
           onOpenAlbum={openAlbum}
           onEdit={desktop && admin ? toggleEdit : undefined}
-          editing={editOpen && edit?.album.id === page.id}
+          editing={editOpen && edit?.album?.id === page.id}
           refresh={refreshes.get(page.id) ?? 0}
         />
       </NeedsNavidrome>
@@ -893,10 +988,11 @@ export function App() {
             {/* a desktop's sidebar, in the tab bar's place (2.0.0-player.19) - first, as it is on screen */}
             {desktop && (
               <Sidebar
-                current={sidebarCurrent(nav.tab, libraryView, hasSongs)}
+                current={sidebarCurrent(nav.tab, libraryView, hasSongs, topNow)}
                 library={libraryItems(hasSongs)}
                 arriving={view.arriving.length}
                 admin={admin}
+                needsLook={needsLook}
                 onSelect={chooseFromSidebar}
                 onSearch={showSearch}
               />

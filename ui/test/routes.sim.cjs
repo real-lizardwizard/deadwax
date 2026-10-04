@@ -55,6 +55,10 @@
  *    page of the old id coming back on top is the new one's; whether a delete leaves Navidrome nothing
  *    of the album (`deletesAll`); and what the panel says (`editStatus`) - never "Finding" for good
  *    after the real scan failed, nothing over an album still being edited.
+ *  - Needs a look (2.0.0-player.25): `#/you/queue/all?facet=<id>` - one page whatever its facet (the
+ *    facet replaced in the address as it is chosen, as a group page's pressing is, kept by a reload,
+ *    back leaving the page in one step); the sidebar's "Needs a look", current while its page is on
+ *    top and opening it on You; and the Edit panel opened on a folder (`folderOnly`).
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -922,6 +926,58 @@ exports.useEffect = (f) => { if (!at().effect) at().effect = { f } }
   frame.commit()
   delete globalThis.window
   delete globalThis.__frame
+}
+
+console.log('\nNeeds a look: the queue page, its facet in the address and not its identity (2.0.0-player.25)')
+{
+  const queue = (facet) => ({ kind: 'queue', id: 'all', ...(facet ? { facet } : {}) })
+  check('pushed on You: #/you/queue/all', R.parseHash('#/you/queue/all'), { route: { tab: 'you', page: queue() }, canonical: '#/you/queue/all' })
+  check('...a facet read from the address, and written back', [R.parseHash('#/you/queue/all?facet=no_art').route.page, R.formatRoute({ tab: 'you', page: queue('no_art') })],
+    [queue('no_art'), '#/you/queue/all?facet=no_art'])
+  check('...one queue page: any other id is it, its address made canonical', R.parseHash('#/you/queue/whatever?facet=new').canonical, '#/you/queue/all?facet=new')
+  check('...an empty facet is none; another page takes no facet', [R.parseHash('#/you/queue/all?facet=').canonical, R.parseHash('#/library/album/x?facet=new').route.page],
+    ['#/you/queue/all', album('x')])
+  check('the same page whatever its facet; its scroll kept under one key', [R.samePage(queue('new'), queue('no_art')), R.scrollKey({ tab: 'you', page: queue('new') })],
+    [true, '#/you/queue/all'])
+  check('the page App opens: All, labelled for the back button above it', R.QUEUE_PAGE, { kind: 'queue', id: 'all', label: 'Needs a look' })
+  const nav = R.openPage(R.startNav({ tab: 'you', page: null }), R.QUEUE_PAGE)
+  const picked = R.replaceTop(nav, queue('no_art'))
+  check('a facet chosen replaces the page on top - the same page, its label kept', [picked.stacks.you, R.formatRoute(R.currentRoute(picked))],
+    [[{ kind: 'queue', id: 'all', label: 'Needs a look', facet: 'no_art' }], '#/you/queue/all?facet=no_art'])
+  check('...the same facet again changes nothing; All takes it out', [R.replaceTop(picked, queue('no_art')) === picked, R.formatRoute(R.currentRoute(R.replaceTop(picked, queue())))],
+    [true, '#/you/queue/all'])
+  check('...and a group\'s pressing is still its own (the two never mix)', R.replaceTop(R.openPage(R.startNav({ tab: 'search', page: null }), { kind: 'group', id: 'g' }), { kind: 'group', id: 'g', release: 'r' }).stacks.search,
+    [{ kind: 'group', id: 'g', release: 'r' }])
+
+  const b = makeBrowser('#/you')
+  b.load()
+  b.router.open(R.QUEUE_PAGE)
+  b.router.update(queue('new'))
+  check('end to end: opened, then a facet - its entry replaced, no new one', [b.hashes(), b.index], [['#/you', '#/you/queue/all?facet=new'], 1])
+  b.router.back()
+  b.settle()
+  check('...back leaves the page in one step', [where(b), b.index], [['you', []], 0])
+  b.forward()
+  check('...forward lands on the facet last chosen', b.entries[b.index].hash, '#/you/queue/all?facet=new')
+  const c = makeBrowser('#/you/queue/all?facet=no_art')
+  c.load()
+  check('a reload (or a link) opens the page on the facet it names', c.router.nav.stacks.you, [queue('no_art')])
+
+  check('the sidebar: Needs a look is Managing\'s own item', F.SIDEBAR_QUEUE, { id: 'queue', label: 'Needs a look' })
+  check('...the current item while its page is on top, whatever its tab; otherwise as before',
+    [F.sidebarCurrent('you', 'albums', true, R.QUEUE_PAGE), F.sidebarCurrent('home', 'albums', true, queue('new')), F.sidebarCurrent('you', 'albums', true, album('x')), F.sidebarCurrent('you', 'albums', true)],
+    ['queue', 'queue', 'you', 'you'])
+  check('...a tap opens its page, on You', F.sidebarMove('queue', 'albums', true), { how: 'queue', tab: 'you' })
+
+  check('the Edit panel opened on a folder: that folder, nothing to find or choose', [E.folderOnly('Old Rips/Third rip'), E.needsChoice(E.folderOnly('a')), E.folderOnly('')],
+    [{ paths: ['Old Rips/Third rip'], from: 'folder' }, false, { paths: [], from: 'none' }])
+  check('...a delete there needs no Navidrome album to judge by', [E.deletesAll(E.folderOnly('a'), 3, undefined), E.deletesAll({ paths: ['a', 'b'], from: 'name' }, 3, undefined)], [true, false])
+  check('...the panel says what it says for an album by any other way: the scan not listing it yet',
+    E.editStatus({ deleted: null, problem: null, error: null, albums: 3, loaded: true, stale: false, asked: true, folders: E.folderOnly('Old Rips/Third rip'), holding: false, release: null }),
+    { text: "The library's scan doesn't list Old Rips/Third rip yet.", retry: true })
+  check('...but the scan LISTING it, the album just not taken yet (the render after a folder request is "asked"): still finding - never a flash of "doesn\'t list"',
+    E.editStatus({ deleted: null, problem: null, error: null, albums: 3, loaded: true, stale: false, asked: true, folders: E.folderOnly('Old Rips/Third rip'), holding: false, listed: true, release: null }),
+    { text: "Finding the album's folder…", busy: true })
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

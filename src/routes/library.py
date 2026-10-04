@@ -1346,6 +1346,60 @@ async def new_imports(request: Request):
     return await store.new_import_summary()
 
 
+@router.get("/queue/summary")
+async def queue_summary(request: Request):
+    """
+    How many albums need a look - the app's count beside "Needs a look" (2.0.0-player.25).
+
+    The count the app's queue page lists, BY CONSTRUCTION: `total` is the albums
+    ui/src/lib/metadataQueue.ts queueAlbums(albums, null) lists over this same saved scan - an
+    outstanding issue, or filed by deadwax and not yet looked at - decorated exactly as
+    /albums?snapshot=true decorates it (attach_issues with the review rows). And it NEVER walks the
+    disk: the badge is asked as the desktop frame shows and after every change, and a scan per ask
+    is exactly the cost the saved scan exists to hide. So it reads the saved scan alone.
+
+    Two things the saved scan can't see, and what it does about each:
+     - an album filed since the last scan (the poller writes its import row as it files, but the
+       scan cache learns the folder only from the next scan): such an import row is counted too
+       (`unscanned_imports`), as the page lists it once it has scanned - the badge is told of a new
+       album at import time, as the main page's always was ("The new-import prompt is recorded at
+       import time");
+     - no saved scan at all (`known` false): the new imports alone, store.new_import_summary's
+       count. It does not fall through to a real scan, as _scan_with_queue does.
+
+    No LIBRARY_PATH, or no store: zeros, `known` false - still a 200.
+    """
+    root = Config.LIBRARY_PATH or ""
+    store = _store(request)
+    tracking = bool(store and store.available)
+    answer = {"known": False, "needs_attention": 0, "new_imports": 0, "total": 0,
+              "unscanned_imports": 0, "tracking_enabled": tracking}
+
+    if not root or store is None:
+        return answer
+
+    await _ensure_cache_loaded(request)
+    snapshot = await asyncio.to_thread(snapshot_library, root)
+
+    if snapshot is None:
+        imports = await store.new_import_summary()
+        count = int(imports.get("count") or 0)
+        return {**answer, "new_imports": count, "total": count, "unscanned_imports": count}
+
+    reviews = await store.album_reviews()
+    albums = snapshot["albums"]
+    queue = attach_issues(albums, reviews)
+    listed = sum(1 for album in albums if album["needs_attention"] or (album["imported"] and not album["reviewed"]))
+    held = {album["path"] for album in albums}
+    #? the same rule attach_issues reads an import by: filed by deadwax, not looked at
+    unscanned = sum(1 for path, review in reviews.items()
+                    if path not in held and review.get("source") == "import" and not review.get("reviewed_at"))
+
+    return {**answer, "known": True, "needs_attention": queue["total"],
+            "new_imports": queue["new_imports"] + unscanned, "total": listed + unscanned,
+            "unscanned_imports": unscanned}
+
+
 @router.post("/queue/ignore")
 async def ignore_issues(request: Request, body: QueueRequest):
     """

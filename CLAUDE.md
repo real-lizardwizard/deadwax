@@ -198,7 +198,9 @@ src/
                    settings (editable since v0.5.1 - see "The settings tab"), navidrome
                    (the player's FIXED list of Subsonic calls - see "The phone player"),
                    me, store_album (the app's id bridge - see "Artists, and the two
-                   libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home")
+                   libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home");
+                   library's /queue/summary is the app's Needs-a-look count, from the saved
+                   scan alone - see "Needs a look"
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
                    are ported. main.css styles BOTH halves - see below.
   styles/theme.css THE TOKEN LAYER. Every colour, size, space, radius, shadow, duration and
@@ -219,7 +221,9 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts, and
                    since 2.0.0-player.24 lib/deckClock.ts, its one time base) - see "The
                    turntable, part two" and "The record's sound follows the hand".
-tests/             2334 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+                   app/NeedsALook.tsx is the review queue on a desktop, its rules the pure
+                   lib/needsLook.ts and its count app/useQueueSummary.ts - see "Needs a look".
+tests/             2350 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -6508,7 +6512,8 @@ later; "Managing links to / for now".
   opening BESIDE the app; the links-out list in app-rules gained it; shown unless deadwax says this
   user isn't an admin - nobody, with logins off: App asks `/deadwax/me` through a latestOnly() as the
   desktop frame shows and hands `admin` down, true until it answers, as You's rows; and no badge,
-  since the review-queue count needs the Managing slice's route), and You at the foot. `sidebarCurrent` highlights where the app is
+  since the review-queue count needs the Managing slice's route - built in 2.0.0-player.25, "Needs a
+  look": Managing's first item, with its count), and You at the foot. `sidebarCurrent` highlights where the app is
   (`aria-current`; none on Search, whose place is the field); `sidebarMove` is what a click does -
   Home, Requests, You and the Library view showing are tab buttons (selectTab: as left, or back to
   the root), another Library view is that view at the Library's root, opened at its top (App deletes
@@ -6608,8 +6613,9 @@ later; "Managing links to / for now".
   2.0.0-player.20, see "The desktop visualizer");
   the turntable on a desktop; the desktop editor (S9, DesktopManage - built in 2.0.0-player.21, "Editing
   an album on desktop"); the comparison table (rejected);
-  "Mine / Everything in the store" (logins are off); the sidebar's "Needs a look" count, Settings and
-  Log as their own items (one "Open the main page" link until the Managing slice); Lyrics and Queue in
+  "Mine / Everything in the store" (logins are off); the sidebar's "Needs a look" count (built in
+  2.0.0-player.25, "Needs a look"), Settings and Log as their own items (one "Open the main page" link
+  until the Managing slices); Lyrics and Queue in
   the bar (nothing for them to open); a desktop Now Playing; "Results for …" as the breadcrumb (the
   back label stays the tab's name). You's "Now Playing opens as" and "Pause winds the record down"
   still show on a desktop - they are this device's phone settings, and an iPad turns between frames.
@@ -7283,6 +7289,212 @@ straight from the FLAC". The spec is the session scratchpad's `uplan/slice-flacw
 - **NOT verified here**: a real Navidrome's ranges on James's server (Go's ServeContent answers them as
   the fake does - the version check already depends on it); a real library's VBR and seek tables at
   scale.
+
+### Needs a look (2.0.0-player.25)
+
+The first of the Managing slices (the plan's section 10: the review queue with a cheap summary route;
+server settings, the log and the bulk runs are later slices). There is NO board for this screen; the
+boards only name it - the desktop sidebar's Managing has "Needs a look" with a count, You has "Albums
+that need a look" with a purple count - so it is built from STYLE.md and the desktop frame's parts. The
+spec is the session scratchpad's `uplan/slice-needs-a-look.md`. Its rules are the main page's review
+queue's, carried over exactly ("The metadata queue stores only what you IGNORED", "The tab badge and the
+queue must never count different things", "Prune review rows...", "The new-import prompt is recorded at
+import time", "Don't derive an overlay's subject from a list that a write reloads", "The editor is keyed
+on a step counter"); LibraryView.tsx, `ui/src/components/` and `ui/src/hooks/` have no diff.
+
+- **Where it is**: the desktop sidebar's Managing, a new first item "Needs a look" (`SIDEBAR_QUEUE`,
+  `SidebarId` 'queue') with Requests' badge look and `badgeText`'s rule ("Needs a look, 3 albums" to
+  VoiceOver, `needsLookLabel`), above "Open the main page" (whose title now names what is still the main
+  page's: server settings, the log, the bulk runs, artist images); `aria-current` while its page is on
+  top (`sidebarCurrent`'s new `page` argument: the queue page is its item whatever tab it is on). And
+  You's "Managing deadwax", desktop only, admin only: a row "Albums that need a look" with the same badge
+  (`.app-queue-badge`), above the link to the main page; on a desktop the footnote no longer claims the
+  queue and the editor are the main page's. Both go through App's `openQueue`: You's tab as it was left,
+  the page pushed over it - nothing when it is already the page on top there (two history moves are
+  never a back and then a push: `history.go` is asynchronous).
+- **The route** (`lib/appRoutes.ts`): `PageKind` 'queue', `#/you/queue/all?facet=<id>` - ONE page
+  (`QUEUE_ID` 'all'; any other id in an address is it, made canonical), the facet in the address as a
+  group page's pressing is and, like it, not its identity: `replaceTop` compares and carries both
+  `release` and `facet`, `scrollKey` leaves both out, `samePage` is kind and id. A facet chosen is
+  `router.update` (App's `pickFacet`): the entry replaced, so a reload keeps it and back leaves the page
+  in one step. routes.sim drives it end to end.
+- **The count: `GET /deadwax/library/queue/summary`** -> `{known, needs_attention, new_imports, total,
+  unscanned_imports, tracking_enabled}`. It NEVER walks the disk: `snapshot_library` (the saved scan,
+  loaded from the database by `_ensure_cache_loaded` after a restart) decorated exactly as
+  `/albums?snapshot=true` decorates it (`attach_issues` with `album_reviews`), and `total` is what
+  `queueAlbums(albums, null)` lists over it - an outstanding issue, or `imported && !reviewed` - so the
+  badge and the page count the same albums BY CONSTRUCTION (`test_the_badge_and_the_page_count_the_same_
+  albums` runs both over one library; needslook.sim holds the page's All count to `summaryTotal`, which
+  is `queueAlbums(albums, null).length`). **One thing beyond the spec's letter**: an import row whose
+  folder the saved scan doesn't hold (filed since the last scan - the poller writes the row as it files,
+  the scan cache learns the folder only from the next scan) is counted too (`unscanned_imports`, read by
+  attach_issues's own rule: source 'import', no `reviewed_at`), because "the new-import prompt is
+  recorded at import time" - a badge blind to the album just downloaded would be the 1.1.2 bug again. With
+  no saved scan at all `known` is false and `total` is `store.new_import_summary`'s count, never a real
+  scan in its place. No LIBRARY_PATH or no store: zeros, `known` false, a 200. No ETag (optional, not
+  built). `tests/test_queue_summary.py` (10) through `TestClient(start())`.
+- **The app's one store of it: `app/useQueueSummary.ts`** (a module, as useOwned and usePins): one
+  request in flight and one "ask again"; asked by App's `useEffect([desktop, admin, pageShown])` - as the
+  desktop frame first shows for an admin and as the app comes back from hidden; by `albumChanged` on
+  EVERY change the Edit panel reports; by the queue page after each album it marks reviewed; and by
+  `onAlbumsFiled` once anything has asked. No timer. While the queue page shows with a REAL scan and no
+  session its own All count stands in (`setPageQueueCount`, cleared as it hides, starts a session or
+  goes); a failed ask keeps the last number, and with none the count is null - no badge drawn over an
+  unknown (badgeText(0) is '' anyway).
+- **The page: `app/NeedsALook.tsx`**, its pure rules `lib/needsLook.ts`. The library through the main
+  page's own `useLibrary(desktop && shown)` - the saved scan drawn at once, a real scan underneath - read
+  only once it first shows, and read again (ETag'd) when it shows again later with nothing under way.
+  Title "Needs a look" under a back button; `NEEDS_LOOK_LINE`; facet chips (the Library chips' look,
+  `aria-pressed`): All N, Newly added N (`NEW_FACET`, only when there is one), then one chip per issue
+  type with albums, the most first, then by label, each titled with its hint (`facets`); the list is
+  `facetAlbums` = `queueAlbums(albums, facet)` (Newly added: its new imports, in its order); a facet
+  that has emptied shows All (`facetShown`) and the address is told once a real scan says so. A row is a
+  button: the folder's cover (`albumArtUrl`, the plain tile when none or a failed load), album, artist
+  and edition (`disc_label`, else `edition`), "New" for a new import, its outstanding issues as chips.
+  States: the spinner until the first answer; `problem` (LIBRARY_PATH) plainly; a failed read with
+  nothing to show, with Try again; "Nothing needs a look."; and "Checking the library…" in a line that is
+  always in the page and a row tall (`.app-queue-checking`, its going moves no row; a failed refresh
+  with albums on screen is said there, with Try again). No solid purple: Apply in the panel is the
+  screen's one.
+- **The session** (`startSession`, `stepTarget`, `rowChanged`, `markFor`, `leavingAtEnd`): a row
+  clicked fixes the list as shown (facet applied) - its paths, in order, the clicked one current. While
+  it lasts the rows drawn are the SESSION's, never the scan's: an album fixed, ignored or deleted stays in
+  its row, faded, saying **Fixed** / **Ignored** / **Deleted** (`MARK_WORDS`; judged against what put it
+  in the list - every issue gone and none accepted is Fixed, some accepted Ignored, a clean new import
+  nothing), a re-filed one followed to its new path (`rowChanged`, by the path it had). Stepping away
+  from an album - Next, Previous, another row, the panel closing, the page left (an unmount cleanup) -
+  marks it reviewed (`markReviewed`, then the count asked again), never one deleted here
+  (`mark_album_reviewed` would write a row for a folder that isn't there). An album gone when stepped to
+  ends the session, as leaveQueue does: deleted here, or absent from the page's own scan - unless a
+  write has told the page of it (`heard`), since that scan may predate a rename. The session ends as the
+  panel closes (an effect: `editing` back to null after the page has seen it open - `opened`), the facet
+  changes (the panel closed with it), or the page goes; its rows are held (`ending`) until the fresh scan
+  that ends it lands, then the list is worked out again. Its own row clicked again closes the panel, as
+  Edit pressed again does. (The review's rules for the ending - the scan asked after the note, held
+  rows refused, the chips held too - are under "After review" below.)
+- **The Edit panel on a FOLDER** (`FolderRequest` beside the album page's `EditRequest`; `isFolderRequest`):
+  `{folder, key, queue, reread, onChange}`. No bridge (`lookUp` marks the request asked, superseding any album-page lookup still out and clearing its answer), no name
+  guess (`folderOnly`, `FoldersFrom` 'folder'), the subject taken from the panel's own scan by path; the
+  library read again underneath only for a session's first album (`reread`; a step between two uses the
+  scan the session began on - a scan per step would stat the whole library each Next); the release editor
+  given the request's `queue` - its existing QueueContext ("3 of 17", ◁, skip ▷, Apply becoming "Next
+  album ▷"), MetadataEditor untouched, keyed on the panel's `session` as before (a new request per step);
+  what became of the album told by path (`toFolder`): to the page (`onChange`, FolderChange: from, the
+  album as the panel's reload has it, deleted) and to App (`{kind: 'folder', from, path, wrote}` - an
+  ignore or un-ignore is `wrote: false`: no file changed, so no announceAlbumsFiled). A delete there
+  leaves the panel open saying so, with "Next album ▷" to go on (the row says Deleted). `deletesAll` takes
+  an album that may be undefined. Every album-page rule stands; app-rules' Edit checks were EXTENDED to
+  the union's spelling (`edit?.album?.id`, `editShown`'s queue branch, `!isFolderRequest(at)`), none
+  weakened. The panel is the queue page's by the same rule: `editShown` is `topNow?.kind === 'queue'` for
+  a folder request. **An album page of the same album elsewhere in the stacks is NOT followed** after a
+  write from the queue - nothing keys it on a folder (acceptable, the spec says; docs/library.md says so).
+- **App**: `openFolderEdit` (the one-panel rule - Sources and Info put away; `opener` the row, focus
+  given back to it, re-pointed at the new current row on each step), `openQueue`, `pickFacet`,
+  `queueView` (no Navidrome gate - nothing on it is Navidrome's), the pages memo already keyed on all it
+  reads (nav, desktop, pageShown, editOpen, edit). You memo keyed on desktop and the count.
+- **Style** (app-desktop.css, its own section at the end - every rule under `.app-desk` inside the 1024px
+  query; tokens `--app-desk-queue-*`): rows at the frame's row height (`--app-desk-row`, 44px where the
+  pointer is coarse) with a 28px cover; the chips give way before the album's name - the tree row's
+  lesson: `flex: 0 var(--app-desk-queue-give) auto` (1000) against the name's `1 1 auto` and a
+  `min(120px, 100%)` floor, and never cut to a stub: one line of whole chips (`flex-wrap: wrap`, a fixed
+  height, overflow hidden), one alone ellipsizing; the row the panel has open in Explorer's selection;
+  a row dealt with faded (`--app-desk-queue-done` on its cover and words) but never its word (green, at
+  full strength); a drawer (1024-1279) keeping the list to the part left in view (`.has-drawer
+  .app-queue-body`, as the group page's Get). The editor's ◁ and skip ▷ a pair with a gap
+  (`.metadata-queue-nav`), its position in the secondary grey. On a phone the page is the app's own
+  card for a page with nothing to show (`app-card app-placeholder-body` in `app-needs`, for the link's
+  colour) - no CSS of its own there, and no other phone screen's DOM touched (the You row and the
+  sidebar item are desktop-only, the phone's Managing footnote word for word as it was).
+- **Not built, on purpose**: server settings, the log, the bulk runs, artist images, re-filing, a phone
+  editor, "Everyone's requests"; anything retired on the main page (LibraryView.tsx unchanged); an ETag
+  on the summary; following an album page of the same album after a write from the queue.
+- **Verified**: 2349 Python tests (10 new in `test_queue_summary.py`, five in `test_app_desktop_css.py`),
+  pyflakes, tsc, the bundle, and all 43 sims (`needslook` 64 new; `routes` 237, `app-rules` 246 and `you`
+  66 extended, app-rules' Edit checks moved to the union's spelling). 43 mutations, one or more per rule
+  pinned (six on the route, eight on the pure rules, thirteen on the page - the re-show read among
+  them - five on the routes and sidebar, eight on App, the panel, You and the store, three on the CSS), each caught and
+  restored byte for byte (checked by hash). The engine guard is empty; `ui/src/components/` and
+  `ui/src/hooks/` have no diff.
+- **Checked in a real page** (headless Chromium, real mouse input, against a scratch copy of the step1
+  library and database served by this worktree on :8095 - never the dev setup's :8081 - with a stranger's
+  rip of Third staged at `Old Rips/Third rip` and The Slow Rush given an import row; 27 checks): You's row
+  and the sidebar item with the count (1 - the import alone - before any saved scan, then 3); the page,
+  its item current; the badge equal to the page's All count and to the summary route's, now from a saved
+  scan; a row opening the panel, the row selected (aria-current), the editor saying "2 of 3"; **It's fine
+  as it is** turning the row to Ignored in place, no row moving (pixel tops unchanged); skip ▷ moving the
+  panel and the selection on; another row and closing the panel ending the session, the list worked out
+  again (the ignored rip gone) and the new import no longer new; the badge following; a facet in the
+  address, kept by a reload; at 1024 and 1280 every row clear of the panel, no sideways scroll; on a
+  phone the note and no You row; no console errors.
+- **NOT verified**: an apply through the queue in a real page (the scratch library is hard-linked to the
+  dev setup's, so nothing was written to its files - the orchestrator's staged-rip check covers apply ->
+  Next album), the real :8081 setup, an iPad on its side, and VoiceOver.
+- **After review** (thirteen findings, each confirmed by skeptics, all fixed in this same version):
+  - **The ending's scan is asked only once the album left has been noted reviewed** (major). `review()`
+    returns the note's promise (settling, never rejecting) and `end(reviewLeaving, marked)` chains the
+    reload onto it - go()'s own ending (an album gone when stepped to) hands its note in as `marked`.
+    Fired side by side, the GET could read `album_reviews()` before the POST's write landed (2 stale
+    scans in 20 through ASGITransport): the album kept its New chip, and the page's stale count beat
+    the server's right one (`page ?? server`) until the page's library was read again.
+  - **The list is worked out again only once no read is still out**: `Ending` is `{rows, chips, facet,
+    read}`; the ending's read answering sets `read`, and an effect clears it only when
+    `!library.loading`. A write's announceAlbumsFiled has the page's own useLibrary scan again a
+    second later; closing inside that second, the ending's read could resolve SUPERSEDED (its albums
+    never written), and the list was rebuilt from the scan from before the session - the fixed album
+    back with its old chips until the next read landed.
+  - **Held rows are seen to refuse a tap**: aria-disabled while `ending` (faded to `--app-job-busy`, a
+    progress cursor, no hover - `.app-queue-row[aria-disabled='true']`), the click refused as before;
+    they looked live and a click silently did nothing for as long as the scan took.
+  - **The chips hold still for the whole session and while its rows are held** (`heldChips`, taken as
+    the session begins, through `heldNow` since end() is reached from the panel's callbacks; the pressed
+    chip is the session's, then the ending's, facet). A write rescanning the page's library had the
+    session's own chip vanish (its count 0), later chips shift left under the pointer and All change.
+  - **`rowChanged` takes the current row first** when it holds the path: after a disc folder merged
+    into another row's folder two rows share one, and a delete from the second's panel marked the first
+    Deleted - then Next noted the deleted folder reviewed.
+  - **Focus never falls to the page**: a step through the queue (skip, ◁, Next album, Next album after
+    a delete) sets the panel's `focusNext` to the Release tab in the reset effect when focus was in the
+    panel or nowhere, so the editor going with the album hands it on; a Try again is aria-disabled
+    while a read is out (never `disabled`), and one that worked hands focus to the page's body
+    (`tabIndex -1`, no ring); a row the ended session was on that leaves the list (fixed, ignored,
+    renamed) hands focus to the row now at its place, or the last, or the body - each only when focus
+    fell to the page (`focusLost`).
+  - **No flash of "The library's scan doesn't list <folder> yet."** on every step: a folder request is
+    "asked" at once, so for a render the folder was known and not yet held. `editStatus` takes
+    `listed` (the scan in hand lists the one folder) and says "Finding the album's folder…" then.
+  - **Tests**: needslook.sim now runs the REAL useQueueSummary.ts against a faked deadwax (one request
+    out, exactly one more after it, a failure keeping the last number - null when there was none -
+    the page's count over the server's and back, filings asking again, the listener added once), and
+    checks the race (no scan until the note is written, go()'s ending too), the held rows' refusal,
+    a superseded ending read, the chips held, a facet not reset on a SAVED scan, `disc_label` before
+    the edition, a failed cover's plain tile, Try again aria-disabled and refused, and the merged disc
+    folders; app-rules pins the focus rules, the step's focusNext, `listed`, an ignore's and an
+    un-ignore's `toFolder`, `written`'s dispatch to `wroteFolder`, its three callers and the Next album
+    button after a delete (none of which any sim held: mutating each passed everything); routes.sim
+    `editStatus`'s `listed`; test_app_desktop_css the held row and the body's focus. 29 mutations, one
+    or more per fix, each caught and restored byte for byte (one, the ended row's focus call, first got
+    past and gained its pin). troubleshooting.md says "only the new albums are counted" holds for a
+    new database, a moved `LIBRARY_PATH` and a library whose last read found no albums - not only
+    "until the library has been read once since this database began".
+  - **Totals after review**: 2350 Python tests (2348 passed, 2 skipped; one new in
+    `test_app_desktop_css.py`), pyflakes, tsc, the bundle, all 43 sims (`needslook` 100, `routes` 238,
+    `app-rules` 250).
+- **After a second review** (three findings, each fixed with a check that fails without it):
+  - **A facet emptied while the page was hidden left a stale address.** Leaving the queue page closes
+    the panel, the session's ending read lands under the other tab, and the fall-back-to-All effect
+    called `onFacet(null)` - which `router.update` applies to the top of the tab SHOWING, so nothing
+    changed, and the effect never ran again: the address kept `?facet=X` under All, and the page went
+    back to X by itself when such an album turned up. The effect now needs `shown` (and has it in its
+    deps), so the address is told as the page shows again.
+  - **A folder request now supersedes an album-page lookup still out** (`lookups.supersede()` and
+    `setAnswer(null)` in `lookUp`'s folder branch): the panel stays mounted, so a slow search3 from an
+    earlier Edit used to land on the folder request, set `askedFor` to the old key and leave the panel on
+    "Finding the album's folder…" with no Look again.
+  - **The page's count cleared as it goes with no session** is pinned now (it was true but untested:
+    only the unmount WITH a session was checked, where the count was null already).
+  - 6 mutations (the `shown` guard, `shown` in the deps, the unmount clear, the supersede and the
+    cleared answer, each alone and together), all caught, each file restored byte for byte.
+    `needslook` 104 checks, `app-rules` 250.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -8650,7 +8862,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2334 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2350 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -8682,10 +8894,10 @@ node ui/test/wrap.sim.cjs       # which browsers ask for FLAC inside an MP4 (Web
 node ui/test/fmp4.sim.cjs       # reading a fragmented MP4's head as the stream does - init, fragments, what it refuses
 node ui/test/stream.sim.cjs     # the stream's pure rules - joins, placing songs, what to fetch next, answers, retries
 node ui/test/settings.sim.cjs   # You > Playback - Maximum quality's keys and notes word for word, Gapless a checkbox whose tap calls the player, Now Playing opens as and its key, Pause winds the record down and its key
-node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history; the desktop frame (panels over sheets, a drawer over the page, the sidebar's moves, the Library's store, useFrame against a fake matchMedia); the Edit panel's rules (a third side panel, a page becoming an album's new id, which folder, when to follow, moves remembered, what the panel says, whether a delete empties the album)
-node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin; the visualizer - no createMediaElementSource anywhere, its silent copy's chain however spelled, its toggle from the click (a held Space's repeats ignored), its context only from the bar's click, nothing secure-only or random, a press waking it and nothing more, focus kept in it, the panels inert and the poll stopped behind it, its scroll lock, its pictures per address; the Edit panel (desktop and admin only, one panel at a time, closed off its page, the editors' Escape from the page passed over and a layer's Escape its own, the editors let go once it closes, the follow's own latestOnly, focus kept in the panel, no playback action)
+node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, back labels, and the router against a fake history; the desktop frame (panels over sheets, a drawer over the page, the sidebar's moves, the Library's store, useFrame against a fake matchMedia); the Edit panel's rules (a third side panel, a page becoming an album's new id, which folder, when to follow, moves remembered, what the panel says, whether a delete empties the album); Needs a look's route (`#/you/queue/all?facet=`, the facet not its identity), its sidebar item and the panel on a folder
+node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin; the visualizer - no createMediaElementSource anywhere, its silent copy's chain however spelled, its toggle from the click (a held Space's repeats ignored), its context only from the bar's click, nothing secure-only or random, a press waking it and nothing more, focus kept in it, the panels inert and the poll stopped behind it, its scroll lock, its pictures per address; the Edit panel (desktop and admin only, one panel at a time, closed off its page, the editors' Escape from the page passed over and a layer's Escape its own, the editors let go once it closes, the follow's own latestOnly, focus kept in the panel, no playback action); Needs a look (no playback action, the library read only once it shows on a desktop, the one markReviewed in the app, the ending's scan after its note, the count's one store and where it is asked, the sidebar item an admin's, You's row a desktop's, the panel on a folder and every way it reports, focus kept in the page and the panel)
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
-node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions, Getting albums and their store (seeded once, asked again, saves in turn)
+node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions, Getting albums and their store (seeded once, asked again, saves in turn); on a desktop "Albums that need a look" with its count, never on a phone
 node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Navidrome sent
 node ui/test/info.sim.cjs       # Info > About's rows (whose artist card it is), the albums played from (an artist's whole queue), what Info asks for and when it draws it, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape; Info as a desktop panel, its box a tab stop, focus in again across 1024px
 node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button; with the deck's sound, the press, release, wind-down and the arm during a coast
@@ -8705,6 +8917,7 @@ node ui/test/pins.sim.cjs       # pins - which pin is the thing on screen (names
 node ui/test/musicfeel.sim.cjs  # the desktop visualizer's feel and tempo - the board's three synthetic songs (smooth, aggressive, one that builds), click tracks, silence holding everything, the neutral pace, the words' edges
 node ui/test/vizsync.sim.cjs    # the visualizer's silent copy kept in time - started, paused, re-synced past 0.25 s, the next window asked ahead, each song's state its own, the next song's first window fetched ahead, a whole song and two songs back to back through a fake copy
 node ui/test/visualizer.sim.cjs # the visualizer's pure parts - the FIXED rotation order, the choices kept per device, the cover's colours, the bands and waveform, the idle signal, the size caps
+node ui/test/needslook.sim.cjs  # Needs a look - queueAlbums' list and the facets (Newly added only when there is one, a facet emptied falling back), the session (rows fixed, Fixed/Ignored/Deleted, a rename followed, merged disc folders, reviewed on every way of leaving an album, never one deleted, an album gone ending it), and the page rendered - its states, the selected row, what the panel is asked for, its count, the ending (its scan after the note, rows held and refused until no read is out, the chips held), a phone asking nothing; and the REAL useQueueSummary.ts against a faked deadwax
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -8725,7 +8938,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2334 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2350 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

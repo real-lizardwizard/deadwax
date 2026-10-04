@@ -94,8 +94,9 @@ export function editAlbum(album: {
 }
 
 /** Where the folders came from: the store's rows of the release, the scan by the release id, the
- *  scan by name (no release anywhere), or nowhere. */
-export type FoldersFrom = 'store' | 'release' | 'name' | 'none'
+ *  scan by name (no release anywhere), the folder itself (an album opened from Needs a look, by its
+ *  path - 2.0.0-player.25), or nowhere. */
+export type FoldersFrom = 'store' | 'release' | 'name' | 'folder' | 'none'
 
 export interface EditFolders {
   paths: string[]
@@ -130,6 +131,11 @@ export function editFolders(answer: BridgeFolders | null, albums: readonly ScanA
   return named.length ? { paths: named.map((scanned) => scanned.path), from: 'name' } : NOWHERE
 }
 
+/** The folders of an album opened by its folder (Needs a look): that one, nothing to find or choose. */
+export function folderOnly(path: string): EditFolders {
+  return path ? { paths: [path], from: 'folder' } : NOWHERE
+}
+
 /** Whether the user has to say which folder it is: several found by name alone. Several of the
  *  release (a set kept one folder per disc) start on the first, with the others a choice away. */
 export function needsChoice(folders: EditFolders): boolean {
@@ -140,9 +146,9 @@ export function needsChoice(folders: EditFolders): boolean {
  *  goes back from it: it was the album's only folder - or, found by name among several, it holds as
  *  many songs as Navidrome lists for the album (same-named untagged folders can be albums of their
  *  own in Navidrome, told apart by their dates; several of ONE release are one album there). */
-export function deletesAll(folders: EditFolders | null, tracks: number, album: EditAlbum): boolean {
+export function deletesAll(folders: EditFolders | null, tracks: number, album: EditAlbum | undefined): boolean {
   if (!folders || folders.paths.length <= 1) return true
-  return folders.from === 'name' && typeof album.songCount === 'number' && tracks >= album.songCount
+  return folders.from === 'name' && typeof album?.songCount === 'number' && tracks >= album.songCount
 }
 
 /** What the panel's body says while it has no album to edit - or instead of one. */
@@ -173,6 +179,9 @@ export interface EditStatusFacts {
   folders: EditFolders | null
   /** an album is held, its editors drawn */
   holding: boolean
+  /** the scan in hand lists the (one) folder - the panel is about to take it (2.0.0-player.25 review:
+   *  a folder request is "asked" at once, so for a render the folder was known and not yet held) */
+  listed?: boolean
   /** the release Navidrome (or the bridge) knows the album by, if any */
   release: string | null
 }
@@ -202,6 +211,8 @@ export function editStatus(facts: EditStatusFacts): EditStatus | null {
   }
   //? the panel draws the folders to choose from instead
   if (needsChoice(folders)) return null
+  //? listed and about to be taken: still finding, never "doesn't list" for the render before it is held
+  if (facts.listed) return { text: "Finding the album's folder…", busy: true }
   return { text: `The library's scan doesn't list ${folders.paths[0]} yet.`, retry: true }
 }
 

@@ -852,6 +852,22 @@ export interface NewImportsResponse {
   tracking_enabled: boolean
 }
 
+/**
+ * GET /deadwax/library/queue/summary (2.0.0-player.25): how many albums need a look - the app's count
+ * beside "Needs a look". Read off the SAVED scan, never the disk: `total` is the albums
+ * lib/metadataQueue.ts queueAlbums(albums, null) lists over that scan (an outstanding issue, or a new
+ * import), plus any import filed since the scan (`unscanned_imports`). With no saved scan `known` is
+ * false and `total` is the new imports alone.
+ */
+export interface QueueSummaryResponse {
+  known: boolean
+  needs_attention: number
+  new_imports: number
+  total: number
+  unscanned_imports: number
+  tracking_enabled: boolean
+}
+
 /* ===== library: retagging ===== */
 
 /**

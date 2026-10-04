@@ -16,6 +16,8 @@
  *  - Each connection row is a live region of its own, read whole, so VoiceOver hears "slskd,
  *    NOT_LOGGED_IN", not a bare word with no service - and the list itself is not one.
  *  - The link to the main page opens beside the app.
+ *  - On a desktop (2.0.0-player.25), "Albums that need a look" in Managing, with its count (none
+ *    drawn while it isn't known), above that link and going to the queue's page; on a phone no row.
  *  - Playback holds Gapless, then "Now Playing opens as" (2.0.0-player.11), then Maximum quality:
  *    Gapless is handed the player itself - the object whose setGapless its tap calls - the look
  *    the setting App keeps and App's way to change it, and the notes say where the button that
@@ -491,6 +493,37 @@ exports.readPreferences = () => globalThis.__getting.preferences
   console.log('\nthe main page opens beside the app')
   const link = find((node) => node.type === 'a')[0]
   check('the Managing row links to / in a new tab, rel="noopener"', [link?.props.href, link?.props.target, link?.props.rel], ['/', '_blank', 'noopener'])
+
+  console.log('\nNeeds a look (2.0.0-player.25): a desktop\'s row in Managing, never a phone\'s')
+  {
+    const row = () => find(byClass('app-queue-link-row'))[0]
+    //? the nodes under one node that pass `test`
+    const within = (node, test) => {
+      const hits = []
+      const visit = (at) => {
+        if (!at || typeof at !== 'object') return
+        if (Array.isArray(at)) { at.forEach(visit); return }
+        if (test(at)) hits.push(at)
+        visit(at.props?.children)
+      }
+      visit(node)
+      return hits
+    }
+    const footnotes = () => find(byClass('app-footnote')).map(text)
+    draw({ shown: true, current: true, ...LOOK })
+    check('a phone: no row, and Managing\'s words as they were', [row(), footnotes().some((words) => words.includes('Server settings, albums that need a look, the log and editing an album'))], [undefined, true])
+    const opened = []
+    draw({ shown: true, current: true, ...LOOK, desktop: true, needsLook: 3, onNeedsLook: () => opened.push(true) })
+    const order = find(byClass('app-link-row')).map(text)
+    check('a desktop: "Albums that need a look" with its count, above the link to the main page',
+      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order[1]],
+      ['Albums that need a look', '3', 'Albums that need a look, 3 albums', true, 'Open the main page'])
+    row().props.onClick()
+    check('...a tap goes to its page', opened, [true])
+    check('...and the main page\'s footnote no longer says the queue is there', footnotes().some((words) => words.includes('albums that need a look')), false)
+    draw({ shown: true, current: true, ...LOOK, desktop: true, needsLook: null, onNeedsLook: () => {} })
+    check('the count not known: no badge drawn over it, the plain name read', [within(row(), byClass('app-queue-badge')).length, row().props['aria-label']], [0, undefined])
+  }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')
   process.exit(failures ? 1 : 0)

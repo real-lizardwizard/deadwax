@@ -137,6 +137,15 @@
  *    delete of one folder of several asks the page again once Navidrome has scanned; and the state
  *    rules each pinned (the release editor keyed on the session, several by name a choice, the album
  *    from a real scan, the library read only once the panel opens, the files read only for Tags).
+ *  - Needs a look (2.0.0-player.25): the review queue's page (app/NeedsALook.tsx) calls no playback
+ *    action; it reads the library through the main page's hook only once it shows on a desktop, and on
+ *    a phone draws a note before any row; it is the one file in the app that marks an album reviewed,
+ *    and asks the count again when it does; the count is one store (app/useQueueSummary.ts), asked by
+ *    App as the desktop frame shows for an admin and the page comes back, after every change the Edit
+ *    panel reports, and on a filed album - never on a timer. The sidebar's item is Managing's first and
+ *    an admin's; You's row a desktop's. A row opens the Edit panel on its folder by the one-panel rule,
+ *    and the panel asks no bridge for a folder, reads the library again only for a session's first
+ *    album, gives the release editor the queue, and tells the page and App by path.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -380,9 +389,9 @@ console.log('\na link out of the app opens beside it')
   check('every one opens in a new tab, rel="noopener"', out.filter(([, tag]) => !opensBeside(tag)), [])
   //? the Search placeholder's link went with it in 2.0.0-player.13 (Requests' in .12); the desktop
   //? sidebar's Managing link came in 2.0.0-player.19, and the Edit panel's to the main page's library
-  //? (an album it can't find a folder for) in 2.0.0-player.21
-  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel)',
-    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/NeedsNavidrome.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+  //? (an album it can't find a folder for) in 2.0.0-player.21, and Needs a look's phone note in .25
+  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel, Needs a look on a phone)',
+    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -1138,17 +1147,17 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
     [true, true, []])
   check('Edit is on the album page only for a desktop and an admin, and drawn only when handed',
     [/onEdit=\{desktop && admin \? toggleEdit : undefined\}/.test(app), /\{onEdit && \(\s*<button\b[^>]*class="pl-pill app-edit-toggle"\s*aria-pressed=\{editing\}/.test(page),
-      /editing=\{editOpen && edit\?\.album\.id === page\.id\}/.test(app)],
+      /editing=\{editOpen && edit\?\.album\?\.id === page\.id\}/.test(app)],
     [true, true, true])
   const toggle = /const toggleEdit = useCallback\(\(event: MouseEvent, album: EditAlbum\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
   check('Edit opens it - a new request each press - putting Sources and Info away; pressed again on its album, closes it',
-    [/if \(editOpenNow\.current && editNow\.current\?\.album\.id === album\.id\) \{\s*setEditOpen\(false\)\s*return\s*\}/.test(toggle),
+    [/if \(editOpenNow\.current && editNow\.current\?\.album\?\.id === album\.id\) \{\s*setEditOpen\(false\)\s*return\s*\}/.test(toggle),
       /editOpener\.current = takeOpener\(event\)\s*editKeys\.current \+= 1\s*setEdit\(\{ album, key: editKeys\.current \}\)\s*setEditOpen\(true\)/.test(toggle),
       /sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)/.test(toggle)],
     [true, true, true])
   check('crossing to the phone closes it, and so does its page stopping being the one showing',
     [/if \(closes\.editPanel\) \{\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(app),
-      /const editShown = edit !== null && topNow\?\.kind === 'album' && topNow\.id === edit\.album\.id/.test(app),
+      /const editShown = edit !== null && \(isFolderRequest\(edit\) \? topNow\?\.kind === 'queue' : topNow\?\.kind === 'album' && topNow\.id === edit\.album\.id\)/.test(app),
       /if \(!editOpen \|\| editShown\) return\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(app)],
     [true, true, true])
   check('a side panel by the one hook: modal only as a sheet (it never is), Escape from inside it, focus in to its close and back to Edit',
@@ -1224,10 +1233,10 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
   //? (review) what albumChanged does to the page and the panel, each pinned
   check('(review) a move: remembered, the panel following it; a write and its settle ask the page again (by its id now); a delete closes the panel',
     [/noteMove\(moves\.current, change\.id, change\.to\)/.test(changed),
-      /if \(at && at\.album\.id === change\.id\) setEdit\(\{ \.\.\.at, album: \{ \.\.\.at\.album, id: change\.to \} \}\)/.test(changed),
+      /if \(at && !isFolderRequest\(at\) && at\.album\.id === change\.id\) setEdit\(\{ \.\.\.at, album: \{ \.\.\.at\.album, id: change\.to \} \}\)/.test(changed),
       /const now = movedTo\(moves\.current, id\) \?\? id\s*setRefreshes\(\(was\) => new Map\(was\)\.set\(now, \(was\.get\(now\) \?\? 0\) \+ 1\)\)/.test(changed),
       /if \(change\.kind === 'written' \|\| change\.kind === 'settled'\) \{\s*if \(change\.kind === 'written'\) announceAlbumsFiled\(\)\s*ask\(change\.id\)\s*return/.test(changed),
-      /if \(editNow\.current\?\.album\.id === change\.id\) \{\s*if \(change\.last\) editOpener\.current = null\s*setEditOpen\(false\)\s*\}\s*if \(!change\.last\) ask\(change\.id\)/.test(changed)],
+      /if \(editNow\.current\?\.album\?\.id === change\.id\) \{\s*if \(change\.last\) editOpener\.current = null\s*setEditOpen\(false\)\s*\}\s*if \(!change\.last\) ask\(change\.id\)/.test(changed)],
     [true, true, true, true, true])
   check('(review) a page of an album that moved, back on top (back, forward, its tab chosen), becomes the album\'s page as it is now',
     [/useEffect\(\(\) => \{\s*if \(topNow\?\.kind !== 'album'\) return\s*const to = movedTo\(moves\.current, topNow\.id\)\s*if \(!to\) return[\s\S]*?router\.become\(topNow, \{ kind: 'album', id: to,[\s\S]*?\}, \[nav\]\)/.test(app)],
@@ -1251,6 +1260,101 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
       /refresh=\{refreshes\.get\(page\.id\) \?\? 0\}/.test(app),
       /const answer = again \? prefetchAlbum\(id, false, true\)\.then\(\(\) => fetchAlbum\(id, request\.signal\)\) : fetchAlbum\(id, request\.signal\)/.test(page)],
     [true, true, true, true, true, true])
+}
+
+console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-player.25)')
+{
+  const app = code(read('app/App.tsx'))
+  const page = code(read('app/NeedsALook.tsx'))
+  const store = code(read('app/useQueueSummary.ts'))
+  const side = code(read('app/Sidebar.tsx'))
+  const you = code(read('app/You.tsx'))
+  const panel = code(read('app/EditPanel.tsx'))
+  check('no playback action from any of its files, nor a context',
+    ['app/NeedsALook.tsx', 'app/useQueueSummary.ts', 'lib/needsLook.ts'].map((file) => [actionsIn(code(read(file))), /useContext|PlayerContext|ActionsContext/.test(code(read(file)))]),
+    [[[], false], [[], false], [[], false]])
+  check('the page reads the library through the main page\'s hook, only once it shows on a desktop - and nothing else of it',
+    [/const library = useLibrary\(desktop && shown\)/.test(page), (page.match(/useLibrary\(/g) ?? []).length, /listAlbums|loadScan|queueSummary\(/.test(page)],
+    [true, 1, false])
+  check('...on a phone a note and nothing more: its return comes before any row is drawn',
+    [/if \(!desktop\) \{\s*return \(/.test(page), page.indexOf('if (!desktop)') < page.indexOf('app-queue-list')], [true, true])
+  check('the list is queueAlbums, through lib/needsLook.ts, and its session the pure rules\'',
+    [/from '\.\.\/lib\/needsLook'/.test(page), /export function facetAlbums[\s\S]*?queueAlbums\(albums, facet\)/.test(code(read('lib/needsLook.ts'))),
+      /const begun = startSession\(albums, path, showing\)/.test(page), /const target = stepTarget\(was, index,/.test(page)],
+    [true, true, true, true])
+  check('stepping away marks the album left reviewed, and asks the count again - the only markReviewed in the app',
+    [/const review = \(path: string \| null\): Promise<void> =>\s*path \? libraryApi\.markReviewed\(path\)\.then\(\(\) => askQueueSummary\(\), \(\) => undefined\) : Promise\.resolve\(\)/.test(page),
+      /const marked = review\(target\.leaving\)\s*if \(target\.kind === 'end'\) \{\s*end\(false, marked\)/.test(page),
+      files.filter((file) => APP_SIDE(file) && /markReviewed\(/.test(code(read(file))))],
+    [true, true, ['app/NeedsALook.tsx']])
+  check('the panel closing ends the session; so does the page going',
+    [/if \(editing !== null\) \{\s*opened\.current = true\s*return\s*\}\s*if \(opened\.current\) end\(true\)/.test(page),
+      /useEffect\(\(\) => \(\) => \{\s*const was = sessionNow\.current\s*if \(was\) \{\s*const path = leavingAtEnd\(was\)\s*if \(path\) review\(path\)/.test(page)],
+    [true, true])
+  check('the count: one store - asked as the desktop frame shows for an admin and the page comes back, after every change the panel reports, by the page\'s reviews and on a filed album; no timer',
+    [/useEffect\(\(\) => \{\s*if \(desktop && admin && pageShown\) askQueueSummary\(\)\s*\}, \[desktop, admin, pageShown\]\)/.test(app),
+      /const albumChanged = useCallback\(\(change: AlbumChange\) => \{\s*\/\/[^\n]*\n\s*askQueueSummary\(\)/.test(read('app/App.tsx')),
+      /onAlbumsFiled\(\(\) => askQueueSummary\(\)\)/.test(store), /if \(asking\) again = true\s*else ask\(\)/.test(store),
+      files.filter((file) => APP_SIDE(file) && /askQueueSummary\(|\(askQueueSummary\)/.test(code(read(file)))).sort(),
+      /setTimeout|setInterval/.test(store), (app.match(/useQueueSummary\(\)/g) ?? []).length],
+    [true, true, true, true, ['app/App.tsx', 'app/NeedsALook.tsx', 'app/useQueueSummary.ts'], false, 1])
+  check('...the page\'s own count standing in only while it shows with a real scan and no session',
+    [/setPageQueueCount\(desktop && shown && real && !session && !ending \? summaryTotal\(library\.albums\) : null\)/.test(page), /return page \?\? server/.test(store)],
+    [true, true])
+  check('the sidebar\'s item: Managing\'s first, an admin\'s, with the count',
+    [/\{admin && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul class="app-side-list">\s*\{item\(SIDEBAR_QUEUE\)\}/.test(side),
+      /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow\)/.test(app)],
+    [true, true, true])
+  check('You\'s row: a desktop\'s, in Managing (an admin\'s), above the link to the main page - the phone\'s Managing as it was',
+    [/\{desktop && \(\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), you.indexOf('app-queue-link-row') < you.indexOf('Open the main page'),
+      /\{admin && \([\s\S]*?app-queue-link-row/.test(you), /desktop=\{desktop\}\s*needsLook=\{needsLook\}\s*onNeedsLook=\{openQueue\}/.test(app)],
+    [true, true, true, true])
+  check('its page opened on You - the tab as left, the page pushed only when it isn\'t on top there',
+    [/const onTop = stack\[stack\.length - 1\]\?\.kind === 'queue'\s*if \(router\.nav\.tab !== 'you'\) router\.tab\('you'\)\s*if \(!onTop\)/.test(app),
+      /if \(move\.how === 'queue'\) \{\s*openQueue\(\)/.test(app)],
+    [true, true])
+  check('a row opens the Edit panel on its folder by the one-panel rule - Sources and Info put away',
+    [/const openFolderEdit = useCallback\([\s\S]*?setEdit\(\{ \.\.\.request, key: editKeys\.current \}\)\s*setEditOpen\(true\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)/.test(app),
+      /onEdit=\{openFolderEdit\}/.test(app), /editing=\{editOpen && isFolderRequest\(edit\) \? edit\.folder : null\}/.test(app)],
+    [true, true, true])
+  check('...the panel: no bridge for a folder (an earlier lookup still out superseded), the library read again only for a session\'s first album, the release editor given the queue',
+    [/if \(isFolderRequest\(at\)\) \{\s*(?:\/\/[^\n]*\n\s*)?lookups\.supersede\(\)\s*setAnswer\(null\)\s*setAskedFor\(at\.key\)\s*return\s*\}/.test(panel), /if \(isFolderRequest\(request\) && !request\.reread\) return/.test(panel),
+      /isFolderRequest\(request\) \? folderOnly\(request\.folder\)/.test(panel), /queue=\{queue\}/.test(panel)],
+    [true, true, true, true])
+  check('...and what became of the album told to the page that opened it and to App, by path - never an album page\'s id',
+    [/at\.onChange\?\.\(\{ from, album, deleted, wrote \}\)\s*changed\.current\(\{ kind: 'folder', from, path:/.test(panel),
+      /if \(isFolderRequest\(at\)\) \{\s*toFolder\(at, album\.path, updated, true\)\s*return\s*\}/.test(panel),
+      /if \(isFolderRequest\(at\)\) \{\s*toFolder\(at, album\.path, null, true, true\)\s*return\s*\}/.test(panel),
+      /if \(change\.kind === 'folder'\) \{\s*if \(change\.wrote\) announceAlbumsFiled\(\)\s*return\s*\}/.test(app)],
+    [true, true, true, true])
+  check('after review: the ending\'s scan asked only once the note is written; the list worked out again only with no read still out',
+    [/void noted\s*\.then\(\(\) => libraryNow\.current\.reload\(false\)\)\s*\.then\(\(\) => setEnding\(/.test(page),
+      /if \(ending\?\.read && !library\.loading\) \{\s*setEnding\(null\)\s*setHeldChips\(null\)/.test(page)],
+    [true, true])
+  check('...focus kept in the page: a Try again that worked, a row the ended session was on gone from the list - only when focus fell to the page',
+    [/if \(retrying\.current && !library\.loading\) \{\s*retrying\.current = false\s*if \(focusLost\(\)\) body\.current\?\.focus/.test(page),
+      /if \(endedAt\.current !== null && !session && !ending\) \{[\s\S]*?if \(focusLost\(\)\) \{[\s\S]*?buttons\[Math\.min\(at, buttons\.length - 1\)\] : body\.current\s*target\?\.focus\(\{ preventScroll: true \}\)/.test(page),
+      /endedAt\.current = was\.index/.test(page), /<div ref=\{body\} class="app-queue-body" tabIndex=\{-1\}>/.test(page),
+      /\sdisabled=\{/.test(page), (page.match(/aria-disabled=\{library\.loading \? 'true' : undefined\} onClick=\{retry\}/g) ?? []).length,
+      /const retry = \(\) => \{\s*if \(library\.loading\) return\s*retrying\.current = true/.test(page)],
+    [true, true, true, true, false, 2, true])
+  check('...the panel: a step through the queue hands focus on to the Release tab, never the page; listing the folder, it says it is finding it',
+    [/if \(isFolderRequest\(request\)\) \{\s*const active = document\.activeElement\s*if \(!active \|\| active === document\.body \|\| box\.current\?\.contains\(active\)\) focusNext\.current = toTab\('release'\)/.test(panel),
+      panel.indexOf("focusNext.current = toTab('release')") < panel.indexOf('setSubject(null)\n'),
+      /listed: !!folders && folders\.paths\.length === 1 && library\.albums\.some\(\(album\) => album\.path === folders\.paths\[0\]\)/.test(panel)],
+    [true, true, true])
+  check('...and every way the panel reports on a folder: an ignore and an un-ignore told (no file written), tags/art/lyrics through wroteFolder, Next album after a delete',
+    [(panel.match(/const updated = follow\(await library\.reload\(false\), album\.path\)\s*if \(isFolderRequest\(at\)\) toFolder\(at, album\.path, updated, false\)/g) ?? []).length,
+      /const ignoreAlbum = async[\s\S]*?toFolder\(at, album\.path, updated, false\)[\s\S]*?const unignoreAlbum = async[\s\S]*?toFolder\(at, album\.path, updated, false\)/.test(panel),
+      /const written = \(at: EditRequest \| FolderRequest, album: LibraryAlbum\) =>\s*isFolderRequest\(at\) \? wroteFolder\(at, album\) : wrote\(at, album\)/.test(panel),
+      /const wroteFolder = \(at: FolderRequest, album: LibraryAlbum\) => async \(\) => \{\s*writes\.current \+= 1\s*const updated = follow\(await library\.reload\(false\), album\.path\)\s*toFolder\(at, album\.path, updated, true\)/.test(panel),
+      /\{deleted && queue && queue\.position < queue\.total && \(\s*<button type="button" class="app-edit-button" onClick=\{queue\.onNext\}>\s*Next album ▷/.test(panel),
+      (panel.match(/onApplied=\{written\(request, subject\)\}|onDone=\{written\(request, subject\)\}/g) ?? []).length],
+    [2, true, true, true, true, 3])
+  check('the pages memo is keyed on what the queue page reads (the frame, the page shown, the panel and its request)',
+    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes\]/.test(app),
+      /page\.kind === 'queue' \? queueView\(tab, page\)/.test(app)],
+    [true, true])
 }
 
 console.log('\nApp moves history only through the router')

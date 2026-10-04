@@ -41,6 +41,10 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   Edit under its cover while a drawer is open (Edit's own drawer would cover it); a tag's long name
   broken inside its column; busy words in a solid button the button's white; a pressing's track count
   on its first line; long names broken, never clipped; and a tick box's label a finger's target.
+- Needs a look (2.0.0-player.25), with no board: rows at the frame's row height (a finger's where the
+  pointer is coarse), the chips giving way before the album's name and never cut to a stub, the row the
+  panel has open in Explorer's selection, a row dealt with faded but never its word, the quiet
+  "Checking the library…" in a line always a row tall, the list clear of a drawer, and no solid purple.
 """
 
 import re
@@ -557,3 +561,70 @@ def test_a_tick_box_is_a_fingers_target_where_the_pointer_is_coarse():
     #? and the box sits in its label in the markup
     panel = (SRC / "app" / "EditPanel.tsx").read_text()
     assert len(re.findall(r'<label class="app-edit-hit">\s*<input\s+type="checkbox"', panel)) == 2
+
+
+# ---------------------------------------------------------------- Needs a look (2.0.0-player.25)
+
+def test_the_queue_rows_are_the_frames_rows_and_a_fingers_where_the_pointer_is_coarse():
+    """A row at the frame's row height (44px itself where the pointer is coarse), a button filling its
+    line, with the folder's cover inside it; a facet a finger's target where the pointer is coarse."""
+    row = declarations(DESKTOP, ".app-desk .app-queue-row", DESK)
+    assert (row["min-height"], row["width"], row["text-align"]) == ("var(--app-desk-row)", "100%", "left")
+    assert media_tokens(DESKTOP, COARSE)["--app-desk-row"] == "var(--pl-hit)"
+    assert declarations(DESKTOP, ".app-desk .app-queue-row", COARSE)["min-height"] == "var(--pl-hit)"
+    assert declarations(DESKTOP, ".app-desk .app-queue-facet", COARSE)["min-height"] == "var(--pl-hit)"
+    cover = declarations(DESKTOP, ".app-desk .app-queue-cover", DESK)
+    assert (cover["width"], cover["height"], cover["flex"]) == ("var(--app-desk-queue-cover)",) * 2 + ("none",)
+    assert media_tokens(DESKTOP, DESK)["--app-desk-queue-cover"] == "28px"
+
+
+def test_the_queue_rows_chips_give_way_before_the_albums_name():
+    """The tree row's lesson: the chips shrink a thousand times faster than the name, to nothing, and are
+    never cut to a stub - those that don't fit wrap out of their one line; the name ellipsizes last."""
+    chips = declarations(DESKTOP, ".app-desk .app-queue-chips", DESK)
+    assert chips["flex"] == "0 var(--app-desk-queue-give) auto"
+    assert media_tokens(DESKTOP, DESK)["--app-desk-queue-give"] == "1000"
+    assert (chips["min-width"], chips["overflow"], chips["flex-wrap"], chips["height"]) == ("0", "hidden", "wrap", "var(--app-desk-queue-chip)")
+    chip = declarations(DESKTOP, ".app-desk .app-queue-chip", DESK)
+    assert (chip["flex"], chip["max-width"], chip["text-overflow"], chip["white-space"]) == ("none", "100%", "ellipsis", "nowrap")
+    text = declarations(DESKTOP, ".app-desk .app-queue-text", DESK)
+    assert text["flex"] == "1 1 auto" and text["min-width"].startswith("min(var(--app-desk-queue-text-min)")
+    for selector in (".app-desk .app-queue-album", ".app-desk .app-queue-artist"):
+        assert declarations(DESKTOP, selector, DESK)["text-overflow"] == "ellipsis", selector
+
+
+def test_the_row_the_panel_has_open_is_explorers_selection_and_a_dealt_with_row_is_faded_but_not_its_word():
+    current = declarations(DESKTOP, ".app-desk .app-queue-row.is-current", DESK)
+    assert (current["border-color"], current["background"]) == ("var(--dw-selection-border)", "var(--dw-selection-bg)")
+    faded = declarations(DESKTOP, ".app-desk .app-queue-row.is-done .app-queue-text", DESK)
+    assert faded == declarations(DESKTOP, ".app-desk .app-queue-row.is-done .app-queue-cover", DESK) == {"opacity": "var(--app-desk-queue-done)"}
+    assert not any(".app-queue-mark" in selector and "opacity" in values for _where, selector, values in rules(DESKTOP))
+
+
+def test_a_held_row_is_seen_to_refuse_a_tap_and_the_page_body_takes_focus_without_a_ring():
+    """2.0.0-player.25 review: while a session's rows are held for the fresh scan they are aria-disabled
+    - faded and a progress cursor, no hover - so a click visibly does nothing; the page's body takes
+    focus (a Try again that worked) with no ring of its own."""
+    held = declarations(DESKTOP, ".app-desk .app-queue-row[aria-disabled='true']", DESK)
+    assert (held["opacity"], held["cursor"]) == ("var(--app-job-busy)", "progress")
+    assert declarations(DESKTOP, ".app-desk .app-queue-row[aria-disabled='true']:hover", DESK)["background"] == "transparent"
+    assert declarations(DESKTOP, ".app-desk .app-queue-body:focus", DESK)["outline"] == "none"
+
+
+def test_the_checking_line_is_always_a_row_tall_and_the_list_keeps_clear_of_a_drawer():
+    """"Checking the library…" lives in a line that is always there and a row tall, so its going moves no
+    row; a drawer open over the page (1024-1279px) keeps the list to the part left in view."""
+    assert declarations(DESKTOP, ".app-desk .app-queue-checking", DESK)["min-height"] == "var(--app-desk-row)"
+    assert declarations(DESKTOP, ".app-desk.has-drawer .app-queue-body", DESK)["max-width"] == \
+        "calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap))"
+    page = (SRC / "app" / "NeedsALook.tsx").read_text()
+    assert '<p class="app-queue-checking" role="status">' in page
+
+
+def test_the_queue_page_has_no_solid_purple_button():
+    """STYLE.md: one solid purple button a screen - Apply, in the panel beside it."""
+    page = (SRC / "app" / "NeedsALook.tsx").read_text()
+    assert "is-primary" not in page and "app-primary" not in page
+    for _where, selector, values in rules(DESKTOP):
+        if "app-queue" in selector:
+            assert "var(--dw-accent)" not in values.get("background", ""), selector

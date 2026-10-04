@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 import { pingMusicBrainz, pingSlskd, type PingAnswer } from '../api/connections'
 import { me as fetchMe, type Me } from '../api/me'
 import { isAbort, latestOnly } from '../lib/latest'
+import { needsLookLabel } from '../lib/needsLook'
+import { badgeText } from '../lib/requestsView'
 import { navidromeStatus, type NavidromeStatus } from '../player/api'
 import { ChevronRightIcon } from '../player/icons'
 import { usePlayerActions, usePlayerState } from './context'
@@ -70,6 +72,9 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   "unknown" there until the app is killed.
  * - The link to the main page opens it BESIDE the app (a new tab in a browser), so the music playing
  *   here carries on: in the same page it would unload the player, its queue and all.
+ * - On a DESKTOP (2.0.0-player.25), "Albums that need a look" above it, with how many - the review
+ *   queue's page, Needs a look (`onNeedsLook`: App opens it on this tab). A phone has no such row, and
+ *   its Managing reads as it always has: no editor has a board there yet.
  *
  * It works with Navidrome unset or down: nothing here waits on it. A page, so it reads the player
  * from context; `shown` is App's word that the tab has been opened at least once, `current` that it
@@ -82,6 +87,9 @@ export function You({
   onOpensAs,
   windDown,
   onWindDown,
+  desktop = false,
+  needsLook = null,
+  onNeedsLook,
 }: {
   shown: boolean
   /** the tab showing now: Getting albums are asked again each time it becomes so */
@@ -92,6 +100,11 @@ export function You({
   /** "Pause winds the record down", and the way to change it - App's */
   windDown: boolean
   onWindDown: (on: boolean) => void
+  /** the desktop's frame: Managing has the review queue's row */
+  desktop?: boolean
+  /** how many albums need a look (null: not known yet) */
+  needsLook?: number | null
+  onNeedsLook?: () => void
 }) {
   const player = usePlayerState()
   const actions = usePlayerActions()
@@ -236,15 +249,37 @@ export function You({
             Managing deadwax
           </h2>
           <div class="app-group">
+            {desktop && (
+              <button
+                type="button"
+                class="app-row app-link-row app-queue-link-row"
+                {...(needsLook ? { 'aria-label': needsLookLabel('Albums that need a look', needsLook) } : {})}
+                onClick={() => onNeedsLook?.()}
+              >
+                <span class="app-row-label">Albums that need a look</span>
+                {badgeText(needsLook ?? 0) && (
+                  <span class="app-queue-badge app-mono" aria-hidden="true">
+                    {badgeText(needsLook ?? 0)}
+                  </span>
+                )}
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
             <a class="app-row app-link-row" href="/" target="_blank" rel="noopener">
               <span class="app-row-label">Open the main page</span>
               <ChevronRightIcon class="app-chevron" />
             </a>
           </div>
-          <p class="app-footnote">
-            Server settings, albums that need a look, the log and editing an album are on the main
-            page for now.
-          </p>
+          {desktop ? (
+            <p class="app-footnote">
+              Server settings, the log, the bulk runs and artist images are on the main page for now.
+            </p>
+          ) : (
+            <p class="app-footnote">
+              Server settings, albums that need a look, the log and editing an album are on the main
+              page for now.
+            </p>
+          )}
         </section>
       )}
 

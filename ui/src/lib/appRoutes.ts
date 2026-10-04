@@ -13,6 +13,10 @@
  *   #/<tab>/artist/<id>                                an artist (2.0.0-player.17): Navidrome's
  *                                                      artist id, or `mb:<mbid>` for one known only
  *                                                      by MusicBrainz (lib/artistPage.ts reads it)
+ *   #/<tab>/queue/all?facet=<id>                       Needs a look (2.0.0-player.25), the review
+ *                                                      queue - pushed on You. One page whatever
+ *                                                      the facet: `facet` is in the address, as a
+ *                                                      group page's pressing is, not its identity
  *
  * The player's old `#/album/<id>` links still open: they are the Library's album, and the address
  * is rewritten to `#/library/album/<id>` in place. An empty hash is Home.
@@ -47,10 +51,17 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
 }
 
 /** What a page can be: an album in the library (Navidrome's id), a MusicBrainz release group -
- *  the album you don't have (2.0.0-player.13) - or an artist (2.0.0-player.17). */
-export type PageKind = 'album' | 'group' | 'artist'
+ *  the album you don't have (2.0.0-player.13) - an artist (2.0.0-player.17), or Needs a look, the
+ *  review queue (2.0.0-player.25). */
+export type PageKind = 'album' | 'group' | 'artist' | 'queue'
 
-const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist']
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue']
+
+/** There is one queue page: its id is always this. */
+export const QUEUE_ID = 'all'
+
+/** Needs a look, as App opens it (from the sidebar, or You's row) - All, no facet. */
+export const QUEUE_PAGE: Page = { kind: 'queue', id: QUEUE_ID, label: 'Needs a look' }
 
 /** A page pushed on a tab. `label` names it on the back button of a page pushed over it - never
  *  part of the address, and never part of what makes two pages the same one. `release` is a group
@@ -62,6 +73,8 @@ export interface Page {
   id: string
   label?: string
   release?: string
+  /** the queue page's facet (2.0.0-player.25): in the address (`?facet=`), never its identity */
+  facet?: string
 }
 
 export interface Route {
@@ -84,14 +97,15 @@ export function formatRoute(route: Route): string {
   const root = `#/${route.tab}`
   if (!route.page) return root
   const path = `${root}/${route.page.kind}/${encodeURIComponent(route.page.id)}`
+  if (route.page.kind === 'queue' && route.page.facet) return `${path}?facet=${encodeURIComponent(route.page.facet)}`
   return route.page.kind === 'group' && route.page.release ? `${path}?release=${encodeURIComponent(route.page.release)}` : path
 }
 
 /** What a page's scroll is kept under: its address without the pressing - choosing another
- *  pressing is the same page, and must not jump it back to the top. */
+ *  pressing is the same page, and must not jump it back to the top - nor the queue's facet. */
 export function scrollKey(route: Route): string {
   if (!route.page) return formatRoute(route)
-  const { release: _release, ...page } = route.page
+  const { release: _release, facet: _facet, ...page } = route.page
   return formatRoute({ tab: route.tab, page })
 }
 
@@ -100,6 +114,11 @@ function pageFrom(parts: readonly string[], query: string): Page | null {
   const kind = parts[0] as PageKind
   if (!PAGE_KINDS.includes(kind) || !parts[1]) return null
   const id = decode(parts.slice(1).join('/'))
+  if (kind === 'queue') {
+    //? one queue page: whatever id the address gave, it is that one
+    const facet = new URLSearchParams(query).get('facet')?.trim()
+    return facet ? { kind, id: QUEUE_ID, facet } : { kind, id: QUEUE_ID }
+  }
   if (kind !== 'group') return { kind, id }
   const release = new URLSearchParams(query).get('release')?.trim()
   return release ? { kind, id, release } : { kind, id }
@@ -172,15 +191,21 @@ export function openPage(nav: Nav, page: Page): Nav {
 
 /**
  * The page on top of the tab showing, made `page` - the same page (kind and id) in another state:
- * a group page showing another pressing. The same nav when the top is another page, or nothing
- * changed. Pushed nothing, so back still leaves the page, as it does after a pick in a list.
+ * a group page showing another pressing, the queue page another facet. The same nav when the top is
+ * another page, or nothing changed. Pushed nothing, so back still leaves the page, as it does after
+ * a pick in a list.
  */
 export function replaceTop(nav: Nav, page: Page): Nav {
   const stack = nav.stacks[nav.tab]
   const top = stack[stack.length - 1]
-  if (!samePage(top, page) || (top!.release ?? null) === (page.release ?? null)) return nav
-  const { release: _release, ...kept } = top!
-  return withStack(nav, nav.tab, [...stack.slice(0, -1), page.release ? { ...kept, release: page.release } : kept])
+  if (!samePage(top, page)) return nav
+  if ((top!.release ?? null) === (page.release ?? null) && (top!.facet ?? null) === (page.facet ?? null)) return nav
+  const { release: _release, facet: _facet, ...kept } = top!
+  return withStack(nav, nav.tab, [...stack.slice(0, -1), {
+    ...kept,
+    ...(page.release ? { release: page.release } : {}),
+    ...(page.facet ? { facet: page.facet } : {}),
+  }])
 }
 
 /**
