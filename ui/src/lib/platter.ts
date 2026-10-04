@@ -116,6 +116,28 @@ export function handSpeed(samples: readonly HandSample[], time: number, windowMs
   return Math.max(-MAX_SPEED, Math.min(MAX_SPEED, speed))
 }
 
+/** How long a gap between the hand's last sample and its release is not a rest, in ms: a finger moving
+ *  right up to lifting off sends its last move up to a frame or so before the release - a sample's
+ *  spacing at 60 Hz, and its delivery. */
+export const RELEASE_TAIL_MS = 40
+
+/**
+ * The platter's speed as the hand lets go at `time` (ms) - 2.0.0-player.24: the hand's speed over the
+ * `windowMs` up to its LAST SAMPLE, by the samples' own times, not up to the release. A finger moving to
+ * the last sends its last move up to a frame before it lifts, and taken up to the release that still
+ * tail read as slowing - a fifth slower, a frame in 90 ms. A longer gap is a finger that rested before
+ * letting go: past `tailMs` the rest takes the speed down in proportion, to none once it is a whole
+ * window - as handSpeed has it - so a finger that stopped before letting go doesn't flick.
+ */
+export function releaseSpeed(samples: readonly HandSample[], time: number, windowMs = VELOCITY_WINDOW_MS, tailMs = RELEASE_TAIL_MS): number {
+  if (samples.length < 2 || !(windowMs > 0)) return 0
+  const last = samples[samples.length - 1]!.time
+  const gap = Math.max(0, time - last)
+  if (gap >= windowMs) return 0
+  const rested = Math.max(0, gap - tailMs) / Math.max(1e-9, windowMs - tailMs)
+  return handSpeed(samples, last, windowMs) * (1 - rested)
+}
+
 /* ===== the equations, one phase at a time ===== */
 
 /**

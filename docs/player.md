@@ -559,8 +559,12 @@ below.
   where the record is.
   - **With its sound**: take hold of the record and the song pauses under your finger; turn it and
     you hear it, faster or slower as your hand goes, backwards when you turn it back, and nothing
-    while your finger rests. A press that stays put for a moment takes hold too, and a quick tap is
-    still a tap. Let go and the record carries on at the speed your hand gave it. If the song was
+    while your finger rests. Turn it at the record's own speed - a turn every 1.8 seconds - and you
+    hear the song as it plays (since 2.0.0-player.24; before, it warbled out of all recognition - see
+    below). A press that stays put for a moment takes hold too, and a quick tap is
+    still a tap. Let go and the record carries on at the speed your hand gave it - the speed it had as
+    your finger last moved, not slowed by the moment between that and lifting it, and from where it
+    was then, so its sound carries straight on without a stall. If the song was
     playing, the motor brings the platter back to its own speed - a backwards flick is stopped
     about as quickly as a forward one is slowed (under a second for a hard one), then the platter
     spins back up - and the song carries on from there, the record's own sound handing over to it.
@@ -599,12 +603,33 @@ below.
     (about half as much again for a hi-res song played as it is, whose stretches are shorter), and
     nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns as
     before 2.0.0-player.14: silently, and with no momentum.
+  - **It's a twentieth of a second behind your hand**, always the same (since 2.0.0-player.24): the
+    record's sound follows every touch your phone reports, each at the moment it was made, and plays
+    the path they trace 50 ms later - late enough that the next touch has always arrived, so it never
+    has to guess where your hand is going. That's what makes a steady turn sound steady: before, it
+    was told where the record was once a frame, timed by the audio's own clock - which on an iPhone
+    moves in steps of about 21 milliseconds - so every frame's timing was off by up to a step, and the
+    pitch swung by that much, many times a second. The coasts, the motor's run back to speed and the
+    wind-down are timed the same smooth way, and are 50 ms behind too; the song itself, and where it's
+    moved to when you let go, are just as before. A finger's own jitter is smoothed out of the pitch
+    while you turn steadily - as much as the jitter deadwax measures in your own touches calls for, so
+    a heavier finger, or a grip near the middle of the record, still sounds steady; as you speed up,
+    slow down or turn back, it follows your hand closely instead. A busy moment that loses a couple of
+    your touches doesn't stop the sound. Taking hold of a playing record, or pausing it with a
+    wind-down, plays the song's last twentieth of a second again as the record's sound starts; and
+    letting go of a playing record at about its own speed - when the song plays on straight from your
+    hand - skips that twentieth: the record's sound stops as you let go, that much behind, and the song
+    starts from where your hand let go. All of that holds from the very first turn: while the turntable
+    shows with its sound on, deadwax keeps reading the phone's audio clock - ten times a second, even
+    with the record standing still - so the first grab of a paused record after you open the screen, or
+    come back to the app, is timed as smoothly as any other, and nothing it learns mid-turn moves the
+    timing until you let go.
   - **Over plain `http://` too** (since 2.0.0-player.16): a browser gives the part that best plays
     this sound - an AudioWorklet, on an audio thread of its own - only to a page on HTTPS (or on the
     computer itself, `localhost`). Opened at a plain `http://` address on your network, deadwax plays
     the record's sound on the page's main thread instead, with the very same code, so it sounds the
-    same - only a few hundredths of a second later; on HTTPS it gets its own thread, which is steadier
-    if the page is busy. From the first tap
+    same - only a few hundredths of a second later (about 0.09 s behind your hand in all, where it's
+    0.05 s on HTTPS); on HTTPS it gets its own thread, which is steadier if the page is busy. From the first tap
     that starts the sound until the turntable goes (switched back to the cover), deadwax also tells an
     iPhone that the page plays music, so the ringer switch on silent doesn't mute the record's sound (while you turn it the song itself is paused, and iOS would
     otherwise treat the record's sound as the kind the switch silences - not yet checked on a phone).
@@ -756,7 +781,7 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
 | Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
 | | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
-| The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why) and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
+| The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why), how far the phone's audio clock moves at a time, and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
 | Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
 
 The **Gap** row is timed with Gapless off as well, the same way, so you can compare the two.
@@ -819,7 +844,10 @@ it did before 2.0.0-player.14: silently, the song playing on under your finger.
 The line under it says which part plays the sound (since 2.0.0-player.16): `On its own audio thread
 (an AudioWorklet)`, or `On the main thread - this page isn't on HTTPS, so the browser has no
 AudioWorklet` when deadwax is opened at a plain `http://` address (or `… the AudioWorklet wouldn't
-load (…)`, in the browser's words, when it refused it) - then what its stretches have cost.
+load (…)`, in the browser's words, when it refused it) - then, once it has seen it move (since
+2.0.0-player.24), how far the phone's audio clock moves at a time, `Its clock moves 21.3 ms at a time`
+(the audio's own render: about 21 ms on an iPhone, 6 on a desktop browser; deadwax times the record's
+sound smoothly across those steps) - then what its stretches have cost.
 
 **Navidrome sent** is there to check what your Navidrome really sends before later parts of the app
 rely on it: the field names only, such as `discTitles` on an album or `musicBrainzId`, `playCount`
@@ -1172,6 +1200,14 @@ question the whole player existed to answer. Still to find out:
   silent shouldn't mute it (deadwax now asks iOS to treat the page as playing music from the first
   tap on the turntable until it goes); and, after turning the record, locking the phone mid-song should still leave the
   music playing, with the lock screen's controls and AirPods working;
+- **the turntable's sound following your hand** (2.0.0-player.24 - the fix for "it doesn't sound
+  like anything"): turning the record steadily at about its own speed should sound like the song,
+  at about half speed like the song an octave down, backwards like it backwards, on HTTPS and over
+  plain `http://` alike; the sound should feel a hair behind your finger (a twentieth of a second, a
+  little more over `http://`) and never lurch - the very first turn of a paused record after opening
+  the screen included; stopping your finger should stop it within a moment, and starting again should
+  carry on from there. Debug's **Turntable sound** line says how far your phone's audio clock moves at
+  a time (`Its clock moves … ms at a time`) - tell us what it says;
 - **Requests** on the phone: the ✕ asking in the card (a home-screen app always asks: it has its
   own storage, and no Settings tab to turn that off), the count on the tab, Home's Arriving coming
   and going, a download started on the main page showing up when you come back to the app, what

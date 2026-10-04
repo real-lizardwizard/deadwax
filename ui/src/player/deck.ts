@@ -32,7 +32,22 @@
  *    a tap (HOLD_MS): then the song pauses (`hold`) and the record's sound takes over at the song's
  *    position, at its own speed if it was playing, and follows the hand from there - silent while the
  *    finger rests. A press on a coasting record takes it at once.
- *  - Let go, the hand's speed over its last ~90 ms becomes the platter's (lib/platter). A song that was
+ *  - THE SOUND FOLLOWS THE HAND'S OWN SAMPLES (2.0.0-player.24): each pointer sample goes to the voice as
+ *    it comes (`hand`), with the time the event gives it - each of a move's coalesced events too - never
+ *    one drive a frame; the voice plays the path through them HAND_DELAY_S behind (lib/deckVoice). Every
+ *    time it is told - a sample's, a take's, each frame's place on a coast, a wind-down or the motor's
+ *    run, the handover's - is the page's clock mapped onto the audio context's by ONE smooth mapping
+ *    (lib/deckClock), never a `currentTime` read for the message: its steps (the audio's own render, 21
+ *    ms on an iPhone) were what made James's "it doesn't sound like anything". It is read every frame
+ *    while anything moves, at every stamp, and on a timer of its own while the turntable shows and the
+ *    context runs, whatever the record does (`keepClock`: every CLOCK_SETTLE_MS while the mapping
+ *    settles, every CLOCK_TICK_MS after) - so the first grab of a paused record, which runs no frames,
+ *    finds it settled - and held steady through a gesture, whatever it reads meanwhile.
+ *  - Let go, the hand's speed over its last ~90 ms - up to its last sample, by the samples' own times, so
+ *    the frame or so between the last move and the lift isn't read as slowing (releaseSpeed) - becomes
+ *    the platter's (lib/platter), and the plan carries on from that sample's own moment and place, the
+ *    hand still moving through those few ms (a lift after a longer rest starts it at the lift). A
+ *    frame begun before what the voice was last told drives nothing (`stampedTo`). A song that was
  *    playing: the motor takes the platter back to speed - stopping it first, from a backwards flick -
  *    and the song is sought AT THE RELEASE to where the platter will be at speed (the physics is exact,
  *    so that is known then, and the element has the whole coast to buffer); at speed the song plays
@@ -70,12 +85,13 @@
  */
 
 import { isAbort, latestOnly } from '../lib/latest'
+import { clockReading, clockSettled, contextTimeAt, newDeckClock, resetDeckClock } from '../lib/deckClock'
 import {
   REPORTS_PER_SECOND, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
   type DeckReport, type VoiceHeard, type VoiceMessage,
 } from '../lib/deckVoice'
 import {
-  DEGREES_PER_SECOND, VELOCITY_WINDOW_MS, acceleration, coast, degreesFor, handSpeed, motor, phaseAt, planAt, voiceRate,
+  DEGREES_PER_SECOND, RELEASE_TAIL_MS, VELOCITY_WINDOW_MS, acceleration, coast, degreesFor, motor, phaseAt, planAt, releaseSpeed, voiceRate,
   type HandSample, type Plan,
 } from '../lib/platter'
 import { ApiError } from '../api/http'
@@ -97,11 +113,23 @@ export const REFRESH_AHEAD_S = 6
 export const REFRESH_MIN_MS = 3000
 /** A window that couldn't be had is asked again after this long, in ms. */
 export const RETRY_MS = 10_000
-/** The hand's speed for the sound, measured over this much of its last movement, in ms - shorter
- *  than a release's, so the sound answers the hand quickly. */
-export const HAND_SPEED_MS = 40
-/** How long one frame's drive holds, in seconds: a drive that stops coming runs out by itself. */
+/** How long one frame's drive holds past its own time, in seconds: a drive that stops coming runs out
+ *  by itself. */
 export const DRIVE_FOR_S = 0.12
+/** The audio's clock read on the deck's own timer (keepClock), in ms: this often while its mapping is
+ *  young (lib/deckClock's clockSettled - just after the context is made or resumed, its every state change
+ *  starting the mapping again), CLOCK_TICK_MS once it has settled - while the turntable shows and the
+ *  context runs, whatever the record does. Frames read it too, but only while something moves: a paused
+ *  record runs none, so the first grab of one after its context was made or resumed was stamped by a
+ *  mapping nothing had read since (second review of 2.0.0-player.24 - up to a step's jump in its first
+ *  readings). Ten readings a second keep it settled and never stale (an audio clock drifting from the
+ *  page's is followed), for the cost of a timer. Quick only for the first CLOCK_SETTLE_TICKS readings
+ *  after the timer starts afresh (the turntable shown, the context's state changed): a clock that
+ *  doesn't move (a context said to run that renders nothing) is then read slowly, not 67 times a second
+ *  for nothing. */
+export const CLOCK_SETTLE_MS = 15
+export const CLOCK_SETTLE_TICKS = 40
+export const CLOCK_TICK_MS = 100
 /** The handover: the record's sound holds speed 1 for at most this long waiting for the song to play,
  *  then fades out over HANDOVER_FADE_S. A play that hasn't started by then was refused, and the
  *  platter spins down. */
@@ -245,6 +273,9 @@ interface DeckAudio {
 }
 
 const audio: DeckAudio = { context: null, voice: null, loading: false, problem: null, missing: null, why: null }
+//? the page's clock mapped onto the context's (lib/deckClock, 2.0.0-player.24): everything the voice
+//? steers by is stamped through it - started again for each context, and as its clock stops and starts
+const clock = newDeckClock()
 let moduleUrl: string | null = null
 const audioListeners = new Set<() => void>()
 let heardListener: ((heard: VoiceHeard) => void) | null = null
@@ -321,9 +352,11 @@ function startVoice(context: AudioContext): void {
  * as of `currentTime`, a take started a block or two behind where the record was by the time it was
  * heard, and raced to catch it up (review of 2.0.0-player.16: up to 1.8 times the speed, for 20-80 ms,
  * on every grab and every wind-down); placed where the record had got to instead, a grab's still hand
- * then pulled it back as far. Only what changes the voice is held: a drive replaces the drive before
- * it, and a window every window before it. It says where it is as often as the worklet does. Ready once
- * it has played its first block.
+ * then pulled it back as far. Since 2.0.0-player.24 a hand's samples and a plan's frames are each a knot
+ * of the path the voice plays, so every one is held and applied, in order, each heard the same lag on -
+ * none replacing another, as the worklet keeps every one (until its review a drive replaced a drive held
+ * just before it, a knot the worklet kept and this didn't); only a window replaces every window before
+ * it. It says where it is as often as the worklet does. Ready once it has played its first block.
  */
 function startScript(context: AudioContext, why: string): void {
   if (typeof context.createScriptProcessor !== 'function') {
@@ -339,9 +372,10 @@ function startScript(context: AudioContext, why: string): void {
       kind: 'script',
       ready: false,
       post: (message) => {
-        const said = message.type === 'take' || message.type === 'drive' ? { ...message, time: message.time + lag, until: message.until + lag } : message
-        //? a drive sets every field the one before it set; a window sets nothing but the window
-        if (said.type === 'drive' && held[held.length - 1]?.type === 'drive') held.pop()
+        const said = message.type === 'take' || message.type === 'drive' ? { ...message, time: message.time + lag, until: message.until + lag }
+          : message.type === 'hand' ? { ...message, time: message.time + lag } : message
+        //? a window sets nothing but the window, so only the newest counts - and a hand's sample or a
+        //? plan's frame is never dropped: each is a knot of the path, as the worklet has it
         if (said.type === 'window') for (let i = held.length - 1; i >= 0; i--) if (held[i]!.type === 'window') held.splice(i, 1)
         held.push(said)
       },
@@ -422,6 +456,9 @@ export function wakeDeckAudio(): void {
       audio.problem = null
       audio.missing = null
       audio.why = null
+      resetDeckClock(clock)
+      //? suspended or resumed, its clock stood still meanwhile: the mapping starts again
+      context.addEventListener?.('statechange', () => resetDeckClock(clock))
       context.addEventListener?.('statechange', audioChanged)
       startVoice(context)
       audioChanged()
@@ -468,9 +505,16 @@ function closeDeckAudio(): void {
   audio.problem = null
   audio.why = null
   sleepOnceRunning = false
+  resetDeckClock(clock)
   if (context && context.state !== 'closed') context.close().catch(() => undefined)
   releaseAudioSession()
   audioChanged()
+}
+
+/** The one clock's mapping as it stands (2.0.0-player.24): the offset in use (context s less page s),
+ *  the smallest step the audio's clock has been seen to move by, and how many readings it is made of. */
+export function deckClockMapping(): { offset: number | null; step: number; count: number } {
+  return { offset: clock.offset, step: clock.step, count: clock.count }
 }
 
 /** Whether the audio context runs. */
@@ -537,6 +581,10 @@ export class Deck {
   private settleTimer: ReturnType<typeof setTimeout> | undefined
   private resumeTimer: ReturnType<typeof setTimeout> | undefined
   private handoverTimer: ReturnType<typeof setTimeout> | undefined
+  private clockTimer: ReturnType<typeof setTimeout> | undefined
+  //? the timer's readings since it last started afresh: quick ones, the mapping still young, only for the
+  //? first CLOCK_SETTLE_TICKS of them
+  private clockTicks = 0
   private handoverOff: (() => void) | null = null
   private raf = 0
   private showing = false
@@ -570,6 +618,11 @@ export class Deck {
   //? ms after the turntable showed that the last window landed - what Debug's cost is measured to
   private lastFetchAt = 0
   private heard: (VoiceHeard & { at: number }) | null = null
+  //? the latest page time (ms) anything told the voice was stamped at: a frame no later than it has
+  //? nothing to add to the path (stampedTo)
+  private stampedTo = -Infinity
+  //? the audio clock's step as Debug was last told it
+  private reportedStep = 0
   private songId: string
 
   constructor(host: DeckHost) {
@@ -597,6 +650,8 @@ export class Deck {
     clearTimeout(this.settleTimer)
     clearTimeout(this.resumeTimer)
     this.resumeTimer = undefined
+    clearTimeout(this.clockTimer)
+    this.clockTimer = undefined
     cancelFrame(this.raf)
     this.raf = 0
     this.positionOff?.()
@@ -660,11 +715,13 @@ export class Deck {
       this.positionOff = this.host.onPosition(this.onPosition)
       this.keepHere()
       this.loop()
+      this.keepClock()
     } else {
       this.positionOff?.()
       this.positionOff = null
       cancelFrame(this.raf)
       this.raf = 0
+      this.keepClock()
       //? a window still being fetched is let go; one in hand (being decoded) is kept, and handed on
       if (this.pending?.stage === 'fetch') {
         this.requests.supersede()
@@ -819,9 +876,11 @@ export class Deck {
    * through the host) and the record's sound starts at its position, at its own speed if it was
    * playing. Coasting, coming back to speed or winding down: caught where the platter is, its sound
    * carrying on from there, and whether the song is meant to play kept from what it was doing. Either
-   * way the hand has it from here. Returns where it was taken.
+   * way the hand has it from here - the path the voice follows is the hand's from `time` (the pointer
+   * event's own time, ms: the move that crossed a tap's few pixels - or now, for a press that rested).
+   * Returns where it was taken.
    */
-  takeOver(): number {
+  takeOver(time: number = now()): number {
     const press = this.press
     if (!press) return this.host.position()
     if (press.taken) return press.anchor
@@ -835,10 +894,10 @@ export class Deck {
       clearTimeout(this.planTimer)
       this.planTimer = undefined
       this.endHandover()
-      const { v } = planAt(motion.plan, (now() - motion.since) / 1000)
-      at = this.recordAt()
+      const { v } = planAt(motion.plan, (time - motion.since) / 1000)
+      at = this.recordAt(time)
       press.intent = motion.role === 'handover' ? 'play' : 'pause'
-      if (!motion.sounding && this.sounding(at)) this.take(at, motion.quiet ? 0 : voiceRate(v))
+      if (!motion.sounding && this.sounding(at)) this.take(at, motion.quiet ? 0 : voiceRate(v), time)
     } else {
       const playing = this.host.playing()
       //? a song changed under the hand a moment ago, about to be played (songChanged): meant to play
@@ -848,27 +907,39 @@ export class Deck {
       at = this.host.position()
       if (playing) this.host.hold()
       press.intent = playing || pending ? 'play' : 'pause'
-      if (this.sounding(at)) this.take(at, playing ? 1 : 0)
+      if (this.sounding(at)) this.take(at, playing ? 1 : 0, time)
     }
     press.taken = true
     press.anchor = at
     press.at = at
     this.angle = this.angleNow()
     this.motion = { kind: 'hand' }
+    //? the hand has the record here, now: the path's first sample of it (a hand that rests sends no more,
+    //? and the record stops there)
+    this.post({ type: 'hand', at, time: this.stamp(time) })
     this.keep(at)
     this.loop()
     return at
   }
 
-  /** The hand moved: how far it has turned the record since the press (radians, as lib/turntable
-   *  counts it) and where that puts the song (seconds). */
+  /**
+   * The hand moved: at `time` - the pointer sample's own (its event's timeStamp, or one of its coalesced
+   * events', in ms: when the finger was there, not when the handler ran) - it had turned the record by
+   * `turned` since the press (radians, as lib/turntable counts it), which puts the song at `at` (seconds).
+   * Each sample goes to the voice as it comes, a knot of the path it plays (2.0.0-player.24) - never one
+   * drive a frame. A sample older than the last is dropped; one of the same moment replaces it.
+   */
   hand(time: number, turned: number, at: number): void {
     const press = this.press
     if (!press?.taken) return
+    const last = press.samples[press.samples.length - 1]
+    if (last && time < last.time) return
+    if (last && time === last.time) press.samples.pop()
     press.samples.push({ time, turned })
-    //? only the last moment of the hand counts: the release's speed, and the sound's
+    //? only the last moment of the hand counts: the release's speed
     while (press.samples.length > 2 && time - press.samples[0]!.time > 4 * VELOCITY_WINDOW_MS) press.samples.shift()
     press.at = at
+    this.post({ type: 'hand', at, time: this.stamp(time) })
     if (!this.covers(at, 0)) this.keep(at)
     this.loop()
   }
@@ -899,7 +970,15 @@ export class Deck {
       this.host.show(null, false)
       return { seek: null, play: false }
     }
-    const speed = handSpeed(press.samples, time, VELOCITY_WINDOW_MS)
+    //? the hand's speed up to its last sample, by the samples' own times - unless it rested before letting go
+    const speed = releaseSpeed(press.samples, time)
+    //? and the plan from the moment of that sample, where it had the record: a lift up to RELEASE_TAIL_MS
+    //? after it is the hand still moving at that speed - from the release's own time, the plan would have
+    //? the record stand still for the gap, and the sound dropped almost to nothing as it let go (review of
+    //? 2.0.0-player.24: to 0.07x on a flick released a frame after its last move). After a rest, from the
+    //? release: the record was held still meanwhile
+    const last = press.samples[press.samples.length - 1]!.time
+    const since = time - last <= RELEASE_TAIL_MS ? Math.min(time, last) : time
     if (press.intent === 'play') {
       const plan = motor(press.at, speed, length)
       if (this.reduced || plan.duration <= RESUME_IN_GESTURE_S) {
@@ -910,7 +989,7 @@ export class Deck {
         this.loop()
         return { seek: plan.x, play: true }
       }
-      this.startPlan(plan, 'handover', press.at, this.sounding(press.at))
+      this.startPlan(plan, 'handover', press.at, this.sounding(press.at), since)
       this.keepPath(plan)
       return { seek: plan.x, play: false }
     }
@@ -921,7 +1000,7 @@ export class Deck {
       this.host.show(null, false)
       return { seek: plan.x, play: false }
     }
-    this.startPlan(plan, 'coast', press.at, this.sounding(press.at))
+    this.startPlan(plan, 'coast', press.at, this.sounding(press.at), since)
     this.keepPath(plan)
     return { seek: plan.x, play: false }
   }
@@ -994,10 +1073,10 @@ export class Deck {
    *  wind-down too, when it sounds - or the song's own position. A wind-down that made no sound left
    *  the song where it paused, not where the platter got to; and a plan something else sought (quiet)
    *  is where that put it. */
-  private recordAt(): number {
+  private recordAt(time: number = now()): number {
     const motion = this.motion
     if (motion.kind === 'plan' && motion.role !== 'spin' && !motion.quiet && (motion.sounding || motion.role !== 'winddown')) {
-      return planAt(motion.plan, (now() - motion.since) / 1000).x
+      return planAt(motion.plan, (time - motion.since) / 1000).x
     }
     return this.host.position()
   }
@@ -1033,17 +1112,32 @@ export class Deck {
     this.startPlan(plan, role, plan.phases[0] ? planAt(plan, 0).x : 0, false)
   }
 
-  private startPlan(plan: Plan, role: Role, x0: number, sounding: boolean): void {
+  /** A plan from page time `since` (ms - the hand's last sample for a release moments after it, the
+   *  release's own after a rest, or now): sounding, its start is the voice's path from that moment, as
+   *  well as each frame's place on it - and the timer for its end is shortened by however long ago that
+   *  was. */
+  private startPlan(plan: Plan, role: Role, x0: number, sounding: boolean, since: number = now()): void {
     const from = this.angleNow()
     clearTimeout(this.planTimer)
     //? a wind-down without its sound leaves the song where it paused: nothing seeks it to the end
     const sought = role === 'winddown' && !sounding ? x0 : plan.x
-    this.motion = { kind: 'plan', role, plan, since: now(), from, x0, sounding, sought, quiet: false }
+    this.motion = { kind: 'plan', role, plan, since, from, x0, sounding, sought, quiet: false }
     const motion = this.motion
+    if (sounding) this.drive(motion, since)
     //? the plan's end on a timer, not the frame loop: a hidden page draws nothing, but a coast back to
     //? speed must still play the song when it gets there
-    this.planTimer = setTimeout(() => this.planEnded(motion), plan.duration * 1000)
+    this.planTimer = setTimeout(() => this.planEnded(motion), Math.max(0, plan.duration * 1000 - (now() - since)))
     this.loop()
+  }
+
+  /** The voice told where a sounding plan has the record at page time `time` (ms) - and how fast, and
+   *  how that is changing, so it follows the curve between frames - stamped by the one clock. */
+  private drive(motion: PlanMotion, time: number): void {
+    const t = (time - motion.since) / 1000
+    const { x, v } = planAt(motion.plan, t)
+    const accel = t < motion.plan.duration ? acceleration(v, motion.role === 'handover' || (motion.role === 'spin' && motion.plan.v >= 1)) : 0
+    const stamped = this.stamp(time)
+    this.post({ type: 'drive', at: x, rate: voiceRate(v), accel: voiceRate(accel), time: stamped, until: stamped + DRIVE_FOR_S })
   }
 
   private planEnded(motion: Motion): void {
@@ -1055,7 +1149,7 @@ export class Deck {
       //? unless the song was sought somewhere else meanwhile (quiet: there is nothing to hold for)
       this.motion = { kind: 'turning', since: now(), from: angle }
       this.host.show(null, false)
-      this.handOver(motion.plan.x, motion.sounding && !motion.quiet)
+      this.handOver(motion.plan.x, motion.sounding && !motion.quiet, motion.since + motion.plan.duration * 1000)
       this.host.resume()
       //? a play iOS refuses ("Tap play to start") leaves the song paused: the platter spins down
       //? rather than turning on beside it. A play that takes clears this (playingChanged)
@@ -1076,15 +1170,15 @@ export class Deck {
     this.loop()
   }
 
-  /** The record's sound holds speed 1 from `at` until the song is really playing - its position past
-   *  `at` - then fades; HANDOVER_MAX_S at most. A position nowhere near `at` (the song sought elsewhere
-   *  as it started) ends it as well: there is nothing to hand over to. */
-  private handOver(at: number, sounding: boolean): void {
+  /** The record's sound holds speed 1 from `at` - where the plan ended, at page time `time` (ms) -
+   *  until the song is really playing - its position past `at` - then fades; HANDOVER_MAX_S at most. A
+   *  position nowhere near `at` (the song sought elsewhere as it started) ends it as well: there is
+   *  nothing to hand over to. */
+  private handOver(at: number, sounding: boolean, time: number): void {
     this.endHandover()
     if (!sounding) return
-    const context = audio.context
-    const time = context?.currentTime ?? 0
-    this.post({ type: 'drive', at, rate: 1, time, until: time + HANDOVER_MAX_S })
+    const stamped = this.stamp(time)
+    this.post({ type: 'drive', at, rate: 1, time: stamped, until: stamped + HANDOVER_MAX_S })
     const done = () => {
       this.endHandover()
       this.post({ type: 'fade', seconds: HANDOVER_FADE_S })
@@ -1142,18 +1236,20 @@ export class Deck {
     this.host.turnFace(this.angleNow())
     const press = this.press
     const motion = this.motion
-    const context = audio.context
-    const contextTime = context?.currentTime ?? 0
+    //? the clock read once a frame while anything moves - and on the deck's own timer whatever the record
+    //? does (keepClock): a still record runs no frames, and its grab must find the mapping settled too
+    this.readClock()
     if (press?.taken) {
-      const rate = handSpeed(press.samples, Math.max(time, press.samples[press.samples.length - 1]!.time), HAND_SPEED_MS)
-      this.post({ type: 'drive', at: press.at, rate: voiceRate(rate), time: contextTime, until: contextTime + DRIVE_FOR_S })
+      //? the hand's samples went to the voice as they came (hand): only what it is heard playing to show
       this.host.show(this.heardNow() ?? press.at, true)
     } else if (motion.kind === 'plan') {
       const t = (time - motion.since) / 1000
-      const { x, v } = planAt(motion.plan, t)
-      //? the plan's own acceleration too, so the voice follows the curve between frames
-      const accel = t < motion.plan.duration ? acceleration(v, motion.role === 'handover' || (motion.role === 'spin' && motion.plan.v >= 1)) : 0
-      if (motion.sounding) this.post({ type: 'drive', at: x, rate: voiceRate(v), accel: voiceRate(accel), time: contextTime, until: contextTime + DRIVE_FOR_S })
+      const { x } = planAt(motion.plan, t)
+      //? where the plan has the record at this frame's own time - its place, speed and acceleration - once
+      //? that is later than anything the voice was told: a frame's time is when it began, and the release
+      //? (or the tap) it follows may have come after that - driven, it would erase the plan's own start and
+      //? set it at a moment the plan hadn't begun (review of 2.0.0-player.24)
+      if (motion.sounding && time > this.stampedTo) this.drive(motion, time)
       //? a coast running out of the window - sounding or not: the next asked for (asked at the release
       //? already, as a rule - keepPath), and it sounds from where it has got to as it arrives
       if (!motion.quiet && (motion.role === 'coast' || motion.role === 'handover') && !this.covers(x, 0)) this.keep(x)
@@ -1186,9 +1282,63 @@ export class Deck {
     }
   }
 
-  private take(at: number, rate: number): void {
-    const time = audio.context?.currentTime ?? 0
-    this.post({ type: 'take', at, rate, time, until: time + DRIVE_FOR_S })
+  /** The voice takes up the record at `at`, moving at `rate`, as of page time `time` (ms). */
+  private take(at: number, rate: number, time: number = now()): void {
+    const stamped = this.stamp(time)
+    this.post({ type: 'take', at, rate, time: stamped, until: stamped + DRIVE_FOR_S })
+  }
+
+  /** Whether the voice is following a path of the deck's - a hand, a sounding plan, the handover: the
+   *  clock's mapping is held steady meanwhile. */
+  private steering(): boolean {
+    const motion = this.motion
+    return !!this.press?.taken || (motion.kind === 'plan' && motion.sounding) || this.handoverOff !== null
+  }
+
+  /**
+   * The clock read on the deck's own timer while the turntable shows and its context runs - whatever the
+   * record does: every CLOCK_SETTLE_MS while the mapping is young (a context just made or resumed - each
+   * state change starts it again; for CLOCK_SETTLE_TICKS readings at most), every CLOCK_TICK_MS once
+   * settled - so a press finds it settled, and its readings never go stale through a long rest. Started
+   * afresh, or stopped, as either changes: shown or hidden (a real suspend settles later, and the timer
+   * stops at the hide), the context's state - and stopped as the deck goes (its timer reading on, with
+   * this deck's `steering()`, would let go of a mapping the next turntable's hand holds).
+   */
+  private keepClock(): void {
+    this.clockTicks = 0
+    this.armClock()
+  }
+
+  private armClock(): void {
+    clearTimeout(this.clockTimer)
+    this.clockTimer = undefined
+    if (!this.showing || !deckAudioRunning()) return
+    const settling = !clockSettled(clock) && this.clockTicks < CLOCK_SETTLE_TICKS
+    this.clockTimer = setTimeout(this.onClockTick, settling ? CLOCK_SETTLE_MS : CLOCK_TICK_MS)
+  }
+
+  private readonly onClockTick = () => {
+    this.clockTimer = undefined
+    this.readClock()
+    this.clockTicks += 1
+    this.armClock()
+  }
+
+  /** A reading of the audio context's clock against the page's, for the one mapping - and Debug told
+   *  when the step it moves by is first seen, or changes. */
+  private readClock(): void {
+    const context = audio.context
+    if (!context) return
+    clockReading(clock, now(), context.currentTime, this.steering())
+    if (Math.abs(clock.step - this.reportedStep) > 1e-4) this.report()
+  }
+
+  /** Page time `time` (ms) as the audio context's clock has it (seconds), by the one mapping - never a
+   *  `currentTime` read for the message (its steps were the warble). */
+  private stamp(time: number): number {
+    this.readClock()
+    if (time > this.stampedTo) this.stampedTo = time
+    return contextTimeAt(clock, time) ?? time / 1000
   }
 
   /** Whether the record can sound at `at`: the context runs, a voice is ready, and its window covers
@@ -1363,8 +1513,13 @@ export class Deck {
     //? arrived with the record already in a hand or coasting, silent for want of it: it sounds from here
     const press = this.press
     const motion = this.motion
-    if (press?.taken && this.heardNow() === null && this.sounding(press.at)) this.take(press.at, 0)
-    else if (motion.kind === 'plan' && !motion.sounding && !motion.quiet && (motion.role === 'coast' || motion.role === 'handover')) {
+    if (press?.taken && this.heardNow() === null && this.sounding(press.at)) {
+      //? held still from here, where the hand has it - as of its last sample, which put it there, so the
+      //? samples on their way since go on from it rather than being older than it
+      const time = press.samples[press.samples.length - 1]?.time ?? now()
+      this.take(press.at, 0, time)
+      this.post({ type: 'hand', at: press.at, time: this.stamp(time) })
+    } else if (motion.kind === 'plan' && !motion.sounding && !motion.quiet && (motion.role === 'coast' || motion.role === 'handover')) {
       const { x, v } = planAt(motion.plan, (now() - motion.since) / 1000)
       if (this.sounding(x)) {
         this.take(x, voiceRate(v))
@@ -1381,10 +1536,12 @@ export class Deck {
 
   private readonly onAudio = () => {
     //? a context made, resumed, suspended; a voice ready: what was waiting goes on - and the
-    //? window is asked for now, if none was for want of somewhere to put it
+    //? window is asked for now, if none was for want of somewhere to put it; the clock read on the
+    //? deck's timer while it runs (its mapping started again by the state change: quickly, to settle)
     this.decode()
     this.handWindow()
     this.keepHere()
+    this.keepClock()
     this.report()
   }
 
@@ -1412,7 +1569,9 @@ export class Deck {
       failed: this.failed && song && this.failed.song === song.id ? this.failed.why : null,
       fetched: this.fetched,
       lastFetchAt: this.lastFetchAt,
+      clockStep: clock.step,
     })
+    this.reportedStep = clock.step
   }
 }
 

@@ -25,7 +25,9 @@
  *  - Turntable sound (2.0.0-player.14): ready, or off and why, with the cost. Since 2.0.0-player.16
  *    every way the record can't sound reads Off - starting, its window loading, none yet - since a
  *    press then is 2.0.0-player.11's; and the note names the voice: its own audio thread, or the main
- *    thread and why (the page not on HTTPS, the AudioWorklet refused).
+ *    thread and why (the page not on HTTPS, the AudioWorklet refused). Since 2.0.0-player.24 it says how
+ *    far the audio's clock moves at a time, once the deck has seen it move - after the voice, before
+ *    the cost.
  *  - "Navidrome sent": the names of the song's and the album's fields, sorted; those sent EMPTY
  *    ("", 0, [], {} - Navidrome always writes musicBrainzId and discTitles) named apart; the
  *    fields other songs of the album carry and this one doesn't (playCount and played are left
@@ -155,6 +157,21 @@ console.log('\nTurntable sound (2.0.0-player.16): which voice plays it, and why'
     [`On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet ${DOT} 3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in`,
       "On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet"])
   check('...and none named while there is none', turntable({ ...ready, voice: null, voiceWhy: null, window: null }).note, undefined)
+}
+
+console.log('\nTurntable sound (2.0.0-player.24): how far the audio\'s clock moves at a time')
+{
+  const turntable = (report) => rows.turntableRow(report)
+  const ready = {
+    context: 'running', problem: null, voice: 'worklet', voiceWhy: null,
+    window: { start: 31, end: 72.6, kind: 'FLAC', decodedAt: 44100, bytes: 3_400_000 },
+    loading: false, refused: null, failed: null, fetched: 6_800_000, lastFetchAt: 61_000, clockStep: 1024 / 48000,
+  }
+  check('an iPhone\'s 1024 frames a render: after the voice, before the cost',
+    turntable(ready).note, `On its own audio thread (an AudioWorklet) ${DOT} Its clock moves 21.3 ms at a time ${DOT} 3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in`)
+  check('...desktop Brave\'s 256 at 44.1 kHz; nothing said before it has been seen to move (0), nor by a report without it',
+    [turntable({ ...ready, clockStep: 256 / 44100, fetched: 0 }).note, turntable({ ...ready, clockStep: 0, fetched: 0 }).note, turntable({ ...ready, clockStep: undefined, fetched: 0 }).note],
+    [`On its own audio thread (an AudioWorklet) ${DOT} Its clock moves 5.8 ms at a time`, 'On its own audio thread (an AudioWorklet)', 'On its own audio thread (an AudioWorklet)'])
 }
 
 console.log('\nFormat: what Navidrome said of the file')

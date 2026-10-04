@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
+import { eventTime, pointerSamples } from '../lib/deckClock'
 import { clock, keyTarget } from '../lib/scrub'
 import { isFlac, resamples } from '../lib/streamWrap'
 import {
   ARM, ARM_PARTS, PLATTER, RECORD, STAGE, across, armAngle, armMove, armStart, dragEnd, dragFor, moved, needleAt,
   placeCircle, placePoint, preview, previewWords, recordMove, recordStart, samePreview, shownTime, timeLine,
-  type Box, type Drag, type Preview,
+  type Box, type Drag, type Preview, type RecordDrag,
 } from '../lib/turntable'
 import { Cover } from './Cover'
 import { Deck, wakeDeckAudio, type DeckHost } from './deck'
@@ -61,7 +62,9 @@ function kindOf(track: { suffix?: string | null | undefined; contentType?: strin
  *   the press moves past a tap or rests longer than one, the song pauses, the record's sound follows
  *   the hand, and letting go hands the platter the hand's speed - the deck says where the song lands,
  *   which this seeks to as the finger lets go, and plays it from there when there is no coast to wait
- *   for. The click after a turn - or after the record was taken - is not a tap.
+ *   for. The deck is handed every sample a move carries - each of its coalesced events, in order - with
+ *   the time the event gives it, never when the handler ran (2.0.0-player.24: the record's sound follows
+ *   the hand's own samples). The click after a turn - or after the record was taken - is not a tap.
  * - THE ARM moves in from the outer groove as the song plays, following the song's position
  *   (usePosition, like the scrubber - no timer of its own) or, while the deck has the record, the
  *   time the deck shows. Dragged, it goes anywhere in the song, seeking where it lets go - and while
@@ -245,7 +248,7 @@ export function Turntable({
     live.current = deck.live()
     setDrag(recordStart(event.pointerId, track, event.clientX, event.clientY, pressBox.current))
     //? the deck's press - or .11's, under which the record stops under the finger, as .11's spin did
-    if (live.current) deck.pressed(performance.now())
+    if (live.current) deck.pressed(eventTime(event.timeStamp, performance.now()))
     else deck.holdStill(true)
   }
   const onArmDown = (event: PointerEvent) => {
@@ -260,18 +263,24 @@ export function Turntable({
     if (!now) return
     const within = pressBox.current ?? box()
     if (now.kind === 'record' && live.current) {
-      //? the deck's press: the turn counts from where the record was taken, the song paused there
-      const step = recordMove(now, event.pointerId, event.clientX, event.clientY, within, length, deck.taken() ? deck.anchor() : drawnAt.current)
-      if (step === now || step?.kind !== 'record') return
-      let turning = step
-      if (!deck.taken() && moved(turning)) {
-        //? past a tap: the record is taken here, and its turn counts from here
-        deck.takeOver()
-        turning = Object.assign({}, turning, { offset: 0 })
+      //? the deck's press: the turn counts from where the record was taken, the song paused there. Every
+      //? sample the move carries (the coalesced ones a browser keeps, in order) goes to the deck with its
+      //? own time - when the finger was there, not when this ran (2.0.0-player.24)
+      let turning: Drag = now
+      for (const sample of pointerSamples(event, performance.now())) {
+        const step = recordMove(turning, event.pointerId, sample.x, sample.y, within, length, deck.taken() ? deck.anchor() : drawnAt.current)
+        if (step === turning || step?.kind !== 'record') continue
+        let next: RecordDrag = step
+        if (!deck.taken() && moved(next)) {
+          //? past a tap: the record is taken here, and its turn counts from here
+          deck.takeOver(sample.time)
+          next = Object.assign({}, next, { offset: 0 })
+        }
+        if (deck.taken()) deck.hand(sample.time, next.turned, deck.anchor() + next.offset)
+        if (moved(next)) turned.current = true
+        turning = next
       }
-      if (deck.taken()) deck.hand(performance.now(), turning.turned, deck.anchor() + turning.offset)
-      if (moved(turning)) turned.current = true
-      setDrag(turning)
+      if (turning !== now) setDrag(turning)
       return
     }
     const next = now.kind === 'record'
@@ -289,9 +298,9 @@ export function Turntable({
     if (how === 'up' && now && now.pointer === event.pointerId) wakeDeckAudio()
     if (now?.kind === 'record' && live.current && now.pointer === event.pointerId) {
       const taken = deck.taken()
-      //? the page's clock, as the deck's frames are on - never the event's own stamp, which some
-      //? WebKit has given on another clock
-      const { seek, play } = deck.release(performance.now(), how)
+      //? the event's own time, as the hand's samples have theirs - the page's clock where some WebKit
+      //? gives the stamp on another (eventTime)
+      const { seek, play } = deck.release(eventTime(event.timeStamp, performance.now()), how)
       //? the record stays where the hand left it - a record held still and then nudged a few pixels
       //? included - and the click that may follow isn't a tap
       if (how === 'up' && (moved(now) || taken)) {

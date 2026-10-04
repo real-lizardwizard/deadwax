@@ -54,8 +54,8 @@
  *  - ITS REVIEW: a take applied after it was said starts where the record is by then; on the main
  *    thread, with the page's frames and the browser's blocks on one clock, a wind-down and a grab -
  *    either first - never read faster than the song, and a grab held still never swings far back
- *    (messages held to the next block, heard SCRIPT_LAG_BLOCKS blocks on, a drive replacing the drive
- *    before it and a window every window before it); a coast or a run back to speed out of its window
+ *    (messages held to the next block, heard SCRIPT_LAG_BLOCKS blocks on, a window replacing every
+ *    window before it); a coast or a run back to speed out of its window
  *    still the deck's - caught where the platter is, nothing played under the hand, sounded as the
  *    window lands; a press that IS .11's ending whatever the deck had going (a silent wind-down, a
  *    coast whose context a hide suspended - no leap at the release, the run back to speed's song
@@ -63,6 +63,20 @@
  *    voice, and only once; a hide while a tap's resume settles suspending it as it runs - but not the
  *    mini player's tap, nor a hide undone before it settled; each audio-session wake held to a context
  *    of its own.
+ *  - THE RECORD'S SOUND FOLLOWS THE HAND (2.0.0-player.24): the voice plays its path HAND_DELAY_S behind
+ *    - a take, a drive and a coast all heard that much later (the checks above say where); the release's
+ *    speed taken by the samples' own times, up to the last of them (a still tail of RELEASE_TAIL_MS is no
+ *    slowing, a rest is, a whole window of one no flick at all); and on the main thread every sample of a
+ *    hand applied in order, its own time kept and the lag added - none replacing another. ITS REVIEW: a
+ *    frame begun before the release (or the tap) it follows drives nothing; a window landing under the
+ *    hand starts its path at the hand's last sample, not when it landed; and on the main thread every
+ *    frame's drive of a coast is applied too, in order, as the worklet keeps each one. ITS SECOND REVIEW:
+ *    the clock read on the deck's own timer while the turntable shows and its context runs, the record
+ *    still too - started by a deck mounting on a context already running, quick only for its first
+ *    CLOCK_SETTLE_TICKS readings while the mapping is young (a clock that never moves read slowly), slow
+ *    once settled, stopped at the hide while a real suspend still settles, and gone with its deck (a
+ *    grab on the next held through every reading).
+ *    ui/test/decksound.sim.cjs listens to the result, and ui/test/deckclock.sim.cjs holds the clock.
  *
  * Run it with:  node ui/test/deck.sim.cjs
  */
@@ -227,6 +241,19 @@ console.log('\nthe hand\'s speed: its last ~90 ms')
   check('a jump in the samples is held to MAX_SPEED', platter.handSpeed([{ time: 0, turned: 0 }, { time: 1, turned: 100 }], 1), platter.MAX_SPEED)
 }
 
+console.log('\nthe release\'s speed (2.0.0-player.24): by the samples\' own times - a still tail is no slowing, a rest is')
+{
+  const turnPerSecond = (time) => ({ time, turned: (time / 1000) * 2 * Math.PI })
+  const steady = [0, 16, 32, 48, 64, 80, 96, 112, 128].map(turnPerSecond)
+  check('let go 30 ms after the last sample - a finger moving to the last sends its last move up to a frame before it lifts: the full speed, 1.8 (taken up to the release, 1.2 - a third slower)',
+    [platter.RELEASE_TAIL_MS, round(platter.releaseSpeed(steady, 128 + 30), 6), round(platter.handSpeed(steady, 128 + 30), 6)], [40, 1.8, 1.2])
+  check('...at the last sample itself, or a tail of RELEASE_TAIL_MS: the full speed', [round(platter.releaseSpeed(steady, 128), 6), round(platter.releaseSpeed(steady, 128 + 40), 6)], [1.8, 1.8])
+  check('a finger that rested past the tail: slower in proportion - half way from the tail to a whole window, half the speed', round(platter.releaseSpeed(steady, 128 + 65), 6), 0.9)
+  check('...a rest of the whole window (VELOCITY_WINDOW_MS) or more: no flick at all', [platter.releaseSpeed(steady, 128 + 90), platter.releaseSpeed(steady, 128 + 400)], [0, 0])
+  check('...backwards the same; one sample, or none: no speed',
+    [round(platter.releaseSpeed(steady.map((sample) => ({ ...sample, turned: -sample.turned })), 128 + 30), 6), platter.releaseSpeed([{ time: 0, turned: 0 }], 30), platter.releaseSpeed([], 30)], [-1.8, 0, 0])
+}
+
 /* ===== the voice ===== */
 
 const SR = 48000
@@ -252,20 +279,25 @@ const biggestStep = (data) => { let p = 0; for (let i = 1; i < data.length; i++)
 //? the signal's own biggest step a sample, read at speed 1: 0.5 * 2 pi 440 / 48000
 const SIGNAL_STEP = 0.5 * 2 * Math.PI * 440 / SR
 
+//? the voice plays its path this far behind (2.0.0-player.24): the record's sound is that much later
+//? than the hand, the coast, the wind-down - a constant
+const DELAY = voice.HAND_DELAY_S
+
 console.log('\nthe voice: its position is the sum of its rate')
 {
   const state = voice.newVoiceState()
+  check('it plays its path HAND_DELAY_S (50 ms) behind - the literal in newVoiceState, the voice naming nothing outside itself', [DELAY, state.delay], [0.05, 0.05])
   voice.voiceCommand(state, sine(30), 0, SR)
   voice.voiceCommand(state, { type: 'take', at: 12, rate: 1, time: 0, until: 100 }, 0, SR)
   render(state, 1, 0)
-  check('at speed 1 for a second, taken at its own speed: a second on, exactly', round(state.pos, 9), 13)
+  check('at speed 1 for a second, taken at its own speed: a second on, exactly - from where the record was the delay before the take', round(state.pos, 9), round(13 - DELAY, 9))
   voice.voiceCommand(state, { type: 'drive', at: 13, rate: -1, time: 1, until: 100 }, 1, SR)
   render(state, 2, 1)
-  check('then backwards at -1 for two: back past where it started, to the drive\'s position', near(state.pos, 11, 1e-3), true)
+  check('then backwards at -1 for two: back past where it started, where the drive has the record the delay before', near(state.pos, 11 + DELAY, 1e-3), true)
   const free = voice.newVoiceState()
   voice.voiceCommand(free, sine(30), 0, SR)
   voice.voiceCommand(free, { type: 'take', at: 20, rate: 0.75, time: 0, until: 0.05 }, 0, SR)
-  let summed = 20
+  let summed = free.pos
   for (let i = 0; i < SR / 2; i++) {
     voice.renderVoice(free, [new Float32Array(1)], 1, SR, i / SR)
     summed += free.rate / SR
@@ -283,8 +315,9 @@ console.log('\na change of speed is smoothed, and never jumps the sound')
   //? from the rate it was reading at the moment the drive changes
   const rates = [state.rate]
   let t = 0.2
-  voice.voiceCommand(state, { type: 'drive', at: state.pos, rate: -1, time: t, until: 100 }, t, SR)
-  for (let i = 0; i < 2400; i++) {
+  //? where the record is on the path at 0.2 - the voice is the delay behind it - turned to -1 there
+  voice.voiceCommand(state, { type: 'drive', at: state.pos + DELAY, rate: -1, time: t, until: 100 }, t, SR)
+  for (let i = 0; i < 2400 + DELAY * SR; i++) {
     voice.renderVoice(state, [new Float32Array(1), new Float32Array(1)], 1, SR, t)
     rates.push(state.rate)
     t += 1 / SR
@@ -296,7 +329,7 @@ console.log('\na change of speed is smoothed, and never jumps the sound')
     rates.push(state.rate)
     t += 1 / SR
   }
-  check('...and settles at -1 within about 150 ms (catching up the position it was told on the way)', near(rates.at(-1), -1, 0.01), true)
+  check('...and settles at -1 within about 150 ms of reaching it on its path (catching up the position it was told on the way)', near(rates.at(-1), -1, 0.01), true)
   const swing = voice.newVoiceState()
   voice.voiceCommand(swing, sine(30), 0, SR)
   voice.voiceCommand(swing, { type: 'take', at: 15, rate: 1, time: 0, until: 100 }, 0, SR)
@@ -314,7 +347,7 @@ console.log('\na change of speed is smoothed, and never jumps the sound')
   }
   run(0.15)
   for (const rate of [-1, 2.5, 0.2, -3, 1]) {
-    voice.voiceCommand(swing, { type: 'drive', at: swing.pos, rate, time: now, until: now + 1 }, now, SR)
+    voice.voiceCommand(swing, { type: 'drive', at: swing.pos + DELAY * swing.rate, rate, time: now, until: now + 1 }, now, SR)
     run(0.15)
   }
   check('through five changes of speed and direction: no step bigger than the signal\'s own at the fastest speed it was read at',
@@ -380,7 +413,7 @@ console.log('\nit goes where it is driven, and stops when the drive does')
     render(state, 1 / 60, now)
     now += 1 / 60
   }
-  check('a second of a hand at 2.5x: where the hand is, to a few ms, at its speed', [near(state.pos, 14 + 2.5 * now, 0.005), near(state.rate, 2.5, 0.01)], [true, true])
+  check('a second of a hand at 2.5x: where the hand was the delay before, to a few ms, at its speed', [near(state.pos, 14 + 2.5 * (now - DELAY), 0.005), near(state.rate, 2.5, 0.01)], [true, true])
   render(state, 0.4, now)
   check('the drive stops coming (a stalled page): it runs out by itself, still and silent - never a record left whirring', near(state.rate, 0, 1e-3), true)
   const behind = []
@@ -396,12 +429,14 @@ console.log('\nit goes where it is driven, and stops when the drive does')
       voice.voiceCommand(follow, { type: 'drive', at: x, rate: v, accel: platter.acceleration(v, on), time: now, until: now + 0.12 }, now, SR)
       render(follow, 1 / 60, now)
       now += 1 / 60
-      worst = Math.max(worst, Math.abs(follow.pos - platter.planAt(plan, now).x))
+      //? where the platter was the delay before - or, before that, where the take had it moving
+      const was = now >= DELAY ? platter.planAt(plan, now - DELAY).x : 20 + v0 * (now - DELAY)
+      worst = Math.max(worst, Math.abs(follow.pos - was))
     }
     //? within a millisecond of real time behind, at the speed it goes: the rate's smoothing, no more
     behind.push(worst <= 0.001 + Math.abs(v0) * 0.001)
   }
-  check('a coast or a run back to speed, driven a frame at a time: what is heard is where the platter is, within a ms of real time all the way', behind, [true, true, true, true])
+  check('a coast or a run back to speed, driven a frame at a time: what is heard is where the platter was the delay before, within a ms of real time all the way', behind, [true, true, true, true])
 }
 
 console.log('\nloudness: faded in, faded out, stopped')
@@ -436,11 +471,11 @@ console.log('\na take applied after it was said starts where the record is by th
     voice.renderVoice(late, [new Float32Array(1)], 1, SR, 1.043 + i / SR)
     fastest = Math.max(fastest, late.rate)
   }
-  check('it starts at 12.043 - where a record at 12 s and its own speed is 43 ms later - and never reads faster than the record goes (started at 12, it raced to catch up at up to 1.8 times)',
-    [round(start, 6), round(fastest, 4) <= 1], [12.043, true])
+  check('it starts at 12.043 less the delay - where a record at 12 s and its own speed is 43 ms later, the voice the delay behind it - and never reads faster than the record goes (started at 12, it raced to catch up at up to 1.8 times)',
+    [round(start, 6), round(fastest, 4) <= 1], [round(12.043 - DELAY, 6), true])
   const early = voice.newVoiceState()
   voice.voiceCommand(early, { type: 'take', at: 12, rate: -2, time: 1, until: 1.2 }, 0.99, SR)
-  check('...backwards too, and applied before its own time: where the record was then', round(early.pos, 6), 12.02)
+  check('...backwards too, and applied before its own time: where the record was then, the delay before', round(early.pos, 6), round(12.02 + 2 * DELAY, 6))
 }
 
 console.log('\nthe worklet: made from the same functions, it plays the very same samples')
@@ -461,6 +496,8 @@ console.log('\nthe worklet: made from the same functions, it plays the very same
   let same = true
   const where = new Map()
   for (let block = 0; block < 400; block++) {
+    //? a hand's samples too (2.0.0-player.24): the module fits and plays them as the functions do
+    if (block >= 40 && block < 90 && block % 3 === 0) say({ type: 'hand', at: 12 + scope.currentTime * 0.8, time: scope.currentTime })
     if (block === 100) say({ type: 'drive', at: direct.pos, rate: -2, time: scope.currentTime, until: 100 })
     if (block === 250) say({ type: 'fade', seconds: 0.04 })
     const a = [new Float32Array(128), new Float32Array(128)], b = [new Float32Array(128), new Float32Array(128)]
@@ -470,12 +507,12 @@ console.log('\nthe worklet: made from the same functions, it plays the very same
     if (a[0].some((v, i) => v !== b[0][i]) || a[1].some((v, i) => v !== b[1][i])) same = false
     scope.currentTime += 128 / SR
   }
-  check('400 blocks through a take, a reversal and a fade: sample for sample what the functions give', same, true)
+  check('400 blocks through a take, a hand\'s samples, a reversal and a fade: sample for sample what the functions give', same, true)
   const heard = posted.filter((m) => m.type === 'heard')
   check('it says where it is ~30 times a second: 32 times in 400 blocks of 128', [heard.length, Object.keys(heard[0] ?? {}).sort()], [32, ['gain', 'pos', 'rate', 'time', 'type']])
   check('...and what it says is exactly where it was', heard.every((report) => report.pos === where.get(report.time)), true)
   check('the four functions it is made of name nothing outside themselves (they run in a scope of their own)',
-    [voice.newVoiceState, voice.voiceCommand, voice.renderVoice, voice.voiceReport].map((fn) => /\b(exports|require|platter|turntable|REPORTS_PER_SECOND)\b/.test(fn.toString())), [false, false, false, false])
+    [voice.newVoiceState, voice.voiceCommand, voice.renderVoice, voice.voiceReport].map((fn) => /\b(exports|require|platter|turntable|REPORTS_PER_SECOND|HAND_DELAY_S)\b/.test(fn.toString())), [false, false, false, false])
   check('...nor one another: voiceReport counts, it doesn\'t render (the main-thread voice calls renderVoice itself)', /renderVoice|voiceCommand|newVoiceState/.test(voice.voiceReport.toString()), false)
 }
 
@@ -544,8 +581,9 @@ let workletHeld = null
 //? a context with no AudioWorklet (a page that isn't on HTTPS), or with no ScriptProcessorNode either
 let noWorklet = false
 let noScript = false
-//? resumes that settle only when the test says (their settlers kept here), not at once
+//? resumes that settle only when the test says (their settlers kept here), not at once - and suspends
 let resumesHeld = null
+let suspendsHeld = null
 //? decoded windows that hold a tone rather than silence, so what a voice plays can be compared
 let decodeTone = false
 //? the ScriptProcessorNodes made, and what is asked of them
@@ -598,7 +636,12 @@ class FakeContext {
     this.state = 'running'
     return Promise.resolve()
   }
-  suspend() { this.calls.push('suspend'); this.state = 'suspended'; return Promise.resolve() }
+  suspend() {
+    this.calls.push('suspend')
+    if (suspendsHeld) return new Promise((resolve) => suspendsHeld.push(() => { this.state = 'suspended'; resolve() }))
+    this.state = 'suspended'
+    return Promise.resolve()
+  }
   close() { this.calls.push('close'); this.state = 'closed'; return Promise.resolve() }
   decodeAudioData(bytes, done, failed) {
     decodes++
@@ -633,6 +676,15 @@ const settle = () => new Promise((resolve) => setImmediate(resolve))
 
 const deckModule = require(path.join(OUT, 'player/deck.js'))
 const { Deck, wakeDeckAudio, deckReport, windowMargins } = deckModule
+//? the clock's readings, counted where deck.js reaches them - when, and whether the mapping was held
+const clockLib = require(path.join(OUT, 'lib/deckClock.js'))
+const clockReads = []
+const realClockReading = clockLib.clockReading
+clockLib.clockReading = (...args) => {
+  clockReads.push({ at: args[1], held: args[3] })
+  return realClockReading(...args)
+}
+const readsBetween = (from, to) => clockReads.filter((read) => read.at > from && read.at <= to)
 
 function fakeHost(overrides = {}) {
   const host = {
@@ -743,6 +795,73 @@ async function main() {
     deck.destroy()
   }
 
+  console.log('\nthe clock read on the deck\'s own timer while the turntable shows and its context runs, the record still too (second review of 2.0.0-player.24)')
+  {
+    //? the context made and running before the deck is (the look button's click wakes it as the turntable
+    //? mounts - its state change comes before there is a deck to hear it): shown, the deck reads the clock
+    //? itself, a paused record running no frames. This fake's clock stands still - a context said to run
+    //? that renders nothing - so its mapping never settles
+    wakeDeckAudio()
+    await settle()
+    const host = fakeHost({ isPlaying: false })
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    const shown = clock
+    advance(deckModule.CLOCK_SETTLE_MS * deckModule.CLOCK_SETTLE_TICKS)
+    const quick = readsBetween(shown, clock).length
+    const slowFrom = clock
+    advance(1000)
+    check('a paused record, the context already running as the deck mounts: no frame asked for, and the clock read on the deck\'s own timer - every CLOCK_SETTLE_MS while its mapping is young, but for its first CLOCK_SETTLE_TICKS (40) readings at most: a clock that never moves is then read every CLOCK_TICK_MS (10 in a second), not 67 times a second for nothing',
+      [frames.length, deckModule.CLOCK_SETTLE_TICKS, Math.abs(quick - deckModule.CLOCK_SETTLE_TICKS) <= 1, Math.abs(readsBetween(slowFrom, clock).length - 1000 / deckModule.CLOCK_TICK_MS) <= 1], [0, 40, true, true])
+    //? hidden and shown again, resumed by the mini player's tap - its clock moving from here, in an iPhone's
+    //? steps: settled in its first few quick readings, then slow
+    deck.setShowing(false)
+    await settle()
+    const base = clock
+    Object.defineProperty(contexts.at(-1), 'currentTime', { configurable: true, get: () => Math.floor((clock - base) / (1024 / 48)) * (1024 / 48000) + 5 })
+    deck.setShowing(true)
+    deckModule.resumeDeckAudio()
+    await settle()
+    const moving = clock
+    advance(1000)
+    check('...its clock moving: the quick readings stop once it has settled (well inside the first 300 ms), then CLOCK_TICK_MS apart',
+      [readsBetween(moving, moving + 300).length >= 13, readsBetween(moving + 300, moving + 1000).length <= 8], [true, true])
+    //? hidden - a real suspend settles a moment later, its context running meanwhile
+    suspendsHeld = []
+    const hidden = clock
+    deck.setShowing(false)
+    advance(500)
+    check('...hidden, its suspend still settling (a real one is asynchronous): not read meanwhile - the timer stops at the hide', [contexts.at(-1).state, readsBetween(hidden, clock).length], ['running', 0])
+    suspendsHeld.splice(0).forEach((done) => done())
+    suspendsHeld = null
+    await settle()
+    deck.destroy()
+  }
+  {
+    //? a turntable gone and the next made at once (the look switched back, say): nothing of the first may read
+    //? on - its reading, not held, would let go of the mapping the next one's hand holds
+    wakeDeckAudio()
+    await settle()
+    const first = new Deck(fakeHost({ isPlaying: false }))
+    first.setShowing(true)
+    advance(50)
+    first.destroy()
+    const second = new Deck(fakeHost({ isPlaying: false }))
+    second.setShowing(true)
+    second.songChanged('time')
+    wakeDeckAudio()
+    await settle()
+    await settle()
+    second.pressed(clock)
+    second.takeOver()
+    const took = clock
+    advance(1000)
+    const during = readsBetween(took, clock)
+    check('a deck gone, another made at once and its record grabbed: every reading through the grab held - the first deck\'s timer went with it', [second.taken(), during.length > 5, during.every((read) => read.held)], [true, true, true])
+    second.release(clock, 'cancel')
+    second.destroy()
+  }
+
   console.log('\na press: a tap is a tap; the record is taken past a tap, or after resting longer than one')
   const fresh = async (overrides) => {
     const host = fakeHost(overrides)
@@ -779,6 +898,11 @@ async function main() {
   console.log('\nlet go of a playing record: back to speed, the song sought at the release and played at speed')
   {
     const { host, deck } = await fresh()
+    //? the audio's clock moving on with the page's, in an iPhone's 21.3 ms steps - so the one clock's
+    //? stamps can be told from a currentTime read for the message
+    const base = clock
+    Object.defineProperty(contexts.at(-1), 'currentTime', { configurable: true, get: () => Math.floor((clock - base) / (1024 / 48)) * (1024 / 48000) + 5 })
+    runFrames(40)
     deck.pressed(clock)
     const taken = deck.takeOver()
     check('taken by a move past a tap (Turntable calls takeOver): paused at once', [taken, host.calls], [60, ['hold']])
@@ -788,9 +912,14 @@ async function main() {
     const at = 60 - 0.1 * SECONDS_PER_TURN
     const speed = platter.handSpeed([{ time: clock - 100, turned: 0 }, { time: clock, turned: -0.1 * 2 * Math.PI }], clock)
     const plan = platter.motor(at, speed, 425)
+    const releasedAt = clock
     const released = deck.release(clock, 'up')
+    const start = portMessages.at(-1)
     check('the release says where to seek - where the motor has it back at speed - now; and not to play yet: there is a coast',
       [round(released.seek, 6), released.play], [round(plan.x, 6), false])
+    check('...the coast starts on the voice\'s path at the release itself (2.0.0-player.24): a drive posted at once, where the hand let go, at its speed, stamped by the one clock at the release\'s own time - not the audio clock\'s step it happened to be on',
+      [start.type, round(start.at, 6), round(start.rate, 6), round(start.time, 6), Math.abs(start.time - contexts.at(-1).currentTime) > 1e-4],
+      ['drive', round(at, 6), round(speed, 6), round(releasedAt / 1000 + deckModule.deckClockMapping().offset, 6), true])
     check('...from backwards: later than the hand let go of it - stopped, then pulled up',
       [round(plan.duration, 3), plan.x < at], [round(Math.log(1 + (platter.FRICTION_VISCOUS * -speed) / (platter.MOTOR_PULL + platter.FRICTION_DRY)) / platter.FRICTION_VISCOUS + platter.SPIN_UP_S, 3), true])
     runFrames(3)
@@ -799,10 +928,14 @@ async function main() {
     check('...and the time line shows where it is, scrubbing', host.shown.at(-1)[1], true)
     advance(plan.duration * 1000 - 50)
     check('not at speed yet: the song still paused', host.calls, ['hold'])
-    advance(60)
+    //? frames on past the end: the plan's timer comes due inside a frame, and runs late
+    runFrames(4)
     check('at speed: the song plays (after the tap - the player\'s own toggle, through the host)', host.calls, ['hold', 'resume'])
     const hold = posted('drive').at(-1)
-    check('...and the record\'s sound holds speed 1 from there until the song is really playing', [hold.rate, round(hold.at, 6), hold.until - hold.time], [1, round(plan.x, 6), deckModule.HANDOVER_MAX_S])
+    check('...and the record\'s sound holds speed 1 from there until the song is really playing', [hold.rate, round(hold.at, 6), round(hold.until - hold.time, 9)], [1, round(plan.x, 6), deckModule.HANDOVER_MAX_S])
+    check('...from the moment the plan ended - stamped at its end (the release\'s time and the plan\'s length), not whenever the timer fired',
+      round(hold.time, 6), round((releasedAt + plan.duration * 1000) / 1000 + deckModule.deckClockMapping().offset, 6))
+    Object.defineProperty(contexts.at(-1), 'currentTime', { configurable: true, writable: true, value: 0 })
     const fades = posted('fade').length
     host.moveTo(plan.x + 0.01)
     check('the song\'s clock not moving yet: no fade', posted('fade').length, fades)
@@ -826,6 +959,87 @@ async function main() {
     advance(plan.duration * 1000 + 100)
     check('...it stops there, and nothing plays it', host.calls, [])
     check('...the record\'s sound stopped with it', posted('stop').length > 0, true)
+    deck.destroy()
+  }
+
+  console.log('\nlet go 30 ms after the last move (2.0.0-player.24): the flick at the hand\'s speed, not a third slower')
+  {
+    const { host, deck } = await fresh({ isPlaying: false })
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 4 * Math.PI, 60 + (ms / 1000) * 2 * SECONDS_PER_TURN)
+    clock += 130
+    const at = 60 + 0.2 * SECONDS_PER_TURN
+    const samples = [{ time: clock - 130, turned: 0 }, { time: clock - 30, turned: 0.4 * Math.PI }]
+    const released = deck.release(clock, 'up')
+    check('sought to where the hand\'s own speed (3.6) coasts - its samples\' times, the 30 ms after the last no slowing - not where 2.4 would (taken up to the release)',
+      [round(released.seek, 6), round(released.seek, 6) === round(platter.coast(at, platter.handSpeed(samples, clock), 425).x, 6)],
+      [round(platter.coast(at, 3.6, 425).x, 6), false])
+    deck.destroy()
+  }
+
+  console.log('\na frame begun before the release or the tap it follows (review of 2.0.0-player.24): it drives nothing')
+  {
+    //? Chrome's frame time is when the frame began, and a pointerup or a tap handled in it can be later
+    //? than that: driven, that frame's place on the plan would be stamped before the plan began - its start
+    //? erased from the voice's path and set back to the frame's moment
+    const runFrameAt = (time) => {
+      const due = frames
+      frames = []
+      for (const frame of due) frame.run(time)
+    }
+    const { deck } = await fresh()
+    //? the audio's clock running on with the page's, in a desktop's 5.8 ms steps
+    const base = clock
+    Object.defineProperty(contexts.at(-1), 'currentTime', { configurable: true, get: () => Math.floor((clock - base) / (256 / 44.1)) * (256 / 44100) + 5 })
+    runFrames(20)
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 4 * Math.PI, 60 + (ms / 1000) * 2 * SECONDS_PER_TURN)
+    clock += 100
+    const from = portMessages.length
+    deck.release(clock, 'up')
+    const start = portMessages[from] ?? {}
+    runFrameAt(clock - 5)
+    const early = portMessages.slice(from + 1).filter((message) => message.type === 'drive')
+    clock += 16
+    runFrameAt(clock)
+    const later = portMessages.slice(from + 1).filter((message) => message.type === 'drive')
+    check('let go, and the next frame began 5 ms before the release: no drive from it - the plan\'s start the voice has stays its first knot - and the frame after drives as ever, later than it',
+      [start.type, early.length, later.length, later.every((message) => message.time > start.time)], ['drive', 0, 1, true])
+    deck.destroy()
+  }
+  {
+    const { host, deck } = await fresh()
+    const base = clock
+    Object.defineProperty(contexts.at(-1), 'currentTime', { configurable: true, get: () => Math.floor((clock - base) / (256 / 44.1)) * (256 / 44100) + 5 })
+    runFrames(20)
+    const from = portMessages.length
+    const landing = deck.pausing()
+    host.isPlaying = false
+    const take = portMessages.slice(from).find((message) => message.type === 'take')
+    const due = frames
+    frames = []
+    for (const frame of due) frame.run(clock - 3)
+    const early = portMessages.slice(from).filter((message) => message.type === 'drive' && message.time < take.time)
+    check('...a pause winding down, its first frame begun 3 ms before the tap: nothing driven earlier than the take',
+      [landing !== null, take !== undefined, early.length], [true, true, 0])
+    deck.destroy()
+  }
+
+  console.log('\na sample older than the hand\'s last (2.0.0-player.24): dropped - nothing measured or sought from it')
+  {
+    const { host, deck } = await fresh({ isPlaying: false })
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 4 * Math.PI, 60 + (ms / 1000) * 2 * SECONDS_PER_TURN)
+    const hands = posted('hand').length
+    //? a stray, timed before the last sample, somewhere else entirely
+    deck.hand(clock + 50, 9, 99)
+    clock += 100
+    const released = deck.release(clock, 'up')
+    check('the release measured and sought from the samples in order - as though the stray never came - and the voice not told of it',
+      [round(released.seek, 6), posted('hand').length - hands], [round(platter.coast(60 + 0.2 * SECONDS_PER_TURN, 3.6, 425).x, 6), 0])
     deck.destroy()
   }
 
@@ -1412,7 +1626,8 @@ async function main() {
     let lastHeard = null
     voice.newVoiceState = () => { called.newVoiceState++; mirror = real.newVoiceState(); return real.newVoiceState() }
     const applied = []
-    voice.voiceCommand = (state, said, at, rate) => { called.voiceCommand++; applied.push(said.type); real.voiceCommand(mirror, said, at, rate); return real.voiceCommand(state, said, at, rate) }
+    const appliedMessages = []
+    voice.voiceCommand = (state, said, at, rate) => { called.voiceCommand++; applied.push(said.type); appliedMessages.push(said); real.voiceCommand(mirror, said, at, rate); return real.voiceCommand(state, said, at, rate) }
     voice.renderVoice = (...args) => { called.renderVoice++; return real.renderVoice(...args) }
     voice.voiceReport = (...args) => { called.voiceReport++; const heard = real.voiceReport(...args); if (heard) { called.heard++; lastHeard = heard } return heard }
     const same = []
@@ -1488,21 +1703,31 @@ async function main() {
     playBlocks(script, 50)
     check('it says where it is as often as the worklet: 32 times in 50 blocks of 1024 (the worklet, 32 in 400 of 128) - and the deck hears each',
       [called.heard - heardBefore, deck.heard?.pos === lastHeard?.pos, deck.heard?.time === lastHeard?.time], [32, true, true])
-    //? a browser that stops asking for blocks a while (a stalled page): what waits for the next is only
-    //? what still changes the voice
+    //? a browser that asks for no block for a while, its clock running on (a busy page): every sample of
+    //? a hand waits for the next block, and is applied - in order, none replacing another, each a knot of
+    //? the path the voice plays (2.0.0-player.24: a drive a frame replaced the one before it, and the
+    //? hand's own samples were never sent at all)
     deck.pressed(clock)
     deck.takeOver()
     playBlocks(script, 1)
     applied.length = 0
-    const said = contexts.at(-1).currentTime
+    appliedMessages.length = 0
+    const pages = []
     for (let frame = 0; frame < 20; frame++) {
-      deck.hand(clock, 0, deck.anchor())
+      deck.hand(clock, -frame * 0.01, deck.anchor() - frame * 0.003)
+      pages.push(clock)
       runFrames(1)
+      contexts.at(-1).currentTime += 0.016
     }
     playBlocks(script, 1)
-    check('...no block asked for over twenty frames of a hand: their drives held as the last of them, each replacing the one before', applied, ['drive'])
-    check('...and heard SCRIPT_LAG_BLOCKS blocks (43 ms) after it was said, whole: from then, for as long as it was said to hold (DRIVE_FOR_S)',
-      [round(mirror.driveTime - said, 6), round(mirror.driveUntil - mirror.driveTime, 6)], [round((2 * 1024) / 48000, 6), deckModule.DRIVE_FOR_S])
+    const hands = appliedMessages.filter((said) => said.type === 'hand')
+    const offset = deckModule.deckClockMapping().offset
+    check('...no block asked for over twenty frames of a hand: all twenty of its samples applied, in order, where the hand had the record',
+      [applied, hands.map((said) => round(said.at, 6))], [Array(20).fill('hand'), pages.map((_, frame) => round(deck.anchor() - frame * 0.003, 6))])
+    //? (the clock's offset held through the gesture moves at most half a millisecond a second towards its
+    //? envelope - lib/deckClock's CLOCK_SLEW - so over these 0.32 s each stamp is within 0.16 ms of the last)
+    check('...each heard SCRIPT_LAG_BLOCKS blocks (43 ms) after its own time, as the one clock has it - 16 ms apart, as they were',
+      [hands.every((said, i) => near(said.time - (pages[i] / 1000 + offset), (2 * 1024) / 48000, 2e-4)), hands.slice(1).every((said, i) => near(said.time - hands[i].time, 0.016, 1e-5))], [true, true])
     deck.release(clock, 'cancel')
     playBlocks(script, 1)
     applied.length = 0
@@ -1516,6 +1741,34 @@ async function main() {
     const start = deckReport().window?.start
     playBlocks(script, 1)
     check('...nor over two windows arriving: the newer held, the older let go of', [start, applied, round(mirror.window?.start ?? 0, 3)], [296, ['window'], 296])
+    //? and the same of a coast's frames, after a flick: every frame's drive applied, in order, the lag
+    //? added - each a knot of the path, as the worklet keeps every one (review of 2.0.0-player.24: a drive
+    //? replaced the drive held before it, so the main thread's path lost knots the worklet's had)
+    deck.pressed(clock)
+    deck.takeOver()
+    playBlocks(script, 1)
+    const flicked = clock
+    for (let ms = 10; ms <= 100; ms += 10) {
+      clock += 10
+      contexts.at(-1).currentTime += 0.01
+      deck.hand(clock, -((clock - flicked) / 1000) * 4 * Math.PI, deck.anchor() - ((clock - flicked) / 1000) * 2 * SECONDS_PER_TURN)
+    }
+    playBlocks(script, 1)
+    applied.length = 0
+    appliedMessages.length = 0
+    const frameTimes = []
+    deck.release(clock, 'up')
+    for (let frame = 0; frame < 6; frame++) {
+      runFrames(1)
+      frameTimes.push(clock)
+      contexts.at(-1).currentTime += 0.016
+    }
+    playBlocks(script, 1)
+    const drives = appliedMessages.filter((said) => said.type === 'drive')
+    const mapped = deckModule.deckClockMapping().offset
+    check('...nor over six frames of a coast after a flick: the plan\'s start and all six frames\' drives applied, in order, each heard SCRIPT_LAG_BLOCKS blocks after its own time - none replacing another',
+      [applied, drives.slice(1).every((said, i) => near(said.time - (frameTimes[i] / 1000 + mapped), (2 * 1024) / 48000, 2e-4)), drives.every((said, i) => i === 0 || said.time > drives[i - 1].time)],
+      [Array(7).fill('drive'), true, true])
     deck.destroy()
 
     //? the page and the browser on one clock, for `ms`: a frame every 16 ms, and a block of the script
@@ -1674,6 +1927,7 @@ async function main() {
     check('...once the platter is past the window\'s start, the next window still decoding: still the deck\'s - the flick paused the song already, and there is nothing for .11\'s path to play on (review: taken down it, the coast ran on under the finger)',
       deck.live(), true)
     const timersBefore = timers.length
+    const pressedAt = clock
     deck.pressed(clock)
     const caught = deck.takeOver()
     const takes = posted('take').length
@@ -1687,6 +1941,12 @@ async function main() {
     decodeMode = 'now'
     const sounded = posted('take').at(-1)
     check('...that window in, under the hand: it sounds from where it was caught, held still', [posted('take').length - takes, round(sounded.at, 6), sounded.rate], [1, round(caught, 6), 0])
+    const after = portMessages.slice(portMessages.indexOf(sounded))
+    check('...the hand\'s path starting there with it (2.0.0-player.24): the take, then a sample of the hand where it holds the record, at the same moment',
+      [after[1]?.type, round(after[1]?.at ?? 0, 6), after[1]?.time === sounded.time], ['hand', round(caught, 6), true])
+    const mappedNow = deckModule.deckClockMapping().offset + clock / 1000
+    check('...and that moment the hand\'s last sample (here the press itself, 3 s before), not when the window landed: samples on their way since go on from it rather than being older than it (review of 2.0.0-player.24)',
+      near(mappedNow - sounded.time, (clock - pressedAt) / 1000, 1e-6), true)
     check('...let go where it was caught: sought there', round(deck.release(clock, 'up').seek, 6), round(caught, 6))
     deck.destroy()
   }

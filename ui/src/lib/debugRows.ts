@@ -259,9 +259,11 @@ function megabytes(bytes: number): string {
  * playing on (2.0.0-player.16 - the deck takes a press only when the record can sound there). This is
  * how an iPhone tells what WebKit made of it. The note says which voice plays it and why (2.0.0-player.16:
  * on the main thread when the page has no AudioWorklet - it isn't on HTTPS - or it wouldn't load), then
- * what windows have cost since the turntable showed - and when, after it showed, the last of them came:
- * the deck reports as things change, not as time passes, so that is the time the bytes are measured to
- * (divide one by the other for a rate).
+ * how far the audio's clock moves at a time (2.0.0-player.24: the audio's own render - about 21 ms on an
+ * iPhone - which the deck maps smoothly over; how James's phone renders, read off it), then what windows
+ * have cost since the turntable showed - and when, after it showed, the last of them came: the deck
+ * reports as things change, not as time passes, so that is the time the bytes are measured to (divide
+ * one by the other for a rate).
  */
 export function turntableRow(report: DeckReport | null | undefined): DebugRow {
   const label = 'Turntable sound'
@@ -269,12 +271,13 @@ export function turntableRow(report: DeckReport | null | undefined): DebugRow {
   const voice = report.voice === 'script'
     ? `On the main thread - ${report.voiceWhy ?? 'this browser has no AudioWorklet'}`
     : report.voice === 'worklet' ? 'On its own audio thread (an AudioWorklet)' : undefined
+  const step = report.clockStep && report.clockStep > 0 ? `Its clock moves ${(report.clockStep * 1000).toFixed(1)} ms at a time` : undefined
   const cost = report.fetched > 0
     ? `${report.window ? `${megabytes(report.window.bytes)} a window; ` : ''}${megabytes(report.fetched)} fetched since the turntable showed, the last window ${clock(report.lastFetchAt / 1000)} in`
     : undefined
-  //? the row's own note first, then which voice, then the cost
+  //? the row's own note first, then which voice, then its clock's step, then the cost
   const withNotes = (row: DebugRow): DebugRow => {
-    const note = [row.note, voice, cost].filter(Boolean).join(' · ')
+    const note = [row.note, voice, step, cost].filter(Boolean).join(' · ')
     return note ? { ...row, note } : row
   }
   const window = report.window

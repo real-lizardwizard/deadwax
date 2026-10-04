@@ -691,6 +691,34 @@ no AudioWorklet`. On HTTPS it says `On its own audio thread (an AudioWorklet)`.
 Turning the record never touches the song's own playback: if it's silent, the music still plays
 exactly as it did when you let go.
 
+## The turntable's sound doesn't sound like the song
+
+Until 2.0.0-player.24, turning the record at its own speed gave a warble nothing like the song (James:
+"it doesn't sound like anything"): the record's sound was timed by the audio's own clock, which on an
+iPhone moves in steps of about 21 ms, so its pitch swung many times a second. It now follows each touch
+your phone reports at the moment it was made, played back on one smooth clock - so a steady turn plays
+the song at your hand's speed. What's left is by design:
+
+- **It's a moment behind your finger**: a twentieth of a second on HTTPS, about 0.09 s over plain
+  `http://` - always the same, so the next touch has always arrived before the sound gets there.
+  Taking hold of a playing record, or pausing it with the wind-down, repeats the song's last twentieth
+  of a second as the record's sound takes over; letting go of a playing record at about its own speed
+  skips it (the song plays on straight from where your hand let go, while the record's sound, that much
+  behind, stops as you let go) - neither is a fault.
+- **Its pitch follows your hand**, and a hand turning by eye is never quite steady - you hear that,
+  as you would on a real deck. While you turn steadily deadwax smooths a finger's own jitter out of the
+  pitch, measuring how much there is in your touches (so a heavier finger, or a grip near the middle of
+  the record, is smoothed as much as it needs); as you speed up, slow down or turn back it follows you
+  closely instead. A record turned with a mouse a pixel at a time, slowly, can still waver a little:
+  a pixel is a coarse step at that speed.
+- **The first turn sounds like every other**: deadwax reads your phone's audio clock all the while the
+  turntable shows with its sound on, even with the record standing still, so the first grab of a paused
+  record after opening the screen or coming back to the app is timed as smoothly as the rest. If the
+  first moments of a turn, and only those, warble, say so.
+- **Debug's line under Turntable sound** says how far your phone's audio clock moves at a time (`Its
+  clock moves 21.3 ms at a time`) - the steps the record's sound is now timed smoothly across. If the
+  sound still warbles, say what that line says, and which browser and device.
+
 ## The visualizer doesn't move with the music, or says a song can't be seen
 
 [The visualizer](player.md#the-visualizer) (the five bars at the right of the desktop's player bar)
