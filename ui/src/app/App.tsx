@@ -23,7 +23,7 @@ import { NowPlaying } from '../player/NowPlaying'
 import { PlayerBar } from '../player/PlayerBar'
 import { Visualizer } from '../player/Visualizer'
 import { wakeVisualizerAudio } from '../player/vizAudio'
-import { deckReport, onDeckReport, resumeDeckAudio, wakeDeckAudio } from '../player/deck'
+import { deckRecorded, deckReport, onDeckRecorded, onDeckReport, recordDeckSound, resumeDeckAudio, wakeDeckAudio } from '../player/deck'
 import { usePlayer, type Player } from '../player/usePlayer'
 import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerWindDown } from '../state/persisted'
 import { ActionMenu } from './ActionMenu'
@@ -311,6 +311,14 @@ export function App() {
   //? never a frame at a time
   const [turntableSound, setTurntableSound] = useState(deckReport)
   useEffect(() => onDeckReport(setTurntableSound), [])
+  //? a recording of it (2.0.0-player.32): running, or made and waiting to be saved - started from Debug's
+  //? button, a tap, since it may make the context
+  const [turntableRecording, setTurntableRecording] = useState(deckRecorded)
+  useEffect(() => onDeckRecorded(setTurntableRecording), [])
+  const recordTurntable = useCallback(() => {
+    const problem = recordDeckSound(20)
+    if (problem) console.warn(`turntable recording: ${problem}`)
+  }, [])
 
   const checkNavidrome = useCallback(() => {
     setStatus(null)
@@ -1061,6 +1069,8 @@ export function App() {
             album={playedFrom}
             sentFormat={sentFormat}
             turntable={turntableSound}
+            recording={turntableRecording}
+            onRecord={recordTurntable}
             details={infoDetails}
             onArtist={toArtist}
             panel={panel}

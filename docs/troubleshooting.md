@@ -709,6 +709,16 @@ over plain `http://`) instead of a twentieth. If you still hear it:
 - **The record feels late under your finger**: that is the eighth of a second. It can be shortened, at
   the cost of some of the steadiness.
 
+**If you still hear a digital sound after all of that, record it** (2.0.0-player.32) - three fixes in
+a row were each real and each not the one being heard, and a recording from your own device is what
+settles it: open **•••** > **Info** > **Debug** with the turntable showing and its sound started (turn
+the record once first), press **Record 20 s** on the **Recording** row, press **Done**, and turn the
+record as you normally would for the next 20 seconds. Open Info > Debug again: the row says
+`20 s recorded`, and **Save the recording** downloads one JSON file of about 5 MB - what the record's
+sound actually played, with every touch as it came and what the sound made of it. Nothing is sent
+anywhere by itself; send the file with your report. On a Mac, Chromium with the window narrowed below
+1024 px gets the phone layout, and over plain `http://` the same main-thread sound path as the phone.
+
 ## The turntable makes no sound when you turn the record
 
 Since 2.0.0-player.14 [the turntable](player.md#the-turntable) has its own sound: turning the record

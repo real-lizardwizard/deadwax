@@ -263,7 +263,8 @@ function importsUsePlayer(text) {
 function linksOut(text) {
   return [...text.matchAll(/<a\b[^>]*>/g)].map((match) => match[0]).filter((tag) => {
     const href = /\bhref=(?:"([^"]*)"|'([^']*)'|\{)/.exec(tag)
-    return href && !((href[1] ?? href[2] ?? '').startsWith('#'))
+    //? a link that SAVES a file (`download`) leaves nothing: Debug's recording (2.0.0-player.32)
+    return href && !((href[1] ?? href[2] ?? '').startsWith('#')) && !/\bdownload\b/.test(tag)
   })
 }
 
@@ -1396,6 +1397,7 @@ console.log('\nthe checks themselves')
   check('nor is a type-only import', importsUsePlayer("import type { Player } from '../player/usePlayer'"), false)
   check('nor another module\'s usePlayer', importsUsePlayer("import { usePlayer } from '../lib/somethingElse'"), false)
   check('a link out is found; an in-app # link is not', [linksOut('<a href="/">x</a> <a href="#/home">y</a>').length, linksOut('<a class="b"\n href="/x">').length], [1, 1])
+  check('...nor a link that saves a file', linksOut('<a href={row.action.href} download={row.action.download}>save</a>').length, 0)
   check('opening beside needs both target and noopener',
     [opensBeside('<a href="/" target="_blank" rel="noopener">'), opensBeside('<a href="/" target="_blank">'), opensBeside('<a href="/" rel="noopener">')], [true, false, false])
 }

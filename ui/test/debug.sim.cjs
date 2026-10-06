@@ -90,7 +90,7 @@ console.log('\nthe layout: five sections, their rows in order')
   const sections = rows.debugSections(input())
   check('sections', sections.map((section) => section.title), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
   check('rows', sections.map((section) => section.rows.map((row) => row.label)), [
-    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless'], ['Gap', 'Last seek'], ['Turntable sound', 'Turntable timing'], ['Song', 'On other songs', 'Album'],
+    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless'], ['Gap', 'Last seek'], ['Turntable sound', 'Turntable timing', 'Recording'], ['Song', 'On other songs', 'Album'],
   ])
 }
 
@@ -157,6 +157,18 @@ console.log('\nTurntable sound (2.0.0-player.16): which voice plays it, and why'
     [`On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet ${DOT} 3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in`,
       "On the main thread - this page isn't on HTTPS, so the browser has no AudioWorklet"])
   check('...and none named while there is none', turntable({ ...ready, voice: null, voiceWhy: null, window: null }).note, undefined)
+}
+
+console.log('\nRecording (2.0.0-player.32): the record\'s sound, every touch and what the voice made of it, as a file to send')
+{
+  const base = { context: 'running', problem: null, voice: 'script', voiceWhy: null, window: null, loading: false, refused: null, failed: null, fetched: 0, lastFetchAt: 0 }
+  const run = () => {}
+  check('no turntable showing: says what the recording is of, and offers no button', rows.recordingRow(null, run, null), { label: 'Recording', value: 'Shows the turntable first: the recording is of its sound' })
+  check('the turntable showing: the button that starts one', rows.recordingRow(null, run, base).action, { label: 'Record 20 s', onClick: run })
+  check('...and no button when nothing would start one', rows.recordingRow(null, null, base).action, undefined)
+  check('under way: how long, and what to do', rows.recordingRow({ state: 'recording', seconds: 20 }, run, base), { label: 'Recording', value: "Recording the record's sound for 20 s - turn the record as you would" })
+  check('made: the file to save, by its name and size, as a link that downloads it', rows.recordingRow({ state: 'saved', seconds: 20, href: 'blob:x', name: 'deadwax-turntable-script-2026.json', bytes: 5.2 * 1048576 }, run, base),
+    { label: 'Recording', value: '20 s recorded: save the file and send it', note: 'deadwax-turntable-script-2026.json', action: { label: 'Save the recording (5.2 MB)', href: 'blob:x', download: 'deadwax-turntable-script-2026.json' } })
 }
 
 console.log('\nTurntable timing (2.0.0-player.28): how the turntable keeps up on this device, for a phone to say')

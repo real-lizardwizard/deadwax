@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { aboutRows, type About, type AboutAlbumFields, type AboutDetails } from '../lib/aboutRows'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import type { DeckReport } from '../lib/deckVoice'
-import { debugSections, type DebugSection } from '../lib/debugRows'
+import { debugSections, type DebugSection, type RecordingState } from '../lib/debugRows'
 import type { QueueTrack } from '../lib/playQueue'
 import { Cover } from '../player/Cover'
 import { ChevronRightIcon } from '../player/icons'
@@ -67,6 +67,8 @@ export function InfoSheet({
   album,
   sentFormat,
   turntable = null,
+  recording = null,
+  onRecord = null,
   details = null,
   onArtist = null,
   panel = 'sheet',
@@ -83,6 +85,9 @@ export function InfoSheet({
   sentFormat: (track: QueueTrack) => 'raw' | 'mp3' | null
   /** the turntable's sound (2.0.0-player.14), for Debug's "Turntable sound": null while none shows */
   turntable?: DeckReport | null
+  /** a recording of it, running or made, and what starts one (2.0.0-player.32) */
+  recording?: RecordingState | null
+  onRecord?: (() => void) | null
   /** what App asked for as Info opened (2.0.0-player.17): null until it answers */
   details?: AboutDetails | null
   /** close everything and open the artist's page, by Navidrome's id for them; null for none */
@@ -126,6 +131,8 @@ export function InfoSheet({
           song: song as Readonly<Record<string, unknown>> | null,
           album: answer,
           turntable,
+          recording,
+          onRecord,
         }),
       }
     }
@@ -295,6 +302,19 @@ export function InfoSheet({
                     <dt class="app-kv-label">{row.label}</dt>
                     <dd class={`app-kv-value${row.mono ? ' app-mono' : ''}`}>{row.value}</dd>
                     {row.note && <dd class="app-kv-note app-mono">{row.note}</dd>}
+                    {row.action && (
+                      <dd class="app-kv-action">
+                        {row.action.href ? (
+                          <a class="app-button app-info-action" href={row.action.href} download={row.action.download}>
+                            {row.action.label}
+                          </a>
+                        ) : (
+                          <button type="button" class="app-button app-info-action" onClick={row.action.onClick}>
+                            {row.action.label}
+                          </button>
+                        )}
+                      </dd>
+                    )}
                   </div>
                 ))}
               </dl>

@@ -53,6 +53,17 @@ export interface DebugRow {
   note?: string
   /** a data value - numbers, rates, field names - set in the monospace face */
   mono?: boolean
+  /** a control on the row (2.0.0-player.32): a button that does something, or a link to save a file */
+  action?: { label: string; onClick?: () => void; href?: string; download?: string }
+}
+
+/** A recording of the record's sound, running or made (player/deck.ts recordDeckSound), as Debug has it. */
+export interface RecordingState {
+  state: 'recording' | 'saved'
+  seconds: number
+  href?: string
+  name?: string
+  bytes?: number
 }
 
 export interface DebugSection {
@@ -78,6 +89,9 @@ export interface DebugInput {
   album: Readonly<Record<string, unknown>> | null
   /** the turntable's sound (2.0.0-player.14, player/deck.ts): null while no turntable shows */
   turntable?: DeckReport | null
+  /** a recording of it, running or made, and the button that starts one (2.0.0-player.32) */
+  recording?: RecordingState | null
+  onRecord?: (() => void) | null
 }
 
 /** A rate as every row says it: 192 kHz, 44.1 kHz. */
@@ -327,6 +341,26 @@ export function turntableTimingRow(report: DeckReport | null | undefined): Debug
   return { label, value, note: notes.join(' · ') }
 }
 
+/**
+ * A recording of the record's sound (2.0.0-player.32, deck.ts recordDeckSound): the button that starts
+ * one, how long one under way has left, and the file to save once it is made - what James sends back
+ * when the sound is wrong on his device and not here.
+ */
+export function recordingRow(recording: RecordingState | null | undefined, onRecord: (() => void) | null | undefined, turntable: DeckReport | null | undefined): DebugRow {
+  const label = 'Recording'
+  if (recording?.state === 'recording') return { label, value: `Recording the record's sound for ${recording.seconds} s - turn the record as you would` }
+  if (recording?.state === 'saved' && recording.href) {
+    const size = recording.bytes ? ` (${(recording.bytes / 1048576).toFixed(1)} MB)` : ''
+    return { label, value: `${recording.seconds} s recorded: save the file and send it`, note: recording.name ?? '', action: { label: `Save the recording${size}`, href: recording.href, download: recording.name ?? 'deadwax-turntable.json' } }
+  }
+  if (!turntable) return { label, value: 'Shows the turntable first: the recording is of its sound' }
+  return {
+    label,
+    value: '20 s of what the record\'s sound plays, with every touch and what the voice made of it, as a file to send with a bug report',
+    ...(onRecord ? { action: { label: 'Record 20 s', onClick: onRecord } } : {}),
+  }
+}
+
 type Answer = Readonly<Record<string, unknown>>
 
 /** The names of the fields an answer carries, sorted as plain strings - the same order on every
@@ -397,7 +431,7 @@ export function debugSections(input: DebugInput): DebugSection[] {
     { title: 'The file', rows: [formatRow(input.track)] },
     { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), whyRow(input), gaplessRow(input)] },
     { title: 'Last song change and seek', rows: [gapRow(input.gaps), seekRow(input.lastSeek)] },
-    { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable)] },
+    { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable), recordingRow(input.recording, input.onRecord, input.turntable)] },
     {
       title: 'Navidrome sent',
       rows: [sentRow('Song', input.song), otherSongsRow(input.song, input.album), sentRow('Album', input.album)],

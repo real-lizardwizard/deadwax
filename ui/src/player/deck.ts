@@ -87,7 +87,7 @@
 import { isAbort, latestOnly } from '../lib/latest'
 import { clockReading, clockSettled, contextTimeAt, newDeckClock, resetDeckClock } from '../lib/deckClock'
 import {
-  REPORTS_PER_SECOND, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
+  HAND_DELAY_S, REPORTS_PER_SECOND, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
   type DeckHealth, type DeckReport, type VoiceHeard, type VoiceMessage,
 } from '../lib/deckVoice'
 import {
@@ -268,6 +268,8 @@ interface Voice {
 interface DeckAudio {
   context: AudioContext | null
   voice: Voice | null
+  /** the voice's own node, for a recording to tap (recordDeckSound) */
+  node: AudioNode | null
   loading: boolean
   problem: string | null
   missing: 'unsupported' | 'no-voice' | null
@@ -275,7 +277,7 @@ interface DeckAudio {
   why: string | null
 }
 
-const audio: DeckAudio = { context: null, voice: null, loading: false, problem: null, missing: null, why: null }
+const audio: DeckAudio = { context: null, voice: null, node: null, loading: false, problem: null, missing: null, why: null }
 //? the page's clock mapped onto the context's (lib/deckClock, 2.0.0-player.24): everything the voice
 //? steers by is stamped through it - started again for each context, and as its clock stops and starts
 const clock = newDeckClock()
@@ -350,8 +352,9 @@ function startVoice(context: AudioContext): void {
   context.audioWorklet.addModule(moduleUrl).then(() => {
     if (audio.context !== context) return
     const node = new AudioWorkletNode(context, VOICE_PROCESSOR, { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] })
-    node.port.onmessage = (event: MessageEvent) => heardListener?.(event.data as VoiceHeard)
+    node.port.onmessage = (event: MessageEvent) => heard(event.data as VoiceHeard)
     node.connect(context.destination)
+    audio.node = node
     audio.voice = { kind: 'worklet', ready: true, post: (said, transfer) => node.port.postMessage(said, transfer), disconnect: () => node.disconnect() }
   }).catch((error: unknown) => {
     if (audio.context === context && !audio.voice) startScript(context, `the AudioWorklet wouldn't load (${message(error)})`)
@@ -440,8 +443,8 @@ function startScript(context: AudioContext, why: string): void {
       }
       for (const said of held.splice(0)) voiceCommand(state, said, at, context.sampleRate)
       renderVoice(state, channels, out.length, context.sampleRate, at)
-      const heard = voiceReport(state, out.length, context.sampleRate, at, REPORTS_PER_SECOND)
-      if (heard) heardListener?.(heard)
+      const said = voiceReport(state, out.length, context.sampleRate, at, REPORTS_PER_SECOND)
+      if (said) heard(said)
       if (!voice.ready && audio.voice === voice) {
         voice.ready = true
         audioChanged()
@@ -449,6 +452,7 @@ function startScript(context: AudioContext, why: string): void {
     }
     node.connect(context.destination)
     audio.voice = voice
+    audio.node = node
     audio.why = why
   } catch (error) {
     audio.problem = `the sound's ScriptProcessorNode couldn't be made - ${message(error)}`
@@ -535,6 +539,167 @@ export function resumeDeckAudio(): void {
   })
 }
 
+/* ----- a recording of the record's sound, for a bug report (2.0.0-player.32) ----- */
+
+/**
+ * What the voice said about where it is, to the deck - and to a recording under way. The worklet posts
+ * it from its port, the main-thread voice says it from its block.
+ */
+function heard(said: VoiceHeard): void {
+  recording?.heard.push(said)
+  heardListener?.(said)
+}
+
+interface DeckRecording {
+  seconds: number
+  since: number
+  until: number
+  kind: 'worklet' | 'script'
+  rate: number
+  blocks: Float32Array[][]
+  blockTimes: number[]
+  messages: Record<string, unknown>[]
+  heard: VoiceHeard[]
+  tap: ScriptProcessorNode
+  timer: ReturnType<typeof setTimeout>
+}
+
+/** A recording running, or the last one made: what Debug offers to save. */
+export interface DeckRecorded {
+  state: 'recording' | 'saved'
+  seconds: number
+  /** the file, once saved: its address (a blob URL), name and size */
+  href?: string
+  name?: string
+  bytes?: number
+}
+
+let recording: DeckRecording | null = null
+let recorded: DeckRecorded | null = null
+const recordingListeners = new Set<(state: DeckRecorded | null) => void>()
+
+export function deckRecorded(): DeckRecorded | null {
+  return recorded
+}
+
+export function onDeckRecorded(listener: (state: DeckRecorded | null) => void): () => void {
+  recordingListeners.add(listener)
+  return () => recordingListeners.delete(listener)
+}
+
+function recordedChanged(): void {
+  for (const listener of [...recordingListeners]) listener(recorded)
+}
+
+/** A message the deck sent the voice, noted by a recording under way - a window by its shape only. */
+function noteForRecording(message: VoiceMessage): void {
+  if (!recording) return
+  const t = Math.round(now() * 10) / 10
+  if (message.type === 'window') recording.messages.push({ t, type: 'window', start: message.start, rate: message.rate, length: message.channels[0]?.length ?? 0 })
+  else recording.messages.push({ t, ...message })
+}
+
+/**
+ * RECORD THE RECORD'S SOUND for `seconds` (2.0.0-player.32): what the voice's node actually plays, tapped
+ * by a ScriptProcessorNode of its own, with every message the deck sent the voice meanwhile (each hand
+ * sample as it came, the takes, the drives, the fades) and everything the voice said of where it was -
+ * then offered to save as one JSON file, the audio in it as 16-bit samples. James hears "a digital sound"
+ * on his iPhone and his Mac that no lab recording here has shown, after three fixes each of which was
+ * real and none of which was it; this is the ground truth, so the voice can be replayed here with his
+ * very samples and its output held against what he heard. A diagnostic, nothing the player does: the tap
+ * hangs off the voice's own node and never the song's element. Starts only from a tap (Debug's button),
+ * since it may make the context. Answers why it couldn't start, or null.
+ */
+export function recordDeckSound(seconds = 20): string | null {
+  if (recording) return 'already recording'
+  wakeDeckAudio()
+  const context = audio.context
+  const node = audio.node
+  const voice = audio.voice
+  //? a voice not ready yet (the script voice before its first block, a worklet still loading) has nothing to
+  //? tap: the record's sound starts from a turn, so that is what is asked for
+  if (!context || !node || !voice || !voice.ready || context.state !== 'running') return audio.problem ?? 'the sound has not started - turn the record once first'
+  if (typeof context.createScriptProcessor !== 'function') return 'this browser cannot tap the sound'
+  try {
+    const tap = context.createScriptProcessor(4096, 2, 2)
+    const started: DeckRecording = {
+      seconds, since: now(), until: now() + seconds * 1000, kind: voice.kind, rate: context.sampleRate,
+      blocks: [], blockTimes: [], messages: [], heard: [], tap,
+      timer: setTimeout(() => finishRecording(), seconds * 1000),
+    }
+    tap.onaudioprocess = (event: AudioProcessingEvent) => {
+      if (recording !== started) return
+      const input = event.inputBuffer
+      const copies: Float32Array[] = []
+      for (let c = 0; c < input.numberOfChannels; c++) copies.push(Float32Array.from(input.getChannelData(c)))
+      started.blocks.push(copies)
+      started.blockTimes.push(event.playbackTime)
+    }
+    node.connect(tap)
+    tap.connect(context.destination)
+    if (recorded?.href) URL.revokeObjectURL(recorded.href)
+    recording = started
+    recorded = { state: 'recording', seconds }
+    recordedChanged()
+    return null
+  } catch (error) {
+    return `the recording couldn't start - ${message(error)}`
+  }
+}
+
+function finishRecording(): void {
+  const done = recording
+  if (!done) return
+  recording = null
+  clearTimeout(done.timer)
+  done.tap.onaudioprocess = null
+  try {
+    audio.node?.disconnect(done.tap)
+  } catch {
+    //? the node may be gone already
+  }
+  try {
+    done.tap.disconnect()
+  } catch {
+    //? likewise
+  }
+  const frames = done.blocks.reduce((sum, block) => sum + (block[0]?.length ?? 0), 0)
+  const channels = Math.max(1, ...done.blocks.map((block) => block.length))
+  //? 16-bit, interleaved, as a WAV holds it - base64 in the JSON
+  const pcm = new Int16Array(frames * channels)
+  let at = 0
+  for (const block of done.blocks) {
+    const length = block[0]?.length ?? 0
+    for (let i = 0; i < length; i++) {
+      for (let c = 0; c < channels; c++) {
+        const v = block[c]?.[i] ?? block[0]![i]!
+        pcm[at++] = Math.max(-32768, Math.min(32767, Math.round(v * 32767)))
+      }
+    }
+  }
+  const bytes = new Uint8Array(pcm.buffer)
+  //? in pieces of a multiple of THREE bytes: a piece that isn't one is padded with '=' by btoa, and
+  //? padding in the middle of the text breaks the decode (the first cut's 32768-byte pieces did)
+  const PIECE = 32766
+  let base64 = ''
+  for (let i = 0; i < bytes.length; i += PIECE) base64 += btoa(String.fromCharCode(...bytes.subarray(i, i + PIECE)))
+  const payload = {
+    recording: 'deadwax turntable sound', version: 1, when: new Date().toISOString(),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    secure: (globalThis as { isSecureContext?: boolean }).isSecureContext ?? null,
+    voice: done.kind, sampleRate: done.rate, delaySeconds: HAND_DELAY_S,
+    scriptLagSeconds: done.kind === 'script' ? (SCRIPT_LAG_BLOCKS * SCRIPT_BUFFER) / done.rate : 0,
+    clock: deckClockMapping(), report: lastReport, pageTimeAtStart: done.since,
+    tapBlock: 4096, blockTimes: done.blockTimes,
+    audio: { format: 'int16le', channels, frames, base64 },
+    messages: done.messages, heard: done.heard,
+  }
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+  const name = `deadwax-turntable-${done.kind}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`
+  recorded = { state: 'saved', seconds: done.seconds, href: URL.createObjectURL(blob), name, bytes: blob.size }
+  recordedChanged()
+}
+
 /** Suspended - or, starting or resuming still, suspended as soon as it runs. */
 function sleepDeckAudio(): void {
   const context = audio.context
@@ -552,6 +717,7 @@ function closeDeckAudio(): void {
   }
   audio.context = null
   audio.voice = null
+  audio.node = null
   audio.loading = false
   audio.problem = null
   audio.why = null
@@ -1370,6 +1536,7 @@ export class Deck {
   }
 
   private post(message: VoiceMessage, transfer: Transferable[] = []): void {
+    noteForRecording(message)
     try {
       audio.voice?.post(message, transfer)
     } catch {

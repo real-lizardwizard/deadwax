@@ -626,9 +626,9 @@ globalThis.URL.createObjectURL = () => 'blob:deck-voice'
 const contexts = []
 const portMessages = []
 class FakeNode {
-  constructor() { this.port = { postMessage: (message) => portMessages.push(message), onmessage: null } }
-  connect() {}
-  disconnect() {}
+  constructor() { this.port = { postMessage: (message) => portMessages.push(message), onmessage: null }; this.connections = [] }
+  connect(to) { this.connections.push(to) }
+  disconnect(from) { this.connections = from === undefined ? [] : this.connections.filter((to) => to !== from) }
 }
 //? how the fake browser decodes: at once ('now'), 300 ms later ('slow'), when the test says ('held' - the
 //? callbacks kept in `decodesHeld`), or refusing: the callback with null, with an Error, or by throwing
@@ -649,9 +649,9 @@ let decodeTone = false
 //? the ScriptProcessorNodes made, and what is asked of them
 const scripts = []
 class FakeScript {
-  constructor(context, args) { this.context = context; this.args = args; this.connected = false; this.disconnected = false; this.onaudioprocess = null; scripts.push(this) }
-  connect(to) { this.connected = to === this.context.destination }
-  disconnect() { this.disconnected = true }
+  constructor(context, args) { this.context = context; this.args = args; this.connected = false; this.disconnected = false; this.onaudioprocess = null; this.connections = []; scripts.push(this) }
+  connect(to) { this.connections.push(to); if (to === this.context.destination) this.connected = true }
+  disconnect(from) { if (from === undefined) { this.disconnected = true; this.connections = [] } else this.connections = this.connections.filter((to) => to !== from) }
 }
 //? the browser asking a script voice for `blocks` blocks of 1024, each to play two blocks ahead of the
 //? context's clock, as a ScriptProcessorNode's are; what each was filled with comes back
@@ -2001,6 +2001,79 @@ async function main() {
     decodeTone = false
   }
 
+  console.log('\na recording of the record\'s sound (2.0.0-player.32): what the voice plays, tapped, with every message and report, as one file')
+  {
+    //? James hears "a pretty digital sound" that no lab recording has shown: the recorder gives him a file of
+    //? what HIS device plays, with the hand samples that made it, to replay here. Pinned: the tap on the
+    //? voice's node, the file's shape, and that its audio decodes to exactly the frames tapped - the first
+    //? cut's base64 came in 32768-byte pieces, each padded by btoa, and 20 s decoded to 29 bytes too many
+    noWorklet = true
+    globalThis.isSecureContext = false
+    const { recordDeckSound, deckRecorded, onDeckRecorded } = deckModule
+    const states = []
+    const stopListening = onDeckRecorded((state) => states.push(state?.state ?? null))
+    let captured = null
+    const makeUrl = globalThis.URL.createObjectURL
+    globalThis.URL.createObjectURL = (blob) => { captured = blob; return 'blob:deck-recording' }
+    check('before the sound has started: refused, and told what to do', recordDeckSound(1), 'the sound has not started - turn the record once first')
+    const host = fakeHost()
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    wakeDeckAudio()
+    await settle()
+    const voiceNode = scripts.at(-1)
+    pump(voiceNode, 1)
+    await settle()
+    await settle()
+    const made = scripts.length
+    const problem = recordDeckSound(1)
+    const tap = scripts.at(-1)
+    check('asked with the voice ready: a tap of 4096 a block, two in and two out, the voice\'s node into it and it to the speakers; the state \'recording\' and told',
+      [problem, scripts.length - made, tap.args, voiceNode.connections.includes(tap), tap.connected, deckRecorded(), states],
+      [null, 1, [4096, 2, 2], true, true, { state: 'recording', seconds: 1 }, ['recording']])
+    check('...asked again meanwhile: refused as already recording', recordDeckSound(1), 'already recording')
+    //? three blocks tapped, 49152 bytes of samples: past one base64 piece, so a padded piece would show;
+    //? values that survive 16 bits exactly, the right channel the left's negative
+    const frames = 4096
+    const expected = []
+    for (let block = 0; block < 3; block++) {
+      const left = new Float32Array(frames), right = new Float32Array(frames)
+      for (let i = 0; i < frames; i++) { const k = ((block * frames + i) * 7) % 32767 - 16383; left[i] = k / 32767; right[i] = -k / 32767; expected.push(k, -k) }
+      tap.onaudioprocess({ inputBuffer: { numberOfChannels: 2, getChannelData: (c) => (c === 0 ? left : right) }, playbackTime: 1.5 + block * frames / 48000 })
+    }
+    //? a hand sample and a report during it, so the file carries both
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let frame = 1; frame <= 6; frame++) {
+      deck.hand(clock, -frame * 0.04, 60 - (frame * 0.04 / (2 * Math.PI)) * SECONDS_PER_TURN)
+      runFrames(1)
+    }
+    pump(voiceNode, 2)
+    advance(1000)
+    await settle()
+    const saved = deckRecorded()
+    check('a second on: saved - the tap let go of (the voice\'s node still to the speakers), a file named for the voice and the time, its size told, and told',
+      [saved?.state, tap.disconnected, voiceNode.connections.includes(tap), voiceNode.connected, /^deadwax-turntable-script-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d\.json$/.test(saved?.name ?? ''), saved?.href, saved?.bytes > 60000, states.at(-1)],
+      ['saved', true, false, true, true, 'blob:deck-recording', true, 'saved'])
+    const text = await captured.text()
+    const file = JSON.parse(text)
+    const pcm = Buffer.from(file.audio.base64, 'base64')
+    const samples = Array.from(new Int16Array(pcm.buffer, pcm.byteOffset, pcm.length / 2))
+    check('the file: what it is, the voice, the rate, the delays, the tap\'s block, three block times, and the audio\'s frames and channels',
+      [file.recording, file.version, file.voice, file.secure, file.sampleRate, file.delaySeconds, file.scriptLagSeconds, file.tapBlock, file.blockTimes, file.audio.format, file.audio.channels, file.audio.frames],
+      ['deadwax turntable sound', 1, 'script', false, 48000, voice.HAND_DELAY_S, 2048 / 48000, 4096, [1.5, 1.5 + 4096 / 48000, 1.5 + 8192 / 48000], 'int16le', 2, 3 * frames])
+    check('...its audio decodes to exactly the frames tapped, interleaved, 16-bit', [pcm.length, samples.length === expected.length && samples.every((v, i) => v === expected[i])], [3 * frames * 2 * 2, true])
+    check('...and carries the hand sample the deck sent and what the voice said meanwhile',
+      [file.messages.some((m) => m.type === 'take'), file.messages.filter((m) => m.type === 'hand').length >= 6, file.heard.length >= 1, typeof file.when, file.report?.voice, typeof file.clock],
+      [true, true, true, 'string', 'script', 'object'])
+    deck.release(clock, 'cancel')
+    deck.destroy()
+    stopListening()
+    globalThis.URL.createObjectURL = makeUrl
+    delete globalThis.isSecureContext
+    noWorklet = false
+  }
   console.log('\nlive() only when the record can sound there: a running context alone is not enough')
   {
     workletHeld = []

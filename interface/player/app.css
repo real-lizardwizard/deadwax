@@ -986,6 +986,15 @@ html.app-viz-open { overflow: hidden; }
 .app-kv-value { font-size: var(--dw-text-heading); }
 .app-kv-value.app-mono,
 .app-kv-note { font-size: var(--dw-text-footnote); }
+/* a row's control (2.0.0-player.32: Debug's recording of the record's sound): a secondary button or a
+   link drawn as one, on a line of its own under the value, reaching a finger's height */
+.app-kv-action { flex-basis: 100%; margin: 0; }
+.app-info-action {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--pl-hit);
+    text-decoration: none;
+}
 .app-kv-note { color: var(--dw-text-2); }
 
 /* ===== Now Playing's two looks (2.0.0-player.11): the button, and the turntable ===== */

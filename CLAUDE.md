@@ -5955,6 +5955,54 @@ out. What was left was something the lab's Chromium does differently from an iPh
   could not have shown: the two before it were real but not his. If the buzz is still there with this,
   the next step is a recording from the phone itself, not another guess.
 
+#### A recording of the record's sound (2.0.0-player.32)
+
+James, after .31: "yeah it still has a pretty digital sound", and "there doesn't seem to be much of a
+difference between mac and iphone" - Chromium on his Mac, over plain http, sounds the same as the
+phone. Four fixes (.27 warble, .28 echo, .29 kernel, .31 clock) were each real and measurable and none
+was what he hears; the lab's recordings (synthetic hands, headless Chromium, `work/hang`, `work/tt`)
+show nothing left. So, rather than a fifth guess: a recorder in Info > Debug that brings back what HIS
+device plays, with everything that made it.
+
+- **What it records** (`recordDeckSound(seconds)` in deck.ts): a ScriptProcessorNode of 4096 (`tap`) on
+  the VOICE'S OWN NODE (`audio.node` - the AudioWorkletNode or the script voice's node, kept since this
+  slice), connected on to the destination so the browser pulls it; every block's two channels copied
+  with its `playbackTime`; every message the deck sends the voice meanwhile (`noteForRecording` in
+  `post()`: the takes, every hand sample as it came, the drives, fades, stops - a window as its start,
+  rate and length, never its samples); and everything the voice says of where it is (`heard()`, the
+  one wrapper both hosts now call). `finishRecording()` after `seconds` (or when asked) disconnects
+  the tap, interleaves the blocks as 16-bit PCM, base64s them and offers one JSON file through a blob
+  URL: `{recording, version: 1, when, userAgent, secure, voice, sampleRate, delaySeconds (HAND_DELAY_S),
+  scriptLagSeconds, clock (deckClockMapping), report (the last DeckReport), pageTimeAtStart, tapBlock,
+  blockTimes, audio: {format: 'int16le', channels, frames, base64}, messages, heard}` -
+  `deadwax-turntable-<voice>-<time>.json`, about 5 MB for 20 s. It refuses while one is running, and
+  before the sound has started (no running context, no READY voice: "turn the record once first").
+  Nothing is uploaded: the file is the user's to send.
+  - **base64 in pieces of a multiple of THREE bytes** (`PIECE` 32766). The first cut's 32768-byte pieces
+    were each padded with `=` by btoa, and 20 s decoded to 29 bytes too many - Node's decoder stops at
+    the first padding, a browser's atob throws. The sim pins the exact decode past one piece.
+  - `closeDeckAudio` clears `audio.node` with the voice, so a stale node can't be tapped.
+- **The row** (`recordingRow` in debugRows.ts, 'The turntable' section after Turntable timing; the
+  `DebugRow.action` a button or a download link InfoSheet draws in an `app-kv-action` dd): "Shows the
+  turntable first" off the turntable; **Record 20 s** (`onRecord`, App's `recordTurntable` ->
+  `recordDeckSound(20)`); "Recording the record's sound for 20 s - turn the record as you would"; then
+  `20 s recorded: save the file and send it` with **Save the recording (5.0 MB)** - an `<a download>`,
+  which `app-rules.sim`'s links-open-beside rule exempts (`linksOut()`), since a download opens nothing.
+  App keeps `turntableRecording` from `onDeckRecorded`. The button is reached from Info > Debug only.
+- **Verified**: deck.sim's "a recording of the record's sound" (refused before the sound, the tap's
+  node and connections, 'recording' then 'saved' with the name and size, the file's fields, three
+  tapped blocks decoding to exactly their 49,152 bytes, the hand samples and reports carried); the
+  piece-size mutation (32768) fails the decode check. In the real page over plain http
+  (`work/hang/record.cjs`, headless Chromium as `deadwax.test`): Record 20 s during an 8 s synthetic
+  scrub gave a 5.0 MB file of 958,464 frames (19.97 s), 234 contiguous 4096-frame blocks, the scrub's
+  sound at -27 dBFS for 8 s and digital silence either side, 493 hand samples, 35 drives, 600 reports.
+- **How to read one** (for the file James sends): decode `audio` (int16le, interleaved) and listen;
+  the rate the voice played at is in `heard[].rate` 30 times a second, the hand in `messages` of type
+  `hand` (`at` in song seconds, `time` on the audio clock); replay the messages through the real
+  `lib/deckVoice.ts` (newVoiceState/voiceCommand/renderVoice at the script host's block timing) and
+  compare with the recorded samples - a difference is the host or the device, agreement is the voice
+  itself. `work/hang/recording.json` is the lab's own for comparison.
+
 ### Sources and Get (2.0.0-player.15)
 
 Slice 5 of the one app (`uplan/slices.md` S5, numbered .15 because the turntable took .11 and .14).
