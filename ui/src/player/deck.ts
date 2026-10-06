@@ -1472,7 +1472,14 @@ export class Deck {
     const song = this.host.song()
     if (!this.showing || !song) return
     const busy = !!this.press || this.stilled || this.wanted === song.id || (this.motion.kind === 'plan' && this.motion.role !== 'spin')
-    if (!this.host.playing() && !busy) return
+    //? a paused song gets its FIRST window - the one for where it is - as the turntable shows, or as it is
+    //? sought somewhere the window doesn't reach, and nothing more (no refreshing ahead: it isn't
+    //? going anywhere). Until 2.0.0-player.30 nothing was fetched for a paused song until the record was
+    //? turned, so its first turn was always silent (James: "the scrubbing audio doesn't seem to load
+    //? ever until after the first scrub")
+    const where = at ?? this.host.position()
+    const unmet = !this.covers(where, 0)
+    if (!this.host.playing() && !busy && !unmet) return
     if (!song.flac) {
       if (this.refused?.song !== song.id) {
         this.refused = { song: song.id, why: `it isn't a FLAC file (it is ${song.kind || 'something else'})` }
@@ -1489,7 +1496,6 @@ export class Deck {
     }
     this.wanted = null
     if (this.failed?.song === song.id && now() < this.failed.until) return
-    const where = at ?? this.host.position()
     const { back, ahead } = windowMargins(this.span?.song === song.id ? this.span.seconds : WINDOW_S)
     const refreshing = span === undefined && this.host.playing() && !busy
     const room = song.length > 0 ? Math.max(0, song.length - where - 0.5) : Infinity

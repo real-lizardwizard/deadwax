@@ -5092,8 +5092,9 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   browser couldn't decode is never asked again for that song.
 - **The audio context, only from a gesture** (WebKit counts click, pointerup and keyup - not pointerdown):
   `wakeDeckAudio()` makes it (once) and resumes it, from the record's click and release, the transport's
-  three buttons and the look button switching TO the turntable; `resumeDeckAudio()` resumes one that
-  exists, from the mini player's tap opening Now Playing (App's openSheet). `app-rules.sim.cjs` pins
+  three buttons and the look button switching TO the turntable - and, since 2.0.0-player.30, the mini
+  player's tap when Now Playing opens as the turntable; `resumeDeckAudio()` resumes one that
+  exists, from that tap otherwise (App's openSheet). `app-rules.sim.cjs` pins
   exactly those call sites by the handler each is in, and that the context is constructed only inside
   wakeDeckAudio. Suspended when the screen closes or the page hides - nothing of it runs on a locked
   phone - and closed when the turntable unmounts (the look switched to the cover). Never resumed without
@@ -5892,6 +5893,33 @@ moved on, which was the wrong reading: in a band where the slowed song has NOTHI
 - **NOT verified**: James's ears, on his iPhone - whether this was the "extra sound". The gaps a busy main
   thread would put in the sound over plain http are a different artifact, and Debug's "Turntable timing"
   (.28) counts them.
+
+#### The first turn, and the mini player's tap (2.0.0-player.30)
+
+James: "the scrubbing audio doesn't seem to load ever until after the first scrub". Two rules met to make
+that so, each defensible alone:
+
+- **The deck's audio context was made only by a tap on the turntable itself** (the record's click and
+  release, the transport, the look button switching TO the turntable); the mini player's tap opening Now
+  Playing only RESUMED one that existed. So with "Now Playing opens as: Turntable" - James's setting - the
+  turntable opened with no context, every press was .11's (silent, the song playing on under the finger),
+  and only the release's `wakeDeckAudio()` made one. App's `openSheet` now calls `wakeDeckAudio()` when
+  `opensAs` is the turntable (read through a ref: the callback is made once) and `resumeDeckAudio()`
+  otherwise - the tap is a gesture WebKit counts. app-rules' list of call sites gains it, and pins the
+  condition.
+- **Nothing was fetched for a paused song until the record was turned** (a cost rule from .14, pinned as
+  "nothing fetched for a paused song"): the first press of a paused record was .11's, which asked for the
+  window, and only the next turn sounded. `keep()` now fetches a paused song's FIRST window - the one for
+  where it is, `unmet`: nothing covering its position - as the turntable shows and as it is sought
+  somewhere the window doesn't reach, and nothing more (no refreshing ahead: a paused song goes nowhere).
+  A playing song is kept covered as before.
+- **Verified in the real page** (headless Chromium over plain http, Now Playing opened from the mini player
+  straight onto the turntable, no tap on it): the window was fetched before the first press, playing and
+  paused alike, and the first turn took the record and played the song at the hand's speed (1071 and 1059
+  cycles, median 1.000). deck.sim pins both (the paused song's window on showing and on moving, once; a
+  press meanwhile asking nothing more; the first press the deck's), app-rules the tap's condition.
+- **Cost**: one 40 s window (about 2.5 MB of CD FLAC) fetched for a paused song as the turntable shows,
+  where before it cost nothing until touched.
 
 ### Sources and Get (2.0.0-player.15)
 

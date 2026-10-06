@@ -23,7 +23,7 @@ import { NowPlaying } from '../player/NowPlaying'
 import { PlayerBar } from '../player/PlayerBar'
 import { Visualizer } from '../player/Visualizer'
 import { wakeVisualizerAudio } from '../player/vizAudio'
-import { deckReport, onDeckReport, resumeDeckAudio } from '../player/deck'
+import { deckReport, onDeckReport, resumeDeckAudio, wakeDeckAudio } from '../player/deck'
 import { usePlayer, type Player } from '../player/usePlayer'
 import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerWindDown } from '../state/persisted'
 import { ActionMenu } from './ActionMenu'
@@ -294,6 +294,9 @@ export function App() {
   const [librarySeen, setLibrarySeen] = useState(nav.tab === 'library')
   //? "Now Playing opens as", kept on this device
   const [opensAs, setOpensAs] = useState<Look>(readPlayerOpensAs)
+  //? as the mini player's tap reads it (openSheet is made once)
+  const opensAsNow = useRef(opensAs)
+  opensAsNow.current = opensAs
   const chooseOpensAs = useCallback((look: Look) => {
     writePlayerOpensAs(look)
     setOpensAs(look)
@@ -500,9 +503,12 @@ export function App() {
     sheetOpener.current = takeOpener(event)
     setSheetOpen(true)
     nowPlayingOpen.current = true
-    //? the mini player's tap is a gesture: a turntable left showing gets its sound back from it
-    //? (never made here - resumed, when there is one)
-    resumeDeckAudio()
+    //? the mini player's tap is a gesture: a Now Playing that opens as the turntable gets its sound made
+    //? and started from it (2.0.0-player.30: made only by a tap on the turntable itself until then, so a
+    //? turntable opened this way had no sound until a first scrub had come and gone); one that opens as
+    //? the cover only gets a sound back that a turntable left showing already had
+    if (opensAsNow.current === 'turntable') wakeDeckAudio()
+    else resumeDeckAudio()
   }, [])
   const closeSheet = useCallback(() => {
     setOver('none')

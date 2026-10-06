@@ -577,6 +577,7 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
   })
   check('made or resumed only from gestures WebKit counts: the record\'s click and release, the transport, the look button, the mini player\'s tap', wakes.sort(), [
     'app/App.tsx: openSheet: resumeDeckAudio',
+    'app/App.tsx: openSheet: wakeDeckAudio',
     'player/NowPlaying.tsx: onLook: wakeDeckAudio',
     'player/NowPlaying.tsx: onNext: wakeDeckAudio',
     'player/NowPlaying.tsx: onPrevious: wakeDeckAudio',
@@ -584,6 +585,11 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
     'player/Turntable.tsx: onRecordClick: wakeDeckAudio',
     'player/Turntable.tsx: onRelease: wakeDeckAudio',
   ])
+  //? 2.0.0-player.30: the mini player's tap MAKES the sound when Now Playing will open as the turntable
+  //? (James: "the scrubbing audio doesn't seem to load ever until after the first scrub" - until then only
+  //? a tap on the turntable itself made it), and only resumes one otherwise
+  check('...the mini player\'s tap makes it only when Now Playing opens as the turntable, else resumes',
+    /if \(opensAsNow\.current === 'turntable'\) wakeDeckAudio\(\)\s*else resumeDeckAudio\(\)/.test(code(read('app/App.tsx'))), true)
   const made = files.filter((file) => /\bnew\s+(?:Context|AudioContext|webkitAudioContext)\b/.test(code(read(file))))
   //? (2.0.0-player.20: and the desktop visualizer's, its own - see "the desktop visualizer" below)
   check('...and made in two places, the deck and the visualizer\'s silent copy', made, ['player/deck.ts', 'player/vizAudio.ts'])

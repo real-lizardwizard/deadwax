@@ -1702,7 +1702,9 @@ async function main() {
     const before = asked.length
     const { host, deck } = await fresh({ isPlaying: false })
     await play(host, 5)
-    check('a paused song, the turntable showing: nothing asked until it plays or the record is turned', asked.length, before)
+    //? 2.0.0-player.30: a paused song's first window - for where it is - is asked for as the turntable
+    //? shows (nothing was, until the record was turned: its first turn was always silent)
+    check('a paused song, the turntable showing: the window for where it is asked for once, and nothing more as it stays paused', asked.slice(before), ['/deadwax/navidrome/scrub/time?at=56&seconds=40'])
     deck.destroy()
   }
 
@@ -1973,14 +1975,12 @@ async function main() {
     noScript = false
   }
   {
-    const { host, deck } = await fresh({ isPlaying: false })
     const before = asked.length
-    check('a paused song, its voice ready: no window yet (none is asked for a paused song), so a press is .11\'s', [asked.length - before, deck.live()], [0, false])
+    const { deck } = await fresh({ isPlaying: false })
+    check('a paused song, its voice ready: its window asked for as the turntable shows (2.0.0-player.30), and once it is in the first press is the deck\'s - no silent turn first', [asked.slice(before), deck.live()], [['/deadwax/navidrome/scrub/time?at=56&seconds=40'], true])
     deck.holdStill(true)
-    await settle()
-    check('...pressed - .11\'s press, the record held still under it: the window where the record is asked for', asked.slice(before), ['/deadwax/navidrome/scrub/time?at=56&seconds=40'])
     deck.holdStill(false)
-    check('...so the next press there is the deck\'s', deck.live(), true)
+    check('...a press meanwhile asking for nothing more', asked.length - before, 1)
     deck.destroy()
     const mp3 = await fresh({ song: () => ({ id: 'mp3', length: 200, flac: false, kind: 'MP3' }) })
     mp3.deck.holdStill(true)
@@ -2165,13 +2165,14 @@ async function main() {
     await settle()
     check(`a paused song, its sound not yet started (${kind === 'script' ? 'on the main thread' : 'the worklet'}): the first press .11's, and its window asked for once the voice is there - so the next press has its sound (review: the release let go of the press first, and the ask was lost)`,
       [first, asked.slice(before), deck.live()], [false, ['/deadwax/navidrome/scrub/time?at=60&seconds=40'], true])
-    //? the arm moving the paused song well away, and the screen closed and opened again: that one ask
-    //? was the press's, and nothing more is fetched for a paused song
+    //? the arm moving the paused song well away: the window for there asked for (2.0.0-player.30: a paused
+    //? song's first window follows where it is) - and the screen closed and opened again asks nothing more
     host.moveTo(150)
+    await settle()
     deck.setShowing(false)
     deck.setShowing(true)
     await settle()
-    check('...that ask was the press\'s alone: the paused song moved elsewhere and the screen opened again, nothing more fetched', asked.length - before, 1)
+    check('...the paused song moved elsewhere: the window for there asked for, once; the screen opened again, nothing more', asked.slice(before), ['/deadwax/navidrome/scrub/time?at=60&seconds=40', '/deadwax/navidrome/scrub/time?at=146&seconds=40'])
     deck.destroy()
     noWorklet = false
     delete globalThis.isSecureContext

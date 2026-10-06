@@ -1215,7 +1215,7 @@ question the whole player existed to answer. Still to find out:
 - **the turntable's sound following your hand** (2.0.0-player.24 - the fix for "it doesn't sound
   like anything"): turning the record steadily at about its own speed should sound like the song,
   at about half speed like the song an octave down, backwards like it backwards, on HTTPS and over
-  plain `http://` alike; the sound should feel a hair behind your finger (a twentieth of a second, a
+  plain `http://` alike; the sound should feel a hair behind your finger (an eighth of a second since 2.0.0-player.27, a
   little more over `http://`) and never lurch - the very first turn of a paused record after opening
   the screen included; stopping your finger should stop it within a moment, and starting again should
   carry on from there. Debug's **Turntable sound** line says how far your phone's audio clock moves at

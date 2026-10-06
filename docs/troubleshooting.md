@@ -715,15 +715,17 @@ rather than pausing the song over silence. When it's silent, **Info → Debug**'
 row (**•••** on the now-playing screen, then **Info**, then **Debug**) says why, in the order to check:
 
 - **`Off: waiting for a tap to start the sound`**: a phone only lets a page start sound from a tap,
-  so the record's sound starts at the first tap on the record, the play/pause or skip buttons, or
-  the button that switches to the turntable (once it has started, the mini player's tap opening the
-  screen brings it back too) - and a turn of the record before any of those is silent, with the
-  song playing on under your finger as before. No stretch of the song is fetched for it until then.
-  It stops again whenever the screen closes or the phone locks, and the next tap starts it.
+  so the record's sound starts at the first tap on the record, the play/pause or skip buttons, the
+  button that switches to the turntable, or - since 2.0.0-player.30 - the mini player's tap when Now
+  Playing opens as the turntable (until then that tap only brought back a sound that had already
+  started, so a turntable opened that way was silent until a first scrub had come and gone) - and a
+  turn of the record before any of those is silent, with the song playing on under your finger as
+  before. It stops again whenever the screen closes or the phone locks, and the next tap starts it.
 - **`Off: its window is loading - …`** or **`Off: no window yet - …`**: the record plays a stretch
-  of the song round where it is, and that stretch hasn't arrived. It's fetched while the song plays
-  (a moment after the first tap), or, for a paused song, when you first press the record - so the
-  first turn of a paused record is silent and the next has its sound. A press outside the stretch
+  of the song round where it is, and that stretch hasn't arrived. It's fetched as soon as the sound
+  has started - a moment after the first tap - for a paused song as much as a playing one (since
+  2.0.0-player.30; before, a paused song's was fetched only when you first pressed the record, so its
+  first turn was always silent). A press outside the stretch
   shown on a `Ready: …` row works as before too - except on a record still coasting from a flick,
   which you catch as ever, silent until the next stretch arrives.
 - **`Off: still starting - …`**: the part that plays the sound hasn't begun yet. If it never gets
