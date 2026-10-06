@@ -1933,6 +1933,74 @@ async function main() {
     decodeTone = false
   }
 
+  console.log('\nthe main-thread voice counts its own clock (2.0.0-player.31): a stamp that jitters by whole blocks changes nothing it plays')
+  {
+    //? WebKit stamps a block's playbackTime from the main thread, from the hardware clock as of whenever the
+    //? main thread got to it, quantised to the hardware buffer: block to block it jitters by up to a buffer.
+    //? The same record, taken and turned the same way, pumped with exact stamps and with jittering ones:
+    //? what the speakers get must be the same samples (James: "that digital buzz sound when scrubbing", with
+    //? no block late - the voice reading its path by a clock that jumped a block at a time)
+    noWorklet = true
+    globalThis.isSecureContext = false
+    decodeTone = true
+    const BLOCK = 1024 / 48000
+    const scrub = async (stampOf) => {
+      const host = fakeHost()
+      const deck = new Deck(host)
+      deck.setShowing(true)
+      deck.songChanged(host.song().id)
+      wakeDeckAudio()
+      await settle()
+      const script = scripts.at(-1)
+      const context = script.context
+      const blocks = []
+      let index = 0
+      const block = () => {
+        const exact = context.currentTime + 2 * BLOCK
+        blocks.push(fill(script, stampOf(exact, index++)).channels[0])
+        context.currentTime += BLOCK
+      }
+      block()
+      await settle()
+      await settle()
+      await settle()
+      deck.pressed(clock)
+      deck.takeOver()
+      block()
+      for (let frame = 1; frame <= 60; frame++) {
+        deck.hand(clock, -frame * 0.04, 60 - (frame * 0.04 / (2 * Math.PI)) * SECONDS_PER_TURN)
+        runFrames(1)
+        block()
+      }
+      deck.release(clock, 'cancel')
+      deck.destroy()
+      return blocks
+    }
+    const exact = await scrub((stamp) => stamp)
+    //? late by up to 1.4 blocks, quantised to a block - the first block's stamp exact, as both runs anchor on it
+    let seed = 99
+    const next = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
+    const jittered = await scrub((stamp, index) => (index === 0 ? stamp : Math.round((stamp + next() * 1.4 * BLOCK) / BLOCK - 0.5) * BLOCK))
+    const loud = exact.filter((data) => peak(data) > 0.05).length
+    //? the rate each run read at, cycle by cycle (the tone's rising zero crossings), over the turn's steady
+    //? part - and how far the jittered run's strays from the exact run's
+    const rates = (blocks) => {
+      const data = Float32Array.from(blocks.slice(12, 60).flatMap((block) => Array.from(block)))
+      const crossings = []
+      for (let i = 1; i < data.length; i++) if (data[i - 1] < 0 && data[i] >= 0) crossings.push((i - 1 + -data[i - 1] / (data[i] - data[i - 1])) / 48000)
+      return crossings.slice(1).map((t, i) => 1 / (t - crossings[i]) / 440)
+    }
+    const a = rates(exact), b = rates(jittered)
+    const n = Math.min(a.length, b.length)
+    const stray = Math.sqrt(a.slice(0, n).reduce((sum, r, i) => sum + (b[i] - r) ** 2, 0) / n)
+    const within = a.slice(0, n).filter((r, i) => Math.abs(b[i] - r) < 0.01).length / n
+    check(`sixty blocks of a hand turning the record back, their stamps jittering by whole blocks: read at the rate the exact stamps give - within 1% on every cycle (stray ${(stray * 100).toFixed(2)}% rms; followed as stamped, the rate wobbled 7-9% rms, a third of cycles within 3%)`,
+      [exact.length, loud > 40, n > 200, within === 1 && stray < 0.003], [62, true, true, true])
+    noWorklet = false
+    delete globalThis.isSecureContext
+    decodeTone = false
+  }
+
   console.log('\nlive() only when the record can sound there: a running context alone is not enough')
   {
     workletHeld = []

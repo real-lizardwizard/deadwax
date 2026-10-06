@@ -692,6 +692,10 @@ pitch followed the jitter in the phone's touch readings. It now works each touch
 touches either side of it and plays about an eighth of a second behind your hand (120 ms; about 163
 over plain `http://`) instead of a twentieth. If you still hear it:
 
+- **A buzz at the record's sound, over plain `http://` only, with no block late** was real until
+  2.0.0-player.31: on that address the sound is made on the page's main thread, and Safari stamps each
+  block's time from the main thread, so the stamp jumped by up to a block at a time and the sound
+  warbled at the block rate. The sound keeps its own count of time now.
 - **A thin, metallic or fizzy sound on top of the slowed or sped-up song** - "a digital artifact on
   top" - was real until 2.0.0-player.29: slowing or speeding the record's sound means working out the
   sound between the song's own samples, and the short curve it used left a faint mirror copy of the

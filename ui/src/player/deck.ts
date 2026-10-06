@@ -299,6 +299,22 @@ export const SCRIPT_BUFFER = 1024
  *  waits up to one block for the next to be asked for, which plays a block after it is asked - 43 ms
  *  at 48 kHz, a constant lag on the record's sound and nothing more (startScript). */
 export const SCRIPT_LAG_BLOCKS = 2
+/**
+ * The main-thread voice's clock is COUNTED (2.0.0-player.31): each block one block after the one before,
+ * anchored on the first block's `playbackTime` - not read from each block's. WebKit stamps a block's
+ * playbackTime on the MAIN thread, from the hardware clock as of whenever the main thread got to it,
+ * quantised to the hardware buffer, so from block to block the stamp jitters by up to a buffer (21 ms on
+ * an iPhone) - and a voice reading its path by it warbled at the block rate (James, with no block late:
+ * "that digital buzz sound when scrubbing"; the lab's Chromium stamps exactly, so it never showed). The
+ * count is anchored again only when the stamp has moved SCRIPT_REANCHOR_BLOCKS away (blocks the page
+ * never rendered: the hardware played on without them), and meanwhile eased toward the stamp's running
+ * mean by at most SCRIPT_SLEW_S a block - a hundredth of the step the ear could find.
+ */
+export const SCRIPT_REANCHOR_BLOCKS = 3
+export const SCRIPT_SLEW_S = 0.00002
+export const SCRIPT_DRIFT_EASE = 0.02
+/** A stamp within this of the count is the count: an exact clock, followed as it is. */
+export const SCRIPT_STAMP_TOLERANCE_S = 0.001
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
@@ -391,13 +407,32 @@ function startScript(context: AudioContext, why: string): void {
         node.disconnect()
       },
     }
+    //? the counted clock (SCRIPT_REANCHOR_BLOCKS): the next block's time, and the stamp's running drift from it
+    let counted: number | null = null
+    let drift = 0
     node.onaudioprocess = (event: AudioProcessingEvent) => {
       const out = event.outputBuffer
       const channels: Float32Array[] = []
       for (let channel = 0; channel < out.numberOfChannels; channel++) channels.push(out.getChannelData(channel))
-      const at = Number.isFinite(event.playbackTime) ? event.playbackTime : context.currentTime
+      const reported = Number.isFinite(event.playbackTime) ? event.playbackTime : context.currentTime
+      const blockSeconds = out.length / context.sampleRate
+      let at: number
+      const off = counted === null ? Infinity : reported - counted
+      if (Math.abs(off) > SCRIPT_REANCHOR_BLOCKS * blockSeconds) {
+        //? the first block, or blocks the page never rendered: anchored on the stamp
+        at = reported
+        drift = 0
+      } else if (Math.abs(off) <= SCRIPT_STAMP_TOLERANCE_S) {
+        //? a stamp that agrees with the count: an exact clock (Chromium's), followed as it is
+        at = reported
+      } else {
+        //? a stamp a step away from the count: WebKit's jitter - the count holds, eased toward the drift
+        drift += (off - drift) * SCRIPT_DRIFT_EASE
+        at = counted! + Math.max(-SCRIPT_SLEW_S, Math.min(SCRIPT_SLEW_S, drift))
+      }
+      counted = at + blockSeconds
       //? asked for after it was due to play: the page was busy, and what was heard had a gap in it
-      const lateBy = context.currentTime - at
+      const lateBy = context.currentTime - reported
       soundHealth.blocks += 1
       if (lateBy > 0) {
         soundHealth.lateBlocks += 1

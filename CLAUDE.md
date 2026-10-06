@@ -5921,6 +5921,40 @@ that so, each defensible alone:
 - **Cost**: one 40 s window (about 2.5 MB of CD FLAC) fetched for a paused song as the turntable shows,
   where before it cost nothing until touched.
 
+#### The main-thread voice's clock (2.0.0-player.31)
+
+James, after .30: "It's not saying there are any blocks late, but it still has that digital buzz sound
+when scrubbing". No late blocks ruled the main thread's load out, and .29 had ruled the interpolation
+out. What was left was something the lab's Chromium does differently from an iPhone on plain http.
+
+- **The cause** (read in WebKit's ScriptProcessorNode, then shown offline): the main-thread voice took each
+  block's time from the event's `playbackTime`. Chromium stamps that on the audio thread, exactly;
+  WebKit's `fireProcessEvent` stamps it on the MAIN thread, from the hardware clock as of whenever the main
+  thread got to the block, quantised to the hardware buffer - so from block to block it jitters by up to a
+  buffer (21 ms on an iPhone). The voice read its path by that clock: the path's time jumped a block at a
+  time, the steering turned each jump into rate, and the record's sound warbled at the block rate and its
+  sub-harmonics. Offline, the real voice fed a steady 1x hand with its block clock jittered as WebKit's
+  would be: the rate wobbled 6.9% rms with 29% of cycles within 3% (9.2% and 14% at 45 ms of jitter);
+  with the clock counted, exactly 1x. My late-block count (`currentTime - playbackTime`) never saw it: a
+  late stamp is still ahead of `currentTime`.
+- **The fix** (deck.ts `startScript`): the main-thread voice COUNTS its clock - each block one block after
+  the one before, anchored on the first block's stamp. A stamp that agrees with the count (within
+  `SCRIPT_STAMP_TOLERANCE_S`, 1 ms - Chromium's exact clock) is followed as it is, so the lab's samples are
+  unchanged to the bit; a stamp a step away (WebKit's jitter) leaves the count holding, eased toward the
+  stamp's running mean (`SCRIPT_DRIFT_EASE`) by at most `SCRIPT_SLEW_S` (0.02 ms) a block - a drift from
+  blocks the page never rendered is taken up in seconds without a step the ear could find; a stamp a whole
+  `SCRIPT_REANCHOR_BLOCKS` (3) away anchors the count again (a resume, a long gap). Lateness is still
+  counted against the stamp. The worklet's clock was always exact and is untouched.
+- **The pin** (deck.sim, "the main-thread voice counts its own clock"): the same record taken and turned
+  back for sixty blocks, once with exact stamps and once with stamps late by up to 1.4 blocks and
+  quantised to a block (the first exact, so both anchor alike): the rate read cycle by cycle strays 0.05%
+  rms from the exact run's, every cycle within 1%; with the stamp followed as before it strays 9.2% rms.
+  The mirror check (every sample a block gives equal to renderVoice at the block's own time) still holds
+  under exact stamps.
+- **NOT verified**: James's iPhone. This is the third candidate for one complaint, and the first the lab
+  could not have shown: the two before it were real but not his. If the buzz is still there with this,
+  the next step is a recording from the phone itself, not another guess.
+
 ### Sources and Get (2.0.0-player.15)
 
 Slice 5 of the one app (`uplan/slices.md` S5, numbered .15 because the turntable took .11 and .14).
