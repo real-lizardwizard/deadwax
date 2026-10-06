@@ -45,6 +45,13 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   pointer is coarse), the chips giving way before the album's name and never cut to a stub, the row the
   panel has open in Explorer's selection, a row dealt with faded but never its word, the quiet
   "Checking the library…" in a line always a row tall, the list clear of a drawer, and no solid purple.
+- Server settings and the log (2.0.0-player.33), with no board: the page at least the page area's height
+  and its save bar sticky at the foot above the player bar, taking no clicks while it says nothing and
+  keeping keyboard focus clear of it while it says something, Save its one solid purple button; the
+  settings tab's own rows styled by
+  their own class names under `.app-settings` (this page loads no main.css); fields iOS won't zoom into
+  and a finger's targets where the pointer is coarse; the log's words broken anywhere, its errors red and
+  warnings amber; long values and paths broken, never run out; both pages clear of a drawer.
 """
 
 import re
@@ -90,12 +97,13 @@ def test_the_breakpoints_are_the_frames_own():
 
 
 def test_nothing_reaches_the_phone():
-    """No rule outside a media query from 1024px, and none outside the desktop frame's class."""
+    """No rule outside a media query from 1024px, and none outside the desktop frame's class - `html` alone,
+    or `html` holding something inside the frame (`html:has(.app-desk ...)`, which only a desktop has)."""
     for where, selector, _values in rules(DESKTOP):
         assert where, f"{selector} is outside every media query - it would reach the phone"
         for part in selector.split(","):
             part = part.strip()
-            assert part in (":root", "html") or part.startswith(".app-desk"), part
+            assert part in (":root", "html") or part.startswith(".app-desk") or part.startswith("html:has(.app-desk "), part
 
 
 def test_the_desktop_stylesheet_draws_only_from_tokens():
@@ -628,3 +636,75 @@ def test_the_queue_page_has_no_solid_purple_button():
     for _where, selector, values in rules(DESKTOP):
         if "app-queue" in selector:
             assert "var(--dw-accent)" not in values.get("background", ""), selector
+
+
+def test_the_settings_save_bar_sits_above_the_player_bar_and_save_is_its_one_solid_purple_button():
+    """2.0.0-player.33: the save bar at the foot of the page area - sticky above the player bar, whatever
+    height a coarse pointer gives it - and Save the page's one primary."""
+    bar = declarations(DESKTOP, ".app-desk .app-settings-savebar", DESK)
+    assert (bar["position"], bar["bottom"], bar["min-height"]) == ("sticky", "var(--app-desk-bar)", "var(--app-desk-set-bar)")
+    desk, coarse = media_tokens(DESKTOP, DESK), media_tokens(DESKTOP, COARSE)
+    assert desk["--app-desk-set-bar"] == "calc(var(--app-desk-control) + 2 * var(--app-desk-set-bar-pad))"
+    assert coarse["--app-desk-set-bar"] == "calc(var(--pl-hit) + 2 * var(--app-desk-set-bar-pad))"
+    save = declarations(DESKTOP, ".app-desk .app-settings-save", DESK)
+    assert (save["background"], save["border-color"]) == ("var(--dw-primary-bg)", "var(--dw-primary-border)")
+    page = (SRC / "app" / "ServerSettings.tsx").read_text()
+    assert page.count("is-primary") == 1 and 'class="app-button is-primary app-settings-save"' in page
+    for _where, selector, values in rules(DESKTOP):
+        if ("app-settings" in selector or "app-log" in selector) and "app-settings-save" not in selector:
+            assert "--dw-primary-bg" not in values.get("background", ""), selector
+
+
+def test_the_settings_page_reaches_the_foot_and_its_idle_bar_takes_no_clicks_nor_hides_focus():
+    """Sticky only pins while the page is taller than the window: on a short tab the bar would sit under
+    the last group, mid-screen. So the page fills the page area at least, the body taking the room. And the
+    bar, always there, is a box over what a long tab scrolls under it: idle (transparent) it takes no
+    clicks, and saying something (opaque) it covers what is there, so keyboard focus stops above it too."""
+    page = declarations(DESKTOP, ".app-desk .app-settings:not(.is-phone)", DESK)
+    assert (page["display"], page["flex-direction"], page["min-height"]) == ("flex", "column", "var(--app-desk-set-page)")
+    assert media_tokens(DESKTOP, DESK)["--app-desk-set-page"] == "calc(100dvh - var(--app-desk-bar))"
+    assert declarations(DESKTOP, ".app-desk .app-settings:not(.is-phone) .app-settings-body", DESK)["flex"] == "1 0 auto"
+    assert declarations(DESKTOP, ".app-desk .app-settings-savebar:not(.is-said)", DESK)["pointer-events"] == "none"
+    assert "pointer-events" not in declarations(DESKTOP, ".app-desk .app-settings-savebar.is-said", DESK)
+    assert declarations(DESKTOP, "html:has(.app-desk .app-pane:not([hidden]) .app-settings-savebar.is-said)", DESK)["scroll-padding-bottom"] == \
+        "calc(var(--app-desk-bar) + var(--app-desk-set-bar) + var(--dw-hairline))"
+    #? only for the pane that shows (review): the page stays drawn in You's hidden pane while another tab
+    #? shows, holding "Saved." or a draft, and :has() matches what is hidden - every other tab's focus
+    #? stopped a save bar's height higher than its player bar needs
+    for _where, selector, values in rules(DESKTOP):
+        if "scroll-padding" in " ".join(values) and "app-settings-savebar" in selector:
+            assert ".app-pane:not([hidden]) .app-settings-savebar" in selector, selector
+    panes = (SRC / "app" / "App.tsx").read_text()
+    assert 'class="app-pane" data-tab={tab} hidden={nav.tab !== tab}' in panes
+    #? and the words focus is given as Save and Discard go draw no ring
+    assert declarations(DESKTOP, ".app-desk .app-settings-savebar-text:focus", DESK)["outline"] == "none"
+
+
+def test_the_settings_rows_are_the_tabs_own_classes_styled_here_and_long_values_break():
+    """The main page's settings rows, by their own names under .app-settings - and a key, a path in a
+    note, a reason, the verdict: broken, never run out of the page."""
+    for selector in (".app-desk .app-settings .settings-env-key", ".app-desk .app-settings .settings-env-effect",
+                     ".app-desk .app-settings .settings-env-detail", ".app-desk .app-settings .settings-verdict",
+                     ".app-desk .app-settings-savebar-text", ".app-desk .app-log-words"):
+        assert declarations(DESKTOP, selector, DESK)["overflow-wrap"] == "anywhere", selector
+    field = declarations(DESKTOP, ".app-desk .app-settings .settings-env-input", DESK)
+    assert (field["background"], field["min-width"]) == ("var(--dw-well)", "0")
+    assert declarations(DESKTOP, ".app-desk .app-settings .settings-env.is-edited", DESK)["border-left-color"] == "var(--dw-amber-icon)"
+
+
+def test_where_the_pointer_is_coarse_the_settings_fields_are_17px_and_the_controls_a_finger():
+    field = declarations(DESKTOP, ".app-desk .app-settings .settings-env-input", COARSE)
+    assert (field["font-size"], field["height"]) == ("var(--dw-text-body)", "var(--pl-hit)")
+    for selector in (".app-desk .app-settings .settings-env-revert", ".app-desk .app-settings-save",
+                     ".app-desk .app-settings-discard", ".app-desk .app-log-clear"):
+        assert declarations(DESKTOP, selector, COARSE)["min-height"] == "var(--pl-hit)", selector
+
+
+def test_the_log_draws_errors_red_and_warnings_amber_and_both_pages_keep_clear_of_a_drawer():
+    assert declarations(DESKTOP, ".app-desk .app-log-row.is-error .app-log-words", DESK)["color"] == "var(--dw-danger-text)"
+    assert declarations(DESKTOP, ".app-desk .app-log-row.is-warning .app-log-words", DESK)["color"] == "var(--dw-amber-text)"
+    row = declarations(DESKTOP, ".app-desk .app-log-row", DESK)
+    assert row["font-size"] == "var(--dw-text-data)"
+    for selector in (".app-desk.has-drawer .app-settings-body", ".app-desk.has-drawer .app-log-body", ".app-desk.has-drawer .app-settings-savebar"):
+        assert declarations(DESKTOP, selector, DESK)["max-width"] == \
+            "calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap))", selector

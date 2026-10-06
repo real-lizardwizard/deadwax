@@ -81,8 +81,9 @@ export interface ServerSettings {
   organizing: { enabled: boolean; blockers: string[] }
 }
 
-export function getServerSettings(): Promise<ServerSettings> {
-  return get<ServerSettings>('/settings')
+/** `signal`: the app's Server settings page calls an older read off as a newer one begins. */
+export function getServerSettings(signal?: AbortSignal): Promise<ServerSettings> {
+  return get<ServerSettings>('/settings', signal)
 }
 
 /** One setting to change. A null value means "revert to the environment's value". */

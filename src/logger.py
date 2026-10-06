@@ -1,6 +1,9 @@
 import asyncio
+import collections
 import json
 import logging
+import secrets
+import threading
 
 #? httpx writes every request it makes to its own logger at INFO, with the whole URL, query
 #? string and all - and the root logger below sends INFO to the container log that Komodo shows.
@@ -25,28 +28,70 @@ sse_clients = set()
 _loop: asyncio.AbstractEventLoop | None = None
 
 
-def register_sse_client():
+#? The page-bound lines, kept (2.0.0-player.33): the stream kept no history, so a log opened after
+#? something happened was empty - the app's Log page is opened when there is something to look at,
+#? which is after it happened. The last LOG_HISTORY lines meant for the page are kept, each exactly
+#? as the stream sends it (nothing the stream didn't already send - no secret is kept that wasn't
+#? already on the page) plus a server time and a sequence number rising by one per line, so the
+#? page can join this history and the stream with no gap and no line twice
+#? (GET /deadwax/interface_logs/recent; the stream's `after`). In memory only: it starts empty when
+#? deadwax starts, and `LOG_BOOT` names this run, so a page that saw an earlier one's numbers can
+#? tell them apart from this one's (they start again at 1).
+LOG_HISTORY = 500
+LOG_BOOT = secrets.token_hex(6)
+_history: collections.deque = collections.deque(maxlen=LOG_HISTORY)
+_seq = 0
+#? lines are logged from worker threads as well as the loop: the number, the history and the order
+#? the streams are handed lines in all change together, under this
+_lock = threading.Lock()
+
+
+def recent_log() -> tuple[list[dict], int]:
+    """The page-bound lines kept, oldest first, and the number of the last one logged (0: none yet)."""
+    with _lock:
+        return list(_history), _seq
+
+
+def register_sse_client(after: int | None = None, boot: str | None = None):
+    """A stream's queue; the kept lines it hasn't had yet, to send first (none without `after`); and
+    the number at or below which it has every line (the stream skips a publish it already sent).
+
+    Taken together, with nothing awaited between: every line kept by then is in what is handed back,
+    and every line after it is published to the queue (its publishing runs on this loop later), so a
+    page that read the history up to `after` and opens a stream from there misses nothing. A line can
+    be both (kept on another thread just before the queue was added, published just after); the stream
+    sends each number once. `boot` is the run the page's `after` was from: another run's numbers say
+    nothing about this one's, so every line kept is new to it.
+    """
     global _loop
     _loop = asyncio.get_running_loop()
     q = asyncio.Queue()
-    sse_clients.add(q)
-    return q
+    with _lock:
+        if after is None:
+            missed, floor = [], 0
+        elif boot is not None and boot != LOG_BOOT:
+            missed, floor = list(_history), 0
+        else:
+            missed, floor = [line for line in _history if line["seq"] > after], after
+        sse_clients.add(q)
+    return q, missed, max([floor, *(line["seq"] for line in missed)])
 
 
 def unregister_sse_client(q):
     sse_clients.discard(q)
 
 
-def publish_sse_event(event_json):
+def publish_sse_event(event_json, seq=None):
     for q in list(sse_clients):
-        q.put_nowait(event_json)
+        q.put_nowait((seq, event_json))
 
 
 class SSEHandler(logging.Handler):
     """Sends the records marked `extra={"frontend": True}` to every open event-log stream."""
 
     def emit(self, record):
-        if not getattr(record, "frontend", False) or not sse_clients:
+        global _seq
+        if not getattr(record, "frontend", False):
             return
 
         event = {"event_type": record.levelname, "event_content": record.getMessage()}
@@ -58,9 +103,15 @@ class SSEHandler(logging.Handler):
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = _loop
-        if loop is None or loop.is_closed():
-            return
-        loop.call_soon_threadsafe(publish_sse_event, json.dumps(event))
+
+        with _lock:
+            _seq += 1
+            #? the main page reads event_type, event_content and src, and ignores the rest
+            event.update(seq=_seq, time=record.created, boot=LOG_BOOT)
+            _history.append(event)
+            #? handed over inside the lock, so the streams get lines in the order they were numbered
+            if sse_clients and loop is not None and not loop.is_closed():
+                loop.call_soon_threadsafe(publish_sse_event, json.dumps(event), _seq)
 
 
 def setup_logging():

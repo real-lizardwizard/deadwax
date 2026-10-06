@@ -2510,3 +2510,393 @@
     .app-desk .app-queue-row { min-height: var(--pl-hit); }
     .app-desk .app-queue-facet { min-height: var(--pl-hit); }
 }
+
+/* ===== Server settings and the log (2.0.0-player.33): app/ServerSettings.tsx, app/EventLog.tsx =====
+   No board draws either; the sidebar's Managing names them. Built from STYLE.md and the frame's parts:
+   pages under You with their title and a line saying what they are, kept to the readable width the
+   queue page keeps (and clear of a drawer). The settings are the main page's settings tab's own rows
+   (components/SettingsView.tsx), styled here by their own class names, as the Edit panel styles the
+   editors - this page loads no main.css: the server's groups under the Edit panel's underline tabs,
+   each group a card of rows, a row's key monospace, where its value came from a small chip, an edited
+   row marked amber at its edge, an error said in the failure text, a field STYLE.md's well. The page
+   is at least the window's height (less the player bar), and the save bar at its foot, sticky above
+   the player bar - at the foot of the window however long or short the tab - saying nothing (and
+   taking no clicks) until there is something to save; while it says something, keyboard focus
+   scrolls clear of it too. Save in it is the page's one solid purple button. The log is a list of text
+   lines at the frame's data size - its time monospace, its level red for an error and amber for a
+   warning - a long word broken anywhere rather than run out of the page; where the stream stands is
+   one line above it. Long values and paths break, never overflow. */
+@media (min-width: 1024px) {
+    :root {
+        --app-desk-set-lines: 12px;       /* between the page's parts */
+        --app-desk-set-row-gap: 4px;      /* a row's lines */
+        --app-desk-set-row-pad-y: 10px;
+        --app-desk-set-row-pad-x: 14px;
+        --app-desk-set-chip-pad: 6px;     /* where a value came from, a row's badge */
+        --app-desk-set-mark: 6px;         /* a tab's mark: unsaved, or needs attention */
+        --app-desk-set-edge: 3px;         /* an edited row's amber edge */
+        --app-desk-set-control: 30px;     /* a field, a dropdown */
+        --app-desk-set-note: 62ch;        /* a note's measure */
+        --app-desk-set-bar-pad: 10px;     /* the save bar's padding, above and below */
+        --app-desk-set-bar: calc(var(--app-desk-control) + 2 * var(--app-desk-set-bar-pad));   /* its height */
+        --app-desk-set-page: calc(100dvh - var(--app-desk-bar));   /* the page area: the window above the player bar */
+        --app-desk-log-time: 64px;        /* HH:MM:SS, monospace */
+        --app-desk-log-level: 64px;       /* WARNING, at the data size */
+        --app-desk-log-src: 84px;         /* where it came from: musicbrainz at the data size */
+        --app-desk-log-pad: 4px;          /* a line's padding, above and below */
+        --app-desk-log-dot: 8px;          /* where the stream stands */
+    }
+
+    /* the settings page fills the page area at least, so its save bar is at the foot of the window
+       even on a short tab - where sticky alone would leave it under the last group, mid-screen */
+    .app-desk .app-settings:not(.is-phone) {
+        display: flex;
+        flex-direction: column;
+        min-height: var(--app-desk-set-page);
+    }
+
+    .app-desk .app-settings:not(.is-phone) .app-settings-body { flex: 1 0 auto; }
+
+    .app-desk .app-settings-body,
+    .app-desk .app-log-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-set-lines);
+        max-width: calc(var(--app-desk-content-max) + var(--pl-edge-left) + var(--pl-edge-right));
+        padding: 0 var(--pl-edge-right) var(--app-desk-gap) var(--pl-edge-left);
+    }
+
+    /* a drawer over the page's edge: the page keeps to the part left in view */
+    .app-desk.has-drawer .app-settings-body,
+    .app-desk.has-drawer .app-log-body,
+    .app-desk.has-drawer .app-settings-savebar {
+        max-width: calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap));
+    }
+
+    .app-desk .app-settings-line,
+    .app-desk .app-log-line,
+    .app-desk .app-settings-state,
+    .app-desk .app-settings-problem,
+    .app-desk .app-log-problem,
+    .app-desk .app-log-empty {
+        margin: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-settings-line a { color: var(--dw-accent); }
+    .app-desk .app-settings-line code { font-family: var(--dw-font-mono); color: var(--dw-text); }
+    .app-desk .app-settings-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-desk-set-lines); }
+    .app-desk .app-settings-problem,
+    .app-desk .app-log-problem { color: var(--dw-danger-text); }
+
+    /* a tab's mark: a dot in the accent while it holds an unsaved change, amber when a setting there
+       needs attention */
+    .app-desk .app-settings-tab { display: inline-flex; align-items: center; gap: var(--app-desk-set-chip-pad); }
+    .app-desk .app-settings-mark {
+        flex: none;
+        width: var(--app-desk-set-mark);
+        height: var(--app-desk-set-mark);
+        border-radius: var(--dw-radius-round);
+        background: var(--dw-accent);
+    }
+    .app-desk .app-settings-mark.is-attention { background: var(--dw-amber-icon); }
+
+    .app-desk .app-settings-panel { display: flex; flex-direction: column; gap: var(--app-desk-gap); }
+
+    /* --- the settings tab's own parts --- */
+
+    .app-desk .app-settings .settings-section { display: flex; flex-direction: column; gap: var(--app-desk-set-row-gap); }
+
+    .app-desk .app-settings .settings-section-title {
+        margin: 0;
+        color: var(--dw-text-heading-color);
+        font-size: var(--dw-text-heading);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-settings .settings-section-note,
+    .app-desk .app-settings .settings-env-effect {
+        max-width: var(--app-desk-set-note);
+        margin: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-settings .settings-section-body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-card);
+        box-shadow: var(--dw-highlight);
+    }
+
+    .app-desk .app-settings .settings-env-list { display: flex; flex-direction: column; }
+
+    .app-desk .app-settings .settings-env,
+    .app-desk .app-settings .settings-mode {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-set-row-gap);
+        min-width: 0;
+        padding: var(--app-desk-set-row-pad-y) var(--app-desk-set-row-pad-x);
+        border-left: var(--app-desk-set-edge) solid transparent;
+    }
+
+    .app-desk .app-settings .settings-env + .settings-env,
+    .app-desk .app-settings .settings-mode + .settings-mode { border-top: var(--dw-hairline) solid var(--dw-row-border); }
+
+    /* an edit still only a draft: marked at its edge until it is saved */
+    .app-desk .app-settings .settings-env.is-edited { border-left-color: var(--dw-amber-icon); background: var(--dw-tint-amber); }
+
+    .app-desk .app-settings .settings-env-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--app-desk-set-chip-pad);
+        min-width: 0;
+    }
+
+    .app-desk .app-settings .settings-env-key,
+    .app-desk .app-settings .settings-mode-name {
+        color: var(--dw-text);
+        font-family: var(--dw-font-mono);
+        font-size: var(--dw-text-data);
+        font-weight: var(--dw-weight-semibold);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-settings .settings-mode { flex-direction: row; align-items: baseline; gap: var(--app-desk-set-lines); }
+    .app-desk .app-settings .settings-mode-name { flex: none; color: var(--dw-accent-text); }
+    .app-desk .app-settings .settings-mode-note { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+
+    /* where the value came from, the row's badge, a setting that can't be changed here */
+    .app-desk .app-settings .settings-env-source,
+    .app-desk .app-settings .settings-env-badge,
+    .app-desk .app-settings .settings-env-locked {
+        display: inline-flex;
+        align-items: center;
+        padding: 0 var(--app-desk-set-chip-pad);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-tag);
+        color: var(--dw-text-2);
+        font-size: var(--dw-text-label);
+    }
+
+    .app-desk .app-settings .settings-env-source.is-override {
+        border-color: var(--dw-badge-purple-border);
+        background: var(--dw-badge-purple-bg);
+        color: var(--dw-accent-text);
+    }
+
+    .app-desk .app-settings .settings-env-badge {
+        border-color: var(--dw-danger-border);
+        color: var(--dw-danger-text);
+    }
+
+    .app-desk .app-settings .settings-env-badge.is-edited {
+        border-color: var(--dw-badge-amber-border);
+        background: var(--dw-badge-amber-bg);
+        color: var(--dw-amber-text);
+    }
+
+    .app-desk .app-settings .settings-env-control { display: flex; align-items: center; gap: var(--app-desk-field-gap); min-width: 0; }
+
+    /* a field or a dropdown: STYLE.md's well, its edge the best match's purple with focus */
+    .app-desk .app-settings .settings-env-input {
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
+        height: var(--app-desk-set-control);
+        padding: 0 var(--app-desk-item-pad);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-well);
+        box-shadow: var(--dw-well-inset);
+        color: var(--dw-text);
+        font-family: var(--dw-font-mono);
+        font-size: var(--app-desk-text-sm);
+        outline: none;
+    }
+
+    .app-desk .app-settings .settings-env-input:focus { border-color: var(--dw-best); }
+    .app-desk .app-settings .settings-env-input::placeholder { color: var(--dw-text-3); }
+
+    .app-desk .app-settings .settings-env-revert {
+        align-self: flex-start;
+        color: var(--dw-accent);
+        font-size: var(--app-desk-text-sm);
+        text-align: left;
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-settings .settings-env-revert:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring);
+        border-radius: var(--dw-radius-control);
+    }
+
+    /* what is wrong with a value, and the note another row's edit asks of this one */
+    .app-desk .app-settings .settings-env-detail {
+        max-width: var(--app-desk-set-note);
+        color: var(--dw-danger-text);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+        overflow-wrap: anywhere;
+    }
+
+    /* whether organizing can happen: amber while it can't, green while it can */
+    .app-desk .app-settings .settings-verdict {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-set-row-gap);
+        padding: var(--app-desk-set-row-pad-y) var(--app-desk-set-row-pad-x);
+        border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-tint-amber);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-settings .settings-verdict.ok { border-color: var(--dw-badge-green-border); background: var(--dw-tint-green); }
+    .app-desk .app-settings .settings-verdict-title { color: var(--dw-amber-text); font-size: var(--app-desk-text); }
+    .app-desk .app-settings .settings-verdict.ok .settings-verdict-title { color: var(--dw-badge-green-text); }
+
+    .app-desk .app-settings .settings-verdict-list {
+        margin: 0;
+        padding-left: var(--app-desk-gap);
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+    }
+
+    /* the save bar: at the foot of the page area, sticky above the player bar - always there, saying
+       nothing (and drawing nothing) until there is something to save. Idle it takes no clicks: it is a
+       box over whatever a long tab scrolls under it, and an invisible one must not swallow a press on
+       a field there. Saying something, it is opaque, and keyboard focus scrolls clear of it (html, below) */
+    .app-desk .app-settings-savebar {
+        position: sticky;
+        bottom: var(--app-desk-bar);
+        z-index: var(--app-z-desk-frame);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--app-desk-field-gap);
+        max-width: calc(var(--app-desk-content-max) + var(--pl-edge-left) + var(--pl-edge-right));
+        min-height: var(--app-desk-set-bar);
+        padding: var(--app-desk-set-bar-pad) var(--pl-edge-right) var(--app-desk-set-bar-pad) var(--pl-edge-left);
+        border-top: var(--dw-hairline) solid transparent;
+    }
+
+    .app-desk .app-settings-savebar:not(.is-said) { pointer-events: none; }
+    .app-desk .app-settings-savebar.is-said { border-top-color: var(--dw-frame-border); background: var(--dw-bg); }
+
+    /* while the bar says something it covers what scrolls under it: focus stops above it as well (its
+       height, and the hairline along its top) - only while it is in the pane that SHOWS (review): the
+       page stays drawn in You's hidden pane while another tab shows, and :has() matches what is hidden */
+    html:has(.app-desk .app-pane:not([hidden]) .app-settings-savebar.is-said) { scroll-padding-bottom: calc(var(--app-desk-bar) + var(--app-desk-set-bar) + var(--dw-hairline)); }
+
+    /* focus is given to what the bar says as Save and Discard go (never dropped to the page): words, no ring */
+    .app-desk .app-settings-savebar-text:focus { outline: none; }
+
+    .app-desk .app-settings-savebar-text {
+        flex: 1 1 auto;
+        min-width: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-settings-savebar.has-error .app-settings-savebar-text { color: var(--dw-danger-text); }
+
+    .app-desk .app-settings-discard,
+    .app-desk .app-settings-save {
+        min-height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    /* the page's one solid purple button */
+    .app-desk .app-settings-save {
+        border-color: var(--dw-primary-border);
+        background: var(--dw-primary-bg);
+        box-shadow: var(--dw-primary-highlight);
+        color: var(--dw-text);
+    }
+
+    .app-desk .app-settings-save:active:not([aria-disabled='true']) { filter: var(--dw-primary-pressed); }
+    .app-desk .app-settings-savebar [aria-disabled='true'] { opacity: var(--app-job-busy); cursor: progress; }
+
+    /* --- the log --- */
+
+    .app-desk .app-log-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--app-desk-field-gap); }
+
+    /* where the stream stands: one line, never a column of failures */
+    .app-desk .app-log-stream {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--app-desk-field-gap);
+        margin: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-log-dot {
+        flex: none;
+        width: var(--app-desk-log-dot);
+        height: var(--app-desk-log-dot);
+        border-radius: var(--dw-radius-round);
+        background: var(--dw-text-3);
+    }
+
+    .app-desk .app-log-stream.is-live .app-log-dot { background: var(--dw-green-icon); }
+    .app-desk .app-log-stream.is-lost { color: var(--dw-amber-text); }
+    .app-desk .app-log-stream.is-lost .app-log-dot { background: var(--dw-amber-icon); }
+
+    .app-desk .app-log-clear[aria-disabled='true'] { color: var(--dw-text-3); cursor: default; }
+
+    .app-desk .app-log-list {
+        margin: 0;
+        padding: 0;
+        border-top: var(--dw-hairline) solid var(--dw-row-border);
+        list-style: none;
+    }
+
+    /* a line: its time, its level, where it came from, its words - one line of the data size, a long
+       word broken anywhere rather than run out of the page */
+    .app-desk .app-log-row {
+        display: grid;
+        grid-template-columns: var(--app-desk-log-time) var(--app-desk-log-level) var(--app-desk-log-src) minmax(0, 1fr);
+        align-items: baseline;
+        gap: var(--app-desk-cell-gap);
+        padding: var(--app-desk-log-pad) var(--app-desk-cell-pad);
+        border-bottom: var(--dw-hairline) solid var(--dw-row-border);
+        color: var(--dw-text);
+        font-size: var(--dw-text-data);
+        line-height: var(--dw-leading-note);
+    }
+
+    .app-desk .app-log-time { color: var(--dw-text-3); }
+    .app-desk .app-log-level { color: var(--dw-text-2); font-weight: var(--dw-weight-semibold); }
+    .app-desk .app-log-src { min-width: 0; overflow: hidden; color: var(--dw-text-2); text-overflow: ellipsis; white-space: nowrap; }
+    .app-desk .app-log-words { min-width: 0; overflow-wrap: anywhere; }
+    .app-desk .app-log-row.is-error .app-log-level,
+    .app-desk .app-log-row.is-error .app-log-words { color: var(--dw-danger-text); }
+    .app-desk .app-log-row.is-warning .app-log-level,
+    .app-desk .app-log-row.is-warning .app-log-words { color: var(--dw-amber-text); }
+}
+
+/* a finger where the pointer is coarse: a field iOS won't zoom into, and a finger's targets */
+@media (min-width: 1024px) and (pointer: coarse) {
+    :root { --app-desk-set-bar: calc(var(--pl-hit) + 2 * var(--app-desk-set-bar-pad)); }   /* the save bar, its buttons a finger */
+    .app-desk .app-settings .settings-env-input { height: var(--pl-hit); font-size: var(--dw-text-body); }
+    .app-desk .app-settings .settings-env-revert,
+    .app-desk .app-settings-discard,
+    .app-desk .app-settings-save,
+    .app-desk .app-log-clear { min-height: var(--pl-hit); }
+}

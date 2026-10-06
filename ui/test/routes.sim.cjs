@@ -59,6 +59,10 @@
  *    facet replaced in the address as it is chosen, as a group page's pressing is, kept by a reload,
  *    back leaving the page in one step); the sidebar's "Needs a look", current while its page is on
  *    top and opening it on You; and the Edit panel opened on a folder (`folderOnly`).
+ *  - The server's settings and the log (2.0.0-player.33): `#/you/settings/server` and `#/you/log/all`,
+ *    one page each as the queue's is (any id made canonical, nothing more in the address), back saying
+ *    "You", a reload keeping them; the sidebar's "Settings" and "Log", current while their page is on
+ *    top and opening it on You.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -978,6 +982,58 @@ console.log('\nNeeds a look: the queue page, its facet in the address and not it
   check('...but the scan LISTING it, the album just not taken yet (the render after a folder request is "asked"): still finding - never a flash of "doesn\'t list"',
     E.editStatus({ deleted: null, problem: null, error: null, albums: 3, loaded: true, stale: false, asked: true, folders: E.folderOnly('Old Rips/Third rip'), holding: false, listed: true, release: null }),
     { text: "Finding the album's folder…", busy: true })
+}
+
+console.log('\nThe server\'s settings and the log: one page each, as the queue\'s (2.0.0-player.33)')
+{
+  check('pushed on You: #/you/settings/server and #/you/log/all',
+    [R.parseHash('#/you/settings/server'), R.parseHash('#/you/log/all')],
+    [{ route: { tab: 'you', page: { kind: 'settings', id: 'server' } }, canonical: '#/you/settings/server' },
+      { route: { tab: 'you', page: { kind: 'log', id: 'all' } }, canonical: '#/you/log/all' }])
+  check('...one page each: any other id is it, and nothing more is kept in the address',
+    [R.parseHash('#/you/settings/whatever?facet=new&release=x').canonical, R.parseHash('#/you/log/yesterday?facet=no_art').canonical],
+    ['#/you/settings/server', '#/you/log/all'])
+  check('...a kind with no id is the tab\'s root, as any page\'s', [R.parseHash('#/you/settings').canonical, R.parseHash('#/you/log/').canonical], ['#/you', '#/you'])
+  check('the pages App opens, labelled for the back button above them', [R.SETTINGS_PAGE, R.LOG_PAGE],
+    [{ kind: 'settings', id: 'server', label: 'Server settings' }, { kind: 'log', id: 'all', label: 'Log' }])
+  check('their scroll kept under their address; neither the same page as the other, nor as the queue',
+    [R.scrollKey({ tab: 'you', page: R.SETTINGS_PAGE }), R.scrollKey({ tab: 'you', page: R.LOG_PAGE }), R.samePage(R.SETTINGS_PAGE, R.LOG_PAGE), R.samePage(R.LOG_PAGE, R.QUEUE_PAGE)],
+    ['#/you/settings/server', '#/you/log/all', false, false])
+  const nav = R.openPage(R.startNav({ tab: 'you', page: null }), R.SETTINGS_PAGE)
+  check('back from either says "You"', [R.backLabel(nav), R.backLabel(R.openPage(R.startNav({ tab: 'you', page: null }), R.LOG_PAGE))], ['You', 'You'])
+  check('...and from a page pushed over them, their own names', R.backLabel(R.openPage(nav, R.LOG_PAGE)), 'Server settings')
+  check('...opened twice is one page', R.openPage(nav, R.SETTINGS_PAGE), nav)
+
+  const b = makeBrowser('#/you')
+  b.load()
+  b.router.open(R.LOG_PAGE)
+  check('end to end: opened, a history entry pushed', [b.hashes(), b.index], [['#/you', '#/you/log/all'], 1])
+  b.router.back()
+  b.settle()
+  check('...back leaves it in one step', [where(b), b.index], [['you', []], 0])
+  const c = makeBrowser('#/you/settings/server')
+  c.load()
+  check('a reload (or a link) opens it', c.router.nav.stacks.you, [{ kind: 'settings', id: 'server' }])
+
+  //? App opens one Managing page over another by `become` (its entry replaced): siblings, never a pile
+  const d = makeBrowser('#/you')
+  d.load()
+  d.router.open(R.SETTINGS_PAGE)
+  d.router.become(R.SETTINGS_PAGE, R.LOG_PAGE)
+  check('one Managing page made another: its entry replaced, back still saying "You"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
+    [['#/you', '#/you/log/all'], [R.LOG_PAGE], 'You'])
+  d.router.become(R.LOG_PAGE, R.QUEUE_PAGE)
+  d.router.back()
+  d.settle()
+  check('...and back from the last leaves them all in one step', [where(d), d.index], [['you', []], 0])
+
+  check('the sidebar: Settings and Log are Managing\'s items', [F.SIDEBAR_SETTINGS, F.SIDEBAR_LOG],
+    [{ id: 'settings', label: 'Settings' }, { id: 'log', label: 'Log' }])
+  check('...each current while its page is on top, whatever its tab; otherwise as before',
+    [F.sidebarCurrent('you', 'albums', true, R.SETTINGS_PAGE), F.sidebarCurrent('home', 'albums', true, R.LOG_PAGE), F.sidebarCurrent('search', 'albums', true, R.SETTINGS_PAGE), F.sidebarCurrent('you', 'albums', true, R.QUEUE_PAGE), F.sidebarCurrent('you', 'albums', true)],
+    ['settings', 'log', 'settings', 'queue', 'you'])
+  check('...a tap opens its page, on You', [F.sidebarMove('settings', 'albums', true), F.sidebarMove('log', 'albums', true)],
+    [{ how: 'managing', tab: 'you', kind: 'settings' }, { how: 'managing', tab: 'you', kind: 'log' }])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

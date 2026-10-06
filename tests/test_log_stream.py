@@ -74,12 +74,12 @@ def test_a_line_logged_from_a_worker_thread_reaches_the_page():
     log.addHandler(handler)
 
     async def go():
-        queue = register_sse_client()
+        queue, _, _ = register_sse_client()
         try:
             log.info("from the loop", extra={"frontend": True})
             await asyncio.to_thread(log.info, "from a worker thread", extra={"frontend": True})
             await asyncio.sleep(0.05)
-            return [json.loads(queue.get_nowait())["event_content"] for _ in range(queue.qsize())]
+            return [json.loads(queue.get_nowait()[1])["event_content"] for _ in range(queue.qsize())]
         finally:
             unregister_sse_client(queue)
 

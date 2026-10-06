@@ -17,6 +17,9 @@
  *                                                      queue - pushed on You. One page whatever
  *                                                      the facet: `facet` is in the address, as a
  *                                                      group page's pressing is, not its identity
+ *   #/<tab>/settings/server                            the server's settings (2.0.0-player.33), and
+ *   #/<tab>/log/all                                    the event log - pushed on You, one page each,
+ *                                                      as the queue page is
  *
  * The player's old `#/album/<id>` links still open: they are the Library's album, and the address
  * is rewritten to `#/library/album/<id>` in place. An empty hash is Home.
@@ -51,17 +54,28 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
 }
 
 /** What a page can be: an album in the library (Navidrome's id), a MusicBrainz release group -
- *  the album you don't have (2.0.0-player.13) - an artist (2.0.0-player.17), or Needs a look, the
- *  review queue (2.0.0-player.25). */
-export type PageKind = 'album' | 'group' | 'artist' | 'queue'
+ *  the album you don't have (2.0.0-player.13) - an artist (2.0.0-player.17), Needs a look, the
+ *  review queue (2.0.0-player.25), or the server's settings or the event log (2.0.0-player.33). */
+export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log'
 
-const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue']
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log']
 
 /** There is one queue page: its id is always this. */
 export const QUEUE_ID = 'all'
 
 /** Needs a look, as App opens it (from the sidebar, or You's row) - All, no facet. */
 export const QUEUE_PAGE: Page = { kind: 'queue', id: QUEUE_ID, label: 'Needs a look' }
+
+/** The server's settings (2.0.0-player.33): one page, whatever id an address gives it. */
+export const SETTINGS_ID = 'server'
+export const SETTINGS_PAGE: Page = { kind: 'settings', id: SETTINGS_ID, label: 'Server settings' }
+
+/** The event log (2.0.0-player.33): one page, whatever id an address gives it. */
+export const LOG_ID = 'all'
+export const LOG_PAGE: Page = { kind: 'log', id: LOG_ID, label: 'Log' }
+
+/** The Managing pages that are one page each, by kind: an address's id is made this one. */
+const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID }
 
 /** A page pushed on a tab. `label` names it on the back button of a page pushed over it - never
  *  part of the address, and never part of what makes two pages the same one. `release` is a group
@@ -114,6 +128,9 @@ function pageFrom(parts: readonly string[], query: string): Page | null {
   const kind = parts[0] as PageKind
   if (!PAGE_KINDS.includes(kind) || !parts[1]) return null
   const id = decode(parts.slice(1).join('/'))
+  //? the server's settings and the log: one page each, whatever the address said, with nothing more
+  const only = ONE_PAGE[kind]
+  if (only) return { kind, id: only }
   if (kind === 'queue') {
     //? one queue page: whatever id the address gave, it is that one
     const facet = new URLSearchParams(query).get('facet')?.trim()

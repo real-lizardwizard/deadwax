@@ -146,6 +146,15 @@
  *    an admin's; You's row a desktop's. A row opens the Edit panel on its folder by the one-panel rule,
  *    and the panel asks no bridge for a folder, reads the library again only for a session's first
  *    album, gives the release editor the queue, and tells the page and App by path.
+ *  - Server settings and the log (2.0.0-player.33, app/ServerSettings.tsx, app/EventLog.tsx) call no
+ *    playback action. The log's stream (an EventSource, held open: one of the six connections a browser
+ *    allows the host, which the player's audio uses too) is opened by EventLog alone, in an effect that
+ *    opens nothing unless the page is what shows (a desktop, an admin, the app in front, the visualizer
+ *    not over it - App's `live`) and closes it as that stops; its lines are text, never HTML. The
+ *    settings page reads through latestOnly(), never over a draft, and a save calls a read still out
+ *    off. What both pages hold - the drafts, the refusal, the tab, the lines - is kept in their modules,
+ *    never as component state, so a page left and come back to still has it. The sidebar's Settings and
+ *    Log are an admin's, after Needs a look; You's rows a desktop's.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -359,7 +368,8 @@ console.log('\nan album page is memoised on what it reads of the player')
     //? (2.0.0-player.15: and the Sources sheet and whether the app is in front, which the group page's `shown` reads;
     //? 2.0.0-player.19: and the frame, and which album - and pressing - a desktop's Sources panel shows)
     //? 2.0.0-player.21: and the Edit toggle's state - admin, the panel, its album - and an edit's refresh)
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? 2.0.0-player.33: and the visualizer, which the server settings' and the log's `live` read)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -391,8 +401,9 @@ console.log('\na link out of the app opens beside it')
   //? the Search placeholder's link went with it in 2.0.0-player.13 (Requests' in .12); the desktop
   //? sidebar's Managing link came in 2.0.0-player.19, and the Edit panel's to the main page's library
   //? (an album it can't find a folder for) in 2.0.0-player.21, and Needs a look's phone note in .25
-  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel, Needs a look on a phone)',
-    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+  //? and (2.0.0-player.33) the server settings' line and its phone note, and the log's phone note
+  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel, Needs a look on a phone, the server settings, the log on a phone)',
+    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/EventLog.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -405,7 +416,9 @@ console.log('\nNow Playing covers everything behind it')
   //? 2.0.0-player.19: on a phone - a desktop's side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
   check('...inert while Now Playing or the Sources sheet shows, on a phone - or the visualizer, on a desktop',
-    [/const visualizerShown = desktop && visualizing\s*const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen\)\) \|\| visualizerShown/.test(app)], [true])
+    //? (2.0.0-player.33: visualizerShown is worked out earlier now - the pages memo reads it)
+    [/const visualizerShown = desktop && visualizing\n/.test(app), /const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen\)\) \|\| visualizerShown/.test(app),
+      (app.match(/const visualizerShown =/g) ?? []).length], [true, true, 1])
   //? (2.0.0-player.20) ...and a desktop's Sources or Info panel left open goes inert under the visualizer
   //? too - outside that wrapper, each takes it as `covered`, as Now Playing takes what is over it
   check('...and a desktop\'s Sources and Info panels, outside it, are inert under the visualizer',
@@ -1316,8 +1329,10 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
     [/\{desktop && \(\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), you.indexOf('app-queue-link-row') < you.indexOf('Open the main page'),
       /\{admin && \([\s\S]*?app-queue-link-row/.test(you), /desktop=\{desktop\}\s*needsLook=\{needsLook\}\s*onNeedsLook=\{openQueue\}/.test(app)],
     [true, true, true, true])
+  //? (2.0.0-player.33: through openManagingPage, which also replaces another Managing page on top)
   check('its page opened on You - the tab as left, the page pushed only when it isn\'t on top there',
-    [/const onTop = stack\[stack\.length - 1\]\?\.kind === 'queue'\s*if \(router\.nav\.tab !== 'you'\) router\.tab\('you'\)\s*if \(!onTop\)/.test(app),
+    [/const openQueue = useCallback\(\(\) => openManagingPage\(QUEUE_PAGE\), \[\]\)/.test(app)
+      && /const top = stack\[stack\.length - 1\] \?\? null\s*if \(router\.nav\.tab !== 'you'\) router\.tab\('you'\)\s*if \(top\?\.kind === page\.kind\) return/.test(app),
       /if \(move\.how === 'queue'\) \{\s*openQueue\(\)/.test(app)],
     [true, true])
   check('a row opens the Edit panel on its folder by the one-panel rule - Sources and Info put away',
@@ -1359,7 +1374,7 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       (panel.match(/onApplied=\{written\(request, subject\)\}|onDone=\{written\(request, subject\)\}/g) ?? []).length],
     [2, true, true, true, true, 3])
   check('the pages memo is keyed on what the queue page reads (the frame, the page shown, the panel and its request)',
-    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes\]/.test(app),
+    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown\]/.test(app),
       /page\.kind === 'queue' \? queueView\(tab, page\)/.test(app)],
     [true, true])
 }
@@ -1378,6 +1393,63 @@ console.log('\nthe page renders the app')
   check('player/main.tsx renders <App /> from app/App', [/from '\.\.\/app\/App'/.test(main), /render\(<App \/>/.test(main)], [true, true])
   check('the old shell and settings sheet are gone',
     ['player/PlayerApp.tsx', 'player/Settings.tsx'].filter((file) => fs.existsSync(path.join(SRC, file))), [])
+}
+
+console.log('\nServer settings and the log in the app, on a desktop (2.0.0-player.33)')
+{
+  const settings = code(read('app/ServerSettings.tsx'))
+  const log = code(read('app/EventLog.tsx'))
+  const app = code(read('app/App.tsx'))
+  const sidebar = code(read('app/Sidebar.tsx'))
+  const you = code(read('app/You.tsx'))
+  check('no playback action from either page', [actionsIn(settings), actionsIn(log)], [[], []])
+  //? a held stream is one of the six connections a browser allows the host - the player's audio uses them too
+  const opening = files.filter((file) => /\bnew EventSource\b/.test(code(read(file))))
+  check('the log is the one file in the app that opens a stream', opening, ['app/EventLog.tsx'])
+  check('...in an effect that opens nothing unless the page is what shows, keyed on exactly that, and closes it as that stops',
+    [/useEffect\(\(\) => \{\s*if \(!desktop \|\| !live\) return\b[\s\S]*?new EventSource\([\s\S]*?return \(\) => \{\s*closed = true\s*reads\.supersede\(\)\s*source\?\.close\(\)[\s\S]*?\}, \[desktop, live\]\)/.test(log),
+      (log.match(/new EventSource\(/g) ?? []).length],
+    [true, 1])
+  check('...a history answering after it stopped showing opens nothing (`closed` asked first)',
+    [/recentLog\(ticket\.signal\)\.then\(\s*\(recent\) => \{\s*if \(!ticket\.current\(\) \|\| closed\) return/.test(log)], [true])
+  check('App\'s `live`: the page\'s tab current, the app in front, the visualizer not over it; both a desktop\'s and an admin\'s',
+    [/const managingLive = \(tab: Tab\) => pageShown && nav\.tab === tab && !visualizerShown/.test(app),
+      /<ServerSettings desktop=\{desktop && admin\} live=\{managingLive\(tab\)\}/.test(app),
+      /<EventLog desktop=\{desktop && admin\} live=\{managingLive\(tab\)\}/.test(app)],
+    [true, true, true])
+  check('the log\'s lines and the settings\' rows are text: nothing set as HTML in either',
+    [/dangerouslySetInnerHTML|innerHTML|insertAdjacentHTML/.test(log), /dangerouslySetInnerHTML|innerHTML|insertAdjacentHTML/.test(settings),
+      /<span class="app-log-words">\{line\.event_content\}<\/span>/.test(log)],
+    [false, false, true])
+  check('the settings read through latestOnly, never over a draft, and a save calls a read still out off',
+    [/const ticket = reads\.begin\(\)\s*setLoading\(true\)\s*getServerSettings\(ticket\.signal\)/.test(settings),
+      /if \(!desktop \|\| !live \|\| Object\.keys\(kept\.drafts\)\.length\) return\s*read\(\)/.test(settings),
+      /const save = async \(\) => \{[\s\S]*?reads\.supersede\(\)[\s\S]*?saveServerSettings\(/.test(settings)],
+    [true, true, true])
+  //? App draws only a tab's top page: a page left for a sibling, Back or Go to album goes - and with it any
+  //? state of its own (review: the drafts the bar had counted, dropped without a word)
+  check('what the pages hold outlives them: the drafts, the refusal, the tab and the lines kept in their modules, never component state',
+    [/^let kept: PageState = freshPage\(\)$/m.test(settings), /const \{ server, drafts: draftEnv, tab, saving, saveError, justSaved \} = kept/.test(settings),
+      /useState<Record<string, string \| null>>|useState<SettingsTab>|useState<Settings \| null>/.test(settings),
+      /^let kept: LogState = emptyLog\(\)$/m.test(log), /const log = kept\b/.test(log), /useState<LogState>/.test(log)],
+    [true, true, false, true, true, false])
+  check('...drawn from the main page\'s settings tab\'s own parts, not copies',
+    [/from '\.\.\/components\/SettingsView'/.test(settings), /<ServerGroup\b/.test(settings), /\bfunction SettingRow\b|settings-env-head/.test(settings)],
+    [true, true, false])
+  check('the sidebar\'s Settings and Log: an admin\'s, after Needs a look, before the main page',
+    [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_SETTINGS\)\}\s*\{item\(SIDEBAR_LOG\)\}\s*<li>\s*<a/.test(sidebar)], [true])
+  check('You\'s rows: a desktop\'s, opening the pages through App',
+    [(you.match(/\{desktop && \(\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('(settings|log)'\)\}>/g) ?? []).length,
+      /onManaging=\{openManaging\}/.test(app), /move\.how === 'managing'\) \{\s*openManaging\(move\.kind\)/.test(app)],
+    [2, true, true])
+  check('the Managing pages are siblings: each opened through one helper, one over another REPLACING it (never piled up)',
+    [/const openQueue = useCallback\(\(\) => openManagingPage\(QUEUE_PAGE\), \[\]\)/.test(app),
+      /const openManaging = useCallback\(\(kind: 'settings' \| 'log'\) => openManagingPage\(kind === 'settings' \? SETTINGS_PAGE : LOG_PAGE\), \[\]\)/.test(app),
+      /if \(top\?\.kind === page\.kind\) return[\s\S]{0,120}if \(top && MANAGING_KINDS\.includes\(top\.kind\)\) router\.become\(top, page\)\s*else router\.open\(page\)/.test(app),
+      /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'settings', 'log'\]/.test(app)],
+    [true, true, true, true])
+  check('the pages memo is keyed on what they read - the visualizer too',
+    [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown\]/.test(app)], [true, true])
 }
 
 console.log('\nthe checks themselves')

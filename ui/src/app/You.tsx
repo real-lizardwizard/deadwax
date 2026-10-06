@@ -48,8 +48,11 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
 
 /**
  * You: how Get works for you, what this device plays like, whether deadwax can reach what it needs,
- * and what version it is. The rest of looking after deadwax - server settings, the albums that need
- * a look, the log, editing an album - is on the main page for now, and this says so and links there.
+ * and what version it is - and, on a DESKTOP, the way to the app's own Managing pages: the albums that
+ * need a look, the server's settings and the log (below). What is left of looking after deadwax is on
+ * the main page for now, and this says so and links there: on a desktop the bulk runs, artist images
+ * and re-filing an artist; on a PHONE all of it - server settings, the albums that need a look, the
+ * log and editing an album, none of which the app draws there yet.
  *
  * - Getting albums (2.0.0-player.15, GettingChoices.tsx): "When I tap Get" (Show me the sources, the
  *   default, or Pick the best source for me) and the quality floor - kept per USER on the server
@@ -74,7 +77,9 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   here carries on: in the same page it would unload the player, its queue and all.
  * - On a DESKTOP (2.0.0-player.25), "Albums that need a look" above it, with how many - the review
  *   queue's page, Needs a look (`onNeedsLook`: App opens it on this tab). A phone has no such row, and
- *   its Managing reads as it always has: no editor has a board there yet.
+ *   its Managing reads as it always has: no editor has a board there yet. Under it (2.0.0-player.33)
+ *   "Server settings" and "Log", the app's own pages of them (`onManaging`: App opens them on this
+ *   tab) - a desktop's only, as the queue's row.
  *
  * It works with Navidrome unset or down: nothing here waits on it. A page, so it reads the player
  * from context; `shown` is App's word that the tab has been opened at least once, `current` that it
@@ -90,6 +95,7 @@ export function You({
   desktop = false,
   needsLook = null,
   onNeedsLook,
+  onManaging,
 }: {
   shown: boolean
   /** the tab showing now: Getting albums are asked again each time it becomes so */
@@ -105,6 +111,8 @@ export function You({
   /** how many albums need a look (null: not known yet) */
   needsLook?: number | null
   onNeedsLook?: () => void
+  /** the server's settings, or the log: its page (2.0.0-player.33) */
+  onManaging?: (kind: 'settings' | 'log') => void
 }) {
   const player = usePlayerState()
   const actions = usePlayerActions()
@@ -265,6 +273,18 @@ export function You({
                 <ChevronRightIcon class="app-chevron" />
               </button>
             )}
+            {desktop && (
+              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('settings')}>
+                <span class="app-row-label">Server settings</span>
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
+            {desktop && (
+              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
+                <span class="app-row-label">Log</span>
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
             <a class="app-row app-link-row" href="/" target="_blank" rel="noopener">
               <span class="app-row-label">Open the main page</span>
               <ChevronRightIcon class="app-chevron" />
@@ -272,7 +292,7 @@ export function You({
           </div>
           {desktop ? (
             <p class="app-footnote">
-              Server settings, the log, the bulk runs and artist images are on the main page for now.
+              The bulk runs, artist images and re-filing an artist are on the main page for now.
             </p>
           ) : (
             <p class="app-footnote">

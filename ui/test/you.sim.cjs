@@ -515,14 +515,32 @@ exports.readPreferences = () => globalThis.__getting.preferences
     const opened = []
     draw({ shown: true, current: true, ...LOOK, desktop: true, needsLook: 3, onNeedsLook: () => opened.push(true) })
     const order = find(byClass('app-link-row')).map(text)
+    //? (2.0.0-player.33) Server settings and Log between it and the link to the main page
     check('a desktop: "Albums that need a look" with its count, above the link to the main page',
-      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order[1]],
+      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order[3]],
       ['Albums that need a look', '3', 'Albums that need a look, 3 albums', true, 'Open the main page'])
     row().props.onClick()
     check('...a tap goes to its page', opened, [true])
     check('...and the main page\'s footnote no longer says the queue is there', footnotes().some((words) => words.includes('albums that need a look')), false)
     draw({ shown: true, current: true, ...LOOK, desktop: true, needsLook: null, onNeedsLook: () => {} })
     check('the count not known: no badge drawn over it, the plain name read', [within(row(), byClass('app-queue-badge')).length, row().props['aria-label']], [0, undefined])
+  }
+
+  console.log('\nServer settings and Log (2.0.0-player.33): a desktop\'s rows in Managing, never a phone\'s')
+  {
+    const rows = () => find(byClass('app-link-row')).map(text)
+    const footnotes = () => find(byClass('app-footnote')).map(text)
+    draw({ shown: true, current: true, ...LOOK })
+    check('a phone: neither row - only the link to the main page', rows(), ['Open the main page'])
+    const opened = []
+    draw({ shown: true, current: true, ...LOOK, desktop: true, needsLook: 2, onNeedsLook: () => {}, onManaging: (kind) => opened.push(kind) })
+    check('a desktop: under "Albums that need a look", Server settings then Log, then the main page', rows().map((words) => words.replace(/\d+$/, '')),
+      ['Albums that need a look', 'Server settings', 'Log', 'Open the main page'])
+    const button = (words) => find((node) => node.type === 'button' && text(node) === words)[0]
+    button('Server settings').props.onClick()
+    button('Log').props.onClick()
+    check('...each opening its page', opened, ['settings', 'log'])
+    check('...and the footnote no longer says settings and the log are on the main page', footnotes().some((words) => /settings|the log/i.test(words)), false)
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

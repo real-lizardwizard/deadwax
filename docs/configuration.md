@@ -27,6 +27,20 @@ written.
 Two settings can't be changed from the settings tab, and the tab says why: `DB_PATH` is where
 the tab's own overrides are stored, and `PUID`/`PGID` are used before the app starts.
 
+### In the app, on a desktop
+
+The server settings can also be changed in [the app](player.md) at `/player/` on a desktop (a
+window at least 1024 pixels wide): **Managing → Settings** in the sidebar, or **You → Server
+settings**. It is the same server half of the settings tab - the same rows, the same three pages
+(Library, Downloads, Connections), the same rules - and what is saved there is the same override,
+in the same database. Changes stay drafts until **Save changes**, which saves every page's changes
+at once or, if deadwax refuses one, none of them, saying why. A change made while a save is still
+on its way stays a draft for the next save, and drafts are kept if you go to another page - the Log,
+say - and come back, until the app is reloaded. The browser preferences (search,
+candidates, auto-grab, the interface) and **Re-time saved lyrics** are still the main page's
+settings tab's; the page says so and links to it. On a phone the page only says it needs a wider
+screen.
+
 ## Server settings
 
 ### Connections

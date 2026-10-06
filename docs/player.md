@@ -138,7 +138,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   version, and that logins are off. Server settings, the albums that need a look and the log are on
   the main page for now - and so is editing an album, on a phone (on a desktop an album's page has
   **Edit**, and **Managing deadwax** has **Albums that need a look**, with how many, which opens
-  **Needs a look**, [below](#on-a-desktop)) - and **Open the main page** takes you there.
+  **Needs a look**, then **Server settings** and **Log**, [below](#on-a-desktop)) - and **Open the
+  main page** takes you there.
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
   from, and **✕** to cancel, which asks in the card first: **Keep it** or **Cancel download**),
   **Waiting** (its place in the user's queue, or "starting"), **Needs attention** (why it stopped,
@@ -364,8 +365,12 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
   songs, as on a phone) - then **Managing**: **Needs a look**, with how many albums need one, the
   library's review queue in the app ([the library guide](library.md#needs-a-look-in-the-app) has it),
-  and **Open the main page**, which opens the main page in a new tab (server settings, the log and the
-  bulk runs are there for now; an album is edited from its own page, below), and
+  **Settings**, the server's settings - the main page's settings tab's server half, its three pages
+  and its one save ([Configuration](configuration.md#in-the-app-on-a-desktop) has it) - and **Log**,
+  deadwax's event log: the last 500 lines since it started, then new ones as they come, while the page
+  shows ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)),
+  and **Open the main page**, which opens the main page in a new tab (the bulk runs, artist pictures
+  and re-filing an artist are there for now; an album is edited from its own page, below), and
   **You** at the foot. Where you are is highlighted. Home, Requests and You work as the phone's tabs
   do: a click shows it as you left it, and a click on the one showing goes back to its first page
   (and, there, to the top). So does the Library view showing. Another Library view shows that view -
@@ -1145,19 +1150,19 @@ fixes that.
   section isn't shown.
 - **An album with no MusicBrainz release id can't be pinned** (its pin isn't shown): nothing would
   find it again once it moved.
-- **On a desktop**, the sidebar's **Managing** has **Needs a look** and otherwise opens the main page;
+- **On a desktop**, the sidebar's **Managing** has **Needs a look**, **Settings** and **Log**, and otherwise opens the main page;
   between 1024 and 1279 pixels wide a panel lies over the right of the page, the end of a long
   tracklist under it. The Edit panel edits one album, from its page or from **Needs a look**: the bulk
-  runs, an artist's pictures, **Move albums to …**, the server settings and the log are the main
-  page's. On a phone **Needs a look** is a short note pointing at the main page. The [visualizer](#the-visualizer)
+  runs, an artist's pictures and **Move albums to …** are the main page's, and so are the browser
+  preferences of its settings tab. On a phone **Needs a look**, **Settings** and **Log** are short notes pointing at the main page. The [visualizer](#the-visualizer)
   sees FLAC songs only; its play/pause is its one control of the music (skip and seek from the player
   bar, after leaving it).
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
-- **The rest of deadwax**: editing an album on a phone, the albums that need a look (on a phone - a
-  desktop has **Needs a look**) and the server settings are on the main page, which also works on a
-  phone.
+- **The rest of deadwax**: editing an album on a phone, the albums that need a look, the server
+  settings and the log (on a phone - a desktop has **Needs a look**, **Settings** and **Log**) are on
+  the main page, which also works on a phone.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata

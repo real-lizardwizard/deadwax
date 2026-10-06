@@ -275,8 +275,10 @@ Library:
   the album's own page, its **Edit** button (since 2.0.0-player.21; [below](#editing-an-album-in-the-app)).
   The albums that need a look are the sidebar's **Needs a look**, under **Managing** (since
   2.0.0-player.25; [below](#needs-a-look-in-the-app)). The bulk runs (**Get covers · N** and the
-  rest), an artist's pictures, **Move albums to …**, the server settings and the log are still this
-  page's: **Managing**'s **Open the main page** opens it in a new tab.
+  rest), an artist's pictures and **Move albums to …** are still this page's: **Managing**'s **Open
+  the main page** opens it in a new tab. The server settings and the log are **Managing**'s
+  **Settings** and **Log** (since 2.0.0-player.33; see [Configuration](configuration.md#in-the-app-on-a-desktop)
+  and [Troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)).
 
 ## Editing an album in the app
 

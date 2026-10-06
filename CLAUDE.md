@@ -194,7 +194,10 @@ src/
                    the player - holds the login; client_for(request), the per-user seam),
                    app.py, same_origin.py (refuses
                    writes another website asks for - see "The 1.0.1 fixes")
-  routes/          search_musicbrainz, download, monitor_slskd, interface_logs, library,
+  routes/          search_musicbrainz, download, monitor_slskd, interface_logs (the event log's
+                   stream, and since 2.0.0-player.33 /recent: the last 500 page-bound lines
+                   src/logger.py keeps, numbered - see "Server settings and the log in the
+                   app"), library,
                    settings (editable since v0.5.1 - see "The settings tab"), navidrome
                    (the player's FIXED list of Subsonic calls - see "The phone player"),
                    me, store_album (the app's id bridge - see "Artists, and the two
@@ -223,7 +226,10 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    turntable, part two" and "The record's sound follows the hand".
                    app/NeedsALook.tsx is the review queue on a desktop, its rules the pure
                    lib/needsLook.ts and its count app/useQueueSummary.ts - see "Needs a look".
-tests/             2354 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+                   app/ServerSettings.tsx (drawn from components/SettingsView.tsx's own exported
+                   parts) and app/EventLog.tsx (lib/eventLog.ts) are the server's settings and the
+                   event log on a desktop - see "Server settings and the log in the app".
+tests/             2373 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -6877,7 +6883,8 @@ later; "Managing links to / for now".
   an album on desktop"); the comparison table (rejected);
   "Mine / Everything in the store" (logins are off); the sidebar's "Needs a look" count (built in
   2.0.0-player.25, "Needs a look"), Settings and Log as their own items (one "Open the main page" link
-  until the Managing slices); Lyrics and Queue in
+  until the Managing slices; built in 2.0.0-player.33, "Server settings and the log in the app"); Lyrics
+  and Queue in
   the bar (nothing for them to open); a desktop Now Playing; "Results for …" as the breadcrumb (the
   back label stays the tab's name). You's "Now Playing opens as" and "Pause winds the record down"
   still show on a desktop - they are this device's phone settings, and an iPad turns between frames.
@@ -7566,8 +7573,9 @@ on a step counter"); LibraryView.tsx, `ui/src/components/` and `ui/src/hooks/` h
 
 - **Where it is**: the desktop sidebar's Managing, a new first item "Needs a look" (`SIDEBAR_QUEUE`,
   `SidebarId` 'queue') with Requests' badge look and `badgeText`'s rule ("Needs a look, 3 albums" to
-  VoiceOver, `needsLookLabel`), above "Open the main page" (whose title now names what is still the main
-  page's: server settings, the log, the bulk runs, artist images); `aria-current` while its page is on
+  VoiceOver, `needsLookLabel`), above "Open the main page" (whose title then named what was still the
+  main page's: server settings, the log, the bulk runs, artist images - the settings and the log built
+  in 2.0.0-player.33, "Server settings and the log in the app"); `aria-current` while its page is on
   top (`sidebarCurrent`'s new `page` argument: the queue page is its item whatever tab it is on). And
   You's "Managing deadwax", desktop only, admin only: a row "Albums that need a look" with the same badge
   (`.app-queue-badge`), above the link to the main page; on a desktop the footnote no longer claims the
@@ -7667,8 +7675,9 @@ on a step counter"); LibraryView.tsx, `ui/src/components/` and `ui/src/hooks/` h
   card for a page with nothing to show (`app-card app-placeholder-body` in `app-needs`, for the link's
   colour) - no CSS of its own there, and no other phone screen's DOM touched (the You row and the
   sidebar item are desktop-only, the phone's Managing footnote word for word as it was).
-- **Not built, on purpose**: server settings, the log, the bulk runs, artist images, re-filing, a phone
-  editor, "Everyone's requests"; anything retired on the main page (LibraryView.tsx unchanged); an ETag
+- **Not built, on purpose**: server settings, the log (both built in 2.0.0-player.33, "Server settings
+  and the log in the app"), the bulk runs, artist images, re-filing, a phone editor, "Everyone's
+  requests"; anything retired on the main page (LibraryView.tsx unchanged); an ETag
   on the summary; following an album page of the same album after a write from the queue.
 - **Verified**: 2349 Python tests (10 new in `test_queue_summary.py`, five in `test_app_desktop_css.py`),
   pyflakes, tsc, the bundle, and all 43 sims (`needslook` 64 new; `routes` 237, `app-rules` 246 and `you`
@@ -7804,6 +7813,231 @@ things it found, each fixed:
 - **Verified**: 2354 Python tests (four new in tests/test_pages.py: the stamps, another address for a file written again, what is kept
   and what is still asked about), app-rules.sim (the deferred Library, the three sizes), and the real
   page before and after with the request log above.
+
+### Server settings and the log in the app (2.0.0-player.33)
+
+The second Managing slice (the plan's section 10), built like "Needs a look". No board draws either
+screen; the desktop sidebar's Managing only names "Settings" and "Log". The spec is the session
+scratchpad's `uplan/slice-settings-log.md`; it named the slice .27, and it is .33 because player-spike
+took .26 to .32 (the launch audit and the turntable's sound) while it was built, to be rebased onto them. The main page's settings tab and log are unchanged: its
+settings tab renders the same tree as before (checked once, by rendering the old and the new
+SettingsView with function components drawn through, on all three server pages, untouched and with
+drafts: identical), and init.js ignores the new fields on an event.
+
+- **Where they are**: the desktop sidebar's Managing, after "Needs a look", **Settings** and **Log**
+  (`SIDEBAR_SETTINGS`, `SIDEBAR_LOG`; `SidebarId` 'settings' | 'log'; current while their page is on
+  top, `sidebarCurrent`'s `page`), an admin's, then "Open the main page" (its title now names only the
+  bulk runs, artist images and re-filing). You's Managing, desktop only: **Server settings** and
+  **Log** rows under "Albums that need a look" (`onManaging`), and the desktop footnote names only the
+  bulk runs, artist images and re-filing. No unread badge on Log: it would need the stream held open.
+- **The routes** (`lib/appRoutes.ts`): `PageKind` 'settings' and 'log', `#/you/settings/server` and
+  `#/you/log/all` - one page each (`SETTINGS_ID`, `LOG_ID`, `ONE_PAGE`: any id in an address is it,
+  made canonical, nothing more kept), back "You" (`SETTINGS_PAGE` and `LOG_PAGE` labelled "Server
+  settings" and "Log" for a page above them). **The three Managing pages are siblings**
+  (`openManagingPage` in App, which openQueue now goes through too): one opened while another is on
+  top of You REPLACES it (`router.become`), never pushed over it, so Settings -> Log -> Settings never
+  piles up and back from any of them says "You"; nothing when it is already on top. The queue page
+  follows the same rule now (before, it had no siblings and was always pushed over what was on top),
+  pinned in app-rules and driven in routes.sim.
+- **The settings page: `app/ServerSettings.tsx`**, the SERVER half of the settings tab drawn from
+  SettingsView's own parts, exported for it with no change to the tab's DOM: `ServerGroup` (a group's
+  rows, `children` after them - the tab passes Re-time lyrics there), `SettingRow`, `Section`,
+  `OrganizingVerdict`, `OrganizeModes` and `editedEnvDraft` (the draft rule: a value set back to the
+  saved one is no change, except a secret's - any typing is a change). Its tabs are the tab's three
+  server tabs (`lib/serverSettings.ts` `SERVER_TABS`: Library first, then Downloads, Connections - the
+  main page lists them Downloads, Library, Connections after its Search tab; `tabForGroup` places each
+  group, an unknown one under Library) as the Edit panel's underline tabs, marked by `tabMarks`
+  (attention, else unsaved), the arrow keys moving round (and focus with them). Every edit is a draft
+  until **Save changes**, kept across tabs; ONE save bar, always in the page (its WORDS the
+  `role="status"` region, never Discard and Save - around them too, a screen reader read their names
+  with every change), at the foot of the page area above the player bar, says nothing until there is
+  something; the batch is the
+  server's all-or-nothing PUT, a refusal said there ("Not saved: …", kept until the next save or
+  Discard, as the main page keeps it) with every draft still drawn. Save is the page's one solid purple
+  button. **The rows stay editable while a save is on its way** (the server stats every path it is
+  sent - a moment on a NAS): an edit made then stays a draft (`draftsAfterSave`: only what was sent,
+  still as sent, goes - a key typed again since, or one the save never carried, stays), and the bar
+  says "N unsaved changes", never "Saved."; until the review a save cleared every draft and so wiped
+  that edit unsent. A successful save also clears a failed re-read's "Couldn't read the settings again"
+  line (the settings were just answered). **Focus is never dropped to the page**: Save and Discard are
+  drawn only with a draft, so the save or discard that takes the last one takes them away with focus
+  on one; a layout effect then gives focus to what the bar says (`tabIndex -1`, no ring) - only when it
+  fell to the body. NOT here: the main page's browser preferences and Re-time lyrics - one line says
+  so, the main page linked beside the app. Read (`getServerSettings`, which now takes a `signal`) the
+  first time the page shows and again each time it comes back into view **with no draft**
+  (`kept.drafts`), through latestOnly; a save calls any read still out off, so an older answer never
+  lands over the save's. Never at start-up. **What the page holds outlives it** (`kept`, a module
+  store with listeners, as useGetSettings is): App draws only a tab's top page, so the sidebar's Log or
+  Needs a look (which replace it), Back or Go to album unmount it - and the drafts the bar had counted
+  went with it, without a word, until the review. The settings as answered, the drafts, the refusal,
+  the tab and a save on its way are kept there until Save or Discard (or a reload): coming back with a
+  draft reads nothing over it, and a save left mid-way lands there all the same. Two copies drawn (an
+  address can put the page on another tab) are one page. `forgetServerSettingsPage()` is the sims'.
+- **The log page: `app/EventLog.tsx`** (pure rules `lib/eventLog.ts`): text lines, newest first, each
+  with the server's time (`lineTime`, HH:MM:SS, monospace), its level (`levelOf`: errors red, warnings
+  amber) and where it came from (`src`, always drawn so the words keep one column) - **all text**, never
+  HTML (the log quotes strangers' titles and paths; the v0.9.21 rule). At most `LOG_KEPT` (500) kept.
+  **Clear** empties the view and keeps the number, so nothing cleared comes back, and the empty view
+  then says "Cleared. New lines show here as deadwax logs them." (`EMPTY_WORDS`), never "Nothing logged
+  yet." - which is for a history that really was empty. Where the stream stands - Connecting…, Live,
+  "The stream was lost - trying again" - is ONE line above the list (`STREAM_WORDS`), never a column of
+  failures. **"Trying again" is kept true**: EventSource tries again by itself only after a NETWORK
+  error; an answer that isn't the stream (a reverse proxy's 502 while deadwax restarts) ends it for good
+  (readyState CLOSED), and the page then asks again itself after `STREAM_RETRY_MS` (5 s) - the history
+  first, then the stream from where it ends - once per failure, the timer called off as the page stops
+  showing. Without a proxy (James's setup) a restart refuses the connection, a network error, and
+  EventSource recovers on its own. **A history that couldn't be read is filled in by the next**: the
+  stream then opens from now, and the run's first line heard leaves a `gap` below it (LogState) - the
+  lines deadwax kept from before it, which the page never had; the next history read puts them under
+  the run's own lines and above any older run's (`fillGap`). Without it those lines, all at or below the
+  newest number, were dropped as "had" for good. Clear drops a gap with the view. **The lines outlive
+  the page** as the settings' drafts do (`kept`, the module's `LogState`; `forgetEventLogPage()` for
+  the sims): left for a sibling or by Back and come back to, the history is joined by number to what
+  was on screen - nothing twice, a gap filled, and nothing cleared back again (it was, every time, until
+  the review, which made troubleshooting's "the lines cleared don't come back when you return" untrue).
+- **The history** (`src/logger.py`): the last `LOG_HISTORY` (500) page-bound records - exactly what
+  SSEHandler forwards (`frontend: True`), nothing else - each with `seq` (rising by one per line,
+  across threads), `time` (the record's) and `boot` (`LOG_BOOT`, this run's name: numbers start again at
+  1 when deadwax restarts). `emit` now runs whether or not a stream is open, and numbers, keeps and hands
+  the line to the streams under one `threading.Lock`, so the streams get lines in the order they were
+  numbered. **`GET /deadwax/interface_logs/recent`** -> `{lines, last, boot}` (oldest first; gzipped
+  like any text route; a GET, so the same-origin guard passes it). **The stream takes `after` and
+  `boot`**: `register_sse_client(after, boot)` returns the queue, the kept lines after `after` (all of
+  them for another run's `boot`), and the number at or below which it has every line - taken together
+  with adding the queue, nothing awaited between, so a line logged on another thread between the page's
+  read and its stream is in one or the other, and the stream sends each number once (a publish at or
+  below what the replay sent is skipped - the queue is handed each line once, in the order numbered, so
+  that floor never needs moving). The queue now holds `(seq, json)`. `after` is 0 or more and `boot` at
+  most 64 characters (deadwax's are 12), a 422 otherwise. **The spec said "fetch
+  recent, open the stream, drop anything at or below `last`"**; that order alone has a gap (a line
+  logged between the read and the stream's opening is in neither), which `after` closes. Without
+  `after` (the main page) the stream is exactly as before: only what is logged from now, the first-chunk
+  comment first. EventSource reconnecting by itself asks from the same `after`; the page drops what it
+  has by number (`joinLine`).
+- **The stream is held only while the page is what shows**: EventLog's effect on `[desktop, live]`
+  opens nothing unless both, reads /recent first, then `new EventSource(logStreamUrl(last, boot))`, and
+  closes it in its cleanup; App's `live` is `managingLive(tab)` - `pageShown && nav.tab === tab &&
+  !visualizerShown` - and both pages get `desktop && admin` (a non-admin, impossible with logins off,
+  would see the phone's note). A held connection is one of the six a browser allows the host over plain
+  http/1.1, and the player's audio uses them. `visualizerShown` moved above the pages memo, which is
+  keyed on it now.
+- **Phone**: both addresses show the app's card ("Changing deadwax's settings needs a wider screen for
+  now - or the main page.", "The log needs a wider screen for now - or the main page.") and ask nothing;
+  no existing phone screen's DOM changed (You's new rows and the sidebar items are desktop-only, the
+  phone footnote word for word as it was).
+- **Style** (app-desktop.css, its own section at the end; tokens `--app-desk-set-*`, `--app-desk-log-*`):
+  the settings tab's own classes styled by name under `.app-desk .app-settings` (no main.css on this
+  page) - groups as cards, the key monospace, where a value came from a chip, an edited row amber at its
+  edge, errors in the failure text, fields STYLE.md's well; long keys, notes, paths and the verdict broken
+  anywhere; the settings page at least the page area's height (`--app-desk-set-page`, the window less
+  the player bar; the body growing into it), so the save bar - `position: sticky; bottom:
+  var(--app-desk-bar)`, `--app-desk-set-bar` tall, taller on a coarse pointer - is at the foot of the
+  window on a short tab too, where sticky alone left it under the last group mid-screen; idle it takes
+  no clicks (`pointer-events: none` without `is-said`: an invisible box over what a long tab scrolls
+  under it swallowed presses on fields there), and while it says something `html:has(.app-desk
+  .app-pane:not([hidden]) .app-settings-savebar.is-said)` adds its height to the scroll padding, so
+  keyboard focus stops above it - only from the pane that SHOWS: the page stays drawn in You's hidden
+  pane while another tab shows (holding "Saved." or a draft), and `:has()` matches what is hidden, so
+  every other tab's focus stopped 55px higher than its player bar needed until the review
+  (`test_nothing_reaches_the_phone` takes `html:has(.app-desk ...)`, which only a desktop can match);
+  the log a grid of time, level, source and words at the data size, words broken anywhere;
+  both pages kept clear of a drawer as the queue page is; a coarse pointer gets 17px fields and 44px
+  controls.
+- **Not built, on purpose**: the browser preferences and Re-time lyrics in the app, the bulk runs,
+  artist images, re-filing, a phone editor or phone settings, an unread count on the Log, retiring
+  anything on the main page.
+- **Verified**: 2366 Python tests (2364 passed, 2 skipped; `test_log_history.py` 12 new, four in
+  `test_app_desktop_css.py`; `test_log_stream.py`'s one call to `register_sse_client` reads its new
+  return), pyflakes, tsc, the bundle, all 44 sims (`settingslog` new; `routes`, `app-rules` and `you`
+  extended, `app-rules`' memo and `covered` checks moved to the new spelling, never weakened). 37
+  mutations, one per rule pinned (seven on the server, 26 on the pages, the routes, App, the sidebar
+  and You, three on the CSS, one on the draft rule), each restored byte for byte (checked by hash): all
+  caught - one, the log page's `closed` check after the history answers, only by app-rules' text pin
+  (it is a second guard: the cleanup's supersede already makes the answer stale); one, `tabMarks`
+  handed the drafts, only after the sim gained a check on a tab with no attention mark of its own. The
+  engine guard is empty.
+- **Checked in a real page** (headless Chromium, real mouse input, this worktree's own instance on
+  :8095 with a scratch database and an empty library - never the dev setup's :8081; 46 checks): the
+  sidebar's Managing order; nothing read and no stream at start-up; Settings at `#/you/settings/server`,
+  its item current, back "You", three tabs, no preference or Re-time; a path holding markup typed on
+  Library and an address on Connections - the retype note, "2 unsaved changes", the bar above the player
+  bar; Save refused (the password not retyped) with both drafts kept; the address set back and saved,
+  the override stored and the row in error, Library marked; Log replacing Settings (back still "You"),
+  Live, the line logged before it opened there from the history, drawn as text (no image made, nothing
+  ran), a warning amber, one stream from `after=…&boot=…`, a line logged while it shows arriving once,
+  the stream closed on leaving, the lines logged while away joined on coming back with none twice, Clear
+  emptying the view with no request; at 1440, 1280 and 1024, with Info open beside, no sideways scroll
+  and the page clear of the panel; the music playing through it all on one audio element; on a phone
+  both notes with nothing asked, and no new You row; no console errors and no dialog.
+- **After review** (fourteen findings confirmed, two of them the same - all fixed, each with a check that
+  fails without it where it can be tested): an edit made while a save was on its way wiped unsent under
+  "Saved." (`draftsAfterSave`); "The stream was lost - trying again" said for good once the browser had
+  given up on the stream (CLOSED, behind a proxy answering 502) - the page now asks again itself; a
+  history that failed once losing the lines kept from before the first line heard, for good (the `gap`);
+  a failed re-read's line left beside the settings a save had just answered; the idle save bar, a
+  transparent box, swallowing presses on the fields a long tab scrolled under it, and hiding a field
+  focused under it once it said something (`pointer-events`, the scroll padding); focus dropped to the
+  page as Save or Discard went; "Nothing logged yet." after Clear; the bar mid-screen on a short tab
+  (the page's min-height); Discard clearing a refusal, the arrow keys' direction and the stream's query
+  bounds pinned by nothing (now they are); `SERVER_TABS`' comment and the sim's label claiming the main
+  page's tab order (it lists Downloads first); You.tsx's docstring saying all of Managing is the main
+  page's (a phone's case only now); and the stream's `sent = seq`, redundant (the queue is handed lines
+  in order) and dropped. A claimed duplicate `font-size` in the CSS was checked and isn't there.
+  **Totals after review**: 2369 Python tests (2367 passed, 2 skipped; two more in `test_log_history.py`,
+  the bounds asked straight through the app so an endless stream can't hang them, and one in
+  `test_app_desktop_css.py`), pyflakes, tsc, the bundle, all 44 sims (`settingslog` 114 checks, 40 of
+  them the review's; `app-rules` 262). 35 mutations, one or more per fix, each restored byte for byte
+  (checked by hash): all caught. The engine guard is empty. **Checked in a real page** (headless
+  Chromium, this worktree's own instance on :8096, a scratch database and an empty library; 31 checks):
+  at 1440x900, 1280x800 and 1024x768 the save bar's foot on the player bar's top on the short Downloads
+  tab (no scroll added: at 1024 its own content is taller than the window) and the long Library; a real
+  click on a field scrolled under the idle bar landing in the field; with a draft the page's bottom
+  scroll padding 127px (72 + 54 + the hairline) and Tab to a control under the bar scrolling it clear -
+  and, the rule overridden to the player bar's 72px, the same Tab leaving it under the bar (the control);
+  Save and Discard by the keyboard leaving focus on the bar's words, no ring; Clear saying "Cleared…";
+  a reload whose history read was answered 502 live from then, its earlier lines filled in on coming
+  back, none twice; the stream answered 502 (the browser's EventSource CLOSED) saying "trying again",
+  asked again three times in 12 s rather than in a loop, Live once answered, and nothing asked after
+  leaving. A coarse pointer (touch emulation, 1180x820): the bottom padding 165px (100 + 64 + the
+  hairline), exactly the 100px player bar and the 65px save bar on it, fields 17px.
+- **NOT verified**: an iPad on its side (17px fields, 44px targets), VoiceOver (the save bar's and the
+  stream line's live regions), Safari's EventSource reconnecting, a real restart of deadwax under an open
+  Log page (the `boot` parameter is pinned in the Python tests and, since the second review, in the sims
+  through the REAL api/logs.ts), and the real :8081 setup.
+- **After a second review** (eight findings confirmed, two pairs the same - six fixes, each testable one
+  with a check that fails without it): the drafts dropped without a word when the page was left (above:
+  the module store, and the log's lines with it - each page now drawn again by the module's listeners,
+  so the sims also hold that a change tells every copy drawn and a copy gone nothing: a line from the
+  stream is what tells the log page to draw its new line); the save bar's scroll padding on every tab (above); the
+  version, set to .27 as the spec said when player-spike had already taken .27 (then .30, taken too
+  while this was fixed - now .33); the sim
+  carrying its own copy of api/logs.ts, so the stream's address could lose `boot` with every suite
+  passing - which would break the one thing `boot` exists for, a deadwax restart without a proxy
+  (EventSource reconnecting with `after=N` and no run: nothing replayed, the new run's first N lines
+  skipped) - it now runs the real file, deadwax faked at `fetch` one layer down, and asks for the
+  addresses themselves (`after=0` sent, a run's name encoded, a number with no run from now); the save
+  bar's live region round its buttons (above); and "Needs a look"'s section, whose sidebar title and
+  "Not built" list still named the server settings and the log (both now say where they were built).
+  **Totals after the second review**: 2369 Python tests (2367 passed, 2 skipped; none new - the CSS
+  test's selector check was tightened in place), pyflakes, tsc, the bundle, all 44 sims (`settingslog`
+  140 checks, 26 of them the second review's; `app-rules` 263). 14 mutations, one or more per testable
+  fix (the drafts and the lines dying with their page, a page or a gone copy told nothing, a read over
+  kept drafts, the padding from any pane, the stream's address losing `boot`, `after=0` or the
+  encoding, or keeping `after` with no run, the history's path, the live region on the bar), each
+  restored byte for byte (checked by hash): all caught - three (the drafts' and the lines' listeners,
+  a gone log page's) only once the sim could see a page told to draw again (`redraws`, its first hook).
+  **Checked in a real page** (headless Chromium, real clicks and typed text, this worktree's own
+  instance on :8097 with a scratch database and an empty library; 30 checks): two drafts on two tabs
+  kept through the sidebar's Log, Needs a look, the sidebar's You and Back - the page gone each time,
+  nothing read over them, the tab left on and its mark; a refused save's words kept through Log and
+  back; the bottom scroll padding 127px on Settings with a draft and 72px on Home and the Library with
+  the page still drawn in You's hidden pane, its bar saying something (a draft, and "Saved."); the
+  accessibility tree's status region the bar's count alone, no button in it; a line logged while the
+  Log shows drawn with nothing else done; the lines on screen drawn at once on coming back, the line
+  logged while away joined, every kept line once and in order, one new stream from where the history
+  ended; Cleared kept through leaving; no console error, no dialog.
+  After the rebase onto 2.0.0-player.32 the merged tree is 2373 Python tests (the four of "Loading,
+  audited" joining) and `app-rules` 269 checks, every sim passing and the engine guard empty.
 
 ### Artists who have renamed (v0.6.18)
 
@@ -9171,7 +9405,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2354 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2373 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see the npm gotcha above:
@@ -9227,6 +9461,7 @@ node ui/test/musicfeel.sim.cjs  # the desktop visualizer's feel and tempo - the 
 node ui/test/vizsync.sim.cjs    # the visualizer's silent copy kept in time - started, paused, re-synced past 0.25 s, the next window asked ahead, each song's state its own, the next song's first window fetched ahead, a whole song and two songs back to back through a fake copy
 node ui/test/visualizer.sim.cjs # the visualizer's pure parts - the FIXED rotation order, the choices kept per device, the cover's colours, the bands and waveform, the idle signal, the size caps
 node ui/test/needslook.sim.cjs  # Needs a look - queueAlbums' list and the facets (Newly added only when there is one, a facet emptied falling back), the session (rows fixed, Fixed/Ignored/Deleted, a rename followed, merged disc folders, reviewed on every way of leaving an album, never one deleted, an album gone ending it), and the page rendered - its states, the selected row, what the panel is asked for, its count, the ending (its scan after the note, rows held and refused until no read is out, the chips held), a phone asking nothing; and the REAL useQueueSummary.ts against a faked deadwax
+node ui/test/settingslog.sim.cjs # Server settings and the log in the app - the server's groups only, drawn from the settings tab's own parts (a secret masked, choices, locked, revert, the retype note), drafts across the tabs and one save, a refusal keeping every draft (until the next save or Discard), read again only with no draft, a save calling a read off, an edit made while a save is on its way kept, focus given to the bar as Save or Discard goes, the arrow keys; the log's history and stream joined by number (no gap, no line twice, a restart, Clear and what it says), a history that failed filled in by the next, markup drawn as text, 500 at most, the lost stream one line and asked again by hand once the browser gives up on it, the stream closed when hidden; the drafts and the lines outliving their page, every copy told as they change; the stream's and the history's addresses from the real api/logs.ts; on a phone a note, nothing asked
 ```
 
 `npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
@@ -9247,7 +9482,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2354 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2373 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

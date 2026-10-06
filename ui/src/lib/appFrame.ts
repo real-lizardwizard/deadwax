@@ -118,8 +118,9 @@ export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: b
  */
 export type LibraryPick = 'recent' | 'albums' | 'artists' | 'songs'
 
-/** The sidebar's items - `queue` is Managing's "Needs a look" (2.0.0-player.25), an admin's. */
-export type SidebarId = 'home' | 'requests' | LibraryPick | 'queue' | 'you'
+/** The sidebar's items - `queue` is Managing's "Needs a look" (2.0.0-player.25), `settings` and `log`
+ *  its "Settings" and "Log" (2.0.0-player.33) - an admin's. */
+export type SidebarId = 'home' | 'requests' | LibraryPick | 'queue' | 'settings' | 'log' | 'you'
 
 export interface SidebarItem {
   id: SidebarId
@@ -151,6 +152,10 @@ export const LIBRARY_TITLES: Readonly<Record<LibraryPick, string>> = {
 /** Managing's own item (2.0.0-player.25): the review queue, above the link to the main page. */
 export const SIDEBAR_QUEUE: SidebarItem = { id: 'queue', label: 'Needs a look' }
 
+/** Managing's server settings and event log (2.0.0-player.33), after Needs a look. */
+export const SIDEBAR_SETTINGS: SidebarItem = { id: 'settings', label: 'Settings' }
+export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Log' }
+
 /** The Library's views the sidebar lists: Songs left out when Navidrome's empty search lists none,
  *  as the phone leaves out its chip (null: not known yet, so it stays). */
 export function libraryItems(hasSongs: boolean | null): SidebarItem[] {
@@ -170,6 +175,9 @@ export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Fr
  *  while its page is the one on top (`page`, the tab's top page), whatever tab it was pushed on. */
 export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null): SidebarId | null {
   if (page?.kind === 'queue') return 'queue'
+  //? the server's settings and the log, the same way (2.0.0-player.33)
+  if (page?.kind === 'settings') return 'settings'
+  if (page?.kind === 'log') return 'log'
   if (tab === 'search') return null
   if (tab === 'library') return shownPick(pick, hasSongs, 'desktop')
   return tab
@@ -185,9 +193,12 @@ export type SidebarMove =
   | { how: 'view'; tab: 'library'; pick: LibraryPick }
   /** Needs a look: its page, on You (App's openQueue) */
   | { how: 'queue'; tab: 'you' }
+  /** the server's settings, or the log: its page, on You (App's openManaging) */
+  | { how: 'managing'; tab: 'you'; kind: 'settings' | 'log' }
 
 export function sidebarMove(item: SidebarId, pick: LibraryPick, hasSongs: boolean | null): SidebarMove {
   if (item === 'queue') return { how: 'queue', tab: 'you' }
+  if (item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
   if (item === 'home' || item === 'requests' || item === 'you') return { how: 'tab', tab: item }
   if (item === shownPick(pick, hasSongs, 'desktop')) return { how: 'tab', tab: 'library' }
   return { how: 'view', tab: 'library', pick: item }

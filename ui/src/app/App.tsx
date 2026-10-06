@@ -6,7 +6,7 @@ import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
 import { closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
-import { QUEUE_ID, QUEUE_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type Tab } from '../lib/appRoutes'
+import { LOG_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
@@ -29,6 +29,7 @@ import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerW
 import { ActionMenu } from './ActionMenu'
 import { ArtistPage, type ArtistPreview } from './ArtistPage'
 import { ActionsContext, PlayerContext, pickActions } from './context'
+import { EventLog } from './EventLog'
 import { EditPanel, isFolderRequest, type AlbumChange, type EditRequest, type FolderRequest } from './EditPanel'
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
@@ -38,6 +39,7 @@ import { NeedsNavidrome } from './NeedsNavidrome'
 import { ReleaseGroupPage } from './ReleaseGroupPage'
 import { Requests } from './Requests'
 import { Search } from './Search'
+import { ServerSettings } from './ServerSettings'
 import { Sidebar } from './Sidebar'
 import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
@@ -62,6 +64,9 @@ function sessionStore(): StorageLike | null {
 }
 
 const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
+
+/** The Managing pages, siblings in the sidebar: one opened over another replaces it. */
+const MANAGING_KINDS: readonly PageKind[] = ['queue', 'settings', 'log']
 
 /** Nothing arriving: one array for every render, so Home's element holds still while it stays so. */
 const NOTHING_ARRIVING: readonly RequestRow[] = []
@@ -364,6 +369,8 @@ export function App() {
   //? What's showing, as far as the downloads go: a tab's ROOT, with Now Playing not over it - nor the
   //? desktop's visualizer, which covers the whole screen as Now Playing does a phone's
   const pageShown = usePageShown()
+  //? the desktop's full-screen visualizer is over everything (2.0.0-player.20)
+  const visualizerShown = desktop && visualizing
   const watching = watchingOf({ shown: pageShown, tab: nav.tab, depth: nav.stacks[nav.tab].length, sheetOpen: sheetOpen || (desktop && visualizing) })
   //? a failed look while something was on its way: keep asking until deadwax answers (stallsOn)
   const [stalled, setStalled] = useState(false)
@@ -595,17 +602,24 @@ export function App() {
     setInfoPanel(false)
   }, [])
 
-  //? Needs a look (2.0.0-player.25), from the sidebar or You's row: its page, on You - the tab shown
-  //? as it was left and the page pushed over it, or nothing when it is already the page on top there
-  const openQueue = useCallback(() => {
+  //? A Managing page - Needs a look (2.0.0-player.25), the server's settings or the log (2.0.0-player.33) -
+  //? from the sidebar or You's rows: its page, on You - the tab shown as it was left and the page pushed
+  //? over it, or nothing when it is already the page on top there. Another Managing page on top is
+  //? REPLACED by it (`router.become`: its entry replaced, never a page pushed over it - the three are
+  //? the sidebar's siblings, so going from one to another never piles them up, and back from any of them
+  //? says "You"). Never a pop and then a push: two history moves at once aren't (`history.go` is
+  //? asynchronous).
+  const openManagingPage = (page: Page) => {
     const stack = router.nav.stacks.you
-    const onTop = stack[stack.length - 1]?.kind === 'queue'
+    const top = stack[stack.length - 1] ?? null
     if (router.nav.tab !== 'you') router.tab('you')
-    if (!onTop) {
-      scrolls.current.delete(scrollKey({ tab: 'you', page: QUEUE_PAGE }))
-      router.open(QUEUE_PAGE)
-    }
-  }, [])
+    if (top?.kind === page.kind) return
+    scrolls.current.delete(scrollKey({ tab: 'you', page }))
+    if (top && MANAGING_KINDS.includes(top.kind)) router.become(top, page)
+    else router.open(page)
+  }
+  const openQueue = useCallback(() => openManagingPage(QUEUE_PAGE), [])
+  const openManaging = useCallback((kind: 'settings' | 'log') => openManagingPage(kind === 'settings' ? SETTINGS_PAGE : LOG_PAGE), [])
   //? a facet chosen there: the page's address replaced, as a pressing chosen on a group page
   const pickFacet = useCallback((facet: string | null) => {
     router.update({ kind: 'queue', id: QUEUE_ID, ...(facet ? { facet } : {}) })
@@ -730,6 +744,10 @@ export function App() {
     }
     if (move.how === 'queue') {
       openQueue()
+      return
+    }
+    if (move.how === 'managing') {
+      openManaging(move.kind)
       return
     }
     const away = router.nav.tab !== 'library' || router.nav.stacks.library.length > 0
@@ -863,6 +881,7 @@ export function App() {
         desktop={desktop}
         needsLook={needsLook}
         onNeedsLook={openQueue}
+        onManaging={openManaging}
       />
     ),
     [youSeen, youCurrent, opensAs, windDown, desktop, needsLook],
@@ -911,8 +930,19 @@ export function App() {
     />
   )
 
+  //? The server's settings and the log (2.0.0-player.33): a desktop's, an admin's - on a phone a short
+  //? note, asking nothing. `live`: the page is what shows - its tab current, the app in front, the
+  //? visualizer not over it (the log holds its stream open only then)
+  const managingLive = (tab: Tab) => pageShown && nav.tab === tab && !visualizerShown
+  const settingsView = (tab: Tab) => (
+    <ServerSettings desktop={desktop && admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+  )
+  const logView = (tab: Tab) => (
+    <EventLog desktop={desktop && admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+  )
+
   const pageView = (tab: Tab, page: Page, player: Player) =>
-    page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
+    page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
@@ -960,7 +990,7 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown],
   )
 
   const playing = player.track
@@ -973,7 +1003,6 @@ export function App() {
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows; a desktop's
   //? side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
-  const visualizerShown = desktop && visualizing
   const covered = (!desktop && (sheetOpen || sourcesOpen)) || visualizerShown
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)

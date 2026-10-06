@@ -146,7 +146,7 @@ const FORMAT_PREFERENCES: { id: FormatPreference; name: string; note: string }[]
  * Small shared pieces
  * ==========================================================================*/
 
-function Section({
+export function Section({
   title,
   note,
   children,
@@ -219,7 +219,103 @@ function Checkbox({
  * Server configuration - now editable
  * ==========================================================================*/
 
-function SettingRow({
+/**
+ * The server drafts after an edit of one setting (exported for the app's Server settings page,
+ * 2.0.0-player.33, which keeps the same drafts): setting a value back to the one already saved is
+ * no change and leaves the draft - except a secret's, which has no readable value, so any typing is
+ * a change by definition.
+ */
+export function editedEnvDraft(
+  current: Record<string, string | null>,
+  key: string,
+  value: string,
+  committed: ServerSetting | undefined,
+): Record<string, string | null> {
+  const next = { ...current, [key]: value }
+  if (committed && !committed.secret && (committed.value ?? '') === value) delete next[key]
+  return next
+}
+
+/**
+ * A server group's rows (exported for the app's Server settings page, 2.0.0-player.33): every
+ * setting, its draft, and the note another row's edit asks of it. `children` follow the rows inside
+ * the group - the settings tab's Re-time lyrics, which the app's page leaves to the main page.
+ */
+export function ServerGroup({
+  group,
+  server,
+  draftEnv,
+  onEdit,
+  onRevert,
+  children,
+}: {
+  group: ServerSettingsGroup
+  server: ServerSettings | null
+  draftEnv: Record<string, string | null>
+  onEdit: (key: string, value: string) => void
+  onRevert: (key: string) => void
+  children?: ComponentChildren
+}) {
+  return (
+    <Section title={group.label} note={group.note}>
+      <div class="settings-env-list">
+        {group.settings.map((setting) => (
+          <SettingRow
+            key={setting.key}
+            setting={setting}
+            draft={draftEnv[setting.key]}
+            onEdit={onEdit}
+            onRevert={onRevert}
+            note={retypeSecretNote(setting.key, server, draftEnv)}
+          />
+        ))}
+      </div>
+      {children}
+    </Section>
+  )
+}
+
+/** Whether organizing can happen, and every reason it can't - said once, at the top of Library. */
+export function OrganizingVerdict({ organizing }: { organizing: ServerSettings['organizing'] }) {
+  return (
+    <div class={`settings-verdict${organizing.enabled ? ' ok' : ''}`} role="status">
+      <span class="settings-verdict-title">
+        {organizing.enabled
+          ? 'Organizing is active — finished downloads will be tagged and filed.'
+          : 'Organizing will not file anything right now.'}
+      </span>
+
+      {organizing.blockers.length ? (
+        <ul class="settings-verdict-list">
+          {organizing.blockers.map((blocker) => (
+            <li key={blocker}>{blocker}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+/** What ORGANIZE_MODE can be set to, least to most destructive. */
+export function OrganizeModes({ modes }: { modes: ServerSettings['organize_modes'] }) {
+  return (
+    <Section
+      title="Organize modes"
+      note="What ORGANIZE_MODE can be set to, least to most destructive."
+    >
+      <div class="settings-env-list">
+        {Object.entries(modes).map(([mode, description]) => (
+          <div key={mode} class="settings-mode">
+            <code class="settings-mode-name">{mode}</code>
+            <span class="settings-mode-note">{description}</span>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+export function SettingRow({
   setting,
   draft,
   onEdit,
@@ -521,13 +617,8 @@ export function SettingsView({ active }: { active: boolean }) {
 
   function editEnv(key: string, value: string) {
     setJustSaved(false)
-    setDraftEnv((current) => {
-      const next = { ...current, [key]: value }
-      const committed = settingsByKey.get(key)
-      //? Secrets have no readable current value, so any typing is a change by definition.
-      if (committed && !committed.secret && (committed.value ?? '') === value) delete next[key]
-      return next
-    })
+    //? Secrets have no readable current value, so any typing is a change by definition.
+    setDraftEnv((current) => editedEnvDraft(current, key, value, settingsByKey.get(key)))
   }
 
   function revertEnv(key: string) {
@@ -579,23 +670,11 @@ export function SettingsView({ active }: { active: boolean }) {
     (server?.groups ?? []).filter((group) => tabForGroup(group.id) === tab)
 
   const renderGroup = (group: ServerSettingsGroup) => (
-    <Section key={group.id} title={group.label} note={group.note}>
-      <div class="settings-env-list">
-        {group.settings.map((setting) => (
-          <SettingRow
-            key={setting.key}
-            setting={setting}
-            draft={draftEnv[setting.key]}
-            onEdit={editEnv}
-            onRevert={revertEnv}
-            note={retypeSecretNote(setting.key, server, draftEnv)}
-          />
-        ))}
-      </div>
+    <ServerGroup key={group.id} group={group} server={server} draftEnv={draftEnv} onEdit={editEnv} onRevert={revertEnv}>
       {group.id === 'lyrics' && (
         <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />
       )}
-    </Section>
+    </ServerGroup>
   )
 
   //? the server half of a tab: its groups once they have loaded, or why they haven't
@@ -856,38 +935,8 @@ export function SettingsView({ active }: { active: boolean }) {
               override that wins over the environment and applies without a restart — the row
               says so, and can be reverted.
             </p>
-            {serverPart('library', server && (
-              <div class={`settings-verdict${server.organizing.enabled ? ' ok' : ''}`} role="status">
-                <span class="settings-verdict-title">
-                  {server.organizing.enabled
-                    ? 'Organizing is active — finished downloads will be tagged and filed.'
-                    : 'Organizing will not file anything right now.'}
-                </span>
-
-                {server.organizing.blockers.length ? (
-                  <ul class="settings-verdict-list">
-                    {server.organizing.blockers.map((blocker) => (
-                      <li key={blocker}>{blocker}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ))}
-            {server ? (
-              <Section
-                title="Organize modes"
-                note="What ORGANIZE_MODE can be set to, least to most destructive."
-              >
-                <div class="settings-env-list">
-                  {Object.entries(server.organize_modes).map(([mode, description]) => (
-                    <div key={mode} class="settings-mode">
-                      <code class="settings-mode-name">{mode}</code>
-                      <span class="settings-mode-note">{description}</span>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            ) : null}
+            {serverPart('library', server && <OrganizingVerdict organizing={server.organizing} />)}
+            {server ? <OrganizeModes modes={server.organize_modes} /> : null}
           </>
         )}
 

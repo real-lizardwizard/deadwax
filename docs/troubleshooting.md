@@ -513,6 +513,32 @@ album with an issue you haven't accepted, and every album deadwax filed that nob
 - **The page is missing on a phone**: it's a short note there, pointing at the main page, which has
   the same queue (**Review N**). There's no editor on a phone yet.
 
+## The app's Log is missing lines, says "The stream was lost", or starts empty
+
+The app's **Log** (on a desktop: the sidebar's **Managing → Log**, or **You → Log**) shows the same
+lines as the main page's log, newest first. As it opens it reads what deadwax kept: **the last 500
+lines since deadwax started** - nothing from before a restart (a Komodo redeploy starts it empty), and
+nothing older than those 500. Then it follows deadwax live, joining the two so no line is missing or
+shown twice.
+
+- **"The stream was lost - trying again"**: deadwax stopped answering (restarting, or the network
+  dropped). The page keeps trying by itself - also behind a reverse proxy that answers with an error
+  page while deadwax is down, which makes the browser give up: the page then asks again itself every
+  few seconds. When deadwax answers again the lines logged meanwhile are filled in, as long as they are
+  among the last 500. If deadwax restarted, its earlier lines are gone from what it kept, but the ones
+  already on screen stay.
+- **"deadwax couldn't send the lines it kept"**: the page couldn't read the history as it opened, so it
+  shows only what deadwax logs from then on. The next time it opens (leave the page and come back) it
+  reads the history again and fills in the earlier lines it missed.
+- **It only follows while it is showing.** Leave the page, put the app in the background or open the
+  visualizer over it and it stops listening; it catches up as it shows again. That is on purpose: a
+  connection held open is one of the few a browser allows to deadwax, and the player's music uses
+  them too. So there is no count of unread lines anywhere.
+- **Clear** empties the page only, which then says **Cleared**. Nothing on the server is cleared, and
+  the lines cleared don't come back when you return; deadwax's own container log is untouched either
+  way.
+- **On a phone** the page is a short note pointing at the main page, which has the log too.
+
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
 The [phone player](player.md) shows one of these on Home and in the Library tab, in place of your

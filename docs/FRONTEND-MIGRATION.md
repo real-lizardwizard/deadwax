@@ -31,13 +31,17 @@ move. Cross-tree DOM writes go in the shell, synchronously.
 artist/album names hand off to the vanilla search rather than reimplementing it. It retires
 when the search view is ported.
 
-**What the one app still lacks before the main page can retire** (2.0.0-player.25): server
-settings, the log, the bulk runs (covers, CD art, lyrics, re-timing lyrics), artist images and
-re-filing an artist (**Move albums to …**), and an editor on the phone. Editing one album - its
-release, its tags, its cover, CD art and lyrics, deleting it - is in the app on a desktop since
-2.0.0-player.21, and the review queue since 2.0.0-player.25 (**Needs a look**: stepping the editor
-through the albums that need a look, ignoring and un-ignoring, the New count, with a count in the
-sidebar and You). The main page's own queue (**Review N**, LibraryView.tsx) is unchanged beside it.
+**What the one app still lacks before the main page can retire** (2.0.0-player.33): the bulk runs
+(covers, CD art, lyrics, re-timing lyrics), artist images and re-filing an artist (**Move albums to
+…**), and an editor on the phone. Editing one album - its release, its tags, its cover, CD art and
+lyrics, deleting it - is in the app on a desktop since 2.0.0-player.21, the review queue since
+2.0.0-player.25 (**Needs a look**: stepping the editor through the albums that need a look, ignoring
+and un-ignoring, the New count, with a count in the sidebar and You), and the server settings and
+the event log since 2.0.0-player.33 (**Settings**, drawn from SettingsView.tsx's own exported parts -
+`ServerGroup`, `SettingRow`, `OrganizingVerdict`, `OrganizeModes`, `editedEnvDraft` - and **Log**,
+over the server's kept history and the stream). The main page's own queue (**Review N**,
+LibraryView.tsx), settings tab and log are unchanged beside them; the browser preferences stay the
+main page's, kept in that browser.
 
 **Needs Node `^20.19.0 || >=22.12.0`.** On older Node, `npm install` warns but silently drops
 rolldown's native binary and the build dies with "Cannot find module
