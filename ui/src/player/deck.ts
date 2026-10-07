@@ -95,7 +95,7 @@ import {
   type HandSample, type Plan,
 } from '../lib/platter'
 import { ApiError } from '../api/http'
-import { scrubWindow } from './api'
+import { scrubWindow, type ScrubWindow } from './api'
 
 /** A press resting longer than a tap takes the record (and pauses a playing song), in ms. */
 export const HOLD_MS = 250
@@ -196,6 +196,13 @@ export interface DeckHost {
   show(at: number | null, scrubbing: boolean): void
   /** the press took the record: the click after it is not a tap */
   grabbed(): void
+  /**
+   * Where the song's windows come from instead of deadwax (2.0.0-player.36, the test bench at
+   * /player/lab/): `seconds` of the song from `from`, in the shape scrubWindow answers - bytes the
+   * browser decodes, the first sample's number, how many, at what rate. The app gives none, and its
+   * windows are deadwax's (scrubWindow), exactly as before.
+   */
+  window?(song: DeckSong, from: number, seconds: number, signal: AbortSignal | undefined): Promise<ScrubWindow>
 }
 
 /** What a release asks Turntable to do, in the release's own handler: seek, and play at once. */
@@ -599,6 +606,8 @@ interface DeckRecording {
   heard: VoiceHeard[]
   tap: ScriptProcessorNode
   timer: ReturnType<typeof setTimeout>
+  /** kept for the page as well as offered as the file (2.0.0-player.36, the test bench) */
+  keep: boolean
 }
 
 /** A recording running, or the last one made: what Debug offers to save. */
@@ -613,6 +622,47 @@ export interface DeckRecorded {
 
 let recording: DeckRecording | null = null
 let recorded: DeckRecorded | null = null
+
+/**
+ * The last recording, as the page keeps it (2.0.0-player.36): the test bench at /player/lab/ replays its
+ * messages through the voice's own functions and sets what the voice played beside an ideal turntable.
+ * What it holds is what the saved file holds - the tapped audio (as floats here, every channel, each
+ * block's playbackTime), every message the deck sent the voice, everything the voice said of where it
+ * was, the clock's mapping - and the file's own text, so the page can offer the very file. Kept only
+ * for a recording started with `keep` - Debug's never is - and only the last.
+ */
+export interface DeckRecordingData {
+  voice: 'worklet' | 'script'
+  sampleRate: number
+  /** the tapped audio, every channel, the blocks one after another */
+  channels: Float32Array[]
+  tapBlock: number
+  blockTimes: number[]
+  blockPeaks: number[]
+  /** page ms the recording began, and ended */
+  since: number
+  until: number
+  messages: Record<string, unknown>[]
+  heard: VoiceHeard[]
+  clock: { offset: number | null; step: number; count: number }
+  delaySeconds: number
+  scriptLagSeconds: number
+  /** the saved file's text, exactly */
+  file: string
+}
+
+let kept: DeckRecordingData | null = null
+
+/** The last recording started with `keep` - null until one has finished. */
+export function deckRecordingData(): DeckRecordingData | null {
+  return kept
+}
+
+/** Finish the recording under way now, as its time running out would - the test bench's "Record the
+ *  next motion" stops it as the motion has settled. Nothing when none is. */
+export function stopDeckRecording(): void {
+  finishRecording()
+}
 const recordingListeners = new Set<(state: DeckRecorded | null) => void>()
 
 export function deckRecorded(): DeckRecorded | null {
@@ -650,7 +700,7 @@ function noteForRecording(message: VoiceMessage): void {
  * hangs off the voice's own node and never the song's element. Starts only from a tap (Debug's button),
  * since it may make the context. Answers why it couldn't start, or null.
  */
-export function recordDeckSound(seconds = 20): string | null {
+export function recordDeckSound(seconds = 20, keep = false): string | null {
   if (recording) return 'already recording'
   wakeDeckAudio()
   const context = audio.context
@@ -665,7 +715,7 @@ export function recordDeckSound(seconds = 20): string | null {
     const started: DeckRecording = {
       seconds, since: now(), until: now() + seconds * 1000, kind: voice.kind, rate: context.sampleRate,
       blocks: [], blockTimes: [], blockPeaks: [], messages: [], heard: [], tap,
-      timer: setTimeout(() => finishRecording(), seconds * 1000),
+      timer: setTimeout(() => finishRecording(), seconds * 1000), keep,
     }
     tap.onaudioprocess = (event: AudioProcessingEvent) => {
       if (recording !== started) return
@@ -746,10 +796,81 @@ function finishRecording(): void {
     audio: { format: 'int16le', channels, frames, base64 },
     messages: done.messages, heard: done.heard,
   }
-  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+  const text = JSON.stringify(payload)
+  const blob = new Blob([text], { type: 'application/json' })
   const name = `deadwax-turntable-${done.kind}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`
+  if (done.keep) {
+    //? the test bench's (2.0.0-player.36): the same recording as floats, every channel, for the page
+    const floats: Float32Array[] = []
+    for (let c = 0; c < channels; c++) {
+      const channel = new Float32Array(frames)
+      let to = 0
+      for (const block of done.blocks) {
+        const data = block[c] ?? block[0]!
+        channel.set(data, to)
+        to += data.length
+      }
+      floats.push(channel)
+    }
+    kept = {
+      voice: done.kind, sampleRate: done.rate, channels: floats, tapBlock: 4096, blockTimes: done.blockTimes, blockPeaks: done.blockPeaks,
+      since: done.since, until: now(), messages: done.messages, heard: done.heard, clock: payload.clock,
+      delaySeconds: payload.delaySeconds, scriptLagSeconds: payload.scriptLagSeconds, file: text,
+    }
+  }
   recorded = { state: 'saved', seconds: done.seconds, href: URL.createObjectURL(blob), name, bytes: blob.size }
   recordedChanged()
+}
+
+/* ----- what the test bench's live spectrogram reads (2.0.0-player.36) ----- */
+
+let analyser: { node: AudioNode; analyser: AnalyserNode; silent: GainNode } | null = null
+
+/**
+ * An AnalyserNode on the record's sound - hung off the voice's own node in the deck's own context, the
+ * way the recorder's tap is, and on to the speakers through a gain of 0, so a browser that only runs
+ * what reaches them runs it and nothing heard changes. For the test bench's live spectrogram; nothing
+ * of the app asks for it. Made again when the voice is (a new context, the script voice after a worklet
+ * that wouldn't load); null while there is none. Never the song's element.
+ */
+export function deckSoundAnalyser(): AnalyserNode | null {
+  const node = audio.node
+  const context = audio.context
+  if (analyser && analyser.node === node && context && analyser.analyser.context === context) return analyser.analyser
+  releaseDeckSoundAnalyser()
+  if (!node || !context || context.state === 'closed') return null
+  try {
+    const made = context.createAnalyser()
+    made.fftSize = 8192
+    made.smoothingTimeConstant = 0
+    const silent = context.createGain()
+    silent.gain.value = 0
+    node.connect(made)
+    made.connect(silent)
+    silent.connect(context.destination)
+    analyser = { node, analyser: made, silent }
+    return made
+  } catch {
+    return null
+  }
+}
+
+/** ...and let go of: the page hidden, or the bench done with it. */
+export function releaseDeckSoundAnalyser(): void {
+  const was = analyser
+  analyser = null
+  if (!was) return
+  try {
+    was.node.disconnect(was.analyser)
+  } catch {
+    //? the node may be gone with its context
+  }
+  try {
+    was.analyser.disconnect()
+    was.silent.disconnect()
+  } catch {
+    //? likewise
+  }
 }
 
 /** Suspended - or, starting or resuming still, suspended as soon as it runs. */
@@ -1778,7 +1899,10 @@ export class Deck {
     this.pending = { song: id, from, to: from + WINDOW_S, stage: 'fetch' }
     this.report()
     try {
-      const got = await scrubWindow(id, from, WINDOW_S, request.signal, song.maxRate ?? null)
+      //? the test bench's own windows where it gives them (2.0.0-player.36); deadwax's otherwise
+      const got = this.host.window
+        ? await this.host.window(song, from, WINDOW_S, request.signal)
+        : await scrubWindow(id, from, WINDOW_S, request.signal, song.maxRate ?? null)
       if (!request.current()) return
       const start = got.first / got.rate
       const end = (got.first + got.samples) / got.rate

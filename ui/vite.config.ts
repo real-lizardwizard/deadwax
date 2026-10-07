@@ -14,23 +14,38 @@ import preact from '@preact/preset-vite'
  * When the migration finishes and Vite owns the main page, let it build `index.html` normally -
  * but keep the player's entry beside it: dropping `rollupOptions.input` outright would drop the
  * player. See docs/FRONTEND-MIGRATION.md.
+ *
+ * The turntable's test bench at /player/lab/ (2.0.0-player.36) is a third page, built by a SECOND pass
+ * (`vite build --mode lab`, which `npm run build` runs after the first) into the same folder: it shares
+ * the deck and the turntable with the player, and built beside it rollup would split what they share
+ * into chunks of their own - changing what the app's page loads. Built alone it carries its own copy,
+ * and the app's bundle is what it would be without it.
  */
-export default defineConfig({
+
+//? The app's two pages: the main interface, and the player at /player/
+const APP_INPUTS = {
+  'deadwax-ui': 'src/main.tsx',
+  'deadwax-player': 'src/player/main.tsx',
+}
+//? ...and the turntable's test bench at /player/lab/, a pass of its own
+const LAB_INPUTS = {
+  'deadwax-lab': 'src/lab/main.tsx',
+}
+
+export default defineConfig(({ mode }) => ({
   plugins: [preact()],
 
   build: {
     outDir: '../interface/dist',
-    emptyOutDir: true,
+    //? the bench's pass adds to what the app's left
+    emptyOutDir: mode !== 'lab',
     sourcemap: true,
 
     rollupOptions: {
       // Two pages, two entries: the main interface, and the player at /player/. Named so each
       // lands at a fixed filename its hand-written page can name; code they share (preact, the
-      // HTTP helpers) is split into a hashed chunk both load.
-      input: {
-        'deadwax-ui': 'src/main.tsx',
-        'deadwax-player': 'src/player/main.tsx',
-      },
+      // HTTP helpers) is split into a hashed chunk both load. (The bench's pass: one entry.)
+      input: mode === 'lab' ? LAB_INPUTS : APP_INPUTS,
       output: {
         // The entry filenames are stable and unhashed because static, hand-written pages
         // (`interface/index.html`, `interface/player/index.html`) have to reference them by
@@ -41,7 +56,7 @@ export default defineConfig({
         entryFileNames: '[name].js',
         // Split chunks and assets keep their hashes and are served immutable. Same file
         // contents always mean the same URL, so caching them hard is safe.
-        chunkFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: mode === 'lab' ? 'assets/lab-[name]-[hash].js' : 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
@@ -60,4 +75,4 @@ export default defineConfig({
       '/assets': 'http://127.0.0.1:8080',
     },
   },
-})
+}))

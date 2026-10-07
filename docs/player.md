@@ -710,6 +710,140 @@ below.
 
 There's no hint on how to use it: the record and the arm are the instructions.
 
+## Testing the turntable
+
+The turntable has a **test bench** (2.0.0-player.36): a page of its own where you turn the real
+turntable - the same record, the same momentum and the same sound your phone runs, nothing re-made for
+the page - over simple signals the page makes itself, and hear what it played beside an ideal
+turntable turned exactly the same way. It is there for the question "is that digital sound deadwax's,
+or is it what turning a record at those speeds sounds like?".
+
+**Getting there**: on the now-playing screen, **•••** > **Info** > **Debug**, and **Open the test
+bench** on the **Test bench** row, under **The turntable** - it opens in a tab of its own beside the
+app, so the song playing carries on. Or type the address: `/player/lab/` after deadwax's own (for
+example `http://192.168.1.10:8080/player/lab/`). It works on a phone and on a desktop, over plain
+`http://` as well as `https://`. Nothing it does is saved on the server or touches the library.
+
+**The turntable**, at the top: turn it with a finger or the mouse as in the app, tap it to play or
+pause, and use the arm. Its label carries a mark, so you can see it turn. **Play** plays the test song (and **Pause** winds the record down when **Pause
+winds the record down** is ticked, as in the app); **Start the sound** starts the record's sound
+without playing anything. Under them it says where the record's sound runs: **on its own audio
+thread** over `https://` or on `localhost`, **on the main thread** over plain `http://` (a phone or a
+browser only gives a page the audio thread when it is secure) - the same as the app does.
+
+**The song** is one of these, made at 44.1 kHz (a CD rip), 48 kHz or 96 kHz (a hi-res song), two
+minutes long, 12 dB under full scale unless it says otherwise:
+
+- **Sine 440 Hz** - the reference: turned at any steady speed it must sound like one pure tone.
+- **Sine 1 kHz** - where a wobble in the speed is easiest to hear. **Sine 100 Hz** (low) and **Sine 5
+  kHz** (high).
+- **Two sines, 440 + 660 Hz** - a fifth: two lines that must stay two lines.
+- **Square**, **Sawtooth** and **Triangle 220 Hz** - each with nothing above the song's own top.
+- **Chord** (A major) - something like an organ.
+- **Tone bursts** (1 kHz, 50 ms on, 450 off) - starts and stops, and silence between.
+- **Clicks**, one every half second - a slowed record makes thumps, a sped-up one ticks.
+- **Sweep 50 Hz to 10 kHz** over the two minutes - where you are is the pitch you hear.
+- **Pink noise**, 20 dB under full scale RMS - broadband. **Silence** - anything you hear while
+  turning it is the bench's or deadwax's own.
+- **Sine 440 Hz at full scale** - so the record's limiter has something to do.
+- **Square 220 Hz, aliased on purpose** - a reference only, never deadwax's: a square made the cheap
+  way, its aliases in the song itself - so it sounds harsh and out of tune with itself, and turned
+  faster or slower they move with the speed, like everything else in it.
+- **Your own file** - any file the browser can play, its first two minutes.
+
+**Turn it for me** turns the record for you, through the very steps a finger's turn goes through, 60
+times a second, with none of a hand's unevenness: **Steady 1x**, **0.5x**, **0.25x**, **2x**,
+**Backwards 1x**, **1x with a slow wobble** (10% either way, 1.3 times a second, like a hand
+drifting), **A slow ramp** (0.25x up to 2x and back over 8 s) and **A scratch** (back and forth,
+twice a second). Tick **With a finger's jitter** to add a real finger's unevenness. While one runs -
+from the tap, while it gets the record ready too - the record can't be grabbed and **Play** is faded
+and does nothing (the song and the record's sound would play together); **Stop the motion** stops it once it
+turns. A motion starts where the record is, if it
+fits there, or 20 seconds in; a file too short for one says how long it needs.
+
+**Record, and compare**: **Record 10 s** records what the record's sound plays while you turn it -
+starting the sound first, if it hasn't started; **Record the next motion** records the next of **Turn
+it for me**. The song can't be changed while it records, and a recording the page was hidden through
+(the screen locked, another app or tab) is thrown away - the record's sound stops with the page. A
+moment later you get three versions of the same movement, level-matched:
+
+- **A - deadwax**: what the record's sound played.
+- **B - ideal, deadwax's path**: the song read perfectly from its definition along exactly the path
+  deadwax's own sound followed, keeping only what a perfect turntable could send out at that speed:
+  nothing at or past half the sound's sample rate - a perfect cut-off, which a sped-up record reaches
+  sooner, so a square wave played fast loses its top harmonics in B, as it has to in A. Pink noise, the aliased
+  square and your own file, which are samples rather than a formula, are read between their samples
+  by a long, near-perfect interpolator - far cleaner than deadwax's, but a filter all the same. What
+  is in A and not in B is how deadwax reads the song.
+- **C - ideal, smooth path**: the song read the same perfect way along a smooth path through your
+  movement (for a motion, the motion's own exact path), with no limits a live sound has. It never jumps: where your
+  hand lets go, rests or sets off again, or misses a few samples, the path carries straight on, its
+  speed eased from one to the next. What is in A and not in C is everything deadwax adds while it
+  follows your hand live.
+
+Press **Play the comparison** and switch with the buttons (or the arrow keys among them) or the keys
+**1**, **2** and **3** - the switch goes to the same moment of the recording, through a moment's
+silence that is the same whichever you switch to, so the switch itself tells you nothing - and
+**Space** plays or pauses. The keys work anywhere on the page once there is a comparison, except
+while you type in a field, or with another button focused (Space presses that button). Under them, a spectrogram of each (time across, pitch up; a stray line shows as a
+line that shouldn't be there) and the numbers:
+
+- **Read head off the smooth path**: how far deadwax's sound strayed from the smooth path, in
+  milliseconds of the song - the most, and typically.
+- **Speed wobble above 20 Hz**: how much the speed flutters, as a share of the speed - for deadwax's
+  path and for the smooth one. A flutter like that is heard as a warble or a buzz on a tone.
+- **What isn't the signal (A against B)**: for a tone, how loud the sound in A is that the perfect
+  reading hasn't got, against the tone, and the loudest single such sound and its pitch. Lower is
+  cleaner; 60 dB or more down is hard to hear on a tone.
+- **The replay**: how closely playing the recording back through deadwax's sound here reproduces it -
+  what B and C are built on - and how far its read head was from where the sound said it was. Often
+  it is the recording to the bit. But it can't know exactly when each step of a movement reached the
+  sound - least of all on the main thread - so where the speed changes it may be up to a tenth of a
+  millisecond of the song off (the replay then reads -18 to -90 dB rather than far below): far too
+  little to hear, or to move the numbers above.
+
+If it says **Record it again**, none of the numbers above is shown, only the replay's, and the line
+under it says why:
+
+- **The replay didn't follow this recording**: something held the page up while it played (on the
+  main thread the record's sound is played between everything else the page does), the sound slowed
+  where the movement didn't, and B isn't deadwax's path. That is a stall of the page, not of the way
+  deadwax reads the song: record it again.
+- **Nothing took the record while it recorded**: you pressed **Record 10 s** and didn't turn the
+  record, or a turn was already under way when you pressed it (only a turn that starts after it
+  counts: let go, and take it again). Nothing is compared then - it says so under the Record
+  buttons.
+- **The record's sound said nothing of where it was after the record was taken**: the recording ended
+  just after you took it. Record again, and keep turning while it records.
+
+**What it means**: if A and C sound alike to you, what you hear is what turning a record at those
+speeds sounds like - nothing to fix. If C is clean and A isn't, deadwax adds it, and the numbers say
+which part: A against B is how the sound reads the song, B against C the path it follows.
+
+**Blind**: to check your ears without knowing which is which, choose two of A, B and C and **Start the
+blind test**: each trial plays the two and an X that is one of them at random, and you say which. At
+the end it says how many you got and how likely that score is by guessing - under 5% means you can
+hear the difference.
+
+**Check this device** runs, on the 1 kHz and 440 Hz sines, Steady 1x, 0.5x, 2x, Backwards 1x and the
+slow wobble, recording each (about a minute and a half), and lists for each which sound path ran, how
+far its clock moves at a time, how many of its blocks were late (on the main thread - on its own audio
+thread it says **None (an AudioWorklet)**, which counts none), how many of the page's frames came late
+while it turned (the page held up), the speed's wobble and the sound that isn't the signal - or
+**Record it again** in their place, with why, on a run whose replay didn't hold. **Play** is faded
+and does nothing while it runs. **Keep
+the page in view and the screen awake while it runs** (on an iPhone, Auto-Lock locks it after 30
+seconds or a minute untouched): a hidden page stops the record's sound, so a run the page was hidden
+through is thrown away, and the check waits for you to tap **Carry on** to run it again. **Save
+results** gives you one file of all of it - the browser, whether the page was secure, every number and
+every recording - to send with a report; a check that stopped part way (**Stop the check**, or a run
+that failed) gives one too, of the runs it finished, marked incomplete with why. It is the way to get
+numbers off an iPhone over plain `http://`.
+
+**The record's sound, live** draws the record's sound as it plays, so a stray line can be seen as
+well as heard; it moves only while the record sounds. And **How the sound is running** at the foot
+of the page shows Info > Debug's two turntable rows.
+
 ## Gapless playback (experimental)
 
 Between two songs there's normally a short pause, about a second on an iPhone over a VPN: when
@@ -826,6 +960,7 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why), how far the phone's audio clock moves at a time, and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
 | The turntable | **Turntable timing** | how the turntable is keeping up on this phone, counted since it last showed (2.0.0-player.28): `The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed`, and under it whether the sound - when it is made on the page's main thread - had gaps (`12 of 3400 blocks late, the worst by 38 ms`), how the picture kept up under your finger (`310 frames, 4 late, the longest gap 118 ms`), any let-go after which the song didn't start, and any time the browser interrupted the sound - and, since 2.0.0-player.35, how many peaks the record's sound held under full scale and the deepest it turned the sound down to do it (`Peaks held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB`: each of those went past half a decibel under full scale and was turned down; on a loud song about a third of them went over full scale too, where the browser would have cut them off - counted up to a quarter of a second or so after you let go, once the sound, an eighth of a second behind your hand, has caught up, coasts included). If the turntable feels like it hangs, these numbers say where |
 | The turntable | **Recording** | a 20-second recording of the record's own sound, as a file to send with a bug report (2.0.0-player.32). **Record 20 s** starts it (the turntable showing, and its sound started - turn the record once first); close Info and turn the record as you would; when the row says `20 s recorded`, **Save the recording** downloads one JSON file (about 5 MB for 20 s) holding what the record's sound actually played on your device, every touch as it came, and what the sound made of it - exactly what's needed to hear and replay a sound no lab has reproduced; since 2.0.0-player.35 it also holds each moment's loudest sample as it was before the file's 16 bits cut it off, so it shows how far over anything went. Nothing is sent anywhere by itself |
+| The turntable | **Test bench** | a link, **Open the test bench**, that opens the turntable's test bench at `/player/lab/` in a tab of its own beside the app, so the song playing carries on (2.0.0-player.36) - see [Testing the turntable](#testing-the-turntable) |
 | Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
 
 The **Gap** row is timed with Gapless off as well, the same way, so you can compare the two.

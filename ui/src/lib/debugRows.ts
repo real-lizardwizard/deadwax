@@ -53,8 +53,9 @@ export interface DebugRow {
   note?: string
   /** a data value - numbers, rates, field names - set in the monospace face */
   mono?: boolean
-  /** a control on the row (2.0.0-player.32): a button that does something, or a link to save a file */
-  action?: { label: string; onClick?: () => void; href?: string; download?: string }
+  /** a control on the row (2.0.0-player.32): a button that does something, a link to save a file - or
+   *  (2.0.0-player.36) a page that opens BESIDE the app (`beside`), so the music playing isn't unloaded */
+  action?: { label: string; onClick?: () => void; href?: string; download?: string; beside?: boolean }
 }
 
 /** A recording of the record's sound, running or made (player/deck.ts recordDeckSound), as Debug has it. */
@@ -368,6 +369,22 @@ export function recordingRow(recording: RecordingState | null | undefined, onRec
   }
 }
 
+/** Where the turntable's test bench is (2.0.0-player.36). */
+export const BENCH_ADDRESS = '/player/lab/'
+
+/**
+ * "Test bench" (2.0.0-player.36): a link to the turntable's test bench at /player/lab/ - the real turntable
+ * over simple test signals, an ideal turntable to hear it beside, and a check of this device that gives a
+ * file to send - opening beside the app, so what plays here carries on.
+ */
+export function benchRow(): DebugRow {
+  return {
+    label: 'Test bench',
+    value: 'The turntable over test tones, beside an ideal turntable turned the same way, and a check of this device',
+    action: { label: 'Open the test bench', href: BENCH_ADDRESS, beside: true },
+  }
+}
+
 type Answer = Readonly<Record<string, unknown>>
 
 /** The names of the fields an answer carries, sorted as plain strings - the same order on every
@@ -438,7 +455,7 @@ export function debugSections(input: DebugInput): DebugSection[] {
     { title: 'The file', rows: [formatRow(input.track)] },
     { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), whyRow(input), gaplessRow(input)] },
     { title: 'Last song change and seek', rows: [gapRow(input.gaps), seekRow(input.lastSeek)] },
-    { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable), recordingRow(input.recording, input.onRecord, input.turntable)] },
+    { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable), recordingRow(input.recording, input.onRecord, input.turntable), benchRow()] },
     {
       title: 'Navidrome sent',
       rows: [sentRow('Song', input.song), otherSongsRow(input.song, input.album), sentRow('Album', input.album)],

@@ -177,7 +177,8 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    separately - hard-refresh when verifying a palette change.
   player/          the app's page at /player/, manifest, icons, and two stylesheets: player.css
                    (the player; mechanics its own, look on theme.css section 10) and app.css (the
-                   tab bar, Home, Requests, You) - see "The one app".
+                   tab bar, Home, Requests, You) - see "The one app". player/lab/ is the turntable's
+                   test bench's page and its own lab.css.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one;
@@ -194,7 +195,10 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    app/ServerSettings.tsx (drawn from components/SettingsView.tsx's own exported
                    parts) and app/EventLog.tsx (lib/eventLog.ts) are the server's settings and the
                    event log on a desktop - see "Server settings and the log in the app".
-tests/             2373 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+                   ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
+                   in a pass of its own: the real Turntable and deck over signals it makes, set
+                   beside an ideal turntable - see notes/turntable-bench.md.
+tests/             2391 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -236,6 +240,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
 | the turntable's sound following the hand (.24) | `notes/turntable-sound.md` |
 | the turntable's sound since: warble, echo, kernel, first turn, clock, recorder, limiter (.27-.35) | `notes/turntable-fixes.md` |
+| the turntable's test bench at /player/lab/ (.36): signals, motions, A/B/C, Check this device | `notes/turntable-bench.md` |
 | the desktop visualizer, the Mandala, the music's feel | `notes/visualizer.md` |
 | windows cut straight from the FLAC | `notes/flac-windows.md` |
 | backend and data gotchas (slskd, MusicBrainz, compose, scans) | `notes/backend-gotchas.md` |
@@ -433,14 +438,14 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2373 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2391 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
 
 ```bash
 npm install
-npm run build      # tsc --noEmit && vite build -> interface/dist/, required to see downloads
+npm run build      # tsc --noEmit && vite build && vite build --mode lab (the test bench's pass) -> interface/dist/, required to see downloads
 npm run typecheck  # tsc alone; runs on older Node when the build won't
 npm run dev        # harness on :5173, proxies /deadwax + /styles to :8080 (start the backend first)
 ```
@@ -471,7 +476,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2373 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2391 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

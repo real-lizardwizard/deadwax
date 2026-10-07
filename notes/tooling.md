@@ -90,7 +90,9 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   player (spiked at 0.8.0, ported in 1.0.3) there are TWO entries**, so the config is `input: { 'deadwax-ui':
   'src/main.tsx', 'deadwax-player': 'src/player/main.tsx' }` with `output: { dir:
   '../interface/dist', entryFileNames: '[name].js', chunkFileNames: 'assets/[name]-[hash].js' }`
-  - a single `output.file` cannot hold two entries and a shared chunk. Rolldown doesn't empty
+  - a single `output.file` cannot hold two entries and a shared chunk (since 2.0.0-player.36 the test
+  bench's `deadwax-lab` is a third, in a config of its own, as vite builds it in a pass of its own - see
+  notes/turntable-bench.md). Rolldown doesn't empty
   the folder as vite's `emptyOutDir` does, so old hashed chunks pile up in `interface/dist/assets/`;
   harmless, and `rm -rf interface/dist` first keeps it tidy. The Preact preset
   only adds dev-time plugins, so a production bundle loses nothing. It is a LOCAL workaround -

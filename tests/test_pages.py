@@ -7,7 +7,9 @@ each page's `/dist/<name>.js` must be a vite input whose source exists, and each
 links (and each one those import) must be served. The app grows in place at /player/, where James's
 home-screen app is scoped: the manifest's start_url and scope must stay there, or iOS stops
 treating the installed icon as that app. And the app's own stylesheets are revalidated and gzipped,
-like the page around it - since 2.0.0-player.19 the desktop frame's too, linked last.
+like the page around it - since 2.0.0-player.19 the desktop frame's too, linked last. And since
+2.0.0-player.36 the turntable's test bench at /player/lab/, a page of its own, built in a pass of its own
+so the app's bundle is what it would be without it - its page stamped as the app's is.
 """
 
 import json
@@ -29,6 +31,8 @@ UI = REPO / "ui"
 PAGES = {
     "/": INTERFACE / "index.html",
     "/player/": INTERFACE / "player" / "index.html",
+    #? the turntable's test bench (2.0.0-player.36)
+    "/player/lab/": INTERFACE / "player" / "lab" / "index.html",
 }
 
 
@@ -38,11 +42,15 @@ def client():
 
 
 def vite_inputs() -> dict[str, str]:
-    """The build's named entries, as vite.config.ts lists them: name -> source path under ui/."""
+    """The build's named entries, as vite.config.ts lists them - the app's pass and the test bench's
+    (2.0.0-player.36: APP_INPUTS and LAB_INPUTS) - name -> source path under ui/."""
     config = (UI / "vite.config.ts").read_text()
-    block = re.search(r"input:\s*\{(.*?)\}", config, re.S)
-    assert block, "vite.config.ts has no rollupOptions.input block"
-    return dict(re.findall(r"'([\w-]+)':\s*'([^']+)'", block.group(1)))
+    blocks = re.findall(r"_INPUTS\s*=\s*\{(.*?)\}", config, re.S)
+    assert blocks, "vite.config.ts names no entries (APP_INPUTS, LAB_INPUTS)"
+    found: dict[str, str] = {}
+    for block in blocks:
+        found.update(dict(re.findall(r"'([\w-]+)':\s*'([^']+)'", block)))
+    return found
 
 
 def _html(page: Path) -> str:
@@ -67,7 +75,7 @@ def stylesheets(page: Path) -> list[str]:
 
 def test_the_build_makes_both_entries_and_their_sources_exist():
     inputs = vite_inputs()
-    assert inputs.keys() >= {"deadwax-ui", "deadwax-player"}
+    assert inputs.keys() >= {"deadwax-ui", "deadwax-player", "deadwax-lab"}
     for name, source in inputs.items():
         assert (UI / source).is_file(), f"vite entry {name} names {source}, which isn't there"
 
@@ -140,6 +148,7 @@ def test_the_apps_stylesheet_is_revalidated_and_gzipped(client, sheet):
 def test_no_page_or_stylesheet_loads_a_font_from_the_internet():
     """The canvas boards link Noto Sans from Google Fonts; deadwax self-hosts it and runs offline."""
     shipped = [INTERFACE / "index.html", INTERFACE / "player" / "index.html", *INTERFACE.glob("player/*.css"),
+               INTERFACE / "player" / "lab" / "index.html", *INTERFACE.glob("player/lab/*.css"),
                INTERFACE / "styles" / "theme.css", INTERFACE / "styles" / "main.css"]
     for path in shipped:
         text = path.read_text()

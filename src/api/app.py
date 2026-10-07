@@ -292,8 +292,8 @@ def start() -> FastAPI:
     #? read from the disk per request (a stat a file), so a new build is seen without a restart.
     STAMPED = re.compile(r'''(?P<attr>href|src)="(?P<path>/(?:player|dist|styles)/[^"?#]+\.(?:css|js))"''')
 
-    def stamped_page() -> Response:
-        html = (interface_path / "player" / "index.html").read_text(encoding="utf-8")
+    def stamped_page(page: str = "player/index.html") -> Response:
+        html = (interface_path / page).read_text(encoding="utf-8")
 
         def stamp(match: re.Match) -> str:
             try:
@@ -311,6 +311,15 @@ def start() -> FastAPI:
     @app.get("/player/index.html")
     async def serve_app_by_name():
         return stamped_page()
+
+    #? the turntable's test bench (2.0.0-player.36): a page of its own beside the app, stamped the same way
+    @app.get("/player/lab/")
+    async def serve_lab():
+        return stamped_page("player/lab/index.html")
+
+    @app.get("/player/lab/index.html")
+    async def serve_lab_by_name():
+        return stamped_page("player/lab/index.html")
 
     app.mount("/", StaticFiles(directory=interface_path, html=True), name="interface")
     logger.info("adding root endpoint to serve index.html")

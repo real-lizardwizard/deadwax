@@ -439,7 +439,11 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   reopen()
   check('Debug chosen', tabs().map((tab) => [tab.props['aria-selected'], tab.props.tabIndex]), [[false, -1], [true, 0]])
   check('Debug draws its five sections - the turntable\'s sound among them since 2.0.0-player.14', view.find((node) => node.type === 'h3').map(text), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
-  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Why', 'Gapless', 'Gap', 'Last seek', 'Turntable sound', 'Turntable timing', 'Recording', 'Song', 'On other songs', 'Album'])
+  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Why', 'Gapless', 'Gap', 'Last seek', 'Turntable sound', 'Turntable timing', 'Recording', 'Test bench', 'Song', 'On other songs', 'Album'])
+  //? the turntable's test bench (2.0.0-player.36): a link opening beside the app, so the music isn't unloaded
+  check('...the test bench a link opening beside the app, to /player/lab/',
+    view.find((node) => node.type === 'a' && node.props?.href === '/player/lab/').map((node) => [node.props.target, node.props.rel, node.props.download ?? null, text(node)]),
+    [['_blank', 'noopener', null, 'Open the test bench']])
   check('...Gapless on, in one stream', text(view.find(byClass('app-kv-value'))[4]), 'On, in one stream')
   check('Debug asked how the song was sent', formats > 0, true)
 

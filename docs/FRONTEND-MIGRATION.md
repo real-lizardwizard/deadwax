@@ -72,6 +72,7 @@ ui/
     main.tsx             # mount table: element id -> component
     player/              # the phone player at /player/ - its own entry, main.tsx (1.0.3); the engine and its screens
     app/                 # the one app it grows into (2.0.0-player.9): App, the tabs, Home, Requests, You, the sheets over Now Playing - main.tsx renders App
+    lab/                 # the turntable's test bench at /player/lab/ (2.0.0-player.36) - its own entry, main.tsx, built in a pass of its own
     bridge.ts            # window.deadwax - the seam with the vanilla app
     api/                 # types.ts + one wrapper module per backend module
     components/
@@ -83,22 +84,31 @@ ui/
   package.json
 interface/               # existing vanilla app — stays until fully replaced
   player/                # the player's hand-written page, manifest, icons and stylesheet
+    lab/                 # the test bench's hand-written page and stylesheet
   dist/                  # build output, gitignored
 ```
 
-**The build inputs are two TypeScript entries, not `index.html`.** While the port is
-incremental the page users get is still the hand-written `interface/index.html`, which loads the
-bundle as one extra module script. So the build emits JS, not a page. Since 1.0.3 there are two
-entries, one per hand-written page:
+**The build inputs are TypeScript entries, not `index.html`.** While the port is incremental the
+page users get is still the hand-written `interface/index.html`, which loads the bundle as one extra
+module script. So the build emits JS, not a page. There is one entry per hand-written page - two
+since 1.0.3, three since 2.0.0-player.36 - in two passes:
 
-| entry | source | loaded by |
-| --- | --- | --- |
-| `deadwax-ui` | `src/main.tsx` | `interface/index.html`, the main page (as `/dist/deadwax-ui.js`) |
-| `deadwax-player` | `src/player/main.tsx`, which renders `src/app/App.tsx` | `interface/player/index.html`, the app at `/player/` (as `/dist/deadwax-player.js`) |
+| entry | source | loaded by | pass |
+| --- | --- | --- | --- |
+| `deadwax-ui` | `src/main.tsx` | `interface/index.html`, the main page (as `/dist/deadwax-ui.js`) | the app's, `vite build` |
+| `deadwax-player` | `src/player/main.tsx`, which renders `src/app/App.tsx` | `interface/player/index.html`, the app at `/player/` (as `/dist/deadwax-player.js`) | the app's, `vite build` |
+| `deadwax-lab` | `src/lab/main.tsx`, which renders `src/lab/Bench.tsx` | `interface/player/lab/index.html`, the turntable's test bench at `/player/lab/` (as `/dist/deadwax-lab.js`) | its own, `vite build --mode lab` |
 
-Both entry filenames are pinned unhashed (`entryFileNames: '[name].js'`) because a static HTML
-file has to name them. Code they share (Preact, the HTTP helpers) goes into a hashed chunk under
-`dist/assets/` that both import, and split chunks keep their hashes.
+`npm run build` runs both passes (`tsc --noEmit && vite build && vite build --mode lab`); the second
+adds to the folder the first emptied (`emptyOutDir` off in lab mode) and names its chunks `lab-*`.
+**Keep the bench out of the app's pass** (`APP_INPUTS` in `vite.config.ts`;
+`tests/test_lab_page.py` fails if it is folded in): built beside the app, rollup splits what it
+shares with the player - the deck and the turntable - into chunks the app's own page then loads,
+which changes the app's bundle for a page the app never shows. Alone, it carries its own copy.
+
+All entry filenames are pinned unhashed (`entryFileNames: '[name].js'`) because a static HTML file
+has to name them. Code the app's two entries share (Preact, the HTTP helpers) goes into a hashed
+chunk under `dist/assets/` that both import, and split chunks keep their hashes.
 
 When the migration finishes and Vite owns the main page, let it build `index.html` normally, but
 **keep the player's entry** (or give the player its own HTML input): deleting

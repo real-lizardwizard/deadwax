@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- viewport-fit=cover, as the app's page: the bench keeps what you touch out of the notch with the safe-area insets -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Turntable test bench</title>
+    <meta name="theme-color" content="#000000">
+    <link rel="icon" href="/player/icon.svg" type="image/svg+xml">
+    <link rel="preload" href="/styles/font/noto-sans/noto-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <!-- the app's tokens and the stylesheets the turntable is drawn by, then the bench's own -->
+    <link rel="stylesheet" href="/styles/theme.css">
+    <link rel="stylesheet" href="/player/player.css">
+    <link rel="stylesheet" href="/player/app.css">
+    <link rel="stylesheet" href="/player/lab/lab.css">
+</head>
+<body>
+    <div id="lab-root"></div>
+    <!-- built from ui/src/lab/main.tsx by `npm run build` - see ui/vite.config.ts -->
+    <script type="module" src="/dist/deadwax-lab.js"></script>
+</body>
+</html>

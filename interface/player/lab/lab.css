@@ -1,0 +1,315 @@
+/*
+  The turntable's test bench at /player/lab/ (2.0.0-player.36): one column, a phone's first and a
+  desktop's centred, over the app's own stylesheets - the turntable is drawn by app.css's rules exactly as
+  in Now Playing, and the buttons, chips and grouped rows are the app's. Classes here are `lab-`; values
+  are tokens - theme.css's --dw-*, player.css's --pl-*, app.css's --app-*, and the few below.
+*/
+
+:root {
+    --lab-max: 760px;                /* the column at its widest */
+    --lab-section-gap: 28px;
+    --lab-gap: 10px;
+    --lab-deck-height: min(92vw, 56vh, 480px);   /* the turntable's room: as big as fits, both ways */
+    --lab-option-pad: 8px;
+    --lab-radio: 20px;
+    --lab-option-min: min(100%, 230px);          /* a signal's column, before they wrap to one */
+    --lab-rate-min: min(100%, 9em);              /* a rate's */
+    --lab-motion-min: min(100%, 9.5em);          /* a motion's button */
+    --lab-figure-gap: 6px;
+    --lab-control: 36px;             /* a control's height for a mouse; a finger gets --pl-hit */
+    /* a status line holds its line whether it says anything or not, so nothing below it moves */
+    --lab-status-line: calc(var(--dw-text-footnote) * var(--dw-leading-note));
+    /* a mark on the record's label that turns with it: the bench's record has no cover there, and a
+       plain black label on round grooves looks the same at every angle (review of 2.0.0-player.36) */
+    --lab-label-mark: conic-gradient(from 0deg, var(--dw-accent) 0deg 28deg, transparent 28deg 180deg, var(--dw-tt-label-edge) 180deg 194deg, transparent 194deg);
+    /* how far "Turn it for me" has turned the record, written by the bench on its own box (.lab-deck) */
+    --lab-motion-turn: 0deg;
+}
+
+.lab {
+    max-width: var(--lab-max);
+    margin: 0 auto;
+    padding:
+        calc(var(--pl-safe-top) + var(--pl-gutter))
+        var(--pl-edge-right)
+        calc(var(--pl-safe-bottom) + var(--lab-section-gap))
+        var(--pl-edge-left);
+    overflow-wrap: anywhere;
+}
+
+.lab-title {
+    margin: 0;
+    font-size: var(--dw-text-large-title);
+    font-weight: var(--dw-weight-bold);
+    line-height: var(--dw-leading-title);
+    letter-spacing: var(--dw-tracking-title);
+}
+
+.lab-lead,
+.lab-note,
+.lab-meaning {
+    margin: var(--lab-gap) 0 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-heading);
+    line-height: var(--dw-leading-body);
+}
+
+.lab-meaning { color: var(--dw-text); }
+
+.lab-section { margin-top: var(--lab-section-gap); }
+
+.lab-subtitle {
+    margin: var(--lab-section-gap) 0 0;
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* ===== the song: two radio groups, a file ===== */
+
+.lab-fieldset {
+    margin: var(--lab-gap) 0 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.lab-legend {
+    padding: 0;
+    margin-bottom: var(--lab-figure-gap);
+    color: var(--dw-text-label-color);
+    font-size: var(--dw-text-label);
+}
+
+.lab-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--lab-option-min), 1fr));
+    gap: var(--lab-figure-gap);
+}
+
+.lab-options.is-row { grid-template-columns: repeat(auto-fit, minmax(var(--lab-rate-min), 1fr)); }
+
+.lab-option {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--lab-option-pad);
+    min-height: var(--lab-control);
+    padding: var(--lab-option-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-card);
+    cursor: pointer;
+}
+
+.lab-option:has(input:checked) {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+}
+
+.lab-option.is-reference { border-style: dashed; }
+
+.lab-option input,
+.lab-check input {
+    flex: none;
+    width: var(--lab-radio);
+    height: var(--lab-radio);
+    margin: 0;
+    accent-color: var(--dw-accent);
+}
+
+.lab-option input:focus-visible,
+.lab-check input:focus-visible,
+.lab-file input:focus-visible,
+.lab-field select:focus-visible,
+.lab-field input:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+.lab-option-words { display: flex; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+.lab-option-name { font-size: var(--dw-text-heading); }
+.lab-option-note { color: var(--dw-text-2); font-size: var(--dw-text-footnote); line-height: var(--dw-leading-note); }
+.lab-option.is-short { align-items: center; }
+/* what a signal shows is said for the one chosen: seventeen notes would put the rest a long way down */
+.lab-option:not(:has(input:checked)) .lab-option-note { display: none; }
+
+.lab-file,
+.lab-field {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lab-gap);
+    margin-top: var(--lab-gap);
+    font-size: var(--dw-text-heading);
+}
+
+/* text the phone would zoom into under 16px */
+.lab-file input,
+.lab-field select,
+.lab-field input {
+    min-height: var(--lab-control);
+    max-width: 100%;
+    color: var(--dw-text);
+    font-size: var(--dw-text-body);
+}
+
+.lab-field select,
+.lab-field input {
+    padding: 0 var(--lab-option-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-field);
+}
+
+/* ===== the turntable and its transport ===== */
+
+.lab-deck {
+    display: flex;
+    flex-direction: column;
+    height: var(--lab-deck-height);
+    margin-top: var(--lab-gap);
+}
+
+.lab-now {
+    margin: var(--lab-gap) 0 0;
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    text-align: center;
+}
+
+.lab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lab-gap);
+    margin-top: var(--lab-gap);
+}
+
+.app-button.is-primary-lab {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+}
+
+.app-button[aria-pressed="true"],
+.lab-motion.is-on {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    color: var(--dw-accent-text);
+}
+
+/* a control that can't be used just now: aria-disabled, so it keeps the focus a keyboard gave it, faded,
+   and its tap refused by the bench (review of 2.0.0-player.36: disabled dropped focus to the page) */
+.lab .app-button[aria-disabled="true"] {
+    opacity: var(--app-pin-off);
+    cursor: default;
+}
+
+.lab .app-button[aria-disabled="true"]:active { background: var(--dw-secondary-bg); }
+
+/* the record's label, marked so its turning shows */
+.lab-deck .app-tt-label { background-image: var(--lab-label-mark); }
+
+/* the motions' turn of the record, as the individual `rotate` - added to the transform Turntable writes on
+   the same element for a hand's turn, so neither undoes the other (review of 2.0.0-player.36: written into
+   that transform, the next hand's turn snapped the record back by the motion's whole turn) */
+.lab-deck .app-tt-turn { rotate: var(--lab-motion-turn); }
+
+.lab-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--lab-option-pad);
+    min-height: var(--lab-control);
+    font-size: var(--dw-text-heading);
+    cursor: pointer;
+}
+
+.lab-status {
+    min-height: var(--lab-status-line);
+    margin: var(--lab-gap) 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.lab-motions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--lab-motion-min), 1fr));
+    gap: var(--lab-gap);
+    margin-top: var(--lab-gap);
+}
+
+.lab-motion { justify-content: flex-start; text-align: left; }
+
+/* ===== comparing ===== */
+
+.lab-compare { margin-top: var(--lab-gap); }
+
+.lab-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(2 * var(--app-chip-reach)) var(--app-chip-gap);
+    margin: calc(var(--lab-gap) + var(--app-chip-reach)) 0 var(--app-chip-reach);
+}
+
+.lab-clip-notes {
+    margin: var(--lab-gap) 0;
+    padding-left: var(--dw-gutter-grouped);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.lab-figures { display: grid; gap: var(--lab-gap); margin: var(--lab-gap) 0; }
+
+.lab-figure { margin: 0; }
+
+.lab-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-viz-bg);
+}
+
+.lab-caption {
+    margin-top: var(--lab-figure-gap);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+}
+
+.lab-abx-setup {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lab-gap);
+}
+
+.lab-abx-setup .lab-subtitle { flex-basis: 100%; }
+
+/* ===== "Check this device" ===== */
+
+.lab-runs {
+    display: grid;
+    gap: var(--lab-gap);
+    margin: var(--lab-gap) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lab-run { padding: var(--lab-option-pad); }
+
+.lab-run-title {
+    margin: 0 0 var(--lab-figure-gap);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.lab .app-group { margin-top: var(--lab-gap); }
+
+/* a finger's targets: every control 44px, the record's sound as it was */
+@media (pointer: coarse) {
+    :root { --lab-control: var(--pl-hit); }
+    .lab-option { min-height: var(--pl-hit); }
+}

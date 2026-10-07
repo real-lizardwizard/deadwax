@@ -15,6 +15,15 @@ import { usePosition, type Player } from './usePlayer'
 /** What the drag says in place of the song's position - the time line under the song shows it. */
 export type TurntablePreview = Preview | null
 
+/**
+ * What the turntable reads of the player - all it reads (2.0.0-player.36): Now Playing hands it the app's
+ * own player, and the test bench at /player/lab/ a small one of its own, playing a song it made.
+ */
+export type TurntablePlayer = Pick<Player, 'track' | 'playing' | 'duration' | 'maxRate' | 'position' | 'onPosition' | 'toggle' | 'seek'>
+
+/** Where the turntable's windows come from instead of deadwax: the test bench's (DeckHost's `window`). */
+export type WindowSource = NonNullable<DeckHost['window']>
+
 const DEG = 180 / Math.PI
 
 /** Whether the page is showing: false on a locked phone, or with the app in the background. */
@@ -88,8 +97,9 @@ export function Turntable({
   onPreview,
   windDown = true,
   deck: deckRef,
+  windowSource,
 }: {
-  player: Player
+  player: TurntablePlayer
   /** Now Playing is open - closed, the record stops */
   open: boolean
   /** the CD art to draw on the record, or null for the plain one */
@@ -99,14 +109,21 @@ export function Turntable({
   windDown?: boolean
   /** where Now Playing finds this turntable's deck */
   deck?: { current: Deck | null }
+  /** the test bench's windows of the song it made (2.0.0-player.36) - read as the turntable mounts; the
+   *  app gives none, and the windows are deadwax's */
+  windowSource?: WindowSource
 }) {
-  const position = usePosition(player)
+  //? usePosition reads only position() and onPosition() of what it is handed
+  const position = usePosition(player as Player)
   //? the song's position as last drawn: a release seeks from it, so it lands where the time line said
   const drawnAt = useRef(position)
   drawnAt.current = position
   //? the player as last rendered, for the deck, whose callbacks outlive a render
   const latest = useRef(player)
   latest.current = player
+  //? the test bench's window source as last rendered
+  const windows = useRef(windowSource)
+  windows.current = windowSource
   const visible = useVisible()
   //? the stage's own box, where every point of the drawing is placed from
   const frame = useRef<SVGSVGElement>(null)
@@ -167,7 +184,8 @@ export function Turntable({
         if (!playing) return null
         //? the cap the player asks for this song at, so its window is cut from the very copy it plays
         const maxRate = resamples(playing, now.maxRate ?? 'original', 'raw') ? 48000 : null
-        return { id: playing.id, length: now.duration || 0, flac: isFlac(playing), kind: kindOf(playing), maxRate }
+        //? a song the test bench made has windows whatever it is: the bench makes them
+        return { id: playing.id, length: now.duration || 0, flac: !!windows.current || isFlac(playing), kind: kindOf(playing), maxRate }
       },
       playing: () => latest.current.playing,
       position: () => latest.current.position(),
@@ -195,6 +213,8 @@ export function Turntable({
         if (now?.kind === 'record') setDrag(Object.assign({}, now, { offset: 0 }))
       },
     }
+    //? the test bench's windows (2.0.0-player.36): only where it gives them, so the app's deck asks deadwax
+    if (windows.current) host.window = (song, from, seconds, signal) => windows.current!(song, from, seconds, signal)
     return new Deck(host)
   }, [])
 
@@ -457,10 +477,10 @@ export function TurntableTime({
   player,
   previewing,
 }: {
-  player: Player
+  player: TurntablePlayer
   previewing: TurntablePreview
 }) {
-  const position = usePosition(player)
+  const position = usePosition(player as Player)
   const length = player.duration || 0
   return <p class="app-tt-time">{timeLine(shownTime(previewing, position, length), length, previewWords(previewing))}</p>
 }

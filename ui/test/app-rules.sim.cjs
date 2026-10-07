@@ -402,8 +402,9 @@ console.log('\na link out of the app opens beside it')
   //? sidebar's Managing link came in 2.0.0-player.19, and the Edit panel's to the main page's library
   //? (an album it can't find a folder for) in 2.0.0-player.21, and Needs a look's phone note in .25
   //? and (2.0.0-player.33) the server settings' line and its phone note, and the log's phone note
-  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel, Needs a look on a phone, the server settings, the log on a phone)',
-    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/EventLog.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+  //? (2.0.0-player.36: and Info > Debug's link to the turntable's test bench, a page of its own)
+  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel, Needs a look on a phone, the server settings, the log on a phone, Info > Debug\'s test bench)',
+    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -560,7 +561,8 @@ console.log('\nthe turntable: a tap in the click, a seek as it lets go, and none
   check('...and a release plays only when the deck says there is no coast to wait for',
     /if \(play && !player\.playing\) player\.toggle\(\)/.test(handlers.find(([name]) => name === 'onRelease')?.[1] ?? ''), true)
   check('no frame loop of its own and nothing from the engine\'s clock: the platter is the deck\'s, the arm usePosition',
-    [/requestAnimationFrame|setInterval|setTimeout/.test(table), /usePosition\(player\)/.test(table), /visibilitychange/.test(table),
+    //? (2.0.0-player.36: usePosition handed the turntable's narrower player, which is all it reads of one)
+    [/requestAnimationFrame|setInterval|setTimeout/.test(table), /usePosition\(player( as Player)?\)/.test(table), /visibilitychange/.test(table),
       /requestAnimationFrame/.test(code(read('player/deck.ts')))], [false, true, true, true])
   const sheet = code(read('player/NowPlaying.tsx'))
   //? the element, not the type TurntablePreview or TurntableTime
@@ -585,13 +587,22 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
     const holding = blocks.filter((block) => block.index <= at && at < block.index + block[0].length)
     return holding.at(-1)?.[2] ?? null
   }
-  const wakes = files.filter((file) => APP_SIDE(file) && file !== 'player/deck.ts').flatMap((file) => {
+  //? (2.0.0-player.36: and the turntable's test bench's, a page of its own whose deck is the app's own -
+  //? its play button and Start the sound, as the spec has them, and its motions', Record's, the device
+  //? check's and Carry on's buttons, each a click)
+  const wakes = files.filter((file) => (APP_SIDE(file) || file.startsWith('lab/')) && file !== 'player/deck.ts').flatMap((file) => {
     const text = code(read(file))
     return [...text.matchAll(/\b(wakeDeckAudio|resumeDeckAudio)\(\)/g)].map((match) => `${file}: ${enclosing(text, match.index)}: ${match[1]}`)
   })
-  check('made or resumed only from gestures WebKit counts: the record\'s click and release, the transport, the look button, the mini player\'s tap', wakes.sort(), [
+  check('made or resumed only from gestures WebKit counts: the record\'s click and release, the transport, the look button, the mini player\'s tap - and the test bench\'s own buttons', wakes.sort(), [
     'app/App.tsx: openSheet: resumeDeckAudio',
     'app/App.tsx: openSheet: wakeDeckAudio',
+    'lab/Bench.tsx: onCarryOn: wakeDeckAudio',
+    'lab/Bench.tsx: onCheck: wakeDeckAudio',
+    'lab/Bench.tsx: onMotion: wakeDeckAudio',
+    'lab/Bench.tsx: onPlay: wakeDeckAudio',
+    'lab/Bench.tsx: onRecord: wakeDeckAudio',
+    'lab/Bench.tsx: onStart: wakeDeckAudio',
     'player/NowPlaying.tsx: onLook: wakeDeckAudio',
     'player/NowPlaying.tsx: onNext: wakeDeckAudio',
     'player/NowPlaying.tsx: onPrevious: wakeDeckAudio',
@@ -641,6 +652,111 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
   check('...the cover\'s previous and next wake no audio context: only on the turntable',
     ['onPrevious', 'onNext'].map((name) => new RegExp(`const ${name} = \\(\\) => \\{\\s*if \\(turntable\\) wakeDeckAudio\\(\\)\\s*player\\.\\w+\\(\\)\\s*\\}`).test(nowPlaying)),
     [true, true])
+}
+
+console.log('\nthe turntable\'s test bench (2.0.0-player.36): its own player and windows, contexts only from a tap, nothing of the app\'s player')
+{
+  const bench = code(read('lab/Bench.tsx'))
+  const handler = (name) => new RegExp(`\\n( *)const ${name} = [^\\n]*=> \\{([\\s\\S]*?)\\n\\1\\}`).exec(bench)?.[2] ?? ''
+  //? the deck's recording may make its context (recordDeckSound wakes it): the Record button's click wakes
+  //? the sound in the tap, and the recording starts once it runs (review: the first tap on a cold page was
+  //? refused, "the sound has not started", though that tap had started it) - and from a motion only once
+  //? the deck is live, its context running already
+  const motion = /const motion = async \([\s\S]*?\n {2}\}\n/.exec(bench)?.[0] ?? ''
+  const starting = handler('startRecording')
+  check('the deck\'s recording: the Record button\'s click wakes the sound in the tap, and records once it runs; a motion records once the deck is live (its context running)',
+    [/wakeDeckAudio\(\)\s*void startRecording\(\)/.test(handler('onRecord')),
+      starting.indexOf("await until(() => deckReport()?.context === 'running'") >= 0 && starting.indexOf("await until(() => deckReport()?.context === 'running'") < starting.indexOf('recordDeckSound(RECORD_SECONDS, true)'),
+      (bench.match(/recordDeckSound\(/g) ?? []).length,
+      motion.indexOf('await until(() => deck.live()') >= 0 && motion.indexOf('await until(() => deck.live()') < motion.indexOf('recordDeckSound(')],
+    [true, true, 2, true])
+  check('the bench\'s play button pauses and plays as Now Playing\'s does on the turntable: the deck\'s pausing() and resuming()',
+    [/const landing = deck\?\.pausing\(\) \?\? null\s*player\.toggle\(\)\s*if \(landing !== null\) player\.seek\(landing\)/.test(handler('onPlay')),
+      /const from = deck\?\.resuming\(\) \?\? null\s*if \(from !== null\) player\.seek\(from\)\s*player\.toggle\(\)/.test(handler('onPlay'))], [true, true])
+  //? ...and not while a motion or the check turns it (review): played under the hand, the song and the
+  //? record's sound were heard together, and the release sought the playing song on and left the record
+  //? still beside it. A motion is busy from its tap, its making ready included - before it turns - and one
+  //? tap starts one
+  check('...and the play button is refused, and said to be, while a motion (from its tap) or the check runs - and a motion\'s tap starts one motion',
+    [/^\s*if \(!madeRef\.current \|\| busy\) return\s*wakeDeckAudio\(\)/.test(handler('onPlay')), /onClick=\{onPlay\} aria-disabled=\{!made \|\| busy\}/.test(bench),
+      /const busy = !!running \|\| preparing \|\| !!check\?\.running/.test(bench),
+      /if \(busy \|\| !made \|\| motionGoing\.current\) return\s*motionGoing\.current = true\s*setPreparing\(true\)/.test(handler('onMotion')),
+      /\.finally\(\(\) => \{\s*motionGoing\.current = false\s*setPreparing\(false\)/.test(handler('onMotion')),
+      /<div ref=\{deckBox\} class="lab-deck" inert=\{busy\}>/.test(bench)],
+    [true, true, true, true, true, true])
+  //? the runner asks for the player as it is - at the release too, after the take paused it: the bench's
+  //? player is a new object each time it starts or stops (review: handed the one of the motion's start, a
+  //? song the take paused was never played again)
+  check('...a motion handed the player as it is when asked, never the one of its start; a check\'s run counted by runCounts, its blocks said by blocksLine',
+    [/runMotion\(deck, \(\) => playerRef\.current, def,/.test(motion), /runMotion\(deck, playerRef\.current/.test(bench),
+      /\.\.\.runCounts\(done\.data\.voice, before, after\?\.health\)/.test(bench), /\{ label: 'Blocks late', value: blocksLine\(run\) \}/.test(bench)],
+    [true, false, true, true])
+  //? its listening room: an AudioContext of its own, made only in make(), which only play() reaches,
+  //? which only toggle() does - from the bench's Play button and Space's keyup, each a gesture
+  const room = code(read('lab/listen.ts'))
+  const roomMethods = [...room.matchAll(/\n {2}(?:private )?(\w+)\([^)]*\)[^{\n]*\{[\s\S]*?\n {2}\}/g)]
+  check('its listening room makes its context only in make(), reached only from play(), reached only from toggle()',
+    [roomMethods.filter((m) => /\bnew Room\(/.test(m[0])).map((m) => m[1]), roomMethods.filter((m) => /this\.make\(\)/.test(m[0])).map((m) => m[1]),
+      roomMethods.filter((m) => /this\.play\(\)/.test(m[0])).map((m) => m[1]).sort()],
+    [['make'], ['play'], ['restart', 'toggle']])
+  check('...toggled only from the Play buttons\' click and Space\'s keyup (a gesture WebKit counts)',
+    [[...bench.matchAll(/room\.toggle\(\)/g)].length, /const onListen = \(\) => \{\s*room\.toggle\(\)\s*\}/.test(bench), /const up = \(event: KeyboardEvent\) => \{\s*if \(event\.key !== ' '[^\n]*\n\s*event\.preventDefault\(\)\s*room\.toggle\(\)/.test(bench), (bench.match(/onClick=\{onListen\}/g) ?? []).length],
+    [2, true, true, 2])
+  //? the comparison's keys (review): on the document while a comparison shows - Space and 1-3 wherever the
+  //? focus is (a click in WebKit focuses nothing, and a control the bench takes away drops it to the page),
+  //? but never where something is typed into, and Space not on another control (whose own Space presses
+  //? it): the comparison's own controls carry data-room, where Space plays or pauses it
+  const keys = /useEffect\(\(\) => \{\s*if \(!compared\) return([\s\S]*?)\n {2}\}, \[compared\]\)/.exec(bench)?.[1] ?? ''
+  check('...its keys on the document while a comparison shows - not where something is typed into, Space not on another control; on none of the sections',
+    [/document\.addEventListener\('keydown', down\)/.test(keys) && /document\.addEventListener\('keyup', up\)/.test(keys), /document\.removeEventListener\('keyup', up\)/.test(keys),
+      /INPUT\|SELECT\|TEXTAREA/.test(keys), /closest\('\[data-room\]'\)/.test(keys), /<section[^>]*onKey/.test(bench),
+      (bench.match(/data-room/g) ?? []).length >= 5],
+    [true, true, true, true, false, true])
+  //? focus never dropped to the page (review): busy controls are aria-disabled, never disabled, their taps
+  //? refused; a control the bench takes away hands focus to what replaces it; a comparison landing takes it
+  check('...focus handed on: what the blind test takes away hands it to its next control, a comparison landing to its Play; the chips one tab stop, moved by the arrows',
+    [/useLayoutEffect\(\(\) => \{\s*const next = focusNext\.current/.test(bench),
+      ['startAbx', 'nextTrial'].map((name) => /focusNext\.current = \{ name: 'abx-play'/.test(handler(name))),
+      /focusNext\.current = \{ name: answers\.length >= abx\.trials \? 'abx-back' : 'abx-next'/.test(handler('guess')),
+      /focusNext\.current = \{ name: 'compare-play', force: false \}/.test(handler('backToCompare')),
+      /focusNext\.current = \{ name: 'compare-play', force: true \}/.test(bench),
+      ['compare-play', 'abx-play', 'abx-next', 'abx-back'].map((name) => bench.includes(`data-focus="${name}"`)),
+      (bench.match(/tabIndex=\{room\.selected === index \? 0 : -1\}/g) ?? []).length, (bench.match(/onKeyDown=\{onChipKey\}/g) ?? []).length],
+    [true, [true, true], true, true, true, [true, true, true, true], 2, 2])
+  //? the song held still while anything records (review: a signal changed mid-recording was measured
+  //? against the old one); a hidden page's run or recording thrown away, the check waiting for a tap to
+  //? carry on; a check that stops part way still gives its file
+  check('...the song held still while anything records; a hidden page\'s run or recording thrown away; a check that stops part way still gives its file',
+    [/const recording = recorded\?\.state === 'recording' \|\| startingRecord/.test(bench), /const locked = busy \|\| recording/.test(bench),
+      (bench.match(/<fieldset class="lab-fieldset" disabled=\{locked\}>/g) ?? []).length, /accept="audio\/\*"\s*disabled=\{locked\}/.test(bench), /onClick=\{onCheck\} aria-disabled=\{locked\}/.test(bench),
+      /watchForHide\(\(\) => \{\s*run\?\.stop\(\)\s*if \(recordingIt\) stopDeckRecording\(\)/.test(motion) && motion.indexOf('watchForHide(') < motion.indexOf('await until(() => deck.live()'), /const watch = watchForHide\(\(\) => stopDeckRecording\(\)\)/.test(starting),
+      /if \(what\.watch\?\.hidden\) \{\s*setComparing\(HIDDEN_RECORDING\)/.test(bench),
+      /const hiding = watchForHide\(\)[\s\S]{0,900}done = await motion\(id, true, null\)[\s\S]{0,200}if \(!done\?\.interrupted && !hiding\.hidden\) break\s*setCheck\(state\(HIDDEN_CHECK, \{ waiting: true \}\)\)\s*await new Promise<void>\(\(go, stop\) => \{ carryOn\.current = \{ go, stop \} \}\)/.test(bench),
+      /\} catch \(error\) \{[\s\S]{0,200}href: await save\(\{ complete: false/.test(bench)],
+    [true, true, 2, true, true, true, true, true, true, true])
+  //? what the bench says by reading.ts's rules (review): a recording nothing took said so before anything is
+  //? worked out (it was told as a stall of the page), the check's runs by their verdict, the transport's
+  //? line by transportLine (its "stopped" stayed up after Play brought the sound back)
+  check('...a recording nothing took said so before it is compared; the check\'s runs say why they want recording again; the transport\'s line kept by transportLine',
+    [/if \(!tookTheRecord\(data\.messages\)\) \{\s*setComparing\(NOT_TAKEN\)\s*return\s*\}/.test(handler('analyse')) && handler('analyse').indexOf('tookTheRecord(') < handler('analyse').indexOf('compareRecording('),
+      /\{ label: 'Record it again', value: againLine\(run\.numbers\) \?\? NOT_HELD \}/.test(bench),
+      /setStatus\(\(line\) => transportLine\(line, was, now, hidden\)\)/.test(bench), /setStatus\(SOUND_STOPPED\)/.test(bench)],
+    [true, true, true, false])
+  check('...and no other audio context in the bench but the decoder\'s, an OfflineAudioContext, in decode.ts alone',
+    [files.filter((file) => file.startsWith('lab/') && /\bnew\s+(?:Context|AudioContext|webkitAudioContext|Room|Decoder)\b/.test(code(read(file)))).sort(), files.filter((file) => /OfflineAudioContext/.test(code(read(file))))],
+    [['lab/decode.ts', 'lab/listen.ts'], ['lab/decode.ts']])
+  //? its player is its own: one <audio> of the bench's, never usePlayer; the turntable reaches it through
+  //? the narrow TurntablePlayer, and the deck its windows through the bench's source
+  check('its player is its own <audio>, made once; no part of the bench reaches the app\'s player',
+    [(code(read('lab/benchPlayer.ts')).match(/document\.createElement\('audio'\)/g) ?? []).length,
+      files.filter((file) => file.startsWith('lab/') && /usePlayer|app\/context|app\/App/.test(code(read(file))))],
+    [1, []])
+  check('the turntable drawn with the bench\'s windows and its deck',
+    /<Turntable player=\{player\} open=\{true\} discArt=\{null\} onPreview=\{setPreviewing\} windDown=\{windDown\} deck=\{deckRef\} windowSource=\{windowSource\} \/>/.test(bench), true)
+  const table = code(read('player/Turntable.tsx'))
+  check('Turntable takes the windows only where they are given - the app\'s deck asks deadwax as ever',
+    [/if \(windows\.current\) host\.window = /.test(table), (code(read('app/App.tsx') + read('player/NowPlaying.tsx')).match(/windowSource/g) ?? []).length],
+    [true, 0])
 }
 
 console.log('\nwhat Info reads is taken in the tap, and asks the engine\'s element only')
@@ -943,7 +1059,8 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
       /const closes = closesOnCrossing\(frame\)\s*if \(closes\.nowPlaying\) \{[\s\S]*?setOver\('none'\)\s*setSheetOpen\(false\)/.test(app),
       /if \(closes\.infoPanel\) \{[\s\S]*?setInfoPanel\(false\)/.test(app)],
     [2, true, true, true])
-  check('...and nothing but Now Playing draws the turntable', files.filter((file) => /<Turntable\s/.test(code(read(file)))), ['player/NowPlaying.tsx'])
+  //? (2.0.0-player.36: and the turntable's test bench at /player/lab/ - a page of its own, no part of the app's frame)
+  check('...and nothing but Now Playing draws the turntable - in the app; the test bench is a page of its own', files.filter((file) => /<Turntable\s/.test(code(read(file)))), ['lab/Bench.tsx', 'player/NowPlaying.tsx'])
   //? a side panel is no sheet over the page: Sources and Info take how they are drawn from App, and
   //? are modal only as a sheet
   const sheet = code(read('app/Sources.tsx'))

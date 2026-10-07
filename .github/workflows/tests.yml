@@ -74,8 +74,8 @@ jobs:
 
       - run: npm ci
 
-      # tsc --noEmit and then vite build, exactly as the image does - a type error fails here
-      # before it can fail a release
+      # tsc --noEmit, then vite build and the test bench's own pass (vite build --mode lab), exactly
+      # as the image does - a type error fails here before it can fail a release
       - run: npm run build
 
       # The sims are plain Node scripts that exit non-zero on a failure - there is no JS test

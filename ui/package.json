@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && vite build --mode lab",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },

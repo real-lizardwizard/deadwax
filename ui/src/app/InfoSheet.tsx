@@ -304,7 +304,12 @@ export function InfoSheet({
                     {row.note && <dd class="app-kv-note app-mono">{row.note}</dd>}
                     {row.action && (
                       <dd class="app-kv-action">
-                        {row.action.href ? (
+                        {row.action.href && row.action.beside ? (
+                          //? a page of its own (2.0.0-player.36, the turntable's test bench): beside the app, never over it
+                          <a class="app-button app-info-action" href={row.action.href} target="_blank" rel="noopener">
+                            {row.action.label}
+                          </a>
+                        ) : row.action.href ? (
                           <a class="app-button app-info-action" href={row.action.href} download={row.action.download}>
                             {row.action.label}
                           </a>

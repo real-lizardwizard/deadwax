@@ -752,6 +752,14 @@ of a twentieth. If you still hear it:
 - **The record feels late under your finger**: that is the eighth of a second. It can be shortened, at
   the cost of some of the steadiness.
 
+**To tell whether it is deadwax at all**, use [the turntable's test bench](player.md#testing-the-turntable)
+(2.0.0-player.36, **Info** > **Debug** > **Open the test bench**): turn the real turntable over test
+tones, or have it turned for you at perfect speeds, and hear what it played (A) beside a perfect
+turntable turned the same way (B along deadwax's own path, C along a smooth one) - blind if you like.
+If A and C sound alike, what you hear is what turning a record sounds like; if C is clean and A isn't,
+deadwax adds it, and the numbers under them say which part. Its **Check this device** gives a file of
+numbers and recordings to send - keep the page in view and the screen awake while it runs.
+
 **If you still hear a digital sound after all of that, record it** (2.0.0-player.32) - three fixes in
 a row were each real and each not the one being heard, and a recording from your own device is the
 way to find what is (the clipping above was found in one; since 2.0.0-player.35 a recording also holds
