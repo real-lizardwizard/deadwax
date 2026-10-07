@@ -87,7 +87,7 @@
 import { isAbort, latestOnly } from '../lib/latest'
 import { clockReading, clockSettled, contextTimeAt, newDeckClock, resetDeckClock } from '../lib/deckClock'
 import {
-  HAND_DELAY_S, REPORTS_PER_SECOND, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
+  HAND_DELAY_S, REPORTS_PER_SECOND, VOICE_CEILING, VOICE_LOOKAHEAD_S, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
   type DeckHealth, type DeckReport, type VoiceHeard, type VoiceMessage,
 } from '../lib/deckVoice'
 import {
@@ -151,6 +151,10 @@ export const PAUSE_SETTLE_MS = 300
 export const SONG_CHANGE_SETTLE_MS = 300
 /** What the voice last said is believed for this long, in ms, extrapolated by its rate. */
 export const HEARD_FRESH_MS = 120
+/** What the voice's limiter held after the deck last reported - the counts for a hold's last moments
+ *  and a coast's, which the voice plays HAND_DELAY_S behind the hand - is reported once the deck no
+ *  longer steers the sound, no more often than this, in ms (review of 2.0.0-player.35). */
+export const HEALTH_REPORT_MS = 250
 /** The song found this far from where the deck had it sought, in seconds, was sought there by
  *  something else - Previous restarting it, a key on the arm - and the record's sound has nothing to
  *  follow. Further than any wind-down travels from where the song paused (0.3 s). */
@@ -288,8 +292,20 @@ let heardListener: ((heard: VoiceHeard) => void) | null = null
 //? the deck hasn't set it
 let sessionBefore: string | null = null
 //? how the sound is keeping up, counted for Info > Debug's "Turntable timing" (2.0.0-player.28): the
-//? main-thread voice's blocks asked for after they were due, and the context's interruptions
-const soundHealth = { blocks: 0, lateBlocks: 0, worstBlockMs: 0, interruptions: 0 }
+//? main-thread voice's blocks asked for after they were due, and the context's interruptions - and
+//? (2.0.0-player.35) the peaks the voice's limiter held under the ceiling: how many runs of samples, how
+//? many samples, and the deepest it turned the sound down, dB
+const soundHealth = { blocks: 0, lateBlocks: 0, worstBlockMs: 0, interruptions: 0, peaksHeld: 0, samplesHeld: 0, deepestHoldDb: 0 }
+//? the lowest limiter gain the health takes as it is: 120 dB down - anything lower (a gain of 0, which the
+//? voice floors at) is said as that
+const DEEPEST_GAIN_SAID = 1e-6
+//? the limiter's counts have moved since the deck last reported (review of 2.0.0-player.35): the voice
+//? plays the hand's path HAND_DELAY_S behind (and the script lag more, on the main thread), so what it
+//? held over a hold's last moments - and over a whole coast - comes in after the report the hold's end
+//? makes, and a paused record has no later report of its own: the deck reports again once it has
+//? stopped steering the sound (onHeard). Only the limiter's counts: a late block is the page being busy,
+//? and a report re-renders the page - reporting for it could make more of them
+let healthMoved = false
 //? the turntable was hidden while its context was still starting or resuming (a tap's, and the page
 //? hidden before it settled): suspended as soon as it runs, since nothing else would - a gesture asking
 //? for the sound, or the turntable showing again, lets that go (review of 2.0.0-player.16)
@@ -547,6 +563,25 @@ export function resumeDeckAudio(): void {
  */
 function heard(said: VoiceHeard): void {
   recording?.heard.push(said)
+  //? what the limiter did since the voice last said (2.0.0-player.35), counted for Debug
+  if (said.held > 0) {
+    soundHealth.peaksHeld += said.peaks
+    soundHealth.samplesHeld += said.held
+    healthMoved = true
+  }
+  if (said.lowest < 1) {
+    //? read as at least DEEPEST_GAIN_SAID: the voice floors its gain at 0 (only for a window some 1e16
+    //? times full scale), and -20 log10 of 0 is Infinity - of anything below it, NaN - which Debug would
+    //? print (review of 2.0.0-player.35)
+    const lowest = said.lowest > DEEPEST_GAIN_SAID ? said.lowest : DEEPEST_GAIN_SAID
+    const deepest = -20 * Math.log10(lowest)
+    //? a deeper dip than any so far is news; a gain still coming back up after one (lowest under 1, nothing
+    //? new held) is not - it would have the deck report every HEALTH_REPORT_MS for the second it takes
+    if (deepest > soundHealth.deepestHoldDb) {
+      soundHealth.deepestHoldDb = deepest
+      healthMoved = true
+    }
+  }
   heardListener?.(said)
 }
 
@@ -558,6 +593,8 @@ interface DeckRecording {
   rate: number
   blocks: Float32Array[][]
   blockTimes: number[]
+  /** each tapped block's loudest sample as a float, before the file's 16 bits clamp it (2.0.0-player.35) */
+  blockPeaks: number[]
   messages: Record<string, unknown>[]
   heard: VoiceHeard[]
   tap: ScriptProcessorNode
@@ -606,7 +643,10 @@ function noteForRecording(message: VoiceMessage): void {
  * then offered to save as one JSON file, the audio in it as 16-bit samples. James hears "a digital sound"
  * on his iPhone and his Mac that no lab recording here has shown, after three fixes each of which was
  * real and none of which was it; this is the ground truth, so the voice can be replayed here with his
- * very samples and its output held against what he heard. A diagnostic, nothing the player does: the tap
+ * very samples and its output held against what he heard. Since 2.0.0-player.35 (version 2) the file also
+ * carries each tapped block's loudest sample as a float (`blockPeaks`) - the 16-bit audio clamps at full
+ * scale, so that is what says how far over anything went - and the limiter's ceiling and lookahead; the
+ * voice's own reports in it say what its limiter held down. A diagnostic, nothing the player does: the tap
  * hangs off the voice's own node and never the song's element. Starts only from a tap (Debug's button),
  * since it may make the context. Answers why it couldn't start, or null.
  */
@@ -624,16 +664,27 @@ export function recordDeckSound(seconds = 20): string | null {
     const tap = context.createScriptProcessor(4096, 2, 2)
     const started: DeckRecording = {
       seconds, since: now(), until: now() + seconds * 1000, kind: voice.kind, rate: context.sampleRate,
-      blocks: [], blockTimes: [], messages: [], heard: [], tap,
+      blocks: [], blockTimes: [], blockPeaks: [], messages: [], heard: [], tap,
       timer: setTimeout(() => finishRecording(), seconds * 1000),
     }
     tap.onaudioprocess = (event: AudioProcessingEvent) => {
       if (recording !== started) return
       const input = event.inputBuffer
       const copies: Float32Array[] = []
-      for (let c = 0; c < input.numberOfChannels; c++) copies.push(Float32Array.from(input.getChannelData(c)))
+      //? and the block's loudest sample as it is, a float: the 16-bit file clamps at full scale, so this
+      //? is what says how far over anything went
+      let loudest = 0
+      for (let c = 0; c < input.numberOfChannels; c++) {
+        const copy = Float32Array.from(input.getChannelData(c))
+        for (let i = 0; i < copy.length; i++) {
+          const size = Math.abs(copy[i]!)
+          if (size > loudest) loudest = size
+        }
+        copies.push(copy)
+      }
       started.blocks.push(copies)
       started.blockTimes.push(event.playbackTime)
+      started.blockPeaks.push(loudest)
     }
     node.connect(tap)
     tap.connect(context.destination)
@@ -684,13 +735,14 @@ function finishRecording(): void {
   let base64 = ''
   for (let i = 0; i < bytes.length; i += PIECE) base64 += btoa(String.fromCharCode(...bytes.subarray(i, i + PIECE)))
   const payload = {
-    recording: 'deadwax turntable sound', version: 1, when: new Date().toISOString(),
+    recording: 'deadwax turntable sound', version: 2, when: new Date().toISOString(),
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
     secure: (globalThis as { isSecureContext?: boolean }).isSecureContext ?? null,
     voice: done.kind, sampleRate: done.rate, delaySeconds: HAND_DELAY_S,
     scriptLagSeconds: done.kind === 'script' ? (SCRIPT_LAG_BLOCKS * SCRIPT_BUFFER) / done.rate : 0,
     clock: deckClockMapping(), report: lastReport, pageTimeAtStart: done.since,
-    tapBlock: 4096, blockTimes: done.blockTimes,
+    tapBlock: 4096, blockTimes: done.blockTimes, blockPeaks: done.blockPeaks,
+    limiter: { ceiling: VOICE_CEILING, lookaheadSeconds: VOICE_LOOKAHEAD_S },
     audio: { format: 'int16le', channels, frames, base64 },
     messages: done.messages, heard: done.heard,
   }
@@ -840,6 +892,8 @@ export class Deck {
   private stampedTo = -Infinity
   //? the audio clock's step as Debug was last told it
   private reportedStep = 0
+  //? when (page ms) Debug was last told anything - the limiter's late counts wait HEALTH_REPORT_MS from it
+  private reportedAt = -Infinity
   //? a let-go that means the song to play: where it was sought, when (page ms) and how long the record's
   //? run back to speed is - until the song's own playback is seen moving from there (noteBack)
   private letGo: { at: number; since: number; motor: number } | null = null
@@ -945,6 +999,7 @@ export class Deck {
       this.frames = this.slowFrames = this.worstFrameMs = this.notBack = 0
       this.backMs = this.motorMs = null
       soundHealth.blocks = soundHealth.lateBlocks = soundHealth.worstBlockMs = soundHealth.interruptions = 0
+      soundHealth.peaksHeld = soundHealth.samplesHeld = soundHealth.deepestHoldDb = 0
       this.lastFetchAt = 0
       this.positionOff = this.host.onPosition(this.onPosition)
       this.keepHere()
@@ -1815,7 +1870,13 @@ export class Deck {
   }
 
   private readonly onHeard = (heard: VoiceHeard) => {
-    this.heard = { ...heard, at: now() }
+    const at = now()
+    this.heard = { ...heard, at }
+    //? what the limiter held since the last report, come in after it - a hold's last moments, a coast:
+    //? told once the deck no longer steers the sound, at most every HEALTH_REPORT_MS (review of
+    //? 2.0.0-player.35). Never while it steers: a report re-renders the page, and under a hand on the
+    //? main thread that is the voice's own time
+    if (healthMoved && !this.steering() && at - this.reportedAt >= HEALTH_REPORT_MS) this.report()
   }
 
   private readonly onAudio = () => {
@@ -1865,6 +1926,8 @@ export class Deck {
       health: this.health(),
     })
     this.reportedStep = clock.step
+    this.reportedAt = now()
+    healthMoved = false
   }
 }
 

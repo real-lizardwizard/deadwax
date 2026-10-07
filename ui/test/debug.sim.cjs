@@ -187,6 +187,18 @@ console.log('\nTurntable timing (2.0.0-player.28): how the turntable keeps up on
     rows.turntableTimingRow({ ...base, health: { ...health, blocks: 0, frames: 0, backMs: 180, motorMs: 0, notBack: 2, interruptions: 1 } }),
     { label: 'Turntable timing', value: 'The song was back 0.18 s after the last let-go',
       note: "The sound, on the main thread: no block played yet · Under a hand: no frames yet · 2 let-goes after which the song didn't start · The sound interrupted 1 time" })
+  //? 2.0.0-player.35: what the voice's limiter held under full scale - runs of samples over its ceiling, half
+  //? a decibel under (Club Diver peak-normalised along James's hand: 36 of them, 65 samples, 1.35 dB)
+  const held = { ...health, peaksHeld: 36, samplesHeld: 65, deepestHoldDb: 1.354 }
+  check('the peaks the voice\'s limiter held under full scale, after the main thread\'s blocks: how many, how many samples, the deepest it turned the sound down',
+    rows.turntableTimingRow({ ...base, health: held }).note,
+    'The sound, on the main thread: 12 of 3400 blocks late, the worst by 38 ms · Peaks held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB · Under a hand: 310 frames, 4 late, the longest gap 118 ms')
+  check('...one peak of one sample, on the audio thread; and none at all, said plainly',
+    [rows.turntableTimingRow({ ...base, voice: 'worklet', voiceWhy: null, health: { ...held, peaksHeld: 1, samplesHeld: 1, deepestHoldDb: 0.04 } }).note,
+      rows.turntableTimingRow({ ...base, voice: 'worklet', voiceWhy: null, health: { ...held, peaksHeld: 0, samplesHeld: 0, deepestHoldDb: 0 } }).note],
+    ['Peaks held under full scale: 1 since it showed (1 sample), the deepest under 0.1 dB · Under a hand: 310 frames, 4 late, the longest gap 118 ms',
+      'Peaks held under full scale: none since it showed · Under a hand: 310 frames, 4 late, the longest gap 118 ms'])
+  check('...and no word of it with no voice yet (nothing has played)', rows.turntableTimingRow({ ...base, voice: null, health: held }).note, 'Under a hand: 310 frames, 4 late, the longest gap 118 ms')
 }
 
 console.log('\nTurntable sound (2.0.0-player.24): how far the audio\'s clock moves at a time')

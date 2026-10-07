@@ -715,9 +715,26 @@ the song - an echo.
 Until 2.0.0-player.27 the record's sound had a fast flutter on it whenever your hand's speed was
 changing, which is nearly always: "warbly, like there's a dragonfly sound on top of the music". The
 pitch followed the jitter in the phone's touch readings. It now works each touch's speed out from the
-touches either side of it and plays about an eighth of a second behind your hand (120 ms; about 163
-over plain `http://`) instead of a twentieth. If you still hear it:
+touches either side of it and plays about an eighth of a second behind your hand (121.5 ms - 120 for
+that, and since 2.0.0-player.35 1.5 more for the limiter below; about 165 over plain `http://`) instead
+of a twentieth. If you still hear it:
 
+- **A crackle or tick on the loudest drum hits, at any speed, its own included** was real until
+  2.0.0-player.35, and it is what a recording found: on a loud song the record's sound went over full
+  scale (working out the sound between the song's own samples brings back the peaks the song has
+  between them, and the sound's filter for the deepest bass adds to them - about 2 to 3 dB on a loud,
+  hard-clipped master), and the browser cuts off whatever is over. On James's song that was 144
+  samples at full scale in 15 short bursts, about one a second, on the loudest drum hits; in the
+  recording's slowed stretches, the only ones where a sound the song can't make can be told from the
+  song, it was the only such sound - whether it is the "digital sound" he hears is still for his ears
+  to say. The sound now ends in a limiter that turns it down smoothly, 1.5 ms ahead of a peak, just
+  enough to keep every sample half a decibel under full scale, and changes nothing at all where
+  nothing comes near it. **Info** > **Debug** > **Turntable timing** says how many peaks it has held
+  since the turntable showed and the deepest it turned the sound down (`Peaks held under full scale:
+  36 since it showed (65 samples), the deepest 1.4 dB`), brought up to date a moment after you let go
+  (the sound runs an eighth of a second behind your hand, and a coast after it is counted too). A loud
+  song turned down by a decibel or so on its loudest moments is the limiter doing its job; a crackle
+  with that count still at none isn't it.
 - **A buzz at the record's sound, over plain `http://` only, with no block late** was real until
   2.0.0-player.31: on that address the sound is made on the page's main thread, and Safari stamps each
   block's time from the main thread, so the stamp jumped by up to a block at a time and the sound
@@ -736,8 +753,10 @@ over plain `http://`) instead of a twentieth. If you still hear it:
   the cost of some of the steadiness.
 
 **If you still hear a digital sound after all of that, record it** (2.0.0-player.32) - three fixes in
-a row were each real and each not the one being heard, and a recording from your own device is what
-settles it: open **•••** > **Info** > **Debug** with the turntable showing and its sound started (turn
+a row were each real and each not the one being heard, and a recording from your own device is the
+way to find what is (the clipping above was found in one; since 2.0.0-player.35 a recording also holds
+each moment's loudest sample before the file's 16 bits cut it off, so it shows how far over anything
+went): open **•••** > **Info** > **Debug** with the turntable showing and its sound started (turn
 the record once first), press **Record 20 s** on the **Recording** row, press **Done**, and turn the
 record as you normally would for the next 20 seconds. Open Info > Debug again: the row says
 `20 s recorded`, and **Save the recording** downloads one JSON file of about 5 MB - what the record's
@@ -809,12 +828,12 @@ iPhone moves in steps of about 21 ms, so its pitch swung many times a second. It
 your phone reports at the moment it was made, played back on one smooth clock - so a steady turn plays
 the song at your hand's speed. What's left is by design:
 
-- **It's a moment behind your finger**: a twentieth of a second on HTTPS, about 0.09 s over plain
-  `http://` - always the same, so the next touch has always arrived before the sound gets there.
-  Taking hold of a playing record, or pausing it with the wind-down, repeats the song's last twentieth
-  of a second as the record's sound takes over; letting go of a playing record at about its own speed
-  skips it (the song plays on straight from where your hand let go, while the record's sound, that much
-  behind, stops as you let go) - neither is a fault.
+- **It's a moment behind your finger**: about an eighth of a second on HTTPS (121.5 ms), about 0.165 s
+  over plain `http://` - always the same, so the touches around each moment have always arrived before
+  the sound gets there. Taking hold of a playing record, or pausing it with the wind-down, repeats the
+  song's last eighth of a second as the record's sound takes over; letting go of a playing record at
+  about its own speed skips it (the song plays on straight from where your hand let go, while the
+  record's sound, that much behind, stops as you let go) - neither is a fault.
 - **Its pitch follows your hand**, and a hand turning by eye is never quite steady - you hear that,
   as you would on a real deck. While you turn steadily deadwax smooths a finger's own jitter out of the
   pitch, measuring how much there is in your touches (so a heavier finger, or a grip near the middle of

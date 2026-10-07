@@ -222,8 +222,9 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
                    with the player inside them - see "The one app". player/deck.ts is the
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts, and
-                   since 2.0.0-player.24 lib/deckClock.ts, its one time base) - see "The
-                   turntable, part two" and "The record's sound follows the hand".
+                   since 2.0.0-player.24 lib/deckClock.ts, its one time base; the voice ends
+                   in a peak limiter since 2.0.0-player.35) - see "The turntable, part two",
+                   "The record's sound follows the hand" and "The record's sound never clips".
                    app/NeedsALook.tsx is the review queue on a desktop, its rules the pure
                    lib/needsLook.ts and its count app/useQueueSummary.ts - see "Needs a look".
                    app/ServerSettings.tsx (drawn from components/SettingsView.tsx's own exported
@@ -5000,7 +5001,10 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   four speeds; since 2.0.0-player.24 of where it was HAND_DELAY_S before - coasts, the motor and the
   wind-down are played the delay behind, like the hand). A drive runs out by itself (`until`, DRIVE_FOR_S 0.12 s): a stalled page never leaves
   a record whirring. A DC blocker at 10 Hz makes a record held still silent (it reads one sample over
-  and over), fades at the window's edges and on take/fade/stop keep it from clicking. Its three
+  and over), fades at the window's edges and on take/fade/stop keep it from clicking; and since
+  2.0.0-player.35 a lookahead peak limiter at its end keeps every sample under -0.5 dBFS ("The record's
+  sound never clips" - its ceiling and lookahead literals in renderVoice, `VOICE_CEILING` and
+  `VOICE_LOOKAHEAD_S` outside, held equal by limiter.sim). Its three
   functions (four since 2.0.0-player.16, with `voiceReport`) are SELF-CONTAINED - no imports, no module
   constants, nor one another - because the worklet module is made
   from their own `toString()` (`voiceWorkletSource()`, loaded from a Blob URL): a worklet runs in a scope
@@ -5877,7 +5881,10 @@ moved on, which was the wrong reading: in a band where the slowed song has NOTHI
   (beta 7, about 70 dB), 12 zero crossings either side, tabulated at 128 entries a crossing and read
   between them (`state.kernel`, built in newVoiceState, since the voice's functions name nothing outside
   themselves). At the song's speed or slower it joins the window's own samples up and lets nothing above
-  the song's top through (25 taps a sample); for a record turning faster it is STRETCHED by how many of
+  the song's top through (25 taps a sample) - all but the top 10-15% of the band: its cutoff is at the
+  window's Nyquist frequency, and its transition band images that back just above the slowed top (2.0.0-player.35's
+  review: at a 44.1 kHz window 20 kHz at -20 dB, 18 kHz at -68 - see "The record's sound never clips"); for a
+  record turning faster it is STRETCHED by how many of
   the window's samples go by in one of ours, so its cutoff comes down by as much and what would fold is
   left out - up to 4x (97 taps), past which everything is a squeal anyway. Each sample's weights are made
   once (`state.taps`) and summed per channel, normalised by their own sum, so a steady level reads as
@@ -6008,6 +6015,276 @@ device plays, with everything that made it.
   `lib/deckVoice.ts` (newVoiceState/voiceCommand/renderVoice at the script host's block timing) and
   compare with the recorded samples - a difference is the host or the device, agreement is the voice
   itself. `work/hang/recording.json` is the lab's own for comparison.
+
+#### The record's sound never clips (2.0.0-player.35)
+
+James, after five fixes (.27 warble, .28 echo, .29 kernel, .30 first turn, .31 clock): "yeah it still has a
+pretty digital sound", "there doesn't seem to be much of a difference between mac and iphone". .32's
+recorder brought back a file from his Mac (Chromium, plain http, so the main-thread voice, 44.1 kHz, 16 s of
+one long scrub, 985 hand samples, no block late) - the session scratchpad's `ttmeasure/james/rec1.json`, with
+the orchestrator's scripts beside it - and the spec is `uplan/slice-limiter.md`. What the file showed:
+
+- **The voice did exactly what the lab's does**: his messages replayed through the real `lib/deckVoice.ts`
+  (`replay.cjs`, the script host's lag, applied at the next block) match the 500 reports his browser's voice
+  made to 0.001 ms and 0.00007 of rate. The speed is clean (0.13% above 20 Hz); nothing past the slowed
+  song's top but the clips (`above.py` looks from 22.05 kHz x |speed| x 1.08 + 600 Hz up: -58 dB overall,
+  mostly the clips, -79 dB in a median slowed frame); no gaps, repeated blocks or block-edge clicks. **Not
+  quite "no imaging", though** (review): the kernel's cutoff is at the window's Nyquist frequency, and its
+  transition band images the top 10-15% of the song's band back just above the slowed top - through the
+  kernel, relative to the tone, at a 44.1 kHz window 21 kHz at -9.5 dB, 20 kHz -20, 19 kHz -35, 18 kHz -68
+  (at 48 kHz: 22 kHz -17.7, 21 kHz -30, 20 kHz -50); the same at every speed, and at 0.5x the images of 20-22
+  kHz land under that line, where `above.py` can't see them. In rec1's steady slowed frames the band from
+  the slowed top + 300 Hz up to the line holds about -86 dB per bin of the frame - about 12 dB under the
+  song just below the top, 25 dB over the floor past the line, and the kernel's images predict it to within
+  2 dB (`work/verify/img/`): very likely inaudible on his song (bright: its 20-21 kHz 37-41 dB under its 1-4
+  kHz). Left as it is - moving the cutoff under the window's Nyquist changes what is heard, James's call -
+  and 2.0.0-player.29's "nothing above the song's top let through" corrected below and in renderVoice.
+- **The output clipped**: 144 samples at exactly full scale over 16.5 s of sound (38 left, 106 right), on
+  the loudest drum hits, at every speed - 0.2x to 1.5x, backwards too, 1x included. Counted as runs: 84
+  channel by channel (23 left, 61 right; 1-13 samples each, 62 of them a single sample), 81 with the
+  channels together - which come in **15 bursts** (runs within 50 ms joined; 8 of them only 1-4 samples at
+  full scale), about one a second, one per loud drum hit: not "five a second", which is runs read as
+  events (review). 10 of the 15 came at 0.8x or faster, either way, where the song's own treble is there to
+  mask them. Slowed frames (0.05-0.9x: the only ones the method can look into, 41% of the sounding frames;
+  the median speed was 0.94x) holding a clip carried a median -53 dB above the song's possible top, against
+  -81 dB in frames without: in the slowed frames the clipping was the only non-song sound found. Whether it
+  is the "digital sound" James hears is for his ears (NOT verified, below). Every lab measurement compared
+  floats, where nothing over 1.0 is ever cut - which is why none showed it. Normal playback doesn't suffer it:
+  the element sends the song's own samples.
+- **Why it went over** (measured here, with the limiter out of the way): the kernel, reading between the
+  song's samples, recreates the song's own intersample peaks and no more (its peak within -0.2 to +0.06 dB of
+  the song's true peak over the stretch read, on every stand-in at 1x); **the 10 Hz DC blocker adds the
+  rest**: a median +0.57 dB to the peak along the hand and at 1x over the stand-ins here (+0.51 at 1x and
+  +0.71 along the hand over the transparency review's), up to about 3 dB on a hard-clipped master (its phase
+  turn on the bass lifts the peaks that sit on it, and not only below 20 Hz: above it the same moment still
+  peaks about 2 dB up). The most found: +2.9 dB to the whole run's peak on Harmful or Fatal +6 dB hard-clipped
+  along his hand (+3.1 within 10 ms of the peak), at 0.16x between two of his reversals - where, on that
+  master, the limiter turns the sound down deepest anywhere on his path, 3.7 dB (2.1 on its +9 dB alimiter
+  master) - and +2.1 dB locally at 1x on Club Diver hard-clipped (review; `work/limiter-fixer/dclift.py`
+  over `work/review-transparency/out/`). Not changed: it is what silences a record held still.
+
+What was built: **a lookahead peak limiter at the end of `renderVoice`**, after the DC blocker, inside the
+four self-contained functions (its rings made in `newVoiceState`), so both hosts have it by being the same
+functions.
+
+- **By construction**: each sample's NEED is the gain that brings its loudest channel to the ceiling (1 for
+  most), made `SAFE` (1 - 2^-30) under it; a running minimum of the need over [n - D - H, n] (D the
+  lookahead, H the hold, in samples) - a monotonic queue, each sample pushed and popped once at most,
+  constant time however long the window; that minimum taken at once going down and brought back up over
+  `RELEASE_S` (never above the minimum: the envelope is under it by induction), snapped to exactly 1 within
+  2^-24 (a step a 32-bit float can't tell from 1); then two running-sum boxes whose lengths add up to D + 2 -
+  a triangle - so the gain written with sample n - D is an average of envelope values each made with that
+  sample's need in its minimum, never above it. The gain written is also held to that sample's own need
+  (rounding only) - **and floored at 0** (review): the boxes' running sums carry rounding of about 1e-16 of
+  the values near 1 they held, so a sample whose need is smaller than that - some 1e16 times full scale,
+  nothing a decoded window holds - left a sum, and the gain, a hair under 0, and a huge sample times a tiny
+  negative gain is any size (1.47 at 1e16, 1241 at 1e20, up to about 1e23 at 3.4e38, in the review's
+  `work/review-correctness/h7.cjs`). With the gain between 0 and the sample's need, what is written is at
+  most its loudest channel times its need, the ceiling; and the ceiling is a 32-bit float, so a 64-bit value
+  under it stays under it in the output's 32 bits (rounding is monotonic). deck.ts reads a reported lowest
+  gain of 0 or below as 120 dB down (`DEEPEST_GAIN_SAID`), so Debug never prints Infinity or NaN. One gain
+  for every channel. A non-finite sample (nothing decodeAudioData makes) goes in as 0. Counted in samples,
+  so it holds at any rate; the rings (1024, and 8192 for the minimum's queue - powers of two, indexed by
+  mask) cover the lookahead and hold at 192 kHz, and past that both are only shorter in time. A box's
+  running sum is made again from its values once a ring and set exactly when every value is 1, so it never
+  drifts; at rest (need 1, envelope 1, both boxes all 1) a short path writes the same samples.
+- **Transparent first**: wherever its gain is exactly 1 the output is the voice as it was, bit for bit, only
+  later - `limiter.sim` holds that against the voice as it was (`fixtures/deckVoice-2.0.0-player.29.cjs`) at
+  44.1-192 kHz, through a swinging hand and a coast: on a chord peaking about 3.5 dB under the ceiling, and
+  (second review) the same chord turned up until the voice as it was peaks at 0.99999 of the ceiling in 64 bits,
+  every report saying nothing held. With only the first, a limiter acting a little early - from -2.9 dBFS,
+  a "gentler" knee - passed every sim, since nothing else there lies between the chord and the ceiling.
+- **The numbers, each by measurement** (the scratchpad's `work/limiter-builder/`: stand-in masters made from
+  six incompetech tracks - peak-normalised, +3 dB into ffmpeg's alimiter "mild", +9 dB "lim", and +6 dB
+  hard-clipped - cut to his window and read along his own hand, `replay2.cjs`, and played at 1x a fraction of
+  a sample off the song's samples):
+  - **`CEILING` -0.5 dBFS** (`VOICE_CEILING`, 0.94406086 as a float). A sample-peak ceiling can't bound the
+    true peak, so it was chosen so that the limited sound's own intersample peaks stay where plain playback's
+    are: at -0.5 every peak-normalised master played at 1x stays under 0 dBTP (-0.19 to -0.50), and the
+    limited sound's true peak is at or under the song's own on every peak-normalised and mild run but two -
+    Pump's two masters along the hand (sped to 1.7x, the top crowding the Nyquist frequency: +0.90 against the
+    song's +0.15 peak-normalised; still +0.40 at -1 dBFS). At -0.3 a third run is over, at -0.1 seven. The
+    cost of the half decibel: on the peak-normalised masters the sound is turned down by more than 0.1 dB 7.3%
+    of the time along the hand and 12.5% at 1x (median; -0.1 would be 1.6% / 2.3%, -1 dBFS 21% / 31%).
+  - **`LOOKAHEAD_S` 1.5 ms, two boxes**: the gain's energy above 1 kHz (what would spread a partial into new
+    bands) is -62 dB of its variation along the hand; one box would be -51, 1 ms -47, 0.5 ms -37, and 3 ms
+    buys only 5 dB more for twice the latency. **That measure can't see what the attack does to a slowed
+    record's bass** (review, under "Transparency where it acts"): a 1.5 ms edge times a 20-odd Hz wave near
+    full scale is new sound at 100-500 Hz, which a 5 ms lookahead cuts by two thirds - for 3.5 ms more
+    latency. Left at 1.5 ms; the trade is James's call.
+  - **`HOLD_S` 20 ms, `RELEASE_S` 60 ms**: with no hold, a steady 25-50 Hz tone 1 dB over the ceiling had its
+    gain move every cycle - harmonics at -49 dB (release 60 ms; -37 at 10 ms, -61 at 250) - where clipping the
+    same tone at full scale leaves -37 dB at 50 Hz and -34 at 100 (at 25 Hz the DC blocker keeps it just under
+    full scale). With a 20 ms hold (longer than half a 25 Hz cycle) none: below -140 dB from 25 Hz up, -86
+    at 20 Hz; a 30 ms hold would cover 17 Hz, for more time turned down. Below about 20 Hz - a slowed record's
+    deepest bass, a 40-60 Hz note at 0.2-0.3x - half a cycle outlasts the lookahead and hold together (21.5
+    ms), the gain follows each crest, and the tone is shaped a little (review): 0.45 dB over the ceiling,
+    where the voice as it was played it clean, harmonics -42.8 dB at 8 Hz, -45.6 at 10, -48.5 at 12, -54 at
+    15, -59.5 at 17, odd ones, at 24-85 Hz (`limiter.sim` pins them). A 50 ms hold would make 10-15 Hz clean,
+    at the cost of more time turned down: under -0.5 dB 43% of the time on Cool Rock's +9 dB master at 1x
+    (31% now), 10% on Harmful or Fatal's (6.5%) - left at 20 ms. `limiter.sim` pins the hold both ways
+    (second review: the release check alone let a hold up to about 28 ms through - a 25 ms hold passed): held at
+    its lowest for 20 ms, and 2 ms after the hold the gain already 2% of the dip back up (a hold 1 ms longer
+    leaves it at its lowest there); and the release's own rate, the dip left falling by e between 60 and
+    120 ms after the hold, to 1% (the envelope's deficit falls exactly exponentially, whatever the hold).
+    On the music: 7.3% of the time
+    turned down >0.1 dB (5.7% with no hold), a mean of 0.029 dB, and the gain's energy above 20 Hz -12.9 dB
+    of its variation (-10.4 with no hold, -14.9 with 30 ms and 120 ms).
+- **The latency is kept, not taken out of the path's delay**: 1.5 ms, so hand to sound is 121.5 ms (about
+  165 on the main thread). `HAND_DELAY_S` is the hand's fit's look-ahead and its margin (SMOOTH_AFTER_S and
+  delivery); shaving 1.5 ms off it would cut that margin, and would move every pin held to positions (the read
+  head, the heard reports, the handover, the wind-down, the release) for a difference a hand can't feel - the
+  time line is drawn a frame at a time (16.7 ms). The reports still say where the read head is; what is heard
+  of it is 1.5 ms later. Every existing pin holds unchanged (deck.sim, decksound.sim) - but deck.sim's list of
+  a report's keys, which gained the limiter's three, and the recorder file's version (2), each on purpose.
+- **Said in Debug**: each report (`voiceReport`, both hosts alike) carries what the limiter did since the
+  last: `held` (samples over the ceiling it brought down), `peaks` (runs of them) and `lowest` (the lowest
+  gain it wrote), counted afresh after each. deck.ts's `heard()` adds them into the health (`peaksHeld`,
+  `samplesHeld`, `deepestHoldDb`, reset as the turntable shows), and **Turntable timing**'s note says "Peaks
+  held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB" - what Club Diver
+  peak-normalised along his hand gives (none, or "under 0.1 dB" for a tiny dip; nothing until there is a
+  voice). The health reaches Debug as a hold ends, as it always has - **and again once the voice has played
+  the rest** (second review): it plays the hand's path `HAND_DELAY_S` behind (and the script lag more on the main
+  thread), so the limiter's counts for a hold's last 120-165 ms, and for a whole coast, come in after the
+  report the release makes, and a paused record has no later report of its own - a quick flick of a paused
+  loud record read "none" or a handful while the voice held thousands of peaks through its coast, and went on
+  saying so. deck.ts's `heard()` marks the health moved when a report brings a peak held or a dip deeper than
+  any so far (not a gain still coming back up after one: that lasts up to a second after a deep dip, and
+  would report every quarter second for nothing), and `onHeard` reports once the deck no longer steers the
+  sound (`steering()`: no hand, no sounding plan, no handover) and `HEALTH_REPORT_MS` (250) have passed since
+  the last report. Never while it steers: a report re-renders the page, which under a hand on the main
+  thread is the voice's own time. Only the limiter's counts: a late block is the page being busy, and
+  reporting for it could make more of them. A peak counted is a run of samples over
+  the CEILING, not only over full scale: in the replays 5-38% of them reached full scale (about a third on
+  the mild and limited masters), so the count is higher than the clips the voice as it was would have made.
+- **The recorder** (version 2) adds `blockPeaks` - each tapped block's loudest sample, either channel, as a
+  float, before the 16-bit file clamps it - and `limiter: {ceiling, lookaheadSeconds}`.
+- **Cost**, renderVoice in 1024-sample blocks at 44.1 kHz, one version per process, the median of five runs,
+  three times over. On headless Chromium's main thread (`benchpage/bench-page.cjs`: a page of its own per
+  version, a synthetic loud window with a third of its samples over the ceiling, and the same 10 dB down):
+  +25-28 ns a sample at 0.5-1x on the loud window (172 to 199 at 1x, +15%), +15 at 2x, +12-13 on the quiet one
+  (the limiter at rest, +8%); a block at 1x takes 0.20 ms of its 23.2 ms (0.18 before). Under Node 20 on the
+  hard-clipped Club Diver: +12 at rest, +24-32 at 0.5-1x, +31-36 at 2x.
+
+Evidence (all in `work/limiter-builder/`):
+
+- **His recording replayed** over the stand-ins (`summary.py`, `events.py`): no sample over the ceiling on
+  any of 22 masters along his hand or at 1x, and none at full scale, where the voice as it was put up to
+  67,378 samples at or over full scale along the hand (172,318 at 1x) - runs of them (either channel) 0.7 a
+  second on Club Diver peak-normalised, 10 on its mild master, hundreds on the hard-clipped ones, and in
+  bursts (runs within 50 ms joined) 0.2 and 3.7 a second: his song's 81 runs in 15 bursts (4.9 and 0.9 a
+  second) between the two (`work/limiter-fixer/bursts.py`). Above the song's top in slowed frames that
+  clipped, the limited sound has exactly what the unclipped sound has (within 0.1 dB, every master), where
+  the clipped one added 1.3 to 34 dB; on the peak-normalised masters that is within about 5 dB of the clean
+  frames (the louder frames carry a little more of the voice's own floor). How it turns the sound down
+  there: on the peak-normalised masters 0.4-3.6 dips a second below -0.1 dB, 73-127 ms long (median; p95
+  140-430 ms), the deepest 0.7-1.35 dB, peaks brought down a median 0.2-0.8 dB; on the mild masters the dips
+  run together on the dense stretches (seconds at a time, ~1 dB).
+- **At 1x with no hand** (the song itself): the same, 0.9-3.9 dips a second on the four peak-normalised
+  masters that reach the ceiling often (the other two once or twice in 40 s), the deepest 0.4-1.6 dB.
+- **Transparency where it acts** (`transp.py`): measured as the error's energy against the song's own in
+  each third-octave band (100 Hz-16 kHz) of every 46 ms frame that went over FULL SCALE, along his hand and
+  at 1x, since an error far under the music in its own band is masked by it. There the limiter's error is
+  the song at another level: the same ratio in every band, 20 log10 of the dip (median worst band -19 to -24
+  dB on the peak-normalised and mild masters, p95 -4 to -20 dB); clipping's is new sound in the bands where
+  the song is quiet - worst band p95 +13 to +40 dB along the hand on every hard-clipped and limited master
+  but Devastation and Revenge's (+4, its error spread wider: 13 bands within 20 dB of the song). Where its
+  gain is 1 (65% of the samples replayed on Club Diver peak-normalised along the hand) it is the unlimited
+  sound, bit for bit. **The exception, found in review: a slowed record's bass under the attack.**
+  `transp.py` never looked at frames between the ceiling and full scale, nor at a record held at a steady
+  slow speed. Dragged at a steady 0.25x, a very loud, bass-heavy master puts the slowed bass - a 20-odd Hz
+  wave near full scale, over the ceiling but under full scale, which the voice as it was played clean -
+  under the gain's 1.5 ms attack, and the attack's edge times that wave is new sound at 100-500 Hz, level
+  with the slowed song there and 20-33 dB more than a plain level change would leave. Over the masking, by
+  the transparency review's spread-masking estimate (`work/review-transparency/regress.py`, the gain above 5
+  Hz): 40 of Breakdown's 1238 limited frames (worst +17 dB), 10 of Cool Rock's 735 (+8), 3 of Harmful or
+  Fatal's 135 (+4.7), all three +9 dB into alimiter; by a PEAQ-flavoured model that counts the 22 Hz wave as
+  a masker (`work/verify/splatter/peaq.py`, full scale 92 dB SPL), 3, 0 and 0 (+5 dB, at 503 Hz) with a
+  noise masker's offset, 51 and 19 (+17.7) with a strict tonal one. None on the peak-normalised masters at
+  0.25-0.5x, none at 1x, and 1 frame in 24 runs along James's own hand. A 5 ms lookahead cuts it to 12
+  (+6.8) and 4 (+2.8), for 3.5 ms more latency; a 50 ms hold changes little (28, and the worst still +17):
+  it is the attack's edge, not the release. Rare, small, and how often it is audible depends on the model;
+  left at 1.5 ms (the lookahead bullet above).
+- **In the real page** (headless Chromium, real touch input, a 14 s scrub at 0.26-1.74x through Info > Debug's
+  recorder, against a copy of the stub library with Club Diver +9 dB into alimiter added - the builder's own
+  instance, deadwax on 8104 and a stand-in Navidrome on 4544): over plain http (`deadwax.test`, the
+  main-thread voice) and on localhost (the worklet), the file's loudest 16-bit sample -0.50 dBFS, no sample at
+  full scale, every block peak at or under the ceiling (the loudest exactly it), and Debug's row "Peaks held
+  under full scale: 1889 since it showed (8516 samples), the deepest 2.4 dB" (worklet: 1878, 8630, 2.5 dB) -
+  what the file's own report says too (the worklet's, made a moment before, one peak fewer). Its hand
+  replayed through the voice as it was over the same FLAC (`replay2.cjs`; the replay through today's voice
+  matches what the page recorded, correlation 0.9996): 804 clips, 57 a second. **The late counts, after the
+  second review** (`work/limiter-fixer2/latecount.cjs`, its own instance on 8104 and 4544 over a copy of the
+  loud masters): Club Diver +9 dB paused from the transport, Debug read, the recorder started, one quick flick
+  of the paused record into a coast, Debug read again 23 s later - its count rose by exactly what the voice's
+  reports in the file add up to, 171 over plain http and 179 on localhost, every one of them reported after
+  the hand's last sample; the same over plain http with the fix's report taken out rose by 35 of 171 (an
+  incidental report caught some). The files' loudest sample -0.50 dBFS, none at full scale.
+- **Also measured, not changed** - how much of a slowed record is deep bass: in his recording 40% of the
+  energy is below 60 Hz at 0.3-0.6x (-4.0 dB), 12% at 0.6-0.9x, 6% at 1x. A second-order high-pass at 30 Hz
+  would take 0.68 dB of a slowed record's sound (20 Hz: 0.25, 40 Hz: 1.19) and 0.05 dB of his song at 1x - but
+  0.48 dB of Club Diver's sub-bass at 1x. Only 6.5% of a 0.3-0.6x record is below 30 Hz, so a gentle high-pass
+  gains little where it would matter to a speaker; the case isn't overwhelming, and James hasn't said whether
+  he listens on speakers or headphones.
+- **Sims**: `limiter.sim.cjs` (new) - the guarantee (six full-scale windows x 17 rates from -24 to 24 x both
+  hosts' paths; takes, fades, stops, a hand, windows swapped mid-block and one running out at 22.05-768 kHz in
+  blocks of 1024, 128, 333 and 1; NaN-free; and, since the review, windows of +-1e16, +-1e20 and +-3.4e38
+  under the ceiling with every report's lowest gain between 0 and 1), the transparency and the lookahead's
+  latency at four rates (and, since the second review, right up to the ceiling), the attack's shape (never a
+  step; a triangle's bend), the hold (no shorter and, since the second review, no longer) and the release
+  (and its own rate), both channels alike, steady low tones turned down unshaped from 25 Hz up and, below 20 Hz, shaped no more than
+  measured (8-17 Hz, each under its bound), the reports' counts, and self-containment; `deck.sim` - the
+  report's keys, a loud window through the real deck and main-thread voice under the ceiling with its counts
+  reaching the health exactly and counted afresh, a reported lowest gain of 0 or below read as 120 dB, and
+  the recorder's block peaks and version - and, since the second review, frames and blocks on one clock: a
+  60-frame hold reporting nothing, a cancelled hold's late counts told 250 ms or more after its release, a
+  paused loud record's five-frame flick and coast told whole once the coast is over (4204 peaks held,
+  where the report its release made had none of them), nothing more once the counts stop, and a deeper dip
+  alone told; `debug.sim` - the row's
+  words. Mutations (the scratchpad's
+  `work/limiter-builder/mut/`, and after the review all of them again on the final code with the review's
+  fixes added, `work/limiter-fixer/mutate.py` and `mut.log`), each file restored byte for byte (by hash): 33
+  of 34 rules caught - the review's five (the gain not floored at 0; the deck taking a lowest gain of 0 or
+  below as it is, or saying it as 240 dB rather than 120; a 15 ms hold and a 40 ms release, which shape the
+  tones under 20 Hz past their bounds) and the builder's 29: the ceiling raised and above full scale, the
+  lookahead, the minimum's window (caught by the smoothness check: the holding to each sample's need kept
+  the guarantee), no hold, the release's time and none at all, no snap to 1, one box, the boxes a sample too
+  long (with the holding to the need out too), the delay a sample short, one channel deciding, the rest path
+  taking a new peak, NaN let through, each count, the reports not counted afresh, the report without its
+  counts (by the type check, before the sim ran), the deck's health (peaks, deepest, reset), the recorder's
+  block peaks (one channel; missing) and version, and Debug's three wording rules. The survivor is an
+  equivalent mutant - the average not set to exactly 1 when every value in its box is, where the box's sum is
+  already set to exactly its length then, so the average comes out 1 anyway - and three backups change no
+  sample by design: the `SAFE` margin (rounding only, and only in 64 bits: a 32-bit output can't go past a
+  32-bit ceiling by a 64-bit rounding); the rest path (an optimisation: the same samples); and the sums remade
+  once a ring - as a box's exactly 1 (the reset sum and the average together), which the rest path gives too.
+  The holding of each gain to its sample's need was one of them until the review: on a window far past full
+  scale the boxes' rounding can carry the gain over a tiny need as well as under 0, and the review's case
+  catches it out - it is the upper half of what the floor is the lower half of. Replayed over the builder's
+  22 masters along his hand and at 1x, the final voice writes the very bytes the builder's did (44 of 44,
+  `work/limiter-fixer/replay/`): the floor never acts on anything a decoded window holds. **The second
+  review's** (`work/limiter-fixer2/mutate.py`, `mut.log`, each file restored by hash): 20 of 20 caught - the
+  late counts (no report from `onHeard`, a report while steering, no throttle, a 50 ms one, the health moved
+  by any gain under 1, a report not clearing it, a held count or a deeper dip not moving it, the report's
+  time not kept), acting before the ceiling (from -2.9 dBFS - the review's - and -1.9, from 0.999 of the
+  ceiling, a soft knee from 0.9), and the hold and release (25, 21 and 30 ms holds; 55, 58, 62 and 66 ms
+  releases). Two first got past - a 50 ms throttle (the check read the constant it was testing) and a
+  deeper dip alone - and gained the checks that catch them. The first two lists re-run on the final code
+  (`work/limiter-fixer2/previous.py`, `previous.log`, on a copy of the worktree): 33 of 34 caught again (the
+  deck forgetting the deepest rewritten for `heard()`'s new shape), the same equivalent survivor, and the same
+  backups (holding to the need caught; the other three change no sample).
+- **Verified**: 2373 Python tests (2371 passed, 2 skipped; none new - the change is the page's), pyflakes,
+  tsc, the bundle, all 45 sims (`limiter` 30 new; `deck` 272, 13 new; `debug` 98, 3 new). The engine guard is
+  empty, and `player.sim.cjs` untouched. The fixture `deckVoice-2.0.0-player.29.cjs` is tsc's compile of
+  `lib/deckVoice.ts` as it was at 71c2f24, byte for byte under its header (checked).
+- **NOT verified**: James's ears, on his Mac and iPhone - whether the clipping was the digital sound he
+  hears, and all of it (a recording made with this build says, through its block peaks and Debug's count):
+  it came in 15 short bursts about a second apart, 10 of them at 0.8x or faster, and was the only non-song
+  sound found in the slowed frames - the only ones the method could look into - so a sound elsewhere isn't
+  ruled out; the iPhone at all; his own master (the stand-ins are other music, made as loud or louder at the
+  top). **For James to decide**: a 3-5 ms lookahead (above: less of the attack's 100-500 Hz on a slowed,
+  bass-heavy master, for 1.5-3.5 ms more latency), and moving the kernel's cutoff a little under the
+  window's Nyquist frequency (no images of the top octave, for a little of the song's own top).
 
 ### Sources and Get (2.0.0-player.15)
 
@@ -9703,7 +9980,7 @@ node ui/test/routes.sim.cjs     # the app's routes - the hash, per-tab stacks, b
 node ui/test/app-rules.sim.cjs  # the app's gesture rules - usePlayer once, playback actions only from allowed files, no audio in app/, the turntable's audio context only from gestures (never the cover's), nothing touching the player's element; the desktop frame chosen below the engine, its panels not modal, the shell's classes, the Info drawer on Go to album, the sidebar's admin; the visualizer - no createMediaElementSource anywhere, its silent copy's chain however spelled, its toggle from the click (a held Space's repeats ignored), its context only from the bar's click, nothing secure-only or random, a press waking it and nothing more, focus kept in it, the panels inert and the poll stopped behind it, its scroll lock, its pictures per address; the Edit panel (desktop and admin only, one panel at a time, closed off its page, the editors' Escape from the page passed over and a layer's Escape its own, the editors let go once it closes, the follow's own latestOnly, focus kept in the panel, no playback action); Needs a look (no playback action, the library read only once it shows on a desktop, the one markReviewed in the app, the ending's scan after its note, the count's one store and where it is asked, the sidebar item an admin's, You's row a desktop's, the panel on a folder and every way it reports, focus kept in the page and the panel)
 node ui/test/discs.sim.cjs      # disc headings from Navidrome's discTitles - "Disc 4 · <title>", and when headings show
 node ui/test/you.sim.cjs        # the You tab - asked when it first shows, /me asked again, what it says, the live regions, Getting albums and their store (seeded once, asked again, saves in turn); on a desktop "Albums that need a look" with its count, never on a phone
-node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Navidrome sent
+node ui/test/debug.sim.cjs      # Info > Debug's rows - Format, Sent as, Resampled, Why, Gapless, Gap, Last seek, Turntable sound, Turntable timing (the peaks held under full scale), Recording, Navidrome sent
 node ui/test/info.sim.cjs       # Info > About's rows (whose artist card it is), the albums played from (an artist's whole queue), what Info asks for and when it draws it, and every sheet (Now Playing, •••, Info): locks, focus in and back, Escape; Info as a desktop panel, its box a tab stop, focus in again across 1024px
 node ui/test/turntable.sim.cjs  # the turntable - the arm, turning the record 1.8 s a turn, tap vs drag, seek on release, when it spins, the look button; with the deck's sound, the press, release, wind-down and the arm during a coast
 node ui/test/requests.sim.cjs   # the Requests tab and Home's Arriving - grouping, every row's words, one primary, Arriving = the badge, asking again, the ✕'s question, what a screen reader hears; Done rows opening and playing their album, why one can't, and looking again (doneLooks, and with effects running)
@@ -9713,8 +9990,9 @@ node ui/test/group.sim.cjs      # that page and its dropdown rendered - asking, 
 node ui/test/payload.sim.cjs    # the ONE download payload builder, deep-equal to what the main page's two Find buttons sent before the move (8 captured cases, labels too), and which credit each field comes from
 node ui/test/sources.sim.cjs    # the Sources sheet and its cards rendered - only the newest search, Cancel letting it go in the gesture, a Get from the tap with its runners-up, the best match whatever the sort, the chips, a pick for you and when it isn't made, Re-search, slskd's words, the store's box, the live region, focus kept in the sheet; the desktop panel, Signals (a pick by them, a fresh Get clearing them, none in a phone's sheet), its box a tab stop, and searching again for another pressing
 node ui/test/search.sim.cjs     # the Search tab rendered - both halves, a song's tap, the gate, held albums left out once, a box cut back; useOwned; the real prefetch; the rows' Get chips, and their lookups called off when you move on
-node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the main-thread voice where there is no worklet, the deck against fakes (its windows, coasts, handovers, wind-downs, when a press is its own, the timer it reads the clock on)
+node ui/test/deck.sim.cjs       # the turntable's momentum and sound - the physics against an integration, the voice, the worklet from its source, the main-thread voice where there is no worklet, the deck against fakes (its windows, coasts, handovers, wind-downs, when a press is its own, the timer it reads the clock on); a loud window through the real main-thread voice under the limiter's ceiling, its counts reaching the health (a lowest gain of 0 or below read as 120 dB) - and those for a hold's last moments and a coast once the deck stops steering, at most every 250 ms, never during a hold; the recorder's file (block peaks)
 node ui/test/deckclock.sim.cjs  # the turntable's one time base - currentTime's steps mapped smoothly (5.8 and 21.3 ms, late readings), held through a gesture from its first reading (a mapping just started, young or not yet moving, or made young by stale readings - never a jump), kept through a rest (and let go of when a drifting clock made them stale), followed for minutes read ten times a second, started again when its clock stood still, nothing kept from a clock standing still as it starts, its step even read once a frame; event times and a move's coalesced samples
+node ui/test/limiter.sim.cjs    # the record's sound never clips (2.0.0-player.35) - the limiter's guarantee (full-scale windows at every rate from -24 to 24, both hosts' paths, takes, fades, stops, a hand, windows swapped mid-block, 22.05-768 kHz, never NaN, windows far past full scale with the gain never below 0), bit for bit the voice as it was where nothing reaches the ceiling (only later by the lookahead, right up to the ceiling), the attack's triangle, the hold (no shorter, no longer) and the release's rate, both channels alike, low tones turned down unshaped from 25 Hz up and shaped no more than measured below 20, the reports' counts, self-contained
 node ui/test/decksound.sim.cjs  # the record's sound following the hand through the REAL Turntable, deck, clock and voice - cycle by cycle at 1x, 0.5x, 2x and backwards on both hosts and clocks, harder hands (Gaussian jitter, grips near the spindle, whole pixels), the old page side failing in the same harness, letting go (no stall, no swing back after a rest, the 1x skip), the first grab of a still record after a resume (stamped steadily, sounding as any grab from still), the deck's own clock timer, Debug's step on a desktop clock, the path's edges (stops, late and missing samples, stalls, turns back, rests, a coast caught by an older sample, a ring overrun); the warble: hands whose speed changes, with a finger's jitter - the rate's error by band, and 2.0.0-player.24's frozen voice failing it
 node ui/test/artist.sim.cjs     # the artist page's order and who-is-who (Navidrome's artist <-> MusicBrainz's), Library > Artists' sort, the id bridge's "Also" chips, "This pressing" and the folder; the page rendered - rows drawn once with steady keys, Play waiting for the library, a few albums at a time, the session's answers, late lookups opening nothing
 node ui/test/home.sim.cjs       # Home finished - "Not played in a while" (more than 30 days, oldest first, up to 20, none under 4 or without played), Pinned first then Recently added then Not played, the shelves waiting for the pins (counted while Home shows), all in the gate

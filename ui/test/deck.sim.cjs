@@ -569,10 +569,10 @@ console.log('\nthe worklet: made from the same functions, it plays the very same
   }
   check('400 blocks through a take, a hand\'s samples, a reversal and a fade: sample for sample what the functions give', same, true)
   const heard = posted.filter((m) => m.type === 'heard')
-  check('it says where it is ~30 times a second: 32 times in 400 blocks of 128', [heard.length, Object.keys(heard[0] ?? {}).sort()], [32, ['gain', 'pos', 'rate', 'time', 'type']])
+  check('it says where it is ~30 times a second: 32 times in 400 blocks of 128 - and, since 2.0.0-player.35, what its limiter held down since it last said (held, peaks, lowest)', [heard.length, Object.keys(heard[0] ?? {}).sort()], [32, ['gain', 'held', 'lowest', 'peaks', 'pos', 'rate', 'time', 'type']])
   check('...and what it says is exactly where it was', heard.every((report) => report.pos === where.get(report.time)), true)
   check('the four functions it is made of name nothing outside themselves (they run in a scope of their own)',
-    [voice.newVoiceState, voice.voiceCommand, voice.renderVoice, voice.voiceReport].map((fn) => /\b(exports|require|platter|turntable|REPORTS_PER_SECOND|HAND_DELAY_S)\b/.test(fn.toString())), [false, false, false, false])
+    [voice.newVoiceState, voice.voiceCommand, voice.renderVoice, voice.voiceReport].map((fn) => /\b(exports|require|platter|turntable|REPORTS_PER_SECOND|HAND_DELAY_S|VOICE_CEILING|VOICE_LOOKAHEAD_S)\b/.test(fn.toString())), [false, false, false, false])
   check('...nor one another: voiceReport counts, it doesn\'t render (the main-thread voice calls renderVoice itself)', /renderVoice|voiceCommand|newVoiceState/.test(voice.voiceReport.toString()), false)
 }
 
@@ -644,7 +644,8 @@ let noScript = false
 //? resumes that settle only when the test says (their settlers kept here), not at once - and suspends
 let resumesHeld = null
 let suspendsHeld = null
-//? decoded windows that hold a tone rather than silence, so what a voice plays can be compared
+//? decoded windows that hold a tone rather than silence, so what a voice plays can be compared - or, set
+//? to 'loud', a full-scale square wave
 let decodeTone = false
 //? the ScriptProcessorNodes made, and what is asked of them
 const scripts = []
@@ -707,7 +708,9 @@ class FakeContext {
     decodes++
     const length = Math.round((bytes.byteLength / BYTES_A_SECOND) * 48000)
     const tone = () => Float32Array.from({ length }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 440 * i) / 48000))
-    const buffer = { numberOfChannels: 2, sampleRate: 48000, length, getChannelData: () => (decodeTone ? tone() : new Float32Array(length)) }
+    //? 'loud' (2.0.0-player.35): a full-scale square wave, which the voice reads over full scale
+    const square = () => Float32Array.from({ length }, (_, i) => (Math.floor((i * 880) / 48000) % 2 ? -1 : 1))
+    const buffer = { numberOfChannels: 2, sampleRate: 48000, length, getChannelData: () => (decodeTone === 'loud' ? square() : decodeTone ? tone() : new Float32Array(length)) }
     if (decodeMode === 'null') return failed(null)
     if (decodeMode === 'error') return failed(new Error('EncodingError: Decoding failed'))
     if (decodeMode === 'throw') throw new TypeError('Not enough arguments')
@@ -2037,9 +2040,16 @@ async function main() {
     //? values that survive 16 bits exactly, the right channel the left's negative
     const frames = 4096
     const expected = []
+    const peaks = []
     for (let block = 0; block < 3; block++) {
       const left = new Float32Array(frames), right = new Float32Array(frames)
       for (let i = 0; i < frames; i++) { const k = ((block * frames + i) * 7) % 32767 - 16383; left[i] = k / 32767; right[i] = -k / 32767; expected.push(k, -k) }
+      //? one sample over full scale in the last block (2.0.0-player.35): the 16 bits clamp it, the block's
+      //? peak says how far over it went
+      if (block === 2) { left[7] = 1.25; expected[(2 * frames + 7) * 2] = 32767 }
+      //? and the right louder than the left in another: a block's peak is its loudest channel's
+      if (block === 1) { right[11] = -0.75; expected[(frames + 11) * 2 + 1] = Math.round(-0.75 * 32767) }
+      peaks.push(Math.max(...left.map(Math.abs), ...right.map(Math.abs)))
       tap.onaudioprocess({ inputBuffer: { numberOfChannels: 2, getChannelData: (c) => (c === 0 ? left : right) }, playbackTime: 1.5 + block * frames / 48000 })
     }
     //? a hand sample and a report during it, so the file carries both
@@ -2062,7 +2072,9 @@ async function main() {
     const samples = Array.from(new Int16Array(pcm.buffer, pcm.byteOffset, pcm.length / 2))
     check('the file: what it is, the voice, the rate, the delays, the tap\'s block, three block times, and the audio\'s frames and channels',
       [file.recording, file.version, file.voice, file.secure, file.sampleRate, file.delaySeconds, file.scriptLagSeconds, file.tapBlock, file.blockTimes, file.audio.format, file.audio.channels, file.audio.frames],
-      ['deadwax turntable sound', 1, 'script', false, 48000, voice.HAND_DELAY_S, 2048 / 48000, 4096, [1.5, 1.5 + 4096 / 48000, 1.5 + 8192 / 48000], 'int16le', 2, 3 * frames])
+      ['deadwax turntable sound', 2, 'script', false, 48000, voice.HAND_DELAY_S, 2048 / 48000, 4096, [1.5, 1.5 + 4096 / 48000, 1.5 + 8192 / 48000], 'int16le', 2, 3 * frames])
+    check('...each block\'s loudest sample, either channel, as a float, past the 16 bits\' clamp (2.0.0-player.35: the middle block\'s right -0.75, the last block\'s 1.25), and the limiter\'s ceiling and lookahead',
+      [file.blockPeaks, file.limiter], [peaks, { ceiling: voice.VOICE_CEILING, lookaheadSeconds: voice.VOICE_LOOKAHEAD_S }])
     check('...its audio decodes to exactly the frames tapped, interleaved, 16-bit', [pcm.length, samples.length === expected.length && samples.every((v, i) => v === expected[i])], [3 * frames * 2 * 2, true])
     check('...and carries the hand sample the deck sent and what the voice said meanwhile',
       [file.messages.some((m) => m.type === 'take'), file.messages.filter((m) => m.type === 'hand').length >= 6, file.heard.length >= 1, typeof file.when, file.report?.voice, typeof file.clock],
@@ -2073,6 +2085,179 @@ async function main() {
     globalThis.URL.createObjectURL = makeUrl
     delete globalThis.isSecureContext
     noWorklet = false
+  }
+  console.log('\n2.0.0-player.35: a loud window on the main thread - never above the ceiling, and what the limiter held reaches Debug')
+  {
+    //? James's recording held 144 samples at full scale, in 15 bursts on the loudest drum hits: the voice read
+    //? his loud master over full scale and the browser cut it. A full-scale square wave decoded, the record taken and turned back and forth
+    //? through the real deck and the real main-thread voice: every sample the speakers get under the ceiling,
+    //? and the deck's health counting the peaks held, and the deepest - for Info > Debug's "Turntable timing"
+    noWorklet = true
+    globalThis.isSecureContext = false
+    decodeTone = 'loud'
+    const host = fakeHost()
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    wakeDeckAudio()
+    await settle()
+    const voiceNode = scripts.at(-1)
+    pump(voiceNode, 1)
+    await settle()
+    await settle()
+    check('the window in, the main-thread voice ready: a press is the deck\'s - and nothing held down yet',
+      [deck.live(), deckReport().voice, deckReport().health.peaksHeld, deckReport().health.samplesHeld, deckReport().health.deepestHoldDb], [true, 'script', 0, 0, 0])
+    let loudest = 0, blocks = 0
+    //? every report the voice makes, where deck.js reaches voiceReport - what the health must add up to
+    const realReport = voice.voiceReport
+    const said = []
+    voice.voiceReport = (...args) => { const heard = realReport(...args); if (heard) said.push(heard); return heard }
+    const listen = (count) => pump(voiceNode, count).forEach((block) => { blocks++; for (const data of block.channels) for (const v of data) loudest = Math.max(loudest, Math.abs(v)) })
+    deck.pressed(clock)
+    deck.takeOver()
+    listen(2)
+    for (let frame = 1; frame <= 40; frame++) {
+      deck.hand(clock, Math.sin(frame / 6) * 0.8, 60 + Math.sin(frame / 6) * 0.25)
+      runFrames(1)
+      listen(1)
+    }
+    const saidByRelease = said.length
+    deck.release(clock, 'cancel')
+    //? as the hold ended, a report: the health as it stood then - every report the voice had made
+    const health = deckReport().health
+    listen(10)
+    check(`${blocks} blocks of a full-scale square wave, taken and turned both ways: the loudest sample the speakers got is under the ceiling (${round(voice.VOICE_CEILING, 6)})`,
+      [loudest > 0.5, loudest <= voice.VOICE_CEILING], [true, true])
+    voice.voiceReport = realReport
+    const upTo = said.slice(0, saidByRelease)
+    const total = (key) => upTo.reduce((sum, heard) => sum + heard[key], 0)
+    const deepest = Math.max(...upTo.map((heard) => -20 * Math.log10(heard.lowest)))
+    check('...and the deck\'s health has what its limiter held under it, told as the hold ended: peaks (runs of samples), the samples, the deepest it turned the sound down - exactly what the voice\'s reports added up to by then',
+      [health.peaksHeld > 0, health.samplesHeld > health.peaksHeld, health.deepestHoldDb > 0.4 && health.deepestHoldDb < 12, health.peaksHeld === total('peaks'), health.samplesHeld === total('held'), Math.abs(health.deepestHoldDb - deepest) < 1e-12],
+      [true, true, true, true, true, true])
+    deck.setShowing(false)
+    deck.setShowing(true)
+    check('...counted afresh as the turntable shows again', [deckReport().health.peaksHeld, deckReport().health.samplesHeld, deckReport().health.deepestHoldDb], [0, 0, 0])
+    //? a report whose lowest gain is below 0, or 0 (what the voice floors its gain at - only for a window some
+    //? 1e16 times full scale): -20 log10 of it is NaN or Infinity, which Debug would print. The deck reads it as
+    //? 120 dB down at most (review of 2.0.0-player.35)
+    for (const injected of [-4.4e-16, 0]) {
+      deck.setShowing(false)
+      deck.setShowing(true)
+      voice.voiceReport = (...args) => { const heard = realReport(...args); return heard ? { ...heard, held: 1, peaks: 1, lowest: injected } : heard }
+      deck.pressed(clock)
+      deck.takeOver()
+      listen(8)
+      deck.release(clock, 'cancel')
+      voice.voiceReport = realReport
+      const deepest = deckReport().health.deepestHoldDb
+      check(`...a report's lowest gain of ${injected}: the deepest said as 120 dB, a number`, [Number.isFinite(deepest), Math.abs(deepest - 120) < 1e-9], [true, true])
+      listen(10)
+    }
+    deck.destroy()
+    delete globalThis.isSecureContext
+    noWorklet = false
+    decodeTone = false
+  }
+  console.log('\n...and what it held after the hold ended - its last moments, a coast - reaches Debug too, once the deck no longer steers the sound (review of 2.0.0-player.35)')
+  {
+    //? the voice plays the hand's path HAND_DELAY_S behind (and the script lag more, here on the main thread),
+    //? so the limiter's counts for a hold's last moments come in after the report its end makes - and a paused
+    //? record's coast has no later report of its own: a quick flick of a loud paused record read "none since it
+    //? showed" (or a handful) while the voice held thousands of peaks through the coast. Frames and blocks on one
+    //? clock, the clock's step settled first (a real browser's settles; a step changing makes reports of its own)
+    noWorklet = true
+    globalThis.isSecureContext = false
+    decodeTone = 'loud'
+    const host = fakeHost({ isPlaying: false })
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    wakeDeckAudio()
+    await settle()
+    const voiceNode = scripts.at(-1)
+    pump(voiceNode, 1)
+    await settle()
+    await settle()
+    const context = voiceNode.context
+    const base = clock - context.currentTime * 1000
+    const tick = async (count = 1) => {
+      for (let k = 0; k < count; k++) {
+        runFrames(1)
+        while (context.currentTime * 1000 + base < clock) pump(voiceNode, 1)
+        await settle()
+      }
+    }
+    await tick(150)
+    const realReport = voice.voiceReport
+    const said = []
+    voice.voiceReport = (...args) => { const heard = realReport(...args); if (heard) said.push(heard); return heard }
+    const told = []
+    const stopListening = deckModule.onDeckReport((report) => { if (report) told.push({ at: clock, peaks: report.health.peaksHeld }) })
+    const totals = () => ({
+      peaks: said.reduce((sum, heard) => sum + heard.peaks, 0),
+      held: said.reduce((sum, heard) => sum + heard.held, 0),
+      deepest: Math.max(0, ...said.filter((heard) => heard.lowest < 1).map((heard) => -20 * Math.log10(heard.lowest))),
+    })
+    //? a long, slow scrub first: held through 60 frames (nearly a second) of loud sound - nothing reported while
+    //? the hand steers it, however much the limiter holds meanwhile
+    deck.pressed(clock)
+    deck.takeOver()
+    await tick(2)
+    const toldBefore = told.length
+    for (let frame = 1; frame <= 60; frame++) {
+      deck.hand(clock, Math.sin(frame / 8) * 0.6, 60 + Math.sin(frame / 8) * 0.18)
+      await tick(1)
+    }
+    check('a hand holding a loud record for 60 frames, its limiter holding peaks all the while: Debug told nothing until the hold ends - a report re-renders the page, and under a hand that is the main-thread voice\'s own time',
+      [totals().peaks > 50, told.length - toldBefore], [true, 0])
+    //? let go with no coast (cancel): the release reports at once, the voice's last blocks' counts after it -
+    //? told once HEALTH_REPORT_MS have passed since that report, not at the next of the voice's reports
+    const cancelAt = clock
+    const toldAtCancel = told.length
+    deck.release(clock, 'cancel')
+    const atCancel = deckReport().health.peaksHeld
+    await tick(60)
+    const late = told.slice(toldAtCancel).filter((report) => report.at > cancelAt)
+    check(`...let go with no coast: Debug ends with the peaks held after the release too (${atCancel} at the release, ${totals().peaks} in all), told 250 ms (HEALTH_REPORT_MS) or more after the release's own report - four times a second at most`,
+      [totals().peaks > atCancel, deckReport().health.peaksHeld, deckReport().health.samplesHeld, late.length, late.every((report) => report.at - cancelAt >= 250), deckModule.HEALTH_REPORT_MS],
+      [true, totals().peaks, totals().held, 1, true, 250])
+    //? then one quick flick of the paused record, five frames, let go into a coast
+    const flickFrom = told.length
+    const beforeFlick = totals().peaks
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let frame = 1; frame <= 5; frame++) {
+      deck.hand(clock, -frame * 0.4, 60 - frame * 0.06)
+      await tick(1)
+    }
+    deck.release(clock, 'up')
+    const atRelease = deckReport().health.peaksHeld
+    const releasedAt = clock
+    await tick(300)
+    const all = totals()
+    const health = deckReport().health
+    check(`a quick flick of the paused loud record (five frames) and its coast: Debug ends with every peak the voice held - the flick's ${all.peaks - beforeFlick}, where the report its release made had ${atRelease - beforeFlick} of them`,
+      [all.peaks - beforeFlick > 100, atRelease - beforeFlick < (all.peaks - beforeFlick) / 10, health.peaksHeld, health.samplesHeld, Math.abs(health.deepestHoldDb - all.deepest) < 1e-12], [true, true, all.peaks, all.held, true])
+    const after = told.slice(flickFrom).filter((report) => report.at > releasedAt)
+    check(`...told once, after the coast - not while it coasted (the deck steering the sound), nor at every one of the voice's ${voice.REPORTS_PER_SECOND} reports a second after it, nor for its gain still coming back up`,
+      [after.length, after[0]?.peaks], [1, all.peaks])
+    const quiet = told.length
+    await tick(120)
+    check('...and once its counts stop moving, nothing more: the voice\'s reports carry on, and nothing is told for them', told.length - quiet, 0)
+    //? a dip deeper than any so far, in a report holding no new samples - the dip's deepest gain is written the
+    //? lookahead after its loudest sample was counted, so it can fall in the next report: news too
+    let once = true
+    voice.voiceReport = (...args) => { const heard = realReport(...args); if (heard && once) { once = false; return { ...heard, held: 0, peaks: 0, lowest: 0.1 } } return heard }
+    const deeper = told.length
+    await tick(30)
+    check('...a report with nothing new held but a deeper dip (a gain of 0.1): Debug told the deepest, 20 dB, once', [round(deckReport().health.deepestHoldDb, 6), told.length - deeper], [20, 1])
+    voice.voiceReport = realReport
+    stopListening()
+    deck.destroy()
+    delete globalThis.isSecureContext
+    noWorklet = false
+    decodeTone = false
   }
   console.log('\nlive() only when the record can sound there: a running context alone is not enough')
   {

@@ -56,6 +56,16 @@
  *  - Read through a windowed sinc (2.0.0-player.29; four-point Catmull-Rom before - see newVoiceState's
  *    kernel), so the song at speed 1 - the handover after a
  *    coast, the start of a wind-down - sounds as the song does, not dulled.
+ *  - A lookahead peak limiter last of all (2.0.0-player.35, VOICE_CEILING): no sample it writes is above
+ *    -0.5 dBFS, whatever the window, the speed or the host. Reading a loud master between its samples
+ *    recreates its intersample peaks, above full scale, and the DC blocker adds to them; the browser cuts
+ *    whatever is over 1.0 at its output - a recording from James's Mac held 144 samples at full scale, in
+ *    15 bursts about a second apart (one per loud drum hit), and in its slowed stretches that was the one
+ *    sound no part of the song could make. One gain for both channels, coming down smoothly over the
+ *    lookahead (VOICE_LOOKAHEAD_S, 1.5 ms) ahead of a peak, held 20 ms and back up over tens of ms - never
+ *    a step, and a tone from about 20 Hz up turned down without being shaped (below that the gain follows
+ *    each crest: slight harmonics, renderVoice) - and when nothing reaches the ceiling, the output is the
+ *    sound exactly, delayed by the lookahead, bit for bit.
  *
  * The four functions the worklet runs - newVoiceState, voiceCommand, renderVoice and voiceReport - are
  * written SELF-CONTAINED (no imports, no module constants, no helpers outside themselves, nor one
@@ -81,6 +91,25 @@ export const REPORTS_PER_SECOND = 30
  * (the voice's functions name nothing outside themselves); deck.sim holds the two equal.
  */
 export const HAND_DELAY_S = 0.12
+
+/**
+ * The limiter's ceiling (2.0.0-player.35): no sample the voice writes is above it, -0.5 dBFS as a 32-bit
+ * float (0.94406086...). A sample-peak ceiling half a dB under full scale, so that the output's own
+ * intersample peaks - what a reconstruction filter or a resampler downstream makes between its samples -
+ * stay under full scale too on mastered music: measured on loud masters read along James's hand (see
+ * CLAUDE.md, "The record's sound never clips"). The literal is in renderVoice; limiter.sim holds the two
+ * equal.
+ */
+export const VOICE_CEILING = Math.fround(Math.pow(10, -0.5 / 20))
+
+/**
+ * How far ahead the limiter looks, in seconds (2.0.0-player.35): its gain comes down over this much ahead
+ * of a peak, so the record's sound is this much later again than HAND_DELAY_S says - 1.5 ms, 121.5 ms
+ * from hand to sound in all (about 165 on the main thread). Kept as latency rather than taken out of the
+ * path's delay, which is the hand's fit's look-ahead and its margin; renderVoice's literal, which
+ * limiter.sim holds equal to this.
+ */
+export const VOICE_LOOKAHEAD_S = 0.0015
 
 /** A stretch of the song, decoded: its channels at `rate` samples a second, from `start` (song s). */
 export interface VoiceWindow {
@@ -140,6 +169,43 @@ export interface VoiceState {
   /** the DC blocker's last input and output, per channel */
   lastIn: number[]
   lastOut: number[]
+  /**
+   * THE LIMITER (2.0.0-player.35, renderVoice). Its rings are `limitRing` long - room for the
+   * lookahead at the highest rate either host can have (192 kHz) and then some - indexed by the sample
+   * count `limitN` masked (a power of two). `limitDelay`: the voice's samples, channel after channel,
+   * waiting the lookahead before they are written out; `limitNeed`: the gain each sample needs to be under
+   * the ceiling (1 for most); `limitMinAt`/`limitMinOf` a running minimum of that over the lookahead and
+   * the hold - a double-ended queue in a ring of its own (`limitMinRing`, room for both at 192 kHz), oldest
+   * at `limitMinHead`, next free at `limitMinTail`, its values rising, so it costs nothing to keep however
+   * long the window; `limitEnv` that minimum, coming back up over the release; and two boxes (`limitBoxA`, `limitBoxB`, their sums and how many of their values are
+   * under 1) averaging that over the lookahead - the gain written. `limitLength` the lookahead in samples
+   * it is set up for (0: not yet), `limitChannels` for how many channels (its delay grows for more). And
+   * what it has done since the voice last said where it is: how many samples it brought down
+   * (`limitHeld`), in how many runs (`limitPeaks`, `limitWasOver` the last sample's), and the lowest gain
+   * it wrote (`limitLowest`).
+   */
+  limitRing: number
+  limitDelay: Float64Array
+  limitNeed: Float64Array
+  limitMinRing: number
+  limitMinAt: Float64Array
+  limitMinOf: Float64Array
+  limitMinHead: number
+  limitMinTail: number
+  limitEnv: number
+  limitBoxA: Float64Array
+  limitBoxB: Float64Array
+  limitSumA: number
+  limitSumB: number
+  limitLowA: number
+  limitLowB: number
+  limitN: number
+  limitLength: number
+  limitChannels: number
+  limitHeld: number
+  limitPeaks: number
+  limitWasOver: boolean
+  limitLowest: number
   /** samples played since it last said where it is (voiceReport) */
   counted: number
 }
@@ -167,6 +233,11 @@ export interface VoiceHeard {
   rate: number
   gain: number
   time: number
+  /** since it last said (2.0.0-player.35): samples its limiter brought down under the ceiling, in how
+   *  many runs, and the lowest gain it wrote (1: none) */
+  held: number
+  peaks: number
+  lowest: number
 }
 
 /** A voice at rest: silent, nowhere in particular, nothing to play, no path. */
@@ -199,13 +270,25 @@ export function newVoiceState(): VoiceState {
     const edge = x / ZEROS
     kernel[i] = sinc * (bessel(BETA * Math.sqrt(Math.max(0, 1 - edge * edge))) / bessel(BETA))
   }
+  //? THE LIMITER's rings (renderVoice): room for its lookahead at 192 kHz, the highest rate either host
+  //? can have (1.5 ms is 288 samples there), with plenty to spare - and a delay for two channels, which
+  //? both hosts give it (a host asking for more grows it once, renderVoice)
+  const RING = 1024, CHANNELS = 2
+  //? and its running minimum's, longer: it covers the hold too (renderVoice's HOLD_S), at 192 kHz
+  const MIN_RING = 8192
+  const limitBoxA = new Float64Array(RING).fill(1), limitBoxB = new Float64Array(RING).fill(1)
   return {
     pos: 0, rate: 0, gain: 0, gainTarget: 0, gainAlpha: 0.01, driving: false, delay: 0.12,
     knotTime: new Float64Array(KNOTS), knotAt: new Float64Array(KNOTS), knotPos: new Float64Array(KNOTS),
     knotRate: new Float64Array(KNOTS), knotAccel: new Float64Array(KNOTS), knotUntil: new Float64Array(KNOTS),
     knotHand: new Uint8Array(KNOTS), knotSteady: new Float64Array(KNOTS), first: 0, end: 0, cursor: 0,
     window: null, kernel, kernelZeros: ZEROS, kernelSteps: STEPS, taps: new Float32Array(2 * ZEROS * WIDEST + 2),
-    lastIn: [0, 0], lastOut: [0, 0], counted: 0,
+    lastIn: [0, 0], lastOut: [0, 0],
+    limitRing: RING, limitDelay: new Float64Array(RING * CHANNELS), limitNeed: new Float64Array(RING).fill(1),
+    limitMinRing: MIN_RING, limitMinAt: new Float64Array(MIN_RING), limitMinOf: new Float64Array(MIN_RING), limitMinHead: 0, limitMinTail: 0,
+    limitEnv: 1, limitBoxA, limitBoxB, limitSumA: 0, limitSumB: 0, limitLowA: 0, limitLowB: 0,
+    limitN: 0, limitLength: 0, limitChannels: CHANNELS, limitHeld: 0, limitPeaks: 0, limitWasOver: false, limitLowest: 1,
+    counted: 0,
   }
 }
 
@@ -416,8 +499,8 @@ export function voiceCommand(state: VoiceState, message: VoiceMessage, now: numb
  * time `now`. Each sample: where the path has the record `delay` before it, how fast, and how fast that
  * is changing; the rate steered towards that and smoothed, the read head moved by it, the window read
  * there through the kernel - a windowed sinc, stretched for a record turning faster than the song -
- * (silence outside it, faded at its edges), the gain smoothed, and
- * the DC blocker.
+ * (silence outside it, faded at its edges), the gain smoothed, the DC blocker - and the limiter, which
+ * writes each sample out its lookahead later, never above the ceiling.
  */
 export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: number, sampleRate: number, now: number): void {
   //? the rate's smoothing, and the steering to the path's place - slow (2.0.0-player.27: 0.04 s before),
@@ -443,6 +526,75 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
   const kt = state.knotTime, kp = state.knotPos, kr = state.knotRate, ka = state.knotAccel, ku = state.knotUntil, kh = state.knotHand
   const ks = state.knotSteady
   const kernel = state.kernel, taps = state.taps, zeros = state.kernelZeros, steps = state.kernelSteps
+  //? THE LIMITER (2.0.0-player.35). Reading a loud master between its samples recreates its intersample
+  //? peaks - above full scale - and the DC blocker adds to them, and the browser cuts anything over 1.0 at
+  //? its output: James's recording held 144 samples at full scale over 16 s, in 15 bursts (one per loud
+  //? drum hit; 84 runs, counted channel by channel), at every speed (1x included) - and in its slowed
+  //? stretches, the only ones where a sound the song can't make can be told apart, that was the one there.
+  //? So each sample waits LOOKAHEAD_S before it is written, and is written times a gain that came down
+  //? smoothly, ahead of it, to whatever keeps it under CEILING - one gain for every channel, so the stereo
+  //? image holds - held there for HOLD_S and brought back up over RELEASE_S. Never a step: a sample that
+  //? never reaches the ceiling, with none near it, is written exactly as it was, only later. By construction:
+  //?  - each sample's NEED: the gain that keeps its loudest channel under the ceiling (1 for most) - just
+  //?    under it (SAFE), so no rounding can carry it over;
+  //?  - the lowest need over the lookahead and the hold - the window [n - D - H, n], D and H the two in
+  //?    samples: a running minimum (a queue whose values rise, so each sample is pushed and popped once at
+  //?    most, however long the window). The hold keeps the gain still through a low note's cycle: shorter,
+  //?    and a steady 25-50 Hz tone over the ceiling was shaped every cycle (harmonics -49 dB; none now).
+  //?    Below about 20 Hz - a slowed record's deepest bass - half a cycle outlasts the lookahead and the
+  //?    hold together, so the gain follows each crest and shapes the tone a little: harmonics -46 dB at
+  //?    10 Hz and -60 at 17, 0.45 dB over the ceiling (limiter.sim pins them);
+  //?  - that brought back up towards 1 over RELEASE_S - never above the minimum it follows;
+  //?  - averaged by two boxes whose lengths add up to D + 2, so the gain written with sample n - D is a
+  //?    smooth (triangular) average of values each made with that sample's need in their minimum: never
+  //?    above that need. And never above it by rounding either: the gain written is also held to it - and
+  //?    never below 0 (a running sum's rounding could take it there only for a sample some 1e16 times full
+  //?    scale), so what is written is at most the sample's loudest channel times its need: the ceiling.
+  //? Its ceiling is a 32-bit float, so a value under it in 64 bits stays under it written into the output.
+  //? Counted in samples, so it holds at any rate; past 192 kHz (what newVoiceState's rings are sized for)
+  //? the lookahead and hold are only shorter in time.
+  //? CEILING, LOOKAHEAD_S, HOLD_S and RELEASE_S chosen by measurement on loud masters along James's own
+  //? hand (CLAUDE.md, "The record's sound never clips"); the module's exported ceiling and lookahead say
+  //? the first two outside (limiter.sim holds them equal - this function names nothing outside itself).
+  const CEILING = Math.fround(Math.pow(10, -0.5 / 20))
+  const LOOKAHEAD_S = 0.0015
+  const HOLD_S = 0.02
+  const RELEASE_S = 0.06
+  //? a need is made this much under the ceiling, so the products and quotients' rounding never carry a
+  //? sample over it (2^-30: 0.00000001 dB)
+  const SAFE = 1 - Math.pow(2, -30)
+  //? a gain this near 1 coming back up is 1: a step smaller than a 32-bit float can tell from 1
+  const SNAP = Math.pow(2, -24)
+  //? its rings' length is a power of two (newVoiceState's): a slot is the sample count masked
+  const ring = state.limitRing, mask = ring - 1
+  const lookahead = Math.min(ring - 2, Math.max(1, Math.round(LOOKAHEAD_S * sampleRate)))
+  const minMask = state.limitMinRing - 1
+  const span = Math.min(state.limitMinRing - 2, lookahead + Math.round(HOLD_S * sampleRate))
+  if (state.limitLength !== lookahead || state.limitChannels !== count) {
+    //? set up for this rate and these channels (once: a host's rate and channels never change) - at rest:
+    //? nothing waiting, every gain 1
+    state.limitLength = lookahead
+    state.limitChannels = count
+    if (state.limitDelay.length < ring * count) state.limitDelay = new Float64Array(ring * count)
+    else state.limitDelay.fill(0)
+    state.limitNeed.fill(1)
+    state.limitBoxA.fill(1)
+    state.limitBoxB.fill(1)
+    state.limitMinHead = state.limitMinTail = 0
+    state.limitEnv = 1
+    state.limitLowA = state.limitLowB = 0
+    state.limitN = 0
+    state.limitWasOver = false
+  }
+  const lengthA = Math.ceil((lookahead + 2) / 2), lengthB = lookahead + 2 - lengthA
+  const releaseAlpha = 1 - Math.exp(-1 / (RELEASE_S * sampleRate))
+  const delayLine = state.limitDelay, needs = state.limitNeed, minAt = state.limitMinAt, minOf = state.limitMinOf
+  const boxA = state.limitBoxA, boxB = state.limitBoxB
+  //? its running values, kept here for the block and put back after it
+  let limitN = state.limitN, head = state.limitMinHead, tail = state.limitMinTail, env = state.limitEnv
+  let lowA = state.limitLowA, lowB = state.limitLowB
+  let sumA = lowA === 0 ? lengthA : state.limitSumA, sumB = lowB === 0 ? lengthB : state.limitSumB
+  let heldCount = state.limitHeld, peakCount = state.limitPeaks, wasOver = state.limitWasOver, lowestGain = state.limitLowest
   for (let i = 0; i < frames; i++) {
     const t = now + i * dt
     let desired = 0
@@ -517,7 +669,9 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
     }
     //? this sample's weights: the kernel centred on where the read head is, over the window's samples
     //? either side - as it is for a record at the song's speed or slower (the window's own samples
-    //? joined up, nothing above the song's top let through), stretched for one turning faster (how many
+    //? joined up, nothing above the song's top let through but the top 10-15% of the band's images - the
+    //? cutoff is at the window's Nyquist frequency: at a 44.1 kHz window 20 kHz images at -20 dB, 18 kHz at
+    //? -68, review of 2.0.0-player.35), stretched for one turning faster (how many
     //? of the window's samples go by in one of ours: the cutoff comes down by as much, so what would
     //? fold back is left out), no further than the taps have room for. Normalised by their sum, so a
     //? steady level reads as itself whatever the stretch
@@ -540,6 +694,9 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
       }
       norm = total !== 0 ? (shape * state.gain) / total : 0
     }
+    const n = limitN
+    const slot = n & mask
+    let loudest = 0
     for (let c = 0; c < count; c++) {
       let value = 0
       if (used > 0 && win) {
@@ -556,9 +713,94 @@ export function renderVoice(state: VoiceState, outputs: Float32Array[], frames: 
       const out = value - (state.lastIn[c] ?? 0) + pole * (state.lastOut[c] ?? 0)
       state.lastIn[c] = value
       state.lastOut[c] = out
-      outputs[c]![i] = out
+      //? into the limiter's delay - anything that isn't a number (nothing the voice makes) as silence
+      const held = out > -Infinity && out < Infinity ? out : 0
+      delayLine[c * ring + slot] = held
+      const size = held < 0 ? -held : held
+      if (size > loudest) loudest = size
     }
+    //? this sample's need: the gain that keeps its loudest channel under the ceiling
+    const need = loudest > CEILING ? (CEILING / loudest) * SAFE : 1
+    needs[slot] = need
+    const outSlot = (slot - lookahead) & mask
+    let gain = 1
+    if (need === 1 && env === 1 && lowA === 0 && lowB === 0 && minOf[head & minMask] === 1) {
+      //? at rest - nothing under the ceiling's need within the lookahead, nothing coming back up: every
+      //? value it keeps is 1, so its running minimum is this sample alone, its boxes take a 1 each, and
+      //? the gain is 1 - which is all the long way below would come to
+      wasOver = false
+      minAt[head & minMask] = n
+      tail = head + 1
+      boxA[slot] = 1
+      boxB[slot] = 1
+    } else {
+      if (need < 1) {
+        heldCount += 1
+        if (!wasOver) peakCount += 1
+        wasOver = true
+      } else wasOver = false
+      //? the lowest need over the lookahead: drop what this one undercuts from the back, what has left
+      //? the window from the front
+      while (tail > head && minOf[(tail - 1) & minMask]! >= need) tail -= 1
+      minAt[tail & minMask] = n
+      minOf[tail & minMask] = need
+      tail += 1
+      while (minAt[head & minMask]! < n - span) head += 1
+      const lowest = minOf[head & minMask]!
+      //? held, and back up over the release - never above the minimum it follows
+      if (lowest < env) env = lowest
+      else {
+        env += (lowest - env) * releaseAlpha
+        if (lowest === 1 && 1 - env <= SNAP) env = 1
+      }
+      //? the two boxes, each a running sum (made again from its values once a ring, so rounding never
+      //? builds up) - and exactly 1 whenever every value in it is
+      const leaveA = boxA[(slot - lengthA) & mask]!
+      boxA[slot] = env
+      sumA += env - leaveA
+      lowA += (env < 1 ? 1 : 0) - (leaveA < 1 ? 1 : 0)
+      if (lowA === 0) sumA = lengthA
+      else if (slot === 0) {
+        sumA = 0
+        for (let k = 0; k < lengthA; k++) sumA += boxA[(ring - k) & mask]!
+      }
+      const averaged = lowA === 0 ? 1 : sumA / lengthA
+      const leaveB = boxB[(slot - lengthB) & mask]!
+      boxB[slot] = averaged
+      sumB += averaged - leaveB
+      lowB += (averaged < 1 ? 1 : 0) - (leaveB < 1 ? 1 : 0)
+      if (lowB === 0) sumB = lengthB
+      else if (slot === 0) {
+        sumB = 0
+        for (let k = 0; k < lengthB; k++) sumB += boxB[(ring - k) & mask]!
+      }
+      //? the gain written with the sample the lookahead ago - held to that sample's own need, which it
+      //? is under already but for rounding - and never below 0: the boxes' running sums carry rounding
+      //? of about 1e-16 of the values near 1 they held, so a sample so loud its need is smaller than that
+      //? (1e16 times full scale: nothing a decoded window holds) could leave a sum, and so the gain, a
+      //? hair under 0 - and a huge sample times a tiny negative gain is any size at all (review of
+      //? 2.0.0-player.35). With both, the sample written is at most its loudest channel times its need.
+      gain = lowB === 0 ? 1 : sumB / lengthB
+      const due = needs[outSlot]!
+      if (gain > due) gain = due
+      if (!(gain >= 0)) gain = 0
+      if (gain < lowestGain) lowestGain = gain
+    }
+    for (let c = 0; c < count; c++) outputs[c]![i] = delayLine[c * ring + outSlot]! * gain
+    limitN = n + 1
   }
+  state.limitN = limitN
+  state.limitMinHead = head
+  state.limitMinTail = tail
+  state.limitEnv = env
+  state.limitLowA = lowA
+  state.limitLowB = lowB
+  state.limitSumA = sumA
+  state.limitSumB = sumB
+  state.limitHeld = heldCount
+  state.limitPeaks = peakCount
+  state.limitWasOver = wasOver
+  state.limitLowest = lowestGain
 }
 
 /**
@@ -571,7 +813,12 @@ export function voiceReport(state: VoiceState, frames: number, sampleRate: numbe
   const every = sampleRate / perSecond
   if (state.counted < every) return null
   state.counted -= every
-  return { type: 'heard', pos: state.pos, rate: state.rate, gain: state.gain, time: now }
+  //? and what its limiter did since it last said (2.0.0-player.35), counted afresh from here
+  const heard = { type: 'heard' as const, pos: state.pos, rate: state.rate, gain: state.gain, time: now, held: state.limitHeld, peaks: state.limitPeaks, lowest: state.limitLowest }
+  state.limitHeld = 0
+  state.limitPeaks = 0
+  state.limitLowest = 1
+  return heard
 }
 
 /**
@@ -672,4 +919,10 @@ export interface DeckHealth {
   notBack: number
   /** times the browser interrupted the sound's audio context (a call, another app's audio) */
   interruptions: number
+  /** what the voice's limiter held under the ceiling (2.0.0-player.35): how many peaks (runs of samples
+   *  that would have gone over the ceiling - some of them over full scale too), how many samples, and the
+   *  deepest it turned the sound down, dB (0: never) */
+  peaksHeld: number
+  samplesHeld: number
+  deepestHoldDb: number
 }

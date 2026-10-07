@@ -315,9 +315,11 @@ export function turntableRow(report: DeckReport | null | undefined): DebugRow {
 /**
  * How the turntable is keeping up on this device (2.0.0-player.28, the deck's DeckHealth): how long the
  * song took to come back after the last let-go, and - in the note - whether the sound, made on the main
- * thread, had gaps, how the frames kept up under a hand, and what else got in the way. James: "the
- * turntable player just feels like it hangs a lot, especially when scrubbing" - nothing a lab's browser
- * shows, so the phone says it here.
+ * thread, had gaps, what the voice's limiter held under full scale (2.0.0-player.35: peaks that went over
+ * its ceiling, half a decibel under it - on a loud song about a third of them over full scale too, which the
+ * browser would have cut off - and the deepest it turned the sound down), how the frames kept up under a
+ * hand, and what else got in the way. James: "the turntable player just feels like it hangs a lot,
+ * especially when scrubbing" - nothing a lab's browser shows, so the phone says it here.
  */
 export function turntableTimingRow(report: DeckReport | null | undefined): DebugRow {
   const label = 'Turntable timing'
@@ -332,6 +334,11 @@ export function turntableTimingRow(report: DeckReport | null | undefined): Debug
     notes.push(health.blocks
       ? `The sound, on the main thread: ${health.lateBlocks} of ${health.blocks} blocks late${health.lateBlocks ? `, the worst by ${Math.round(health.worstBlockMs)} ms` : ''}`
       : 'The sound, on the main thread: no block played yet')
+  }
+  if (report.voice && health.peaksHeld !== undefined) {
+    notes.push(health.peaksHeld
+      ? `Peaks held under full scale: ${health.peaksHeld} since it showed (${health.samplesHeld} ${health.samplesHeld === 1 ? 'sample' : 'samples'}), the deepest ${health.deepestHoldDb < 0.05 ? 'under 0.1' : health.deepestHoldDb.toFixed(1)} dB`
+      : 'Peaks held under full scale: none since it showed')
   }
   notes.push(health.frames
     ? `Under a hand: ${health.frames} frames, ${health.slowFrames} late${health.slowFrames ? `, the longest gap ${Math.round(health.worstFrameMs)} ms` : ''}`
