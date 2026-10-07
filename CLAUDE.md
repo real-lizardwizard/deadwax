@@ -7012,6 +7012,9 @@ butterchurn or preset libraries); shapes follow the music's feel, speed its temp
   2D, `player/vizGl.ts` the WebGL side (ping-pong feedback, two slots for a crossfade, a composite).
   The board's fixed 1440x900 became "900 units high, as wide as the screen's shape": x positions keep
   their share of the width, heights and radii are the board's.
+  **Changed in 2.0.0-player.34**: musicFeel is tuned on real music now - the centroid and crest gone,
+  the onsets counted on a grid of 60 a second, the sim's numbers moved (aggressive reads 1, the build
+  falls through 126-136) - see "The Mandala refined, and the feel tuned".
 - **What a real song gives that the board's synthetic one knew**: the 64 bands come from
   getByteFrequencyData (FFT 2048, -90..-22 dB, the analyser's own smoothing off - the effects smooth and
   the feel needs the raw flux) through `bandLayout`/`bandsFromBins` (log-spaced 30 Hz-16 kHz; the
@@ -7147,7 +7150,9 @@ butterchurn or preset libraries); shapes follow the music's feel, speed its temp
   exactly as before. Measured by comparing the rows 3px either side of the centre line on the left
   with the same rows on the right over 24 frames: up to 6.5x more difference on the left before, 1.35x
   at most after. `visualizer.sim.cjs` pins the turned measurement and shows the old way jump at 6.5
-  mirrors (it fails with the old line put back).
+  mirrors (it fails with the old line put back). **Changed in 2.0.0-player.34**: the count no longer
+  glides between whole numbers - it changes only by a fold, a mirror swinging inside every wedge at once
+  - and the Mandala is one figure with room round it; see "The Mandala refined, and the feel tuned".
 - **NOT verified here**: that a real FLAC's analysis looks like the board's synthetic songs (the dB
   range and the kick were chosen, not tuned against James's music - the stub library is tones);
   WebKit's requestFullscreen from the layout effect after the click (Chrome and Firefox allow it for
@@ -7156,6 +7161,263 @@ butterchurn or preset libraries); shapes follow the music's feel, speed its temp
   synthetic click after a waking tap lands inside WAKE_CLICK_MS; the next song's window arriving
   before a real gapless join; a song that can't be seen (the stub library is all FLAC; the sims hold
   it); and how it feels with James's music.
+
+### The Mandala refined, and the feel tuned (2.0.0-player.34)
+
+James (2026-10-04): "I'd also like to get a bit more refinement on the mandala visualizer ... right now it
+just looks a bit busy", "and I'd like it to morph a bit better as opposed to how it currently has a hard
+line that things just appear out of", "and the feel seems to always say 'in between' if we can tune that
+up a bit as well". The spec is the session scratchpad's `uplan/slice-mandala-feel.md`; two builders were
+cut off by usage limits part way, the third audited and finished their work, and a review then found
+thirteen problems and a second review eight more, every one fixed (below, "After review" and "After a
+second review"). The spec named it 2.0.0-player.31; player-spike took .31 to .33 meanwhile, so it ships as
+.34. The frames, the harnesses and every measurement are in the scratchpad (`work/builder/b31/`,
+`work/viz/shots/`, `work/builder/feel/`, the first review's fixes in `work/fixer31/`, the second's in
+`work/fixer31b/`).
+
+- **Busy, as frames showed it**: a lattice of tiles filling the whole screen behind the figure, lines
+  burnt to white with a wide glow, a flare across the middle, every layer (the echoes of the lines, the
+  band of cells, three rings) at once - and, found looking closer, three more: each line dragging a stack
+  of about seven echoes (the trail's feedback kept 74% a frame and moved outward 0.9%), a rainbow fringe
+  on every ring, and the tiles cut off along their square cells' edges (below).
+- **One figure with room round it** (`uRoom`, `mandalaMorph`'s `room`): the figure fills a disc of the
+  screen - `room[0]` 0.43 of its height for smooth music, 0.39 for aggressive (of its width, on a screen
+  taller than it is wide), faded from 0.9 to 1.15 of it, so it has gone by 0.49 of the height, inside the
+  screen's top and bottom (review) - and beyond it the pattern carries on only at 0.11 of the deep colour
+  (`uFlare`), and only some of the time; the echoes and the band of cells each come and go on slow curves
+  of their own. Across ten minutes of the clocks: the faint pattern beyond 30% of the time, the echoes
+  34%, the band 29%, none of them 37%, 0.92 at once on average (`visualizer.sim.cjs` holds the numbers -
+  each under half, the average under one - and since review the shader to scaling each layer by its own).
+  The lines: a base width of 0.0038 (was 0.0046) times 1.2 to 1.5 as the feel rises (was 1.3 to 1.0),
+  and a glow tail of 0.25 to 0.12 (was 0.45 to 0.06) - so as the feel rises a line is drawn wider with
+  less glow beside it, harder, never fainter (review). Against before, smooth music's lines are thinner
+  (0.0046 against 0.0060) with less glow, and aggressive music's WIDER (0.0057 against 0.0046) with more
+  (a tail of 0.12 against 0.06); the rings two not three and in one colour, the core
+  smaller, the flare gone, the polygon's fill fainter (0.08 to 0.03, was 0.14 to 0.05) and read from the
+  polygon's own outline (review), and a pile of glow scaled down in all three channels together
+  (`col *= (1 - exp(-1.5 peak)) / peak`), so it keeps the cover's colour instead of burning to white. The
+  trail keeps 60% a frame less 0.018 (74% less 0.012), so a line drags three or four echoes, not seven -
+  it still flows. It still leans with the feel: smooth music wide, round and soft; aggressive tighter,
+  pointed and harder.
+- **The hard line: the mirror count.** It glided between whole numbers (`glide([6, 8, 5, 12, 7, 10, 4,
+  9])`) through one fold, `seg * tri(a / seg)` with `seg = 2 pi / N`; between whole numbers the wedges
+  don't close round the circle, so one partial wedge sat at atan's wrap - 2.0.0-player.20 took the TEAR out
+  of it, but it stayed a radial line shapes were born out of or vanished into, for every glide. Now the
+  count changes only by a FOLD (`MIRROR_COUNTS` 8, 4, 12, 6, 3, 9, 3, 6, 12, 4, round and round - each step
+  twice or three times as many, or a half or a third; 5, 7 and 10 went, no fold reaches them): the angle is
+  folded into `uOuter` whole wedges (the lower of the two counts), then each wedge folded AGAIN at the
+  count as it swings (`uFold.x`). The second fold reads only the first's answer, so the picture is mirrored
+  about every outer mirror line and every wedge is like every other at every moment, and it is exactly the
+  whole count's fold at each end. In between, a new mirror swings inside every wedge at once, from the
+  outer wedge's half line in to its place, or back out to it as the count halves (its angle, pi / count,
+  moving evenly - `mirrors()`, eased over the last 38% of a 16-beat phrase): what meets it meets its own
+  reflection, as in a kaleidoscope, never an unmirrored edge. `foldAngle()` is the shader's fold in
+  TypeScript; `visualizer.sim.cjs` holds the two to each other, the folded angle continuous across every
+  mirror line and the wrap for every moment of every swing (7,200 points round the circle, eleven moments
+  each), equal to the whole fold at both ends - the end taken a hair before the phrase does, while the
+  swing is still its own (review) - the same either side of a phrase's end where the outer count changes,
+  the swinging mirror's angle moving evenly with the eased swing, the 16 and the 62% themselves, and the old
+  way (6.5 in one fold) failing. Not the spec's other suggestion, `mix(fa, fa2, t)`: at t = 0.5 it maps half
+  of each wedge to a single angle - radial streaks.
+- **Proved in rendered frames** (the real `GlAmbient` and shaders in a file:// harness, the clocks driven,
+  nine frames through every one of the ten swings, the picture sampled round circles at six radii;
+  `measure2.cjs`): with the trail cleared, the worst of the outer wedges against the typical one, over
+  the circle's contrast, was at most 0.061 mid-swing (median 0.005) against 0.93 median and 1.26 at worst
+  for the old glide 6 to 8; the picture either side of every mirror line - outer and swinging - 0.02
+  median (0.34 at worst, at one radius of one frame) against 1.5. With the trail on (it
+  turns and swirls in screen space, so no line is a mirror of it) the odd-wedge median is 0.02-0.06
+  against 0.98. Measured again on the shader as the review left it (four radii, the ten swings): odd
+  wedge 0.003 median, 0.081 at worst; mirror lines 0.019 median, 0.20 at worst. In the real page the
+  2.0.0-player.20 seam check (the rows either side of the centre line, left against right) read 1.13 at
+  most over 20 frames, on localhost and on a non-secure origin.
+- **The tiles were cut off too**: each cell of the source's tile pattern held one polygon, turning
+  (`rot(t * 0.07)`), and a corner or a star's spike reaches up to 0.86 of a cell from its centre - past
+  the cell's edge, where it was cut along a straight line, and spikes appeared out of that line as the
+  tiles turned (worst for aggressive music, which brings stars and triangles). Each tile is now the union
+  (a signed min) of its own polygon and the three in the cells round the corner the point is nearest, and
+  the band's cells the nearer of the cell's and the next one along. `visualizer.sim.cjs` ports the
+  polygon and both fields to JavaScript (held to the shader's lines) and measures a line's brightness a
+  hair either side of every cell edge, over sides 3 to 8, stars, rounding and turns: a jump of 0.00003
+  (0.0001 for the band) against 1.25 cut off. Across a cell's midline, where the four tiles chosen change,
+  it moves under 0.0001.
+- **The cost, in one pass as before**: three more polygons a pixel cost about 13% in SwiftShader (CPU
+  WebGL, 1440x900); the rings in one colour (the fringe split each into three) save about the same, and
+  the figure is worked out only where it or the faint pattern shows (`if (inside > 0.0 || faint > 0.0)` -
+  exact: every colour it adds is scaled by one of them, and `visualizer.sim.cjs` checks that line by
+  line). Averaged over twelve moments of a song: 65.0 ms a frame against 69.4 before. Uniform branches
+  were tried for the band and saved nothing in SwiftShader, so there are none; a GPU was not measured. The
+  review's fixes add nothing a pixel (the fill's field is a copy kept, the disc's reach one `min`).
+- **The feel: always "in between", and why.** The board tuned its weights and ranges on three synthetic
+  songs. Through the page's real pipeline, offline - the copy decoded at 48 kHz and down-mixed as 0.5 (L +
+  R), the analyser emulated as `player/vizAudio.ts` sets it (FFT 2048, Blackman, no smoothing, -90..-22 dB
+  to bytes, read 60 times a second), `bandLayout`/`bandsFromBins`, then `musicFeel` - 27 Kevin MacLeod
+  tracks (incompetech.com, CC BY 4.0; seven calm, six between, seven heavy, two that build, five more kept
+  out) and 17 louder or quieter copies (+3 to +8 dB, -10 dB) put 98% of the old score between 0.03 and
+  0.76: calm 100% smooth, between 70% in between, heavy only 28% aggressive. **The emulation was checked
+  against Chromium's own AnalyserNode** (an OfflineAudioContext, four tracks, 474 frames each): 100.0% of
+  the bytes equal at the right alignment, none more than 1 off; and the down-mix within 2e-7 of 0.5 (L + R).
+- **The readings, as the review left them** (`musicFeel`): onsets a second, counted on a grid of 60
+  samples a second whatever the screen's frame rate (the flux between the spectra held at each sample,
+  the threshold and its rising edge run once a sample, a frame late by n samples spreading its flux over
+  the n); the share of the sound above about 2 kHz (band 43 up); and the flatness of bands 20-63 - the last
+  two read in a window `LEVEL_WINDOW` 0.7 (about 48 dB) deep below the loudest band, each band by how far
+  it stands above the window's bottom, the bottom never below the analyser's floor (`LIFT_FLOOR` 0.03).
+  `aggr` follows its target over `AGGR_FOLLOW_S` 2 s. The crest factor (a 28 ms, gain-controlled waveform:
+  it told calm from heavy not at all) and the centroid (nothing the share above 2 kHz didn't) went, and
+  with them `musicFeel`'s waveform argument.
+- **The new score** (`FEEL_SCORE`, `feelScore`): each reading followed over 5 s, then a smoothstep between
+  [counts nothing, counts in full] with a weight - onsets a second [2.9, 5.5] 0.31; the share above 2 kHz
+  [0.025, 0.17] 0.5; flatness [0.025, 0.23] 0.19. What real music gives (each track's middle): calm 2.7-4.9
+  onsets a second, 0.00-0.04 above 2 kHz, flatness 0.02-0.23; between 2.8-6.3, 0.02-0.11, 0.11-0.55; heavy
+  3.5-6.1, 0.09-0.17, 0.43-0.82 - flatness tells calm from the rest, the share above 2 kHz heavy from
+  between, onsets lean both. The window and the ranges were searched together (random sampling and then
+  refinement, windows 0.5 to 0.8, scored on calm reading smooth, heavy aggressive, between in between and a
+  level change moving nothing) on the twenty calm, between and heavy tracks and their copies at realistic
+  loudness (never the five kept out, nor the two that build), held wide, then rounded. The thresholds stay
+  0.34 and 0.67.
+- **How real music reads now** (share of time smooth / in between / aggressive, after the first 10 s):
+  calm 98-100% smooth (96% at worst, Immersed 8 dB louder); between - Funkorama 0/68/32, Funky Chunk
+  0/86/14, Happy Alley 11/89/0, Surf Inspector 0/80/20, Werq 18/74/8, and Bummin on Tremelo 100/0/0 (a
+  sparse, clean tremolo guitar); heavy 87% aggressive on average (Pump and Club Diver 100, Burn The World
+  Waltz and Summon the Rawk 99, Neolith 91, Harmful or Fatal 63, Metalmania 55 - its onsets are its only
+  difference from Funky Chunk); the two that build cross words (Devastation and Revenge 42/38/20, Long
+  Time Coming 0/51/49). **Kept out of the tuning**: Summer Day and Ether Vox (calm) 100% smooth; Chill Wave
+  (a relaxed synth groove) 67/27/6; and the two heavy ones read mostly IN BETWEEN - Breakdown 0/97/3, with
+  less above 2 kHz (0.04) than any heavy track tuned on (0.09-0.17); Cool Rock 23/74/3, whose top end and
+  flatness are heavy music's but whose onsets are sparse (3.7 a second) for its top end (0.11, the low edge
+  of heavy). They are reported, not tuned to (review: an earlier version gave Cool Rock's reason as
+  little top end too, and the sim required both to stay in between).
+- **A level change, and the screen's frame rate**: 3 dB louder or quieter moves a track's middle aggr
+  0.01 on average (0.04 at most); 6 dB either way 0.025 on average, 0.11 at most (Metalmania 6 dB louder,
+  at the analyser's top - 0.09 at most 6 dB quieter); 10 dB quieter 0.05 (0.15, quieter reading smoother)
+  - against 0.11, 0.17 and 0.28 at most before review, when the brightness and noisiness were read
+  against the floor.
+  It isn't nothing: where the loudest band is quieter than about -40 dB the window stops at the floor
+  (quiet music, or a quiet passage of it, reads a little smoother), and where a loud record's loudest
+  bands pass the analyser's -22 dB top they read as -22 and it reads a little more aggressive (Metalmania 6
+  dB louder, 0.68 to 0.79). A track standing on a word's edge still changes word with a few dB (Chill Wave
+  89% smooth 6 dB quieter, 44% 6 dB louder). Read at 120 and 144 frames a second, every track's middle aggr
+  moves 0.01 on average, 0.08 at most (counted per frame, before review: Dreamer 99% smooth at 60 fps, 3%
+  at 120). **Below 60 the grid can't help, and at 30 it reads a long way off** (second review): the
+  analyser is read half as often and an onset between two reads is lost in their flux - 31% of them on
+  the median track (9% Bummin on Tremelo to 53% Gymnopedie; Club Diver 5.29 a second to 3.42) - so heavy
+  tracks fall from 87% aggressive on average to 59% (Burn The World Waltz 99% to 26%, Club Diver 100% to
+  63%, Metalmania 55% to 0%), between ones drift smooth (22/66/12 to 43/56/1; Happy Alley 89% in between
+  to all smooth), calm ones stay smooth; the share above 2 kHz and the flatness don't move. 30 is
+  ordinary on a laptop: Chrome's Energy Saver halves a page's frame rate (whether Arc offers it isn't
+  known). Not compensated: the variant tried - a late frame's whole flux tested in its first grid sample,
+  0 in the rest, the envelope as it is - brings heavy music back at 30 (Burn, Club Diver, Summon 100%,
+  Metalmania 67%) but reads between music more aggressive than 60 does (28% against 12%; Funkorama 90%)
+  and calm a little less smooth (Dreamer 87%, Immersed 91%), and changes nothing at 60 or above; a
+  choice for James, not made. The guide and the troubleshooting page say what 30 does, and
+  `musicfeel.sim.cjs` holds the made-up calm piece read 30 times a second to seeing fewer (2.07 onsets a
+  second against 2.78), so a compensation has to change that check and those words together. Reads
+  aligned to 128- or 512-sample renders, as a real page reads the analyser between them, move the middle
+  aggr 0.01 on average, 0.09 at most.
+- **The fixture**: `tests/fixtures/feel/real-tracks.json` holds the numbers (never audio) - per track its
+  kind, whether held out, its loudness, the readings once a second, and the shares under this tuning and
+  (for the tracks it held before) the board's - for the 27 tracks and 31 copies of 16 of them: the
+  builder's (louder calm tracks, quieter and louder heavy ones) and every track that stands near the floor
+  - Dreamer, Chill Wave, Late Night Radio and Bummin on Tremelo - 3 and 6 dB either way (review).
+  `musicfeel.sim.cjs` replays the readings through `feelScore` (following over `AGGR_FOLLOW_S`) and holds
+  every track to its shares within 3 points, the classes to what they are, a level change to 0.04 on
+  average and 0.12 at most, and the held-out five only in the direction that matters (calm smooth, heavy
+  never mostly smooth, the groove never mostly aggressive). Retuning means making the fixture again (the
+  sim checks its tuning - `FEEL_SCORE`, `LIFT_FLOOR`, `LEVEL_WINDOW`, `AGGR_FOLLOW_S` - is this one); how
+  onsets are counted is held by the numbers themselves (the board's songs, a busy click and a made-up calm
+  piece, to the third and second decimal).
+- **Only the Mandala takes the feel** - `mandalaMorph`'s A and `mandalaFlow`'s twist, as since
+  2.0.0-player.20; Waves, Liquid and the five feedback styles take the tempo alone (the spec supposed
+  otherwise; their frames at A 0 and 1 are identical). The README and the guide say so.
+- **After review** (thirteen findings, each confirmed by skeptics; every one fixed):
+  - **The polygon's fill had hard edges fill appeared out of** (major). `dPoly` became the nearer of the
+    polygon's outline and the tiles', with its own sign - and where the two were as far away with opposite
+    signs (a curve on no drawn line) the fill went from full to nothing in one pixel: a flat brown disc with
+    rectangular bites, the bites changing shape as the tiles turned - the most visible hard line left once
+    the bloom was gone. The fill is read from the polygon's own field, kept before the tiles are taken in
+    (`dCore`), and fainter, since it now fills the whole polygon: the fill's own contribution jumping by
+    over 0.1 between neighbouring pixels at smooth feel, 1440x900, songs at 455, 210 and 140 s - 2025, 1897
+    and 847 pairs before, 0, 0 and 0 after. The sim walks lines across the tiles: 113 jumps from the
+    nearer outline, 0 from the polygon's own.
+  - **Aggressive music went nearly empty and dim** (major): thinner lines (1.2 to 0.95) broke into faint
+    dashes. Over ten minutes of the clocks from two places (480x300, the share of the screen brighter than
+    0.25): at full aggression the middle share 10.0-10.5% and under 5% lit 10-12% of the time, stretches of
+    11 s - now 13.7%, 3.5-4.0%, 5 s at most; at 0.8, 7.3-8.7% of the time became 2.5-3.5%. The lines are
+    wider as the feel rises (`edge[1]` 1.2 to 1.5) with less glow (0.25 to 0.12).
+  - **At smooth feel the figure ran off the top and bottom** (minor): its fade ended at 0.6 of the height,
+    the edges at 0.5, so lines crossed them at 70% of their brightness while the sides faded to black -
+    cropped, not room. The fade now runs 0.9 to 1.15 of `room[0]` (0.43 smooth, 0.39 aggressive), scaled to
+    the width on a portrait screen; the brightest pixel in the top and bottom 3% (centre square) over ten
+    minutes, 0.79-0.81 at worst, is 0.35 - the faint pattern beyond. The cost, stated: the outer ring the
+    sides used to show is gone, so a smooth figure lights 12.8-13.2% of the screen (16.1-16.6% before) and
+    is under 5% lit 7-8% of the time (3-5%) - its sparse moments, a ring or a faint hexagon while the kind
+    of figure changes, were there before, a little brighter.
+  - **The feel moved with the level** (major): the brightness and noisiness counted how many high bands
+    cleared the analyser's -90 dB floor, so a calm record turned up read in between (Dreamer 85% smooth 3 dB
+    louder, 39% at 6; Chill Wave 51% to 27%), and a hi-res song - analysed from its resampled copy, 3 dB
+    lower - read differently by the quality setting. Now the window (above), and the numbers above.
+  - **The feel moved with the frame rate** (major): onsets were counted per animation frame, so a 120 Hz
+    screen (Arc and Chrome draw at the display's rate) counted half as many again - Dreamer 3/97/0, Funky
+    Chunk 0/8/92. Now on the 60-a-second grid; `musicfeel.sim.cjs` puts a made-up calm piece through the
+    analyser emulation at 60, 120 and 144 fps (2.78, 2.97, 2.88 onsets a second; per frame 2.78, 4.18,
+    5.03).
+  - **Tests that held less than they said**: the echoes and the band now pinned to `uRoom.z` and `uRoom.w`
+    in the shader (removing either left every check green); the phrase-boundary checks could not fail (one
+    ended in a clause always true, one rounded the count it tested, the ends were sampled at the next
+    phrase's start) - a swing stopping 98.5% or 99.7% of the way and cutting at the phrase's end passed
+    them all, and fails now; the even swing and the 16 and 62% were unpinned (a straight count glide
+    passed); the real-track replay followed over its own 2 s, not `musicFeel`'s (`AGGR_FOLLOW_S`, and a
+    check of one frame's follow); how onsets are counted was unpinned (a 3 s window, a 1.2 threshold, a
+    0.04 floor all passed); and the held-out heavy tracks were required to read in between - a tuning that
+    read them aggressive would have failed.
+  - **Words**: the guide's "most pop, funk and lighter rock in between" - no pop was measured, and the one
+    light guitar track reads smooth; the old trail given as 72% a frame (it was 74%); Cool Rock's reason.
+- **After a second review** (eight findings, each confirmed by skeptics; every one fixed):
+  - **The version** (major): the spec's 2.0.0-player.31 was taken on player-spike by then (the voice's
+    counted clock, then .32 and .33), so this change carries .34 everywhere it names itself - `__version__`,
+    this section, the troubleshooting page, the source comments, both sims and the fixture's `about`
+    (free text, read by no test; the fixture's numbers unchanged).
+  - **The guide called the drop at 30 frames a second "a little smoother"** (minor): heavy music falls
+    from 87% aggressive to 59% (Metalmania to 96% in between), and between music drifts smooth - the
+    numbers and the variant tried are under "A level change, and the screen's frame rate". player.md, troubleshooting.md and musicFeel.ts now say what 30
+    does and what brings it on, and `musicfeel.sim.cjs` holds the calm piece at 30 to seeing fewer.
+  - **The figure's disc was not pinned on the main lines** (minor): the skip check asked only that each
+    line adding colour named `inside` or `faint`, and the main lines' one line adds two terms, so
+    `(uBody * 1.5 + uFlare * faint)` - the figure off its disc, a hard edge at 1.15 of its reach or
+    full-strength lines across the screen - passed every sim. The check is term by term now (each
+    additive term a product with `inside` or `faint` as a factor, or a bracketed sum each term of which
+    is; a function's arguments never count), with its own cases; that mutation and three like it fail.
+  - **Words**: the 6 dB level figure (it said 0.09 at most, either way: 0.11 louder, 0.09 quieter, 0.025
+    on average); the shader's header claiming thinner lines with less glow (true of smooth music only:
+    aggressive music's are wider than before, and carry more glow); the held-out check's comment (it
+    described the check the first review removed); a blank line missing before the next section; and
+    pointers from the 2.0.0-player.20 section to this one, where its feel and its gliding count are
+    described as they were.
+- **Verified**: 2354 Python tests (none new), pyflakes, tsc, the bundle, all 43 sims (`visualizer` - the
+  fold, the swing's even angle and its ends, the room and its layers in the shader, the disc inside the
+  screen, the tiles and cells, the fill from the polygon's own field, the clean lines - and `musicfeel` -
+  the grid, the window, the follow, the onsets held, the real tracks - extended). Mutations, each on a
+  scratch copy and restored byte for byte: the builder's 17 that still apply (adapted to the code as it
+  is), 16 for the visualizer's fixes and 15 for the feel's - every one caught (three first got past - the
+  polygon's field reassigned after the tiles, the onset threshold's 0.02 made 0.04, the grid's follow
+  taken from the frame's own dt - and gained the checks that catch them). After the second review those 48
+  were run again on the final code (all caught), with 7 more for its fixes, all caught: the main lines'
+  figure term and their faint term each left unscaled, `inside` moved into a function's argument, an
+  unscaled term added to the band's line (the old per-line check let the first through; reverted alone,
+  with the shader right, it changes nothing, as it should), the term rule letting a function's arguments
+  scale, and a late frame's flux tested whole in its first sample or not divided at all (the 30-frames
+  check). The engine guard is empty. **In the real page** (this worktree's deadwax on :8097, headless
+  Chromium with SwiftShader): a song plays, the visualizer opens on Ambient > Mandala, the silent copy
+  fetches a scrub window, an AudioContext runs (48 kHz, its clock moving), the WebGL Mandala draws and
+  moves inside the screen, the seam rows hold, the readout says the feel, no console errors - on localhost
+  and on `http://deadwax.test:8097`.
+- **NOT verified - James's eyes and James's music**: whether it now reads as calm and rich, not empty
+  (smooth music lights less of the screen than before review, by design); the morph in motion at real
+  speed on his GPU (the frames are a clock driven by hand); the cost on a real GPU; how his library reads
+  (the tuning saw incompetech's library music, not Metallica or Portishead - and modern masters, louder
+  than these, crowd the analyser's -22 dB top more often); WebKit's analyser (Safari's FFT scaling, never
+  checked here); a 44.1 kHz context (the bands are the same frequencies, the bins a little narrower); and
+  whether Arc on his laptop's battery draws at 30 frames a second (where heavy music reads in between).
 
 ### Editing an album on desktop (2.0.0-player.21)
 
@@ -9457,9 +9719,9 @@ node ui/test/decksound.sim.cjs  # the record's sound following the hand through 
 node ui/test/artist.sim.cjs     # the artist page's order and who-is-who (Navidrome's artist <-> MusicBrainz's), Library > Artists' sort, the id bridge's "Also" chips, "This pressing" and the folder; the page rendered - rows drawn once with steady keys, Play waiting for the library, a few albums at a time, the session's answers, late lookups opening nothing
 node ui/test/home.sim.cjs       # Home finished - "Not played in a while" (more than 30 days, oldest first, up to 20, none under 4 or without played), Pinned first then Recently added then Not played, the shelves waiting for the pins (counted while Home shows), all in the gate
 node ui/test/pins.sim.cjs       # pins - which pin is the thing on screen (names folded as the server folds them), a card's words, what a toggle sends, Edit's operations and the drag; the store (asked when asked, changes in turn, Edit's PUT with known, refusals put back and said where made); Pinned and its Edit rendered (focus kept, Not saved under the list); the notice; the pin control
-node ui/test/musicfeel.sim.cjs  # the desktop visualizer's feel and tempo - the board's three synthetic songs (smooth, aggressive, one that builds), click tracks, silence holding everything, the neutral pace, the words' edges
+node ui/test/musicfeel.sim.cjs  # the desktop visualizer's feel and tempo - the board's three synthetic songs (smooth, aggressive, one that builds), click tracks, silence holding everything, the neutral pace, the words' edges; how onsets are counted, held to the number, and counted on a 60-a-second grid (a made-up calm piece through the analyser emulation at 60, 120 and 144 fps - and at 30 seeing fewer, as the guide says); aggr's follow; the share above 2 kHz and the noisiness read in a window below the loudest band (a level change moves neither, a spectrum falling into the floor included, continuous at the floor); and the tuning held to real tracks' numbers (tests/fixtures/feel/real-tracks.json: calm smooth, heavy aggressive, between in between, builds crossing, level copies hardly moving, the held-out five in the direction that matters)
 node ui/test/vizsync.sim.cjs    # the visualizer's silent copy kept in time - started, paused, re-synced past 0.25 s, the next window asked ahead, each song's state its own, the next song's first window fetched ahead, a whole song and two songs back to back through a fake copy
-node ui/test/visualizer.sim.cjs # the visualizer's pure parts - the FIXED rotation order, the choices kept per device, the cover's colours, the bands and waveform, the idle signal, the size caps
+node ui/test/visualizer.sim.cjs # the visualizer's pure parts - the FIXED rotation order, the choices kept per device, the cover's colours, the bands and waveform, the idle signal, the size caps; the Mandala's mirror count changing only by folding (every wedge alike at every moment, the swinging mirror's angle even, its ends exact either side of a phrase's end, the shader folding the same way), one figure with room round it (inside the screen's top and bottom, each extra layer scaled by its own in the shader), its tiles and cells carrying on across cell edges, the fill read from the polygon's own field, aggressive lines harder and no thinner, rings in one colour, a shorter trail, the figure worked out only where it shows (every term of every colour it adds scaled by `inside` or `faint`)
 node ui/test/needslook.sim.cjs  # Needs a look - queueAlbums' list and the facets (Newly added only when there is one, a facet emptied falling back), the session (rows fixed, Fixed/Ignored/Deleted, a rename followed, merged disc folders, reviewed on every way of leaving an album, never one deleted, an album gone ending it), and the page rendered - its states, the selected row, what the panel is asked for, its count, the ending (its scan after the note, rows held and refused until no read is out, the chips held), a phone asking nothing; and the REAL useQueueSummary.ts against a faked deadwax
 node ui/test/settingslog.sim.cjs # Server settings and the log in the app - the server's groups only, drawn from the settings tab's own parts (a secret masked, choices, locked, revert, the retype note), drafts across the tabs and one save, a refusal keeping every draft (until the next save or Discard), read again only with no draft, a save calling a read off, an edit made while a save is on its way kept, focus given to the bar as Save or Discard goes, the arrow keys; the log's history and stream joined by number (no gap, no line twice, a restart, Clear and what it says), a history that failed filled in by the next, markup drawn as text, 500 at most, the lost stream one line and asked again by hand once the browser gives up on it, the stream closed when hidden; the drafts and the lines outliving their page, every copy told as they change; the stream's and the history's addresses from the real api/logs.ts; on a phone a note, nothing asked
 ```

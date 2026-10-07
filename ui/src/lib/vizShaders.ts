@@ -50,20 +50,37 @@ void main() {
 `
 
 /**
- * Mandala, as a real kaleidoscope. The plane is folded into mirrored wedges, and the number of mirrors
- * is any real number, not only a whole one: a triangle-wave fold keeps the edges meeting at every
- * count, so going from 6 to 8 the mirrors visibly swing and the pattern re-forms through them - and the
- * angle is measured AFTER the spin and twist turn the plane, so atan's wrap lands on a mirror line and a
- * count between whole numbers leaves no seam (2.0.0-player.20, found in the real page). Inside
- * the wedge a source pattern drifts, turns and scales on its own path, like the beads in a turned tube,
- * so the figure keeps changing even with the mirrors still. The source is made of distance fields, and
- * it morphs by interpolating them, never by fading: a regular polygon of any number of sides (3-8,
- * again any real number, so a square's corners bulge into a pentagon), which can round into a circle
- * or, now and then, pinch into a star; a flower of circles; and triangle, square and hexagon lattices.
- * On top of that the plane is turned inside out by blending in circle inversion, wound and unwound by
- * a polar twist, and flown slowly in and out through. Nothing follows the beat: brightness and size are
- * steady, and the music only sets how fast the numbers move (lib/visualizer.ts mandalaFlow and
- * mandalaMorph).
+ * Mandala, as a real kaleidoscope. The plane is folded into mirrored wedges - into a whole number of
+ * them (uOuter), and each wedge folded again at the count as it swings (uFold.x). While a count holds
+ * the second fold is exactly the first's count or a whole multiple of it; while it changes (by a fold:
+ * twice or three times as many, or a half or a third, lib/visualizer.ts MIRROR_COUNTS) a new mirror
+ * swings shut inside every wedge at once, or swings open. The second fold reads only the first one's
+ * answer, so every wedge is like every other at every moment (2.0.0-player.34: a single fold at a count
+ * between whole numbers left one wedge unlike the rest, a radial line shapes were born out of). The
+ * angle is measured AFTER the spin and twist turn the plane, so atan's wrap lands on a mirror line
+ * (2.0.0-player.20). Inside the wedge a source pattern drifts, turns and scales on its own path, like
+ * the beads in a turned tube, so the figure keeps changing even with the mirrors still. The source is
+ * made of distance fields, and it morphs by interpolating them, never by fading: a regular polygon of
+ * any number of sides (3-8, any real number, so a square's corners bulge into a pentagon), which can
+ * round into a circle or, now and then, pinch into a star; a flower of circles; and triangle, square
+ * and hexagon lattices. On top of that the plane is turned inside out by blending in circle inversion,
+ * wound and unwound by a polar twist, and flown slowly in and out through.
+ *
+ * ONE figure with room round it (2.0.0-player.34, James: "it just looks a bit busy"): it fills a disc
+ * of the screen (wider for smooth music, tighter for aggressive), and beyond it the pattern carries on
+ * only faintly, in the deep colour, and only some of the time; the echoes of its lines and the band of
+ * cells each come and go too, so a few layers show at once rather than all of them; its lines are
+ * thin and soft for smooth music and drawn wider, with less glow beside them, as the feel rises (harder,
+ * never fainter), and a pile of glow is scaled down in all three channels together, so it keeps the
+ * cover's colour instead of burning to white; the rings are drawn in the cover's colour alone,
+ * without the rainbow fringe that split each into three; the trail behind the lines is about half as
+ * long, so a line no longer drags a stack of echoes; and the flare across the middle is gone. Its
+ * tiles and the band's cells are no longer cut off along their cells' straight edges: each is worked out
+ * with its neighbours, so a corner or a spike carries on into the next cell instead of appearing out of
+ * a straight line as the tiles turn. Where neither the figure nor the faint pattern shows, none of it is
+ * worked out, which (with the rings in one colour) pays for the neighbours. Nothing follows the beat:
+ * brightness and size are steady, and the music only sets how fast the numbers move (lib/visualizer.ts
+ * mandalaFlow and mandalaMorph).
  */
 export const MANDALA = HEAD + COMMON + `
 uniform vec3 uCore;
@@ -72,21 +89,24 @@ uniform vec3 uBody2;
 uniform vec3 uRing;
 uniform vec3 uFlare;
 uniform vec4 uFold;
+uniform float uOuter;
 uniform vec4 uInv;
 uniform vec4 uSrc;
 uniform vec4 uForm;
 uniform vec4 uLat;
 uniform vec4 uRingsQ;
 uniform vec3 uFormW;
-uniform vec4 uEdge;
+uniform vec3 uEdge;
+uniform vec4 uRoom;
 float tri(float x) {
   return abs(fract(x + 0.5) - 0.5);
 }
-float sdPoly(vec2 p, float r, float n, float star, float round) {
-  float seg = 2.0 * PI / n;
-  float la = seg * tri(atan(p.y, p.x) / seg);
+// a regular polygon of any number of sides, its own two numbers made once a frame (k: the angle one side
+// spans, and how far out a spike's tip reaches as a share of r) since every shape of the figure shares them
+float sdPoly(vec2 p, float r, vec2 k, float star, float round) {
+  float la = k.x * tri(atan(p.y, p.x) / k.x);
   float edge = r / cos(la);
-  float spike = mix(r * 0.5, r / cos(0.5 * seg) * 1.35, 2.0 * la / seg);
+  float spike = mix(r * 0.5, r * k.y, 2.0 * la / k.x);
   return length(p) - mix(mix(edge, spike, star), r * 1.08, round);
 }
 float latTri(vec2 s) {
@@ -112,84 +132,110 @@ float lattice(vec2 s, float kind) {
 float glowLine(float d, float w, float tail) {
   return exp(-(d * d) / (w * w)) + tail * exp(-d / (3.0 * w));
 }
-vec3 glowRing(vec3 rr, float R, float w) {
-  vec3 d = rr - R;
+float glowRing(float r, float R, float w) {
+  float d = r - R;
   return exp(-d * d / (w * w)) + 0.12 * exp(-abs(d) / (w * 4.0));
 }
 void main() {
   vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
   float t = uTime;
   float r0 = length(p);
-  vec2 z = p * uFold.w;
-  float k = uInv.y;
-  float inv = uInv.x;
-  float rz = max(length(z), 0.0005);
-  float kr = (k * k) / (rz * rz);
-  vec2 w = mix(z, z * kr, inv);
-  float stretch = uFold.w * sqrt(abs(mix(1.0, -kr, inv)) * abs(mix(1.0, kr, inv)));
-  float mag = clamp(stretch, 0.06, 6.0);
-  float dense = 1.0 - smoothstep(2.5, 9.0, stretch);
-  float r = length(w);
-  // turned by the spin and the twist FIRST, then measured: atan's wrap at +-pi then falls where the even
-  // fold meets itself, so a mirror count between whole numbers leaves no tear along the left horizontal
-  // (added after atan, the offset moved the wrap off the mirror - the board's version tore there)
-  vec2 wt = rot(uFold.y + uFold.z * log(r + 0.02)) * w;
-  float a = atan(wt.y, wt.x);
-  float N = uFold.x;
-  float seg = 2.0 * PI / N;
-  float fa = seg * tri(a / seg);
-  vec2 q = r * vec2(cos(fa), sin(fa));
-  vec2 s = rot(uSrc.x) * (q - uInv.zw) / uSrc.y;
-  float lw = 0.0046 * mag / uSrc.y * uEdge.y;
-  float C = uLat.y;
-  vec2 g = fract(s / C);
-  float dPoly = sdPoly(s, 0.42, uSrc.z, uSrc.w, uForm.y);
-  float dTile = sdPoly(rot(t * 0.07) * ((g - 0.5) * C), C * 0.32, uSrc.z, uSrc.w, uForm.y);
-  dPoly = abs(dPoly) < abs(dTile) ? dPoly : dTile;
-  float petals = min(min(abs(length(g) - 0.7), abs(length(g - vec2(1.0, 0.0)) - 0.7)), min(abs(length(g - vec2(0.0, 1.0)) - 0.7), abs(length(g - vec2(1.0, 1.0)) - 0.7)));
-  float dFlower = min(abs(length(s) - 0.42), petals * C);
-  float dLat = lattice(s / C, uLat.x) * C;
-  float wsum = uFormW.x + uFormW.y + uFormW.z;
-  float d = (uFormW.x * abs(dPoly) + uFormW.y * abs(dFlower) + uFormW.z * dLat) / wsum;
-  float sp = uForm.z;
-  float dn = abs(mod(d + 0.5 * sp + t * 0.012, sp) - 0.5 * sp);
-  float fill = uForm.x * (1.0 - smoothstep(-lw, lw, dPoly)) * uFormW.x / wsum;
-  vec3 col = uBody * glowLine(d, lw, uEdge.x) * 1.1 * dense;
-  col += uBody2 * exp(-d / uForm.w) * glowLine(dn, lw * 0.8, uEdge.x) * 0.7 * dense;
-  col += mix(uBody, uBody2, 0.5) * fill;
-  float cw = uLat.w;
-  vec2 cell = vec2((fract(fa * r / cw) - 0.5) * cw, r - uLat.z);
-  float band = glowLine(abs(sdPoly(rot(t * 0.1) * cell, cw * 0.3, uSrc.z, uSrc.w * 0.5, uForm.y * 0.5)), 0.0035 * mag * uEdge.y, uEdge.x);
-  col += uBody2 * band * (1.0 - smoothstep(cw * 0.35, cw * 0.55, abs(r - uLat.z))) * 0.8 * dense;
-  float ca = uEdge.z;
-  vec3 rr = vec3(r * (1.0 + ca), r, r * (1.0 - ca));
-  float wob = 1.0 + uRingsQ.w * cos(N * fa);
-  float split = uRingsQ.y * 0.02;
-  float rw = 0.0038 * mag;
-  vec3 rings = vec3(0.0);
-  for (int i = 0; i < 3; i++) {
-    float R = (uRingsQ.z + float(i) * uRingsQ.x) * wob;
-    rings += 0.5 * (glowRing(rr, R - split, rw) + glowRing(rr, R + split, rw));
+  // ONE figure with room round it: it fills a disc of the screen (uRoom.x of its height, or of its width
+  // where that is the smaller), faded out before the screen's edge so it is never cut off by the top and
+  // bottom, and beyond that the pattern carries on only faintly, in the deep colour, and only some of the
+  // time (uRoom.y) - and where neither shows, the figure isn't worked out at all
+  float reach = uRoom.x * min(1.0, uRes.x / uRes.y);
+  float inside = 1.0 - smoothstep(reach * 0.9, reach * 1.15, r0);
+  float faint = (1.0 - inside) * uRoom.y * 0.11;
+  vec3 col = vec3(0.0);
+  if (inside > 0.0 || faint > 0.0) {
+    vec2 z = p * uFold.w;
+    float k = uInv.y;
+    float inv = uInv.x;
+    float rz = max(length(z), 0.0005);
+    float kr = (k * k) / (rz * rz);
+    vec2 w = mix(z, z * kr, inv);
+    float stretch = uFold.w * sqrt(abs(mix(1.0, -kr, inv)) * abs(mix(1.0, kr, inv)));
+    float mag = clamp(stretch, 0.06, 6.0);
+    float dense = 1.0 - smoothstep(2.5, 9.0, stretch);
+    float r = length(w);
+    // turned by the spin and the twist FIRST, then measured: atan's wrap at +-pi then falls where the even
+    // fold meets itself, so it leaves no tear along the left horizontal (2.0.0-player.20)
+    vec2 wt = rot(uFold.y + uFold.z * log(r + 0.02)) * w;
+    float a = atan(wt.y, wt.x);
+    // folded into uOuter wedges, then each wedge folded again at the count as it swings (uFold.x, a whole
+    // multiple of uOuter while it holds): the second fold reads only the first's answer, so every wedge
+    // is like every other at every moment, and a change of count is a mirror swinging inside each one
+    float seg = 2.0 * PI / uOuter;
+    float fa = seg * tri(a / seg);
+    float sub = 2.0 * PI / uFold.x;
+    fa = sub * tri(fa / sub);
+    vec2 q = r * vec2(cos(fa), sin(fa));
+    vec2 s = rot(uSrc.x) * (q - uInv.zw) / uSrc.y;
+    float lw = 0.0038 * mag / uSrc.y * uEdge.y;
+    float C = uLat.y;
+    vec2 g = fract(s / C);
+    float pSeg = 2.0 * PI / uSrc.z;
+    vec2 pk = vec2(pSeg, 1.35 / cos(0.5 * pSeg));
+    float dPoly = sdPoly(s, 0.42, pk, uSrc.w, uForm.y);
+    // the polygon's own field, kept for its fill: the fill is the polygon's inside, so it fades in and out
+    // only along the polygon's own outline (a drawn line), never along an edge drawn nowhere
+    float dCore = dPoly;
+    // the tiles: this cell's polygon and the three in the cells round the corner this point is nearest,
+    // so a tile's corners and spikes carry on into the next cell instead of being cut off along its edge
+    // (a straight line spikes appeared out of as the tiles turned)
+    mat2 tr = rot(t * 0.07);
+    vec2 h = (g - 0.5) * C;
+    vec2 o = (step(0.5, g) * 2.0 - 1.0) * C;
+    float dTile = min(min(sdPoly(tr * h, C * 0.32, pk, uSrc.w, uForm.y), sdPoly(tr * (h - vec2(o.x, 0.0)), C * 0.32, pk, uSrc.w, uForm.y)),
+      min(sdPoly(tr * (h - vec2(0.0, o.y)), C * 0.32, pk, uSrc.w, uForm.y), sdPoly(tr * (h - o), C * 0.32, pk, uSrc.w, uForm.y)));
+    dPoly = abs(dPoly) < abs(dTile) ? dPoly : dTile;
+    float petals = min(min(abs(length(g) - 0.7), abs(length(g - vec2(1.0, 0.0)) - 0.7)), min(abs(length(g - vec2(0.0, 1.0)) - 0.7), abs(length(g - vec2(1.0, 1.0)) - 0.7)));
+    float dFlower = min(abs(length(s) - 0.42), petals * C);
+    float dLat = lattice(s / C, uLat.x) * C;
+    float wsum = uFormW.x + uFormW.y + uFormW.z;
+    float d = (uFormW.x * abs(dPoly) + uFormW.y * abs(dFlower) + uFormW.z * dLat) / wsum;
+    col = (uBody * inside * 1.5 + uFlare * faint) * glowLine(d, lw, uEdge.x) * dense;
+    float sp = uForm.z;
+    float dn = abs(mod(d + 0.5 * sp + t * 0.012, sp) - 0.5 * sp);
+    col += uBody2 * exp(-d / (uForm.w * 0.6)) * glowLine(dn, lw * 0.8, uEdge.x) * 0.6 * uRoom.z * dense * inside;
+    float fill = uForm.x * (1.0 - smoothstep(-lw, lw, dCore)) * uFormW.x / wsum;
+    col += mix(uBody, uBody2, 0.5) * fill * inside;
+    float cw = uLat.w;
+    vec2 cell = vec2((fract(fa * r / cw) - 0.5) * cw, r - uLat.z);
+    // the band's cells: the cell's polygon and the next one along, the nearer - a corner crosses into the
+    // next cell instead of being cut off at its edge
+    mat2 br = rot(t * 0.1);
+    float dCell = sdPoly(br * cell, cw * 0.3, pk, uSrc.w * 0.5, uForm.y * 0.5);
+    float dNext = sdPoly(br * (cell - vec2(sign(cell.x) * cw, 0.0)), cw * 0.3, pk, uSrc.w * 0.5, uForm.y * 0.5);
+    float band = glowLine(abs(min(dCell, dNext)), 0.003 * mag * uEdge.y, uEdge.x);
+    col += uBody2 * band * (1.0 - smoothstep(cw * 0.35, cw * 0.55, abs(r - uLat.z))) * 0.6 * uRoom.w * dense * inside;
+    // the rings in the cover's colour alone: the rainbow fringe they had split each into three
+    float wob = 1.0 + uRingsQ.w * cos(uFold.x * fa);
+    float split = uRingsQ.y * 0.02;
+    float rw = 0.003 * mag;
+    float rings = 0.0;
+    for (int i = 0; i < 2; i++) {
+      float R = (uRingsQ.z + float(i) * uRingsQ.x) * wob;
+      rings += 0.5 * (glowRing(r, R - split, rw) + glowRing(r, R + split, rw));
+    }
+    col += rings * mix(uRing, uBody2, 0.4) * 0.8 * dense * inside;
   }
-  col += rings * mix(uRing, vec3(1.0), 0.3) * dense;
-  col += uCore * exp(-r0 * r0 / 0.002) * 1.5;
-  col += uCore * 0.17 * exp(-r0 * 12.0);
-  float fx = abs(p.x);
-  float fw = 0.085;
-  float flare = exp(-(p.y * p.y) / (fw * fw)) * smoothstep(0.02, 0.15, fx) * exp(-fx * 1.8);
-  flare *= 0.65 + 0.35 * sin(p.x * 23.0 + t * 0.7) * sin(p.y * 61.0 - t * 1.1);
-  col += uFlare * flare * 1.6;
-  col += mix(uFlare, vec3(1.0), 0.5) * exp(-(p.y * p.y) / 0.000016) * exp(-fx * 3.0) * 0.2;
+  col += uCore * (exp(-r0 * r0 / 0.0008) * 0.8 + 0.05 * exp(-r0 * 14.0));
+  // brightness kept under white by scaling all three channels together, so a pile of glow stays the
+  // cover's colour instead of burning to white
+  float peak = max(col.r, max(col.g, col.b));
+  col *= (1.0 - exp(-1.5 * peak)) / max(peak, 0.0001);
   vec2 asp = vec2(uRes.y / uRes.x, 1.0);
   vec2 fp = rot(0.0035 + 0.002 * sin(t * 0.13)) * p / 1.009;
   fp += 0.003 * vec2(sin(p.y * 9.0 + t), cos(p.x * 9.0 - t * 1.1));
-  float cab = uEdge.w;
+  float cab = uEdge.z;
   vec3 prev = vec3(
     texture2D(uPrev, fp * (1.0 + cab) * asp + 0.5).r,
     texture2D(uPrev, fp * asp + 0.5).g,
     texture2D(uPrev, fp * (1.0 - cab) * asp + 0.5).b);
-  vec3 fb = max(prev * 0.74 - 0.012, 0.0);
-  gl_FragColor = vec4(max(col, fb) + col * 0.06, 1.0);
+  vec3 fb = max(prev * 0.6 - 0.018, 0.0);
+  gl_FragColor = vec4(max(col, fb) + col * 0.04, 1.0);
 }
 `
 

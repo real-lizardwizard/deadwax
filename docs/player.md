@@ -459,20 +459,35 @@ music carries on throughout - the visualizer only watches it.
   some, or a black record with the cover as its label) and **Ambient**.
 - **Ambient** is a family of styles, chosen from the **Style** list beside the effects: **Mandala** (a
   kaleidoscope whose mirrors swing and whose shapes morph through polygons, lattices, flowers and
-  circles), **Waves** (ridges of the spectrum flying towards you, the heading drifting as if you were
-  flying over them), **Liquid** (ink curling in water), and the **Media Player style** five, after
-  Windows Media Player's: **Burst**, **Ribbons**, **Smoke**, **Rings** and **Embers**. **Rotate all**
-  goes through all eight in that order - each for 30 seconds of playing (a pause doesn't count),
-  fading from one into the next, starting on the Mandala when the visualizer opens on it, or, chosen
-  while another style shows, carrying on from that one - and nothing about it is random.
+  circles - one figure in the middle of the screen with dark room round it, in the cover's colours;
+  when its number of mirrors changes - doubling, tripling, halving or going to a third - a new mirror
+  swings shut inside every wedge at once, or swings open, so every wedge stays like every other and
+  no single line is left for shapes to appear out of; its tiles carry on from one cell into the next
+  rather than being cut off along a straight edge), **Waves** (ridges of the spectrum flying towards
+  you, the heading drifting as if you were flying over them), **Liquid** (ink curling in water), and
+  the **Media Player style** five, after Windows Media Player's: **Burst**, **Ribbons**, **Smoke**,
+  **Rings** and **Embers**. **Rotate all** goes through all eight in that order - each for 30 seconds
+  of playing (a pause doesn't count), fading from one into the next, starting on the Mandala when the
+  visualizer opens on it, or, chosen while another style shows, carrying on from that one - and
+  nothing about it is random.
   The Mandala, Waves and Liquid shift and flow with the music rather than flashing on the beat; the
   Media Player five answer it as Media Player's did (Rings strikes a ring on each kick). Under the
   **Style** button it says how it hears the music - **feel: smooth**, **in between** or
   **aggressive**, and the tempo it has found - and, with Rotate all, which style is showing (on a
-  window 1280 pixels wide or more).
-- **The music shapes it**: aggressive music (metal, say) brings sharp, spiky, fast-twisting figures;
-  smooth music rounder, slower, flowing ones, changing as a song changes; and the tempo sets how fast
-  the styles move.
+  window 1280 pixels wide or more). The feel comes from how busy the music is (its onsets, counted 60
+  times a second on a screen drawing 60 frames a second or more), how much of it is above about 2 kHz, and how
+  noisy it is (distorted guitars and cymbals are noisy, pianos and pads are tonal), each followed over
+  a few seconds; the last two are measured against the loudest part of the sound, so how loud a record
+  was mastered hardly matters (a very quiet one can read a little smoother, a very loud one a little
+  more aggressive). Calm music reads smooth, music with distorted guitars and cymbals aggressive, and
+  funk and other grooving music mostly in between; a sparse, clean guitar piece can read smooth, and a
+  heavy track with little top end, or with few, sparse beats, in between - and a song that builds
+  moves across as it builds. Below 60 frames a second it reads the music less often and misses some of
+  its onsets: at 30, which a battery saver can bring (Chrome's Energy Saver halves a page's frame rate),
+  about a third of them, and heavy music can then read in between and grooving music smooth.
+- **The music shapes it**: the Mandala follows the feel - aggressive music (metal, say) brings sharp,
+  spiky, fast-twisting figures held tighter in the middle; smooth music rounder, slower, wider,
+  flowing ones, changing as a song changes - and the tempo sets how fast every style moves.
 - **Colour**: **From the cover** takes its colours from the playing album's cover (a black-and-white
   cover gives grey); **Purple** is deadwax's own.
 - **The controls** - the song at the top left, the effect, style, colour and Leave full screen at the

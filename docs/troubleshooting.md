@@ -877,6 +877,20 @@ Navidrome didn't answer a range of the file"**, the phone's turntable is silent,
 are sent FLAC songs as they are (so their seeks land off again), and the gapless stream plays each
 song the ordinary way - nothing is made in the cache at all. The fix is the same.
 
+**The feel doesn't seem to match the music**: it is read from the copy over the last few seconds, so
+it settles a few seconds into a song and drifts as the song changes (it starts at "in between"). Since
+2.0.0-player.34 it is tuned on real music: calm music reads **smooth**, metal and other music with
+distorted guitars and cymbals filling its top end **aggressive**, and funk and other grooving music
+mostly **in between**. A sparse, clean guitar piece can read smooth, and a heavy track **in between**
+when it has little top end (few cymbals, little distortion above about 2 kHz) or few, sparse beats.
+How loud the record was mastered hardly matters, and neither does a 120 Hz screen; a very quiet record
+can read a little smoother and a very loud one a little more aggressive. A screen drawing fewer than 60
+frames a second does matter: the feel reads the music less often and misses some of its onsets, and at
+30 - which a battery saver can bring (Chrome's Energy Saver halves a page's frame rate) - about a third
+of them, so heavy music can read **in between** and grooving music **smooth**. On a laptop on battery,
+turning the battery saver off (or plugging in) brings it back. Only the Mandala's shapes follow the
+feel; every style follows the tempo. Before 2.0.0-player.34 it read nearly everything **in between**.
+
 **The colours aren't the cover's**: until the cover has loaded, and for an album with no cover, **From
 the cover** uses the purple. A black-and-white cover gives grey - that is its colour.
 

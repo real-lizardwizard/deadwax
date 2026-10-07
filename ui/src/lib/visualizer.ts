@@ -515,29 +515,79 @@ export function mandalaFlow(M: MandalaState, spec: ArrayLike<number>, beats: num
   M.twist += dt * rate * (0.02 + 0.035 * aggr)
 }
 
+/**
+ * The mirror counts the Mandala goes through, in this order, round and round - each to the next by a
+ * FOLD: twice or three times as many, or a half or a third as many (2.0.0-player.34). So a change of
+ * count is a new mirror swinging shut inside every wedge at once (or swinging open and away), and
+ * every wedge stays like every other the whole way: the counts the old list glided between (6 to 5,
+ * 7 to 10) can't be reached that way, and gliding between them left one wedge round the circle
+ * unlike the rest - a radial line shapes were born out of. Five, seven and ten went with them.
+ */
+export const MIRROR_COUNTS: readonly number[] = [8, 4, 12, 6, 3, 9, 3, 6, 12, 4]
+/** Beats each count lasts (its hold and its swing to the next), and the share of them it holds. */
+export const MIRROR_PHRASE = 16
+export const MIRROR_HOLD = 0.62
+
+/**
+ * The mirrors at the mirrors' clock `c` (beats): `count`, the count as it swings - a whole number
+ * while it holds, between two while a mirror swings - and `outer`, the whole count the swing happens
+ * inside: the lower of the two, which the higher is a multiple of. The swinging mirror's angle (pi /
+ * count) moves evenly from one count's to the other's, eased in and out.
+ */
+export function mirrors(c: number): { count: number; outer: number } {
+  const ph = c / MIRROR_PHRASE, k = Math.floor(ph), n = MIRROR_COUNTS.length
+  const a = MIRROR_COUNTS[((k % n) + n) % n]!, b = MIRROR_COUNTS[(((k + 1) % n) + n) % n]!
+  const u = smoothstep(MIRROR_HOLD, 1, ph - k)
+  const count = u <= 0 ? a : u >= 1 ? b : 1 / (1 / a + (1 / b - 1 / a) * u)
+  return { count, outer: Math.min(a, b) }
+}
+
+/**
+ * The Mandala's fold, as its shader does it (lib/vizShaders.ts MANDALA; ui/test/visualizer.sim.cjs
+ * holds the two to each other): the angle `a` folded into `outer` mirrored wedges, then each wedge
+ * folded again at the count as it swings. The second fold reads only the first one's answer, so the
+ * picture is mirrored about every one of the `outer` count's mirror lines at every moment, and is
+ * exactly the `count` fold whenever `count` is a whole multiple of `outer`.
+ */
+export function foldAngle(a: number, outer: number, count: number): number {
+  const tri = (x: number) => Math.abs((((x + 0.5) % 1) + 1) % 1 - 0.5)
+  const seg = (2 * Math.PI) / outer
+  const fa = seg * tri(a / seg)
+  const sub = (2 * Math.PI) / count
+  return sub * tri(fa / sub)
+}
+
 export interface MandalaFigure {
   fold: [number, number, number, number]
+  /** the whole count the mirrors' swing folds within (`mirrors`) */
+  outer: number
   inv: [number, number, number, number]
   src: [number, number, number, number]
   form: [number, number, number, number]
   formW: [number, number, number]
   lat: [number, number, number, number]
   rings: [number, number, number, number]
-  edge: [number, number, number, number]
+  edge: [number, number, number]
+  /** how much of the screen the figure fills, and the faint lattice beyond it, the echoes and the
+   *  band of cells - each there only some of the time, so only a few layers show at once */
+  room: [number, number, number, number]
 }
 
 /**
  * The Mandala's figure, from its clocks. Every number moves on its own slow curve, out of step with
- * the others, so the combinations keep coming out different: the mirror count and the polygon's
- * sides step through lists, holding each value and gliding to the next (the glide is the mirrors
- * swinging, or a square's corners bulging into a pentagon); the kind of figure (polygon, flower of
- * circles, lattice) and the kind of lattice cycle the same way; starriness and roundness rise only now
- * and then; the inversion spends most of its time off and turns the plane inside out for a stretch;
- * the twist winds and unwinds; the zoom flies in and out. The music's feel (A: 0 smooth .. 1
- * aggressive) leans every curve without replacing it: aggressive music brings stars and spikes, sharp
- * corners, triangles and few sides, triangle lattices, fast tight twists, more time turned inside out
- * and harder lines; smooth music brings roundness, circles and flowers of circles, many sides rounding
- * toward circles, hexagons, soft glow, wide gentle shapes and long slow twists, and hardly ever a star.
+ * the others, so the combinations keep coming out different: the mirror count steps round
+ * MIRROR_COUNTS, holding each and swinging a mirror to the next (`mirrors`), and the polygon's sides
+ * step through a list, holding each value and gliding to the next (a square's corners bulging into a
+ * pentagon); the kind of figure (polygon, flower of circles, lattice) and the kind of lattice cycle
+ * the same way; starriness and roundness rise only now and then; the inversion spends most of its time
+ * off and turns the plane inside out for a stretch; the twist winds and unwinds; the zoom flies in and
+ * out; and the faint lattice beyond the figure, the echoes of its lines and the band of cells each come
+ * and go (`room`), so only a few show at once. The music's feel (A: 0 smooth .. 1 aggressive) leans
+ * every curve without replacing it: aggressive music brings stars and spikes, sharp corners, triangles
+ * and few sides, triangle lattices, fast tight twists, more time turned inside out, harder lines and a
+ * tighter figure; smooth music brings roundness, circles and flowers of circles, many sides rounding
+ * toward circles, hexagons, soft glow, a wide figure of gentle shapes and long slow twists, and hardly
+ * ever a star.
  */
 export function mandalaMorph(M: MandalaState, aggr: number): MandalaFigure {
   const c = M.clock, m = M.shape
@@ -566,13 +616,15 @@ export function mandalaMorph(M: MandalaState, aggr: number): MandalaFigure {
   lk -= (S * 0.6 / k2) * sin(k2 * (lk - 2))
   const starNow = Math.pow(Math.max(0, sin(m * 0.041 + 1.0)), 6)
   const roundNow = Math.pow(Math.max(0, sin(m * 0.033 + 2.5)), 4)
+  const mirror = mirrors(c)
   return {
     fold: [
-      glide([6, 8, 5, 12, 7, 10, 4, 9], 16, c, 0.62),
+      mirror.count,
       M.spin,
       mix(1.0, 2.4, A) * sin(M.twist) * s(c, 0.013, 0.5),
       Math.exp(0.35 * sin(c * 0.045 + 0.3)),
     ],
+    outer: mirror.outer,
     inv: [
       smoothstep(mix(0.72, 0.6, A), mix(0.95, 0.86, A), s(c, 0.031, -1.2)),
       0.3,
@@ -586,7 +638,7 @@ export function mandalaMorph(M: MandalaState, aggr: number): MandalaFigure {
       Math.min(1, starNow * S * 0.28 + A * (0.4 + 0.6 * s(m, 0.057, 0.3))),
     ],
     form: [
-      mix(0.14, 0.05, A),
+      mix(0.08, 0.03, A),
       mix(0.35 + 0.65 * s(m, 0.033, 2.5), roundNow * 0.1, A),
       0.08 + 0.06 * s(m, 0.053, 2),
       (0.05 + 0.25 * s(c, 0.047, 4.4)) * mix(1.3, 0.8, A),
@@ -604,8 +656,16 @@ export function mandalaMorph(M: MandalaState, aggr: number): MandalaFigure {
       0.18 + 0.05 * s(m, 0.029, 3),
       0.03 * s(m, 0.051, 0.4),
     ],
-    //? the look of the lines: glow tail, width, colour fringe, and the trail's fringe
-    edge: [mix(0.45, 0.06, A), mix(1.3, 1.0, A), mix(0.005, 0.015, A), mix(0.0015, 0.0045, A)],
+    //? the look of the lines: glow tail, width, and the trail's colour fringe
+    edge: [mix(0.25, 0.12, A), mix(1.2, 1.5, A), mix(0.0008, 0.0025, A)],
+    //? the room round it: the figure's reach (wide for smooth music, tighter for aggressive), and the
+    //? faint lattice beyond it, the echoes and the band, each coming and going on its own slow curve
+    room: [
+      mix(0.43, 0.39, A),
+      smoothstep(0.62, 0.95, s(c, 0.031, 2.1)),
+      smoothstep(0.6, 0.95, s(m, 0.037, 0.9)),
+      smoothstep(0.66, 0.98, s(c, 0.027, 4.0)),
+    ],
   }
 }
 

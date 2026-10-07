@@ -2,22 +2,42 @@
  * The music's feel (2.0.0-player.20), for the desktop visualizer - a port of the musicFeel() block of
  * the canvas board DesktopVisualizer.dc.html, which was written "self-contained ... so the real player
  * can call it unchanged". PURE: no audio, no DOM - ui/test/musicfeel.sim.cjs drives it with the board's
- * own three synthetic songs and a click track.
+ * own three synthetic songs and a click track, and holds its tuning to readings taken from real music.
  *
- * It works only from what an AnalyserNode gives each frame (player/vizAudio.ts makes these from the
+ * It works only from what an AnalyserNode gives each frame (player/vizAudio.ts makes it from the
  * silent copy of the song it analyses): `spectrum` = 64 bands, 0-1, log-spaced from 30 Hz to 16 kHz
- * and compressed like getByteFrequencyData / 255; `waveform` = the time-domain samples, -1..1. Its
- * readings are slow on purpose, so the feel drifts as a song goes on instead of flickering:
+ * and scaled like getByteFrequencyData / 255 - so a band's value is its level in dB, -90 dB at 0 and
+ * -22 dB at 1. Its readings are slow on purpose, so the feel drifts as a song goes on instead of
+ * flickering:
  *
- *   aggr   0 smooth .. 1 aggressive, a blend of onsets per second (peaks in spectral flux),
- *          brightness (the spectral centroid, and the share of energy above about 2 kHz),
- *          noisiness (spectral flatness in the mids and highs - distorted guitars are noisy, pads
- *          are tonal) and transient sharpness (the waveform's crest factor), each followed over
- *          about 5 s
+ *   aggr   0 smooth .. 1 aggressive, a blend of three readings, each followed over about 5 s
+ *          (FEEL_SCORE): onsets per second (peaks in spectral flux, counted on a grid of 60 a second,
+ *          so a faster screen counts no more - a slower one sees fewer, below); the share of the sound
+ *          above about 2 kHz; and noisiness (spectral flatness in the mids and highs - distorted
+ *          guitars and cymbals are noisy, pads and pianos are tonal). The last two are read in a
+ *          window LEVEL_WINDOW deep below the loudest band, so how loud a record was mastered hardly
+ *          moves them (LEVEL_WINDOW says how far that holds)
  *   bpm    from autocorrelating an onset-strength envelope over the last 8 s, 60-200 bpm; conf says
  *          how sure it is, and while it is unsure the speeds keep a neutral pace
  *   tempo  a speed factor for the flowing styles (0.65-1.5)
  *   beats  beats per second for the Mandala's phrase clock, halved or doubled into 0.9-2.2
+ *
+ * TUNED ON REAL MUSIC (2.0.0-player.34; James: "the feel seems to always say 'in between'"). The
+ * board's weights and ranges were set on its three synthetic songs, and on real spectra 98% of the
+ * score sat between 0.03 and 0.76: heavy music read "aggressive" only 28% of the time. FEEL_SCORE's
+ * ranges now run from what calm music gives to what heavy music gives, measured through this same
+ * pipeline on real tracks (tests/fixtures/feel/real-tracks.json holds the numbers, and the sim holds
+ * the tuning to them). Gone with the retuning: the waveform's crest factor (a 28 ms, gain-controlled,
+ * limited waveform told calm from heavy not at all) and the spectral centroid (it said nothing the
+ * share above 2 kHz didn't). The tuning was measured at 60 frames a second; the onsets are counted on
+ * that grid at any frame rate above it, but below it the analyser is read less often and an onset
+ * between two reads is lost in their flux. At 30 (a battery saver can halve a page's frame rate:
+ * Chrome's Energy Saver does) about a third of the onsets go unseen on a typical real track, from a
+ * tenth to a half, and the word moves a long way: heavy music, 87% aggressive on average at 60, is 59%
+ * aggressive at 30 (Burn The World Waltz 99% to 26%, Metalmania 55% to none), between music drifts
+ * smooth (Happy Alley 89% in between to all smooth), calm music stays smooth. Not compensated - the
+ * variant tried (a late frame's whole flux tested in its first sample) brought heavy music back but read
+ * between music more aggressive than at 60 - and the guide says what 30 does.
  *
  * It holds everything during silence or a pause, so a stop never reads as "smooth". The visualizer
  * reads the feel to shape what it draws (James: metal pointy and aggressive, "Comfortably Numb" smooth
@@ -26,23 +46,39 @@
 
 /** How many bands the spectrum has. */
 export const BANDS = 64
+/** A band this close to the analyser's floor (2 dB of its 68) is nothing: brightness and noisiness never
+ *  count it, however quiet the music round it. */
+export const LIFT_FLOOR = 0.03
+/**
+ * How deep a window below the loudest band brightness and noisiness are read in, as a share of the
+ * analyser's 68 dB (0.7: about 48 dB): a band counts by how far it stands above the window's bottom,
+ * so a record mastered louder or quieter reads much the same - the bottom moves with the loudest band.
+ * Two places it can't: where the loudest band is quieter than about -40 dB (very quiet music, or a
+ * quiet passage of it) the bottom stops at LIFT_FLOOR, and the music reads a little smoother; and where
+ * a loud record's loudest bands pass the analyser's -22 dB top they read as -22, the window sits too
+ * low, and it reads a little more aggressive. Measured on 27 real tracks: 3 dB either way moves the
+ * middle of aggr 0.01 on average (0.04 at most); 6 dB either way 0.025 on average, 0.11 at most
+ * (Metalmania 6 dB louder, at the analyser's top - 0.09 at most 6 dB quieter). (Until review it was
+ * read against the analyser's floor itself, and how many high bands cleared the floor moved with the
+ * level: a calm record turned up 3 dB began to read as in between.)
+ */
+export const LEVEL_WINDOW = 0.7
+/** Seconds `aggr` follows its target over (the words under the style list drift, never flicker). */
+export const AGGR_FOLLOW_S = 2
 /** The onset-strength envelope: samples a second, and how many are kept (8 s). */
 export const ENVELOPE_RATE = 60
 export const ENVELOPE_LENGTH = 480
 
 export interface Feel {
-  /** last frame's spectrum, for the flux */
+  /** the spectrum at the last sample of the 60-a-second grid, for the flux */
   prev: Float32Array
   env: Float32Array
   envAt: number
   envT: number
-  envAcc: number
   acfBuf: Float32Array
   acf: Float32Array
   /** seconds until the tempo is looked for again */
   acfIn: number
-  rms: Float32Array
-  rmsAt: number
   onsets: number[]
   lastOnset: number
   above: boolean
@@ -50,11 +86,10 @@ export interface Feel {
   fDev: number
   /** seconds of music heard (silence doesn't count) */
   clock: number
+  /** onsets a second, the share of the sound above about 2 kHz, and noisiness - each followed over 5 s */
   density: number
-  centroid: number
   high: number
   flat: number
-  crest: number
   aggr: number
   bpm: number
   bpmRaw: number
@@ -67,10 +102,10 @@ export interface Feel {
 /** A feel before any music: in between, a neutral 110 bpm, unsure. */
 export function newFeel(): Feel {
   return {
-    prev: new Float32Array(BANDS), env: new Float32Array(ENVELOPE_LENGTH), envAt: 0, envT: 0, envAcc: 0,
+    prev: new Float32Array(BANDS), env: new Float32Array(ENVELOPE_LENGTH), envAt: 0, envT: 0,
     acfBuf: new Float32Array(ENVELOPE_LENGTH), acf: new Float32Array(128), acfIn: 0,
-    rms: new Float32Array(30), rmsAt: 0, onsets: [], lastOnset: -1, above: false, fMean: 0, fDev: 0.01,
-    clock: 0, density: 3, centroid: 0.4, high: 0.15, flat: 0.5, crest: 2,
+    onsets: [], lastOnset: -1, above: false, fMean: 0, fDev: 0.01,
+    clock: 0, density: 3, high: 0.15, flat: 0.5,
     aggr: 0.45, bpm: 110, bpmRaw: 110, conf: 0, confRaw: 0, beats: 1.83, tempo: 1,
   }
 }
@@ -81,84 +116,104 @@ export function smooth(a: number, b: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 
+/**
+ * How each reading counts toward `aggr`: [the value that counts nothing, the value that counts in
+ * full, its weight] - a smoothstep between the two. Measured through the page's own pipeline (the
+ * analyser emulated exactly, these bands, these readings) on 27 real tracks, the middle of each: calm
+ * ones give 2.7-4.9 onsets a second, a share above 2 kHz of 0.00-0.04 and a flatness of 0.02-0.23;
+ * music between calm and heavy - funk, surf, electronic - 2.8-6.3, 0.02-0.11 and 0.11-0.55; heavy
+ * music 3.5-6.1, 0.09-0.17 and 0.43-0.82. So flatness tells calm from the rest, the share above 2 kHz
+ * tells heavy from between, and onsets lean both. The ranges were searched on twenty of the tracks and
+ * their louder and quieter copies, held to stay wide (no range a threshold in disguise), then rounded;
+ * five tracks were kept out and read as tests/fixtures/feel/real-tracks.json says, beside every other
+ * track's numbers.
+ */
+export const FEEL_SCORE: Readonly<Record<'density' | 'high' | 'flat', readonly [number, number, number]>> = {
+  density: [2.9, 5.5, 0.31],
+  high: [0.025, 0.17, 0.5],
+  flat: [0.025, 0.23, 0.19],
+}
+
+/** `aggr`'s target from the readings as they stand (FEEL_SCORE), 0..1. */
+export function feelScore(F: Pick<Feel, 'density' | 'high' | 'flat'>): number {
+  let score = 0, weights = 0
+  for (const [key, [from, to, weight]] of Object.entries(FEEL_SCORE) as [keyof typeof FEEL_SCORE, readonly [number, number, number]][]) {
+    score += weight * smooth(from, to, F[key])
+    weights += weight
+  }
+  return score / weights
+}
+
 /** One frame of the music, `dt` seconds after the last: the feel, moved on (in place) and returned. */
-export function musicFeel(F: Feel, spectrum: ArrayLike<number>, waveform: ArrayLike<number>, dt: number): Feel {
-  let sum = 0, sum2 = 0, cen = 0, hi2 = 0, flux = 0
+export function musicFeel(F: Feel, spectrum: ArrayLike<number>, dt: number): Feel {
+  let sum = 0, top = 0
   for (let i = 0; i < BANDS; i++) {
     const s = spectrum[i] ?? 0
     sum += s
-    sum2 += s * s
-    cen += i * s
-    if (i >= 43) hi2 += s * s
-    flux += Math.max(0, s - F.prev[i]!)
-    F.prev[i] = s
+    top = Math.max(top, s)
   }
-  //? silence, or a pause: hold everything
-  if (sum / BANDS < 0.03) return F
+  //? silence, or a pause: hold everything (the spectrum kept, so what follows is measured against it)
+  if (sum / BANDS < 0.03) {
+    for (let i = 0; i < BANDS; i++) F.prev[i] = spectrum[i] ?? 0
+    return F
+  }
   F.clock += dt
-  //? the onset-strength envelope, 60 samples a second, the last 8 s kept
-  F.envAcc += flux
+  //? the flux - how much the spectrum rose - and the onsets, on a grid of 60 samples a second whatever
+  //? the screen's frame rate: a 120 Hz screen reads the analyser twice as often, and counting onsets per
+  //? frame counted twice as many (a calm track read in between); here a frame between two samples only
+  //? waits, and one late by n samples spreads its flux over the n
   F.envT += dt
   if (F.envT >= 1 / ENVELOPE_RATE) {
     const n = Math.floor(F.envT * ENVELOPE_RATE)
+    let flux = 0
+    for (let i = 0; i < BANDS; i++) {
+      const s = spectrum[i] ?? 0
+      flux += Math.max(0, s - F.prev[i]!)
+      F.prev[i] = s
+    }
+    flux /= n
+    //? onsets: the flux rising through a threshold that follows the music's own level
+    const a1 = 1 - Math.exp(-1 / ENVELOPE_RATE / 1.0)
     for (let k = 0; k < n; k++) {
-      F.env[F.envAt] = F.envAcc / n
+      //? the onset-strength envelope, the last 8 s kept, for the tempo
+      F.env[F.envAt] = flux
       F.envAt = (F.envAt + 1) % F.env.length
+      const on = flux > F.fMean + 1.5 * F.fDev + 0.02
+      if (on && !F.above && F.clock - F.lastOnset > 0.06) {
+        F.onsets.push(F.clock)
+        F.lastOnset = F.clock
+      }
+      F.above = on
+      F.fMean += (flux - F.fMean) * a1
+      F.fDev += (Math.abs(flux - F.fMean) - F.fDev) * a1
     }
     F.envT -= n / ENVELOPE_RATE
-    F.envAcc = 0
   }
-  //? onsets: the flux rising through a threshold that follows the music's own level
-  const a1 = 1 - Math.exp(-dt / 1.0)
-  const on = flux > F.fMean + 1.5 * F.fDev + 0.02
-  if (on && !F.above && F.clock - F.lastOnset > 0.06) {
-    F.onsets.push(F.clock)
-    F.lastOnset = F.clock
-  }
-  F.above = on
-  F.fMean += (flux - F.fMean) * a1
-  F.fDev += (Math.abs(flux - F.fMean) - F.fDev) * a1
   while (F.onsets.length && F.onsets[0]! < F.clock - 4) F.onsets.shift()
   const density = F.onsets.length / Math.min(4, Math.max(1, F.clock))
-  //? brightness, noisiness and transients
-  const centroid = cen / sum / 63
-  const high = hi2 / Math.max(sum2, 1e-6)
-  let lg = 0, ar = 0
-  for (let i = 20; i < BANDS; i++) {
-    const s = spectrum[i] ?? 0
-    const p = s * s + 1e-4
-    lg += Math.log(p)
-    ar += p
+  //? brightness and noisiness, read in a window LEVEL_WINDOW deep below the loudest band: each band by how
+  //? far it stands above the window's bottom, so the loudest band - however loud the record - sets where
+  //? the window is; the bottom never goes below the analyser's floor (LIFT_FLOOR), where there is nothing
+  const bottom = Math.max(top - LEVEL_WINDOW, LIFT_FLOOR)
+  let all2 = 0, hi2 = 0, lg = 0, ar = 0
+  for (let i = 0; i < BANDS; i++) {
+    const v = Math.max(0, (spectrum[i] ?? 0) - bottom) / LEVEL_WINDOW
+    all2 += v * v
+    if (i >= 43) hi2 += v * v
+    if (i >= 20) {
+      const p = v * v + 1e-4
+      lg += Math.log(p)
+      ar += p
+    }
   }
+  const high = hi2 / Math.max(all2, 1e-6)
   const flat = Math.exp(lg / 44) / (ar / 44)
-  let pk = 0, ms = 0
-  const samples = waveform.length || 1
-  for (let j = 0; j < waveform.length; j++) {
-    const v = waveform[j]!
-    pk = Math.max(pk, Math.abs(v))
-    ms += v * v
-  }
-  const rms = Math.sqrt(ms / samples)
-  F.rms[F.rmsAt] = rms
-  F.rmsAt = (F.rmsAt + 1) % F.rms.length
-  let rMax = 0, rSum = 0
-  for (let k = 0; k < F.rms.length; k++) {
-    rMax = Math.max(rMax, F.rms[k]!)
-    rSum += F.rms[k]!
-  }
-  const crest = 0.5 * pk / Math.max(rms, 1e-4) + 0.5 * rMax / Math.max(rSum / F.rms.length, 1e-4)
   const a5 = 1 - Math.exp(-dt / 5)
   F.density += (density - F.density) * a5
-  F.centroid += (centroid - F.centroid) * a5
   F.high += (high - F.high) * a5
   F.flat += (flat - F.flat) * a5
-  F.crest += (crest - F.crest) * a5
-  const score = 0.3 * smooth(1.5, 8, F.density)
-    + 0.15 * smooth(0.3, 0.55, F.centroid)
-    + 0.15 * smooth(0.06, 0.3, F.high)
-    + 0.25 * smooth(0.3, 0.75, F.flat)
-    + 0.15 * smooth(1.6, 2.6, F.crest)
-  F.aggr += (score - F.aggr) * (1 - Math.exp(-dt / 2))
+  const score = feelScore(F)
+  F.aggr += (score - F.aggr) * (1 - Math.exp(-dt / AGGR_FOLLOW_S))
   //? the tempo, looked for four times a second
   F.acfIn -= dt
   if (F.acfIn <= 0 && F.clock > 3) {

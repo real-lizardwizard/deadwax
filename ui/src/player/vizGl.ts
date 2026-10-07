@@ -62,7 +62,7 @@ interface Slot {
 }
 
 const UNIFORMS = ['uRes', 'uTime', 'uBass', 'uKick', 'uPrev', 'uSpec', 'uHist', 'uWave', 'uPal', 'uA', 'uB', 'uMix',
-  'uCore', 'uBody', 'uBody2', 'uRing', 'uFlare', 'uFold', 'uInv', 'uSrc', 'uForm', 'uLat', 'uRingsQ', 'uFormW', 'uEdge',
+  'uCore', 'uBody', 'uBody2', 'uRing', 'uFlare', 'uFold', 'uOuter', 'uInv', 'uSrc', 'uForm', 'uLat', 'uRingsQ', 'uFormW', 'uEdge', 'uRoom',
   'uHead', 'uPhase', 'uHeading', 'uRoll', 'uCamH', 'uHorizon', 'uYaw', 'uVanish', 'uFlow', 'uFlow2', 'uFlowStep', 'uSurge',
   'uWarp', 'uDrift', 'uFade', 'uLook', 'uRingP', 'uLineW', 'uLineAng', 'uLineP', 'uBarsP', 'uCoreP', 'uHueA', 'uHueB', 'uHueC']
 
@@ -412,13 +412,15 @@ export class GlAmbient {
       gl.uniform3fv(u['uRing']!, roles.ring)
       gl.uniform3fv(u['uFlare']!, roles.flare)
       gl.uniform4fv(u['uFold']!, M.fold)
+      gl.uniform1f(u['uOuter']!, M.outer)
       gl.uniform4fv(u['uInv']!, M.inv)
       gl.uniform4fv(u['uSrc']!, M.src)
       gl.uniform4fv(u['uForm']!, M.form)
       gl.uniform4fv(u['uLat']!, M.lat)
       gl.uniform4fv(u['uRingsQ']!, M.rings)
       gl.uniform3fv(u['uFormW']!, M.formW)
-      gl.uniform4fv(u['uEdge']!, M.edge)
+      gl.uniform3fv(u['uEdge']!, M.edge)
+      gl.uniform4fv(u['uRoom']!, M.room)
     } else if (style === 'waves') {
       const C = this.cam!
       gl.uniform1f(u['uHead']!, this.histHead)

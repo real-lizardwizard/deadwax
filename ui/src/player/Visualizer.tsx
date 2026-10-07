@@ -99,8 +99,8 @@ export function Visualizer({ open, player, opener, onClose }: {
  *  - THE SOUND IT SEES is a silent copy of the song (player/vizAudio.ts) - never the player's own
  *    element. A song that can't be seen (not a FLAC; its window couldn't be had) runs the effects from
  *    a calm idle signal, and one plain line says so.
- *  - THE FEEL: lib/musicFeel.ts reads the copy's spectrum and waveform; the shapes follow the feel,
- *    the speeds the tempo. Silence and the idle signal hold it.
+ *  - THE FEEL: lib/musicFeel.ts reads the copy's spectrum; the Mandala's shapes follow the feel, every
+ *    style's speed the tempo. Silence and the idle signal hold it.
  *  - THE CONTROLS - the song, the effect, the colours, the style, play/pause and Leave full screen -
  *    fade after CHROME_IDLE_MS without the pointer moving while the music plays (never while paused,
  *    pointed at, or with the style list open), and come back on a move, a press or a key - a tap on a
@@ -423,7 +423,7 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
     }
     shapeSignal(L.shaped, L.raw, dt, L.calm)
     //? only the song itself is felt: silence holds the feel by itself, and the idle signal must too
-    if (heard) musicFeel(L.feel, L.raw, L.wave, dt)
+    if (heard) musicFeel(L.feel, L.raw, dt)
     if (L.count % 30 === 0) {
       const words = feelWords(L.feel)
       setFeelText((before) => (before === words ? before : words))
