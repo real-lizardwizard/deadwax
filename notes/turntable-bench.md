@@ -450,3 +450,9 @@ masters (Club Diver, Cool Rock, Devastation and Revenge), as it is and with each
   he does, the next thing to measure is the live host - his saved recording from the bench has A as it was
   played, against which the replay shows any block the page dropped or played late.
 - The guide's B now says B has neither the low filter nor the limiter, and what the matching counts.
+- **James, with the levels matched (2026-10-08): "well I can't seem to tell the difference"** - A and B
+  on "Eye in the Sky". So his earlier preference for B was the bench's level offset, and deadwax's voice
+  reads the song as well as the ideal one along the same movement, by ear as by the measurements. The
+  kernel-cutoff question (above) has no evidence behind it at 48 kHz; what is left to tell apart is A
+  against C (the movement itself) and whether the "digital" sound is in all three (the song slowed and
+  sped up, as any turntable would play it).
