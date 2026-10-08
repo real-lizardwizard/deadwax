@@ -785,7 +785,9 @@ fits there, or 20 seconds in; a file too short for one says how long it needs.
 starting the sound first, if it hasn't started; **Record the next motion** records the next of **Turn
 it for me**. The song can't be changed while it records, and a recording the page was hidden through
 (the screen locked, another app or tab) is thrown away - the record's sound stops with the page. A
-moment later you get three versions of the same movement, level-matched:
+moment later you get three versions of the same movement, level-matched on what you can hear (above
+20 Hz: B and C keep the rumble below that which deadwax's own sound filters out, and counting it would
+play them quieter than A):
 
 - **A - deadwax**: what the record's sound played.
 - **B - ideal, deadwax's path**: the song read perfectly from its definition along exactly the path
@@ -794,7 +796,10 @@ moment later you get three versions of the same movement, level-matched:
   sooner, so a square wave played fast loses its top harmonics in B, as it has to in A. Pink noise, the aliased
   square, your own file and a song from your library, which are samples rather than a formula, are
   read between their samples by a long, near-perfect interpolator - far cleaner than deadwax's, but a
-  filter all the same. What is in A and not in B is how deadwax reads the song.
+  filter all the same. B also has neither of the two things deadwax's sound does after reading the song:
+  the filter that takes out everything under 10 Hz or so (so B keeps a slowed record's deepest rumble, and
+  the offset of a record held still - nothing you can hear) and the limiter that keeps the loudest peaks
+  under full scale. What is in A and not in B is how deadwax reads the song, and those two.
 - **C - ideal, smooth path**: the song read the same perfect way along a smooth path through your
   movement (for a motion, the motion's own exact path), with no limits a live sound has. It never jumps: where your
   hand lets go, rests or sets off again, or misses a few samples, the path carries straight on, its

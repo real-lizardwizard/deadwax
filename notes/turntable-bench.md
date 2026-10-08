@@ -411,3 +411,42 @@ scrub, all on the fixed list already. The guide's section is `docs/player.md#tes
   an MP4 for the stream, the windows decoded by WebKit); a non-FLAC song in a real page (the stand-in's are all
   FLAC; the deck's own refusal is deck.sim's); the iPhone's memory on a long fling.
 
+
+### Matched on what can be heard (2.0.0-player.38)
+
+James, after trying "Eye in the Sky" on the bench: "I think I do like b better, though". A and B follow one
+path sample for sample (B is A's messages replayed through the real voice, read exactly), so a preference
+for B is about how the song is READ - deadwax's 12-zero Kaiser-7 kernel with its cutoff at the window's
+Nyquist frequency, its 10 Hz DC blocker, its limiter, or whatever the live host did that the replay doesn't.
+Before changing the voice, each was measured on its own: his two recordings from the app (`rec1.json`,
+`rec2.json` in the scratchpad's `ttmeasure/james/`) replayed through the real voice over three stand-in
+masters (Club Diver, Cool Rock, Devastation and Revenge), as it is and with each part swapped for B's - the
+48-zero Kaiser-9 kernel, no DC blocker, no limiter (`work/b38/`: `run.sh`, `judge.py`, `level.py`,
+`match.py`, `kresp.py`).
+
+- **The kernel's difference from B's is far under the music**: 38 to 101 dB under it along the path (47 on
+  Club Diver along rec2, 75-101 on the two whose MP3 masters stop at 16-19 kHz), and under a masking
+  estimate (critical bands, Schroeder spreading, a 10 dB offset, the threshold of hearing at 92 dB SPL for
+  full scale) in every frame but 0.1% of rec1's. His recordings' windows were decoded at 48 kHz, where the
+  band from 22.05 to 24 kHz of a CD song is empty, so the kernel's images come only from 20-22 kHz content:
+  through it, a 48 kHz window's 22 kHz images at -18.7 dB, 21 kHz -30, 20 kHz -50, 18 kHz -73 (24 zeros,
+  beta 8: -42, -94, -84, -97; 48 zeros, beta 9: -95 or lower). Content that high in a master is usually 50-70
+  dB under its body. A context at 44.1 kHz would image the top octave far more (20 kHz at about -20 dB):
+  still open, James's call ("moving the voice's kernel cutoff a little under the window's Nyquist frequency").
+- **The DC blocker is the largest difference, and it is in what can't be heard**: below 10 Hz B carries a
+  quarter of all its energy on Club Diver along rec2 (-5.7 dB of the total) (a slowed record's deepest bass, a record held still), and A
+  has 1.9 dB less at 10-20 Hz when slowed, 0.3-0.6 dB less at 20-50 Hz, under 0.15 dB from 50 Hz up.
+- **The limiter changed nothing** on these masters along these paths.
+- **The bench's own level matching was the audible difference.** B and C were matched to A by plain RMS
+  where the voice sounded, and that RMS counted B's sub-20 Hz energy, so B and C played QUIETER than A in
+  everything that can be heard: 1.10 dB on Club Diver and 1.16 dB on Cool Rock along rec2, 0.31 dB on
+  Devastation and Revenge; 0.22 and 0.12 dB along rec1. A dB is enough to tip a preference, and to give the
+  ABX away. Fixed: `audibleRmsWhere()` (analysis.ts) high-passes at `MATCH_FROM_HZ` (20 Hz, 4th order)
+  before the RMS, and compare.ts matches on it. lab.sim's new check reads an ideal turntable with an offset A
+  can't have (the voice's DC blocker takes it out): its tone within 0.02 dB of A's, where plain RMS played it
+  9.6 dB quieter - the mutation back to plain RMS fails it.
+- **So**: the replay says A and B differ audibly by little or nothing but the bench's own level offset.
+  Whether James still hears B as better once the levels are matched, and blind (the ABX), is his to say; if
+  he does, the next thing to measure is the live host - his saved recording from the bench has A as it was
+  played, against which the replay shows any block the page dropped or played late.
+- The guide's B now says B has neither the low filter nor the limiter, and what the matching counts.

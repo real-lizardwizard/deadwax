@@ -999,6 +999,20 @@ export function alignment(recorded: Float32Array, replayed: Float32Array, guess:
   return { lag: best, score: norm > 0 ? bestValue / norm : 0 }
 }
 
+/** Where A, B and C are level-matched from: this many Hz up (2.0.0-player.38). */
+export const MATCH_FROM_HZ = 20
+
+/**
+ * The RMS of `data` over the samples `where` says, counting only what can be heard: high-passed at
+ * MATCH_FROM_HZ first (4th order). The voice's DC blocker takes out what the ideal turntables keep below
+ * 20 Hz - a slowed record's deepest bass, the offset of a record held still - and matched on plain RMS that
+ * inaudible energy turned B and C down by up to 1.4 dB in everything that could be heard (2.0.0-player.38).
+ */
+export function audibleRmsWhere(data: ArrayLike<number>, rate: number, where: (i: number) => boolean): number {
+  const f = highPass(MATCH_FROM_HZ, rate)
+  return rmsWhere(filter(filter(Float64Array.from(data), f), f), where)
+}
+
 /** The RMS of `data` over the samples `where` says. */
 export function rmsWhere(data: ArrayLike<number>, where: (i: number) => boolean): number {
   let sum = 0, count = 0

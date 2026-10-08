@@ -13,7 +13,7 @@
  */
 
 import {
-  alignment, lowerBound, pathFrom, planTiming, readExactly, replay, rmsWhere, speedWobble, spectrograms, stray,
+  alignment, audibleRmsWhere, lowerBound, pathFrom, planTiming, readExactly, replay, rmsWhere, speedWobble, spectrograms, stray,
   type ExactMotion, type RecordedMessage, type SpectrogramImage, type Stray, type VoiceWindowIn,
 } from './analysis'
 import type { VoiceHeard } from '../lib/deckVoice'
@@ -228,12 +228,13 @@ export async function compare(input: CompareInput): Promise<Comparison> {
   const C = exact ? readExactly(exact, xC, vC, gainC, rate, L) : null
   await pause()
 
-  //? level-matched to A where the voice sounded
+  //? level-matched to A where the voice sounded, on what can be heard (above MATCH_FROM_HZ: B and C keep
+  //? the sub-20 Hz energy the voice's DC blocker takes out, and matched on it they played quieter)
   const sounding = (i: number) => i >= aFrom && i < aTo && i >= L && played.gain[i - L]! > 0.5
-  const rmsA = rmsWhere(A, sounding)
+  const rmsA = audibleRmsWhere(A, rate, sounding)
   for (const clip of [B, C]) {
     if (!clip) continue
-    const rms = rmsWhere(clip, sounding)
+    const rms = audibleRmsWhere(clip, rate, sounding)
     if (rmsA > 1e-7 && rms > 1e-9) {
       const scale = rmsA / rms
       for (let i = 0; i < n; i++) clip[i] = clip[i]! * scale

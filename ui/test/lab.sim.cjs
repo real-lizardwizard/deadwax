@@ -1103,6 +1103,26 @@ async function main() {
       const quieter = await run.compareWith((t, cutoff) => 0.5 * run.exact(t, cutoff), false)
       const level = (clip) => 20 * Math.log10(analysis.rmsWhere(clip, () => true) / analysis.rmsWhere(quieter.clips.A, () => true))
       check(`${host}: B and C level-matched to A however loud the definition reads them (within 0.5 dB, read 6 dB quiet)`, [Math.abs(level(quieter.clips.B)) < 0.5, Math.abs(level(quieter.clips.C)) < 0.5], [true, true])
+      //? an ideal turntable carrying what can't be heard and the voice's DC blocker takes out (an offset,
+      //? as a record held still reads): matched on what CAN be heard, so its tone is at A's level - matched
+      //? on plain RMS it played about 9 dB quieter here (2.0.0-player.38: up to 1.4 dB on music)
+      const offset = await run.compareWith((t, cutoff) => run.exact(t, cutoff) + 0.5, false)
+      //? the tone alone: high-passed at 200 Hz (one pole, twice), which leaves nothing of the offset but its
+      //? edges' millisecond
+      const tone = (clip) => {
+        const a = Math.exp((-2 * Math.PI * 200) / run.rate)
+        let x = Float64Array.from(clip)
+        for (let pass = 0; pass < 2; pass++) {
+          const y = new Float64Array(x.length)
+          for (let i = 1; i < x.length; i++) y[i] = a * (y[i - 1] + x[i] - x[i - 1])
+          x = y
+        }
+        return analysis.rmsWhere(x, () => true)
+      }
+      const heard = (clip) => 20 * Math.log10(tone(clip) / tone(offset.clips.A))
+      console.log(`    (${host}: with an offset A can't have, B's tone ${round(heard(offset.clips.B), 2)} dB and C's ${round(heard(offset.clips.C), 2)} dB from A's)`)
+      check(`${host}: B and C level-matched to A on what can be heard - an offset the voice's DC blocker takes out doesn't turn their tone down (within 0.5 dB)`,
+        [Math.abs(heard(offset.clips.B)) < 0.5, Math.abs(heard(offset.clips.C)) < 0.5], [true, true])
     }
   }
 
