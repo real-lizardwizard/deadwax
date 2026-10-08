@@ -750,12 +750,32 @@ minutes long, 12 dB under full scale unless it says otherwise:
   way, its aliases in the song itself - so it sounds harsh and out of tune with itself, and turned
   faster or slower they move with the speed, like everything else in it.
 - **Your own file** - any file the browser can play, its first two minutes.
+- **A song from your library** - a song from Navidrome, the whole of it, played exactly as the app
+  plays it: see below.
+
+**A song from your library** (2.0.0-player.37) puts music you know on the bench. Choose it, and a
+search box appears: type a song, an artist or an album - `eye in the sky`, say, for The Alan Parsons
+Project's "Eye in the Sky" - and tap the song among what Navidrome finds. Each shows its artist and
+album, its length and its format as Info shows it ("FLAC, 16-bit, 44.1 kHz, stereo"). That song is
+then the bench's song, the whole of it, its length as Navidrome has it, and the record's label is its
+album's cover where Navidrome has one. It plays exactly as the app plays it - its own stream, asked for as the app asks for it
+(inside an MP4 in Safari and on an iPhone, resampled under **Up to 48 kHz** for a hi-res song, as
+Navidrome's MP3 for a file the browser can't play), and the record's sound comes from deadwax's own
+windows of it - the same path the app's turntable takes, so what you hear on the bench is what you
+hear in the app. Changing between a song from your library and the bench's own signals starts the
+record's sound afresh, so press **Play** or **Start the sound** after it (the bench says so). The last
+song you picked is offered again the next time the page opens on this device - **Use it again** - as
+long as Navidrome still has it; one it no longer has is forgotten. A song that isn't a FLAC plays, and
+its record is silent, as in the app, and the bench says why ("it isn't a FLAC file"); a song that
+won't load says so. If Navidrome isn't set up or isn't answering, the bench says so in one line, and
+its own signals still work. The song can't be changed while anything records, a motion runs or the
+check runs - the search is faded then.
 
 **Turn it for me** turns the record for you, through the very steps a finger's turn goes through, 60
 times a second, with none of a hand's unevenness: **Steady 1x**, **0.5x**, **0.25x**, **2x**,
 **Backwards 1x**, **1x with a slow wobble** (10% either way, 1.3 times a second, like a hand
 drifting), **A slow ramp** (0.25x up to 2x and back over 8 s) and **A scratch** (back and forth,
-twice a second). Tick **With a finger's jitter** to add a real finger's unevenness. While one runs -
+twice a second). They work on a song from your library too. Tick **With a finger's jitter** to add a real finger's unevenness. While one runs -
 from the tap, while it gets the record ready too - the record can't be grabbed and **Play** is faded
 and does nothing (the song and the record's sound would play together); **Stop the motion** stops it once it
 turns. A motion starts where the record is, if it
@@ -772,9 +792,9 @@ moment later you get three versions of the same movement, level-matched:
   deadwax's own sound followed, keeping only what a perfect turntable could send out at that speed:
   nothing at or past half the sound's sample rate - a perfect cut-off, which a sped-up record reaches
   sooner, so a square wave played fast loses its top harmonics in B, as it has to in A. Pink noise, the aliased
-  square and your own file, which are samples rather than a formula, are read between their samples
-  by a long, near-perfect interpolator - far cleaner than deadwax's, but a filter all the same. What
-  is in A and not in B is how deadwax reads the song.
+  square, your own file and a song from your library, which are samples rather than a formula, are
+  read between their samples by a long, near-perfect interpolator - far cleaner than deadwax's, but a
+  filter all the same. What is in A and not in B is how deadwax reads the song.
 - **C - ideal, smooth path**: the song read the same perfect way along a smooth path through your
   movement (for a motion, the motion's own exact path), with no limits a live sound has. It never jumps: where your
   hand lets go, rests or sets off again, or misses a few samples, the path carries straight on, its
@@ -820,6 +840,20 @@ under it says why:
 speeds sounds like - nothing to fix. If C is clean and A isn't, deadwax adds it, and the numbers say
 which part: A against B is how the sound reads the song, B against C the path it follows.
 
+**On a song from your library**, B and C read the song itself: once the recording is done, the bench
+asks deadwax again for the windows of the song that cover where the record went - cut from the same
+copy the record's sound plays from - and reads them the near-perfect way (the record's own windows,
+which the replay needs, usually come straight from the browser's cache). Never the whole song: only
+those windows, at most four of them (about 160 seconds of a CD-quality song, 52 of a hi-res one played
+as it is - more than ten seconds of ordinary turning goes over). Past that, or if deadwax doesn't send a
+window, there is no B or C that time - A plays alone, with no blind test - and the comparison says
+why; the numbers that need only the paths - how far the read head strayed, the speed's wobble, the
+replay - are still there. **What isn't the signal** isn't measured on music: music
+has something at nearly every pitch, so there is nowhere for it to show. Listen instead: if A and C
+sound alike, the "digital" sound you hear when scrubbing that song is what scrubbing it at those speeds
+sounds like; if C is clean and A isn't, deadwax adds it - and since the record's sound on the bench is
+the app's own path, the same is true in the app.
+
 **Blind**: to check your ears without knowing which is which, choose two of A, B and C and **Start the
 blind test**: each trial plays the two and an X that is one of them at random, and you say which. At
 the end it says how many you got and how likely that score is by guessing - under 5% means you can
@@ -830,7 +864,9 @@ slow wobble, recording each (about a minute and a half), and lists for each whic
 far its clock moves at a time, how many of its blocks were late (on the main thread - on its own audio
 thread it says **None (an AudioWorklet)**, which counts none), how many of the page's frames came late
 while it turned (the page held up), the speed's wobble and the sound that isn't the signal - or
-**Record it again** in their place, with why, on a run whose replay didn't hold. **Play** is faded
+**Record it again** in their place, with why, on a run whose replay didn't hold - it needs a tone, so
+it always runs on the bench's own sines: with a song from your library chosen, it changes the song to
+them and asks you to tap **Carry on** to start the record's sound. **Play** is faded
 and does nothing while it runs. **Keep
 the page in view and the screen awake while it runs** (on an iPhone, Auto-Lock locks it after 30
 seconds or a minute untouched): a hidden page stops the record's sound, so a run the page was hidden

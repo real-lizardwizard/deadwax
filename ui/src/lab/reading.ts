@@ -14,6 +14,10 @@ import { replayVerdict, type Numbers } from './compare'
 export const STARTING = 'Starting the sound - turn the record, or have it turned for you, once it says Ready'
 export const READY = 'Ready - turn the record, or have it turned for you'
 export const SOUND_STOPPED = 'The sound stopped while the page was hidden - press Start the sound, or Play'
+/** ...and as a song from the library takes the place of the bench's own (or the other way): the app's path
+ *  is a turntable of its own - no window source - so its deck is made afresh, and only a tap starts its
+ *  sound (2.0.0-player.37). */
+export const SOUND_AGAIN = "The record's sound starts again for this song - press Play, or Start the sound"
 
 /**
  * The transport's line as the record's sound changes, from `was` to `now`: Ready once it runs, after it
@@ -21,7 +25,7 @@ export const SOUND_STOPPED = 'The sound stopped while the page was hidden - pres
  * back); said to have stopped when a hidden page stopped it; anything else left as it is.
  */
 export function transportLine(line: string, was: DeckReport['context'] | null, now: DeckReport['context'] | null, hidden: boolean): string {
-  if (now === 'running' && was !== 'running') return line === STARTING || line === SOUND_STOPPED ? READY : line
+  if (now === 'running' && was !== 'running') return line === STARTING || line === SOUND_STOPPED || line === SOUND_AGAIN ? READY : line
   if (was === 'running' && now !== 'running' && hidden) return SOUND_STOPPED
   return line
 }
@@ -51,9 +55,21 @@ export function replayRow(numbers: Numbers): DebugRow {
   }
 }
 
+/**
+ * What music has in place of "what isn't the signal" (2.0.0-player.37): on a tone, the sound in A away from
+ * the ideal reading's own frequencies is what deadwax added; music has something at nearly every frequency,
+ * so there is nowhere for it to show - and a number there would mislead.
+ */
+export const NOT_ON_MUSIC: DebugRow = {
+  label: "What isn't the signal",
+  value: 'Not measured on music',
+  note: "On a tone, the sound in A away from the ideal reading's own frequencies is what deadwax added. Music has something at nearly every frequency, so there is nowhere for that to show: listen to A against C, and read the speed's wobble and the read head's distance from the smooth path.",
+}
+
 /** The numbers, each with what it says - none of them, where the replay couldn't be held to the
- *  recording: they would be a stall's, or of nothing. */
-export function numberRows(numbers: Numbers): DebugRow[] {
+ *  recording: they would be a stall's, or of nothing. `music` (a library song or a picked file) says why
+ *  there is no "what isn't the signal". */
+export function numberRows(numbers: Numbers, music = false): DebugRow[] {
   const again = againLine(numbers)
   if (again) return [{ label: 'Record it again', value: again }, replayRow(numbers)]
   const rows: DebugRow[] = []
@@ -73,7 +89,7 @@ export function numberRows(numbers: Numbers): DebugRow[] {
       value: `${dbText(numbers.stray.db)}${numbers.stray.loudest ? `, the loudest at ${Math.round(numbers.stray.loudest.hz)} Hz, ${dbText(numbers.stray.loudest.db)}` : ''}`,
       note: 'The sound in A away from what the ideal reading has, against the sound at it - by frame, so a slow timing drift counts for nothing. Lower is cleaner: under -60 dB is hard to hear on a tone.',
     })
-  }
+  } else if (music) rows.push(NOT_ON_MUSIC)
   if (numbers.silenceDb !== null) {
     rows.push({ label: 'Silence, as played', value: `${dbText(numbers.silenceDb)} RMS`, note: 'Anything here is the voice\'s own.' })
   }

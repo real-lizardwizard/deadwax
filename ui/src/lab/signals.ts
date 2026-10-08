@@ -32,7 +32,7 @@ import { ApiError } from '../api/http'
 /** Every signal the bench offers. */
 export type SignalId =
   | 'sine440' | 'sine1k' | 'sine100' | 'sine5k' | 'fifth' | 'square' | 'saw' | 'triangle' | 'chord'
-  | 'bursts' | 'clicks' | 'sweep' | 'pink' | 'silence' | 'sineFull' | 'squareAliased' | 'file'
+  | 'bursts' | 'clicks' | 'sweep' | 'pink' | 'silence' | 'sineFull' | 'squareAliased' | 'file' | 'library'
 
 /** The source rates a song can be made at. */
 export const SOURCE_RATES = [44100, 48000, 96000] as const
@@ -80,6 +80,10 @@ export const SIGNALS: readonly SignalInfo[] = [
     shows: 'Reference only: a naive square, the way a cheap generator makes it - its aliases are in the song itself, so it sounds harsh and out of tune with itself, and they move with the speed like everything else in it.',
   },
   { id: 'file', name: 'Your own file', shows: 'A file picked on this device (anything the browser decodes): its first 2 minutes.' },
+  {
+    id: 'library', name: 'A song from your library',
+    shows: 'A song from Navidrome, the whole of it, played and turned exactly as the app does: its own stream, and the record\'s sound from deadwax\'s windows of it.',
+  },
 ]
 
 export interface Partial {
@@ -268,7 +272,7 @@ export function seeded(seed: number): () => number {
 
 /** The windowed sinc the ideal reader reads samples through: SINC_ZEROS zero crossings either side,
  *  under a Kaiser window (beta 9: about 90 dB down), tabled SINC_STEPS a crossing and read between. */
-const SINC_ZEROS = 48
+export const SINC_ZEROS = 48
 const SINC_STEPS = 2048
 const SINC_BETA = 9
 let sincTable: Float64Array | null = null
@@ -287,14 +291,16 @@ function sincKernel(): Float64Array {
 }
 
 /** The signal held in `samples` (at `rate`) at song time t, band-limited to `cutoff` Hz: a long windowed
- *  sinc, stretched (its cutoff lowered) where the cutoff is under the samples' own Nyquist frequency. */
-export function sampledReader(samples: Float32Array, rate: number): (t: number, cutoff: number) => number {
+ *  sinc, stretched (its cutoff lowered) where the cutoff is under the samples' own Nyquist frequency.
+ *  `offset` is the song's sample the first of them is (2.0.0-player.37: a library song's windows, which
+ *  start where deadwax cut them) - 0 for a song held whole; outside them, it reads silence. */
+export function sampledReader(samples: Float32Array, rate: number, offset = 0): (t: number, cutoff: number) => number {
   const table = sincKernel()
   const nyquist = rate / 2
   return (t, cutoff) => {
     const scale = Math.min(1, cutoff / nyquist)
     if (!(scale > 0)) return 0
-    const at = t * rate
+    const at = t * rate - offset
     const reach = SINC_ZEROS / scale
     const first = Math.max(0, Math.ceil(at - reach))
     const last = Math.min(samples.length - 1, Math.floor(at + reach))
@@ -453,6 +459,9 @@ export async function makeSignal(id: SignalId, rate: number, options: MakeOption
       exact = sampledReader(out, rate)
       break
     }
+    case 'library':
+      //? a song of the library isn't made here: the bench plays its own stream (lab/library.ts)
+      throw new Error('a song from the library is played as it is, not made')
     case 'file': {
       const file = options.file
       if (!file || !file.channels.length) throw new Error('no file chosen')

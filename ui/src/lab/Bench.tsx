@@ -2,8 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { turntableRow, turntableTimingRow, type DebugRow } from '../lib/debugRows'
 import type { DeckReport } from '../lib/deckVoice'
-import { latestOnly } from '../lib/latest'
+import { isAbort, latestOnly } from '../lib/latest'
 import { clock } from '../lib/scrub'
+import { readPlayerMaxRate } from '../state/persisted'
+import { scrubWindow, songDetails, type Song } from '../player/api'
 import {
   WINDOW_S, deckRecorded, deckRecordingData, deckReport, deckSoundAnalyser, onDeckRecorded, onDeckReport, recordDeckSound,
   releaseDeckSoundAnalyser, stopDeckRecording, wakeDeckAudio, type Deck, type DeckRecorded, type DeckRecordingData,
@@ -14,11 +16,16 @@ import { useBenchPlayer, type BenchPlayer, type BenchSong } from './benchPlayer'
 import { blocksLine, checkFile, checkLine, checkRuns, framesLine, runCounts, type CheckRun, type CheckState } from './check'
 import { compare, replayHeld, tookTheRecord, type Comparison } from './compare'
 import { decodeAt } from './decode'
+import {
+  checkPick, deckCap, formatLine, libraryAddress, libraryTrack, readSpan, readWindows, stitchWindows, voiceWindowFrom, writePick,
+  type PickChecked,
+} from './library'
+import { LibraryPicker } from './LibraryPicker'
 import { ListeningRoom } from './listen'
 import { MOTIONS, motionNeeds, motionStart, type Motion, type MotionId } from './motions'
-import { NOT_HELD, NOT_TAKEN, STARTING, againLine, dbText, meaning, numberRows, percent, transportLine } from './reading'
+import { NOT_HELD, NOT_TAKEN, SOUND_AGAIN, STARTING, againLine, dbText, meaning, numberRows, percent, transportLine } from './reading'
 import { runMotion, type MotionResult, type MotionRun } from './runner'
-import { SIGNALS, SOURCE_RATES, makeSignal, seeded, signalWindow, wavBytes, type Signal, type SignalId, type SourceRate } from './signals'
+import { SIGNALS, SOURCE_RATES, makeSignal, sampledReader, seeded, signalWindow, wavBytes, type Signal, type SignalId, type SourceRate } from './signals'
 import { watchForHide, type HideWatch } from './watch'
 
 /** What a check stopped by you was stopped with. */
@@ -58,9 +65,10 @@ async function until(ready: () => boolean, ms: number): Promise<boolean> {
 
 let songs = 0
 
-/** What the bench made: the signal, and the song its <audio> plays. */
+/** What the bench made: the signal, and the song its <audio> plays - or a song from the library
+ *  (2.0.0-player.37): no signal, and the song's own stream (its BenchSong's `library`). */
 interface Made {
-  signal: Signal
+  signal: Signal | null
   song: BenchSong
 }
 
@@ -82,18 +90,56 @@ interface MotionDone {
   interrupted: boolean
 }
 
-/** A comparison worked out, and what it was of. */
+/** A comparison worked out, and what it was of - music (a library song, a picked file) or not. */
 interface Compared {
   label: string
-  signal: Signal
+  music: boolean
   result: Comparison
+}
+
+/**
+ * A song from the library read for the comparison (2.0.0-player.37): the voice's windows again, and the song
+ * itself over where the paths went - both from deadwax's scrub route, at the song's id and the cap the deck
+ * asked at, exactly as the deck asks.
+ */
+function librarySource(made: Made) {
+  const library = made.song.library!
+  const cap = deckCap(library.track, library.maxRate)
+  const ask = (at: number) => scrubWindow(library.track.id, at, WINDOW_S, undefined, cap)
+  //? the song's own rate, as deadwax sent it - read off the first window asked again
+  let songRate = 0
+  return {
+    /** the window the voice had that began at `start`, asked again at the grid point the deck asked it
+     *  from - the same bytes, or nothing if deadwax answers another */
+    async voiceWindow(start: number): Promise<ArrayBuffer | null> {
+      const got = await ask(voiceWindowFrom(start))
+      songRate ||= got.rate
+      return Math.abs(got.first / got.rate - start) < 1e-9 ? got.bytes : null
+    },
+    /** the song over where the paths went: deadwax's windows covering it, decoded at their own rate - the
+     *  FLAC's own samples - and read through the long windowed sinc, placed by their first sample */
+    async exactOver(extent: { lowest: number; highest: number; fastest: number }, outputRate: number) {
+      const rate = songRate || library.track.sampleRate || 44100
+      const span = readSpan(extent, outputRate, rate, made.song.seconds)
+      let windows
+      try {
+        windows = await readWindows(span, ask)
+      } catch (error) {
+        throw new Error(error instanceof Error && error.name === 'TooWide' ? error.message : `deadwax didn't send a window of the song to read them from - ${message(error)}`)
+      }
+      const stitched = await stitchWindows(windows, decodeAt)
+      return sampledReader(stitched.samples, stitched.rate, stitched.first)
+    },
+  }
 }
 
 /** A recording set beside the ideal turntables: its windows decoded again, the replay and the rest. */
 async function compareRecording(data: DeckRecordingData, what: Recorded, pictures: boolean): Promise<Comparison> {
   const signal = what.made.signal
+  const library = signal ? null : librarySource(what.made)
   //? every window the voice had over the recording - the one as it began, and any sent since - decoded
-  //? again from the bench's own bytes at the deck's rate, by the same decoder
+  //? again at the deck's rate, by the same decoder: from the bench's own bytes, or a library song's asked
+  //? of deadwax again
   const shapes = new Map<string, { start: number; rate: number; length: number }>()
   const key = (start: number, rate: number, length: number) => `${start.toFixed(9)}/${rate}/${length}`
   const start = what.windowAtStart
@@ -106,7 +152,11 @@ async function compareRecording(data: DeckRecordingData, what: Recorded, picture
   const decoded = new Map<string, Float32Array[]>()
   for (const [name, shape] of shapes) {
     try {
-      const channels = await decodeAt(signalWindow(signal, shape.start, WINDOW_S).bytes, data.sampleRate)
+      const bytes = signal ? signalWindow(signal, shape.start, WINDOW_S).bytes : await library!.voiceWindow(shape.start)
+      if (!bytes) continue
+      const channels = await decodeAt(bytes, data.sampleRate)
+      //? a library song's window asked again must be the one the voice had, sample for sample
+      if (!signal && channels[0]?.length !== shape.length) continue
       decoded.set(name, channels)
     } catch {
       //? a window that won't decode here: the replay goes on without it (and says so in its numbers)
@@ -125,13 +175,21 @@ async function compareRecording(data: DeckRecordingData, what: Recorded, picture
     : null
   const knots = exact?.knots
   return compare({
-    recording: data, exact: signal.exact, measure: signal.tonal ? 'tonal' : signal.id === 'silence' ? 'silence' : 'none',
+    recording: data, exact: signal?.exact ?? null, measure: signal?.tonal ? 'tonal' : signal?.id === 'silence' ? 'silence' : 'none',
+    exactOver: library ? (extent) => library.exactOver(extent, data.sampleRate) : null,
     windowAtStart, windowFor, motion: exact, span: knots ? { from: knots[0]!.time, to: knots[knots.length - 1]!.time } : null, pictures, pause: breathe,
   })
 }
 
+/** The clips a comparison can play: A, B and C - or A alone, where the song couldn't be read along the path
+ *  (a library song's, 2.0.0-player.37). */
+const heard = (result: Comparison): Float32Array[] => (result.clips.B && result.clips.C ? [result.clips.A, result.clips.B, result.clips.C] : [result.clips.A])
+
 /** What a recording the page was hidden through says: thrown away, not measured. */
 const HIDDEN_RECORDING = 'The page was hidden while it recorded - the record\'s sound stops with it - so the recording was thrown away. Keep the page in view, and record again.'
+/** What the check says as it takes the bench from a library song to its own sines: their turntable is the
+ *  bench's own again, its deck made afresh, and only a tap may start its sound. */
+const SWITCHED_CHECK = 'The check runs on the bench\'s own sines, so the song changed from your library\'s - and the record\'s sound starts again only with a tap. Tap Carry on to start the check.'
 /** What a run of the check the page was hidden through says, waiting for a tap to carry on. */
 const HIDDEN_CHECK = 'The page was hidden, so that run was thrown away - the record\'s sound stops with it. Keep the page in view and the screen awake, and tap Carry on to run it again.'
 
@@ -291,6 +349,10 @@ export function Bench() {
   const [signalId, setSignalId] = useState<SignalId>('sine440')
   const [rate, setRate] = useState<SourceRate>(44100)
   const [picked, setPicked] = useState<{ name: string; bytes: ArrayBuffer } | null>(null)
+  //? a song from the library, as Navidrome answered for it (2.0.0-player.37) - and the last one picked on
+  //? this device, offered again once Navidrome says it still has it
+  const [librarySong, setLibrarySong] = useState<Song | null>(null)
+  const [offer, setOffer] = useState<PickChecked>({ state: 'none' })
   const [made, setMade] = useState<Made | null>(null)
   const [making, setMaking] = useState<string | null>('Making the song…')
   const builds = useMemo(latestOnly, [])
@@ -343,6 +405,31 @@ export function Bench() {
 
   useEffect(() => {
     const ticket = builds.begin()
+    if (signalId === 'library') {
+      if (!librarySong) {
+        setMaking('Find a song below to make it the song')
+        return
+      }
+      //? its own stream, asked for exactly as the app's player asks for it - the app's track for it, the
+      //? device's Maximum quality, and what the bench's one element can play
+      const track = libraryTrack(librarySong)
+      const maxRate = readPlayerMaxRate()
+      const browser = {
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent ?? '' : '',
+        maxTouchPoints: typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0,
+        canPlayType: playerRef.current.canPlayType,
+      }
+      songs += 1
+      setMade({
+        signal: null,
+        song: {
+          id: `library-${track.id}-${songs}`, title: track.title, seconds: track.duration, rate: track.sampleRate, channels: track.channels,
+          url: libraryAddress(track, browser, maxRate), library: { track, maxRate },
+        },
+      })
+      setMaking(null)
+      return
+    }
     if (signalId === 'file' && !picked) {
       setMaking('Choose a file below to make it the song')
       return
@@ -362,25 +449,58 @@ export function Bench() {
         if (ticket.current()) setMaking(`That couldn't be made into a song - ${message(error)}`)
       }
     })()
-  }, [signalId, rate, picked])
+  }, [signalId, rate, picked, librarySong])
 
-  //? a song's address let go of once its player has moved on to the next
+  //? a song's address let go of once its player has moved on to the next - a WAV's: a library song's is its
+  //? stream's, nothing to let go of
   useEffect(() => {
     const url = made?.song.url
     return () => {
-      if (url) setTimeout(() => URL.revokeObjectURL(url), 2000)
+      if (url?.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(url), 2000)
     }
   }, [made])
+
+  //? the song remembered from last time, asked of Navidrome as the page opens: offered once it answers,
+  //? forgotten when it hasn't the song any more
+  const remembering = useMemo(latestOnly, [])
+  useEffect(() => {
+    const ticket = remembering.begin()
+    checkPick((id) => songDetails(id, ticket.signal)).then((checked) => {
+      if (ticket.current()) setOffer(checked)
+    }, (error: unknown) => {
+      if (ticket.current() && !isAbort(error)) setOffer({ state: 'none' })
+    })
+    return () => remembering.supersede()
+  }, [])
+
+  //? a song from the library made the song: kept for next time
+  const pickLibrary = (song: Song) => {
+    if (locked) return
+    writePick(song)
+    setSignalId('library')
+    setLibrarySong(song)
+  }
 
   //? the deck's windows, the bench's own: exactly the song's samples, as a WAV it decodes
   const windowSource = useCallback<WindowSource>((song, from, seconds) => new Promise((resolve, reject) => {
     const now = madeRef.current
-    if (!now || now.song.id !== song.id) {
+    if (!now?.signal || now.song.id !== song.id) {
       reject(new Error('another song'))
       return
     }
     resolve(signalWindow(now.signal, from, seconds))
   }), [])
+
+  //? a song from the library is turned as the app turns it: a turntable of its own with NO window source, so
+  //? its deck asks deadwax's scrub route for its windows - a deck made afresh as the kind of song changes,
+  //? and its sound started again by a tap (only a tap may)
+  const fromLibrary = !!made?.song.library
+  const kindWas = useRef(fromLibrary)
+  useEffect(() => {
+    if (kindWas.current === fromLibrary) return
+    kindWas.current = fromLibrary
+    setStatus(SOUND_AGAIN)
+  }, [fromLibrary])
 
   useEffect(() => onDeckReport(setReport), [])
   useEffect(() => () => room.close(), [])
@@ -415,10 +535,10 @@ export function Bench() {
     await breathe()
     try {
       const result = await compareRecording(data, what, true)
-      setCompared({ label: what.label, signal: what.made.signal, result })
+      setCompared({ label: what.label, music: !what.made.signal || what.made.signal.id === 'file', result })
       setAbx(null)
       setMode('compare')
-      room.load([result.clips.A, result.clips.B, result.clips.C], result.rate, 0)
+      room.load(heard(result), result.rate, 0)
       setComparing(null)
       //? the comparison takes the focus as it lands - its Play - so Space plays it, wherever the tap that
       //? recorded it left the focus (a field being typed in is left alone)
@@ -509,7 +629,7 @@ export function Bench() {
       }
       //? a hide stops the recording, and saved.current throws it away
       const watch = watchForHide(() => stopDeckRecording())
-      pending.current = { label: `${RECORD_SECONDS} s of your turning, on ${made.signal.name}`, made, windowAtStart, motion: null, watch }
+      pending.current = { label: `${RECORD_SECONDS} s of your turning, on ${made.song.title}`, made, windowAtStart, motion: null, watch }
       setComparing(`Recording ${RECORD_SECONDS} s - turn the record`)
     } finally {
       setStartingRecord(false)
@@ -579,7 +699,7 @@ export function Bench() {
           return null
         }
         recordingIt = true
-        if (!checking.current) pending.current = { label: `${def.label}${random ? ', with a finger\'s jitter' : ''}, on ${now.signal.name}`, made: now, windowAtStart, motion: null, watch }
+        if (!checking.current) pending.current = { label: `${def.label}${random ? ', with a finger\'s jitter' : ''}, on ${now.song.title}`, made: now, windowAtStart, motion: null, watch }
       }
       //? the player as it is when asked - at the release too, after the take paused it (a new object each time)
       run = runMotion(deck, () => playerRef.current, def, { random, onTurn: turnFace() })
@@ -671,6 +791,18 @@ export function Bench() {
       return URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }))
     }
     try {
+      //? from a song of the library, the check's sines are the bench's own turntable again - its deck made
+      //? afresh, its sound stopped with the library's - and only a tap may start it: the check waits for one
+      if (madeRef.current?.song.library) {
+        const before = deckRef.current
+        setSignalId(CHECK_SIGNALS[0]!)
+        setRate(44100)
+        if (!(await until(() => !!madeRef.current?.signal && !!deckRef.current && deckRef.current !== before, 30000))) throw new Error('the song wasn\'t made')
+        if (deckReport()?.context !== 'running') {
+          setCheck(state(SWITCHED_CHECK, { waiting: true }))
+          await new Promise<void>((go, stop) => { carryOn.current = { go, stop } })
+        }
+      }
       if (!(await until(() => !!deckReport()?.voice, 6000))) throw new Error("the record's sound didn't start")
       for (const signalNow of CHECK_SIGNALS) {
         for (const id of CHECK_MOTIONS) {
@@ -684,10 +816,10 @@ export function Bench() {
             //? the run's watch, its making ready included: a hide then leaves the sound suspended for it
             const hiding = watchForHide()
             try {
-              if (madeRef.current?.signal.id !== signalNow || madeRef.current.signal.rate !== 44100) {
+              if (madeRef.current?.signal?.id !== signalNow || madeRef.current.signal.rate !== 44100) {
                 setSignalId(signalNow)
                 setRate(44100)
-                if (!(await until(() => madeRef.current?.signal.id === signalNow && madeRef.current.signal.rate === 44100, 30000))) throw new Error('the song wasn\'t made')
+                if (!(await until(() => madeRef.current?.signal?.id === signalNow && madeRef.current.signal.rate === 44100, 30000))) throw new Error('the song wasn\'t made')
               }
               if (playerRef.current.playing) playerRef.current.toggle()
               playerRef.current.seek(20)
@@ -708,7 +840,7 @@ export function Bench() {
           const what: Recorded = { label: def.label, made: madeRef.current!, windowAtStart: done.windowAtStart, motion: { def, result: done.result }, watch: null }
           const result = await compareRecording(done.data, what, false)
           runs.push({
-            signal: madeRef.current!.signal.name, motion: def.label, voice: done.data.voice,
+            signal: madeRef.current!.song.title, motion: def.label, voice: done.data.voice,
             clockStepMs: after?.clockStep ? after.clockStep * 1000 : null,
             //? the deck counts since the turntable showed - and from 0 again each time it shows: a run's
             //? are the difference (check.ts)
@@ -798,9 +930,9 @@ export function Bench() {
 
   /* ----- the blind test ----- */
 
-  const clipOf = (name: Clip) => compared!.result.clips[name]
+  const clipOf = (name: Clip) => compared!.result.clips[name]!
   const startAbx = () => {
-    if (!compared) return
+    if (!compared?.result.clips.B || !compared.result.clips.C) return
     const x: 0 | 1 = Math.random() < 0.5 ? 0 : 1
     setAbx({ pair, trials, x, answers: [], guessed: null })
     setMode('abx')
@@ -814,7 +946,7 @@ export function Bench() {
     focusNext.current = { name: answers.length >= abx.trials ? 'abx-back' : 'abx-next', force: false }
   }
   const nextTrial = () => {
-    if (!abx || !compared) return
+    if (!abx || !compared?.result.clips.B || !compared.result.clips.C) return
     const x: 0 | 1 = Math.random() < 0.5 ? 0 : 1
     setAbx({ ...abx, x, guessed: null })
     room.load([clipOf(abx.pair[0]), clipOf(abx.pair[1]), clipOf(abx.pair[x])], compared.result.rate, 2)
@@ -824,12 +956,15 @@ export function Bench() {
     if (!compared) return
     setMode('compare')
     setAbx(null)
-    room.load([compared.result.clips.A, compared.result.clips.B, compared.result.clips.C], compared.result.rate, 0)
+    room.load(heard(compared.result), compared.result.rate, 0)
     focusNext.current = { name: 'compare-play', force: false }
   }
 
   const signal = made?.signal ?? null
   const info = SIGNALS.find((one) => one.id === signalId)!
+  //? a library song: what the app's track for it says, and whether its record can sound at all
+  const libraryNow = made?.song.library ?? null
+  const shown: Clip[] = compared?.result.clips.B && compared.result.clips.C ? [...CLIPS] : ['A']
   //? a motion or the check running (a motion from its tap, its making ready included): the record can't be
   //? grabbed, nor the song played or paused, nor another started
   const busy = !!running || preparing || !!check?.running
@@ -854,9 +989,11 @@ export function Bench() {
       <section class="lab-section" aria-labelledby="lab-deck-title">
         <h2 id="lab-deck-title" class="app-section-title">The turntable</h2>
         <div ref={deckBox} class="lab-deck" inert={busy}>
-          <Turntable player={player} open={true} discArt={null} onPreview={setPreviewing} windDown={windDown} deck={deckRef} windowSource={windowSource} />
+          {fromLibrary
+            ? <Turntable key="library" player={player} open={true} discArt={null} onPreview={setPreviewing} windDown={windDown} deck={deckRef} />
+            : <Turntable key="made" player={player} open={true} discArt={null} onPreview={setPreviewing} windDown={windDown} deck={deckRef} windowSource={windowSource} />}
         </div>
-        <p class="lab-now">{signal ? signal.name : 'No song yet'}</p>
+        <p class="lab-now">{libraryNow ? [libraryNow.track.title, libraryNow.track.artist].filter(Boolean).join(' - ') : signal ? signal.name : 'No song yet'}</p>
         <TurntableTime player={player} previewing={previewing} />
         <div class="lab-actions">
           <button type="button" class="app-button is-primary-lab" onClick={onPlay} aria-disabled={!made || busy}>
@@ -893,6 +1030,16 @@ export function Bench() {
 
       <section class="lab-section" aria-labelledby="lab-song-title">
         <h2 id="lab-song-title" class="app-section-title">The song</h2>
+        {/* offered as the page opens - and only until a song of the library has been picked here */}
+        {offer.state === 'found' && !librarySong && (
+          <div class="lab-actions lab-offer">
+            <span class="lab-offer-words">Last time, from your library: {[offer.song.title, offer.song.artist].filter(Boolean).join(' - ')}</span>
+            <button type="button" class="app-button" onClick={() => pickLibrary(offer.song)} aria-disabled={locked}>Use it again</button>
+          </div>
+        )}
+        {offer.state === 'failed' && !librarySong && (
+          <p class="lab-note lab-warning">Your last song from the library ({offer.pick.title || 'its title not kept'}) can't be offered just now - {offer.problem}.</p>
+        )}
         <fieldset class="lab-fieldset" disabled={locked}>
           <legend class="lab-legend">Signal</legend>
           <div class="lab-options">
@@ -921,7 +1068,8 @@ export function Bench() {
             />
           </label>
         )}
-        <fieldset class="lab-fieldset" disabled={locked}>
+        {signalId === 'library' && <LibraryPicker disabled={locked} chosen={libraryNow?.track.id ?? null} onPick={pickLibrary} />}
+        {signalId !== 'library' && <fieldset class="lab-fieldset" disabled={locked}>
           <legend class="lab-legend">Made at</legend>
           <div class="lab-options is-row">
             {SOURCE_RATES.map((one) => (
@@ -931,10 +1079,14 @@ export function Bench() {
               </label>
             ))}
           </div>
-        </fieldset>
+        </fieldset>}
         <p class="lab-note">
-          {making ?? `${signal?.name ?? info.name}: ${clock(made?.song.seconds ?? 0)}, made at ${rate / 1000} kHz, a 24-bit WAV. ${info.shows}`}
+          {making ?? (libraryNow
+            ? `${libraryNow.track.title}: ${clock(made?.song.seconds ?? 0)}, ${formatLine(libraryNow.track)} - its own stream from Navidrome, asked for as the app asks for it.`
+            : `${signal?.name ?? info.name}: ${clock(made?.song.seconds ?? 0)}, made at ${rate / 1000} kHz, a 24-bit WAV. ${info.shows}`)}
         </p>
+        {libraryNow && player.problem && <p class="lab-note lab-warning">This song won't load - {player.problem}.</p>}
+        {libraryNow && report?.refused && <p class="lab-note lab-warning">Its record is silent, as in the app: {report.refused}.</p>}
       </section>
 
       <section class="lab-section" aria-labelledby="lab-record-title">
@@ -958,24 +1110,25 @@ export function Bench() {
                   <button type="button" class="app-button" data-room data-focus="compare-play" onClick={onListen}>{room.playing ? 'Pause' : 'Play'} the comparison</button>
                   <button type="button" class="app-button" data-room onClick={() => room.restart()}>From the start</button>
                 </div>
+                {compared.result.unread && <p class="lab-note lab-warning">No B or C this time: {compared.result.unread}. A and the numbers below that need only the paths are here.</p>}
                 <div class="lab-choices" role="radiogroup" aria-label="Which to hear" onKeyDown={onChipKey}>
-                  {CLIPS.map((name, index) => (
+                  {shown.map((name, index) => (
                     <button key={name} type="button" role="radio" aria-checked={room.selected === index} tabIndex={room.selected === index ? 0 : -1} data-room data-chip={index} class={`app-chip lab-choice${room.selected === index ? ' is-on' : ''}`} onClick={() => room.select(index)}>
                       {CLIP_NAMES[name]}
                     </button>
                   ))}
                 </div>
                 <ul class="lab-clip-notes">
-                  {CLIPS.map((name) => <li key={name}><strong>{name}</strong>: {CLIP_NOTES[name]}</li>)}
+                  {shown.map((name) => <li key={name}><strong>{name}</strong>: {CLIP_NOTES[name]}</li>)}
                 </ul>
                 {compared.result.images && (
                   <div class="lab-figures">
-                    {CLIPS.map((name) => <Spectrogram key={name} image={compared.result.images![name]} label={CLIP_NAMES[name]} />)}
+                    {shown.map((name) => <Spectrogram key={name} image={compared.result.images![name]!} label={CLIP_NAMES[name]} />)}
                   </div>
                 )}
-                <Rows rows={numberRows(compared.result.numbers)} />
+                <Rows rows={numberRows(compared.result.numbers, compared.music)} />
                 <p class="lab-meaning">{meaning(compared.result.numbers)}</p>
-                <div class="lab-abx-setup">
+                {shown.length > 1 && <div class="lab-abx-setup">
                   <h3 class="lab-subtitle">Blind</h3>
                   <label class="lab-field">
                     <span>Compare</span>
@@ -990,7 +1143,7 @@ export function Bench() {
                     <input type="number" min={4} max={40} value={trials} onChange={(event) => setTrials(Math.max(4, Math.min(40, Number((event.currentTarget as HTMLInputElement).value) || 10)))} />
                   </label>
                   <button type="button" class="app-button" onClick={startAbx}>Start the blind test</button>
-                </div>
+                </div>}
               </>
             ) : abx && (
               <div class="lab-abx">

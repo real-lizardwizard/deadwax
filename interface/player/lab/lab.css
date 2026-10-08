@@ -160,6 +160,58 @@
     background: var(--dw-field);
 }
 
+/* ===== a song from your library (2.0.0-player.37): its search, its rows, the song offered again ===== */
+
+.lab-search input { flex: 1 1 auto; }
+
+.lab-results {
+    display: grid;
+    gap: var(--lab-figure-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* a row of Navidrome's answer: a card like a signal's, tapped to make the song the bench's */
+.lab-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--app-line-gap);
+    width: 100%;
+    min-height: var(--lab-control);
+    padding: var(--lab-option-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-card);
+    color: var(--dw-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.lab-result[aria-pressed="true"] {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+}
+
+.lab-result[aria-disabled="true"] {
+    opacity: var(--app-pin-off);
+    cursor: default;
+}
+
+.lab-result:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+.lab-result-title { font-size: var(--dw-text-heading); font-weight: var(--dw-weight-semibold); }
+.lab-result-line { color: var(--dw-text-2); font-size: var(--dw-text-footnote); line-height: var(--dw-leading-note); }
+
+/* what can't be done just now, said plainly: Navidrome away, a song that won't load, a silent record */
+.lab-warning { color: var(--dw-amber-text); }
+
+.lab-offer-words { flex: 1 1 auto; font-size: var(--dw-text-heading); }
+
 /* ===== the turntable and its transport ===== */
 
 .lab-deck {

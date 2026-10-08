@@ -192,3 +192,18 @@ def test_a_motions_turn_of_the_record_is_kept_where_turntable_never_writes():
     assert re.search(r'<div ref=\{deckBox\} class="lab-deck" inert=\{busy\}>', bench)
     turntable = (UI / "src" / "player" / "Turntable.tsx").read_text()
     assert re.search(r'<span class="app-tt-turn" style=\{\{ transform: `rotate\(', turntable)
+
+
+def test_a_song_from_the_library_is_found_in_a_field_too_big_to_zoom_and_tapped_in_a_fingers_row():
+    #? 2.0.0-player.37: the bench's search of Navidrome - a field of the bench's own (16px or more, labelled,
+    #? a ring), its rows a finger's height where the pointer is coarse (they read --lab-control), drawing a
+    #? ring, and faded but still focusable while the song is held still (aria-disabled, never disabled)
+    css = LAB_CSS.read_text()
+    flat = {" ".join(selector.split()): values for context, selector, values in rules(css) if context == ""}
+    assert flat[".lab-result"]["min-height"] == "var(--lab-control)"
+    assert flat['.lab-result[aria-disabled="true"]']["opacity"] == "var(--app-pin-off)"
+    assert flat[".lab-result:focus-visible"]["outline"] == "var(--app-ring) solid var(--dw-accent)"
+    picker = (UI / "src" / "lab" / "LibraryPicker.tsx").read_text()
+    assert re.search(r'<label class="lab-field lab-search">\s*<span>Search your library</span>\s*<input\s+type="search"', picker)
+    assert re.findall(r"<button[^>]*\sdisabled=", picker) == []
+    assert 'aria-disabled={disabled}' in picker

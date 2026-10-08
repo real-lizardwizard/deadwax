@@ -4,6 +4,12 @@
  * exactly along a smooth path through the hand's samples (or a motion's exact path) - level-matched,
  * lined up sample for sample, and measured. Pure: lab.sim.cjs runs it on a recording made by the real
  * deck in the sim. See lab/analysis.ts for each part.
+ *
+ * A song from the library (2.0.0-player.37) isn't defined anywhere the bench can read at will: B and C read
+ * its samples along the path, from deadwax's windows covering where it went - asked for once the replay has
+ * said where that is (`exactOver`, with pathExtent's answer). Where they can't be had - a path over more of
+ * the song than the bench reads at once, or a window deadwax didn't send - A and the numbers that need only
+ * the paths stand, and B and C are left out, saying why (`unread`).
  */
 
 import {
@@ -26,10 +32,24 @@ export interface RecordingIn {
   scriptLagSeconds: number
 }
 
+/** A song read exactly at song time t, nothing at or above `cutoff` Hz of its own in it (Signal.exact). */
+export type Exact = (t: number, cutoff: number) => number
+
+/** Where the paths B and C read along went: their lowest and highest places in the song (seconds), and the
+ *  fastest either moved (the song's own speed is 1). */
+export interface PathExtent {
+  lowest: number
+  highest: number
+  fastest: number
+}
+
 export interface CompareInput {
   recording: RecordingIn
-  /** the signal, exactly (lab/signals.ts's Signal.exact) */
-  exact: (t: number, cutoff: number) => number
+  /** the signal, exactly (lab/signals.ts's Signal.exact) - or none, for a library song read by `exactOver` */
+  exact?: Exact | null
+  /** a library song: its reader over where the paths went, made once the replay has said where that is -
+   *  rejecting, with why, when it can't be had (B and C are left out then) */
+  exactOver?: ((extent: PathExtent) => Promise<Exact>) | null
   /** what can be measured on it: the sound that isn't the signal, for a tone or tones; how loud anything
    *  is at all, for silence; neither, for something broadband */
   measure: 'tonal' | 'silence' | 'none'
@@ -67,11 +87,13 @@ export interface Numbers {
 
 export interface Comparison {
   rate: number
-  clips: { A: Float32Array; B: Float32Array; C: Float32Array }
+  /** B and C null where the song couldn't be read along the path - `unread` says why */
+  clips: { A: Float32Array; B: Float32Array | null; C: Float32Array | null }
+  unread: string | null
   /** the stretch the numbers measure, in the clips' samples: from SETTLE_S after the take to the hand's
    *  last sample - or null */
   measured: { from: number; to: number } | null
-  images: { A: SpectrogramImage; B: SpectrogramImage; C: SpectrogramImage } | null
+  images: { A: SpectrogramImage; B: SpectrogramImage | null; C: SpectrogramImage | null } | null
   numbers: Numbers
 }
 
@@ -113,6 +135,26 @@ export function replayVerdict(numbers: Pick<Numbers, 'fitMs' | 'taken'>): Replay
   if (numbers.fitMs !== null) return numbers.fitMs <= REPLAY_HELD_MS ? 'held' : 'stalled'
   return numbers.taken ? 'unreported' : 'untaken'
 }
+
+/**
+ * Where B's and C's paths went - deadwax's read head where the voice sounded, and the smooth path where it
+ * reads: the lowest and highest places and the fastest speed - or null when neither went anywhere.
+ */
+export function pathExtent(
+  pos: Float64Array, speed: Float64Array, gain: Float64Array, x: Float64Array, v: Float64Array, gainX: Float64Array,
+): PathExtent | null {
+  let lowest = Infinity, highest = -Infinity, fastest = 0
+  const take = (place: number, moving: number) => {
+    if (place < lowest) lowest = place
+    if (place > highest) highest = place
+    if (Math.abs(moving) > fastest) fastest = Math.abs(moving)
+  }
+  for (let i = 0; i < pos.length; i++) if (gain[i]! > 0) take(pos[i]!, speed[i]!)
+  for (let i = 0; i < x.length; i++) if (gainX[i]! > 0) take(x[i]!, v[i]!)
+  return lowest <= highest ? { lowest, highest, fastest } : null
+}
+
+const words = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** The middle value. */
 function median(values: number[]): number {
@@ -166,15 +208,31 @@ export async function compare(input: CompareInput): Promise<Comparison> {
       gainC[i] = played.gain[i]!
     }
   }
-  const B = readExactly(input.exact, played.pos, played.speed, played.gain, rate, L)
+  //? what B and C read: the signal's own definition - or, for a library song, its samples along the paths,
+  //? from deadwax's windows over where they went (or nothing, and why)
+  let exact: Exact | null = input.exact ?? null
+  let unread: string | null = null
+  if (!exact && input.exactOver) {
+    const extent = pathExtent(played.pos, played.speed, played.gain, xC, vC, gainC)
+    if (!extent) unread = 'the record never sounded while it recorded, so there was nothing of the song to read'
+    else {
+      try {
+        exact = await input.exactOver(extent)
+      } catch (error) {
+        unread = words(error)
+      }
+    }
+  } else if (!exact) unread = 'there is nothing to read the song from'
+  const B = exact ? readExactly(exact, played.pos, played.speed, played.gain, rate, L) : null
   await pause()
-  const C = readExactly(input.exact, xC, vC, gainC, rate, L)
+  const C = exact ? readExactly(exact, xC, vC, gainC, rate, L) : null
   await pause()
 
   //? level-matched to A where the voice sounded
   const sounding = (i: number) => i >= aFrom && i < aTo && i >= L && played.gain[i - L]! > 0.5
   const rmsA = rmsWhere(A, sounding)
   for (const clip of [B, C]) {
+    if (!clip) continue
     const rms = rmsWhere(clip, sounding)
     if (rmsA > 1e-7 && rms > 1e-9) {
       const scale = rmsA / rms
@@ -201,7 +259,7 @@ export async function compare(input: CompareInput): Promise<Comparison> {
     smooth: r1 > r0 ? speedWobble(vC, rate, r0, r1) : null,
   }
   const w0 = Math.max(aFrom, r0 + L), w1 = Math.min(aTo, r1 + L)
-  const strayNow = input.measure === 'tonal' && w1 > w0 ? stray(A, B, rate, w0, w1) : null
+  const strayNow = input.measure === 'tonal' && B && w1 > w0 ? stray(A, B, rate, w0, w1) : null
   const silenceDb = input.measure === 'silence' && w1 > w0 ? db(rmsWhere(A, (i) => i >= w0 && i < w1)) : null
   let residual = 0, energy = 0
   for (let i = aFrom; i < aTo; i++) {
@@ -213,14 +271,14 @@ export async function compare(input: CompareInput): Promise<Comparison> {
   const replayDb = energy > 0 ? 10 * Math.log10(Math.max(residual, 1e-30) / energy) : null
   await pause()
 
-  const clips = { A: A.slice(aFrom, aTo), B: B.slice(aFrom, aTo), C: C.slice(aFrom, aTo) }
+  const clips = { A: A.slice(aFrom, aTo), B: B ? B.slice(aFrom, aTo) : null, C: C ? C.slice(aFrom, aTo) : null }
   let images: Comparison['images'] = null
   if (input.pictures) {
-    const [a, b, c] = spectrograms([clips.A, clips.B, clips.C], rate)
-    images = { A: a!, B: b!, C: c! }
+    const drawn = spectrograms([clips.A, ...(clips.B && clips.C ? [clips.B, clips.C] : [])], rate)
+    images = { A: drawn[0]!, B: drawn[1] ?? null, C: drawn[2] ?? null }
   }
   return {
-    rate, clips, images, measured: w1 > w0 ? { from: w0 - aFrom, to: w1 - aFrom } : null,
+    rate, clips, unread, images, measured: w1 > w0 ? { from: w0 - aFrom, to: w1 - aFrom } : null,
     numbers: {
       strayed, wobble, stray: strayNow, silenceDb, replayDb, alignScore: found.score,
       leadMs: timing.lead * 1000, fitMs: Number.isFinite(timing.worst) ? timing.worst * 1000 : null,

@@ -751,8 +751,46 @@ console.log('\nthe turntable\'s test bench (2.0.0-player.36): its own player and
     [(code(read('lab/benchPlayer.ts')).match(/document\.createElement\('audio'\)/g) ?? []).length,
       files.filter((file) => file.startsWith('lab/') && /usePlayer|app\/context|app\/App/.test(code(read(file))))],
     [1, []])
-  check('the turntable drawn with the bench\'s windows and its deck',
-    /<Turntable player=\{player\} open=\{true\} discArt=\{null\} onPreview=\{setPreviewing\} windDown=\{windDown\} deck=\{deckRef\} windowSource=\{windowSource\} \/>/.test(bench), true)
+  //? (2.0.0-player.37) - and a song from the library on a turntable of its own with NO window source, so its
+  //? deck asks deadwax's scrub route as the app's does: keyed apart, so the deck is made afresh between them
+  check('the turntable drawn with the bench\'s windows and its deck - and for a song from the library, keyed apart, with none',
+    [/<Turntable key="made" player=\{player\} open=\{true\} discArt=\{null\} onPreview=\{setPreviewing\} windDown=\{windDown\} deck=\{deckRef\} windowSource=\{windowSource\} \/>/.test(bench),
+      /\{fromLibrary\s*\?\s*<Turntable key="library" player=\{player\} open=\{true\} discArt=\{null\} onPreview=\{setPreviewing\} windDown=\{windDown\} deck=\{deckRef\} \/>\s*:\s*<Turntable key="made"/.test(bench),
+      /const fromLibrary = !!made\?\.song\.library\n/.test(bench), (bench.match(/<Turntable\s/g) ?? []).length],
+    [true, true, true, 2])
+  //? a song from the library (2.0.0-player.37): played at the address the app asks for it at - the app's
+  //? helpers, the device's Maximum quality and what the bench's one element can play; held still while
+  //? anything records, as the bench's own signals are; the last one picked asked of Navidrome again through
+  //? latestOnly; and the comparison's windows asked at the cap the deck asks at
+  const pickLibrary = handler('pickLibrary')
+  check('...a song from the library: the app\'s address for it, held still while anything records, remembered through latestOnly, its comparison read at the deck\'s cap',
+    [/url: libraryAddress\(track, browser, maxRate\), library: \{ track, maxRate \}/.test(bench), /const maxRate = readPlayerMaxRate\(\)/.test(bench),
+      /canPlayType: playerRef\.current\.canPlayType/.test(bench),
+      /^\s*if \(locked\) return\s*writePick\(song\)/.test(pickLibrary), /<LibraryPicker disabled=\{locked\}/.test(bench),
+      /onClick=\{\(\) => pickLibrary\(offer\.song\)\} aria-disabled=\{locked\}/.test(bench),
+      /const ticket = remembering\.begin\(\)\s*checkPick\(\(id\) => songDetails\(id, ticket\.signal\)\)\.then\(\(checked\) => \{\s*if \(ticket\.current\(\)\) setOffer\(checked\)/.test(bench),
+      /const cap = deckCap\(library\.track, library\.maxRate\)\s*const ask = \(at: number\) => scrubWindow\(library\.track\.id, at, WINDOW_S, undefined, cap\)/.test(bench),
+      (bench.match(/scrubWindow\(/g) ?? []).length],
+    [true, true, true, true, true, true, true, true, 1])
+  //? ...and what a library song changes: the turntable made afresh says so (a tap starts its sound again);
+  //? the check, which runs on the bench's own sines, takes the bench back to them and waits for a tap to
+  //? start the sound; the comparison says music has no "what isn't the signal"; the voice's windows asked
+  //? again must be the very ones it had
+  const runCheck = /const runCheck = async \(\) => \{([\s\S]*?)\n {2}\}\n/.exec(bench)?.[1] ?? ''
+  check('...the turntable made afresh said so; the check from a library song back on the sines, waiting for a tap; music said to have no "what isn\'t the signal"; the voice\'s windows the very ones',
+    [/if \(kindWas\.current === fromLibrary\) return\s*kindWas\.current = fromLibrary\s*setStatus\(SOUND_AGAIN\)/.test(bench),
+      /if \(madeRef\.current\?\.song\.library\) \{[\s\S]*?setSignalId\(CHECK_SIGNALS\[0\]!\)[\s\S]*?if \(deckReport\(\)\?\.context !== 'running'\) \{\s*setCheck\(state\(SWITCHED_CHECK, \{ waiting: true \}\)\)\s*await new Promise<void>\(\(go, stop\) => \{ carryOn\.current = \{ go, stop \} \}\)/.test(runCheck)
+        && runCheck.indexOf('madeRef.current?.song.library') < runCheck.indexOf("until(() => !!deckReport()?.voice"),
+      /music: !what\.made\.signal \|\| what\.made\.signal\.id === 'file'/.test(bench), /numberRows\(compared\.result\.numbers, compared\.music\)/.test(bench),
+      /if \(!signal && channels\[0\]\?\.length !== shape\.length\) continue/.test(bench), /return Math\.abs\(got\.first \/ got\.rate - start\) < 1e-9 \? got\.bytes : null/.test(bench)],
+    [true, true, true, true, true, true])
+  const picker = code(read('lab/LibraryPicker.tsx'))
+  check('...its search Navidrome\'s, through librarySearch (paced, latestOnly); Navidrome\'s status through latestOnly; its rows aria-disabled while the song is held',
+    [/librarySearch\(\{ search: \(query, signal\) => searchLibrary\(query, signal\), onAnswer: setAnswer \}\)/.test(picker),
+      /const ticket = statuses\.begin\(\)\s*navidromeStatus\(ticket\.signal\)/.test(picker), /if \(ticket\.current\(\)\) setNavidrome/.test(picker),
+      /aria-disabled=\{disabled\} onClick=\{\(\) => !disabled && onPick\(song\)\}/.test(picker),
+      /useEffect\(\(\) => \(\) => search\.stop\(\), \[\]\)/.test(picker)],
+    [true, true, true, true, true])
   const table = code(read('player/Turntable.tsx'))
   check('Turntable takes the windows only where they are given - the app\'s deck asks deadwax as ever',
     [/if \(windows\.current\) host\.window = /.test(table), (code(read('app/App.tsx') + read('player/NowPlaying.tsx')).match(/windowSource/g) ?? []).length],

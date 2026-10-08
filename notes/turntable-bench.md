@@ -1,6 +1,6 @@
 # The turntable's test bench (2.0.0-player.36)
 
-The page at /player/lab/: the real turntable over signals it makes, beside an ideal one. Read it before changing the bench, or the deck's window source, recorder or analyser tap. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
+The page at /player/lab/: the real turntable over signals it makes, or a song from your library (.37), beside an ideal one. Read it before changing the bench, or the deck's window source, recorder or analyser tap. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 
 ### A test bench for the turntable (2.0.0-player.36)
 
@@ -292,3 +292,122 @@ it points to is the next slice, measured with it. The guide's section is `docs/p
   and above all whether A and C sound alike to him; Safari's ScriptProcessorNode stamps against the
   replay's timing (Chromium's move 1023 frames a block, which the grid follows); an iPad's or a phone's
   coarse targets under a real finger.
+
+### A song from your library on the bench (2.0.0-player.37)
+
+James, on seeing the bench: "hm. how about adding a test song from my library, like eye in the sky". The
+spec is the session scratchpad's `uplan/slice-bench-library.md`. Music he knows - "Eye in the Sky" is in his
+Navidrome - scrubbed on the bench and set beside the ideal turntables, by the REAL path: a library song on
+the bench is exactly what the app's turntable does with that song, so what he hears there is what he hears
+in the app, and A against C says whether deadwax adds anything to real music. **Nothing the app plays
+changes**: `usePlayer.ts`, the engine files, `deck.ts`, `deckVoice.ts`, `Turntable.tsx` and `player/api.ts`
+have no diff, and the app's three bundle files are byte for byte .36's (a build of HEAD compared with this
+one). No new route and no new Navidrome call: the bench uses search3, status, getSong, cover, stream and
+scrub, all on the fixed list already. The guide's section is `docs/player.md#testing-the-turntable`.
+
+- **"A song from your library"**, the last of the signal list (`SIGNALS`' `library`, which `makeSignal`
+  refuses: nothing is made). Chosen, it shows `lab/LibraryPicker.tsx`: a labelled search field (the bench's
+  `.lab-field`, 17px), Navidrome's songs as rows (title; artist and album; length and the format in Info >
+  Debug's own words, `formatRow` - "FLAC, 16-bit, 44.1 kHz, stereo"), a row tapped to make it the song. The
+  search is `librarySearch` (`lab/library.ts`): `searchLibrary`, songs only, asked `LIBRARY_SETTLE_MS` (200)
+  after typing stops as the app's Search asks its library half, Enter at once, an empty box nothing - and
+  through `latestOnly()`, so a slow older answer never lands over a newer one (and its fetch is called off).
+  Navidrome's status is asked once as the picker shows (through latestOnly too): not set up or not
+  answering is one amber line, "The bench's own signals still work." The "Made at" rates go while it is
+  chosen (a library song has its own). The search field is `disabled` and the rows `aria-disabled` while
+  anything records or a motion or the check runs, as the signal radios are.
+- **Remembered** on this device (`PICK_KEY` `deadwax-lab-library-song`: id, title, artist; every read and
+  write in try/catch, a storage refusing or holding nonsense is no pick): asked of Navidrome by id as the
+  page opens (`checkPick`, getSong, through latestOnly) and offered at the top of The song - "Last time, from
+  your library: …", **Use it again**, one tap - until a library song is picked in this visit. A 404 (the
+  song gone, or its id changed with a re-tag) forgets it; Navidrome away keeps it and says it can't be
+  offered just now.
+- **Played as the app plays it** (`libraryAddress`): `streamUrl` with the bench's one element's
+  `canPlayType` (`BenchPlayer.canPlayType` - never a new element), `wrapsFlac` and the device's Maximum
+  quality (`readPlayerMaxRate()`), so Safari and an iPhone get FLAC in an MP4, a hi-res FLAC under "Up to
+  48 kHz" its resampled copy, and what the browser can't play Navidrome's MP3. NOT mirrored: usePlayer's
+  fallback to the song as it is after deadwax refuses a resampled copy (`askedAt`, its `refused` set) - the
+  bench's element then fails, and says so. The bench's player (`useBenchPlayer`) takes `BenchSong.library`
+  (the app's own track, `toQueueTrack`, and the setting), so the turntable reads it as the app's, and its
+  length is Navidrome's until the element knows its own, then the element's (usePlayer's `songLength()`
+  rule) - a WAV of the bench's own keeps its own length as before. A load failure is `problem`, said under
+  the song ("This song won't load - …", by the MediaError's code); a song picked again (a new id, the same
+  address) is asked for again. One element, so never two songs' audio at once.
+- **No window source** (`Turntable` keyed `library`, drawn without `windowSource`): `DeckHost.window` is set
+  only as the turntable mounts, so a library song needs a turntable of its own - its deck asks deadwax's
+  scrub route exactly as the app's does, at the cap Turntable's host works out (`deckCap` is that rule
+  written again for the comparison: 48000 for a hi-res FLAC under "Up to 48 kHz"). The cost: changing between
+  a library song and the bench's own signals makes the deck afresh, whose `destroy()` closes the audio
+  context, and only a tap may start one - the transport says so (`SOUND_AGAIN`, back to Ready by
+  `transportLine` once it runs), and **Check this device**, which always runs on the sines, takes the bench
+  back to them and waits for **Carry on** (`SWITCHED_CHECK`). A song that isn't a FLAC plays and its record
+  is silent, as in the app; the bench says why under the song with the deck's own refusal ("it isn't a FLAC
+  file (it is MP3)", `report.refused`). The record's label is the album's cover (Turntable's own `Cover`),
+  and the line under the record its title and artist.
+- **The comparison on a library song** (`librarySource` in Bench.tsx). The replay's windows - every one the
+  voice had - are asked again from the grid point the deck asked each from (`voiceWindowFrom`: deadwax starts a
+  window on the frame or fragment at or before what was asked, within a grid step), kept only when the answer
+  starts where the voice's did and decodes at the deck's rate to its length - the same bytes, and in the real
+  page from the browser's cache. B and C read the song itself: once the replay has said where the paths went
+  (`pathExtent`: deadwax's read head where the voice sounded and the smooth path where it reads - lowest,
+  highest, fastest), `compare()` calls `exactOver`, which reads the windows covering the span (`readSpan`:
+  plus the long sinc's reach at the fastest speed, `readReach`, and `READ_MARGIN_S` 0.5 s, inside the song) on
+  the deck's grid (`readWindows`: each from the grid point at or before where the last ended, a 416 or a window
+  adding nothing ending it at the song's end), decodes them by `decodeAudioData` AT THEIR OWN RATE - the FLAC's
+  own samples, the ideal reading the song itself, not the browser's resampling of it - lays the first channel
+  of each by its first sample (`stitchWindows`, one decode at a time) and reads it with `sampledReader`, which
+  takes an `offset` now (0, as before, for everything else). **The bound**: `COMPARE_WINDOWS_MAX` 4 windows
+  (160 s of a CD-quality song, about 52 s of a hi-res one played as it is), refused before anything is asked
+  for a span wider than four windows' worth, and after four if they don't reach. Past it, or a window
+  deadwax doesn't send, `compare()` keeps A and the numbers that need only the paths (the read head, the
+  wobble, the replay) and leaves B and C out (`clips.B`/`C` null, `unread` the reason): the bench offers A
+  alone, no blind test, and says "No B or C this time: …". **Music** (a library song or a picked file) has no
+  "what isn't the signal" - nowhere for it to show - and says so (`NOT_ON_MUSIC`, `numberRows(numbers, music)`).
+- **Memory**: B and C decode only the windows over the path, one channel, four at most. The replay decodes
+  the voice's own windows as it always has for the bench's own songs (both channels at the context's rate,
+  about 15 MB a 40 s window at 48 kHz) - one per 40 s the record went over, so an extreme fling over most of a
+  song (a 20x turn for 9 s went over 186 s, six windows) decodes most of it for the replay, though B and C are
+  refused then. Not bounded: without its windows the replay can't reproduce what the voice played.
+- **Measured** (the real page, below): B and C read from deadwax's windows match B and C read from the song's
+  definition to -116 dB in the sim (the real deck, both voices, a 1 kHz sine served as deadwax's windows). On a
+  paused library song a 1x hand turn's replay is -176 dB from what was recorded (to the bit). **Found, not this
+  change's**: on a song PLAYING when the hand takes it, the replay reads -12 to -20 dB on the bench's own sine
+  as on a library song (-63 dB paused) - the handover back to the playing song, which the replay doesn't follow
+  as closely; its fit stays under half a millisecond, so it reads as held.
+- **Not built, on purpose**: a library song's own "Check this device" (its numbers need a tone); usePlayer's
+  refused-copy fallback; a cache of B and C's windows beyond the browser's own; any server change.
+- **Verified**: 2392 Python tests (2390 passed, 2 skipped; 1 new in `test_lab_page.py`: the search field and
+  rows), pyflakes, tsc, the bundle (two passes; `deadwax-ui.js`, `deadwax-player.js` and the shared chunk byte
+  for byte HEAD's), and all 46 sims (`lab` 120, 22 new; `app-rules` 286, 3 new; `deck`, `decksound`,
+  `limiter`, `turntable` and `player` with no diff). 49 mutations, one per rule (the search's latestOnly,
+  pacing, settle and empty box, a failure said; the address's wrap, cap and canPlayType; `deckCap`; Bench's
+  setting and element; no window source and the key; the span's margin and reach; the windows' pre-check,
+  bound, grid, first grid point and 416; the stitching; the reader's offset; `voiceWindowFrom`; `pathExtent`'s
+  gain and smooth path; `unread`; the comparison's cap and the voice window's check; the pick forgotten on a
+  404 only; Bench's pick through latestOnly and held while locked; the picker's status, rows and lock; the
+  music line and flag; `SOUND_AGAIN` and Ready; the check's Carry on; the player's reload, problem, element
+  length (library only) and track and setting; the stylesheet's row height and ring), each file restored by
+  hash: all caught - the 416 only once a fake answered past the end as deadwax does. **In the real page**
+  (this worktree's own deadwax on 8104, the shared stand-in Navidrome on 4533, headless Chromium, real touch
+  and clicks, over plain http as `deadwax.test` and on localhost): 34 of 34 on both - the option after "Your
+  own file", the 17px labelled field, one search for the typing (`/deadwax/navidrome/search?q=tone…`), a row's
+  title, artist and album, length and format, the song picked (its title and artist under the record, 3:20 from
+  Navidrome), its stream at `/deadwax/navidrome/stream/615876f28078?format=raw` and its windows at
+  `/deadwax/navidrome/scrub/615876f28078?at=0&seconds=40`, Debug's Ready, a hand turn sounding, Record and A/B/C
+  with B and C from the scrub windows (`at=0` from the cache, `at=2`), the music line, a 2x motion recorded and
+  compared, a 5x turn over 45 s with the replay's windows asked again from the cache (30, 66, 102) and B and C
+  read from three more (60, 100, 136), no overflow at
+  390x844, 375x667, 844x390 and 1440x900, the song offered again after a reload and one tap taking it, deadwax
+  pointed at a port nothing listens on (a song that won't load said so, the search's failure, the remembered
+  song kept and said, Navidrome's line, a motion on the 440 Hz sine still running), Navidrome back and the song
+  offered again, no console errors; and 8 of 8 more on both - a 20x turn over 186 s giving A alone with the
+  reason, A playing alone, and Check this device from a library song back on the sines, Carry on starting it.
+  The bench's own real-page checks (builder36's driver, its loop taught to skip the new option as it skips the
+  file): 28 of 29 on both, Check this device finishing in 93 s - the 29th, Space, a check of the driver's still
+  looking for a button reading "Play", which .36's review renamed "Play the comparison": so corrected, that
+  part 11 of 11 on both.
+- **NOT verified**: James's "Eye in the Sky" (the stand-in Navidrome has no such song, and sends no
+  `samplingRate`, so a hi-res song's `max_rate=48000` is held by the sims alone); Safari and an iPhone (FLAC in
+  an MP4 for the stream, the windows decoded by WebKit); a non-FLAC song in a real page (the stand-in's are all
+  FLAC; the deck's own refusal is deck.sim's); the iPhone's memory on a long fling.
+

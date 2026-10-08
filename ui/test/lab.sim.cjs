@@ -41,7 +41,7 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-lab-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lab/signals.ts', 'src/lab/motions.ts', 'src/lab/analysis.ts', 'src/lab/compare.ts', 'src/lab/runner.ts', 'src/lab/listen.ts', 'src/lab/benchPlayer.ts', 'src/lab/check.ts', 'src/lab/watch.ts', 'src/lab/reading.ts', 'src/player/Turntable.tsx',
+  'src/lab/signals.ts', 'src/lab/motions.ts', 'src/lab/analysis.ts', 'src/lab/compare.ts', 'src/lab/runner.ts', 'src/lab/listen.ts', 'src/lab/benchPlayer.ts', 'src/lab/check.ts', 'src/lab/watch.ts', 'src/lab/reading.ts', 'src/lab/library.ts', 'src/player/Turntable.tsx',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -764,6 +764,11 @@ async function main() {
       [line(reading.STARTING, 'none', 'running', false), line(reading.READY, 'running', 'none', true), line(reading.SOUND_STOPPED, 'none', 'running', false),
         line('Turning it: Steady 1x', 'none', 'running', false), line(reading.READY, 'running', 'none', false), line(reading.SOUND_STOPPED, 'running', 'running', false)],
       [reading.READY, reading.SOUND_STOPPED, reading.READY, 'Turning it: Steady 1x', reading.READY, reading.SOUND_STOPPED])
+    //? (2.0.0-player.37) a song from the library takes the bench's own song's place on a turntable of its own,
+    //? its deck made afresh: the line says a tap starts the sound again, and Ready once one has
+    check('...and after the kind of song changed (a library song\'s turntable, or the bench\'s own again): Ready once the sound runs again',
+      [line(reading.SOUND_AGAIN, null, 'running', false), line(reading.SOUND_AGAIN, 'none', 'running', false), line(reading.SOUND_AGAIN, 'running', null, false)],
+      [reading.READY, reading.READY, reading.SOUND_AGAIN])
   }
 
   console.log('\nthe motions\' samples: 60 a second on the page\'s clock, along the path')
@@ -858,12 +863,26 @@ async function main() {
    * the song `playing` or paused; a motion run by lab/runner.ts and recorded with the deck's own recorder,
    * kept for the page. `probe` is handed the deck and the harness first, for the checks of its parts.
    */
-  async function deckRun({ host, playing = false, drift = false, jitter = true, probe = null }) {
+  async function deckRun({ host, playing = false, drift = false, jitter = true, probe = null, library = null }) {
     const rate = 48000
     const song = await signals.makeSignal('sine1k', rate, { seconds: 40 })
     const step = host === 'worklet' ? 256 : 1024
-    const world = { host, rate, rendered: 0, inbox: [], calls: [], node: null, script: null, taps: [], gains: [], output: new Float32Array(rate * 60), state: voice.newVoiceState(), audio0: real, connections: [], fetches: 0 }
-    define('fetch', async () => { world.fetches++; throw new Error('no deadwax here') })
+    const world = { host, rate, rendered: 0, inbox: [], calls: [], node: null, script: null, taps: [], gains: [], output: new Float32Array(rate * 60), state: voice.newVoiceState(), audio0: real, connections: [], fetches: 0, served: [] }
+    //? deadwax: none for a song the bench made - its windows are the bench's own - and, for a song from the
+    //? library (2.0.0-player.37), its scrub route faked at fetch: the song's samples [first, first + samples)
+    //? from where it is asked, as a WAV the fake context decodes, a 416 past the end
+    define('fetch', async (address) => {
+      world.fetches++
+      if (!library) throw new Error('no deadwax here')
+      world.served.push(address)
+      const query = new URL(address, 'http://deadwax.test').searchParams
+      try {
+        const w = signals.signalWindow(song, Number(query.get('at')), Number(query.get('seconds')))
+        return { ok: true, status: 200, headers: { get: (name) => (name.toLowerCase() === 'x-deadwax-window' ? `${w.first}/${w.samples}/${w.rate}` : null) }, arrayBuffer: async () => w.bytes }
+      } catch {
+        return { ok: false, status: 416, headers: { get: () => null }, json: async () => ({ detail: 'that is past the end of the song' }) }
+      }
+    })
     class FakeNode {
       constructor() { this.port = { postMessage: (message) => world.inbox.push(message), onmessage: null }; world.node = this }
       connect(to) { world.connections.push(['voice', to]) }
@@ -958,10 +977,10 @@ async function main() {
     //? the turntable on a song the bench made: its own windows, its own player
     const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
     const render = hooks.root(Turntable)
-    const name = `lab-sine1k-${host}${playing ? '-playing' : ''}${drift ? '-drift' : ''}${jitter ? '' : '-still'}`
+    const name = library ? library.track.id : `lab-sine1k-${host}${playing ? '-playing' : ''}${drift ? '-drift' : ''}${jitter ? '' : '-still'}`
     const player = {
-      track: { id: name, title: 'Sine 1 kHz', artist: 'Test bench', album: '', albumId: null, coverArt: null, duration: 40, contentType: 'audio/wav', suffix: 'wav', sampleRate: rate, bitDepth: 24, channels: 1 },
-      playing, duration: 40, maxRate: 'original', at: 12, listeners: new Set(),
+      track: library ? library.track : { id: name, title: 'Sine 1 kHz', artist: 'Test bench', album: '', albumId: null, coverArt: null, duration: 40, contentType: 'audio/wav', suffix: 'wav', sampleRate: rate, bitDepth: 24, channels: 1 },
+      playing, duration: 40, maxRate: library ? library.maxRate : 'original', at: 12, listeners: new Set(),
       log: [],
       seek(t) { this.log.push(['seek', real, t]); this.at = t; for (const l of this.listeners) l(t) },
       toggle() { this.log.push(['toggle', real, this.playing]); this.playing = !this.playing },
@@ -972,7 +991,8 @@ async function main() {
     const windowSource = (songNow, from, seconds) => { asked.push([songNow.id, from, seconds]); return Promise.resolve(signals.signalWindow(song, from, seconds)) }
     const deckRef = { current: null }
     const draw = () => {
-      const tree = render({ player, open: true, discArt: null, onPreview: () => {}, deck: deckRef, windowSource })
+      //? a song from the library: no window source at all, as the bench's library turntable draws it
+      const tree = render(library ? { player, open: true, discArt: null, onPreview: () => {}, deck: deckRef } : { player, open: true, discArt: null, onPreview: () => {}, deck: deckRef, windowSource })
       const walk = (node) => { if (!node || typeof node !== 'object') return; if (Array.isArray(node)) return node.forEach(walk); if (node.props?.ref) node.props.ref.current = { style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 372, height: 368 }) }; walk(node.props?.children) }
       walk(tree)
       render.commit()
@@ -1009,8 +1029,8 @@ async function main() {
     }
     const startWindow = windowAtStart ? { channels: decoded(windowAtStart.start, windowAtStart.decodedAt, Math.round((windowAtStart.end - windowAtStart.start) * windowAtStart.decodedAt)), start: windowAtStart.start, rate: windowAtStart.decodedAt } : null
     const exactMotion = data && result ? analysis.exactKnots(data.messages, result.samples, result.from, result.anchor, 40, motion.path, motion.speed) : null
-    const compareWith = (exact, pictures, recording = data) => compare({
-      recording, exact, measure: 'tonal', windowAtStart: startWindow, windowFor: decoded, motion: exactMotion,
+    const compareWith = (exact, pictures, recording = data, exactOver = null) => compare({
+      recording, exact, exactOver, measure: 'tonal', windowAtStart: startWindow, windowFor: decoded, motion: exactMotion,
       span: { from: exactMotion.knots[0].time, to: exactMotion.knots.at(-1).time }, pictures,
     })
     const compared = data && exactMotion ? await compareWith(song.exact, true) : null
@@ -1019,7 +1039,7 @@ async function main() {
     const at = player.log.findIndex(([what]) => what === 'release')
     const released = at < 0 ? null : player.log[at]
     const after = at < 0 ? [] : player.log.slice(at + 1).filter(([, when]) => when === released[1])
-    return { started, result, taken, data, exactMotion, compared, rate, compareWith, exact: song.exact, released, after }
+    return { started, result, taken, data, exactMotion, compared, rate, compareWith, exact: song.exact, released, after, song, world }
   }
 
   console.log('\nthe deck\'s window source, the in-page recording, the live spectrogram\'s analyser - and a replay of what the real deck played')
@@ -1169,6 +1189,294 @@ async function main() {
         [true, 'held', 'numbers', null],
         ['unreported', true],
         [false, true]])
+  }
+
+
+  /* ===== a song from your library (2.0.0-player.37) ===== */
+
+  const library = require(path.join(OUT, 'lab/library.js'))
+  const api = require(path.join(OUT, 'player/api.js'))
+  const { ApiError } = require(path.join(OUT, 'api/http.js'))
+  const wrap = require(path.join(OUT, 'lib/streamWrap.js'))
+
+  console.log('\na song from your library: found by Navidrome\'s search, paced, only the newest answer said')
+  {
+    //? a search whose answers come back when told, and timers the run moves on
+    const asked = []
+    const answers = []
+    const pending = []
+    let clock = 0
+    let waiting = []
+    const search = library.librarySearch({
+      search: (query, signal) => new Promise((resolve, reject) => {
+        asked.push(query)
+        pending.push({ query, resolve, reject, signal })
+      }),
+      onAnswer: (answer) => answers.push(answer.state === 'found' ? `${answer.query}: ${answer.songs.map((one) => one.title).join(', ')}` : `${answer.query}: ${answer.state}`),
+      setTimer: (run, ms) => { const timer = { at: clock + ms, run }; waiting.push(timer); return timer },
+      clearTimer: (timer) => { waiting = waiting.filter((one) => one !== timer) },
+    })
+    const pass = (ms) => {
+      clock += ms
+      for (const timer of waiting.filter((one) => one.at <= clock)) { waiting = waiting.filter((one) => one !== timer); timer.run() }
+    }
+    const answer = (query, titles) => pending.find((one) => one.query === query).resolve({ artists: [], albums: [], songs: titles.map((title) => ({ id: title, title })) })
+    //? typed a letter at a time, faster than it settles: asked once, LIBRARY_SETTLE_MS after the last
+    search.type('e'); pass(100); search.type('ey'); pass(100); search.type('eye'); pass(199)
+    const beforeSettled = asked.length
+    pass(1)
+    const once = [...asked]
+    //? then more, asked while the first answer is still out - and the NEWER answer comes back first
+    search.type('eye in the sky'); pass(200)
+    answer('eye in the sky', ['Eye in the Sky'])
+    await settle()
+    const newer = answers.at(-1)
+    //? the older answer, slow, lands after it: dropped - and its fetch was called off
+    answer('eye', ['Eye in the Sky', 'Eye of the Tiger'])
+    await settle()
+    const after = answers.at(-1)
+    const calledOff = pending.find((one) => one.query === 'eye').signal?.aborted
+    //? Enter asks at once; an empty box asks nothing, and nothing still out lands
+    search.now('sky')
+    search.type('')
+    answer('sky', ['Sky'])
+    await settle()
+    check('the search: asked once typing has stopped for LIBRARY_SETTLE_MS (200 ms) - not for every letter; a slow older answer never lands over a newer one (and its fetch is called off); Enter asks at once; an empty box asks nothing and lets go of what was out',
+      [library.librarySearch.length, beforeSettled, once, newer, after, calledOff, asked.at(-1), answers.at(-1), answers.includes('sky: Sky')],
+      [1, 0, ['eye'], 'eye in the sky: Eye in the Sky', 'eye in the sky: Eye in the Sky', true, 'sky', ': idle', false])
+    //? a failed search says why; a failure of a question superseded says nothing
+    const failing = []
+    const fails = library.librarySearch({ search: (query) => Promise.reject(new ApiError(503, "Navidrome isn't set up - fill in NAVIDROME_URL", 'failed')), onAnswer: (a) => failing.push(a), settleMs: 0 })
+    fails.now('eye')
+    await settle()
+    check('...a search that fails says why, in deadwax\'s own words', failing.map((a) => a.state === 'failed' ? a.problem : a.state), ['asking', "Navidrome isn't set up - fill in NAVIDROME_URL"])
+    check('...paced as the app\'s Search paces its library half: the same LIBRARY_SETTLE_MS', require(path.join(OUT, 'lib/searchQuery.js')).LIBRARY_SETTLE_MS, 200)
+  }
+
+  console.log('\na song from your library: played at the address the app\'s player asks for it at')
+  {
+    const song = (more) => ({ id: 'eye-in-the-sky', title: 'Eye in the Sky', artist: 'The Alan Parsons Project', album: 'Eye in the Sky', albumId: 'al-1', coverArt: 'al-1', duration: 276, contentType: 'audio/flac', suffix: 'flac', samplingRate: 44100, bitDepth: 16, channelCount: 2, ...more })
+    const chromium = (playable) => ({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36', maxTouchPoints: 0, canPlayType: (type) => (playable(type) ? 'probably' : '') })
+    const iphone = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1', maxTouchPoints: 5, canPlayType: (type) => (type === wrap.FLAC_IN_MP4 || type === 'audio/flac' ? 'maybe' : '') }
+    const everything = chromium(() => true)
+    const noOpus = chromium((type) => !type.includes('opus'))
+    const address = (s, browser, cap) => library.libraryAddress(library.libraryTrack(s), browser, cap)
+    //? the app's own helpers, asked as usePlayer asks them
+    const apps = (s, browser, cap) => { const track = library.libraryTrack(s); return api.streamUrl(track, (type) => browser.canPlayType(type) !== '', wrap.wrapsFlac(browser), cap) }
+    const cases = [
+      [song({}), everything, '48000'], [song({}), iphone, '48000'],
+      [song({ samplingRate: 96000, bitDepth: 24 }), everything, '48000'], [song({ samplingRate: 96000, bitDepth: 24 }), everything, 'original'],
+      [song({ samplingRate: 96000, bitDepth: 24 }), iphone, '48000'],
+      [song({ suffix: 'opus', contentType: 'audio/ogg' }), noOpus, '48000'], [song({ suffix: 'mp3', contentType: 'audio/mpeg' }), everything, '48000'],
+    ]
+    check('a CD-quality FLAC in Chromium as it is; in Safari (an iPhone) inside an MP4; a 96 kHz FLAC under "Up to 48 kHz" resampled (inside an MP4, in any browser), under "Original" as it is; an Opus song this browser can\'t play as Navidrome\'s MP3; an MP3 as it is',
+      cases.map(([s, browser, cap]) => address(s, browser, cap)),
+      ['/deadwax/navidrome/stream/eye-in-the-sky?format=raw', '/deadwax/navidrome/stream/eye-in-the-sky?format=raw&wrap=mp4',
+        '/deadwax/navidrome/stream/eye-in-the-sky?format=raw&wrap=mp4&max_rate=48000', '/deadwax/navidrome/stream/eye-in-the-sky?format=raw',
+        '/deadwax/navidrome/stream/eye-in-the-sky?format=raw&wrap=mp4&max_rate=48000',
+        '/deadwax/navidrome/stream/eye-in-the-sky?format=mp3', '/deadwax/navidrome/stream/eye-in-the-sky?format=raw'])
+    check('...each exactly what the app\'s helpers give for it (streamUrl, canPlayType, wrapsFlac, resamples)', cases.every(([s, browser, cap]) => address(s, browser, cap) === apps(s, browser, cap)), true)
+    const track = library.libraryTrack(song({ samplingRate: 96000, bitDepth: 24 }))
+    check('the app\'s own track for it (toQueueTrack): what the turntable reads of it, as of the app\'s - and the deck\'s cap Turntable\'s host\'s rule: 48000 for a hi-res FLAC under "Up to 48 kHz", none as it is or for a CD-quality song',
+      [track, library.deckCap(track, '48000'), library.deckCap(track, 'original'), library.deckCap(library.libraryTrack(song({})), '48000'), library.formatLine(track), library.formatLine(library.libraryTrack(song({ samplingRate: undefined, bitDepth: undefined, channelCount: undefined })))],
+      [{ id: 'eye-in-the-sky', title: 'Eye in the Sky', artist: 'The Alan Parsons Project', album: 'Eye in the Sky', albumId: 'al-1', coverArt: 'al-1', duration: 276, contentType: 'audio/flac', suffix: 'flac', sampleRate: 96000, bitDepth: 24, channels: 2 },
+        48000, null, null, 'FLAC, 24-bit, 96 kHz, stereo', 'FLAC'])
+  }
+
+  console.log('\na song from your library, remembered: offered again once Navidrome has it, forgotten when it hasn\'t')
+  {
+    const kept = new Map()
+    const storage = { getItem: (key) => kept.get(key) ?? null, setItem: (key, value) => kept.set(key, value), removeItem: (key) => kept.delete(key) }
+    const eye = { id: 'eye', title: 'Eye in the Sky', artist: 'The Alan Parsons Project' }
+    const nothing = await library.checkPick(async () => { throw new Error('never asked') }, storage)
+    library.writePick(eye, storage)
+    const keptAs = [library.PICK_KEY, JSON.parse(kept.get(library.PICK_KEY)), library.readPick(storage)]
+    const found = await library.checkPick(async (id) => ({ ...eye, id, duration: 276 }), storage)
+    const away = await library.checkPick(async () => { throw new ApiError(503, "Navidrome isn't answering", 'failed') }, storage)
+    const stillKept = library.readPick(storage)
+    const gone = await library.checkPick(async () => { throw new ApiError(404, 'Song not found', 'failed') }, storage)
+    const afterGone = [kept.has(library.PICK_KEY), library.readPick(storage)]
+    //? storage that can't be read, or holds something else: nothing remembered, nothing thrown
+    const broken = { getItem: () => { throw new Error('denied') }, setItem: () => { throw new Error('full') }, removeItem: () => { throw new Error('denied') } }
+    kept.set(library.PICK_KEY, '{not json')
+    const odd = [library.readPick(broken), (library.writePick(eye, broken), 'no throw'), (library.forgetPick(broken), 'no throw'), library.readPick(storage), library.readPick(null)]
+    check('nothing kept: nothing offered, Navidrome not asked; kept: its id, title and artist; Navidrome has it: offered; Navidrome away: kept, said; Navidrome hasn\'t it (a 404): forgotten; storage refusing or holding nonsense: nothing remembered, nothing thrown',
+      [nothing.state, keptAs, [found.state, found.song?.duration], [away.state, away.problem], stillKept, gone.state, afterGone, odd],
+      ['none', [library.PICK_KEY, eye, eye], ['found', 276], ['failed', "Navidrome isn't answering"], eye, 'forgotten', [false, null], [null, 'no throw', 'no throw', null, null]])
+  }
+
+  console.log('\nthe comparison on a library song: the windows over the path, decoded, read by the sinc from where each starts')
+  {
+    const rate = 44100
+    const songNow = await signals.makeSignal('sweep', rate, { seconds: 120 })
+    //? the long sinc from a window that starts at sample 220500 (5 s in) reads what it reads over the song
+    //? held whole - the same samples placed by their first; outside the window, silence
+    const whole = signals.sampledReader(songNow.channels[0], rate)
+    const first = 220500
+    const part = signals.sampledReader(songNow.channels[0].subarray(first, first + rate * 10), rate, first)
+    const at = [5.5, 7.25, 9.123456]
+    const diff = Math.max(...at.flatMap((t) => [22050, 8000, 3000].map((cutoff) => Math.abs(whole(t, cutoff) - part(t, cutoff)))))
+    const unplaced = signals.sampledReader(songNow.channels[0].subarray(first, first + rate * 10), rate)
+    check('the offset sampled reader: from a window starting 5 s in, the song\'s own reading at full band and with the cutoff lowered (within 1e-9); unplaced, it reads the wrong stretch; outside the window, silence',
+      [diff < 1e-9, Math.abs(unplaced(7.25, 22050) - whole(7.25, 22050)) > 1e-3, part(2, 22050), part(30, 22050)], [true, true, 0, 0])
+    //? where the paths went, and the span read: the lowest to highest place, plus the reach at the fastest,
+    //? plus the margin - inside the song
+    const pos = Float64Array.from([10, 10.5, 11, 99]), speed = Float64Array.from([1, 1, 2, 30]), gain = Float64Array.from([1, 1, 1, 0])
+    const x = Float64Array.from([9.8, 11.2]), v = Float64Array.from([0.5, 1.5]), gainX = Float64Array.from([1, 1])
+    const extent = compareModule.pathExtent(pos, speed, gain, x, v, gainX)
+    const span = library.readSpan(extent, 48000, rate, 120)
+    const reach = 48 * Math.max(1 / rate, 2 / 48000)
+    check('where the paths went: only where they sound (a place with no gain left out), the lowest, highest and fastest over both; the span read covers it, the reader\'s reach at the fastest and half a second either side, inside the song',
+      [extent, round(span.from, 9), round(span.to, 9), library.readSpan({ lowest: 0.2, highest: 119.9, fastest: 1 }, 48000, rate, 120), compareModule.pathExtent(pos, speed, Float64Array.from([0, 0, 0, 0]), x, v, Float64Array.from([0, 0]))],
+      [{ lowest: 9.8, highest: 11.2, fastest: 2 }, round(9.8 - reach - library.READ_MARGIN_S, 9), round(11.2 + reach + library.READ_MARGIN_S, 9), { from: 0, to: 120 }, null])
+    //? deadwax faked: a window from the frame at or before what was asked (here up to 0.1 s before), WINDOW_S
+    //? long - or `budget` seconds, as a hi-res song's is cut short - and a 416 past the end
+    const fake = (budget = 40) => {
+      const asked = []
+      const fetchWindow = async (at) => {
+        asked.push(at)
+        const begin = Math.max(0, Math.floor(at * 10) / 10 - 0.07)
+        const w = signals.signalWindow(songNow, begin, Math.min(40, budget))
+        return { bytes: w.bytes, first: w.first, samples: w.samples, rate: w.rate }
+      }
+      return { asked, fetchWindow }
+    }
+    const one = fake()
+    const got1 = await library.readWindows({ from: 13.3, to: 30 }, one.fetchWindow)
+    const two = fake()
+    const got2 = await library.readWindows({ from: 13.3, to: 75 }, two.fetchWindow)
+    const covered = (got, span) => got[0].first / rate <= span.from && got.every((w, i) => i === 0 || w.first <= got[i - 1].first + got[i - 1].samples) && (got.at(-1).first + got.at(-1).samples) / rate >= span.to
+    const short = fake(13)
+    const got3 = await library.readWindows({ from: 13.3, to: 45 }, short.fetchWindow)
+    let tooMany = null, tooWide = null
+    const many = fake(13)
+    try { await library.readWindows({ from: 1, to: 60 }, many.fetchWindow) } catch (error) { tooMany = error.name }
+    const wide = fake()
+    try { await library.readWindows({ from: 1, to: 1 + 4 * 40 + 1 }, wide.fetchWindow) } catch (error) { tooWide = [error.name, error.message] }
+    //? past the song's end: as far as it goes - a window that adds nothing, or deadwax's 416 for a start at
+    //? or past the end (asked exactly where the last window ended, as deadwax answers it)
+    const end = fake()
+    const got4 = await library.readWindows({ from: 100, to: 125 }, end.fetchWindow)
+    const strictAsked = []
+    let got5 = null
+    try {
+      got5 = await library.readWindows({ from: 100, to: 125 }, async (at) => { strictAsked.push(at); const w = signals.signalWindow(songNow, at, 40); return { bytes: w.bytes, first: w.first, samples: w.samples, rate: w.rate } })
+    } catch (error) {
+      got5 = error.message
+    }
+    check('the windows read: one for a path within one, asked on the deck\'s grid; two for a path wider than one, the second from the grid point at or before where the first ended; three of a hi-res song\'s short windows for 31 s; more than COMPARE_WINDOWS_MAX (4) refused - a span past 4 windows\' worth before anything is asked; at the song\'s end, as far as it goes (a window that adds nothing ends it, as does deadwax\'s 416 past the end)',
+      [[one.asked, covered(got1, { from: 13.3, to: 30 })], [two.asked, got2.length, covered(got2, { from: 13.3, to: 75 })], [short.asked.length, covered(got3, { from: 13.3, to: 45 })],
+        [tooMany, many.asked.length], [tooWide?.[0], wide.asked.length, /more than 4 of deadwax's windows/.test(tooWide?.[1] ?? '')], [end.asked, got4.length, (got4.at(-1).first + got4.at(-1).samples) / rate],
+        [strictAsked, Array.isArray(got5) ? got5.length : got5], library.COMPARE_WINDOWS_MAX],
+      [[[12], true], [[12, 50], 2, true], [3, true], ['TooWide', 4], ['TooWide', 0, true], [[100, 120], 1, 120], [[100, 120], 1], 4])
+    //? laid side by side by their first samples: the song's own samples over them, each sample the window's
+    const decode = async (bytes, rateNow) => { const wav = signals.readWav(bytes); if (wav.rate !== rateNow) throw new Error('decoded at another rate'); return wav.channels }
+    const stitched = await library.stitchWindows(got2, decode)
+    const wav = signals.readWav(signals.signalWindow(songNow, stitched.first / rate, (stitched.samples.length + 1) / rate).bytes).channels[0]
+    let worst = 0
+    for (let i = 0; i < stitched.samples.length; i++) worst = Math.max(worst, Math.abs(stitched.samples[i] - wav[i]))
+    check('...laid side by side by their first samples: the song\'s own samples from the first window\'s start to the last one\'s end, sample for sample',
+      [stitched.first === got2[0].first, stitched.samples.length === got2.at(-1).first + got2.at(-1).samples - got2[0].first, worst, stitched.rate], [true, true, 0, rate])
+    //? and the window the voice had, asked again: from the grid point it began within - its own start, or
+    //? the next grid point when deadwax began it on a frame or fragment before
+    check('the voice\'s window asked again from the grid point the deck asked it from',
+      [library.voiceWindowFrom(0), library.voiceWindowFrom(38), library.voiceWindowFrom(37.95), library.voiceWindowFrom(36.2), library.voiceWindowFrom(1675800 / 44100), library.voiceWindowFrom(38 + 1e-12)],
+      [0, 38, 38, 38, 38, 38])
+    //? music has no "what isn't the signal": said so, where a tone has its number
+    const numbers = { strayed: null, wobble: { deadwax: 0.01, smooth: 0.01 }, stray: null, silenceDb: null, replayDb: -100, alignScore: 1, leadMs: 0, fitMs: 0.0001, taken: true }
+    const labels = (rows) => rows.map((row) => row.label)
+    check('the numbers on music: the wobble, the read head, the replay - and "what isn\'t the signal" said not to be measured on music, with why; on a tone, its number, and no such line',
+      [labels(reading.numberRows(numbers, true)), reading.numberRows(numbers, true).find((row) => row.value === 'Not measured on music') === reading.NOT_ON_MUSIC, labels(reading.numberRows(numbers)),
+        labels(reading.numberRows({ ...numbers, stray: { db: -80, loudest: null } }, true))],
+      [['Read head off the smooth path', 'Speed wobble above 20 Hz', "What isn't the signal", 'The replay'], true, ['Read head off the smooth path', 'Speed wobble above 20 Hz', 'The replay'],
+        ['Read head off the smooth path', 'Speed wobble above 20 Hz', "What isn't the signal (A against B)", 'The replay']])
+  }
+
+  console.log('\nthe library song\'s player: the app\'s track and setting, what its element can play, a song that won\'t load, the element\'s own length')
+  {
+    class FakeAudio {
+      constructor() { this.paused = true; this.currentTime = 0; this.seeking = false; this.listeners = {}; this.address = null; this.preload = ''; this.duration = NaN; this.error = null; this.loads = 0 }
+      addEventListener(name, f) { (this.listeners[name] ??= new Set()).add(f) }
+      removeEventListener(name, f) { this.listeners[name]?.delete(f) }
+      fire(name) { for (const f of [...(this.listeners[name] ?? [])]) f() }
+      play() { this.paused = false; return Promise.resolve() }
+      pause() { this.paused = true }
+      load() { this.loads++; this.error = null; this.duration = NaN }
+      set src(address) { this.address = address; this.load() }
+      get src() { return this.address }
+      getAttribute(name) { return name === 'src' ? this.address : null }
+      removeAttribute() { this.address = null; this.load() }
+      canPlayType(type) { return type === 'audio/flac' ? 'probably' : '' }
+    }
+    const made = []
+    const page = globalThis.document
+    define('document', { ...page, createElement: (tag) => { const element = tag === 'audio' ? new FakeAudio() : {}; made.push(element); return element } })
+    const { useBenchPlayer, loadProblem } = require(path.join(OUT, 'lab/benchPlayer.js'))
+    const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
+    const render = hooks.root(useBenchPlayer)
+    const track = library.libraryTrack({ id: 'eye', title: 'Eye in the Sky', artist: 'The Alan Parsons Project', duration: 276, suffix: 'flac', contentType: 'audio/flac', samplingRate: 96000, bitDepth: 24, channelCount: 2 })
+    const songOf = (n) => ({ id: `library-eye-${n}`, title: 'Eye in the Sky', seconds: 276, rate: 96000, channels: 2, url: '/deadwax/navidrome/stream/eye?format=raw&wrap=mp4&max_rate=48000', library: { track, maxRate: '48000' } })
+    let player = render(songOf(1)); render.commit(); player = render(songOf(1))
+    const element = made.find((one) => one instanceof FakeAudio)
+    const first = [player.track === track, player.maxRate, player.duration, player.canPlayType('audio/flac'), player.problem, element.src]
+    element.duration = 275.62; element.fire('durationchange'); player = render(songOf(1))
+    const length = player.duration
+    element.error = { code: 4 }; element.fire('error'); player = render(songOf(1))
+    const failed = [player.problem, player.playing]
+    //? the same song picked again: a new id, the same address - loaded again, the problem let go of
+    const loadsBefore = element.loads
+    player = render(songOf(2)); render.commit(); player = render(songOf(2))
+    check('a library song: the app\'s own track and its Maximum quality to the turntable; Navidrome\'s length until the element knows its own (as usePlayer\'s songLength); what its one element can play; a song that won\'t load said plainly; picked again, asked for again',
+      [first, length, failed, element.loads > loadsBefore, player.problem, loadProblem(2), loadProblem(undefined)],
+      [[true, '48000', 276, 'probably', null, '/deadwax/navidrome/stream/eye?format=raw&wrap=mp4&max_rate=48000'], 275.62,
+        ["deadwax or Navidrome didn't send it, or this browser can't play what they sent", false], true, null, 'the connection broke off while it loaded', 'the browser gave no reason'])
+    //? a song the bench made keeps its own length whatever its element says - nothing about it changed
+    const wav = { id: 'lab-1', title: 'Sine', seconds: 120, rate: 44100, channels: 1, url: 'blob:1' }
+    player = render(wav); render.commit(); player = render(wav)
+    element.duration = 119.5; element.fire('durationchange'); player = render(wav)
+    check('...a song the bench made: its own length, its own track, "Original" - as before', [player.duration, player.track.suffix, player.maxRate], [120, 'wav', 'original'])
+    render.unmount()
+    define('document', page)
+  }
+
+  console.log('\nthe real deck on a library song: no window source - it asks deadwax\'s scrub route, as the app\'s does - and B and C read from deadwax\'s windows')
+  for (const host of ['worklet', 'script']) {
+    const track = library.libraryTrack({ id: 'eye in the sky/1', title: 'Eye in the Sky', artist: 'The Alan Parsons Project', duration: 40, suffix: 'flac', contentType: 'audio/flac', samplingRate: 96000, bitDepth: 24, channelCount: 1 })
+    const run = await deckRun({
+      host, library: { track, maxRate: '48000' },
+      probe: async ({ deck, world, asked }) => {
+        const report = deckModule.deckReport()
+        check(`${host}: with no window source the deck asks deadwax's scrub route for the song's window - its id, on the deck's grid, 40 s, at the cap Turntable's host works out (48000 for a hi-res FLAC under "Up to 48 kHz") - and plays it`,
+          [asked.length, world.served.length >= 1, /^\/deadwax\/navidrome\/scrub\/eye%20in%20the%20sky%2F1\?at=\d*[02468]&seconds=40&max_rate=48000$/.test(world.served[0] ?? ''), library.deckCap(track, '48000'), report?.window?.kind, deck.live()],
+          [0, true, true, 48000, 'FLAC', true])
+      },
+    })
+    //? B and C read from the song's windows over the path - the windows asked of the scrub route as the
+    //? deck asks them, at its cap, laid side by side - against B and C read from the song's own definition
+    const cap = library.deckCap(track, '48000')
+    const decodeWav = async (bytes) => signals.readWav(bytes).channels
+    const asked = []
+    const exactOver = async (extent) => {
+      const span = library.readSpan(extent, run.rate, run.rate, 40)
+      const windows = await library.readWindows(span, (at) => { asked.push(at); return api.scrubWindow(track.id, at, 40, undefined, cap) })
+      const stitched = await library.stitchWindows(windows, decodeWav)
+      return signals.sampledReader(stitched.samples, stitched.rate, stitched.first)
+    }
+    const fromWindows = await run.compareWith(null, false, run.data, exactOver)
+    const fromDefinition = await run.compareWith(run.exact, false)
+    const gap = (a, b) => { let d = 0, e = 0; for (let i = 0; i < a.length; i++) { d += (a[i] - b[i]) ** 2; e += b[i] ** 2 } return 10 * Math.log10(d / e) }
+    console.log(`    (${host}: B from the windows against B from the definition ${round(gap(fromWindows.clips.B, fromDefinition.clips.B), 1)} dB, C ${round(gap(fromWindows.clips.C, fromDefinition.clips.C), 1)} dB; asked at ${JSON.stringify(asked)})`)
+    check(`${host}: B and C read from deadwax's windows over the path are the song read exactly (within -100 dB of reading its definition), with nothing left out; the numbers that need only the paths the same either way`,
+      [fromWindows.unread, gap(fromWindows.clips.B, fromDefinition.clips.B) < -100, gap(fromWindows.clips.C, fromDefinition.clips.C) < -100,
+        JSON.stringify(fromWindows.numbers.wobble) === JSON.stringify(fromDefinition.numbers.wobble), fromWindows.numbers.replayDb === fromDefinition.numbers.replayDb, asked.length >= 1, asked.every((at) => at % 2 === 0)],
+      [null, true, true, true, true, true, true])
+    //? where the windows can't be had - too wide, or deadwax not sending one - A and the paths' numbers stand,
+    //? B and C left out with why
+    const refused = await run.compareWith(null, false, run.data, async () => { throw new library.TooWide(300) })
+    check(`${host}: windows that can't be had: no B or C, said why; A, the wobble, the read head and the replay all the same`,
+      [refused.clips.B, refused.clips.C, /more than 4 of deadwax's windows/.test(refused.unread ?? ''), refused.clips.A.length === fromDefinition.clips.A.length,
+        JSON.stringify(refused.numbers.wobble) === JSON.stringify(fromDefinition.numbers.wobble), JSON.stringify(refused.numbers.strayed) === JSON.stringify(fromDefinition.numbers.strayed), refused.numbers.stray],
+      [null, null, true, true, true, true, null])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')
