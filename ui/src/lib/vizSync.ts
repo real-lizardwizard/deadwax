@@ -31,6 +31,10 @@
  *    song that isn't a FLAC, is refused, failed under VIZ_RETRY_MS ago, or is already in hand
  *    (`ahead`; player/vizAudio.ts takes it up as the song changes - takeAhead below). Asked even while
  *    this song can't be seen itself (not a FLAC, refused): the next may be.
+ *  - THE PLAYER'S SPEED (2.0.0-player.39): the copy plays at it - its AudioBufferSourceNode's
+ *    playbackRate - so it keeps the element's pace and the drift rule never has a speed to re-sync it
+ *    for; where it has got to is `copyAt` of its anchor, at that rate, re-anchored where the speed
+ *    changes (`reanchor`). What it shows follows - a song at 2x reads twice the tempo, which is right.
  */
 
 /** How much of the song a window holds, how far before the playhead it starts and on what grid -
@@ -107,6 +111,25 @@ export interface SyncInput {
 }
 
 export type Seeing = 'nothing' | 'seen' | 'waiting' | 'paused' | 'unseen'
+
+/** Where the copy was started (or last re-anchored): its place in the song, the audio context's time
+ *  then, and the rate it plays at (2.0.0-player.39 - the player's speed). */
+export interface CopyAnchor {
+  at: number
+  time: number
+  rate: number
+}
+
+/** Where the copy has got to at context time `now`: from its anchor, at its rate. */
+export function copyAt(anchor: CopyAnchor, now: number): number {
+  return anchor.at + anchor.rate * (now - anchor.time)
+}
+
+/** The anchor moved to `now` at a new rate - where it has got to, from here at `rate` - so a change of
+ *  speed never jumps it. */
+export function reanchor(anchor: CopyAnchor, now: number, rate: number): CopyAnchor {
+  return { at: copyAt(anchor, now), time: now, rate }
+}
 
 export interface SyncPlan {
   /** stop the copy running (it is wrong, or not wanted) */

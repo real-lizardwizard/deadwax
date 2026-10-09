@@ -1,6 +1,7 @@
 # The turntable: the look, and momentum with its own sound
 
-The turntable (2.0.0-player.11), part two (.14) and its fix after James's report (.16).
+The turntable (2.0.0-player.11), part two (.14) and its fix after James's report (.16) - and the speed
+fader beside it (.39), which is the player's speed: see "The speed fader (2.0.0-player.39)" at the end.
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 
@@ -303,7 +304,8 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   the mini player - it fetched a fresh 40 s window every 2 s; with the worklet failed it did the same and
   decoded each). `onAudio` asks once there is somewhere to put it. WINDOW_S (40) from WINDOW_BACK_S (4)
   before the playhead, on a WINDOW_GRID_S (2) grid so the phone's cache (`private, max-age=300`) answers a
-  window asked again, refreshed once the playhead is within REFRESH_AHEAD_S (6) of its end, and fetched on
+  window asked again, refreshed once the playhead is within REFRESH_AHEAD_S (6) of its end (6 s of listening:
+  faster than 1x, that times the speed - see "The speed fader (2.0.0-player.39)"), and fetched on
   demand when a hand or a coast goes outside it - and AT THE RELEASE over the whole of where a coast will go
   (`keepPath`: a backwards flick runs back past the window's start, and a sounding coast used to go silent
   there). ONE window is on its way at a time, from the ask until it is in the voice (`pending`, 'fetch'
@@ -316,7 +318,8 @@ running while it shows. PHONE ONLY, like the turntable. The spec is the session 
   first, so no check can show the floor alone). **Cost**: a window is fetched whole, so 40 s over the 30
   the playhead crosses before the next - a third more than the song's own stream while the turntable shows
   and plays; for a hi-res song played as it is about half as much again (13 s windows: about 7 a minute,
-  where the first cut asked 29). **Measured** with the deck's own rules over the server's real cuts of a generated 4-minute
+  where the first cut asked 29). At 2x a window moves on by 24 s, not 30 (the margin ahead doubled to keep
+  6 s of listening to fetch and decode in): 40/24, two thirds more than the song's own stream. **Measured** with the deck's own rules over the server's real cuts of a generated 4-minute
   CD-quality FLAC (pink noise and a tone, 500 kbps): 6 windows of 2.5 MB in 3 minutes, 5.0 MB a minute
   against the song's own 3.75 (1.33x; 1.36x cut from the fragmented MP4, whose cuts are whole fragments).
   A typical 900 kbps CD FLAC would be about 9 MB a minute. Info > Debug's row says what windows have cost
@@ -636,3 +639,259 @@ doesn't work on my mac either". A fix to .14, not a feature; the spec is the ses
   and 22 for the fixes, every one caught (one - a drive's `until` not moved with its `time` - only once
   a check for it was added). NOT measured anywhere but the harness: the chirp's absence and the 43 ms
   lag by ear, on a phone - James's list.
+
+### The speed fader (2.0.0-player.39)
+
+James (2026-10-08), once the turntable's scrub sound was settled (blind, he can't tell deadwax's from an
+ideal turntable's): "let's add the speed slider" - then "actually let's stick to .25-2x". First proposed
+on 2026-10-07 as an RPM slider: a pitch fader beside the turntable, the pitch moving with the speed as on
+a record deck, kept per device, done with the song's own playbackRate (an engine change). He listens on
+Bluetooth earbuds, mostly on his iPhone, over plain http. The spec is the scratch's `uplan/slice-speed.md`.
+
+- **The speed is the PLAYER's** (`player/usePlayer.ts`, the one engine change): 0.25x to 2x in
+  hundredths (`lib/playSpeed.ts`, pure: `SPEED_MIN`/`SPEED_MAX`, `clampSpeed`, the words), kept per device
+  as `deadwax-player-speed` (`readPlayerSpeed` in `state/persisted.ts`: a number 0.25 to 2, else 1; every
+  read and write in try/catch). Not React state: `speed()`, `onSpeed()` and the `useSpeed()` hook beside
+  `usePosition()`, so a fader moving it 60 times a second re-renders the fader and the chip, never App.
+  `setSpeed()` (held to the range) puts it on EVERY element at once - the standby too - writes it, tells
+  the lock screen (`updatePositionState`, which already carried `audio.playbackRate`), restarts the
+  measured pace - from the update AFTER the change (`paceFrom = false`): the step from the update before
+  it to the next is part old speed, part new, and counted it read 2x to 0.25x as 0.39x for seconds
+  (review) - and tells the listeners.
+- **How it is put on an element** (`applySpeed`): its `playbackRate` AND its `defaultPlaybackRate`, and
+  the pitch switch let go. A load puts playbackRate back to the default - the media element load
+  algorithm's step 7, WebKit `HTMLMediaElement.cpp:1733` and Chromium `html_media_element.cc:1243` (both
+  read at main on 2026-10-08) - so with the default set too, every load keeps the speed: a new song, a
+  reload of a failed one (`audio.load()`), the stream attaching its MediaSource (`element.src =` a blob:
+  address, or `srcObject`), the standby's preload, AirPlay's leave of the stream. The pitch switch is kept
+  by the element across loads (WebKit passes `m_preservesPitch` to the new player, `:2092`; Chromium
+  `SetPreservesPitch`, `:1821`). And `applySpeed(audio)` again just before every `play()` - a handover's
+  standby included - belt and braces for an engine that forgot the default (seen in neither engine's
+  source; player.sim holds it with a hypothetical one). The page's element gets it as the engine starts,
+  the spare as it is made. Only what differs is written.
+- **1x is untouched - read from the source, not assumed.** Chromium resamples whenever pitch preservation
+  is OFF, even at rate 1 (`AudioRendererAlgorithm::ChooseBufferMode`, `audio_renderer_algorithm.cc:341-
+  349`: "Always resample when we don't care about pitch"), through a SincResampler whose kernel is a
+  low-pass at 0.9 of Nyquist - not a passthrough; with it ON, rate 1 is a straight copy (`kPassthrough`,
+  `:355-361`). WebKit chooses AVFoundation's Varispeed at rate 1 whatever preservesPitch says
+  (`MediaSessionManagerCocoa.mm:252`: `if (!preservesPitch || !rate || rate == 1.) return
+  AVAudioTimePitchAlgorithmVarispeed`), so there it makes no difference. So the switch is let go only
+  while the speed isn't 1 - BEFORE the rate going off 1x, and held again AFTER it coming back, so no
+  render quantum plays a time-stretch at the new rate - and at 1x on an element that never had another
+  speed not one property is written (player.sim counts the writes: none, through handovers, a reload and
+  a stream). Firefox reads its samples unprocessed when the rate is 1 either way (`AudioStream.cpp:766-
+  770`).
+- **What browsers do at 0.25-2x.** Chromium takes 0.0625-16 (`html_media_element.h:128-129`,
+  `IsValidPlaybackRate` `:338-340`), throwing NotSupportedError outside it from playbackRate and silently
+  ignoring it from defaultPlaybackRate (`:2930`, `:2949`); its renderer no longer mutes any rate (the
+  header's "muted to preserve quality" comment is stale - FillBuffer has no range check). Firefox clamps
+  to 1/16-16 and MUTES outside 1/threshold..threshold, the pref `media.audio.playbackrate.muting_threshold`
+  8 (`HTMLMediaElement.cpp:185-200`, `:7883`; `StaticPrefList.yaml:14293`) - none of 0.25-2. WebKit takes
+  any rate (no range check, `HTMLMediaElement.cpp:4464-4490`; HLS-only quirks cap 2) and hands it to
+  `[AVPlayer setRate:]` (`MediaPlayerPrivateAVFoundationObjC.mm:1721`) or the MSE renderer's synchronizer
+  (`AudioVideoRendererAVFObjC.mm:518-532`), with Varispeed off 1x when preservesPitch is false.
+  AVFoundation: Varispeed takes 1/32-32 (`AVAudioProcessingSettings.h:43-45`, iOS 17.5 SDK); an
+  AVPlayerItem ready to play plays 1.0-2.0 "even if canPlayFastForward is NO", and 0-1 only where
+  `canPlaySlowForward` says so (`AVPlayerItem.h:277-283`) - WebKit caches canPlayFastForward but never
+  clamps a rate to it (only scanning uses maxFastForwardRate). So 1-2x is promised on an iPhone, and
+  0.25-1x depends on the item - NOT VERIFIED. And `AVSampleBufferAudioRenderer.h:136`: the renderer
+  "may flush enqueued media data" when the rate changes - a change of speed during the one stream may
+  drop a moment of audio on an iPhone (NOT VERIFIED). None of it is hidden: **Info > Debug's "Speed"
+  row** (`speedRow` in `lib/debugRows.ts`, after Gapless) says the speed, whether the pitch switch reads
+  let go or held (`speedReading()` reads the live element's switch by `pitchSwitch`: the standard name,
+  else `webkitPreservesPitch`, else `mozPreservesPitch`, else "no switch"), a rate the browser threw at
+  (its words), a rate that reads back as another, and - because WebKit's playbackRate getter returns the
+  rate asked for whatever AVFoundation does (`m_requestedPlaybackRate`) - the song's OWN pace measured
+  against the page's clock over the last `PACE_WINDOW_S` (8 s) of playing (`paceStep`/`paceOf`, steps
+  from an update that followed another while playing: never across a seek, a pause, a load or a change of
+  speed - each held by a player.sim check, the change of speed with a fake clock that runs at the old rate
+  until the write, as a real one does). A browser that says yes and plays 1x shows there. The row is live
+  while Debug shows (review: it was read only when Info drew, so on a desktop, whose panel isn't modal, it
+  said 1.50x beside a song the bar's chip had put back to 1x, and a pace that came after Debug opened never
+  appeared): InfoSheet listens on `onSpeed` and reads again every `SPEED_READ_MS` (1 s) while the Debug
+  tab is open, asking for a redraw only when the reading changes - the pace to the hundredth the row
+  says; nothing on About or closed (info.sim). Firefox's muting can't be read back (none in range).
+- **AirPlay** (read in WebKit): nothing AirPlay-specific touches the rate. The AVPlayer carries it while
+  `externalPlaybackActive`, the same `setRate:`; the newer wireless media engine rebuild carries
+  `playbackRate()` across in its `RemotePlaybackConfiguration` and puts it back (`HTMLMediaElement.cpp:
+  1488`, `:3327-3335`). deadwax's side: AirPlay always plays the URL way (the stream leaves in the same
+  tap, `leaveStream` → `setSource` → a load, which keeps the default) - player.sim holds it. Whether an
+  AirPlay speaker plays a rate other than 1, and with Varispeed's pitch, is the receiver's - NOT VERIFIED.
+- **The wall-clock rules already took the element's rate** - `listenedStep` (`rate`), `clockStep`'s
+  back-dating, `splitAcrossJoin`/`joinStallMs`, `seekStep`'s end judgement (`event.rate`) - so none of
+  the engine's lib files changed. Pinned at 0.25x and 2x: the pure numbers in `playspeed.sim`, and through
+  the real engine in `player.sim` (a play counted at 2x, a handover's gap a few ms at 0.25x and 0.8x, a
+  7 s early landing judged as 7 s at 2x and 2 s as 2 s at 0.25x). `streamSource.ts` buffers in media
+  seconds, so at 2x a stream needs twice the bytes a second and its cushion lasts half as long in wall
+  time - unchanged, unmeasured on WireGuard.
+- **The fader** (`player/SpeedFader.tsx`, drawn by Turntable inside its stage - so OUTSIDE Now Playing's
+  grip, as the record and the arm - only when handed a player: Now Playing's `fader={player}`; the test
+  bench gives none and has none). The board has no fader, so it is designed in its style from the theme's
+  tokens: a sunken slot (STYLE.md's track: `--dw-track`, `--dw-border`), a knob in the arm's greys
+  (`--dw-tt-arm-weight`, lighter while held) with a grip line, a mark across the slot at 1x lit
+  `--dw-green-icon` while the speed is exactly 1x, and under it a readout in a well (`1.00x`, monospace)
+  that turns STYLE.md's toggled purple off 1x. Its place is `FADER`/`READOUT` in `lib/playSpeed.ts`, in
+  the plinth's units: x 359, the knob's centre from y 150 (2x) to 318 (0.25x), 20 x 12 - clear of the
+  platter (widest at x 346), of the arm over its whole sweep (never right of x 345 there) and of the
+  plinth's edge; the readout at (344, 349), the plinth's bottom right corner. The drawing is an SVG layer
+  on the stage's viewBox, like the arm; the target an HTML `role="slider"` over the slot (the knob's whole
+  travel, a knob's height included), before the arm's handle in the DOM so the handle wins their few px
+  of overlap at a song's start.
+  - **The target never reaches the record** (review: centred on the slot, x 359 is only 21 units from the
+    record's rim at x 338, so a 44px target covered 1.5-4 px of the rim on every phone - a tap there did
+    nothing, a scratch started there set the speed - and the capped one 5 units; playspeed.sim held only
+    the drawn knob). app.css places it `left: max(var(--app-tt-fader-from), calc(var(--app-tt-fader-x) -
+    width / 2))`, no translate: centred on the slot while that keeps clear, else from `FADER_FROM` (the rim
+    and `FADER.clear`, 1 unit) and reaching right, past the plinth's edge into `.app-tt`'s 12px padding -
+    at most 17 px past it, so on a 340-375px phone whose plinth fills the width the phone's own edge
+    clips up to about 3 px of the 44 (the sheet's `overflow: hidden`; no page scroll). Centred only from a
+    410px plinth up. The two places come inline as custom properties; `faderTarget()` (pure) computes the
+    same, and playspeed.sim holds it at 13 plinths from 45 to 440px: never left of the rim and a unit, the
+    knob inside, 44px from 315px up. The real page (fix-check below): not one point of the rim's outer
+    6 px is the fader's at 390x844, 375x667, 393x659, 375x553 or 320x568, a real tap a pixel inside the
+    rim pauses the song, a drag from there leaves the speed alone. (On a phone on its side, a 57px record,
+    `elementFromPoint` still gave the fader 4 sampled points within a pixel of the rim - its integer-ish
+    hit-test rounding at a unit of a fifth of a pixel; three units' clearance gave the same 4, so it stayed
+    one.) Keyboard focus draws its ring round the whole target, so the ring hangs past the plinth's edge.
+  - **The readout is drawn over a failure line** (review): on the turntable the line is laid over the
+    plinth's foot (two lines, `pointer-events: none` - "The turntable (2.0.0-player.11)"), and on a phone
+    short of height it reaches the readout's corner - 5.1-5.9 px into its face at 393x659, 390x664,
+    375x667 and 360x640 (Safari with its bars), 7.7-8.1 at 320x568 and 375x553 - red words through purple
+    ones. An inset on the line would need about 50-80 px each side and push a 75-character message past
+    its two-line clamp; moving the readout up runs into the fader's slot. So the readout has
+    `z-index: var(--app-z-tt-readout)` (1) and an opaque well - its tint laid on `--dw-tt-plinth`
+    (`linear-gradient(tint, tint), var(--dw-tt-plinth)`), the same pixels as before on the plinth - and the
+    line's few px under its face are hidden instead (at 393x659 only ascender tips; at 375x553 the top of a
+    word's x-height under 42 px of face). It reaches over the line because nothing between it and the
+    sheet makes a stacking context: the stage none, and `.app-tt`'s `container-type: size` applies style
+    and size containment only, not layout (WebKit `StyleComputedStyle.cpp:458-468`, `usedContain()`, read
+    at main 2026-10-08; Chromium the same on the real page) - test_app_css.py holds both, and that the line
+    has no z-index of its own.
+  - **By octaves**: `faderShare` is log(speed/0.25)/log(8), so 0.25x, 0.5x, 1x and 2x are a third apart
+    and 1x sits two thirds up - pitch is heard in octaves. ~168 units of travel: about 1.3% a pixel.
+  - **The drag** (`faderStart`/`faderMove`/`faderEnd`, pure): nothing until the finger has travelled
+    `TAP_SLOP_PX` (lib/turntable's 8), then taken at the slop's edge FROM THE SPEED AS IT IS - the arm's
+    rule - so a press or a nudge never jumps it; up is faster; held to the ends (a finger past the end
+    must come back to the knob); LIVE - each move a `setSpeed`. The detent: a drag landing within
+    `SPEED_DETENT` (2%) of 1x is exactly 1x (about 1.5 px either side). Measured in the fader's own box
+    as the press found it; pointer captured; a second finger and a mouse's other buttons start nothing;
+    capture lost ends it; a cancel keeps the speed it had reached (it was live).
+  - **Keys**: arrows 0.01 (up and right faster), Page Up/Down 0.1, Home 0.25, End 2 - with NO detent (an
+    arrow from 1x is 1.01x; a detent would snap it back). `aria-valuetext` "1.25 times" / "normal speed",
+    `aria-orientation="vertical"`.
+  - **The readout's tap** is exactly 1x (`aria-disabled` at 1x).
+  - **44px targets with the arm handle's cap**: `min(var(--pl-hit), var(--app-tt-fader-cap))`, the cap
+    14% of the plinth's width - 44px from a 315px plinth up (a 390 phone's is 366), and on a phone on its
+    side (a 66px plinth) a 9px fader, which starts past the record's rim like every other (the first cut
+    said it "never covers the record"; centred, it covered 5 units of it - see above). The readout's words are
+    `--app-tt-readout-text: min(12px, 3.2cqw, 3.2cqh)` of `.app-tt`, the size container - smaller with the
+    plinth. (The first cut put `var(--app-tt-aspect)` in that token: a custom property's var() is filled
+    in where it is DEFINED, `:root`, where the stage's aspect isn't, so the whole token was invalid and the
+    readout inherited the sheet's 17px - the real page showed it spilling off the plinth; the test now
+    holds the token.)
+- **The chip** (`player/SpeedChip.tsx`): nothing at 1x; otherwise `1.25x` in a 44px button with
+  STYLE.md's toggled chip drawn inside (28px), its tap exactly 1x. At the START of Now Playing's icon row
+  (`margin-right: auto` in a row that is `height: var(--pl-hit)` and `justify-content: flex-end`), so it
+  moves nothing coming and going - the rule from the sheet; and first in the desktop player bar's tools
+  (right-aligned, the tools' 32px height, a 24px face) - so a speed set on the phone is never stuck unseen
+  in the desktop frame an iPad turns into. On the turntable look it is drawn too and hidden
+  (`.app-is-turntable .app-speed-chip { display: none }`) except under `@media (max-height: 500px)` - a
+  phone on its side, where the readout is too small to read. Not on the mini player (the spec named the
+  cover and the bar) - the guide and troubleshooting say so, rather than "wherever the fader isn't
+  showing" (review). Its name starts with what it shows - "1.25x, 1.25 times the song's speed: back to
+  normal speed" - for Voice Control (review: WCAG 2.5.3, label in name; it was "Playing at 1.25 times...",
+  which said "Playing" while paused too). Its press takes it away, so focus on it (a keyboard's,
+  VoiceOver's - `ownerDocument.activeElement` is the chip) goes on to its next sibling, which stays (AirPlay,
+  •••, the bar's Info) before the speed is set - never to the page (review; the app's rule since
+  ServerSettings, Pinned, NeedsALook). A finger's tap gives a button no focus in WebKit and moves none.
+- **The turntable follows the speed** (`player/deck.ts`; Turntable tells it with `speedChanged` as it
+  mounts and on every `onSpeed` - the deck's own speed, so the old one is there to re-anchor from). The
+  motor's target is the speed (`lib/platter.ts`'s `motor(x, speed, length, target = 1)` and
+  `acceleration(speed, motorOn, target = 1)`, every exact phase with `target` where it had 1, `Plan.target`
+  saying what a plan heads for: the motor's, or a coast's 0): the platter turns at `DEGREES_PER_SECOND *
+  speed` (re-anchored mid-turn, no jump); a hand takes a playing record at the speed (`take`); a let-go of
+  a playing record runs back to the speed and is sought where that lands; the handover holds the speed
+  until the song plays; a pause winds down from it (`coast(at, speed)`); a spin-up runs to it (and a change
+  mid spin-up re-plans from where it had got to); a pause from elsewhere spins down from it; a cancel spins
+  back up to it. `plan.v >= 1` tests became `plan.target > 0` (a spin-up to 0.25x is still the motor's). The
+  same motor pull: still to 2x takes 0.8 s, to 0.25x 0.1 s; the wind-down from 2x about 1.25 s, from 0.25x
+  0.55 s. A run back to speed after a let-go keeps the speed it was let go at (the song was sought where
+  that lands) and turns at the new one once there. Debug's "back after the let-go" allows the song's
+  speed. **The window is asked ahead by listening time** (review): `keep()`'s margin ahead was 6 s of the
+  SONG - time for a fetch and a decode, so at 2x 3 s of listening, and a hi-res song's 13 s window about
+  1 s; a hand taking the record in the gap was silent until the late window landed. It is now
+  `ahead * max(1, speed)` while the song plays (12 s of the song at 2x; slower than 1x, as it was), the
+  move-on rule still holding (a 40 s window at 2x moves on 24 s; a 13 s one about 6) - deck.sim holds the
+  ask at 5.75 s before the end at 1x, 11.5 at 2x and 5.875 at 0.5x, and windows of 13 s and 2 s moving on
+  at 2x. **The record's sound needed no change** (`lib/deckVoice.ts` untouched): it reads at whatever
+  rate it is driven at.
+- **The visualizer** (desktop): its silent copy's AudioBufferSourceNode plays at the speed
+  (`node.playbackRate.value`, set before `start`), and where it has got to is `copyAt(anchor, now)` - the
+  anchor's place plus its rate times the context time since (`lib/vizSync.ts`, pure) - re-anchored in place
+  where the speed changes (`reanchor`), the same node carrying on. Without it the drift rule re-synced the
+  copy over and over (vizsync.sim shows a copy left at 1x under a song at 1.5x restarted more than four
+  times a window). Its tempo reading follows: a song at 2x reads twice the bpm, which is right.
+- **The allowlist** (`app-rules.sim.cjs`): `setSpeed` is a player action - not gesture-gated - reached by
+  name from exactly `player/SpeedFader.tsx` and `player/SpeedChip.tsx` (Turntable and Now Playing hand the
+  player on without naming it), each from its handler with nothing awaited; and no file but the engine
+  sets a rate, a default rate or a pitch switch on an element (the copy's `.playbackRate.value` is an
+  AudioParam of its own node).
+- **Verified**: 2395 Python tests (2393 passed, 2 skipped; 3 new - the fader's and readout's targets, the
+  token, the drawing's tokens; the chip that moves nothing and shows on the turntable only on its side;
+  the bar's chip), pyflakes, tsc, the build, and all 47 sims, 4898 checks after the review below (4879
+  before it) - `playspeed` new (80: the numbers, the fader's maths and place - its target off the record
+  at 13 plinths - the stored speed, the wall-clock rules at 0.25x and 2x, what Debug reads, the fader and
+  the chip rendered, the chip's focus, the visualizer's copy against a fake context); `player` 474 -> 521
+  (its fake elements taught playbackRate, defaultPlaybackRate, the pitch switch by name and the load
+  algorithm's reset, every write the page makes kept, and - `net.rateAtWrite`, off unless a check asks -
+  a clock that runs at the old rate until the page writes a new one; every check before them unchanged);
+  `deck` 272 -> 305 (the integration at 0.25x, 0.5x, 1.5x and 2x over 30 flicks each, the deck at the
+  speed, its windows asked by listening time); `vizsync` 54 -> 59, `turntable` 167 -> 174, `app-rules`
+  286 -> 293, `debug` 100 -> 108, `info` 134 -> 143 (the Speed row live). Mutations, each restored byte for byte
+  (by hash): 77, 76 caught - the one not, `speedNow()`'s turning branch returning 1, is unreachable
+  (playingChanged returns before it for a turning platter), equivalent. Two first got past and gained
+  checks: the measure across a load (it needed a second song - a page's first starts unmeasured anyway)
+  and a spin-up to 0.5x that ended still; three more gained checks before the run, found by reading
+  which rules nothing held (the drives' acceleration about the speed, Debug's back-after-let-go at 2x,
+  reduced motion's spin-up to a slow speed). The engine guard: only `usePlayer.ts` and `player.sim.cjs` changed, as the spec allows.
+  **The real page** (the builder's own deadwax on 8110, headless Chromium, real touch and mouse, over
+  plain http as deadwax.test - the main-thread voice - and on localhost - the worklet; 35 + 5 checks each,
+  all passed): the fader dragged to 0.5x (live, finger still down) and 1.5x with playbackRate,
+  defaultPlaybackRate and preservesPitch read back, the song moving at 0.5x; the detent; the readout's tap;
+  the keys; the chip on the cover (`1.50x`, a 44px target at the row's start, its tap 1x, nothing moved
+  as it went) and on the 1440 player bar (its click 1x); Next keeping the speed; a reload keeping it; the
+  Debug row (`1.50x, the pitch moving with it`, measured 1.49x); a scrub at 0.5x - the platter at 100
+  degrees a second, taken (the song paused under the hand), turned, let go, the song playing on at 0.5x
+  from past where it was taken and the platter back at 100 degrees a second; Gapless's stream across a join
+  at 1.5x with both elements carrying it; the visualizer's copy at 1.5x, started once; 375x667 and 844x390
+  (the fader capped to 9px of a 66px plinth, the chip shown on the turntable); no overflow, no console
+  errors, no createMediaElementSource.
+- **The review** (fifteen findings - two of them found twice - each confirmed by a majority of skeptics;
+  all fixed): the
+  fader's target on the record's rim; Debug's pace counting the old speed across a jump; the Speed row
+  stale while Debug was open; the window asked ahead by song time at 2x; the readout under a failure line;
+  the chip dropping focus and named without its text; the guide's turntable figures true only at 1x and
+  its "wherever the fader isn't showing" (the mini player shows nothing); sims.md's lines; and three checks
+  that couldn't fail or weren't there - deck.sim's "told the same speed again" read the angle without a
+  frame (a deck stopping dead there passed), and nothing held the pace's seek guard or the second
+  spin-down (a refused handover play, `coast(0, this.speed, 0)` after HANDOVER_MAX_S) - so "76 of 77"
+  had missed those three rules. 21 more mutations, every one caught: the pace's restart and its seek guard
+  (player), the Speed row's listener, timer, tab and rounding (info), the window margin unscaled and
+  scaled below 1x, the refused handover's spin-down from 1x, the same-speed guard gone or stopping the
+  platter (deck), the chip's focus dropped or moved on a finger's tap, its old name, the target centred,
+  from the rim exactly, or handed no rim (playspeed), and the target's CSS centred, the readout's z-index
+  and opaque well, and a stacking context on the stage (test_app_css.py). The real page (the fixer's own
+  deadwax on 8112, headless Chromium, real touch and mouse, deadwax.test and localhost, `fix-check.cjs`:
+  14 checks each, all passed): the rim as above; the readout on top where a line meets it at 393x659 and
+  375x553, opaque on the plinth's colour; Debug opened straight after End then Home showing the pace
+  unprompted at 0.25x; on the 1440 desktop the open Debug reading 2x and then, after the bar's chip, 1x
+  without a tab switch; the chips' names, and focus on to ••• and to the bar's Info after a keyboard
+  press. The builder's own 35 + 35 + 5 real-page checks run again on 8112: all passed.
+- **NOT verified - James's iPhone**: that the pitch moves with the speed on the phone (Varispeed), that
+  0.25x and 0.5x play at all (`canPlaySlowForward` - Debug's measured pace answers it), a change of speed
+  during the one stream (the renderer's flush), the lock screen's scrubber at the speed, AirPlay at a speed,
+  the fader under a real finger beside the record and the arm, and VoiceOver on it.
+- **Left out**: the chip on the mini player; any speed control on the desktop but the chip (no fader
+  there - the turntable is the phone's); the stream's buffering scaled to the speed; the visualizer's
+  window margin (`VIZ_AHEAD_S`, song seconds like the deck's was - a late window there stops the picture a
+  moment, nothing heard).

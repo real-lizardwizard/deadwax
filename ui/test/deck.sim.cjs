@@ -77,6 +77,12 @@
  *    once settled, stopped at the hide while a real suspend still settles, and gone with its deck (a
  *    grab on the next held through every reading).
  *    ui/test/decksound.sim.cjs listens to the result, and ui/test/deckclock.sim.cjs holds the clock.
+ *  - THE SPEED FADER (2.0.0-player.39): the motor's own speed the player's - the plans at 0.25x, 0.5x,
+ *    1.5x and 2x held to the equations stepped through, flick by flick; the platter turning at the speed
+ *    and carried on without a jump as it changes; a hand taking a playing record at it, the motor bringing
+ *    a let-go back to it (its drives' acceleration about it), the handover holding it, the wind-down, the
+ *    spin-up (re-planned mid-way), the spin-down and a cancel's spin-up at it, reduced motion included;
+ *    and Debug's "back after the let-go" allowing the song's speed.
  *
  * Run it with:  node ui/test/deck.sim.cjs
  */
@@ -115,14 +121,15 @@ const { SECONDS_PER_TURN } = require(path.join(OUT, 'lib/turntable.js'))
  * with the song's ends as the plans have them - a ground truth the plans are held to. Steps of 10 us,
  * the last one cut where the speed reaches its target, so the time it takes is exact to a step.
  */
-function integrate(x, v, motorOn, length, dt = 1e-5) {
+function integrate(x, v, motorOn, length, dt = 1e-5, speed = 1) {
   const low = 0, high = length > 0 ? Math.max(0, length - platter.END_MARGIN_S) : Infinity
   let t = 0
   let clamped = null
-  const target = motorOn ? 1 : 0
+  //? the motor's own speed - the player's (2.0.0-player.39): 1 unless the fader says otherwise
+  const target = motorOn ? speed : 0
   for (let i = 0; i < 2e7; i++) {
     if (v === target) return { t, x, v, clamped }
-    const a = platter.acceleration(v, motorOn)
+    const a = platter.acceleration(v, motorOn, speed)
     let next = v + a * dt
     let step = dt
     if ((v < target && next >= target) || (v > target && next <= target)) {
@@ -193,6 +200,39 @@ console.log('\nwhere it lands, given at the release, against the equations stepp
   }
   check(`${cases.length} flicks, both ways, the motor on and off: every landing within a millisecond of the song, every time within a millisecond`, disagree, [])
   check('...the worst of them', [worstX < 0.001, worstT < 0.001], [true, true])
+
+  //? the speed fader (2.0.0-player.39): the motor's own speed the player's - the same flicks, the motor
+  //? bringing each back to 0.25x, 0.5x, 1.5x and 2x, each plan held to the equations stepped through
+  for (const speed of [0.25, 0.5, 1.5, 2]) {
+    let worst = 0
+    const off = []
+    for (const [x, v, on] of cases) {
+      if (!on) continue
+      const plan = platter.motor(x, v, 425, speed)
+      const steps = integrate(x, Math.max(-platter.MAX_SPEED, Math.min(platter.MAX_SPEED, v)), true, 425, 1e-5, speed)
+      const dx = Math.abs(plan.x - steps.x), dt = Math.abs(plan.duration - steps.t)
+      worst = Math.max(worst, dx, dt)
+      if (dx > 0.001 || dt > 0.001 || (plan.clamped ?? null) !== (steps.clamped ?? null) || plan.target !== speed) off.push([x, v, plan.x, steps.x, plan.duration, steps.t])
+    }
+    check(`the motor at ${speed}x: ${cases.filter(([, , on]) => on).length} flicks back to it, every landing and time within a millisecond of the equations`, [off, worst < 0.001], [[], true])
+  }
+}
+
+console.log('\nthe motor at the player\'s speed (2.0.0-player.39): the same motor, its own speed the fader\'s')
+{
+  check('still to 2x: twice SPIN_UP_S, the same pull - and 0.8 s of the song on; still to 0.25x a quarter of it',
+    [round(platter.motor(100, 0, 425, 2).duration), round(platter.motor(100, 0, 425, 2).x - 100), round(platter.motor(100, 0, 425, 0.25).duration), platter.motor(100, 0, 425, 2).v, platter.motor(100, 0, 425, 0.25).v],
+    [0.8, 0.8, 0.1, 2, 0.25])
+  check('...at its own speed already: nothing to wait for, at any speed', [0.25, 0.5, 1.5, 2].map((speed) => [platter.motor(100, speed, 425, speed).duration, platter.motor(100, speed, 425, speed).v]),
+    [[0, 0.25], [0, 0.5], [0, 1.5], [0, 2]])
+  check('a let-go at 1x on a record running at 1.5x is pulled UP to it; at 0.5x braked DOWN to it',
+    [platter.motor(100, 1, 425, 1.5).phases[0].kind, platter.motor(100, 1, 425, 0.5).phases[0].kind, platter.motor(100, 1, 425, 0.5).phases[0].base], ['pull', 'decay', 0.5])
+  check('...a backwards flick stopped as before - the speed is only where it pulls up to', round(platter.motor(200, -9, 425, 2).phases[0].duration, 3), round(platter.motor(200, -9, 425).phases[0].duration, 3))
+  check('the plan says the speed it heads for: the motor\'s, and a coast\'s none', [platter.motor(100, 3, 425, 1.5).target, platter.motor(100, 3, 425).target, platter.coast(100, 3, 425).target], [1.5, 1, 0])
+  check('...and the acceleration the equations give, about that speed', [platter.acceleration(1, true, 1.5), platter.acceleration(1.5, true, 1.5), platter.acceleration(2, true, 1.5)],
+    [platter.MOTOR_PULL, 0, -(platter.MOTOR_PULL + platter.FRICTION_VISCOUS * 0.5)])
+  check('the wind-down from each speed: friction as ever - from 2x about 1.25 s, from 1x SPIN_DOWN_S, from 0.25x about 0.55 s',
+    [2, 1, 0.25].map((speed) => round(platter.coast(100, speed, 425).duration, 2)), [1.25, 1, 0.55])
 }
 
 console.log('\nthe song\'s ends')
@@ -1240,6 +1280,248 @@ async function main() {
     paused.deck.release(clock, 'up')
     paused.deck.destroy()
     check('a paused song\'s coast: it stays paused', paused.host.calls, [])
+  }
+
+  console.log('\nthe speed fader (2.0.0-player.39): the platter, a hand, the motor and the wind-down at the player\'s speed')
+  {
+    const { host, deck } = await fresh()
+    runFrames(5)
+    deck.speedChanged(1.5)
+    let before = host.angle
+    runFrames(5)
+    check('turning at 1.5x: 80 ms on, 24 degrees - 300 a second, 50 rpm', round(host.angle - before, 3), 24)
+    const at = host.angle
+    deck.speedChanged(0.5)
+    runFrames(0)
+    check('...changed mid-turn: carried on from where it was, no jump', round(deck['angleNow']() - at, 3), 0)
+    before = host.angle
+    runFrames(5)
+    check('...then at 0.5x: 8 degrees in 80 ms', round(host.angle - before, 3), 8)
+    //? the same speed again (Turntable tells it as it mounts): nothing - the motion as it was, the
+    //? platter turning on at it (review of 2.0.0-player.39: the check read the angle without a frame,
+    //? so a deck that stopped dead here passed it)
+    const motion = deck['motion']
+    deck.speedChanged(0.5)
+    before = host.angle
+    runFrames(5)
+    check('told the same speed again: nothing changes - the same turn, 8 degrees in the next 80 ms', [deck['motion'] === motion, round(host.angle - before, 3)], [true, 8])
+    deck.destroy()
+  }
+  {
+    //? a hand takes a playing record at the speed, and the motor brings it back to it
+    const { host, deck } = await fresh()
+    deck.speedChanged(1.5)
+    runFrames(10)
+    deck.pressed(clock)
+    advance(deckModule.HOLD_MS + 1)
+    const take = posted('take').at(-1)
+    check('a press resting on a playing record at 1.5x: taken, the record\'s sound starting at 1.5x where the song was', [host.calls.slice(-2), take.at, take.rate], [['hold', 'grabbed'], 60, 1.5])
+    for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 2 * Math.PI, 60 + (ms / 1000) * SECONDS_PER_TURN)
+    clock += 100
+    const speed = platter.handSpeed([{ time: clock - 100, turned: 0 }, { time: clock, turned: 0.1 * 2 * Math.PI }], clock)
+    const plan = platter.motor(60 + 0.1 * SECONDS_PER_TURN, speed, 425, 1.5)
+    const released = deck.release(clock, 'up')
+    host.at = released.seek
+    check('let go at a turn a second (1.8x): the motor brings it DOWN to 1.5x - sought where that lands',
+      [round(released.seek, 6), released.play, plan.phases[0].kind, plan.v], [round(plan.x, 6), false, 'decay', 1.5])
+    runFrames(2)
+    check('...the coast\'s sound follows the platter towards 1.5x', posted('drive').at(-1).rate > 1.5, true)
+    advance(plan.duration * 1000)
+    runFrames(2)
+    const hold = posted('drive').at(-1)
+    check('at speed: the song played, the record\'s sound holding 1.5x - the song\'s own speed - until it plays', [host.calls.at(-1), hold.rate, round(hold.at, 6)], ['resume', 1.5, round(plan.x, 6)])
+    deck.destroy()
+  }
+  {
+    //? paused at 0.5x: the wind-down starts from 0.5x
+    const { deck } = await fresh()
+    deck.speedChanged(0.5)
+    runFrames(5)
+    const takes = posted('take').length
+    const landing = deck.pausing()
+    const plan = platter.coast(60, 0.5, 425)
+    check('a pause on the turntable at 0.5x: the wind-down from 0.5x - its sound starting there, the song sought where it stops',
+      [round(landing, 6), posted('take').length - takes, posted('take').at(-1).rate, round(plan.duration, 3)], [round(plan.x, 6), 1, 0.5, round(platter.coast(0, 0.5, 0).duration, 3)])
+    deck.destroy()
+  }
+  {
+    //? a play spins it up to the speed; a pause from elsewhere spins it down from it
+    const host = fakeHost({ isPlaying: false })
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    deck.speedChanged(2)
+    host.isPlaying = true
+    deck.playingChanged(true)
+    advance(0.4 * 1000)
+    runFrames(1)
+    check('played at 2x: still spinning up after SPIN_UP_S - twice as far to go', deck['motion'].kind, 'plan')
+    advance(0.4 * 1000 + 50)
+    runFrames(2)
+    let before = host.angle
+    runFrames(5)
+    check('...at speed after 0.8 s: 400 degrees a second', [deck['motion'].kind, round(host.angle - before, 3)], ['turning', 32])
+    host.isPlaying = false
+    deck.playingChanged(false)
+    advance(deckModule.PAUSE_SETTLE_MS + 1)
+    check('a pause from elsewhere (the lock screen): spun down from 2x - friction\'s 1.25 s from there, not 1x\'s 1 s',
+      [deck['motion'].plan.v0 ?? deck['motion'].plan.phases[0].v0, round(deck['motion'].plan.duration, 3)], [2, round(platter.coast(0, 2, 0).duration, 3)])
+    deck.destroy()
+  }
+  {
+    //? a play at 0.5x: spun up to it, and then turning at it - not stopped where the spin-up ended
+    const host = fakeHost({ isPlaying: false })
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    deck.speedChanged(0.5)
+    host.isPlaying = true
+    deck.playingChanged(true)
+    advance(0.2 * 1000 + 50)
+    runFrames(2)
+    const before = host.angle
+    runFrames(5)
+    check('played at 0.5x: spun up in 0.2 s, then turning on at it - 100 degrees a second', [deck['motion'].kind, round(host.angle - before, 3)], ['turning', 8])
+    deck.destroy()
+  }
+  {
+    //? the speed changed while it spins up: it heads for the new one from where it has got to
+    const host = fakeHost({ isPlaying: false })
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    host.isPlaying = true
+    deck.playingChanged(true)
+    advance(200)
+    runFrames(1)
+    const v = deck['speedNow']()
+    deck.speedChanged(2)
+    const motion = deck['motion']
+    check('the speed changed mid spin-up: a fresh spin-up from where it had got to, to the new speed', [motion.kind, motion.role, round(motion.plan.phases[0].v0, 3), motion.plan.target], ['plan', 'spin', round(v, 3), 2])
+    deck.destroy()
+  }
+  {
+    //? a cancel of a hand that took a playing record: the song plays on, the platter spun back up to the speed
+    const { host, deck } = await fresh()
+    deck.speedChanged(0.25)
+    deck.pressed(clock)
+    deck.takeOver()
+    deck.release(clock + 20, 'cancel')
+    check('a cancel: the song plays on, the platter spun up to 0.25x', [host.calls.at(-1), deck['motion'].plan?.target], ['resume', 0.25])
+    deck.destroy()
+  }
+  {
+    //? the coast back to the speed drives the voice with the motor's own acceleration about THAT speed
+    const { host, deck } = await fresh()
+    deck.speedChanged(1.5)
+    runFrames(5)
+    deck.pressed(clock)
+    deck.takeOver()
+    for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 2 * Math.PI, 60 + (ms / 1000) * SECONDS_PER_TURN)
+    clock += 100
+    const released = deck.release(clock, 'up')
+    host.at = released.seek
+    runFrames(2)
+    const drive = posted('drive').at(-1)
+    check('...the coast\'s drives carry the motor\'s acceleration about 1.5x, not about 1x', round(drive.accel, 6), round(platter.acceleration(drive.rate, true, 1.5), 6))
+    //? Debug's "the song was back" after the let-go - the song moving at 2x from where it was sought, reported
+    //? late (a quiet page): still counted as the song coming back, its 2x allowed for
+    deck.speedChanged(2)
+    advance(3_000)
+    host.moveTo(released.seek + 2 * 2.6)
+    check('...and Debug\'s "back after the let-go" counts a song moving at 2x from there, reported 3 s late', deckModule.deckReport().health.backMs !== null, true)
+    deck.destroy()
+  }
+  {
+    //? reduced motion: a play spins it "up" to a slow speed - turning, not left still
+    reduced = true
+    const host = fakeHost({ isPlaying: false })
+    const deck = new Deck(host)
+    deck.setShowing(true)
+    deck.songChanged(host.song().id)
+    deck.speedChanged(0.25)
+    host.isPlaying = true
+    deck.playingChanged(true)
+    check('reduced motion, played at 0.25x: the platter counted as turning at once (it is not drawn turning)', deck['motion'].kind, 'turning')
+    deck.destroy()
+    reduced = false
+  }
+  {
+    //? reduced motion: a release lands at once; the platter "turns" at the speed - still - as ever
+    reduced = true
+    const { deck } = await fresh()
+    deck.speedChanged(1.5)
+    deck.pressed(clock)
+    deck.takeOver()
+    deck.hand(clock + 50, 2, 62)
+    clock += 60
+    const released = deck.release(clock, 'up')
+    check('reduced motion at 1.5x: landed where the motor at 1.5x says, played in the release', [round(released.seek, 6), released.play],
+      [round(platter.motor(62, platter.releaseSpeed([{ time: clock - 60, turned: 0 }, { time: clock - 10, turned: 2 }], clock), 425, 1.5).x, 6), true])
+    deck.destroy()
+    reduced = false
+  }
+  {
+    //? a play iOS refuses after a run back to 2x ("Tap play to start"): after HANDOVER_MAX_S the platter
+    //? spins down FROM 2x - friction's 1.25 s - not dropped to 1x and stopped in 1 s (review of
+    //? 2.0.0-player.39: nothing held this second spin-down)
+    const { host, deck } = await fresh({ resume() { this.calls.push('resume (refused)') } })
+    deck.speedChanged(2)
+    deck.pressed(clock)
+    deck.takeOver()
+    flickBack(deck)
+    deck.release(clock, 'up')
+    for (let i = 0; i < 400 && !host.calls.includes('resume (refused)'); i++) runFrames(1)
+    const held = deck['motion'].kind
+    const at = host.angle
+    runFrames(5)
+    const turned = round(host.angle - at, 3)
+    advance(deckModule.HANDOVER_MAX_S * 1000 + 1)
+    const spin = deck['motion']
+    check('a play refused at 2x: back at speed, turning at 2x (32 degrees in 80 ms) - then spun down from 2x, coast(0, 2)\'s 1.25 s',
+      [host.calls.at(-1), held, turned, spin.kind, spin.role, spin.plan?.phases[0].v0, round(spin.plan?.duration ?? 0, 3)],
+      ['resume (refused)', 'turning', 32, 'plan', 'spin', 2, round(platter.coast(0, 2, 0).duration, 3)])
+    deck.destroy()
+  }
+  {
+    //? the window asked again ahead of the playhead: a fetch and a decode's time in hand at any speed -
+    //? at 2x 12 s of the song before this window ends, 6 s of listening, where it had 6 s of the song, 3 of
+    //? listening (review of 2.0.0-player.39); at 0.5x as at 1x. Still moving on: from 80, past 56
+    const askedAt = async (speed) => {
+      const before = asked.length
+      const { host, deck } = await fresh()
+      deck.speedChanged(speed)
+      let at = null
+      for (let t = 0; t < 80_000 && at === null; t += 250) {
+        advance(250)
+        host.moveTo(host.at + 0.25 * speed)
+        await settle()
+        if (asked.length - before > 1) at = host.at
+      }
+      const from = Number(new URL(asked.at(-1), 'http://x').searchParams.get('at'))
+      deck.destroy()
+      return [at === null ? null : round(96 - at, 3), from]
+    }
+    check('the window 56-96 asked again at 1x 5.75 s before its end, at 2x 11.5 s (5.75 of listening), at 0.5x 5.875 s - each from further on',
+      [await askedAt(1), await askedAt(2), await askedAt(0.5)], [[5.75, 86], [11.5, 80], [5.875, 86]])
+    //? a hi-res song's shorter windows at 2x, and windows of 2 s: each still moves on, none asked twice
+    const starts = []
+    for (const seconds of [13, 2]) {
+      windowSeconds = seconds
+      const before = asked.length
+      const { host, deck } = await fresh()
+      deck.speedChanged(2)
+      for (let t = 0; t < 30_000; t += 250) {
+        advance(250)
+        host.moveTo(host.at + 0.5)
+        await settle()
+      }
+      const list = asked.slice(before).map((url) => Number(new URL(url, 'http://x').searchParams.get('at')))
+      starts.push([list.length > 3, list.every((at, i) => i === 0 || at > list[i - 1])])
+      deck.destroy()
+    }
+    windowSeconds = 40
+    check('...windows of 13 s and of 2 s at 2x: a minute of the song, each window further on than the last', starts, [[true, true], [true, true]])
   }
 
   console.log('\na pause on the turntable winds down - with the setting on, and the window there')

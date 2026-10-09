@@ -1,5 +1,8 @@
 # The desktop visualizer, and the Mandala refined
 
+(Since 2.0.0-player.39 the silent copy plays at the player's speed - `copyAt`/`reanchor` in lib/vizSync.ts:
+see "The speed fader (2.0.0-player.39)" in notes/turntable.md.)
+
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 
 ### The desktop visualizer (2.0.0-player.20)

@@ -35,6 +35,12 @@
  *  - The song's ends: a coast that would run back past the start stops at the start; one that would
  *    run on past the end stops END_MARGIN_S short of it, and the song ends from there as it would.
  *    A motor run back to the start stops there and spins up from it.
+ *
+ * THE MOTOR'S SPEED is the player's (2.0.0-player.39, lib/playSpeed): 0.25x to 2x, `target` in the
+ * platter's own speeds - 1.5 is 50 rpm, the song at 1.5x. The same motor, the same equations with
+ * `target` where they had 1: the same pull below it (so still to 2x takes twice SPIN_UP_S, and to 0.25x
+ * a quarter), the same braking above it, and every phase still exact. Friction knows no target: a
+ * coast is the same at any speed, and the wind-down starts from the song's own speed, whatever it is.
  */
 
 import { SECONDS_PER_TURN } from './turntable'
@@ -206,6 +212,8 @@ export interface Plan {
   duration: number
   x: number
   v: number
+  /** the speed it heads for: 0 for a coast, the motor's speed for the motor (2.0.0-player.39) */
+  target: number
   /** 'start' or 'end' when it was stopped by the song's end; null when it ran its course */
   clamped: 'start' | 'end' | null
 }
@@ -237,11 +245,11 @@ function clampPhase(phase: Phase, low: number, high: number): { phase: Phase; hi
   return { phase, hit: null }
 }
 
-function finish(phases: Phase[], clamped: Plan['clamped'], v: number, bounds: { low: number; high: number }): Plan {
+function finish(phases: Phase[], clamped: Plan['clamped'], v: number, bounds: { low: number; high: number }, target: number): Plan {
   const last = phases[phases.length - 1]
   //? stopped by an end: exactly at it, never the bisection's last nanosecond either side
   const x = clamped === 'start' ? bounds.low : clamped === 'end' ? bounds.high : last ? phaseAt(last, last.duration).x : 0
-  return { phases, duration: phases.reduce((sum, phase) => sum + phase.duration, 0), x, v, clamped }
+  return { phases, duration: phases.reduce((sum, phase) => sum + phase.duration, 0), x, v, clamped, target }
 }
 
 /**
@@ -252,7 +260,7 @@ export function coast(x: number, speed: number, length: number): Plan {
   const bounds = limits(length)
   const { low, high } = bounds
   const start = Math.max(low, Math.min(high, Number.isFinite(x) ? x : low))
-  if (speed === 0 || !Number.isFinite(speed)) return finish([{ kind: 'rest', x0: start, duration: 0 }], null, 0, bounds)
+  if (speed === 0 || !Number.isFinite(speed)) return finish([{ kind: 'rest', x0: start, duration: 0 }], null, 0, bounds, 0)
   const sign: 1 | -1 = speed > 0 ? 1 : -1
   const u0 = Math.abs(speed)
   const phase: Phase = {
@@ -260,33 +268,34 @@ export function coast(x: number, speed: number, length: number): Plan {
     duration: decayTime(u0, FRICTION_DRY, FRICTION_VISCOUS),
   }
   const { phase: kept, hit } = clampPhase(phase, low, high)
-  return finish([kept], hit, 0, bounds)
+  return finish([kept], hit, 0, bounds, 0)
 }
 
 /**
  * The platter let go of with the song PLAYING: the motor takes it back to its own speed - pulling
  * it up from below (stopping it first, from backwards), braking it down from above - and the song carries
  * on from where it is then (`x` of the plan, at `duration`). A run back past the start stops there and
- * spins up from it; one on past the end stops short of it, and the song plays out from there.
+ * spins up from it; one on past the end stops short of it, and the song plays out from there. Its own
+ * speed is `target` - the player's speed (2.0.0-player.39), 1 unless the speed fader says otherwise.
  */
-export function motor(x: number, speed: number, length: number): Plan {
+export function motor(x: number, speed: number, length: number, target = 1): Plan {
   const bounds = limits(length)
   const { low, high } = bounds
   let at = Math.max(low, Math.min(high, Number.isFinite(x) ? x : low))
   let v = Number.isFinite(speed) ? Math.max(-MAX_SPEED, Math.min(MAX_SPEED, speed)) : 0
   const phases: Phase[] = []
   let clamped: Plan['clamped'] = null
-  if (v > 1) {
+  if (v > target) {
     //? braked down to speed: the motor's pull, and friction's speed part, against the overspeed
     const phase: Phase = {
-      kind: 'decay', x0: at, v0: v, base: 1, sign: 1, c: MOTOR_PULL, k: FRICTION_VISCOUS,
-      duration: decayTime(v - 1, MOTOR_PULL, FRICTION_VISCOUS),
+      kind: 'decay', x0: at, v0: v, base: target, sign: 1, c: MOTOR_PULL, k: FRICTION_VISCOUS,
+      duration: decayTime(v - target, MOTOR_PULL, FRICTION_VISCOUS),
     }
     const { phase: kept, hit } = clampPhase(phase, low, high)
     phases.push(kept)
-    return finish(phases, hit, hit ? phaseAt(kept, kept.duration).v : 1, bounds)
+    return finish(phases, hit, hit ? phaseAt(kept, kept.duration).v : target, bounds, target)
   }
-  if (v < 1) {
+  if (v < target) {
     if (v < 0) {
       //? backwards: brought to a stop first - the motor's pull and all of friction against the travel,
       //? a decay towards still - then pulled on up; unless the start comes first
@@ -301,15 +310,15 @@ export function motor(x: number, speed: number, length: number): Plan {
       at = hit === 'start' ? low : phaseAt(kept, kept.duration).x
       v = 0
     }
-    const up: Phase = { kind: 'pull', x0: at, v0: v, a: MOTOR_PULL, duration: (1 - v) / MOTOR_PULL }
+    const up: Phase = { kind: 'pull', x0: at, v0: v, a: MOTOR_PULL, duration: (target - v) / MOTOR_PULL }
     const { phase: kept, hit } = clampPhase(up, low, high)
     phases.push(kept)
-    if (hit) return finish(phases, hit, phaseAt(kept, kept.duration).v, bounds)
+    if (hit) return finish(phases, hit, phaseAt(kept, kept.duration).v, bounds, target)
     //? a stop at the start on the way doesn't move where it ends: the spin-up from there does
-    const ended = finish(phases, null, 1, bounds)
+    const ended = finish(phases, null, target, bounds, target)
     return { ...ended, clamped }
   }
-  return finish([{ kind: 'rest', x0: at, duration: 0 }], null, 1, bounds)
+  return finish([{ kind: 'rest', x0: at, duration: 0 }], null, target, bounds, target)
 }
 
 /* ===== the equations as equations, for the sim to integrate ===== */
@@ -317,14 +326,14 @@ export function motor(x: number, speed: number, length: number): Plan {
 /**
  * dv/dt for a platter at `speed`, the motor on or off - the equations the plans above solve, written
  * out so ui/test/deck.sim.cjs can integrate them step by step and hold the plans to within a
- * millisecond of what the steps give.
+ * millisecond of what the steps give. The motor's own speed is `target` (2.0.0-player.39).
  */
-export function acceleration(speed: number, motorOn: boolean): number {
+export function acceleration(speed: number, motorOn: boolean, target = 1): number {
   if (motorOn) {
     //? backwards: the pull and the whole of friction, both against the travel
     if (speed < 0) return MOTOR_PULL + FRICTION_DRY + FRICTION_VISCOUS * -speed
-    if (speed < 1) return MOTOR_PULL
-    if (speed > 1) return -(MOTOR_PULL + FRICTION_VISCOUS * (speed - 1))
+    if (speed < target) return MOTOR_PULL
+    if (speed > target) return -(MOTOR_PULL + FRICTION_VISCOUS * (speed - target))
     return 0
   }
   if (speed > 0) return -(FRICTION_DRY + FRICTION_VISCOUS * speed)

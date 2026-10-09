@@ -40,6 +40,20 @@
  * it through addressOf() and streamable(). A stream keeps the setting it started with - its songs'
  * addresses can't change under it - and the next song started or got ready uses the new one.
  *
+ * The speed (2.0.0-player.39, lib/playSpeed): 0.25x to 2x, a record deck's pitch - the song's own
+ * playbackRate with pitch preservation off, so faster is higher and slower lower. It is the PLAYER's,
+ * kept on the device, and every element the engine plays on carries it: set as the element's
+ * playbackRate AND its defaultPlaybackRate - a load puts playbackRate back to the default (the media
+ * element load algorithm's step 7: WebKit HTMLMediaElement.cpp:1733, Chromium
+ * html_media_element.cc:1243), so a new song, a reload, a stream attached and the standby's preload all
+ * keep it - and put on the element again just before every play() (applySpeed()), a handover's standby
+ * included. At 1x nothing is touched: pitch preservation is let go only while the speed isn't 1, since
+ * Chromium resamples whenever it is off, even at 1x (AudioRendererAlgorithm::ChooseBufferMode,
+ * audio_renderer_algorithm.cc:341-361, read at main on 2026-10-08), where with it on 1x is a straight
+ * copy. The lock screen is told the rate with the position, and the song's own pace is measured against
+ * the page's clock for Info > Debug (speedReading()), so a browser that doesn't play the speed it was
+ * given says so there.
+ *
  * The position changes several times a second, so it is not React state - rendering the whole
  * player four times a second to move one bar would be waste. Whatever shows it subscribes with
  * usePosition() below, and only that re-renders. From a seek until the element says it has landed,
@@ -59,12 +73,13 @@ import {
   EMPTY_QUEUE, LOAD_RETRY_DELAY_MS, MEDIA_ERR_DECODE, NEW_LISTEN, current, listenHeard, listenStarted,
   listenedStep, nextIndex, previousAction, startQueue, type PlayQueue, type QueueTrack,
 } from '../lib/playQueue'
+import { clampSpeed, paceOf, paceStep, pitchHeldAt, pitchSwitch, type PaceSample, type PitchSwitch, type SpeedReading } from '../lib/playSpeed'
 import { reportedPosition, seekStep, type PendingSeek, type SeekEvent, type SeekReading } from '../lib/scrub'
 import { ENGINE_OFF_MS, joinStallMs, knownFormatOut, splitAcrossJoin, streamable as mayStream, type RunSong } from '../lib/streamPlan'
 import {
   asksForMp4, isFlac, resampledFrom, resamples, wrappedAs, wrapsFlac, type MaxRate, type Wrapped,
 } from '../lib/streamWrap'
-import { readPlayerGapless, readPlayerMaxRate, writePlayerGapless, writePlayerMaxRate } from '../state/persisted'
+import { readPlayerGapless, readPlayerMaxRate, readPlayerSpeed, writePlayerGapless, writePlayerMaxRate, writePlayerSpeed } from '../state/persisted'
 import { coverUrl, fragmentedUrl, scrobble, streamFormat, streamUrl } from './api'
 import { StreamSource, mediaSourceEngine, type StreamEvents, type StreamFailure } from './streamSource'
 
@@ -104,6 +119,15 @@ export interface Player {
   /** the element's position, and a way to hear about it changing - see usePosition() */
   position(): number
   onPosition(listener: (seconds: number) => void): () => void
+  /** the speed, 0.25 to 2 (2.0.0-player.39) - the player's, kept on this device - and a way to hear
+   *  about it changing: not React state, so a fader moving it re-renders only what shows it (useSpeed) */
+  speed(): number
+  onSpeed(listener: (speed: number) => void): () => void
+  /** a new speed - from the fader (player/SpeedFader.tsx) or the chip (player/SpeedChip.tsx), which
+   *  ui/test/app-rules.sim.cjs allows it; held to the range, in hundredths */
+  setSpeed(speed: number): void
+  /** what the element playing does with the speed, for Info > Debug */
+  speedReading(): SpeedReading
 }
 
 /** Safari's AirPlay additions to the media element, which the DOM types don't carry. */
@@ -111,6 +135,10 @@ interface AirPlayAudio extends HTMLAudioElement {
   webkitShowPlaybackTargetPicker?: () => void
   webkitCurrentPlaybackTargetIsWireless?: boolean
 }
+
+/** Pitch preservation by the names browsers have given it (lib/playSpeed's pitchSwitch) - the DOM
+ *  types carry only the standard one. */
+type PitchAudio = HTMLAudioElement & { [name in PitchSwitch]?: boolean }
 
 interface AvailabilityEvent extends Event {
   availability?: string
@@ -183,6 +211,7 @@ export function usePlayer(): Player {
     //? the page's element, and - once the gapless switch has been on - the second one
     const elements: AirPlayAudio[] = [createAudio()]
     const listeners = new Set<(seconds: number) => void>()
+    const speedListeners = new Set<(speed: number) => void>()
     const state = {
       queue: EMPTY_QUEUE as PlayQueue,
       //? Whether the listener means the music to be playing: set by anything that plays, cleared
@@ -208,6 +237,13 @@ export function usePlayer(): Player {
       gapless: readPlayerGapless(),
       //? the "Maximum quality" setting, for every address asked from here on
       maxRate: readPlayerMaxRate(),
+      //? the speed (2.0.0-player.39), on every element - see applySpeed(); the browser's words if it
+      //? refused it; and the song's own pace while it plays, measured for Debug: steps of song against
+      //? the page's clock, from an update that followed another while playing (`paceFrom`)
+      speed: readPlayerSpeed(),
+      speedRefused: null as string | null,
+      pace: [] as PaceSample[],
+      paceFrom: false,
       //? whether the second element has been through load() in a tap - iOS unlocks for good
       spareUnlocked: false,
       //? what the standby element holds or is getting, the wait before it starts getting it, and
@@ -453,6 +489,33 @@ export function usePlayer(): Player {
       state.lastPosition = 0
       state.lastAt = performance.now()
       state.seeked = false
+      state.paceFrom = false
+    }
+
+    /**
+     * The speed on an element (2.0.0-player.39): its playbackRate and its defaultPlaybackRate - which a
+     * load puts the rate back to, so every song the element is given keeps it - and its pitch switch let
+     * go, so the pitch moves with the speed as a record deck's does. Only what differs is written, and at
+     * 1x on an element that never had another speed nothing is: the switch is let go only while the
+     * speed isn't 1 (before the rate, going off 1x, and held again after it, coming back), so 1x is
+     * exactly the playback there always was. A rate the browser refuses is remembered for Debug.
+     */
+    function applySpeed(element: AirPlayAudio) {
+      const speed = state.speed
+      const audio = element as PitchAudio
+      const name = pitchSwitch((each) => each in audio)
+      const pitch = (held: boolean) => {
+        if (name !== null && audio[name] !== held) audio[name] = held
+      }
+      if (!pitchHeldAt(speed)) pitch(false)
+      try {
+        if (element.defaultPlaybackRate !== speed) element.defaultPlaybackRate = speed
+        if (element.playbackRate !== speed) element.playbackRate = speed
+        state.speedRefused = null
+      } catch (error) {
+        state.speedRefused = error instanceof Error ? error.message : String(error)
+      }
+      if (pitchHeldAt(speed)) pitch(true)
     }
 
     /**
@@ -773,6 +836,8 @@ export function usePlayer(): Player {
       //? a stream paused for a while restarts its stuck clock now, while the element is still paused -
       //? a locked phone's timers may not have run since
       liveStream()?.tick()
+      //? the speed, on whatever is about to play - a handover's standby included - before it plays
+      applySpeed(audio)
       audio.play().catch((reason: unknown) => {
         const name = reason instanceof DOMException ? reason.name : ''
         //? AbortError is the previous load being replaced by a newer one, which is fine; and
@@ -873,6 +938,8 @@ export function usePlayer(): Player {
       //? A muted element is never the lock screen's Now Playing (canShowControlsManager in
       //? WebKit), so the standby can't take the lock screen from the song playing.
       spare.muted = true
+      //? the speed, from the start: whatever it is given to get ready keeps it (applySpeed())
+      applySpeed(spare)
       elements.push(spare)
       attach(spare)
     }
@@ -1324,6 +1391,36 @@ export function usePlayer(): Player {
         listeners.add(listener)
         return () => listeners.delete(listener)
       },
+      speed: () => state.speed,
+      onSpeed(listener: (speed: number) => void) {
+        speedListeners.add(listener)
+        return () => speedListeners.delete(listener)
+      },
+      //? on every element at once - the standby too - and the lock screen told the new pace; the
+      //? measured pace starts again, from the update after this one: the step from the update before
+      //? to the next would be part old speed, part new (review: 2x to 0.25x read 0.39x for seconds)
+      setSpeed(speed: number) {
+        const next = clampSpeed(speed)
+        if (next === state.speed) return
+        state.speed = next
+        writePlayerSpeed(next)
+        elements.forEach(applySpeed)
+        state.pace = []
+        state.paceFrom = false
+        updatePositionState()
+        speedListeners.forEach((listener) => listener(next))
+      },
+      speedReading(): SpeedReading {
+        const audio = live() as PitchAudio
+        const name = pitchSwitch((each) => each in audio)
+        return {
+          speed: state.speed,
+          rate: audio.playbackRate,
+          pitch: name === null ? 'no switch' : audio[name] === false ? 'moves' : 'held',
+          refused: state.speedRefused,
+          measured: paceOf(state.pace),
+        }
+      },
     }
 
     function onTimeUpdate() {
@@ -1347,6 +1444,12 @@ export function usePlayer(): Player {
         state.join = null
       }
       const position = stream ? songPosition() : audio.currentTime
+      //? a step of playing from an update that followed another while playing, with no seek or pause
+      //? between: the song's own pace against the page's clock, for Debug (2.0.0-player.39)
+      if (state.paceFrom && !state.seeked && !state.pausedSinceUpdate && position >= state.lastPosition) {
+        state.pace = paceStep(state.pace, { media: position - state.lastPosition, wall: (at - state.lastAt) / 1000 })
+      }
+      state.paceFrom = !audio.paused
       state.pausedSinceUpdate = false
       timeChange({ position: audio.currentTime, at, playbackRate: audio.playbackRate, seeked: state.seeked })
       const step = listenedStep({
@@ -1700,6 +1803,8 @@ export function usePlayer(): Player {
       }
     }
 
+    //? a speed left set from before: the page's element carries it from the start (at 1x, nothing is written)
+    applySpeed(elements[0]!)
     //? a switch left on from before: the second element exists from the start, unlocked by the first tap
     if (state.gapless) ensureSpare()
 
@@ -1769,4 +1874,14 @@ export function usePosition(player: Player): number {
   const [position, setPosition] = useState(() => player.position())
   useEffect(() => player.onPosition(setPosition), [player.onPosition])
   return position
+}
+
+/** The speed (2.0.0-player.39), re-rendering only whatever calls this - as the fader moves it. */
+export function useSpeed(player: Pick<Player, 'speed' | 'onSpeed'>): number {
+  const [speed, setSpeed] = useState(() => player.speed())
+  useEffect(() => {
+    setSpeed(player.speed())
+    return player.onSpeed(setSpeed)
+  }, [player.onSpeed])
+  return speed
 }

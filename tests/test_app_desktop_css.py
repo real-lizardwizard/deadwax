@@ -45,6 +45,7 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   pointer is coarse), the chips giving way before the album's name and never cut to a stub, the row the
   panel has open in Explorer's selection, a row dealt with faded but never its word, the quiet
   "Checking the library…" in a line always a row tall, the list clear of a drawer, and no solid purple.
+- The speed's chip (2.0.0-player.39) first in the player bar's tools, the tools' height, its face smaller.
 - Server settings and the log (2.0.0-player.33), with no board: the page at least the page area's height
   and its save bar sticky at the foot above the player bar, taking no clicks while it says nothing and
   keeping keyboard focus clear of it while it says something, Save its one solid purple button; the
@@ -708,3 +709,13 @@ def test_the_log_draws_errors_red_and_warnings_amber_and_both_pages_keep_clear_o
     for selector in (".app-desk.has-drawer .app-settings-body", ".app-desk.has-drawer .app-log-body", ".app-desk.has-drawer .app-settings-savebar"):
         assert declarations(DESKTOP, selector, DESK)["max-width"] == \
             "calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap))", selector
+
+
+def test_the_speeds_chip_sits_in_the_bars_tools_at_their_height():
+    chip = declarations(DESKTOP, ".app-desk .app-playbar-tools .app-speed-chip", DESK)
+    assert chip["height"] == "var(--app-desk-tool)" and chip["margin-right"] == "0"
+    face = declarations(DESKTOP, ".app-desk .app-playbar-tools .app-speed-chip-face", DESK)
+    assert face["height"] == "var(--app-desk-speed-chip)" and media_tokens(DESKTOP, DESK)["--app-desk-speed-chip"] == "24px"
+    #? the tools hold their buttons at the row's right end, so the chip coming and going moves none of them
+    assert declarations(DESKTOP, ".app-desk .app-playbar-tools", DESK)["justify-content"] == "flex-end"
+

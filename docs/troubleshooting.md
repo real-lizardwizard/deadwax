@@ -659,6 +659,40 @@ own (`192 kHz to 48 kHz, 3 dB quieter`), and two rows that are new, **Why** and 
 ([the phone player](player.md#info--debug) lists them all). The **Gapless** switch that sat beside
 the album's name is a checkbox in **You**, under **Playback**, and keeps the setting it had.
 
+## A song sounds too fast, too slow, too high or too low
+
+That's [the speed](player.md#the-speed-fader) (since 2.0.0-player.39): set on the turntable's speed
+fader, it holds for every song after and is kept on the device, and its pitch moves with it - faster
+is higher, slower lower, as a record played at the wrong speed. Off 1x the now-playing screen says so:
+a chip (`1.25x`) at the left end of the row of buttons under the cover's transport, and the
+turntable's own readout, under its fader; on a desktop, a chip in the player bar. The mini player
+above the tabs doesn't show it, so open the now-playing screen. **Tap the chip, or the readout, and
+it's back to exactly 1x.** Only a song that sounds wrong at 1x is something else - Info → Debug's **Speed** row
+says `Normal (1.00x)` then.
+
+A song at another speed that should be higher or lower and **keeps its own pitch** instead (sounds
+stretched, the way a podcast at 2x does) means the browser is holding the pitch: Debug's **Speed** row
+says `but the browser is holding the pitch`, or `this browser has no pitch switch`. Say which browser
+it is.
+
+### A browser won't play a speed
+
+Every speed from 0.25x to 2x is in the range Chrome, Edge and Firefox play (Firefox mutes outside
+1/8x to 8x; Chrome refuses a speed outside 0.0625x to 16x). On an iPhone and in Safari, Apple's player
+promises any song from 1x to 2x, and below 1x only a song it says it can play slowly - not yet seen on
+an iPhone either way. Info → Debug's **Speed** row says what happened:
+
+- **`Asked for 0.25x; the browser refused it - …`**: the browser threw the speed back, in its own words.
+  The song plays on at the speed it had; choose another.
+- **`Asked for 0.25x; the browser plays it at 1.00x`**: the browser took another speed instead of it.
+- **`The song moved at 1.00x over the last few seconds of playing`** under a speed that isn't 1x: the
+  browser said yes but plays the song at its own speed - what a song Apple won't play slowly would do.
+  (It reads a little under the speed across a moment the song waited for the network, and comes back
+  in a few seconds of playing; after a change of speed it starts again, and shows after a couple of
+  seconds of playing at the new one. The row keeps up while Debug stays open.)
+
+Tell us what it says, with the browser, and the song's format from the **Format** row.
+
 ## The turntable shows a plain black record, not the album's CD art
 
 The record's face is the CD art deadwax holds for the album - a `disc.jpg` (or `disc2.jpg` for a

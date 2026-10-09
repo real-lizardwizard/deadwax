@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { aboutRows, type About, type AboutAlbumFields, type AboutDetails } from '../lib/aboutRows'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
@@ -11,6 +11,10 @@ import type { Player } from '../player/usePlayer'
 import { useSheet } from './useSheet'
 
 export type InfoTab = 'about' | 'debug'
+
+/** How often an open Debug reads the speed again (2.0.0-player.39): the song's measured pace moves as it
+ *  plays, and none of the speed is React state. */
+export const SPEED_READ_MS = 1000
 
 export const INFO_TABS: readonly { id: InfoTab; label: string }[] = [
   { id: 'about', label: 'About' },
@@ -45,7 +49,10 @@ interface Drawn {
  * behind - and a scroller starts its own count, so its own panning comes back inside it.
  *
  * The rows are worked out only while it is open, and what it last drew is kept while it slides
- * away. `sentFormat` is asked only for Debug: it puts a question to the player's audio element.
+ * away. The Speed row (2.0.0-player.39) reads what isn't React state - the speed and the song's measured
+ * pace - so while Debug shows, it is read again as the speed changes (on a desktop the player bar's chip
+ * is beside the panel) and every SPEED_READ_MS (the pace comes after a couple of seconds of playing, and
+ * moves), and drawn again only when what it says has changed. `sentFormat` is asked only for Debug: it puts a question to the player's audio element.
  * It stays mounted, and a closed sheet is only hidden, so its one scroller would keep its offset
  * from one opening to the next and from one tab to the other: it is put back at the top as Info
  * opens and as the tab changes - never as it closes, while it is still sliding away in sight.
@@ -79,7 +86,9 @@ export function InfoSheet({
   onClose: () => void
   /** close everything and open the song's album; null when it names none to go to */
   onAlbum: (() => void) | null
-  player: Pick<Player, 'track' | 'gapless' | 'maxRate' | 'gaps' | 'lastSeek' | 'wrapped'>
+  /** the speed's reading too, and a way to hear of it changing, where the player has one
+   *  (2.0.0-player.39 - the app's always does) */
+  player: Pick<Player, 'track' | 'gapless' | 'maxRate' | 'gaps' | 'lastSeek' | 'wrapped'> & Partial<Pick<Player, 'speedReading' | 'onSpeed'>>
   /** the album answer the queue was played from, as Navidrome sent it; null when not in hand */
   album: AboutAlbumFields | null
   sentFormat: (track: QueueTrack) => 'raw' | 'mp3' | null
@@ -111,6 +120,25 @@ export function InfoSheet({
     if (open && scroller.current) scroller.current.scrollTop = 0
   }, [open, tab])
 
+  //? the Speed row, kept current while Debug shows (review of 2.0.0-player.39: it read 1.50x beside a
+  //? song the bar's chip had put back to 1x): read again as the speed changes and every SPEED_READ_MS,
+  //? drawn again only when what it says changed - the measured pace to the hundredth, as the row says it
+  const [, setSpeedSeen] = useState('')
+  const { speedReading, onSpeed } = player
+  useEffect(() => {
+    if (!open || tab !== 'debug' || !speedReading) return undefined
+    const look = () => {
+      const reading = speedReading()
+      setSpeedSeen(JSON.stringify({ ...reading, measured: reading.measured === null ? null : Math.round(reading.measured * 100) }))
+    }
+    const off = onSpeed?.(look)
+    const timer = setInterval(look, SPEED_READ_MS)
+    return () => {
+      off?.()
+      clearInterval(timer)
+    }
+  }, [open, tab, speedReading, onSpeed])
+
   const track = player.track
   if (open && track) {
     if (tab === 'about') {
@@ -133,6 +161,7 @@ export function InfoSheet({
           turntable,
           recording,
           onRecord,
+          speed: player.speedReading?.() ?? null,
         }),
       }
     }

@@ -1,6 +1,8 @@
 # The phone player: the spike, the port to 1.0 and the scan wait
 
-The phone player's design and its port onto 1.0 (1.0.3).
+The phone player's design and its port onto 1.0 (1.0.3). The player's speed - 0.25x to 2x, its pitch
+moving with it, put on every element the engine plays on - is "The speed fader (2.0.0-player.39)" in
+notes/turntable.md, where the fader that sets it lives.
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 

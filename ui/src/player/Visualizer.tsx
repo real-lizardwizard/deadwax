@@ -406,7 +406,8 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
     const song = p.track ? syncSong(p.track, p.duration || p.track.duration, p.maxRate) : null
     const after = nextIndex(p.queue)
     const following = after === null ? null : p.queue.tracks[after] ?? null
-    listener.tick(song, following ? syncSong(following, following.duration, p.maxRate) : null, playing && !p.buffering, p.position())
+    //? at the player's speed (2.0.0-player.39): the copy keeps the song's pace, and its tempo reads it
+    listener.tick(song, following ? syncSong(following, following.duration, p.maxRate) : null, playing && !p.buffering, p.position(), p.speed())
 
     //? the signal: the copy's, the calm idle one for a song that can't be seen, or silence
     const heard = listener.read(L.raw, L.wave, L.level, dt)

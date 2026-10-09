@@ -22,6 +22,8 @@
  *  - Gap: no change timed yet, a stream change, handovers with the earlier ones on their own
  *    line, and a failed change.
  *  - Last seek: none yet, interrupted, and judged at the song's end.
+ *  - Speed (2.0.0-player.39): not known, normal, the pitch moving or held or no switch, a rate refused in
+ *    the browser's words or read back as another, and the measured pace on the line under it.
  *  - Turntable sound (2.0.0-player.14): ready, or off and why, with the cost. Since 2.0.0-player.16
  *    every way the record can't sound reads Off - starting, its window loading, none yet - since a
  *    press then is 2.0.0-player.11's; and the note names the voice: its own audio thread, or the main
@@ -90,9 +92,30 @@ console.log('\nthe layout: five sections, their rows in order')
   const sections = rows.debugSections(input())
   check('sections', sections.map((section) => section.title), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
   check('rows', sections.map((section) => section.rows.map((row) => row.label)), [
-    //? (2.0.0-player.36: and the turntable's test bench, after the recording)
-    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless'], ['Gap', 'Last seek'], ['Turntable sound', 'Turntable timing', 'Recording', 'Test bench'], ['Song', 'On other songs', 'Album'],
+    //? (2.0.0-player.36: and the turntable's test bench, after the recording; 2.0.0-player.39: the
+    //? speed, after Gapless)
+    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless', 'Speed'], ['Gap', 'Last seek'], ['Turntable sound', 'Turntable timing', 'Recording', 'Test bench'], ['Song', 'On other songs', 'Album'],
   ])
+}
+
+console.log('\nSpeed (2.0.0-player.39): the speed, whether the pitch moves with it, and anything the browser refused')
+{
+  const speed = (over = {}) => rows.speedRow({ speed: 1, rate: 1, pitch: 'held', refused: null, measured: null, ...over })
+  const words = (row) => (row.note ? [row.value, row.note] : row.value)
+  check('nobody said (a page with no player to read): not known; from what Info is handed', [words(rows.speedRow(null)), table(rows.debugSections(input())).Speed], ['Not known', 'Not known'])
+  check('1x: the song as it is - the pitch switch the browser\'s own, untouched', words(speed()), 'Normal (1.00x) - the song as it is, nothing changed')
+  check('another speed, the pitch let go: moving with it, as a record deck\'s', words(speed({ speed: 1.25, rate: 1.25, pitch: 'moves' })), '1.25x, the pitch moving with it')
+  check('...a browser holding it all the same, or with no pitch switch at all: said',
+    [words(speed({ speed: 0.5, rate: 0.5, pitch: 'held' })), words(speed({ speed: 0.5, rate: 0.5, pitch: 'no switch' }))],
+    ['0.50x, but the browser is holding the pitch', '0.50x - this browser has no pitch switch, so it may be holding the pitch'])
+  check('a rate the browser refused: its words', words(speed({ speed: 2, rate: 1, pitch: 'moves', refused: "Failed to set the 'playbackRate' property" })),
+    "Asked for 2.00x; the browser refused it - Failed to set the 'playbackRate' property")
+  check('a rate that reads back as another', words(speed({ speed: 0.25, rate: 0.5, pitch: 'moves' })), 'Asked for 0.25x; the browser plays it at 0.50x')
+  check('the song\'s own pace, measured while it played, on the line under it - so a browser not playing the speed it was given shows',
+    [words(speed({ speed: 0.25, rate: 0.25, pitch: 'moves', measured: 1 })), words(speed({ measured: 1.004 }))],
+    [['0.25x, the pitch moving with it', 'The song moved at 1.00x over the last few seconds of playing'], ['Normal (1.00x) - the song as it is, nothing changed', 'The song moved at 1.00x over the last few seconds of playing']])
+  check('...and in the debug sections, from what Info is handed', table(rows.debugSections(input({ speed: { speed: 1.5, rate: 1.5, pitch: 'moves', refused: null, measured: null } }))).Speed,
+    '1.50x, the pitch moving with it')
 }
 
 console.log('\nTurntable sound (2.0.0-player.14): ready, or off and why - how an iPhone says what WebKit made of it')

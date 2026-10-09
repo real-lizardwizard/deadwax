@@ -10,6 +10,7 @@ import {
 } from '../lib/turntable'
 import { Cover } from './Cover'
 import { Deck, wakeDeckAudio, type DeckHost } from './deck'
+import { SpeedFader, type SpeedPlayer } from './SpeedFader'
 import { usePosition, type Player } from './usePlayer'
 
 /** What the drag says in place of the song's position - the time line under the song shows it. */
@@ -17,9 +18,12 @@ export type TurntablePreview = Preview | null
 
 /**
  * What the turntable reads of the player - all it reads (2.0.0-player.36): Now Playing hands it the app's
- * own player, and the test bench at /player/lab/ a small one of its own, playing a song it made.
+ * own player, and the test bench at /player/lab/ a small one of its own, playing a song it made. The
+ * speed (2.0.0-player.39) only where the player has one - the app's, which the motor follows; the
+ * bench's has none, and its turntable turns at 33 1/3.
  */
 export type TurntablePlayer = Pick<Player, 'track' | 'playing' | 'duration' | 'maxRate' | 'position' | 'onPosition' | 'toggle' | 'seek'>
+  & Partial<Pick<Player, 'speed' | 'onSpeed'>>
 
 /** Where the turntable's windows come from instead of deadwax: the test bench's (DeckHost's `window`). */
 export type WindowSource = NonNullable<DeckHost['window']>
@@ -84,6 +88,9 @@ function kindOf(track: { suffix?: string | null | undefined; contentType?: strin
  *   under a still finger moves the song.
  * - Neither starts the sheet's drag to close: they are not inside its grip (NowPlaying.tsx).
  * - Every release, and every tap, wakes the deck's audio context - "the first release resumes it".
+ * - THE SPEED FADER (2.0.0-player.39, player/SpeedFader.tsx) stands at the right of the platter, as a
+ *   deck's pitch control: the player's speed, 0.25x to 2x - which the deck's motor follows (told here as
+ *   it changes), so the platter turns at it and a let-go record comes back to it.
  * - No hint and no coach mark (James: "the instructions for how to use it are a little annoying").
  *
  * A leaf: the player and the disc art's address come as props. `onPreview` tells Now Playing what
@@ -98,6 +105,7 @@ export function Turntable({
   windDown = true,
   deck: deckRef,
   windowSource,
+  fader,
 }: {
   player: TurntablePlayer
   /** Now Playing is open - closed, the record stops */
@@ -112,6 +120,9 @@ export function Turntable({
   /** the test bench's windows of the song it made (2.0.0-player.36) - read as the turntable mounts; the
    *  app gives none, and the windows are deadwax's */
   windowSource?: WindowSource
+  /** the speed fader's player (2.0.0-player.39): Now Playing's, the app's own - the bench gives none, and
+   *  draws no fader */
+  fader?: SpeedPlayer | null
 }) {
   //? usePosition reads only position() and onPosition() of what it is handed
   const position = usePosition(player as Player)
@@ -229,6 +240,13 @@ export function Turntable({
   useEffect(() => deck.setShowing(open && visible), [open, visible])
   useEffect(() => deck.playingChanged(player.playing), [player.playing])
   useEffect(() => deck.setWindDown(windDown), [windDown])
+  //? the player's speed is the motor's (2.0.0-player.39): told as the turntable mounts, and as it changes
+  useEffect(() => {
+    const now = latest.current
+    if (!now.speed || !now.onSpeed) return undefined
+    deck.speedChanged(now.speed())
+    return now.onSpeed((speed) => deck.speedChanged(speed))
+  }, [])
 
   //? the song changed under the finger: the drag was for the song before, and seeks nowhere - nor
   //? does anything the deck had of it
@@ -424,6 +442,9 @@ export function Turntable({
           </span>
         </button>
         <span class="app-tt-sheen" style={placeCircle(RECORD)} aria-hidden="true" />
+
+        {/* the speed fader, beside the platter - under the arm, whose handle wins where they meet */}
+        {fader && <SpeedFader player={fader} />}
 
         <svg class="app-tt-layer" viewBox={`0 0 ${STAGE.width} ${STAGE.height}`} aria-hidden="true">
           <g class={`app-tt-arm${lifted ? ' is-lifted' : ''}`} transform={`rotate(${+armAngle(shown, length).toFixed(3)} ${ARM.x} ${ARM.y})`}>

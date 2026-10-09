@@ -7,7 +7,8 @@
  *    element for the page's life, and iOS unlocks audio per element from a tap: a second call - a
  *    tab calling it - is a second element nobody unlocked. Only App imports it as a value, so a
  *    renamed import (`usePlayer as useEngine`) can't slip a second call past the count.
- *  - The playback actions (playTracks, toggle, next, previous, setGapless, showAirPlay) must be
+ *  - The playback actions (playTracks, toggle, next, previous, setGapless, showAirPlay - and since
+ *    2.0.0-player.39 setSpeed, which is no gesture-gated action but IS a player action) must be
  *    called straight from a tap, play() in the same turn as the gesture. So they are reached only
  *    from the files allowed below, each a screen whose buttons call them from their click. Adding
  *    a file is a deliberate edit to this list, like the Navidrome route list. app/context.ts may
@@ -237,12 +238,16 @@ const ALLOWED = {
   'player/Visualizer.tsx': ['toggle'],
   //? names them for ActionsContext and calls none (pickActions)
   'app/context.ts': ['playTracks', 'toggle', 'next', 'previous', 'setGapless', 'showAirPlay'],
+  //? the speed (2.0.0-player.39): the turntable's fader - each move, a key, its readout's tap back to 1x -
+  //? and the chip on the cover and the desktop's player bar, whose tap puts it back to 1x
+  'player/SpeedFader.tsx': ['setSpeed'],
+  'player/SpeedChip.tsx': ['setSpeed'],
 }
 
 /** Which playback actions a file's code reaches: by name, as a member, or taken apart from one. */
 function actionsIn(text) {
   const found = new Set()
-  for (const match of text.matchAll(/\b(playTracks|setGapless|showAirPlay)\b/g)) found.add(match[1])
+  for (const match of text.matchAll(/\b(playTracks|setGapless|showAirPlay|setSpeed)\b/g)) found.add(match[1])
   //? toggle, next and previous are ordinary words, so only as a member - classList.toggle aside
   for (const match of text.matchAll(/(?<!classList)\.(toggle|next|previous)\b/g)) found.add(match[1])
   //? and taken out of an object: const { toggle } = player (the KEY taken - `{ nav: next }` takes nav)
@@ -312,11 +317,49 @@ console.log('\nthe playback actions only from the files allowed')
     'player/MiniPlayer.tsx': ['next', 'toggle'],
     'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
     'player/PlayerBar.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
+    'player/SpeedChip.tsx': ['setSpeed'],
+    'player/SpeedFader.tsx': ['setSpeed'],
     'player/Turntable.tsx': ['toggle'],
     'player/Visualizer.tsx': ['toggle'],
   })
   check('app/context.ts names them and calls none',
     [...code(read('app/context.ts')).matchAll(/\.(playTracks|toggle|next|previous|setGapless|showAirPlay)\s*\(/g)].map((m) => m[1]), [])
+}
+
+console.log('\nthe speed (2.0.0-player.39): set from the fader and the chip alone, put on the elements by the engine alone')
+{
+  //? by name, from exactly the files that call it - and each calls it straight from its handler
+  const fader = code(read('player/SpeedFader.tsx'))
+  const chip = code(read('player/SpeedChip.tsx'))
+  check('the fader sets it from a move, a key and its readout\'s tap - nothing awaited before',
+    [/const onPointerMove = \(event: PointerEvent\) => \{[\s\S]*?if \(to !== null\) player\.setSpeed\(to\)\s*\}/.test(fader),
+      /const onKeyDown = \(event: KeyboardEvent\) => \{[\s\S]*?player\.setSpeed\(to\)\s*\}/.test(fader),
+      /onClick=\{\(\) => player\.setSpeed\(SPEED_NORMAL\)\}/.test(fader), /\bawait\b|\.then\(/.test(fader)],
+    [true, true, true, false])
+  //? (its handler hands focus on to the next button after it, as the chip goes - review of 2.0.0-player.39)
+  check('the chip\'s tap puts it back to exactly 1x, and nothing else - from its handler, nothing awaited',
+    [/const onTap = \(event: MouseEvent\) => \{[\s\S]*?player\.setSpeed\(SPEED_NORMAL\)[\s\S]*?\}/.test(chip), /onClick=\{onTap\}/.test(chip), (chip.match(/setSpeed\(/g) ?? []).length, /\bawait\b|\.then\(/.test(chip)],
+    [true, true, 1, false])
+  //? where each is drawn: the fader in the turntable alone (outside Now Playing's grip, as the record and
+  //? the arm are), the chip in Now Playing's icon row and the desktop's player bar's tools
+  const drawnIn = (name) => files.filter((file) => APP_SIDE(file) && new RegExp(`<${name}\\b`).test(code(read(file))))
+  check('the fader is drawn by the turntable alone; the chip by Now Playing and the player bar', [drawnIn('SpeedFader'), drawnIn('SpeedChip')],
+    [['player/Turntable.tsx'], ['player/NowPlaying.tsx', 'player/PlayerBar.tsx']])
+  const nowPlaying = code(read('player/NowPlaying.tsx'))
+  check('...the chip at the start of the icon row - one fixed height, its buttons at its right end - never above the title or in the grip',
+    [/<div class="pl-sheet-footer">\s*<SpeedChip player=\{player\} \/>/.test(nowPlaying), nowPlaying.indexOf('<SpeedChip') > nowPlaying.indexOf('class="pl-sheet-body"')],
+    [true, true])
+  const bar = code(read('player/PlayerBar.tsx'))
+  check('...and first in the player bar\'s tools', /<div class="app-playbar-tools">\s*<SpeedChip player=\{player\} \/>/.test(bar), true)
+  //? only the engine puts a rate or a pitch switch on an element: the visualizer's own silent copy is a
+  //? node of its own (its playbackRate an AudioParam, `.playbackRate.value`), never the player's element
+  const SETS = /\.(playbackRate|defaultPlaybackRate)\s*=(?!=)|\b(preservesPitch|webkitPreservesPitch|mozPreservesPitch)\b/
+  check('nothing outside the engine sets a rate or a pitch switch on an element', files.filter((file) => APP_SIDE(file) && !ENGINE.has(file) && SETS.test(code(read(file)))), [])
+  const engine = code(read('player/usePlayer.ts'))
+  check('...the engine on every element: the page\'s at the start, the spare as it is made, all of them as it changes, and whatever plays just before its play()',
+    [/applySpeed\(elements\[0\]!\)/.test(engine), /spare\.muted = true\s*applySpeed\(spare\)/.test(engine), /elements\.forEach\(applySpeed\)/.test(engine),
+      /applySpeed\(audio\)\s*audio\.play\(\)/.test(engine)],
+    [true, true, true, true])
 }
 
 console.log('\nnothing outside app/ and player/ can reach the player')
@@ -1271,7 +1314,7 @@ console.log('\nthe desktop visualizer: a silent copy, never the player\'s elemen
       /if \(!request\.current\(\)\) return/.test(audio), /const ticket = this\.decodes\.begin\(\)/.test(audio)],
     [true, true, true, true])
   check('the screen asks for the queue\'s next song too, so its first window is fetched ahead (lib/vizSync.ts prefetch)',
-    [/const after = nextIndex\(p\.queue\)/.test(screen), /listener\.tick\(song, following \? syncSong\(following, following\.duration, p\.maxRate\) : null, playing && !p\.buffering, p\.position\(\)\)/.test(screen),
+    [/const after = nextIndex\(p\.queue\)/.test(screen), /listener\.tick\(song, following \? syncSong\(following, following\.duration, p\.maxRate\) : null, playing && !p\.buffering, p\.position\(\), p\.speed\(\)\)/.test(screen),
       /else if \(plan\.prefetch !== null && following\) void this\.fetchWindow\(following, plan\.prefetch\)/.test(audio), /const taken = takeAhead\(this\.held, this\.ahead, this\.current, following\?\.id \?\? null\)/.test(audio)],
     [true, true, true, true])
   //? a tap on a touch screen (an iPad on its side is a desktop frame) moves no pointer: a press brings

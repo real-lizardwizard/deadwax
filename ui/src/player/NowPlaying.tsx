@@ -6,6 +6,7 @@ import { lookButtonLabel, otherLook, playingDisc, type Look } from '../lib/turnt
 import { discArtUrl, playedAlbum } from './api'
 import { Cover } from './Cover'
 import { wakeDeckAudio, type Deck } from './deck'
+import { SpeedChip } from './SpeedChip'
 import {
   AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, RecordIcon, SquareIcon,
 } from './icons'
@@ -156,6 +157,12 @@ export function Scrubber({ player }: { player: Player }) {
  * record's own tap does (`windDown`, You's "Pause winds the record down"), and its play starts from
  * where a coasting or winding-down record is; the cover's pause is always instant, and nothing of
  * the deck runs while the cover shows - its previous and next wake nothing.
+ *
+ * THE SPEED (2.0.0-player.39): the turntable has its fader (player/SpeedFader.tsx, inside Turntable); the
+ * cover has the speed's chip (player/SpeedChip.tsx), "1.25x" at the left of the icon row wherever the
+ * speed isn't 1x, a tap back to 1x - in the row that is one fixed height, so it moves nothing. On the
+ * turntable it is drawn too, and app.css shows it only on a phone on its side, where the plinth is too
+ * small to read the fader's own readout.
  */
 export function NowPlaying({
   player,
@@ -324,6 +331,7 @@ export function NowPlaying({
           onPreview={setPreviewing}
           windDown={windDown}
           deck={deck}
+          fader={player}
         />
       )}
 
@@ -368,8 +376,10 @@ export function NowPlaying({
         </div>
 
         {/* The icon row, a tap target tall whatever is in it. ••• is always there, at the right
-            end; AirPlay comes and goes to its left, so nothing moves when a speaker does. */}
+            end; AirPlay comes and goes to its left, so nothing moves when a speaker does - nor the
+            speed's chip, at the left end, when the speed leaves 1x and comes back (2.0.0-player.39). */}
         <div class="pl-sheet-footer">
+          <SpeedChip player={player} />
           {player.airplay && (
             <button type="button" class="pl-icon-button" onClick={player.showAirPlay} aria-label="AirPlay">
               <AirPlayIcon class="pl-icon" />

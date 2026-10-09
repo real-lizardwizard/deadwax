@@ -28,6 +28,7 @@
 
 import type { DeckReport } from './deckVoice'
 import { describeGaps, type GapReading } from './gapless'
+import { SPEED_NORMAL, speedLabel, type SpeedReading } from './playSpeed'
 import type { QueueTrack } from './playQueue'
 import { clock, describeSeek, type SeekReading } from './scrub'
 import { RESAMPLED_TO, describeWrap, isFlac, resamples, type MaxRate, type Wrapped } from './streamWrap'
@@ -93,6 +94,8 @@ export interface DebugInput {
   /** a recording of it, running or made, and the button that starts one (2.0.0-player.32) */
   recording?: RecordingState | null
   onRecord?: (() => void) | null
+  /** what the element playing does with the speed (2.0.0-player.39, the player's speedReading) */
+  speed?: SpeedReading | null
 }
 
 /** A rate as every row says it: 192 kHz, 44.1 kHz. */
@@ -232,6 +235,28 @@ export function whyRow({ track, wrapped, maxRate, format }: Pick<DebugInput, 'tr
 export function gaplessRow({ track, wrapped, gapless }: Pick<DebugInput, 'track' | 'wrapped' | 'gapless'>): DebugRow {
   if (!gapless) return { label: 'Gapless', value: 'Off' }
   return { label: 'Gapless', value: wrappedFor(wrapped, track)?.got === 'stream' ? 'On, in one stream' : 'On' }
+}
+
+/**
+ * "Speed" (2.0.0-player.39): the speed the player asked for and what the browser does with it - whether
+ * it lets the pitch move with it (its pitch switch off, as a record deck's) or holds it, and anything it
+ * refused: a rate it threw at, a rate that reads back as another, or - measured, the song's own clock
+ * against the page's while it played - a song that isn't moving at the speed it was given (an iPhone's
+ * AVFoundation promises 1x-2x for any song, and below 1x only where the song says it can). The note
+ * says the measured pace when there is one; it reads lower than the speed across a stall.
+ */
+export function speedRow(reading: SpeedReading | null | undefined): DebugRow {
+  const label = 'Speed'
+  if (!reading) return { label, value: NOT_KNOWN }
+  const { speed, rate, pitch, refused, measured } = reading
+  const pace = measured === null ? undefined : `The song moved at ${speedLabel(measured)} over the last few seconds of playing`
+  const withPace = (row: DebugRow): DebugRow => (pace ? { ...row, note: pace } : row)
+  if (refused) return withPace({ label, value: `Asked for ${speedLabel(speed)}; the browser refused it - ${refused}` })
+  if (Math.abs(rate - speed) > 1e-6) return withPace({ label, value: `Asked for ${speedLabel(speed)}; the browser plays it at ${speedLabel(rate)}` })
+  if (speed === SPEED_NORMAL) return withPace({ label, value: 'Normal (1.00x) - the song as it is, nothing changed' })
+  if (pitch === 'moves') return withPace({ label, value: `${speedLabel(speed)}, the pitch moving with it` })
+  if (pitch === 'held') return withPace({ label, value: `${speedLabel(speed)}, but the browser is holding the pitch` })
+  return withPace({ label, value: `${speedLabel(speed)} - this browser has no pitch switch, so it may be holding the pitch` })
 }
 
 const GAP_PREFIX = 'Last song change '
@@ -453,7 +478,7 @@ function otherSongsRow(song: Answer | null, album: Answer | null): DebugRow {
 export function debugSections(input: DebugInput): DebugSection[] {
   return [
     { title: 'The file', rows: [formatRow(input.track)] },
-    { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), whyRow(input), gaplessRow(input)] },
+    { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), whyRow(input), gaplessRow(input), speedRow(input.speed)] },
     { title: 'Last song change and seek', rows: [gapRow(input.gaps), seekRow(input.lastSeek)] },
     { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable), recordingRow(input.recording, input.onRecord, input.turntable), benchRow()] },
     {

@@ -68,7 +68,8 @@ fs.writeFileSync(path.join(OUT, 'node_modules/preact/hooks.js'), `
 let current = null
 function slot(init) { const i = current.cursor++; if (!(i in current.slots)) current.slots[i] = init(); return current.slots[i] }
 const changed = (a, b) => !a || !b || a.length !== b.length || a.some((v, i) => !Object.is(v, b[i]))
-exports.useState = (v) => { const s = slot(() => ({ v: typeof v === 'function' ? v() : v })); return [s.v, (x) => { s.v = typeof x === 'function' ? x(s.v) : x }] }
+//? a set that changes the value counts as a redraw asked for (asked) - this stand-in draws only when told
+exports.useState = (v) => { const r = current; const s = slot(() => ({ v: typeof v === 'function' ? v() : v })); return [s.v, (x) => { const n = typeof x === 'function' ? x(s.v) : x; if (!Object.is(n, s.v)) r.asked = (r.asked ?? 0) + 1; s.v = n }] }
 exports.useMemo = (f, deps) => { const s = slot(() => ({})); if (changed(s.deps, deps)) { s.v = f(); s.deps = deps } return s.v }
 exports.useRef = (v) => slot(() => ({ current: v }))
 exports.useEffect = exports.useLayoutEffect = (f, deps) => {
@@ -82,6 +83,7 @@ exports.root = (component) => {
     try { return component(props) } finally { current = outer }
   }
   render.commit = () => { for (const s of root.effects.splice(0)) { if (typeof s.cleanup === 'function') s.cleanup(); s.cleanup = s.f() } }
+  render.asked = () => root.asked ?? 0
   return render
 }
 `)
@@ -163,6 +165,7 @@ function mount(component, name) {
       render.commit()
       return tree
     },
+    asked: () => render.asked(),
     find(test) {
       const hits = []
       const visit = (node) => {
@@ -439,7 +442,8 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   reopen()
   check('Debug chosen', tabs().map((tab) => [tab.props['aria-selected'], tab.props.tabIndex]), [[false, -1], [true, 0]])
   check('Debug draws its five sections - the turntable\'s sound among them since 2.0.0-player.14', view.find((node) => node.type === 'h3').map(text), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
-  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Why', 'Gapless', 'Gap', 'Last seek', 'Turntable sound', 'Turntable timing', 'Recording', 'Test bench', 'Song', 'On other songs', 'Album'])
+  //? (2.0.0-player.39: Speed after Gapless - not known here, this player has no speed to read)
+  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Why', 'Gapless', 'Speed', 'Gap', 'Last seek', 'Turntable sound', 'Turntable timing', 'Recording', 'Test bench', 'Song', 'On other songs', 'Album'])
   //? the turntable's test bench (2.0.0-player.36): a link opening beside the app, so the music isn't unloaded
   check('...the test bench a link opening beside the app, to /player/lab/',
     view.find((node) => node.type === 'a' && node.props?.href === '/player/lab/').map((node) => [node.props.target, node.props.rel, node.props.download ?? null, text(node)]),
@@ -459,6 +463,72 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   drawDeck()
   const deckRow = deckView.find(byClass('app-kv-label')).findIndex((node) => text(node) === 'Turntable sound')
   check('Debug says the turntable\'s sound from what it is handed', text(deckView.find(byClass('app-kv-value'))[deckRow]), 'Ready: 0:42-1:12, FLAC, decoded at 48 kHz')
+  //? the speed (2.0.0-player.39): read off the player's own speedReading as Debug draws, after Gapless
+  const speedView = mount(InfoSheet, 'info with a speed')
+  const fast = { ...player, speedReading: () => ({ speed: 1.25, rate: 1.25, pitch: 'moves', refused: null, measured: null }) }
+  const drawSpeed = () => speedView.render({ open: true, opener: { current: null }, onClose() {}, onAlbum: null, player: fast, album: EXPERIENCE, sentFormat: () => 'raw' })
+  drawSpeed()
+  speedView.find((node) => node.props?.role === 'tab')[1].props.onClick()
+  drawSpeed()
+  const speedRow = speedView.find(byClass('app-kv-label')).findIndex((node) => text(node) === 'Speed')
+  check('Debug says the speed from the player\'s own reading of it (2.0.0-player.39)', [speedRow, text(speedView.find(byClass('app-kv-value'))[speedRow])], [5, '1.25x, the pitch moving with it'])
+  speedView.render({ open: false, opener: { current: null }, onClose() {}, onAlbum: null, player: fast, album: EXPERIENCE, sentFormat: () => 'raw' })
+  //? ...and kept current while Debug shows (review of 2.0.0-player.39: on a desktop the panel isn't modal,
+  //? and it read 1.50x beside a song the bar's chip had put back to 1x; the measured pace never came into
+  //? a Debug opened early): listening for the speed, and read again every SPEED_READ_MS - a redraw asked
+  //? for only when what it says changed. A timer of its own, never left running off Debug
+  {
+    const intervals = []
+    const realSetInterval = globalThis.setInterval, realClearInterval = globalThis.clearInterval
+    globalThis.setInterval = (fn, ms) => { const timer = { fn, ms, live: true }; intervals.push(timer); return timer }
+    globalThis.clearInterval = (timer) => { if (timer) timer.live = false }
+    const running = () => intervals.filter((timer) => timer.live)
+    const tick = () => running().forEach((timer) => timer.fn())
+    const heard = new Set()
+    const state = { speed: 1.5, measured: null }
+    const live = {
+      ...player,
+      speedReading: () => ({ speed: state.speed, rate: state.speed, pitch: state.speed === 1 ? 'held' : 'moves', refused: null, measured: state.measured }),
+      onSpeed(listener) { heard.add(listener); return () => heard.delete(listener) },
+    }
+    const liveView = mount(InfoSheet, 'info with a live speed')
+    const draw = (open = true) => liveView.render({ open, opener: { current: null }, onClose() {}, onAlbum: null, player: live, album: EXPERIENCE, sentFormat: () => 'raw' })
+    const row = () => {
+      const at = liveView.find(byClass('app-kv-label')).findIndex((node) => text(node) === 'Speed')
+      const value = liveView.find(byClass('app-kv-value'))[at]
+      return text(value)
+    }
+    draw()
+    check('the speed kept current - on About: not listening for it, no timer', [heard.size, running().length], [0, 0])
+    liveView.find((node) => node.props?.role === 'tab')[1].props.onClick()
+    draw()
+    check('...on Debug: listening for the speed, and read again every SPEED_READ_MS', [row(), heard.size, running().map((timer) => timer.ms)], ['1.50x, the pitch moving with it', 1, [1000]])
+    let asked = liveView.asked()
+    state.speed = 1
+    heard.forEach((listener) => listener(1))
+    check('...the speed changed with Debug open (the bar\'s chip): a redraw asked for, and drawn it says 1x', [liveView.asked() > asked, (draw(), row())],
+      [true, 'Normal (1.00x) - the song as it is, nothing changed'])
+    asked = liveView.asked()
+    tick()
+    check('...read again with nothing changed: no redraw', liveView.asked() - asked, 0)
+    state.measured = 0.996
+    tick()
+    const paceNote = () => liveView.find(byClass('app-kv-note')).map(text).filter((note) => note.startsWith('The song moved'))
+    check('...the song\'s pace measured a second on: a redraw, and it is drawn', [liveView.asked() - asked, (draw(), paceNote())], [1, ['The song moved at 1.00x over the last few seconds of playing']])
+    asked = liveView.asked()
+    state.measured = 0.998
+    tick()
+    check('...the pace moving under the hundredth the row says: no redraw', liveView.asked() - asked, 0)
+    liveView.find((node) => node.props?.role === 'tab')[0].props.onClick()
+    draw()
+    check('...back to About: not listening, its timer stopped', [heard.size, running().length], [0, 0])
+    liveView.find((node) => node.props?.role === 'tab')[1].props.onClick()
+    draw()
+    draw(false)
+    check('...closed on Debug: the same', [heard.size, running().length], [0, 0])
+    globalThis.setInterval = realSetInterval
+    globalThis.clearInterval = realClearInterval
+  }
   //? closed, so its lock and its Escape are no part of the checks after this
   deckView.render({ open: false, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw' })
 

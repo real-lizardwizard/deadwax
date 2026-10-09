@@ -107,6 +107,17 @@ And for pins and a finished Home (2.0.0-player.18):
   none) - the rest of the row lets the page scroll; the row being dragged sits over the rest.
 - The app's one notice for pins: fixed at the top, over Now Playing's menu and Info, taking no taps,
   clipped away (never removed) while it says nothing.
+
+And for the speed fader (2.0.0-player.39):
+
+- The fader takes every touch on it (touch-action: none), a tap target wide - a share of the plinth on
+  a small one, the arm handle's rule - and never on the record (from just past its rim where centring on
+  the slot would reach it); its readout a tap target the same way, its words a label's size and smaller
+  with the plinth, its well opaque and drawn over a failure line laid across the plinth's foot; the
+  knob, the slot and the mark drawn from the theme's tokens.
+- The chip: a tap target tall, STYLE.md's toggled chip inside it, at the start of the icon row that is
+  one fixed height - so it moves nothing coming and going - and on the turntable only on a phone on its
+  side, where the plinth is too small to read the readout.
 """
 
 import re
@@ -957,4 +968,64 @@ def test_edits_buttons_reach_44px_and_only_the_grip_takes_a_drag():
     assert not [selector for _, selector, values in rules(APP) if "app-pin" in selector and "touch-action" in values and selector != ".app-pin-grip"]
     assert declarations(APP, ".app-pin-row.is-dragging")["z-index"] == "var(--app-z-pin-drag)"
     assert declarations(APP, ".app-pin-row .app-pin-text")["flex"] == "1"
+
+
+# ------------------------------------------------------------------- the speed fader (2.0.0-player.39)
+
+def test_the_fader_takes_every_touch_and_is_a_tap_target_unless_the_plinth_is_small():
+    fader = declarations(APP, ".app-tt-fader")
+    assert (fader["touch-action"], fader["user-select"], fader["-webkit-touch-callout"]) == ("none", "none", "none")
+    assert fader["position"] == "absolute" and "transform" not in fader
+    #? 44px, but never more than a share of the plinth: on a phone on its side (a 45px plinth) a 44px
+    #? fader beside the record would cover it - the arm handle's rule
+    assert fader["width"] == "min(var(--pl-hit), var(--app-tt-fader-cap))"
+    #? centred on the slot only while that keeps it off the record: else from just past the record's rim
+    #? (review of 2.0.0-player.39 - centred, it covered the rim on every phone, and took its taps and
+    #? turns). The two places come inline from lib/playSpeed; playspeed.sim holds faderTarget to this
+    assert fader["left"] == "max(var(--app-tt-fader-from), calc(var(--app-tt-fader-x) - min(var(--pl-hit), var(--app-tt-fader-cap)) / 2))"
+    assert ALL_TOKENS["--app-tt-fader-cap"] == "14%"
+    readout = declarations(APP, ".app-tt-readout")
+    assert readout["min-width"] == readout["min-height"] == "min(var(--pl-hit), var(--app-tt-fader-cap))"
+    assert readout["transform"] == "translate(-50%, -50%)"
+    face = declarations(APP, ".app-tt-readout-face")
+    #? a label's size, and smaller with the plinth - the room's container units - so it never spills
+    assert face["font-size"] == "var(--app-tt-readout-text)" and face["font-family"] == "var(--dw-font-mono)" and face["white-space"] == "nowrap"
+    #? no var() of the stage's: a custom property's var() is filled in where it is defined - :root - and
+    #? one undefined there made the whole token invalid, the words the page's 17px (the real page showed it)
+    assert ALL_TOKENS["--app-tt-readout-text"] == "min(var(--dw-text-label), 3.2cqw, 3.2cqh)"
+    assert declarations(APP, ".app-tt")["container-type"] == "size"
+    #? off 1x, STYLE.md's toggled look; at 1x a well - each tint laid on the plinth's own colour, so the
+    #? face is opaque: drawn OVER a failure line laid across the plinth's foot, which reaches it on a phone
+    #? short of height (review of 2.0.0-player.39 - red words ran through its purple ones), the same pixels
+    #? as before on the plinth
+    assert (face["background"], face["box-shadow"]) == ("linear-gradient(var(--dw-well), var(--dw-well)), var(--dw-tt-plinth)", "var(--dw-well-inset)")
+    off = declarations(APP, ".app-tt-readout.is-off .app-tt-readout-face")
+    assert (off["background"], off["border-color"]) == (
+        "linear-gradient(var(--dw-toggled-bg), var(--dw-toggled-bg)), var(--dw-tt-plinth)", "var(--dw-toggled-border)")
+    assert readout["z-index"] == "var(--app-z-tt-readout)" and ALL_TOKENS["--app-z-tt-readout"] == "1"
+    #? the failure line it is drawn over: no z-index of its own, nor anything between the readout and the
+    #? sheet that would make a stacking context and keep the readout's under it
+    assert "z-index" not in declarations(APP, ".app-is-turntable .pl-sheet-error")
+    for between in (".app-tt-stage", ".app-tt"):
+        rule = declarations(APP, between)
+        assert not ({"z-index", "isolation", "transform", "filter", "opacity", "contain", "will-change"} & set(rule)), between
+    #? the drawing: the slot STYLE.md's track, the knob the arm's greys, the mark lit green at 1x
+    assert declarations(APP, ".app-tt-fader-slot") == {"fill": "var(--dw-track)", "stroke": "var(--dw-border)"}
+    assert declarations(APP, ".app-tt-fader-knob")["fill"] == "var(--dw-tt-arm-weight)"
+    assert declarations(APP, ".app-tt-fader-mark.is-on")["fill"] == "var(--dw-green-icon)"
+
+
+def test_the_speed_chip_moves_nothing_and_shows_on_the_turntable_only_on_a_phone_on_its_side():
+    chip = declarations(APP, ".app-speed-chip")
+    #? a tap target tall in a row that is one: its height is the row's, and it sits at the row's start
+    assert chip["height"] == "var(--pl-hit)" and chip["margin-right"] == "auto" and chip["flex"] == "none"
+    assert declarations(PLAYER_CSS, ".pl-sheet-footer")["height"] == "var(--pl-hit)"
+    assert declarations(PLAYER_CSS, ".pl-sheet-footer")["justify-content"] == "flex-end"
+    face = declarations(APP, ".app-speed-chip-face")
+    assert (face["height"], face["background"], face["border"], face["color"]) == (
+        "var(--app-speed-chip)", "var(--dw-toggled-bg)", "var(--dw-hairline) solid var(--dw-toggled-border)", "var(--dw-accent-text)")
+    assert ALL_TOKENS["--app-speed-chip"] == "28px" and face["border-radius"] == "var(--dw-radius-control)"
+    #? on the turntable the readout says it - but on a phone on its side the plinth is too small to read
+    assert declarations(APP, ".app-is-turntable .app-speed-chip") == {"display": "none"}
+    assert declarations(APP, ".app-is-turntable .app-speed-chip", "@media (max-height: 500px)") == {"display": "grid"}
 

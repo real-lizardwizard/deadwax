@@ -23,6 +23,10 @@
  *    cancel seeks nowhere; a drag begun on a song that has since changed is dropped. Both drags
  *    capture the pointer; the preview goes with the turntable when it unmounts.
  *  - The time line: "2:31 of 7:05", and what the drag says while there is one.
+ *  - The speed fader (2.0.0-player.39): drawn on the stage when Now Playing hands the turntable its player
+ *    (after the record, before the arm's handle), none for a player with no speed (the test bench's);
+ *    the deck told the speed as the turntable mounts and as it changes, and no longer once it has gone;
+ *    the speed's chip first in Now Playing's icon row, outside the grip.
  *  - The record turns - the deck's frame loop (player/deck.ts, 2.0.0-player.14), a turn in
  *    SECONDS_PER_TURN - while the song plays and Now Playing is open and the page is showing, and
  *    spins down when it pauses; never while closed or hidden; Turntable itself has no frame loop.
@@ -443,6 +447,33 @@ const pointer = (point, extra = {}) => ({
   pointerId: 1, isPrimary: true, pointerType: 'touch', button: 0, clientX: point.x, clientY: point.y, timeStamp: clock,
   currentTarget: { captured: null, setPointerCapture(id) { this.captured = id } }, ...extra,
 })
+
+console.log('\nthe speed fader (2.0.0-player.39): drawn where the player has one, the deck told the speed')
+{
+  const listeners = new Set()
+  const speedPlayer = { now: 1.5, speed() { return this.now }, onSpeed(listener) { listeners.add(listener); return () => listeners.delete(listener) }, setSpeed() {} }
+  const player = fakePlayer({ speed: () => speedPlayer.now, onSpeed: (listener) => speedPlayer.onSpeed(listener) })
+  const deckRef = { current: null }
+  const view = mount(Turntable, 'turntable with a speed')
+  view.render({ player, open: true, discArt: null, onPreview() {}, deck: deckRef, fader: speedPlayer })
+  check('given the fader\'s player: the fader drawn on the stage, after the record, before the arm\'s handle',
+    (() => {
+      const children = view.find(byClass('app-tt-stage'))[0].props.children.flat().filter(Boolean)
+      const at = (test) => children.findIndex(test)
+      return [!!view.find(named('SpeedFader'))[0], at(byClass('app-tt-record')) < at(named('SpeedFader')), at(named('SpeedFader')) < at(byClass('app-tt-handle'))]
+    })(), [true, true, true])
+  check('...the deck told the player\'s speed as it mounts', deckRef.current['speed'], 1.5)
+  speedPlayer.now = 0.5
+  listeners.forEach((listener) => listener(0.5))
+  check('...and as it changes', deckRef.current['speed'], 0.5)
+  view.unmount()
+  check('...and no longer once it has gone', listeners.size, 0)
+  const bench = mount(Turntable, 'the bench\'s turntable')
+  const benchDeck = { current: null }
+  bench.render({ player: fakePlayer(), open: true, discArt: null, onPreview() {}, deck: benchDeck })
+  check('a player with no speed (the test bench\'s): no fader, and the deck at 1x', [bench.find(named('SpeedFader')).length, benchDeck.current['speed']], [0, 1])
+  bench.unmount()
+}
 
 console.log('\nthe record: a tap plays or pauses, in the click; a turn seeks where it lets go')
 {
@@ -998,6 +1029,10 @@ console.log('\nNow Playing opens as the setting says; the button switches it whi
   check('the record and the arm are not in the grip the sheet is dragged by',
     [view.find(named('Turntable'), grip()).length, hasClass(grip(), 'app-grip-top'), view.find(byClass('app-look-button'), grip()).length], [0, true, 1])
   check('the playing song\'s disc of the album it was played from', turntable().props.discArt, '/deadwax/library/disc_art/navidrome?album=wywh&disc=2')
+  //? the speed fader (2.0.0-player.39): Now Playing hands the turntable its player for the fader; the chip
+  //? sits in the icon row on either look (app.css shows it on the turntable only on a phone on its side)
+  check('the turntable handed the player for its speed fader; the speed\'s chip first in the icon row, outside the grip',
+    [turntable().props.fader === player, view.find(byClass('pl-sheet-footer'))[0].props.children[0].type.name, view.find(named('SpeedChip'), grip()).length], [true, 'SpeedChip', 0])
   turntable().props.onPreview({ time: 90, how: 'arm' })
   draw(true)
   check('...and the time line shows what the turntable previews', view.find(named('TurntableTime'))[0].props.previewing, { time: 90, how: 'arm' })
@@ -1021,6 +1056,7 @@ console.log('\nNow Playing opens as the setting says; the button switches it whi
   button().props.onClick()
   draw(true, 'turntable')
   check('...and the button still switches it', looks(), ['Show as a turntable', false, true, false])
+  check('...the cover\'s icon row keeps the speed\'s chip at its start', view.find(byClass('pl-sheet-footer'))[0].props.children[0].type.name, 'SpeedChip')
   const nowPlaying = fs.readFileSync(path.join(UI, 'src/player/NowPlaying.tsx'), 'utf8')
   check('the button leaves the setting alone: Now Playing has no way to change it', /onOpensAs|writePlayerOpensAs|setOpensAs/.test(nowPlaying), false)
 

@@ -27,6 +27,10 @@
  *  - a whole song played through a fake copy: a handful of windows, every one asked ahead, the copy
  *    never running outside its window, never further than DRIFT_S from the element; and two songs back
  *    to back, gaplessly: the second's copy running from its first frame.
+ *  - the player's speed (2.0.0-player.39): the copy where its anchor and its rate say (copyAt), carried
+ *    on without a jump through a change of rate (reanchor); a whole song at 1.5x and at 2x through a copy
+ *    playing at the speed - started once per window and never re-synced, never further than DRIFT_S -
+ *    where a copy left at 1x is re-synced over and over.
  *
  * Run it with:  node ui/test/vizsync.sim.cjs
  */
@@ -43,7 +47,7 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 ], { cwd: UI, stdio: 'inherit' })
 
 const sync = require(path.join(OUT, 'vizSync.js'))
-const { planSync, takeAhead, vizMargins, windowFrom, VIZ_WINDOW_S, VIZ_BACK_S, VIZ_GRID_S, VIZ_AHEAD_S, DRIFT_S, VIZ_RETRY_MS, END_GUARD_S } = sync
+const { planSync, takeAhead, vizMargins, windowFrom, copyAt, reanchor, VIZ_WINDOW_S, VIZ_BACK_S, VIZ_GRID_S, VIZ_AHEAD_S, DRIFT_S, VIZ_RETRY_MS, END_GUARD_S } = sync
 
 let failures = 0
 function check(label, actual, expected) {
@@ -213,6 +217,55 @@ console.log('\na whole song played through a fake copy')
   check('the copy never ran outside its window', outside, 0)
   check('...never further than 0.25 s from the element - the stall stopped it, and it started again where the element was', worst <= DRIFT_S, true)
   check('...started once at the beginning, once per new window, and again after the stall', starts.length, 1 + 7 + 1)
+}
+
+console.log('\nthe player\'s speed (2.0.0-player.39): the copy plays at it')
+{
+  const anchor = { at: 50, time: 10, rate: 1.5 }
+  check('where the copy has got to: its anchor on by its rate - 2 s at 1.5x is 3 s of the song', [copyAt(anchor, 12), copyAt({ ...anchor, rate: 0.25 }, 14)], [53, 51])
+  const moved = reanchor(anchor, 12, 0.5)
+  check('...a change of rate carries it on from where it had got to, no jump - then at the new rate',
+    [moved, copyAt(moved, 12), copyAt(moved, 14)], [{ at: 53, time: 12, rate: 0.5 }, 53, 54])
+  //? a 4-minute song at the speed, 60 frames a second, through a fake copy: the element and the copy
+  //? both at the speed - or the copy left at 1x, which the drift rule then re-syncs over and over
+  const whole = (speed, copyRate) => {
+    const song = { id: 's', length: 240, flac: true, maxRate: null }
+    let position = 0, heldW = null, pending = null, source = null, keys = 0, worst = 0, frames = 0
+    const arrive = [], starts = [], asked = []
+    for (let frame = 0; position < 239; frame++) {
+      const t = frame / 60
+      position = Math.min(240, position + speed / 60)
+      while (arrive.length && arrive[0].at <= t) {
+        const w = arrive.shift()
+        keys += 1
+        heldW = { song: 's', start: w.from, end: Math.min(240, w.from + 40), key: keys }
+        pending = null
+      }
+      const at = source ? copyAt(source.anchor, t) : null
+      const p = planSync({ song, following: null, running: true, position, now: t * 1000, audio: 'running', held: heldW, ahead: null, pending,
+        source: source ? { song: 's', key: source.key, at } : null, refused: [], failed: [], span: null })
+      if (p.stop || p.start !== null) source = null
+      if (p.start !== null) {
+        source = { key: heldW.key, anchor: { at: p.start, time: t, rate: copyRate } }
+        starts.push(p.start)
+      }
+      if (p.fetch !== null) {
+        asked.push(p.fetch)
+        pending = { song: 's', from: p.fetch, to: p.fetch + 40 }
+        arrive.push({ from: p.fetch, at: t + 0.6 })
+      }
+      if (source) worst = Math.max(worst, Math.abs(copyAt(source.anchor, t) - position))
+      frames = frame
+    }
+    return { starts: starts.length, windows: asked.length, worst, seconds: frames / 60 }
+  }
+  for (const speed of [1.5, 2]) {
+    const run = whole(speed, speed)
+    check(`a 4-minute song at ${speed}x, the copy at ${speed}x: done in ${Math.round(240 / speed)} s, started once a window and never re-synced, never ${DRIFT_S} s from the element`,
+      [Math.round(run.seconds), run.starts, run.windows, run.worst <= DRIFT_S], [Math.round(239 / speed), run.windows, 8, true])
+  }
+  const wrong = whole(1.5, 1)
+  check('...a copy left at 1x under a song at 1.5x is re-synced over and over - what the copy\'s rate saves', wrong.starts > 4 * wrong.windows, true)
 }
 
 console.log('\ntwo songs back to back, gaplessly')

@@ -1,4 +1,5 @@
 import { Cover } from './Cover'
+import { SpeedChip } from './SpeedChip'
 import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, VisualizerIcon } from './icons'
 import { Scrubber } from './NowPlaying'
 import type { Player } from './usePlayer'
@@ -18,7 +19,10 @@ import type { Player } from './usePlayer'
  *    draws it - the full-screen visualizer (player/Visualizer.tsx), which App opens from its click:
  *    the click is the gesture its audio context and full screen need. There is no turntable on a
  *    desktop (James: "I don't think it makes a lot of sense on desktop") - the visualizer is the
- *    desktop's.
+ *    desktop's. And before them all, the speed's chip (2.0.0-player.39, player/SpeedChip.tsx): "1.25x"
+ *    wherever the speed isn't 1x - set on the phone's turntable, an iPad turned on its side would
+ *    otherwise play it with nothing here saying so - and a tap on it back to 1x. The tools sit at the
+ *    row's right end, so the chip coming and going moves none of them.
  *
  * Its transport calls the player straight from the click - nothing awaited, the gesture rule
  * (ui/test/app-rules.sim.cjs allows this file toggle, next, previous and showAirPlay). With nothing
@@ -92,6 +96,7 @@ export function PlayerBar({
       </div>
 
       <div class="app-playbar-tools">
+        <SpeedChip player={player} />
         {player.airplay && (
           <button type="button" class="app-playbar-button" onClick={() => player.showAirPlay()} aria-label="AirPlay">
             <AirPlayIcon class="app-playbar-icon" />

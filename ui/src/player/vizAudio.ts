@@ -34,7 +34,7 @@
 import { ApiError } from '../api/http'
 import { isAbort, latestOnly } from '../lib/latest'
 import { FFT_SIZE, MAX_DB, MIN_DB, bandLayout, bandsFromBins, waveFromSamples, type BandSpan } from '../lib/visualizer'
-import { VIZ_RETRY_MS, VIZ_WINDOW_S, planSync, takeAhead, type HeldWindow, type Seeing, type SyncSong } from '../lib/vizSync'
+import { VIZ_RETRY_MS, VIZ_WINDOW_S, copyAt, planSync, reanchor, takeAhead, type CopyAnchor, type HeldWindow, type Seeing, type SyncSong } from '../lib/vizSync'
 import { scrubWindow } from './api'
 
 type ContextClass = new () => AudioContext
@@ -112,7 +112,11 @@ export class VizListener {
   private bins = new Uint8Array(0)
   private samples = new Float32Array(0)
   private node: AudioBufferSourceNode | null = null
-  private source: { song: string; key: number; anchorTime: number; anchorAt: number } | null = null
+  //? the copy playing: its song and window, and where it was started, when, at what rate (the player's
+  //? speed, 2.0.0-player.39) - copyAt says where it has got to
+  private source: { song: string; key: number; anchor: CopyAnchor } | null = null
+  //? the player's speed at the last look: what a copy is started at
+  private rate = 1
   private held: Held | null = null
   /** the next song's first window, fetched in this one's last seconds (lib/vizSync.ts prefetch) */
   private ahead: Held | null = null
@@ -133,16 +137,22 @@ export class VizListener {
   constructor(private readonly onSeeing: (seeing: Seeing, why: string | null) => void) {}
 
   /** One look: what the element is doing and the song after it, and the copy made to follow it
-   *  (lib/vizSync.ts). */
-  tick(song: SyncSong | null, following: SyncSong | null, running: boolean, position: number): void {
+   *  (lib/vizSync.ts) - at `rate`, the player's speed (2.0.0-player.39). */
+  tick(song: SyncSong | null, following: SyncSong | null, running: boolean, position: number, rate = 1): void {
     const context = audio.context
     const state = !context ? 'none' : context.state === 'running' && this.graph(context) ? 'running' : context.state === 'closed' ? 'none' : 'starting'
     this.current = song?.id ?? null
+    //? the speed changed: the copy running carries on from where it has got to, at the new rate
+    this.rate = rate
+    if (this.node && this.source && context && this.source.anchor.rate !== rate) {
+      this.source.anchor = reanchor(this.source.anchor, context.currentTime, rate)
+      this.node.playbackRate.value = rate
+    }
     //? the song changed to the one fetched ahead: its first window is the one held now
     const taken = takeAhead(this.held, this.ahead, this.current, following?.id ?? null)
     this.held = taken.held
     this.ahead = taken.ahead
-    const source = this.source && context ? { song: this.source.song, key: this.source.key, at: this.source.anchorAt + (context.currentTime - this.source.anchorTime) } : null
+    const source = this.source && context ? { song: this.source.song, key: this.source.key, at: copyAt(this.source.anchor, context.currentTime) } : null
     const ids = [song?.id, following?.id]
     const plan = planSync({
       song, following, running, position, now: Date.now(), audio: state,
@@ -239,6 +249,8 @@ export class VizListener {
     if (!held || !context || !this.analyser) return
     const node = context.createBufferSource()
     node.buffer = held.buffer
+    //? at the player's speed, as the song plays (2.0.0-player.39)
+    node.playbackRate.value = this.rate
     node.connect(this.analyser)
     node.onended = () => {
       if (this.node !== node) return
@@ -247,7 +259,7 @@ export class VizListener {
     }
     node.start(0, Math.max(0, at - held.start))
     this.node = node
-    this.source = { song: held.song, key: held.key, anchorTime: context.currentTime, anchorAt: at }
+    this.source = { song: held.song, key: held.key, anchor: { at, time: context.currentTime, rate: this.rate } }
   }
 
   private stopNode(): void {

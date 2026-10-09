@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'preact/hooks'
 
 import type { FormatPreference } from '../api/types'
+import { isSpeed, roundSpeed, SPEED_NORMAL } from '../lib/playSpeed'
 import type { MaxRate } from '../lib/streamWrap'
 import type { Look } from '../lib/turntable'
 import type { AmbientChoice, Colours, Effect } from '../lib/visualizer'
@@ -58,6 +59,10 @@ export const STORAGE_KEYS = {
   playerVizEffect: 'deadwax-player-viz-effect',
   playerVizColours: 'deadwax-player-viz-colours',
   playerVizStyle: 'deadwax-player-viz-style',
+  /** The player's speed (2.0.0-player.39): a number from 0.25 to 2, as text ('1.25'); anything else
+   *  stored - nothing, a word, a number out of range - is 1, the song's own speed. Per device, like
+   *  the others: a deck's pitch fader stays where you left it. */
+  playerSpeed: 'deadwax-player-speed',
 } as const
 
 /*
@@ -312,6 +317,25 @@ export function readPlayerWindDown(): boolean {
 
 export function writePlayerWindDown(on: boolean): void {
   writeRaw(STORAGE_KEYS.playerWindDown, on ? 'on' : 'off')
+}
+
+/* ===== deadwax-player-speed ===== */
+
+/**
+ * The player's speed (2.0.0-player.39), per device like the player's other settings. Only a number
+ * from 0.25 to 2 is taken (lib/playSpeed's isSpeed, in hundredths as the fader sets it); anything else
+ * - nothing stored, a word, 0, 3, storage that can't be read - is 1, the song's own speed, so a bad
+ * value never leaves a song playing fast or slow.
+ */
+export function readPlayerSpeed(): number {
+  const saved = readRaw(STORAGE_KEYS.playerSpeed)
+  if (saved === null || saved.trim() === '') return SPEED_NORMAL
+  const speed = Number(saved)
+  return isSpeed(speed) ? roundSpeed(speed) : SPEED_NORMAL
+}
+
+export function writePlayerSpeed(speed: number): void {
+  writeRaw(STORAGE_KEYS.playerSpeed, String(speed))
 }
 
 /* ===== deadwax-player-viz-effect, -colours, -style ===== */

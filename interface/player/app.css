@@ -79,6 +79,20 @@
                                         too small for a tap target (a phone on its side) it must
                                         not cover the record, whose taps it would take */
     --app-tt-time-gap: 6px;          /* the album line to the time line */
+    /* the speed fader on the plinth, its readout, and the speed's chip (2.0.0-player.39) */
+    --app-tt-fader-cap: 14%;         /* the most of the plinth's width the fader's and the readout's targets
+                                        may be: a 44px target from a 315px plinth up, and on a phone on
+                                        its side (a 45px plinth) a share of it - the arm handle's rule.
+                                        The fader's never reaches the record (.app-tt-fader's left) */
+    /* the readout's words as big as a label, and smaller with the plinth: 3.2% of the room it is drawn
+       in (.app-tt, a size container) either way - the plinth is as big as the room allows, about
+       square. (No var() of the stage's own here: a custom property's var() is filled in where it is
+       defined, :root, where the stage's aspect isn't - and the whole token would be invalid.) */
+    --app-tt-readout-text: min(var(--dw-text-label), 3.2cqw, 3.2cqh);
+    --app-tt-readout-pad: 0.15em 0.4em;
+    --app-z-tt-readout: 1;           /* the readout over a failure line laid across the plinth's foot */
+    --app-speed-chip: 28px;          /* the chip's drawn box, in a 44px target */
+    --app-speed-chip-pad: 8px;
     /* the Requests tab and Home's Arriving (2.0.0-player.12), as their boards draw them */
     --app-requests-gap: 18px;        /* between the Requests tab's sections */
     --app-job-gap: 8px;              /* a heading to its cards, and card to card */
@@ -1239,6 +1253,127 @@ html.app-viz-open { overflow: hidden; }
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* ===== the speed (2.0.0-player.39): the fader on the plinth, its readout, and the chip ===== */
+
+/* The fader as a deck's pitch control, drawn in the plinth's units beside the platter (lib/playSpeed's
+   FADER, player/SpeedFader.tsx) - the Turntable board has none, so it is the board's style from the
+   theme's tokens: a sunken slot as STYLE.md draws a bar's track, a knob in the arm's greys with a grip
+   line across it, and the mark at 1x, lit green while the speed is exactly 1x. */
+.app-tt-fader-slot { fill: var(--dw-track); stroke: var(--dw-border); }
+.app-tt-fader-mark { fill: var(--dw-text-3); }
+.app-tt-fader-mark.is-on { fill: var(--dw-green-icon); }
+.app-tt-fader-knob { fill: var(--dw-tt-arm-weight); stroke: var(--dw-tt-pivot-edge); }
+.app-tt-fader-knob.is-held { fill: var(--dw-tt-arm); }
+.app-tt-fader-grip { fill: var(--dw-tt-spindle); stroke: none; }
+
+/* The fader to a finger: the knob's whole travel, a tap target wide - unless the plinth is too small to
+   hold one beside the record (a phone on its side): then a share of it, as the arm's handle is. Centred
+   on the slot (--app-tt-fader-x, inline) unless that reaches the record: then it starts just past the
+   record's rim (--app-tt-fader-from) and reaches further right, into the room round the plinth - the
+   record keeps every touch on itself (lib/playSpeed's faderTarget). Every touch on it is its own. A
+   vertical slider to the keyboard. */
+.app-tt-fader {
+    position: absolute;
+    left: max(var(--app-tt-fader-from), calc(var(--app-tt-fader-x) - min(var(--pl-hit), var(--app-tt-fader-cap)) / 2));
+    width: min(var(--pl-hit), var(--app-tt-fader-cap));
+    border-radius: var(--dw-radius-control);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.app-tt-fader.is-held { cursor: grabbing; }
+.app-tt-fader:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring-inset); }
+
+/* The readout under it: what plays, in a well (STYLE.md's), purple while the speed isn't 1x - and a tap
+   on it back to exactly 1x. A tap target, as the fader is; its words a label's size and smaller with the
+   plinth, so on a small one they never spill over the record. A failure line laid over the plinth's foot
+   (.app-is-turntable .pl-sheet-error, two lines) reaches it on a phone short of height - Safari with its
+   bars, 375-393 wide - so it is drawn OVER that line, its well opaque: its tint laid on the plinth's own
+   colour, the same pixels as before on the plinth, and the line's few px under it hidden rather than
+   red words through its purple ones (review of 2.0.0-player.39). Nothing between it and the sheet
+   makes a stacking context of its own - .app-tt's container-type applies style and size containment,
+   not layout (WebKit StyleComputedStyle.cpp's usedContain) - so its z-index reaches the line. */
+.app-tt-readout {
+    position: absolute;
+    z-index: var(--app-z-tt-readout);
+    display: grid;
+    place-items: center;
+    min-width: min(var(--pl-hit), var(--app-tt-fader-cap));
+    min-height: min(var(--pl-hit), var(--app-tt-fader-cap));
+    padding: 0;
+    color: var(--dw-text-2);
+    transform: translate(-50%, -50%);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.app-tt-readout-face {
+    padding: var(--app-tt-readout-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: linear-gradient(var(--dw-well), var(--dw-well)), var(--dw-tt-plinth);
+    box-shadow: var(--dw-well-inset);
+    font-family: var(--dw-font-mono);
+    font-size: var(--app-tt-readout-text);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--dw-leading-label);
+    white-space: nowrap;
+}
+
+.app-tt-readout.is-off { color: var(--dw-accent-text); }
+
+.app-tt-readout.is-off .app-tt-readout-face {
+    border-color: var(--dw-toggled-border);
+    background: linear-gradient(var(--dw-toggled-bg), var(--dw-toggled-bg)), var(--dw-tt-plinth);
+    box-shadow: none;
+}
+
+.app-tt-readout:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring-inset); border-radius: var(--dw-radius-control); }
+
+/* The chip: "1.25x" wherever the speed isn't 1x and there is no fader to show it - at the left end of
+   Now Playing's icon row on the cover (the row is one fixed height and holds its buttons at its right
+   end, so it moves nothing coming and going) - and a tap back to 1x. A tap target tall, STYLE.md's
+   toggled chip drawn inside it, as the look button draws its face. */
+.app-speed-chip {
+    display: grid;
+    flex: none;
+    place-items: center;
+    height: var(--pl-hit);
+    margin-right: auto;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.app-speed-chip-face {
+    display: grid;
+    place-items: center;
+    height: var(--app-speed-chip);
+    padding: 0 var(--app-speed-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-toggled-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-toggled-bg);
+    color: var(--dw-accent-text);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-footnote);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--dw-weight-semibold);
+    white-space: nowrap;
+}
+
+.app-speed-chip:active .app-speed-chip-face { background: var(--dw-pressed); }
+.app-speed-chip:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring-inset); border-radius: var(--dw-radius-control); }
+
+/* On the turntable the fader's readout says it - except on a phone on its side, where the plinth is too
+   small to read it: there the chip shows too. */
+.app-is-turntable .app-speed-chip { display: none; }
+
+@media (max-height: 500px) {
+    .app-is-turntable .app-speed-chip { display: grid; }
 }
 
 /* ===== the Requests tab's badge (2.0.0-player.12) ===== */

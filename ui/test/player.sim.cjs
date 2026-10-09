@@ -49,6 +49,19 @@
  * its resampled copy, at the level it had; and a hi-res song "Original" streamed as it is that won't
  * decode keeping its MP4.
  *
+ * And the speed (2.0.0-player.39): its fake elements know playbackRate, defaultPlaybackRate and the
+ * pitch switch (by whichever of its three names the page's browser has - net.pitchNames), keep every
+ * write the page makes to them and the rate each play() was called at, and their load puts the rate
+ * back to the default, as both engines' load algorithm does. What that pins: at 1x not one write, through
+ * handovers, a reload and a stream; the speed stored read with care; the pitch switch let go before the
+ * rate and held again after it; setSpeed live, kept, said and held to the range; the speed on every
+ * element the engine plays on - a new song (ended, Previous), a reload, the standby made with it and its
+ * preload keeping it before its play(), a change reaching it, the stream and a join in it, AirPlay leaving
+ * it - and put on again before each play() for an engine that forgot it; the lock screen told the rate;
+ * a play counted, a handover's gap and a seek's landing judged at 0.25x and 2x; and what Debug reads -
+ * the pitch moving or held, a rate refused (Chromium's range, net.rateRange), a browser not playing the
+ * speed (net.ignoresRate) seen in the measured pace, the prefixed switches and none.
+ *
  * A script for the same reason as the other sims: there is no JS test runner here. It compiles
  * usePlayer.ts and what it imports with the repo's TypeScript into a temporary folder, beside a
  * ten-line preact/hooks that renders by calling the hook again.
@@ -177,7 +190,19 @@ const NET = { fetchDelay: 50, seekDelay: 300, staleClockWhileSeeking: false, ans
   failing: new Set(),
   //? a rate the fake engine won't take: an init segment above it is an append error, as an engine
   //? that won't play a stream copy at 192 kHz would give (null: every rate)
-  refuseInitAbove: null }
+  refuseInitAbove: null,
+  //? the speed (2.0.0-player.39): which of the pitch switch's names the elements have (the standard
+  //? one, as both engines have it now; a prefixed one, as an older WebKit or Firefox; or none); the
+  //? playback rates the engine takes - null every one, or [min, max] as Chromium's 0.0625-16, outside
+  //? which setting playbackRate throws and setting defaultPlaybackRate is ignored
+  //? (html_media_element.cc:2930, 2949); an engine that plays at 1x whatever its rate says (what Debug's
+  //? measured pace is for); and a hypothetical one whose load puts the rate back to 1, not to the
+  //? default - seen in neither engine's source, there to hold the speed put on again before each play()
+  pitchNames: ['preservesPitch'], rateRange: null, ignoresRate: false, loadForgetsDefault: false,
+  //? (the review of 2.0.0-player.39) the URL way's clock moving at the rate it had until the page writes
+  //? a new one, as a real media clock does - so the update after a write carries part old rate, part
+  //? new; off, each 250 ms tick is wholly at the rate it finds, as before
+  rateAtWrite: false }
 const net = { ...NET }
 const fetched = []
 //? what the page let go of before its answer came - the same labels as `fetched`
@@ -661,7 +686,21 @@ class FakeAudio {
     this.listeners = {}
     this.muted = false
     this.volume = 1
-    this.playbackRate = 1
+    //? the rate, the rate a load puts back, and pitch preservation - on by default - as the browsers'
+    //? (2.0.0-player.39): every write the PAGE makes to the three is kept (`speedWrites`), so 1x can be
+    //? held to touching none, and the rate each play() was called at (`playRates`)
+    this.rate = 1
+    this.defaultRate = 1
+    this.pitchHeld = true
+    this.speedWrites = []
+    this.playRates = []
+    for (const name of net.pitchNames) {
+      Object.defineProperty(this, name, {
+        get: () => this.pitchHeld,
+        set: (value) => { this.speedWrites.push([name, value]); this.pitchHeld = !!value },
+        enumerable: true, configurable: true,
+      })
+    }
     this.preload = ''
     //? an element made in a tap has no restriction to lift
     this.unlocked = gesture
@@ -703,6 +742,22 @@ class FakeAudio {
 
   get src() { return this.attrs.src ?? '' }
   set src(value) { this.attrs.src = value; this.loadResource() }
+  get playbackRate() { return this.rate }
+  set playbackRate(value) {
+    this.speedWrites.push(['playbackRate', value])
+    const [low, high] = net.rateRange ?? [-Infinity, Infinity]
+    if (value < low || value > high) throw new DOMException(`Failed to set the 'playbackRate' property on 'HTMLMediaElement': The provided playback rate (${value}) is not in the supported playback range.`, 'NotSupportedError')
+    //? net.rateAtWrite: what played since the last tick played at the rate before this one
+    if (net.rateAtWrite && this.playingNow && !this.ms) { this.rateOwed += ((now - this.rateMark) / 1000) * this.rate; this.rateMark = now }
+    this.rate = value
+  }
+  get defaultPlaybackRate() { return this.defaultRate }
+  set defaultPlaybackRate(value) {
+    this.speedWrites.push(['defaultPlaybackRate', value])
+    const [low, high] = net.rateRange ?? [-Infinity, Infinity]
+    if (value >= low && value <= high) this.defaultRate = value
+  }
+  //? (the pitch switch is made per element in the constructor: which names it has is net.pitchNames)
   setAttribute(name, value) { this.attrs[name] = value }
   getAttribute(name) { return this.attrs[name] ?? null }
   removeAttribute(name) { delete this.attrs[name] }
@@ -812,6 +867,9 @@ class FakeAudio {
     //? any load detaches an attached MediaSource for good: closed, its SourceBuffers gone
     if (this.ms) { const source = this.ms; this.ms = null; source.detach() }
     this.reset()
+    //? the load algorithm's step 7: the rate back to the default (WebKit HTMLMediaElement.cpp:1733,
+    //? Chromium html_media_element.cc:1243) - the browser's own, not the page's: no write kept
+    this.rate = net.loadForgetsDefault ? 1 : this.defaultRate
     //? a MediaSource as srcObject beats the src attribute
     if (this.srcObj) { this.attachSource(this.srcObj); return }
     const src = this.attrs.src
@@ -845,6 +903,7 @@ class FakeAudio {
   }
 
   play() {
+    this.playRates.push(this.playbackRate)
     return new Promise((resolve, reject) => {
       if (!(this.unlocked || inGesture())) { reject(new DOMException('refused', 'NotAllowedError')); return }
       if (inGesture()) this.unlocked = true
@@ -891,9 +950,16 @@ class FakeAudio {
     this.queue('playing')
     const gen = this.gen
     if (this.ms) { this.lastTickAt = now; this.tick = later(this.mseDelay(), () => this.mseStep(gen)); return }
+    this.rateMark = now
+    this.rateOwed = 0
     const step = () => {
       if (gen !== this.gen || !this.playingNow) return
-      const by = 0.25 * this.playbackRate
+      //? net.rateAtWrite: the tick's quarter second at the rate each part of it had (see the setter)
+      const by = net.rateAtWrite
+        ? this.rateOwed + ((now - this.rateMark) / 1000) * this.rate
+        : 0.25 * (net.ignoresRate ? 1 : this.playbackRate)
+      this.rateMark = now
+      this.rateOwed = 0
       if (this.seeking) {
         if (net.staleClockWhileSeeking) { this.before += by; this.queue('timeupdate') }
       } else {
@@ -1055,7 +1121,7 @@ class FakeAudio {
     if (this.seeking) { this.tick = later(250, () => this.mseStep(gen)); return }
     const end = this.playableEnd(this.clock)
     const room = end === null ? 0 : Math.max(0, end - this.clock)
-    const step = Math.min(elapsed * this.playbackRate, room)
+    const step = Math.min(elapsed * (net.ignoresRate ? 1 : this.playbackRate), room)
     const out = room - step <= 1e-9
     if (step > 0) {
       //? run out: exactly at the end of the data, not a rounding error short of it
@@ -1904,7 +1970,7 @@ const { describeWrap } = require(path.join(OUT, 'lib/streamWrap.js'))
 /** A fresh page with no player on it: no elements, nothing queued, the storage empty, and the
  *  MediaSource globals it has - `mse`: 'managed', 'plain' or null. A song's `durations` entry is
  *  its tagged length, or an object of its fields ({ duration, seconds, rate, ... }). */
-function freshPage({ gapless = false, durations = {}, userAgent, maxTouchPoints, mse = null, maxRate = null } = {}) {
+function freshPage({ gapless = false, durations = {}, userAgent, maxTouchPoints, mse = null, maxRate = null, speed = null, pitchNames = NET.pitchNames } = {}) {
   //? before the player is made: it decides once, for the page, whether FLAC comes in an MP4
   browser.userAgent = userAgent
   browser.maxTouchPoints = maxTouchPoints
@@ -1922,12 +1988,14 @@ function freshPage({ gapless = false, durations = {}, userAgent, maxTouchPoints,
   makesBegun.length = 0
   makesCancelled.length = 0
   makeWaiters.clear()
-  Object.assign(net, NET, { sentAsFlac: new Set(), fmp4Answer: {}, headerDelay: {}, failing: new Set() })
+  Object.assign(net, NET, { sentAsFlac: new Set(), fmp4Answer: {}, headerDelay: {}, failing: new Set(), pitchNames })
   for (const id of Object.keys(songs)) delete songs[id]
   for (const [id, song] of Object.entries(durations)) songs[id] = typeof song === 'object' ? { ...song } : { duration: song }
   if (gapless) storage.set('deadwax-player-gapless', 'on')
   //? the "Maximum quality" setting as stored on the device - nothing stored is its default
   if (maxRate !== null) storage.set('deadwax-player-max-rate', maxRate)
+  //? the speed as stored on the device (2.0.0-player.39) - nothing stored is 1x
+  if (speed !== null) storage.set('deadwax-player-speed', speed)
   //? before the player is made too: it decides once, for the page, whether there is a MediaSource
   mseGlobals(mse)
 }
@@ -4342,6 +4410,299 @@ async function outcome(promise, ms = 1_000) {
     await run(32_000)
     check('a CD song\'s head 40 s away: the URL way after about 20 s, as it always was', [e0.srcObject === null, /\/stream\/1\?format=raw$/.test(e0.getAttribute('src') ?? ''), e0.playingNow], [true, true, true])
   }
+  /* ======================================================================== */
+  //? THE SPEED (2.0.0-player.39): 0.25x to 2x, the pitch moving with it - the element's playbackRate and
+  //? defaultPlaybackRate, its pitch switch let go only while the speed isn't 1, on every element the
+  //? engine plays on, kept on the device. The fake elements keep every write the page makes to the
+  //? three (speedWrites) and the rate each play() was called at (playRates), and a load puts the rate
+  //? back to the default, as both engines' load algorithm does.
+  const speedWrites = () => elements.flatMap((element) => element.speedWrites)
+  const everyRate = (rate) => elements.every((element) => element.playRates.every((at) => at === rate))
+
+  console.log('\nthe speed at 1x: nothing about playback written - one element, a handover, a reload, a stream')
+  {
+    const p = page({ gapless: true, durations: { 1: 8, 2: 8, 3: 200 } })
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(20_000)
+    check('song 3 playing, after two handovers', [p.player.track.id, elements.length], ['3', 2])
+    elements.find((element) => element.playingNow).fail(2)
+    await run(4_000)
+    check('...and a reload after a failure, playing again', elements.some((element) => element.playingNow), true)
+    check('the speed 1x: not one write of a rate or the pitch switch on any element', [p.player.speed(), speedWrites()], [1, []])
+    check('...and the lock screen told 1x with every position', positions.length > 0 && positions.every((state) => state.playbackRate === 1), true)
+    check('...and Debug says normal, the pitch held - the browser\'s own default', [p.player.speedReading().speed, p.player.speedReading().pitch, p.player.speedReading().refused], [1, 'held', null])
+  }
+  {
+    const p = streamPage({ durations: { 1: 8, 2: 8 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(10_000)
+    check('one stream at 1x, across its join: nothing written either', [p.player.track.id, elements[0].srcObject === mediaSources[0], speedWrites()], ['2', true, []])
+  }
+
+  console.log('\nthe speed stored on the device: read with care')
+  {
+    const read = (stored) => {
+      const p = page({ speed: stored, durations: { 1: 40 } })
+      return [p.player.speed(), elements[0].playbackRate, elements[0].preservesPitch]
+    }
+    check('a number from 0.25 to 2, in hundredths: on the page\'s element from the start, its pitch let go',
+      ['1.5', '0.25', '2', '1.234', ' 0.75 '].map(read), [[1.5, 1.5, false], [0.25, 0.25, false], [2, 2, false], [1.23, 1.23, false], [0.75, 0.75, false]])
+    check('anything else is 1x, and nothing is written: nothing stored, a word, 0, out of range either way, empty',
+      [null, 'fast', '0', '3', '0.2', '-1', '', 'NaN', '1e9'].map((stored) => {
+        const [speed] = read(stored)
+        return [speed, speedWrites()]
+      }), Array.from({ length: 9 }, () => [1, []]))
+    const p = page({ speed: '1.5', durations: { 1: 60 } })
+    positions.length = 0
+    check('...the pitch switch let go BEFORE the rate (never a moment of a time-stretch at the new rate)',
+      elements[0].speedWrites, [['preservesPitch', false], ['defaultPlaybackRate', 1.5], ['playbackRate', 1.5]])
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(4_060)
+    check('the song plays at it: 4 s in, 6 s of the song - the bar hearing it', [near(elements[0].currentTime, 6, 0.4), near(p.lastHeard(), elements[0].currentTime, 0.01)], [true, true])
+    check('...the lock screen told the rate with the position', positions.filter((state) => state.playbackRate === 1.5).length > 0 && positions.every((state) => state.playbackRate === 1.5), true)
+  }
+
+  console.log('\nsetSpeed: live on the element playing, kept, held to the range')
+  {
+    const p = page({ durations: { 1: 200 } })
+    const heard = []
+    p.player.onSpeed((speed) => heard.push(speed))
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(3_000)
+    const before = positions.length
+    const [e0] = elements
+    p.player.setSpeed(0.75)
+    check('at once on the element - rate, default and the pitch let go - kept on the device, and said',
+      [e0.playbackRate, e0.defaultPlaybackRate, e0.preservesPitch, storage.get('deadwax-player-speed'), heard, p.player.speed()], [0.75, 0.75, false, '0.75', [0.75], 0.75])
+    check('...and the lock screen told the new pace there and then', [positions.length > before, positions.at(-1)?.playbackRate], [true, 0.75])
+    const at = e0.currentTime
+    await run(4_000)
+    check('4 s on, 3 s of the song', near(e0.currentTime - at, 3, 0.3), true)
+    const writes = e0.speedWrites.length
+    p.player.setSpeed(0.75)
+    check('the same speed again: nothing written, nobody told', [e0.speedWrites.length - writes, heard], [0, [0.75]])
+    p.player.setSpeed(1)
+    check('back to 1x: the rate first, then the pitch held again - the element as it always was',
+      [e0.speedWrites.slice(writes), e0.playbackRate, e0.preservesPitch, storage.get('deadwax-player-speed')],
+      [[['defaultPlaybackRate', 1], ['playbackRate', 1], ['preservesPitch', true]], 1, true, '1'])
+    check('held to the range, in hundredths: 5 is 2x, 0.1 is 0.25x, 1.234 is 1.23x, not a number is 1x',
+      [5, 0.1, 1.234, NaN].map((speed) => { p.player.setSpeed(speed); return p.player.speed() }), [2, 0.25, 1.23, 1])
+  }
+
+  console.log('\nthe speed on every element the engine plays on')
+  {
+    //? one element: each song loaded on it keeps the speed (the load puts back the default), and every
+    //? play() is called at it
+    const p = page({ speed: '0.5', durations: { 1: 4, 2: 4, 3: 40 } })
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(17_000)
+    check('a new song, by a song ending, twice: the third playing at 0.5x, every play() at it', [p.player.track.id, elements[0].playbackRate, everyRate(0.5), elements[0].playRates.length > 1], ['3', 0.5, true, true])
+    //? half a second into it at 0.5x: Previous goes to the song before
+    tap(() => p.player.previous())
+    await run(1_000)
+    check('...by Previous: the same', [p.player.track.id, elements[0].playbackRate, everyRate(0.5)], ['2', 0.5, true])
+  }
+  {
+    //? a reload after a failure
+    const p = page({ speed: '1.25', durations: { 1: 200 } })
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(4_000)
+    elements[0].fail(2)
+    await run(3_000)
+    const at = elements[0].currentTime
+    await run(4_000)
+    check('a song asked for again after it dropped: at 1.25x - every play() at it, 4 s on, 5 s of the song',
+      [elements[0].playingNow, elements[0].playbackRate, everyRate(1.25), near(elements[0].currentTime - at, 5, 0.4)], [true, 1.25, true, true])
+  }
+  {
+    //? the gapless handover: the standby made with the speed, its preload keeping it, given it before its play()
+    const p = page({ gapless: true, speed: '1.5', durations: { 1: 8, 2: 8 } })
+    const [e0, e1] = elements
+    check('the second element made with the speed, its pitch let go', [e1.playbackRate, e1.defaultPlaybackRate, e1.preservesPitch], [1.5, 1.5, false])
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(3_500)
+    check('the standby holding the next song in memory, still at it after its load - and no play() on it yet', [e1.src.startsWith('blob:'), e1.playbackRate, e1.playRates.length], [true, 1.5, 0])
+    p.player.setSpeed(0.8)
+    check('a change of speed reaches the standby too, there and then', [e0.playbackRate, e1.playbackRate, e1.preservesPitch], [0.8, 0.8, false])
+    await run(9_000)
+    check('handed over: song 2 on the second element, its play() at 0.8x', [p.player.track.id, e1.playingNow, e1.playRates.at(-1), e1.playbackRate], ['2', true, 0.8, 0.8])
+    check('...the readout\'s back-dating at that pace: a handover from memory reads a gap of a few ms, not hundreds', /^Last song change \d{1,2} ms, handed over, from memory$/.test(p.gapLine()), true)
+  }
+  {
+    //? at 0.25x the back-dating matters most: a quarter of a second of the song is a whole second heard
+    const p = page({ gapless: true, speed: '0.25', durations: { 1: 2, 2: 8 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(12_000)
+    check('a handover at 0.25x: song 2 playing, the change read as a few ms', [p.player.track.id, /^Last song change \d{1,2} ms, handed over, from memory$/.test(p.gapLine())], ['2', true])
+  }
+  {
+    //? a browser putting the rate back to 1 on a load, whatever its default says (seen in neither
+    //? engine's source): every play() still carries the speed - it is put on again just before
+    const p = page({ speed: '1.5', durations: { 1: 4, 2: 40 } })
+    net.loadForgetsDefault = true
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(5_000)
+    check('an engine that forgets the default on a load: the next song still plays at 1.5x', [p.player.track.id, elements[0].playbackRate, everyRate(1.5)], ['2', 1.5, true])
+    net.loadForgetsDefault = false
+  }
+  {
+    //? the one stream for FLAC: the MediaSource on the element keeps it, across a join
+    const p = streamPage({ speed: '1.5', durations: { 1: 8, 2: 8 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(3_000)
+    check('one stream at 1.5x: the MediaSource attached, the element at the speed, 3 s in about 4.5 s of the song',
+      [e0.srcObject === mediaSources[0], e0.playbackRate, near(p.player.position(), 4.5, 0.6)], [true, 1.5, true])
+    await run(5_000)
+    check('...across the join: song 2 in the same stream at 1.5x', [p.player.track.id, e0.srcObject === mediaSources[0], e0.playbackRate, everyRate(1.5)], ['2', true, 1.5, true])
+    check('...the lock screen told 1.5x with the song\'s own position', positions.at(-1)?.playbackRate, 1.5)
+    //? AirPlay: the song leaves the stream for the URL way in the same tap - a load - and keeps the speed
+    e0.webkitShowPlaybackTargetPicker = () => {}
+    tap(() => p.player.showAirPlay())
+    await run(1_000)
+    check('AirPlay: the song leaves the stream, on its own address, still at 1.5x', [e0.srcObject, e0.getAttribute('src') !== null, e0.playingNow, e0.playbackRate, everyRate(1.5)], [null, true, true, 1.5, true])
+  }
+
+  console.log('\nwall clock against song time at 0.25x and 2x: counting a play, judging a seek')
+  {
+    //? a 60 s song at 2x is heard in 30 s, and counts as played - its steps of a second of the song each
+    //? half a second of listening
+    const scrobbled = scrobbles.length
+    const p = streamPage({ speed: '2', durations: { 1: 60, 2: 60 } })
+    scrobbles.length = 0
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(16_000)
+    check('a 60 s song at 2x: played (half of it heard) in 16 s', scrobbles.includes('1:played'), true)
+    void scrobbled
+  }
+  {
+    //? the seek judged at a song's end: the song ran on past its clock 7 s of SONG - 3.5 s of listening at 2x
+    const p = page({ speed: '2', durations: { 1: 20, 2: 30 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(1_000)
+    net.landingError = -7
+    tap(() => p.player.seek(10))
+    await run(10_000)
+    check('a seek landed 7 s early, judged at 2x: still 7 s of the song, so about 0:03', [p.player.track.id, p.seekLine()],
+      ['2', 'Last seek: asked 0:10, the player said 0:10 · the song played on 7 s after its clock ended, so it really landed at about 0:03'])
+    net.landingError = 0
+  }
+  {
+    const p = page({ speed: '0.25', durations: { 1: 20, 2: 30 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(1_000)
+    net.landingError = -2
+    tap(() => p.player.seek(16))
+    await run(26_000)
+    check('...and at 0.25x: 2 s of the song, 8 s of listening', [p.player.track.id, p.seekLine()],
+      ['2', 'Last seek: asked 0:16, the player said 0:16 · the song played on 2 s after its clock ended, so it really landed at about 0:14'])
+    net.landingError = 0
+  }
+
+  console.log('\nwhat the browser does with it - Info > Debug')
+  {
+    const p = page({ durations: { 1: 200 } })
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(1_000)
+    p.player.setSpeed(1.5)
+    check('the reading: the speed, the rate read back, the pitch moving, nothing refused, no pace yet', p.player.speedReading(),
+      { speed: 1.5, rate: 1.5, pitch: 'moves', refused: null, measured: null })
+    await run(6_000)
+    const measured = p.player.speedReading().measured
+    check('...the song\'s own pace measured while it plays: 1.5x', [measured !== null, near(measured ?? 0, 1.5, 0.05)], [true, true])
+    tap(() => p.player.toggle())
+    await run(5_000)
+    tap(() => p.player.toggle())
+    await run(3_000)
+    check('...a pause between leaves the measure alone (no step across it)', near(p.player.speedReading().measured ?? 0, 1.5, 0.05), true)
+    p.player.setSpeed(1)
+    check('...back at 1x: the pitch held, the measure begun again', [p.player.speedReading().pitch, p.player.speedReading().measured], ['held', null])
+  }
+  {
+    //? Next to a song slow to load: the wait before it plays is no step of playing - the measure carries on
+    //? from that song's first update, never across the load
+    const p = page({ speed: '1.5', durations: { 1: 200, 2: 200 } })
+    songs['2'].delay = 2_000
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(6_000)
+    tap(() => p.player.next())
+    await run(5_100)
+    check('...Next to a song that took 2 s to load: still 1.5x - the wait before it no part of the measure',
+      [p.player.track.id, p.player.speedReading().measured !== null, near(p.player.speedReading().measured ?? 0, 1.5, 0.05)], ['2', true, true])
+  }
+  {
+    //? a jump in speed between two updates - Home, End, Page Up or Down, the chip, the readout (review of
+    //? 2.0.0-player.39): the step from the update before it to the update after is part old speed, part
+    //? new, so the measure starts from the update after it. The element's clock here moves at the rate it
+    //? had until the page writes another (net.rateAtWrite), as a real one does - with the step counted,
+    //? 2x to 0.25x read 0.39x 2.4 s on, and 1.5x to 1x read 1.04x
+    const jump = async (from, to) => {
+      const p = page({ speed: String(from), durations: { 1: 400 } })
+      net.rateAtWrite = true
+      let updated = 0
+      elements[0].addEventListener('timeupdate', () => { updated = now })
+      tap(() => p.player.playTracks(tracks(['1']), 0))
+      await run(3_000)
+      //? the jump 190 ms after an update: most of the step across it at the old speed
+      await run(updated + 190 - now)
+      p.player.setSpeed(to)
+      await run(2_400)
+      const measured = p.player.speedReading().measured
+      net.rateAtWrite = false
+      return measured === null ? null : Math.round(measured * 1000) / 1000
+    }
+    check('a jump from 2x to 0.25x, and from 1.5x to 1x: the measure 2.4 s on is the new speed - no step across the jump',
+      [await jump(2, 0.25), await jump(1.5, 1)], [0.25, 1])
+  }
+  {
+    //? a seek while the pace is measured: no step across it (review of 2.0.0-player.39 - nothing held the
+    //? rule). Without it the update that lands a seek counts the whole wait for it with no song moved,
+    //? and a browser playing the speed exactly reads slow (1.2x at 1.5x here). The fake's first tick after
+    //? a landing moves a quarter second of the song a few ms on, so the measure reads a little high, never low
+    const p = page({ speed: '1.5', durations: { 1: 400 } })
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(3_000)
+    for (let i = 0; i < 6; i++) {
+      tap(() => p.player.seek(p.player.position()))
+      await run(1_000)
+    }
+    const measured = p.player.speedReading().measured
+    check('six seeks while measuring 1.5x: never read below it - no step across a seek', [measured !== null, (measured ?? 0) >= 1.45], [true, true])
+  }
+  {
+    //? an engine that plays at 1x whatever its rate says: the reading says the speed, and the pace says it isn't
+    const p = page({ speed: '0.5', durations: { 1: 200 } })
+    net.ignoresRate = true
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(6_000)
+    check('a browser not playing the speed it was given: its pace measured 1x against the 0.5x asked',
+      [p.player.speedReading().speed, near(p.player.speedReading().measured ?? 0, 1, 0.05)], [0.5, true])
+    net.ignoresRate = false
+  }
+  {
+    //? a rate the engine refuses (Chromium throws outside 0.0625-16): its words kept, the element left at what it had
+    const p = page({ durations: { 1: 200 } })
+    net.rateRange = [0.5, 16]
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(1_000)
+    p.player.setSpeed(0.25)
+    const reading = p.player.speedReading()
+    check('a rate refused: the browser\'s words for Debug, the element left at 1x, its default untouched',
+      [reading.speed, reading.rate, elements[0].defaultPlaybackRate, /not in the supported playback range/.test(reading.refused ?? '')], [0.25, 1, 1, true])
+    p.player.setSpeed(0.75)
+    check('...a rate it takes clears it', [p.player.speedReading().refused, elements[0].playbackRate], [null, 0.75])
+    net.rateRange = null
+  }
+  {
+    //? the pitch switch by whichever name the browser has: a prefixed one where only that is there, none
+    let p = page({ speed: '1.5', durations: { 1: 40 }, pitchNames: ['webkitPreservesPitch'] })
+    check('only webkitPreservesPitch (an older WebKit): that one let go', [elements[0].webkitPreservesPitch, 'preservesPitch' in elements[0], p.player.speedReading().pitch], [false, false, 'moves'])
+    p = page({ speed: '1.5', durations: { 1: 40 }, pitchNames: ['mozPreservesPitch'] })
+    check('only mozPreservesPitch (an older Firefox): that one', [elements[0].mozPreservesPitch, p.player.speedReading().pitch], [false, 'moves'])
+    p = page({ speed: '1.5', durations: { 1: 40 }, pitchNames: [] })
+    check('no switch at all: the rate all the same, and Debug says it has none', [elements[0].playbackRate, p.player.speedReading().pitch], [1.5, 'no switch'])
+  }
+
   console.warn = realWarn
 
   define('fetch', realFetch)

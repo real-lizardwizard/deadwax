@@ -78,6 +78,7 @@
         --app-desk-tool: 32px;
         --app-desk-tool-icon: 18px;
         --app-desk-tools-gap: 6px;
+        --app-desk-speed-chip: 24px;      /* the speed's chip (2.0.0-player.39), in the tools' 32px row */
         --app-desk-scrub-max: 520px;
         --app-desk-scrub-hit: 16px;       /* the bar's own target: a pointer, not a thumb */
         --app-desk-clock-gap: 10px;
@@ -485,6 +486,12 @@
     .app-desk .app-playbar-tools .app-playbar-button:hover { background: var(--app-desk-hover); color: var(--dw-text); }
     .app-desk .app-playbar-tools .app-playbar-button.is-on { color: var(--dw-accent); }
     .app-desk .app-playbar-tools .app-playbar-icon { width: var(--app-desk-tool-icon); height: var(--app-desk-tool-icon); }
+
+    /* the speed's chip (2.0.0-player.39), first in the tools wherever the speed isn't 1x: the tools'
+       height, its face smaller - the tools sit at the row's right end, so it moves none of them */
+    .app-desk .app-playbar-tools .app-speed-chip { height: var(--app-desk-tool); margin-right: 0; border-radius: var(--dw-radius-control); }
+    .app-desk .app-playbar-tools .app-speed-chip-face { height: var(--app-desk-speed-chip); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-playbar-tools .app-speed-chip:hover .app-speed-chip-face { color: var(--dw-text); }
 
     /* ===== the main area: every tab's page, in the desktop's measure ===== */
 

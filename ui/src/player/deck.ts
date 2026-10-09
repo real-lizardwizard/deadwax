@@ -53,7 +53,7 @@
  *    so that is known then, and the element has the whole coast to buffer); at speed the song plays
  *    (`resume`, after the tap - iOS allows it on an element a tap started; if it refuses, the player's
  *    own "Tap play to start" says so, and the platter spins down rather than turning beside a paused
- *    song), and the record's sound holds speed 1 until the song is really playing, then fades out
+ *    song), and the record's sound holds the song's own speed until the song is really playing, then fades out
  *    (HANDOVER_FADE_S). A song that was paused: the platter coasts to a stop under friction, and the
  *    song is sought at the release to where it will stop, and stays paused. Either way the window is
  *    asked for over the whole of where the platter will go, at the release (`keepPath`).
@@ -74,6 +74,12 @@
  * THE PLATTER is turned frame by frame (requestAnimationFrame) while anything moves and the turntable
  * shows - stopped when still, hidden or closed. Under Reduce Motion it doesn't turn at all, a release
  * lands at once (a playing song plays from there in the release's own gesture), and nothing winds down.
+ *
+ * THE SPEED FADER (2.0.0-player.39): the player's speed is the motor's. The platter turns at it - 1.5x
+ * is 50 rpm - a hand takes a playing record at it, the motor brings a let-go record back to it (lib/
+ * platter's motor with a `target`), the handover holds it until the song plays, a pause winds down from
+ * it and a spin-up runs to it. Turntable says when it changes (`speedChanged`); the record's sound needs
+ * nothing new - it reads at whatever rate the platter is driven at.
  *
  * THE WINDOW is kept ready while the turntable shows and the song plays - once a tap has started the
  * sound, so there is something to decode it with and play it on: WINDOW_S of it, from a little before
@@ -106,7 +112,8 @@ export const HOLD_MS = 250
 export const WINDOW_S = 40
 export const WINDOW_BACK_S = 4
 export const WINDOW_GRID_S = 2
-/** The window is asked again once the playhead is this close to its end, in seconds. */
+/** The window is asked again once the playhead is this close to its end, in seconds of listening: of
+ *  the song at 1x and slower, and that times the speed faster than 1x (2.0.0-player.39 - see keep()). */
 export const REFRESH_AHEAD_S = 6
 /** Asked again ahead of a playhead the window still covers no more often than this, in ms - a floor
  *  under the refresh, whatever length of window deadwax sends. */
@@ -130,7 +137,7 @@ export const DRIVE_FOR_S = 0.12
 export const CLOCK_SETTLE_MS = 15
 export const CLOCK_SETTLE_TICKS = 40
 export const CLOCK_TICK_MS = 100
-/** The handover: the record's sound holds speed 1 for at most this long waiting for the song to play,
+/** The handover: the record's sound holds the song's speed for at most this long waiting for the song to play,
  *  then fades out over HANDOVER_FADE_S. A play that hasn't started by then was refused, and the
  *  platter spins down. */
 export const HANDOVER_MAX_S = 3
@@ -215,7 +222,9 @@ export interface Released {
  * How far behind the playhead a window starts and how near its end the playhead comes before the next
  * is asked, for windows of `span` seconds: WINDOW_BACK_S and REFRESH_AHEAD_S for a whole one, and in
  * proportion for one deadwax cut short (a hi-res song's, at WINDOW_MAX_BYTES) - so each new window
- * still moves on by about three quarters of its length, rather than re-fetching what it had.
+ * still moves on by about three quarters of its length, rather than re-fetching what it had. Faster than
+ * 1x (2.0.0-player.39) keep() asks that much earlier - `ahead` times the speed, the same time to fetch
+ * and decode in - so at 2x a window moves on by 24 s of its 40, not 30, and costs 40/24 of the song.
  */
 export function windowMargins(span: number): { back: number; ahead: number } {
   const scale = Math.max(0, Math.min(1, span / WINDOW_S))
@@ -1029,6 +1038,8 @@ export class Deck {
   //? the handover's test of the song's position, asked every frame as well as when the player says
   private handoverJudge: ((seconds: number) => void) | null = null
   private songId: string
+  //? the player's speed (2.0.0-player.39): the motor's, in the platter's own speeds - 1 is 33 1/3 rpm
+  private speed = 1
 
   constructor(host: DeckHost) {
     this.host = host
@@ -1147,6 +1158,24 @@ export class Deck {
     this.windDown = on
   }
 
+  /**
+   * The player's speed changed (2.0.0-player.39) - the fader, the chip, or the turntable mounting on a
+   * speed set before. A platter turning at speed carries on from where it is at the new one; one
+   * spinning up heads for the new one from where it has got to. A run back to speed after a let-go keeps
+   * the speed it was let go at - the song was sought to where that lands - and turns at the new one once
+   * it is there. Anything else (a hand, a coast, a wind-down) knows no motor's speed.
+   */
+  speedChanged(speed: number): void {
+    if (!(speed > 0) || speed === this.speed) return
+    const motion = this.motion
+    if (motion.kind === 'turning') this.motion = { kind: 'turning', since: now(), from: this.angleNow() }
+    const spinningUp = motion.kind === 'plan' && motion.role === 'spin' && motion.plan.target > 0
+    const v = spinningUp ? this.speedNow() : 0
+    this.speed = speed
+    if (spinningUp) this.spin(motor(0, v, 0, speed), 'spin')
+    this.loop()
+  }
+
   /** The song started or stopped playing. Started: the platter spins up (unless the deck itself is
    *  bringing it to speed). Stopped by anything but the deck: it spins down - once the pause has
    *  lasted PAUSE_SETTLE_MS, since a song change pauses for a moment. */
@@ -1173,14 +1202,14 @@ export class Deck {
       //? where it is
       if (motion.kind === 'plan' && motion.sounding) this.post({ type: 'stop' })
       if (motion.kind === 'plan') this.host.show(null, false)
-      this.spin(motor(0, this.speedNow(), 0), 'spin')
+      this.spin(motor(0, this.speedNow(), 0, this.speed), 'spin')
       this.keepHere()
       return
     }
     if ((this.press && this.press.taken) || this.motion.kind !== 'turning') return
     this.settleTimer = setTimeout(() => {
       this.settleTimer = undefined
-      if (!this.host.playing() && !this.press?.taken && this.motion.kind === 'turning') this.spin(coast(0, 1, 0), 'spin')
+      if (!this.host.playing() && !this.press?.taken && this.motion.kind === 'turning') this.spin(coast(0, this.speed, 0), 'spin')
     }, PAUSE_SETTLE_MS)
   }
 
@@ -1319,7 +1348,7 @@ export class Deck {
       at = this.host.position()
       if (playing) this.host.hold()
       press.intent = playing || pending ? 'play' : 'pause'
-      if (this.sounding(at)) this.take(at, playing ? 1 : 0, time)
+      if (this.sounding(at)) this.take(at, playing ? this.speed : 0, time)
     }
     press.taken = true
     press.anchor = at
@@ -1377,7 +1406,7 @@ export class Deck {
       this.post({ type: 'stop' })
       if (press.intent === 'play') {
         this.host.resume()
-        this.spin(motor(0, 0, 0), 'spin')
+        this.spin(motor(0, 0, 0, this.speed), 'spin')
       } else {
         this.motion = { kind: 'still' }
       }
@@ -1394,7 +1423,7 @@ export class Deck {
     const last = press.samples[press.samples.length - 1]!.time
     const since = time - last <= RELEASE_TAIL_MS ? Math.min(time, last) : time
     if (press.intent === 'play') {
-      const plan = motor(press.at, speed, length)
+      const plan = motor(press.at, speed, length, this.speed)
       if (this.reduced || plan.duration <= RESUME_IN_GESTURE_S) {
         //? nothing to wait for (or nothing to animate): played from there in this very gesture
         this.post({ type: 'stop' })
@@ -1443,7 +1472,7 @@ export class Deck {
       this.motion = { kind: 'still' }
       return null
     }
-    const plan = coast(at, 1, song?.length ?? 0)
+    const plan = coast(at, this.speed, song?.length ?? 0)
     if (plan.duration === 0) {
       //? at the very end of the song: nothing left to wind down into
       this.angle = this.angleNow()
@@ -1451,7 +1480,7 @@ export class Deck {
       return null
     }
     const sounding = this.windDown && this.sounding(at) && this.covers(at, plan.x - at)
-    if (sounding) this.take(at, 1)
+    if (sounding) this.take(at, this.speed)
     this.startPlan(plan, 'winddown', at, sounding)
     return sounding ? plan.x : null
   }
@@ -1506,7 +1535,7 @@ export class Deck {
 
   private speedNow(): number {
     const motion = this.motion
-    if (motion.kind === 'turning') return 1
+    if (motion.kind === 'turning') return this.speed
     if (motion.kind === 'plan') return planAt(motion.plan, (now() - motion.since) / 1000).v
     return 0
   }
@@ -1514,7 +1543,7 @@ export class Deck {
   private angleNow(): number {
     const motion = this.motion
     if (this.reduced || this.stilled) return this.angle
-    if (motion.kind === 'turning') return motion.from + (DEGREES_PER_SECOND * (now() - motion.since)) / 1000
+    if (motion.kind === 'turning') return motion.from + (DEGREES_PER_SECOND * this.speed * (now() - motion.since)) / 1000
     if (motion.kind === 'plan') return motion.from + degreesFor(planAt(motion.plan, (now() - motion.since) / 1000).x - motion.x0)
     return this.angle
   }
@@ -1522,7 +1551,7 @@ export class Deck {
   /** A visual movement only - the spin-up of a play, the spin-down of a pause from elsewhere. */
   private spin(plan: Plan, role: 'spin'): void {
     if (this.reduced) {
-      this.motion = role === 'spin' && plan.v >= 1 ? { kind: 'turning', since: now(), from: this.angle } : { kind: 'still' }
+      this.motion = role === 'spin' && plan.target > 0 ? { kind: 'turning', since: now(), from: this.angle } : { kind: 'still' }
       return
     }
     this.startPlan(plan, role, plan.phases[0] ? planAt(plan, 0).x : 0, false)
@@ -1551,7 +1580,7 @@ export class Deck {
   private drive(motion: PlanMotion, time: number): void {
     const t = (time - motion.since) / 1000
     const { x, v } = planAt(motion.plan, t)
-    const accel = t < motion.plan.duration ? acceleration(v, motion.role === 'handover' || (motion.role === 'spin' && motion.plan.v >= 1)) : 0
+    const accel = t < motion.plan.duration ? acceleration(v, motion.role === 'handover' || (motion.role === 'spin' && motion.plan.target > 0), motion.plan.target) : 0
     const stamped = this.stamp(time)
     this.post({ type: 'drive', at: x, rate: voiceRate(v), accel: voiceRate(accel), time: stamped, until: stamped + DRIVE_FOR_S })
   }
@@ -1561,7 +1590,7 @@ export class Deck {
     if (this.motion !== motion || motion.kind !== 'plan') return
     const angle = this.angleNow()
     if (motion.role === 'handover') {
-      //? at speed: the song plays - after the tap; the record's sound holds speed 1 until it does -
+      //? at speed: the song plays - after the tap; the record's sound holds its speed until it does -
       //? unless the song was sought somewhere else meanwhile (quiet: there is nothing to hold for)
       this.motion = { kind: 'turning', since: now(), from: angle }
       this.host.show(null, false)
@@ -1572,9 +1601,9 @@ export class Deck {
       clearTimeout(this.settleTimer)
       this.settleTimer = setTimeout(() => {
         this.settleTimer = undefined
-        if (!this.host.playing() && !this.press?.taken && this.motion.kind === 'turning') this.spin(coast(0, 1, 0), 'spin')
+        if (!this.host.playing() && !this.press?.taken && this.motion.kind === 'turning') this.spin(coast(0, this.speed, 0), 'spin')
       }, HANDOVER_MAX_S * 1000)
-    } else if (motion.role === 'spin' && motion.plan.v >= 1) {
+    } else if (motion.role === 'spin' && motion.plan.target > 0) {
       this.motion = this.host.playing() ? { kind: 'turning', since: now(), from: angle } : { kind: 'still' }
       this.angle = angle
     } else {
@@ -1586,15 +1615,15 @@ export class Deck {
     this.loop()
   }
 
-  /** The record's sound holds speed 1 from `at` - where the plan ended, at page time `time` (ms) -
-   *  until the song is really playing - its position past `at` - then fades; HANDOVER_MAX_S at most. A
-   *  position nowhere near `at` (the song sought elsewhere as it started) ends it as well: there is
-   *  nothing to hand over to. */
+  /** The record's sound holds the song's own speed (the player's, 2.0.0-player.39) from `at` - where the
+   *  plan ended, at page time `time` (ms) - until the song is really playing - its position past `at` -
+   *  then fades; HANDOVER_MAX_S at most. A position nowhere near `at` (the song sought elsewhere as it
+   *  started) ends it as well: there is nothing to hand over to. */
   private handOver(at: number, sounding: boolean, time: number): void {
     this.endHandover()
     if (!sounding) return
     const stamped = this.stamp(time)
-    this.post({ type: 'drive', at, rate: 1, time: stamped, until: stamped + HANDOVER_MAX_S })
+    this.post({ type: 'drive', at, rate: voiceRate(this.speed), time: stamped, until: stamped + HANDOVER_MAX_S })
     const done = () => {
       this.endHandover()
       this.post({ type: 'fade', seconds: HANDOVER_FADE_S })
@@ -1798,7 +1827,8 @@ export class Deck {
     const letGo = this.letGo
     if (!letGo) return
     const waited = now() - letGo.since
-    if (this.host.playing() && seconds > letGo.at + 0.02 && Math.abs(seconds - letGo.at) < SOUGHT_ELSEWHERE_S + waited / 1000) {
+    //? the song moves at the player's speed from there (2.0.0-player.39)
+    if (this.host.playing() && seconds > letGo.at + 0.02 && Math.abs(seconds - letGo.at) < SOUGHT_ELSEWHERE_S + (this.speed * waited) / 1000) {
       this.backMs = waited
       this.motorMs = letGo.motor
     } else if (waited > letGo.motor + HANDOVER_MAX_S * 1000) this.notBack += 1
@@ -1877,7 +1907,10 @@ export class Deck {
     const { back, ahead } = windowMargins(this.span?.song === song.id ? this.span.seconds : WINDOW_S)
     const refreshing = span === undefined && this.host.playing() && !busy
     const room = song.length > 0 ? Math.max(0, song.length - where - 0.5) : Infinity
-    const need = Math.max(0, span ?? (refreshing ? Math.min(ahead, room) : 0))
+    //? the margin ahead is time for a fetch and a decode, so faster than 1x it is that many more seconds
+    //? of the song: at 2x the next window is asked 12 s of it - still 6 s of listening - before the end of
+    //? this one, never 3 (review of 2.0.0-player.39); slower, the margin is as it was
+    const need = Math.max(0, span ?? (refreshing ? Math.min(ahead * Math.max(1, this.speed), room) : 0))
     if (this.covers(where, need)) return
     const pending = this.pending
     if (pending && pending.song === song.id && where >= pending.from && where + need <= pending.to) return

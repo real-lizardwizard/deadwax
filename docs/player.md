@@ -186,10 +186,11 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   or a browser view over it.
 - **Now playing**: a large cover (a grey square for an album without one), the song's title, and
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
-  to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons, with
-  an **AirPlay** button when there's a speaker on the network to send to, and **•••**. The button
-  at its top right, a round record, shows it as [a turntable](#the-turntable) instead. Drag it
-  down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
+  to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons: at its
+  left end, wherever the speed isn't 1x, [the speed's chip](#the-speed-fader) (`1.25x`; tap it for
+  1x), then an **AirPlay** button when there's a speaker on the network to send to, and **•••**.
+  The button at its top right, a round record, shows it as [a turntable](#the-turntable) instead.
+  Drag it down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
   it's open nothing behind it can be reached by the keyboard or VoiceOver; opening it moves to its
   close arrow, and closing it goes back to where you were. Until 2.0.0-player.10 it also showed two
   lines about how the song was sent and how the last song changes and seek went, and the Gapless
@@ -390,7 +391,9 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   — Album" (click that to go to the album), previous, a round play/pause and next, the scrubber with
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point
   at it), and at the right **AirPlay** when there's a speaker to send to, **Info**, and the
-  [visualizer](#the-visualizer)'s button (five bars). With nothing playing it stays, saying so.
+  [visualizer](#the-visualizer)'s button (five bars) - and before them, wherever the speed isn't 1x,
+  [the speed's chip](#the-speed-fader) (`1.25x`; click it for 1x). With nothing playing it stays,
+  saying so.
   There's no now-playing screen and no [turntable](#the-turntable) on a desktop - the bar is the
   player, and the visualizer is the desktop's full-screen view of it.
 - **Info** opens beside the page as a panel, with the same About and Debug as on a phone. **Done**,
@@ -508,7 +511,8 @@ it, and plays it silently, at volume zero, in time with the song, to measure it.
 exactly as it always does, and nothing of the copy is ever heard. The next song's first stretch is
 fetched in the last few seconds of the one before, so one song flows into the next without the
 visualizer standing still (one you skip to, or jump to, can be still for a moment). It all works
-over a plain `http://` address.
+over a plain `http://` address. At [another speed](#the-speed-fader) the copy plays at that speed too
+(since 2.0.0-player.39), so it stays in time with the song, and a song at 2x reads twice the tempo.
 
 What that copy costs while the visualizer shows: 40 seconds of the song fetched for every 32 played,
 and one stretch of each next song. deadwax cuts each stretch from the copy of the song that
@@ -567,7 +571,9 @@ below.
   goes through why it might show the plain record.
 - **The record turns at 33⅓ rpm** while the song plays. Press play and the platter spins up over
   about 0.4 seconds; pause and it slows to a stop over about a second, as a real deck's does (the
-  song itself starts and stops as it always has). It doesn't turn while the now-playing screen is
+  song itself starts and stops as it always has). Those are the figures at 1x: with [the speed
+  fader](#the-speed-fader) set elsewhere the record turns at that speed instead - 50 rpm at 1.5x - and
+  takes longer or shorter to get there and to stop. It doesn't turn while the now-playing screen is
   closed, the phone is locked or the app is in the background, so nothing is drawn for nobody.
   With **Reduce Motion** on (the iPhone's Settings → Accessibility → Motion), it doesn't turn at
   all.
@@ -581,8 +587,10 @@ below.
   where the record is.
   - **With its sound**: take hold of the record and the song pauses under your finger; turn it and
     you hear it, faster or slower as your hand goes, backwards when you turn it back, and nothing
-    while your finger rests. Turn it at the record's own speed - a turn every 1.8 seconds - and you
-    hear the song as it plays (since 2.0.0-player.24; before, it warbled out of all recognition - see
+    while your finger rests. Turn it at the record's own speed at 1x - a turn every 1.8 seconds - and you
+    hear the song as it plays (a turn of your hand is always 1.8 seconds of the song, so with the speed
+    fader at 2x, where the record turns every 0.9 seconds, a turn every 1.8 seconds plays it at half
+    the speed it was playing) (since 2.0.0-player.24; before, it warbled out of all recognition - see
     below). A press that stays put for a moment takes hold too, and a quick tap is
     still a tap. Let go and the record carries on at the speed your hand gave it - the speed it had as
     your finger last moved, not slowed by the moment between that and lifting it, and from where it
@@ -681,9 +689,10 @@ below.
     the song, exactly as it always was.
 - **Pause winds the record down**, a checkbox in **You** under **Playback**, beside **Now Playing
   opens as**: on (the default), pausing from the turntable - a tap on the record, or the pause button
-  while the turntable shows - slows the song's sound to a stop with the record over about a second,
-  from the song's own speed, and the song stays paused where the sound stopped (tap play before it
-  has, and the song starts from where the sound had got to). Off, the sound stops at once (the record
+  while the turntable shows - slows the song's sound to a stop with the record over about a second
+  at 1x (from 2x about 1.25 s, from 0.25x about 0.55 s - it winds down from the song's own speed),
+  and the song stays paused where the sound stopped (tap play before it has, and the song starts
+  from where the sound had got to). Off, the sound stops at once (the record
   still spins down). It's only ever the turntable's: the cover's pause, the lock screen's and a song
   ending are always instant. Kept on the device, like the others.
 - **Drag the arm** to jump anywhere in the song: to the middle of the record is the end, to its
@@ -698,10 +707,13 @@ below.
 - **Everything else is the same as on the cover**: previous, play/pause and next - except that on
   the turntable they also start the record's sound, its pause winds the record down as a tap on the
   record does, and its play starts from where a coasting record has got to - and the row of buttons
-  under them. The screen still closes only by a drag down from its top row, the arrow, or
-  Escape: a drag on the record or the arm never closes it. A note that a song was skipped or
+  under them, but for the speed's chip: [the speed fader](#the-speed-fader)'s readout, at the
+  plinth's corner, says the speed here (on a phone on its side, where the readout is too small to
+  read, the chip shows too). The screen still closes only by a drag down from its top row, the
+  arrow, or Escape: a drag on the record or the arm never closes it. A note that a song was skipped or
   couldn't be played sits over the foot of the turntable, so the record and the arm never move or
-  change size when it comes and goes.
+  change size when it comes and goes; the speed fader's readout, in that corner, stays drawn on top
+  of it.
 - **On a phone on its side** the turntable is small (there's no landscape layout yet); the arm's
   handle shrinks with it rather than covering the record.
 - **With Reduce Motion on**, a flick still lands where its momentum says - the record jumps there
@@ -709,6 +721,57 @@ below.
   down. Turning the record still has its sound.
 
 There's no hint on how to use it: the record and the arm are the instructions.
+
+## The speed fader
+
+Since 2.0.0-player.39 the song can play from **a quarter of its speed to twice it**, and **its pitch
+moves with it** - a record deck's pitch control, not a time-stretch: faster is higher, slower is lower;
+2x is an octave up, 0.5x an octave down. It's the player's speed, not the turntable's, but it's set on
+the turntable.
+
+- **The fader** stands at the right of the platter, as on a deck: **up is faster**, 0.25x at the
+  bottom, 2x at the top. It goes by octaves - 0.25x, 0.5x, 1x and 2x evenly spaced - so 1x is two
+  thirds of the way up, where a line is drawn across the slot; the line lights green while the speed
+  is exactly 1x. Under it, at the plinth's corner, **the readout** says the speed - `1.00x`, `1.25x` -
+  in purple whenever it isn't 1x. The fader's touch area stops short of the record, so a touch on the
+  record's edge beside it is still the record's.
+- **Drag the knob** and the speed changes as your finger moves, as a pitch fader's does. Nothing
+  happens until your finger has gone a few pixels, and it then moves on from where the speed was, so a
+  touch never jumps it. A drag that ends within 2% of 1x lands on exactly 1x. **Tap the readout** to
+  go straight back to exactly 1x.
+- **From the keyboard, and with VoiceOver**, it's a vertical slider called Speed: the arrows move it by
+  0.01, Page Up and Page Down by 0.1, **Home** to 0.25x and **End** to 2x; VoiceOver reads it as
+  "1.25 times", or "normal speed". The arrows step past the 1x snap, so 1.01x is one press from 1x.
+- **It stays where you left it**, as a deck's pitch fader does: for every song after, kept on the device
+  like the settings in You, through Gapless's stream and its second player, a song asked for again
+  after it dropped, AirPlay, and a reload of the app. The lock screen's scrubber moves at the speed.
+- **Off 1x, a chip says so on the now-playing screen's cover and on a desktop** - `1.25x` - at the
+  left end of the row of buttons under the cover's transport, and in the [desktop's player
+  bar](#on-a-desktop), before AirPlay, Info and the visualizer. **Tap it** and the speed is back to
+  1x. So a speed set on a phone is never left playing unseen on a desktop, or an iPad turned on its
+  side. Nothing moves when it comes and goes. On a phone on its side, where the turntable is too small
+  to read its readout, the chip shows on the turntable too. **The mini player above the tabs doesn't
+  show the speed**: open the now-playing screen to see it.
+- **The turntable follows the speed.** The platter turns at it (50 rpm at 1.5x); taking hold of a
+  playing record starts its sound at it; let go, and the motor brings the record back to it - the
+  same motor, so from still it takes 0.4 seconds to reach 1x and 0.8 to reach 2x; and a pause from the
+  turntable winds down from it, a little longer from 2x (about 1.25 s) and shorter from 0.25x (about
+  0.55 s). Turning the record by hand is the same as ever: 1.8 seconds of the song a turn.
+- **At 1x nothing about playback changes.** deadwax touches none of the browser's playback settings
+  there: the setting that keeps the pitch the same at another speed is switched off only while the
+  speed isn't 1x, because Chrome resamples the song whenever it's off, even at 1x, where with it on 1x
+  is a straight copy. (Safari plays 1x the same way either way.)
+- **What browsers do with it.** Chrome and Edge play every speed from 0.0625x to 16x, so all of this.
+  Firefox mutes the sound outside 1/8x to 8x, so none of this. On an iPhone and in Safari, Apple's
+  player plays any song from 1x to 2x, and below 1x a song it says it can play slowly - which hasn't
+  been tried on an iPhone yet. [Info → Debug](#info--debug)'s **Speed** row says what the browser
+  does: the speed, whether the pitch moves with it, anything it refused, and how fast the song really
+  moved over the last few seconds of playing - so a browser that isn't playing the speed it was given
+  shows there.
+- **Plays are still counted by what you hear of the song**: a song counts once you've heard half of it
+  (or four minutes), whatever the speed - at 2x that comes in half the time.
+- **The [visualizer](#the-visualizer)** watches its silent copy at the same speed, so a song at 2x shows
+  twice the tempo.
 
 ## Testing the turntable
 
@@ -996,6 +1059,7 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | | **Resampled** | `192 kHz to 48 kHz, 3 dB quieter` when deadwax resampled the song for [Maximum quality](#maximum-quality-hi-res-at-48-khz), `Not known yet` while it hasn't said, otherwise `No` |
 | | **Why** | why it came that way: `Maximum quality: Up to 48 kHz`, `48 kHz and below is never resampled`, `Only FLAC is resampled`, `Maximum quality: Original`, and so on |
 | | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
+| | **Speed** | [the speed](#the-speed-fader) (since 2.0.0-player.39): `Normal (1.00x) - the song as it is, nothing changed`, `1.25x, the pitch moving with it`, or what the browser did instead - `but the browser is holding the pitch`, `the browser refused it - …` in its own words, `the browser plays it at 1.00x`. Under it, once the song has played a few seconds, how fast it really moved: `The song moved at 1.24x over the last few seconds of playing` (lower than the speed across a moment it waited for the network; begun again from a change of speed). The row keeps up while Debug is open - a change of speed, from the desktop's player bar beside it, shows at once, and the measure as it comes and moves |
 | Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
 | | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
 | The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why), how far the phone's audio clock moves at a time, and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
@@ -1474,4 +1538,13 @@ question the whole player existed to answer. Still to find out:
   it, though the way it's built was proved on an iPhone first;
 - hi-res songs resampled to 48 kHz, and above all a 24/192 album's joins, and how long the first
   song waits on your NAS; and 24/192 streamed as it is under "Original" (whether an iPhone keeps up
-  with it, and plays FLAC at that rate in a stream at all).
+  with it, and plays FLAC at that rate in a stream at all);
+- **[the speed fader](#the-speed-fader)** (2.0.0-player.39): whether the pitch really moves with the
+  speed on the phone (it should sound like a record played fast or slow, never the same pitch
+  stretched), whether 0.25x and 0.5x play at all (Apple promises 1x to 2x for any song, and below 1x
+  only for a song it says can play slowly - Debug's **Speed** row says how fast the song really moved),
+  whether a change of speed while the [one stream](#one-stream-for-flac) plays stutters (Apple's player
+  may throw away the sound it has queued when the speed changes), the lock screen's scrubber at the
+  speed, and AirPlay - WebKit hands an AirPlay speaker the same speed as the phone, but whether a
+  speaker plays it, and its pitch, is the speaker's business. And the fader under a real finger,
+  beside the record and the arm.
