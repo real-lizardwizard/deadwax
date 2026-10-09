@@ -36,7 +36,8 @@ it points to is the next slice, measured with it. The guide's section is `docs/p
   sets it (a song with one is a FLAC to the deck - the bench makes its windows); and in deck.ts a
   recording kept for the page (`recordDeckSound(seconds, keep)`, `deckRecordingData()` - floats, every
   channel, the messages, the reports, the clock and the saved file's own text, which is unchanged,
-  version 2 - and `stopDeckRecording()`) and an AnalyserNode on the voice's node for the live spectrogram
+  version 2 (version 3 since 2.0.0-player.40, which adds the voice's block - the replay reads it from there,
+  never from the build: see "Less delay between the hand and the sound") - and `stopDeckRecording()`) and an AnalyserNode on the voice's node for the live spectrogram
   (`deckSoundAnalyser()`, on to the speakers through a gain of 0, `releaseDeckSoundAnalyser()`). The app
   passes no window source and asks for neither: `deck.sim`, `decksound.sim` and `limiter.sim` pass with
   no check changed, and app-rules holds App.tsx and NowPlaying.tsx to never naming `windowSource`.

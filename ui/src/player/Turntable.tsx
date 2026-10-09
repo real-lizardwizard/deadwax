@@ -77,7 +77,11 @@ function kindOf(track: { suffix?: string | null | undefined; contentType?: strin
  *   which this seeks to as the finger lets go, and plays it from there when there is no coast to wait
  *   for. The deck is handed every sample a move carries - each of its coalesced events, in order - with
  *   the time the event gives it, never when the handler ran (2.0.0-player.24: the record's sound follows
- *   the hand's own samples). The click after a turn - or after the record was taken - is not a tap.
+ *   the hand's own samples) - those inside a tap's few pixels too, which it keeps (2.0.0-player.40): a
+ *   press taken by moving is taken from the press, heard from when the finger went down, its turn (the
+ *   record's place, and so the time line's) counting from the press - the face carrying on from where it was
+ *   drawn as the slop was crossed (the deck's angle less the turn this adds). The click after a turn - or
+ *   after the record was taken - is not a tap.
  * - THE ARM moves in from the outer groove as the song plays, following the song's position
  *   (usePosition, like the scrubber - no timer of its own) or, while the deck has the record, the
  *   time the deck shows. Dragged, it goes anywhere in the song, seeking where it lets go - and while
@@ -308,11 +312,13 @@ export function Turntable({
       for (const sample of pointerSamples(event, performance.now())) {
         const step = recordMove(turning, event.pointerId, sample.x, sample.y, within, length, deck.taken() ? deck.anchor() : drawnAt.current)
         if (step === turning || step?.kind !== 'record') continue
-        let next: RecordDrag = step
-        if (!deck.taken() && moved(next)) {
-          //? past a tap: the record is taken here, and its turn counts from here
-          deck.takeOver(sample.time)
-          next = Object.assign({}, next, { offset: 0 })
+        const next: RecordDrag = step
+        if (!deck.taken()) {
+          //? inside a tap's few pixels the deck only keeps the sample - it may yet be a tap; past them the
+          //? record is taken FROM THE PRESS (2.0.0-player.40): heard from when the finger went down, every
+          //? sample since handed on, and its turn counting from the press - the offset is kept
+          deck.touched(sample.time, next.turned, next.offset)
+          if (moved(next)) deck.takeOver(sample.time, true)
         }
         if (deck.taken()) deck.hand(sample.time, next.turned, deck.anchor() + next.offset)
         if (moved(next)) turned.current = true

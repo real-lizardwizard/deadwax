@@ -12,7 +12,8 @@
  * its own, wherever the page can have one - or, where it can't (a page that isn't on HTTPS: the browser
  * gives AudioWorklet to secure pages only), a ScriptProcessorNode on the page's main thread
  * (player/deck.ts, 2.0.0-player.16). One DSP, two hosts: nothing about the sound differs but where it
- * runs - and, on the main thread, a constant 43 ms later (SCRIPT_LAG_BLOCKS, deck.ts's startScript).
+ * runs - and, on the main thread, a constant 43 ms later (SCRIPT_LAG_BLOCKS, deck.ts's startScript) - 21 ms in
+ * blocks of 512, where the hardware renders that few (2.0.0-player.40).
  *
  *  - THE PATH (2.0.0-player.24). What the voice follows is a path through time: where the record is in
  *    the song at each moment of the audio context's clock - the hand's own samples, each with the time
@@ -87,8 +88,9 @@ export const REPORTS_PER_SECOND = 30
  * of them after it, and their delivery - so it interpolates between real samples, fitted once and for
  * all, never guesses ahead of them; and short enough to be a latency, not an echo. A constant: the
  * record's sound is this much later than the hand, the coast and the wind-down alike (and on the main
- * thread SCRIPT_LAG_BLOCKS more: 163 ms in all), and nothing else moves. The literal is in newVoiceState
- * (the voice's functions name nothing outside themselves); deck.sim holds the two equal.
+ * thread SCRIPT_LAG_BLOCKS more: 163 ms in all in blocks of 1024, 141 in blocks of 512), and nothing else
+ * moves. The literal is in newVoiceState (the voice's functions name nothing outside themselves); deck.sim
+ * holds the two equal.
  */
 export const HAND_DELAY_S = 0.12
 
@@ -105,9 +107,9 @@ export const VOICE_CEILING = Math.fround(Math.pow(10, -0.5 / 20))
 /**
  * How far ahead the limiter looks, in seconds (2.0.0-player.35): its gain comes down over this much ahead
  * of a peak, so the record's sound is this much later again than HAND_DELAY_S says - 1.5 ms, 121.5 ms
- * from hand to sound in all (about 165 on the main thread). Kept as latency rather than taken out of the
- * path's delay, which is the hand's fit's look-ahead and its margin; renderVoice's literal, which
- * limiter.sim holds equal to this.
+ * from hand to sound in all (about 164 on the main thread in blocks of 1024, 143 in blocks of 512). Kept as
+ * latency rather than taken out of the path's delay, which is the hand's fit's look-ahead and its margin;
+ * renderVoice's literal, which limiter.sim holds equal to this.
  */
 export const VOICE_LOOKAHEAD_S = 0.0015
 
@@ -892,6 +894,29 @@ export interface DeckReport {
   clockStep?: number
   /** how the turntable is keeping up on this device (2.0.0-player.28) - see DeckHealth */
   health?: DeckHealth
+  /** what this device's audio adds after the voice (2.0.0-player.40) - see DeckLatency; null with no context */
+  latency?: DeckLatency | null
+}
+
+/**
+ * What the device's audio adds after the voice, as its audio context says it (2.0.0-player.40, deck.ts
+ * deckLatency) - Info > Debug's "Turntable timing", so a phone says it, Bluetooth included where the browser
+ * knows it. Seconds, or null where the browser doesn't say.
+ */
+export interface DeckLatency {
+  /** the context's baseLatency: in Chromium the hardware's own render; in WebKit only its 128-frame render
+   *  quantum, whatever buffer the hardware runs */
+  base: number | null
+  /** its outputLatency: from the hardware's buffer to the speaker (an older Safari may not say) */
+  output: number | null
+  /** read from getOutputTimestamp(): how far the render clock is ahead of what is at the speaker - base and
+   *  output together, read another way (not a third delay to add to them) */
+  speaker: number | null
+  /** the frames the voice renders at a time: the main-thread voice's block (512 or 1024), the worklet's 128 */
+  block: number | null
+  /** the record's sound behind the hand by design, before any of the above: HAND_DELAY_S, the main-thread
+   *  voice's lag (2 blocks) and the limiter's lookahead - null with no voice */
+  design: number | null
 }
 
 /**

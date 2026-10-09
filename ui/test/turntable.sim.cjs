@@ -837,6 +837,9 @@ async function liveChecks() {
   record().props.onPointerDown(pointer(at))
   check('pressed: the song plays on for now - it may be a tap', player.toggles, [])
   advance(10)
+  //? ...and it does: 10 ms of it by the move past a tap (2.0.0-player.40: the deck takes the record from the
+  //? press, where the song was then - where it is now less what it played since)
+  player.at = 151.01
   record().props.onPointerMove(pointer(onRecord(20)))
   draw()
   check('moved past a tap: the record taken, the song paused - the player\'s own toggle', player.toggles, ['pause'])
@@ -846,7 +849,9 @@ async function liveChecks() {
     advance(10)
     record().props.onPointerMove(pointer(onRecord(20 + step * 3.6)))
   }
-  const taken = 151 + (36 / 360) * SECONDS_PER_TURN
+  //? the turn counted from the press (2.0.0-player.40): 56 degrees, the move that crossed a tap's few pixels
+  //? included - until then from the crossing, 36
+  const taken = 151 + (56 / 360) * SECONDS_PER_TURN
   const plan = platter.motor(taken, 1.8, LENGTH)
   record().props.onPointerUp(pointer(onRecord(56)))
   record().props.onLostPointerCapture(pointer(onRecord(56)))
@@ -976,6 +981,54 @@ async function liveChecks() {
   check('...let go: sought where the arm was shown', player.seeks, [LENGTH])
   advance(3000)
   draw()
+
+  //? review of 2.0.0-player.40: a quick grab of a playing record, frames drawn through the slop - a slow start, its
+  //? crossing 96 and 240 ms after the press: the face as drawn (the hand's turn round the deck's face) carries
+  //? straight on at the crossing - from the last frame, only the platter's own turn since (as first built, it
+  //? stepped back by the platter's run under the slop, 14 and 43 degrees here; before .40, on by the hand's
+  //? turn in the slop, 5)
+  {
+    const angleOf = (node) => Number(/rotate\(([-\d.]+)deg\)/.exec(node?.props?.style?.transform ?? node?.element?.style?.transform ?? '')?.[1] ?? 0)
+    const drawnFace = () => angleOf(view.find(byClass('app-tt-turn'))[0]) + angleOf({ element: view.find(byClass('app-tt-face'))[0].element })
+    const steps = []
+    for (const slopMs of [96, 240]) {
+      //? the song back where its window is, playing, the record's sound ready (a press the deck's)
+      player.at = 151
+      if (!player.playing) player.toggle()
+      draw()
+      await settle()
+      draw()
+      runFrames(5)
+      draw()
+      record().props.onPointerDown(pointer(onRecord(0)))
+      draw()
+      let t = 0
+      while (t + 16 < slopMs) {
+        runFrames(1)
+        t += 16
+        player.at += 0.016
+        record().props.onPointerMove(pointer(onRecord((4 * t) / slopMs)))
+        draw()
+      }
+      const before = drawnFace()
+      advance(slopMs - t)
+      player.at += (slopMs - t) / 1000
+      //? 5 degrees at a radius of 100: 8.7 px from the press, past the slop
+      record().props.onPointerMove(pointer(onRecord(5)))
+      draw()
+      runFrames(1)
+      draw()
+      steps.push([player.toggles.at(-1), Math.round((drawnFace() - before - ((360 / tt.SECONDS_PER_TURN) * (slopMs - t)) / 1000) * 100) / 100])
+      record().props.onPointerUp(pointer(onRecord(5)))
+      record().props.onLostPointerCapture(pointer(onRecord(5)))
+      draw()
+      advance(3000)
+      draw()
+    }
+    if (!player.playing) player.toggle()
+    draw()
+    check('a quick grab of a playing record, a slow start crossing the slop 96 and 240 ms after the press, frames drawn through it: taken (the song paused there), and the face as drawn carries straight on - its step at the crossing the platter\'s own turn since the last frame, no more', steps, [['pause', 0], ['pause', 0]])
+  }
 
   //? a hi-res song under "Up to 48 kHz": its window asked at the cap the song is played at, so it is cut
   //? from the very copy the phone plays (its rate, its level)

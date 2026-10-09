@@ -1,6 +1,7 @@
-# The turntable's sound: the fixes since (.27 to .35)
+# The turntable's sound: the fixes since (.27 to .35, and .40)
 
-The warble, the handover's echo, the kernel, the first turn, the counted clock, the recorder and the limiter.
+The warble, the handover's echo, the kernel, the first turn, the counted clock, the recorder and the limiter - and
+less delay between the hand and the sound (.40).
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 
@@ -536,3 +537,276 @@ Evidence (all in `work/limiter-builder/`):
   top). **For James to decide**: a 3-5 ms lookahead (above: less of the attack's 100-500 Hz on a slowed,
   bass-heavy master, for 1.5-3.5 ms more latency), and moving the kernel's cutoff a little under the
   window's Nyquist frequency (no images of the top octave, for a little of the song's own top).
+
+#### Less delay between the hand and the sound (2.0.0-player.40)
+
+James (2026-10-08): "I do want to make sure that the delay in the turntable is reduced when scrubbing". He
+listens on Bluetooth earbuds (150-250 ms of their own, which no page can reach), mostly on his iPhone, over plain
+http - so his iPhone's Safari and his Mac's Chrome both run the main-thread voice - and he has confirmed, blind,
+that the record's sound is as clean as an ideal turntable's, so nothing here may make it less clean. The spec is
+`uplan/slice-delay.md`; the research it rests on is in `work/delay-chain/`, `delay-estimator/` and `delay-blocks/`
+(summaries there). `HAND_DELAY_S`, the fit, `SMOOTH_S`, `FOLLOW_S`, the kernel and the limiter are as they were -
+the estimator research found the fit already uses 75-84 of its 90 ms look-ahead, and the best estimator saved
+only 10 ms. Nothing heard changes but WHEN - but for the hand's few pixels before a quick grab's take, which
+were dropped (the record's place, and so where a let-go lands, counted from the crossing) and are now the hand's
+like any other (the record's place counted from the press, as the face's turn always was, and a flick let go
+within 90 ms of the press read at its speed over them too). The engine files have no diff.
+
+- **A quick grab is heard from the press** (deck.ts `touched`, `takeOver(time, quick)`, Turntable's `onMove`).
+  A press becomes the deck's take only past `TAP_SLOP_PX` (8 px) - it may yet be a tap - so a press that turns at
+  once was heard from the slop's crossing: 35 ms after the press at 1x, about 70 at 0.5x, 94 at 0.25x. Now the
+  deck keeps every sample inside the slop (`touched`: time, turn, offset - nothing sent, nothing moved), and a
+  take by moving is stamped at the PRESS's own moment with the record where it was then, every sample since
+  posted after it, in order; the voice, `HAND_DELAY_S` behind, still has them ahead of it. Where the record was:
+  a still record's place; a coast's, by its plan at the press (and its voice's knots after the press let go of
+  by the hand's first sample, as ever); a playing song's, its position less its speed times the time since the
+  press - so the take is exactly where a take at the crossing would have the voice start, and the join with the
+  song is as it was (the song still plays on under the slop - the tap's price - and pauses at the crossing). A
+  press older than the voice can still be told of - by the time the page handles the move - is taken from its
+  oldest sample within reach: `TAKE_BACK_S`, `HAND_DELAY_S` less 20 ms on the worklet (it applies a message up
+  to 9 ms after its moment by the page's clock, delay-chain's measure), `SCRIPT_TAKE_BACK_S`, less 5 ms on the
+  main thread (its lag holds what it is told two blocks on). Taken there, a still record is at the hand's place
+  then; a MOVING one - a playing song, a plan the record follows (`planHasRecord`) - where it had got to on its
+  own by that sample (the song's line there, the plan's place), the anchor that less the hand's turn by then,
+  since the voice may already have played it on past the press (after review, below). So the join, and a
+  coast's path, are as a take at the crossing had them, whatever the press's age, and a slower start keeps the
+  part of the slop's delay that is out of reach. Turntable no longer resets the offset at the crossing - the
+  record's place counts from the press - and the hand's samples since the press count toward the let-go's
+  speed. The face carries straight on at the crossing (after review): the deck's angle is the platter's as the
+  slop is crossed less the hand's turn so far (`angleNow() - turned`), since Turntable draws the deck's face
+  inside the hand's turn since the press from then on - before the crossing the face is the platter's (a tap
+  must leave it as it was), after it the hand's turn since. A tap stays a tap (nothing taken, sent, paused or
+  moved), and a press that rests `HOLD_MS` is taken as it was.
+  Re-based (each said in its sim): turntable.sim's flick sought from the press (56 degrees, not the 36 after the
+  crossing) and its fake player's position played on under the slop; decksound's read-head check counting from
+  the press for a quick grab, its stamped-samples check (the take at the press, the slop's samples after it) and
+  its count of knots under the hand (31: the press and 30 samples, where the crossing's sample was sent twice).
+  And, after review, deck.sim's face checks of a quick grab (a paused record, one playing at 0.5x and 2x): the
+  face as drawn carrying straight on from the frame drawn at the crossing, where they had pinned it at the
+  platter's angle at the press.
+- **The main-thread voice's block follows the hardware** (deck.ts `scriptBlockFor`, `startScript`): 512 frames
+  (`SCRIPT_BUFFER_SMALL`) where the context's `baseLatency` times its rate is 512 frames or fewer (within 2%;
+  Chromium says exactly 128, 512 or 1024), 1024 where it is more or isn't said - and always 1024 on Apple's
+  engine (`isAppleEngine`: `navigator.vendor` "Apple Computer, Inc." or a prefixed `webkitAudioContext`, so Safari
+  on a Mac and every iPhone browser), whose `baseLatency` is its 128-frame render quantum whatever the hardware
+  runs (WebKit's `AudioDestinationResampler::framesPerBuffer()` is its render bus's length, `renderQuantumSize`):
+  it can't tell, so it keeps 1024 (a second review's finding; the first build read 128 there and started every
+  Safari in blocks of 512). The lag stays `SCRIPT_LAG_BLOCKS` (2) blocks of
+  whatever size: 21.3 ms where it was 42.7 - 142.8 ms from the hand to the sound in all, where 1024 gives
+  164.2. The node is given up for one of 1024, at the voice's next silent moment (faded or stopped and heard no
+  more, nothing held for it, no recording under way - its state and the window carried over, the next sound a
+  take that starts its path at the new lag), and the page keeps 1024 after (`scriptBlockFloor`): where
+  `SCRIPT_SHARED_OF` (8) of the last `SCRIPT_SHARED_WINDOW` (32) blocks share a stamp with the one before (a
+  pair or a run counted once, after `SCRIPT_SHARED_AFTER`: the hardware renders more than one block at a time -
+  the research: 512 on 1024-frame hardware plays a block before its stamp), or where a block of 512 is written
+  after it began to play where the voice sounds (`SCRIPT_HEARD_LEVEL`, -80 dBFS over it and the two before it:
+  a late block plays the one two before it again). That second rule came from the real page, not the spec: in
+  headless Chromium at 128-frame renders, a let-go's own work on the main thread left 2 flicks in 5 with a
+  2.7 ms stretch played twice in blocks of 512, never in blocks of 1024 (below) - a block of 512 has half the
+  room for whatever else the page does. So 512 holds where the page keeps up, and goes the first time it doesn't
+  where it can be heard.
+- **The counted clock's constants are in seconds** (`countBlock`, pure and exported): `SCRIPT_STAMP_TOLERANCE_S`
+  1 ms; `SCRIPT_REANCHOR_S` 64 ms (was `SCRIPT_REANCHOR_BLOCKS` 3); `SCRIPT_SLEW_PER_S` 0.9375 ms a second (was
+  `SCRIPT_SLEW_S`, 0.02 ms a block); `SCRIPT_DRIFT_EASE_S` 1.067 s (was `SCRIPT_DRIFT_EASE`, 0.02 a block) -
+  each the old value at 1024 frames and 48 kHz, so blocks of 1024 count as they did; in blocks of 512 the
+  per-block constants would have eased twice as fast a second.
+- **The counted clock after a stall** (`countBlock`). Reproduced first: after a main-thread stall Chromium runs
+  the callbacks queued meanwhile back to back, every one stamped alike (inject logs of delay-chain's STALL=400
+  runs, and every one of mine below); the stall's jump anchored the count and each burst callback added a
+  block, re-anchored every four, so it came out of the burst up to 3 blocks AHEAD of the real playbackTime, eased
+  back at 0.02 ms a block - for up to a minute. Over every research recording the k-th callback is the k-th block
+  (each evenly spaced stamp sits on the count from the first). So now: a stamp no later than the one before is a
+  BURST callback - counted on, nothing else; a stamp more than `SCRIPT_REANCHOR_S` later than the count is held
+  (counted on) until two callbacks in a row are evenly spaced again (each stamp one block after the one before,
+  to the tolerance) with every stamp since that far on, then anchored by the least of them - a stamp can be
+  late, never early (Chromium computes it from the clock as the page runs the callback); one even callback alone
+  wasn't enough: the research's 6x-throttled runs had the page late block after block, evenly; a stamp more
+  than `SCRIPT_REANCHOR_S` EARLIER anchors it - at once where it is later than the stamp before, but one no
+  later than the stamp before (as it is while the count agrees, a block being shorter than 64 ms) is first
+  counted on as a burst's and anchored at the next callback (at once, until .40); a count not yet seen to agree with a stamp (the
+  first, or one moved forward) is set back to any stamp earlier than it for `SCRIPT_PROVE_S` (1 s: a first block
+  asked for a render late anchored it late); and a stamp a step away eases the count toward the stamps' LOWER
+  edge (down at once, up over `SCRIPT_DRIFT_EASE_S`) - toward their mean, as before, a page late now and then
+  eased it ahead of the truth. WebKit's jitter (stamps a step away, no bursts known) is still eased, never
+  followed; WebKit's dropped blocks (a jump, then even stamps) are anchored two callbacks after the jump - two
+  later than before, which anchored at the jump itself: 42.7 ms more of the path as it was in blocks of 1024
+  (21.3 in 512) - by the least of the stamps waited on, and unproven again after (`SCRIPT_PROVE_S`).
+- **Debug's late-block count works** (`startScript`): a block counts late when `currentTime`, read once the
+  block is written, is past the block's counted start - the research's slack model, which matched the replayed
+  blocks. Until now it compared `currentTime` with the stamp, which Chromium makes from `currentTime` as the
+  page runs the callback, a block ahead: it could never fire there. Both block sizes.
+- **Debug says the device's own latencies** (`deckLatency`, `DeckReport.latency`, `latencyNote` in
+  lib/debugRows.ts, on Turntable timing): the design (`HAND_DELAY_S`, the lag, the limiter's lookahead), the
+  block in use, and what the context gives - `baseLatency`, `outputLatency` and the render clock's lead on the
+  speaker by `getOutputTimestamp()` (the median of the last nine readings, taken as the deck reads its clock) -
+  each only where the browser gives it: "The record's sound: 142.8 ms behind the hand by design (blocks of 512 on
+  the main thread), then what this device's audio adds - it says base 2.7 ms, output 8.0 ms, 12.3 ms from render
+  to speaker". The recorder's file (version 3) carries `block` and `latency`, and its `scriptLagSeconds` from the
+  block; the bench's replay reads the block from the file (`blockOf(source)`, 1024 for a file that doesn't say).
+
+- **Measured, the sims** (decksound.sim's new pin, "a quick grab heard from the press"; the REAL Turntable, deck,
+  clock and voice, a 440 Hz tone, the hand's own samples): from the press to the sound half way to the hand's
+  speed, less the delay the design gives it (`HAND_DELAY_S`, the main thread's lag, the limiter's 1.5 ms) - a
+  still record, the hand at 1x, 0.5x and 0.25x (slop 33, 50 and 83 ms here), both hosts, an iPhone's clock and
+  a Mac's: 7.7-14.2 ms (24.4 once, the main thread on the iPhone's clock at 0.25x: a cycle of the slowed tone lasts 9-18 ms there, the measure's grain); a record playing at 0.5x and 2x grabbed by a hand at half or a quarter its speed:
+  6.8-12.5 ms. The same check run on HEAD's code (a copy, `work/delay40-builder/head/`): 42-43 ms at 1x, 64 at
+  0.5x, 91-108 at 0.25x, and 57-97 for the playing grabs - the slop and the same rise. The join (where the voice
+  starts against where the song paused, `repeatMs`) is the same before and after to 0.1 ms on every row of the
+  same block size (116-156 ms of the song heard again as the record's sound takes over - the delay and the
+  lag, by when the take lands), and the take's place carried on to the crossing's moment is where the song
+  paused to 0.2 ms - past the reach too, since review (a hand at 0.1x or 0.15x on a record playing at 0.5x, 1x
+  or 2x, crossing 117-217 ms after the press: 115-145 ms heard again, HEAD's to 0.1 ms on every row of the same
+  block size).
+- **Measured, the real page** (`work/delay40-builder/page/`: `drive40.cjs`, `analyze40.py`, `summary40.py`, built
+  on delay-chain's `drive-app.cjs` and its tap on the voice's node; this change's build on 127.0.0.1:8110, HEAD's
+  on 8111, a scratch database, a hard-linked copy of builder36's library, the shared stand-in Navidrome;
+  headless Chromium as `deadwax.test` over plain http with `--audio-buffer-size=128` (a Mac-like device) and
+  1024 (an iPhone-like one), and on `localhost` for the worklet; "Test Signal - Instrument", real touch events
+  at 60 a second). Hand to sound on the render clock, ms - a start after a 0.5 s rest and its stop and turn back
+  at 1x, quick grabs at 1x, 0.5x and 0.25x from the press, a record playing at 0.5x grabbed by a hand at 1x and
+  one at 2x by a hand at 0.5x, each half way from the record's speed to the hand's; design 121.5 / 142.8 / 164.2:
+
+  | | worklet: before → after | main thread, 128-frame renders: before (blocks of 1024) → after (512) | main thread, 1024-frame renders: before → after |
+  | --- | --- | --- | --- |
+  | start after a rest, 50% | 128.4 → 128.4 | 169.5 → 149.6 | 156.5* → 171.2 |
+  | stop, 50% | 135.5 → 135.2 | 177.9 → 158.1 | 165.3* → 178.6 |
+  | turn back | 128.7 → 129.2 | 168.8 → 146.9 | 157.4* → 168.4 |
+  | quick grab, 1x | 162.4 → 128.1 | 204.1 → 153.3 | 199.9 → 173.6 |
+  | quick grab, 0.5x | 188.8 → 131.2 | 231.6 → 152.5 | 233.9 → 174.2 |
+  | quick grab, 0.25x | 226.5 → 167.9 | 269.7 → 169.2 | 267.6 → 189.3 |
+  | playing at 0.5x, hand at 1x | 191.6 → 147.8 | 229.3 → 155.6 | 227.1 → 175.0 |
+  | playing at 2x, hand at 0.5x | 179.2 → 127.5 | 238.8 → 149.0 | 237.1 → 170.4 |
+
+  The slop crossed 34-35 ms after the press at 1x, 58-63 at 0.5x, 92-94 at 0.25x. Headless Chromium hands a
+  move to the page 27-32 ms after its own time (median), so at 0.25x the press was 120-125 ms old when the page
+  could take it: on the worklet past `TAKE_BACK_S`, taken from a sample 25 ms on (46 ms past the design where
+  1x and 0.5x are 7-10); on the main thread within `SCRIPT_TAKE_BACK_S` once that was 115 ms (186.9 at 0.1, the
+  first pass). A phone hands its moves on sooner. *The 1024-frame "before" ran with its counted clock AHEAD:
+  replaying its own stamps (`clockcheck.cjs`) through the clock as it was, up to 21.3 ms ahead for 1010 of its
+  2564 blocks after a burst no one forced - its sound that much early and its look-ahead that much short; after,
+  never ahead, and every number there is the design plus the rise. The render clock's lead on the speaker
+  (getOutputTimestamp, which Debug now says): 10-15 ms at 128-frame renders (output latency 8 ms), 92-97 at 1024
+  (72-80), 40-55 on the worklet's default (32-40).
+- **After a forced stall** (`STALL=400`: the page held 400 ms before each gesture): as it was, the start after a
+  rest came 126.9-133.7 ms after the hand on the main thread - 30-37 ms EARLIER than the design - its clock up to
+  42.6 ms ahead for 928-1221 blocks and 9.5-30.8 ms ahead still as each session ended; after, 170.0-171.6, in
+  step: replayed through `countBlock`, never ahead of an evenly spaced stamp, in blocks of 512 or 1024, across
+  every recording made here (16 sessions, 3-16 bursts each).
+- **Late blocks** (Debug's count, which counts now; stale quanta found in the tap's recording by `staleq.py`):
+  blocks of 1024 - at 1x and 4x CPU, none late but at the harness's own stalls (as it turns a recording into
+  text), no stretch played twice over five flicks, before or after; HEAD's Debug said "0 of N blocks late" while
+  28-29 blocks of a 4x session were late by the clock. Blocks of 512 at 128-frame renders - 15-26 late in a 1x
+  session, most at the harness's stalls, and at let-goes (the page's own work then, 16-45 ms after the finger
+  lifts): 2 flicks in 5 had a 2.7 ms stretch played twice (`after2-128`, the build before the rule below). So:
+  the late-where-heard rule. With it (`after3-*`), blocks of 512 held for 11 s at 1x, 4 s at 4x and 10 s with
+  forced stalls before a late block where the voice was heard (a let-go's own transient, below) moved the page
+  to 1024 - and no stretch was played twice in the flicks after. Headless Chromium paints in software; how long
+  512 holds on James's Mac is what its Debug will say.
+- **Found, not changed**: a let-go after a rest gives a short transient - the stop's 3 ms fade on the level of
+  the sample the still record sits on, through the 10 Hz DC blocker: 0.02-0.04 of full scale (-28 to -34 dBFS)
+  within 50 ms of the lift, before and after alike, on both hosts. Heard as a soft tick, if at all; the voice's
+  own, and James's to judge.
+- **After review** (four reviewers; each finding below confirmed by skeptics, measured on copies of this tree and
+  of HEAD - `work/review-*`, `work/verify/`; the fixes' own runs in `work/delay40-fixer/`):
+  - *A moving record taken past the reach was put back where it was at the press.* The take was placed at the
+    record's place at the press plus the hand's turn, stamped at a later sample - right for a still record, but
+    a playing song or a coast had moved on under the finger meanwhile, and the voice, 120 ms behind, may have
+    played it there already: a playing song's join came later (143-240 ms of it heard again where HEAD had
+    115-145, in decksound's harness; 72 and 144 ms more in deck.sim's at slops of 160 and 240 ms, 90 on the
+    main thread), and a sounding coast's path stepped back - the hand's first knot 132 and 242 ms of the song
+    behind where the coast had the record, the voice rushing backwards at -1.15x and -2.03x under a near-still
+    finger (HEAD: no step, -0.1x), the very artefact .24's review removed. Hit by a gentle grab, or a press that
+    waits a moment before it turns, crossing the slop 100-250 ms after the press - or 70 ms, where a browser
+    passes touches on 30 ms late. Fixed: past the reach a moving record is taken where it had got to on its own
+    by the sample it is taken from, the anchor that less the hand's turn by then (`takeOver`, `planHasRecord`);
+    within reach nothing changed. Pinned: deck.sim (a record playing at 1x and 2x, a hand a tenth of its speed,
+    slops of 160 and 240 ms - the take's line carried to the crossing where the song paused, 0 ms; the same on
+    the main thread at 200 ms; a sounding coast caught with the press 48, 96, 160 and 224 ms before the
+    crossing - the first knot on the coast's line, the voice replayed never below -0.25x) and decksound (the
+    join past the reach, both hosts and clocks, 16 rows).
+  - *The face jumped back at the crossing.* Its angle was set to the platter's at the press, though the face had
+    gone on turning under the slop (it may yet be a tap), so it snapped back by the platter's run under the slop
+    less the hand's turn: 2 and 14 degrees in deck.sim's playing grabs at 0.5x and 2x, 20 and 38 on a coast,
+    14 and 43 in turntable.sim's real Turntable at 1x with slops of 96 and 240 ms (87 at 2x with 240 ms, by the
+    reviewers'); HEAD stepped on by the hand's turn in the slop, about 5 degrees. "What can't be had" was wrong:
+    the face's angle is tied to nothing heard. Fixed: the angle at a quick take is the platter's as the slop is
+    crossed less the hand's turn so far, so the face as drawn carries straight on. Pinned: deck.sim's three face
+    checks re-based to the drawn face's continuity (frames run through the slop), the coast's, the slow hands'
+    at 1x and 2x, and turntable.sim's real Turntable (a step of the platter's own turn since the last frame, 0
+    more).
+  - *The docs promised more than the reach gives*: docs/player.md, troubleshooting.md and the README now say the
+    press is reached back to only about a tenth of a second, counted from when the page hears of the move, so a
+    slower start keeps the rest (headless Chrome over HTTPS at a quarter of the record's speed: about 60 ms
+    sooner, not 95).
+  - *Rules nothing pinned*, each now caught by a check that fails without it: the counted clock started afresh
+    at the switch to 1024 (dropped, the new node's first stamp, which real Chromium gives one block of 1024
+    past the old count's next, is a step away - eased toward for 20-odd seconds, each block rendered 21 ms
+    early, the sound that much later; now checked block by block at that placing); no switch while a recording
+    runs (its tap is on the node and its file names the block); the late-where-heard rule's two blocks before
+    (a silent late block after two loud ones changes it, one after two silent ones doesn't - and, after the
+    second review, one after a loud block then a silent one, the block two before alone loud, changes it too:
+    the first case had the block just before loud as well, so it couldn't tell the two apart); `outputLatency` in
+    Debug (the fake context gains one: 8 and 76 ms read, none where it says none); and the drop's anchor by the
+    LEAST of the stamps waited on and the count re-proved after a forward anchor (without both, 3 ms ahead for
+    100 blocks, 2.1 s; the old check's stamps were exact, so neither could fail it).
+  - *A second review* (findings confirmed by skeptics; fixes in `work/delay40-fixer2/`):
+    - *Every Safari started in blocks of 512*: WebKit's `baseLatency` is its 128-frame render quantum on every
+      device, so `scriptBlockFor` read "128 frames" on James's iPhone and every Mac Safari - against the spec's
+      "can't tell keeps 1024" and these notes. Fixed: Apple's engine keeps 1024 (above); Debug's `base` and the
+      docs say it is Safari's own 128-frame step there, not the hardware's. Pinned: deck.sim (`scriptBlockFor`
+      on Apple's engine at 128-1024 frames, `isAppleEngine` by vendor and by the prefixed constructor and not
+      for Chromium, Firefox or no navigator, and a Safari-like deck on a 128-frame context in blocks of 1024 at
+      164.2 ms).
+    - *Nothing checked that what taps the voice follows the new node after the switch to 1024* (`audio.node`):
+      without it a recording or the bench's analyser started after the switch would hang off the old,
+      disconnected node - a file of silence. Pinned: deck.sim records after the switch and checks the tap is on
+      the new node, not the old.
+    - *The heard rule's two blocks before* was pinned only together with the block just before (above).
+    - *Wording*: docs/player.md and troubleshooting.md said an iPhone got 1024 "so far" (now: Safari and every
+      iPhone browser, because they can't say); troubleshooting.md called `from render to speaker` the same as
+      `output` - it is `base` and `output` together, read another way (the measurements above: 10-15 ms against
+      2.7 + 8, 92-97 against 21.3 + 72-80), so what is heard is the design plus it, not plus all three; the
+      comments on `DeckLatency` and `deckLatency` say the same now.
+  - *Wording*: the clock's notes and comments said a far-earlier stamp anchors at once and a drop one callback
+    later than before - corrected above (a burst's first, then the next callback; two callbacks later).
+  - *Measured in the real page* (`work/delay40-fixer/page/`: the builder's drive40.cjs with three more gestures -
+    a record playing at 1x grabbed by a hand at 0.15x, and a coast after a flick caught by a quick grab at 0.1x
+    and 0.15x - the face as drawn read once each frame has painted, and `trace.py`, the tone's speed after the
+    press; this tree on 127.0.0.1:8112, a copy with the first build's `takeOver` on 8113; headless Chromium on
+    `localhost` (the worklet) and as `deadwax.test` with 128-frame renders (blocks of 512)). The face's largest
+    step back in a frame, first build -> now, worklet / main thread: a record at 2x grabbed by a hand at 0.5x
+    -27.6 / -28.1 -> 0 / 0 degrees; at 1x by 0.15x (slop 160 ms) -30.6 / -30.7 -> 0 / 0; a coast caught at
+    0.15x (slop 154 ms) -25.6 / -25.9 -> 0 / 0, at 0.1x (221 ms) -34.8 / -34.4 -> 0 / 0. The coast's sound (a
+    tone read forwards whichever way it plays, so a run back shows as its speed falling to 0 and rising again):
+    first build, from the coast's 0.9x down to 0.15-0.25, back up to 0.47-0.48 and down again over 150 ms (0.15x
+    hand), and down to 0.39 and back up to 0.96 (0.1x hand, worklet) - the record's sound running backwards
+    under the finger; now, from
+    the coast straight to the hand's 0.15x, or 0.10x, and held there. The grabs within reach as the builder
+    measured them (quick grab at 1x 128.4 ms, 0.25x 168.0, a record at 2x by 0.5x 127.5, on the worklet).
+- **Verified**: 2395 Python tests (2393 passed, 2 skipped; none new - the change is the page's), pyflakes, tsc,
+  the bundle, all 47 sims (`deck` 353, 48 new over .39's 305 - 4 of them the second review's; `decksound` 73, 4 new; `turntable` 175, 1 new;
+  `debug` 110, 2 new; `lab` 122, 1 new; `deckclock` 35 and `limiter` 30 as they were). Re-based, each on purpose: the
+  recorder's version (2 to 3) in deck.sim and lab.sim, and the turntable.sim and decksound.sim literals named
+  above; the fakes gained blocks of either size (deck.sim's `fill`/`pump`, decksound's and lab.sim's hosts), a
+  context's `baseLatency` and a `getOutputTimestamp()`, and a player whose position plays on (decksound). The
+  engine guard is empty. Mutation checks (`work/delay40-builder/mut/mut.py`, `mut.log`, each file restored to its
+  sha256): 27 of 27 caught - the quick grab (from the press, the reach back on either host, the join's anchor,
+  the face at the press, the slop's samples in the let-go's speed, Turntable's quick take and its `touched`),
+  the clock (the burst, two evens, holding at all, unproven, the lower edge, the slew in seconds), Debug's late
+  count, the block (from baseLatency, the shared-stamp and late-where-heard changes, the heard rule, switching
+  only when silent - not when merely not driving - the page's floor, the lag of either size and after the
+  change), the recorder's block, the speaker reading, the bench's block from the file and Debug's note. Two (the
+  slop's samples in the let-go's speed, the lag after the change) first got past, and gained the checks that
+  catch them. After review, on a copy of the tree rather than the tree itself (`work/delay40-fixer/mut/mut.py`,
+  `mut.log`, each file restored to its sha256): 38 of 38 caught - those 27 as the code reads now (the face's
+  now two: from the press as first built, and at the crossing without the hand's turn as HEAD had it), and the
+  moving record past the reach (a plan's place, a playing song's line, the anchor less the hand's turn), the
+  switch's own clock, no switch while recording, the heard rule's two blocks before, `outputLatency`, the
+  drop's anchor by the least and its re-proving. After the second review (`work/delay40-fixer2/mut/mut.py`, `mut.log`): 45 of 45 - those 38, and Apple's engine kept at 1024 (the branch, its default, the vendor and the prefixed constructor), `audio.node` following the switch, and the heard rule's block two before alone (in the max, and its shift).
+- **NOT verified**: James's devices - how long blocks of 512 hold on his Mac (Debug's "blocks of 512" or "of
+  1024" says), what his iPhone's context says of its latencies (its block is 1024 whatever it says - WebKit's
+  baseLatency is its render quantum; whether blocks of 512 would hold on a phone is untried, and wasn't wanted
+  without it), how WebKit stamps after a stall (no bursts are known there; its dropped blocks are
+  anchored two callbacks later than before, so 42.7 ms of the path as it was in blocks of 1024 after each), how
+  a quick grab feels from the press on a real finger, and how a slow one does (a start that is still inside the
+  slop a tenth of a second on is heard from the reach, not the press).

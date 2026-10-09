@@ -30,6 +30,8 @@ export interface RecordingIn {
   clock: { offset: number | null }
   delaySeconds: number
   scriptLagSeconds: number
+  /** the frames the voice rendered at a time (2.0.0-player.40) - absent from a recording made before */
+  block?: number
 }
 
 /** A song read exactly at song time t, nothing at or above `cutoff` Hz of its own in it (Signal.exact). */
@@ -169,7 +171,7 @@ export async function compare(input: CompareInput): Promise<Comparison> {
   const rec = input.recording
   const rate = rec.sampleRate
   const messages = rec.messages as RecordedMessage[]
-  const source = { voice: rec.voice, sampleRate: rate, messages, heard: rec.heard, offset: rec.clock.offset ?? 0, scriptLagSeconds: rec.scriptLagSeconds }
+  const source = { voice: rec.voice, sampleRate: rate, messages, heard: rec.heard, offset: rec.clock.offset ?? 0, scriptLagSeconds: rec.scriptLagSeconds, ...(rec.block ? { block: rec.block } : {}) }
   const lag = rec.voice === 'script' ? rec.scriptLagSeconds : 0
   const recorded = rec.channels[0] ?? new Float32Array(0)
   const firstBlock = rec.blockTimes[0] ?? 0

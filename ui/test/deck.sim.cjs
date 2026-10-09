@@ -678,9 +678,15 @@ let decodes = 0
 //? whether the worklet's module refuses to load - or is held (its settlers kept here) as a slow one is
 let workletFails = false
 let workletHeld = null
-//? a context with no AudioWorklet (a page that isn't on HTTPS), or with no ScriptProcessorNode either
+//? a context with no AudioWorklet (a page that isn't on HTTPS), or with no ScriptProcessorNode either - and
+//? the base latency a context says (2.0.0-player.40: its hardware's render), none unless a check sets one
 let noWorklet = false
 let noScript = false
+let baseLatency
+//? and, where it is set, a getOutputTimestamp() saying the render clock is that far ahead of the speaker - and
+//? an outputLatency (none unless a check sets one)
+let outputTimestampLead = null
+let outputLatency
 //? resumes that settle only when the test says (their settlers kept here), not at once - and suspends
 let resumesHeld = null
 let suspendsHeld = null
@@ -694,19 +700,21 @@ class FakeScript {
   connect(to) { this.connections.push(to); if (to === this.context.destination) this.connected = true }
   disconnect(from) { if (from === undefined) { this.disconnected = true; this.connections = [] } else this.connections = this.connections.filter((to) => to !== from) }
 }
-//? the browser asking a script voice for `blocks` blocks of 1024, each to play two blocks ahead of the
-//? context's clock, as a ScriptProcessorNode's are; what each was filled with comes back
+//? the browser asking a script voice for `blocks` blocks of its size (1024, or 512 since 2.0.0-player.40), each
+//? to play two blocks ahead of the context's clock, as a ScriptProcessorNode's are; what each was filled with
+//? comes back
 const fill = (script, playbackTime) => {
-  const channels = [new Float32Array(1024), new Float32Array(1024)]
-  script.onaudioprocess?.({ outputBuffer: { numberOfChannels: 2, length: 1024, getChannelData: (channel) => channels[channel] }, playbackTime })
+  const size = script.args[0]
+  const channels = [new Float32Array(size), new Float32Array(size)]
+  script.onaudioprocess?.({ outputBuffer: { numberOfChannels: 2, length: size, getChannelData: (channel) => channels[channel] }, playbackTime })
   return { channels, playbackTime }
 }
 const pump = (script, blocks = 1) => {
   const filled = []
   for (let block = 0; block < blocks; block++) {
     const context = script.context
-    filled.push(fill(script, context.currentTime + 2048 / 48000))
-    context.currentTime += 1024 / 48000
+    filled.push(fill(script, context.currentTime + (2 * script.args[0]) / 48000))
+    context.currentTime += script.args[0] / 48000
   }
   return filled
 }
@@ -726,6 +734,12 @@ class FakeContext {
         : workletFails ? Promise.reject(new Error('SyntaxError: Unexpected token')) : Promise.resolve()),
     }
     if (noScript) this.createScriptProcessor = undefined
+    if (baseLatency !== undefined) this.baseLatency = baseLatency
+    if (outputLatency !== undefined) this.outputLatency = outputLatency
+    if (outputTimestampLead !== null) {
+      const lead = outputTimestampLead
+      this.getOutputTimestamp = () => ({ contextTime: this.currentTime - lead, performanceTime: performance.now() })
+    }
     contexts.push(this)
   }
   createScriptProcessor(size, inputs, outputs) { return new FakeScript(this, [size, inputs, outputs]) }
@@ -2354,7 +2368,12 @@ async function main() {
     const samples = Array.from(new Int16Array(pcm.buffer, pcm.byteOffset, pcm.length / 2))
     check('the file: what it is, the voice, the rate, the delays, the tap\'s block, three block times, and the audio\'s frames and channels',
       [file.recording, file.version, file.voice, file.secure, file.sampleRate, file.delaySeconds, file.scriptLagSeconds, file.tapBlock, file.blockTimes, file.audio.format, file.audio.channels, file.audio.frames],
-      ['deadwax turntable sound', 2, 'script', false, 48000, voice.HAND_DELAY_S, 2048 / 48000, 4096, [1.5, 1.5 + 4096 / 48000, 1.5 + 8192 / 48000], 'int16le', 2, 3 * frames])
+      ['deadwax turntable sound', 3, 'script', false, 48000, voice.HAND_DELAY_S, 2048 / 48000, 4096, [1.5, 1.5 + 4096 / 48000, 1.5 + 8192 / 48000], 'int16le', 2, 3 * frames])
+    //? version 3 (2.0.0-player.40): the block the voice rendered at a time - what its lag is made of, which a
+    //? replay reads from here - and what the device's audio adds after the voice, as its context says it
+    check('...since 2.0.0-player.40 (version 3): the voice\'s block, 1024 on a context that says nothing of its hardware, and the latencies it says - none here but the design',
+      [file.block, file.latency && Object.keys(file.latency).sort(), file.latency?.base, file.latency?.output, file.latency?.speaker, file.latency?.block, file.latency && Math.round(file.latency.design * 1e6) / 1e6],
+      [1024, ['base', 'block', 'design', 'output', 'speaker'], null, null, null, 1024, Math.round((voice.HAND_DELAY_S + 2048 / 48000 + voice.VOICE_LOOKAHEAD_S) * 1e6) / 1e6])
     check('...each block\'s loudest sample, either channel, as a float, past the 16 bits\' clamp (2.0.0-player.35: the middle block\'s right -0.75, the last block\'s 1.25), and the limiter\'s ceiling and lookahead',
       [file.blockPeaks, file.limiter], [peaks, { ceiling: voice.VOICE_CEILING, lookaheadSeconds: voice.VOICE_LOOKAHEAD_S }])
     check('...its audio decodes to exactly the frames tapped, interleaved, 16-bit', [pcm.length, samples.length === expected.length && samples.every((v, i) => v === expected[i])], [3 * frames * 2 * 2, true])
@@ -2840,6 +2859,993 @@ async function main() {
     check('no audioSession at all (anything but Safari 16.4 and later): nothing set, nothing thrown, the sound made as ever', await woken(none), [null, [1, 'running', 'running'], ['resume', 'close']])
     if (original) Object.defineProperty(globalThis, 'navigator', original)
     else delete globalThis.navigator
+  }
+
+  console.log('\n2.0.0-player.40: less delay between the hand and the record\'s sound - the counted clock after a stall, in seconds')
+  {
+    const { countBlock, newScriptClock, scriptBlockFor, SCRIPT_REANCHOR_S, SCRIPT_STAMP_TOLERANCE_S } = deckModule
+    const RATE = 48000
+    //? the counted clock as it was until 2.0.0-player.40 - constants a block, a stamp three blocks away anchoring
+    //? it at once, a burst counted a block a callback - for "reproduce it first"
+    const countAsWas = (stamps, size) => {
+      const block = size / RATE
+      let counted = null, drift = 0
+      return stamps.map((reported) => {
+        let at
+        const off = counted === null ? Infinity : reported - counted
+        if (Math.abs(off) > 3 * block) { at = reported; drift = 0 }
+        else if (Math.abs(off) <= 0.001) at = reported
+        else { drift += (off - drift) * 0.02; at = counted + Math.max(-0.00002, Math.min(0.00002, drift)) }
+        counted = at + block
+        return at
+      })
+    }
+    const countNow = (stamps, size) => {
+      const clock = newScriptClock()
+      return stamps.map((stamp) => countBlock(clock, stamp, size / RATE))
+    }
+    check('the main-thread voice\'s block from what the context says of its hardware: 512 where it renders 128, 256, 480 or 512 frames at a time (baseLatency times the rate - exact in Chromium; 0.0107 s, 513.6 frames, a rounded 512), 1024 where it renders 960 or 1024 - and where it says nothing, 0 or nonsense',
+      [128, 256, 480, 512, 513.6, 960, 1024].map((frames) => scriptBlockFor({ baseLatency: frames / RATE, sampleRate: RATE }))
+        .concat([scriptBlockFor({ baseLatency: 512 / 44100, sampleRate: 44100 }), scriptBlockFor({ sampleRate: RATE }), scriptBlockFor({ baseLatency: 0, sampleRate: RATE }), scriptBlockFor({ baseLatency: NaN, sampleRate: RATE })]),
+      [512, 512, 512, 512, 512, 1024, 1024, 512, 1024, 1024, 1024])
+    //? review of 2.0.0-player.40's fixes: WebKit's baseLatency is its render quantum - 128 frames whatever buffer the
+    //? hardware runs (AudioDestinationResampler::framesPerBuffer() is its render bus's length) - so on Apple's engine
+    //? the voice can't tell, and keeps 1024
+    check('...and on Apple\'s engine (Safari, every iPhone browser) 1024 whatever it says - its 128 frames are its render quantum, not the hardware\'s buffer',
+      [128, 256, 512, 1024].map((frames) => scriptBlockFor({ baseLatency: frames / RATE, sampleRate: RATE }, true)).concat([scriptBlockFor({ sampleRate: RATE }, true)]),
+      [1024, 1024, 1024, 1024, 1024])
+    {
+      const { isAppleEngine } = deckModule
+      const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+      const setNavigator = (value) => Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true })
+      const seen = []
+      for (const [vendor, prefixed] of [['Apple Computer, Inc.', false], ['Google Inc.', false], ['', false], ['', true]]) {
+        setNavigator({ vendor })
+        if (prefixed) globalThis.webkitAudioContext = function webkitAudioContext() {}
+        seen.push([isAppleEngine(), scriptBlockFor({ baseLatency: 128 / RATE, sampleRate: RATE })])
+        delete globalThis.webkitAudioContext
+      }
+      if (original) Object.defineProperty(globalThis, 'navigator', original)
+      else delete globalThis.navigator
+      seen.push([isAppleEngine(), scriptBlockFor({ baseLatency: 128 / RATE, sampleRate: RATE })])
+      check('...Apple\'s engine told by navigator.vendor ("Apple Computer, Inc.") or the prefixed webkitAudioContext still given - Chromium\'s "Google Inc.", Firefox\'s "" and no navigator at all aren\'t, and keep 512 on a context saying 128 frames',
+        seen, [[true, 1024], [false, 512], [false, 512], [true, 1024], [false, 512]])
+    }
+
+    //? A STALL, as Chromium has it (the delay-chain research's STALL=400 recordings): the main thread held 400 ms,
+    //? the audio thread meanwhile asking for a block at each wrap; then the callbacks queued run back to back,
+    //? every one stamped alike - the playbackTime of the last of them - and the ones after evenly spaced again.
+    //? The k-th callback is the k-th block (measured: every evenly spaced stamp of every recording sits on it)
+    const stall = (size, blocksBefore = 40, after = 800) => {
+      const block = size / RATE
+      const behind = Math.round(0.4 / block)
+      const truth = [], stamps = []
+      for (let k = 0; k < blocksBefore + behind + 1 + after; k++) {
+        truth.push(1 + (k + 1) * block)
+        stamps.push(k >= blocksBefore && k <= blocksBefore + behind ? 1 + (blocksBefore + behind + 1) * block : 1 + (k + 1) * block)
+      }
+      return { truth, stamps, burst: behind + 1, from: blocksBefore }
+    }
+    const ahead = (ats, truth, from = 0) => {
+      let most = 0, blocks = 0
+      for (let k = from; k < ats.length; k++) {
+        const by = ats[k] - truth[k]
+        most = Math.max(most, by)
+        if (by > SCRIPT_STAMP_TOLERANCE_S) blocks++
+      }
+      return { mostMs: round(most * 1000, 3), blocks }
+    }
+    for (const size of [1024, 512]) {
+      const { truth, stamps, burst, from } = stall(size)
+      const was = ahead(countAsWas(stamps, size), truth, from + burst)
+      const now = countNow(stamps, size)
+      const afterBurst = now.slice(from + burst)
+      check(`a 400 ms stall in blocks of ${size} - a burst of ${burst} callbacks stamped alike, then evenly spaced again: reproduced as it was, the count AHEAD of the real playbackTime after the burst by up to ${was.mostMs} ms for ${was.blocks} of the ${afterBurst.length} blocks after it (eased back at 0.02 ms a block); now never ahead by more than SCRIPT_STAMP_TOLERANCE_S, every block counted where it really plays - through the burst too - and the stamps followed exactly after it`,
+        [was.mostMs > 20 && was.blocks > 600, ahead(now, truth).blocks, now.every((at, k) => Math.abs(at - truth[k]) < 1e-9), afterBurst.every((at, k) => at === stamps[from + burst + k])], [true, 0, true, true])
+    }
+
+    //? blocks the page was never asked for (WebKit drops them while its main thread is busy - the hardware played
+    //? on without them): a jump of ten, and evenly spaced from there
+    {
+      const size = 1024, block = size / RATE
+      const stamps = [], truth = []
+      for (let k = 0; k < 60; k++) {
+        const real = 1 + (k + 1 + (k >= 20 ? 10 : 0)) * block
+        truth.push(real)
+        stamps.push(real)
+      }
+      const now = countNow(stamps, size)
+      check('ten blocks never asked for (WebKit\'s drop): counted on through the jump and the next block, and anchored at the one after - two evenly spaced in a row, each as far on - by the least of them; exact from there (as it was, at once)',
+        [[20, 21].map((k) => round((truth[k] - now[k]) / block, 6)), now.slice(22).every((at, k) => Math.abs(at - truth[22 + k]) < 1e-9), countAsWas(stamps, size)[20] === truth[20]], [[10, 10], true, true])
+    }
+    //? review of 2.0.0-player.40: the drop's anchor by the LEAST of the stamps waited on, and the count re-proved
+    //? after it - the held stamp on time and the three after it 3 ms late (the page late with them, evenly), or all
+    //? of them 3 ms late; then on time. Anchored by the least, it lands on the truth; anchored forward by late
+    //? stamps, it is unproven, and the next stamp - earlier than the count - sets it back at once
+    {
+      const size = 1024, block = size / RATE
+      const run = (lateMs) => {
+        const stamps = [], truth = []
+        for (let k = 0; k < 160; k++) {
+          const real = 1 + (k + 1 + (k >= 20 ? 10 : 0)) * block
+          truth.push(real)
+          stamps.push(real + (k >= 20 && k < 20 + lateMs.length ? lateMs[k - 20] / 1000 : 0))
+        }
+        const now = countNow(stamps, size)
+        return [now.findIndex((at, k) => k >= 20 && Math.abs(at - truth[k]) < 1e-9), ahead(now, truth).blocks, round(ahead(now, truth).mostMs, 3)]
+      }
+      check('ten blocks dropped, the held stamp on time and the three after it 3 ms late, evenly: anchored by the least of them - on the truth, never ahead; and all three 3 ms late: anchored 3 ms ahead for that block alone, the next stamp (on time) setting the count back - unproven after a forward anchor (without both rules, 3 ms ahead for 100 blocks of the first, 2.1 s; without the second, of the second)',
+        [run([0, 3, 3, 3]), run([3, 3, 3])], [[23, 0, 0], [23, 1, 3]])
+    }
+    //? the page late with block after block (a throttled CPU - the research's 6x runs): its stamps late by 5 to 11
+    //? blocks, coming unevenly - never evenly spaced AND all that far on - then on time again
+    {
+      const size = 512, block = size / RATE
+      const late = [0, 0, 6, 6, 7, 5, 9, 9, 11, 8, 8, 7, 10, 10, 6, 5, 5, 11, 9, 8, 6, 7, 7, 5, 9, 10, 11, 6, 5, 0, 0]
+      const stamps = [], truth = []
+      let dispatched = 0
+      for (let k = 0; k < 200; k++) {
+        const wrap = k * block
+        const lateness = k >= 20 && k < 20 + late.length ? late[k - 20] : 0
+        dispatched = Math.max(dispatched, wrap + lateness * block)
+        truth.push(1 + wrap + block)
+        stamps.push(1 + dispatched + block)
+      }
+      const now = countNow(stamps, size), was = countAsWas(stamps, size)
+      check('the page late with block after block, its stamps 5-11 blocks late and uneven: never anchored forward - every block counted where it plays (as it was, anchored to a late stamp and ahead by up to 11 blocks)',
+        [ahead(now, truth).blocks, round(ahead(was, truth).mostMs, 1) > 50], [0, true])
+    }
+    //? the first block asked for late - its stamp a 128-frame render late, the rest on time
+    {
+      const size = 512, block = size / RATE, quantum = 128 / RATE
+      const truth = Array.from({ length: 100 }, (_, k) => 1 + (k + 1) * block)
+      const stamps = truth.map((at, k) => (k === 0 ? at + quantum : at))
+      const now = countNow(stamps, size)
+      check('the first block asked for a render late: the count, unproven yet, set back to the next stamp - earlier than it, as a stamp never is - and exact from there (as it was, 2.7 ms ahead until eased: 133 blocks of 512)',
+        [round((now[0] - truth[0]) * 1000, 3), now.slice(1).every((at, k) => at === truth[k + 1]), ahead(countAsWas(stamps, size), truth).blocks > 60], [2.667, true, true])
+    }
+    //? a stamp far earlier than the count, and no later than the stamp before it (as it is while the count agrees
+    //? with the stamps, a block being shorter than SCRIPT_REANCHOR_S): first counted on as a burst's, and anchored
+    //? at the next callback (until 2.0.0-player.40, at once)
+    {
+      const size = 1024, block = size / RATE
+      const stamps = Array.from({ length: 30 }, (_, k) => 1 + (k + 1) * block - (k >= 15 ? 5 * block : 0))
+      const now = countNow(stamps, size)
+      check('a stamp five blocks EARLIER than the count (past SCRIPT_REANCHOR_S): counted on as a burst\'s (it is no later than the stamp before it), and anchored at the next - one block on from it - and from there',
+        [SCRIPT_REANCHOR_S, now[15] === stamps[14] + block, now.slice(16).every((at, k) => at === stamps[16 + k])], [0.064, true, true])
+    }
+    //? stamps never on time and never early - each 2-20 ms late, as a page busy now and then makes them, or a clock
+    //? stamped late by its own grain - for 20 s: the count eased toward their LOWER edge stays by the truth; toward
+    //? their running mean (as it was), it drifted that far ahead
+    {
+      const size = 1024, block = size / RATE
+      let seed = 3
+      const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+      const n = Math.round(20 / block)
+      const truth = Array.from({ length: n }, (_, k) => 1 + (k + 1) * block)
+      const stamps = truth.map((at, k) => (k === 0 ? at : at + 0.002 + random() * 0.018))
+      const now = countNow(stamps, size), was = countAsWas(stamps, size)
+      const end = (ats) => round((ats[n - 1] - truth[n - 1]) * 1000, 2)
+      check(`stamps 2-20 ms late, never on time, for 20 s: the count eased toward their lower edge - ${end(now)} ms ahead of the truth at the end, within 5 (as it was, toward their mean: ${end(was)} ms ahead)`,
+        [end(now) >= 0 && end(now) <= 5, end(was) > 8], [true, true])
+    }
+    //? the constants in seconds: stamps evenly 10 ms late of the count (WebKit's - not within the tolerance, not
+    //? far enough to anchor) for a second of sound, in blocks of 1024 and of 512 - the count eased the same
+    {
+      const moved = (size) => {
+        const block = size / RATE
+        const n = Math.round(1 / block)
+        const stamps = Array.from({ length: n + 1 }, (_, k) => 1 + (k + 1) * block + (k === 0 ? 0 : 0.01))
+        const ats = countNow(stamps, size)
+        return (ats[n] - (1 + (n + 1) * block)) * 1000
+      }
+      const big = moved(1024), small = moved(512)
+      check(`the counted clock\'s easing in seconds: stamps 10 ms late for a second of sound move it ${round(big, 3)} ms in blocks of 1024, ${round(small, 3)} in blocks of 512 - SCRIPT_SLEW_PER_S a second (0.9375 ms) either way (with the constants a block, 512 moved it twice as far)`,
+        [Math.abs(big - small) < 0.03, Math.abs(big - 0.9375) < 0.05], [true, true])
+    }
+  }
+  console.log('\n2.0.0-player.40: the main-thread voice in blocks of 512 where the hardware renders that few - its lag, a stall through the deck, and Debug\'s late blocks')
+  {
+    noWorklet = true
+    globalThis.isSecureContext = false
+    const realRender = voice.renderVoice, realCommand = voice.voiceCommand
+    const rendered = []
+    const told = []
+    voice.renderVoice = (state, outputs, frames, rate, now) => { rendered.push(now); return realRender(state, outputs, frames, rate, now) }
+    voice.voiceCommand = (state, said, now, rate) => { told.push({ said, now }); return realCommand(state, said, now, rate) }
+    const start = async (frames, speakerLead = null, output = undefined) => {
+      baseLatency = frames === undefined ? undefined : frames / 48000
+      outputTimestampLead = speakerLead
+      outputLatency = output
+      const host = fakeHost()
+      const deck = new Deck(host)
+      deck.setShowing(true)
+      deck.songChanged(host.song().id)
+      wakeDeckAudio()
+      await settle()
+      const script = scripts.at(-1)
+      playBlocksQuietly(script, 1)
+      for (let i = 0; i < 4; i++) await settle()
+      return { host, deck, script, context: script.context }
+    }
+    //? and its outputLatency, where it says one (Chromium's 8 ms at 128-frame renders, 72-80 at 1024 - the real
+    //? page's; a Bluetooth headset's is most of it) - none where it doesn't, as Safari before 18.4 doesn't
+    for (const [frames, size, output] of [[128, 512, 0.008], [512, 512, undefined], [1024, 1024, 0.076], [undefined, 1024, undefined]]) {
+      const { deck, script } = await start(frames, null, output)
+      check(`a context whose hardware renders ${frames ?? 'it doesn\'t say how many'} frames at a time${output ? `, its output latency ${output * 1000} ms` : ', saying nothing of its output latency'}: the main-thread voice in blocks of ${size} - and Debug told so, with what the context says`,
+        [script.args, deckReport().latency?.block, deckReport().latency?.base, deckReport().latency?.output, round(deckReport().latency?.design ?? 0, 6)],
+        [[size, 0, 2], size, frames === undefined ? null : frames / 48000, output ?? null, round(voice.HAND_DELAY_S + (2 * size) / 48000 + voice.VOICE_LOOKAHEAD_S, 6)])
+      deck.destroy()
+    }
+    outputLatency = undefined
+    {
+      //? what the device's audio adds, as getOutputTimestamp() says it where a browser has it: the render clock
+      //? 11.7 ms ahead of what is at the speaker - read as the clock is, and Debug told the median
+      const { deck, script } = await start(128, 0.0117)
+      pump(script, 8)
+      advance(1000)
+      deck.setShowing(false)
+      deck.setShowing(true)
+      check('where the browser has getOutputTimestamp(): the render clock\'s lead on the speaker read as the deck reads its clock, and Debug told it - 11.7 ms here',
+        round((deckReport().latency?.speaker ?? 0) * 1000, 3), 11.7)
+      deck.destroy()
+      outputTimestampLead = null
+    }
+    {
+      //? the lag: a take, and the hand's samples after it, each heard two blocks of 512 after its own time
+      const { host, deck, script } = await start(128)
+      told.length = 0
+      deck.pressed(clock)
+      deck.takeOver()
+      for (let ms = 16; ms <= 64; ms += 16) deck.hand(clock + ms, (ms / 1000) * 2 * Math.PI, 60 + (ms / 1000) * SECONDS_PER_TURN)
+      pump(script, 2)
+      const take = told.find(({ said }) => said.type === 'take')?.said
+      const stamp = (time) => time / 1000 + deckModule.deckClockMapping().offset
+      check('in blocks of 512: a take heard SCRIPT_LAG_BLOCKS blocks of 512 after its own time - 21.3 ms, half the 1024 blocks\' lag - and the hand\'s samples after it the same',
+        [round((take.time - stamp(clock)) * 1000, 3), told.filter(({ said }) => said.type === 'hand').map(({ said }, i) => round((said.time - stamp(clock + (i === 0 ? 0 : i * 16))) * 1000, 3))],
+        [round((2 * 512 / 48000) * 1000, 3), [21.333, 21.333, 21.333, 21.333, 21.333]])
+      deck.release(clock, 'cancel')
+      deck.destroy()
+      void host
+    }
+    //? stamps as the browser gives them, and the clock as the handler reads it after its block: `stamp` the
+    //? block's playbackTime, `clockAfter` currentTime once it is written
+    const ask = (script, stamp, clockAfter) => {
+      script.context.currentTime = clockAfter
+      return fill(script, stamp)
+    }
+    for (const size of [1024, 512]) {
+      //? A STALL through the deck: blocks as ever, then 400 ms with none run, then the burst Chromium runs -
+      //? every callback stamped alike - and evenly spaced from there; each rendered at its counted time
+      const { deck, script, context } = await start(size === 512 ? 128 : 1024)
+      const block = size / 48000
+      const t0 = context.currentTime + 2 * block
+      let k = 0
+      for (; k < 20; k++) ask(script, t0 + k * block, t0 + (k - 2) * block)
+      rendered.length = 0
+      const behind = Math.round(0.4 / block)
+      const from = k
+      for (; k <= from + behind; k++) ask(script, t0 + (from + behind) * block, t0 + (from + behind - 1) * block)
+      for (; k < from + behind + 31; k++) ask(script, t0 + k * block, t0 + (k - 2) * block)
+      const wanted = Array.from({ length: behind + 31 }, (_, i) => t0 + (from + i) * block)
+      check(`a 400 ms stall in blocks of ${size} - ${behind + 1} callbacks run back to back, stamped alike: each rendered at the time its block really plays (the k-th callback the k-th block), through the burst and every block after it - as it was, the burst's stamp anchored the count and each callback after it added a block, ${size === 1024 ? 'up to 64 ms' : 'up to 21 ms'} ahead for a minute`,
+        [rendered.length, rendered.every((at, i) => Math.abs(at - wanted[i]) < 1e-9)], [behind + 31, true])
+      deck.destroy()
+    }
+    //? DEBUG'S LATE BLOCKS, against a browser that replays: the hardware renders 128 frames at a time; the audio
+    //? thread asks for each block as it wraps, the page runs the ask when it is free - and Chromium stamps the
+    //? block from the clock as the page runs it (playbackTime = currentTime + a block), so as it was the count
+    //? (currentTime as the ask ran, against the stamp) could never fire. A block written once the clock has
+    //? passed its start played the block before it again - that is what is counted now (currentTime once the
+    //? block is written, against its counted start). In 128-frame renders, as the clock moves
+    for (const size of [1024, 512]) {
+      noWorklet = true
+      //? 128-frame renders said (blocks of 512) - or not said at all (blocks of 1024)
+      baseLatency = size === 512 ? 128 / 48000 : undefined
+      const host = fakeHost()
+      const deck = new Deck(host)
+      deck.setShowing(true)
+      wakeDeckAudio()
+      await settle()
+      const script = scripts.at(-1)
+      const quanta = size / 128, q = 128 / 48000
+      let replayed = 0, asWas = 0, seed = 7, done = 0
+      const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+      for (let k = 0; k < 200; k++) {
+        const wrap = k * quanta
+        //? the page busy now and then: the ask run up to a block and a half after its wrap, never before the
+        //? one before it is done; the render now and then spanning a 128-frame render
+        const late = k > 0 && k % 7 === 3 ? Math.floor(random() * 1.5 * quanta) + 1 : 0
+        const runs = Math.max(wrap + late, done)
+        done = runs + (random() < 0.2 ? 1 : 0)
+        if (done > wrap + quanta) replayed++
+        if (runs * q > (runs + quanta) * q) asWas++
+        ask(script, (runs + quanta) * q, done * q)
+      }
+      deck.release(clock, 'cancel')
+      deck.songChanged('another')
+      const health = deckReport().health
+      check(`Debug's late blocks in blocks of ${size}, a browser that replays a block written after its start: ${replayed} replayed, ${health.lateBlocks} counted - every one, and no other (as it was, currentTime as the ask ran against Chromium's stamp: ${asWas})`,
+        [replayed > 5, health.lateBlocks, health.blocks, asWas], [true, replayed, 200, 0])
+      deck.destroy()
+    }
+    voice.renderVoice = realRender
+    voice.voiceCommand = realCommand
+    baseLatency = undefined
+    noWorklet = false
+    delete globalThis.isSecureContext
+  }
+
+  console.log('\n2.0.0-player.40: a quick grab is taken from the press - heard from when the finger went down')
+  {
+    const { TAKE_BACK_S, HOLD_MS } = deckModule
+    const stamp = (time) => time / 1000 + deckModule.deckClockMapping().offset
+    const near = (a, b, within = 1e-9) => Math.abs(a - b) <= within
+    const since = () => portMessages.length
+    const sent = (from) => portMessages.slice(from).filter((m) => m.type !== 'window')
+    //? the face as Turntable draws it: the deck's angle, inside the hand's turn since the press once the record is
+    //? taken (or the slop crossed) - and a frame drawn at this very moment, the clock not moved
+    const DEG = 180 / Math.PI
+    const drawNow = () => {
+      const due = frames
+      frames = []
+      for (const frame of due) frame.run(clock)
+    }
+    {
+      //? a tap: moves inside the slop kept, nothing else - nothing sent, nothing paused, nothing taken
+      const { host, deck } = await fresh()
+      runFrames(2)
+      const before = since()
+      const t0 = clock
+      deck.pressed(t0)
+      deck.touched(t0 + 16, 0.01, 0.003)
+      deck.touched(t0 + 33, 0.02, 0.006)
+      advance(60)
+      const released = deck.release(clock, 'up')
+      check('a tap - its moves inside a tap\'s few pixels kept by the deck: nothing sent the voice, nothing paused, nothing taken, nothing sought',
+        [sent(before), host.calls, deck.taken(), released], [[], [], false, { seek: null, play: false }])
+      deck.destroy()
+    }
+    {
+      //? a quick grab of a paused record: the take at the press's moment and place, then the samples since
+      const { host, deck } = await fresh()
+      host.isPlaying = false
+      deck.playingChanged(false)
+      advance(400)
+      runFrames(1)
+      const before = since()
+      const t0 = clock
+      deck.pressed(t0)
+      //? frames drawn under the slop: the platter still winding down from the pause, the finger not past a tap
+      runFrames(1)
+      deck.touched(t0 + 16, 0.01, 0.0029)
+      advance(1)
+      runFrames(1)
+      const drawn = host.angle
+      deck.touched(t0 + 33, 0.03, 0.0086)
+      const anchor = deck.takeOver(t0 + 33, true)
+      deck.hand(t0 + 33, 0.03, anchor + 0.0086)
+      const out = sent(before)
+      check('a quick grab of a paused record - past a tap\'s pixels 33 ms on: taken FROM THE PRESS - its take at the press\'s own moment and place, still, then every sample since at its own time (the one that crossed sent once, by the hand\'s own call)',
+        [out.map((m) => m.type), anchor, out[0].at, out[0].rate, near(out[0].time, stamp(t0)), out.slice(1).map((m) => round(m.at, 4)), out.slice(1).every((m, i) => near(m.time, stamp([t0, t0 + 16, t0 + 33][i])))],
+        [['take', 'hand', 'hand', 'hand'], 60, 60, 0, true, [60, 60.0029, 60.0086], true])
+      drawNow()
+      check('...its turn counting from the press - the record where the hand has it - and the face, as Turntable draws it (the deck\'s angle inside the hand\'s turn), carrying straight on from the frame drawn as the slop was crossed: no jump (review of 2.0.0-player.40 - it stepped back by the platter\'s run under the slop)',
+        [deck.anchor(), round(host.angle + 0.03 * DEG, 6)], [60, round(drawn, 6)])
+      deck.release(clock, 'cancel')
+      deck.destroy()
+    }
+    for (const speed of [0.5, 2]) {
+      //? a playing record at the fader's speed, grabbed quickly: the song played on under the slop and pauses at
+      //? the crossing; the take is where it was at the press, at its speed - the place a take at the crossing
+      //? would have the voice start from, so the record's sound joins the song as it did
+      const { host, deck } = await fresh()
+      deck.speedChanged(speed)
+      runFrames(3)
+      const before = since()
+      const t0 = clock
+      deck.pressed(t0)
+      advance(24)
+      deck.touched(t0 + 24, 0.02, 0.006)
+      //? a frame drawn under the slop at the crossing's moment: the platter turning on at the record's speed
+      runFrames(1)
+      const drawn = host.angle
+      host.at = 60 + speed * 0.04
+      deck.touched(t0 + 40, 0.04, 0.012)
+      const anchor = deck.takeOver(t0 + 40, true)
+      deck.hand(t0 + 40, 0.04, anchor + 0.012)
+      const out = sent(before)
+      const take = out.find((m) => m.type === 'take')
+      //? where the voice starts, HAND_DELAY_S behind, by the take as it is now and as a take at the crossing was
+      const startNow = take.at + take.rate * (stamp(clock) - voice.HAND_DELAY_S - take.time)
+      const startWas = host.at + speed * (stamp(clock) - voice.HAND_DELAY_S - stamp(t0 + 40))
+      drawNow()
+      check(`a quick grab of a record playing at ${speed}x: paused at the crossing (the song played on under the slop); taken from the press - where the song was then, at its speed, stamped then - so the voice starts where a take at the crossing would have it (the join as it was); the face, drawn with the hand's turn, carrying straight on from the frame before - no jump (as first built, from the platter's angle at the press, it stepped back ${speed === 2 ? '14' : '2'} degrees here)`,
+        [host.calls, round(anchor, 9), take.rate, near(take.time, stamp(t0)), near(startNow, startWas, 1e-9), round(host.angle + 0.04 * DEG, 6)],
+        [['hold'], round(60, 9), speed, true, true, round(drawn, 6)])
+      deck.release(clock, 'cancel')
+      deck.destroy()
+    }
+    {
+      //? a press older than the voice can still be told of (TAKE_BACK_S): taken from its oldest sample within it
+      const { host, deck } = await fresh()
+      host.isPlaying = false
+      deck.playingChanged(false)
+      advance(400)
+      const before = since()
+      const t0 = clock
+      deck.pressed(t0)
+      for (const [ms, offset] of [[40, 0.002], [80, 0.004], [120, 0.006]]) deck.touched(t0 + ms, offset * 3, offset)
+      advance(130)
+      const anchor = deck.takeOver(t0 + 120, true)
+      const out = sent(before)
+      check(`a press older than TAKE_BACK_S (${round(TAKE_BACK_S * 1000, 1)} ms) by the time it is taken (130 ms on): taken from its oldest sample within it - 40 ms after the press, where the hand had it then - the turn still counting from the press`,
+        [round(TAKE_BACK_S, 6), out.map((m) => m.type), round(out[0].at, 6), near(out[0].time, stamp(t0 + 40)), out.slice(1).map((m) => round(m.at, 6)), anchor],
+        [round(voice.HAND_DELAY_S - 0.02, 6), ['take', 'hand', 'hand'], 60.002, true, [60.002, 60.004], 60])
+      deck.release(clock, 'cancel')
+      deck.destroy()
+    }
+    {
+      //? on the main thread the voice holds what it is told SCRIPT_LAG_BLOCKS blocks on, so it can be told of a
+      //? moment further back: SCRIPT_TAKE_BACK_S - a press 110 ms old taken from the press, one 130 ms old from
+      //? its oldest sample within 115
+      noWorklet = true
+      globalThis.isSecureContext = false
+      const taken = []
+      for (const age of [110, 130]) {
+        const host = fakeHost({ isPlaying: false })
+        const deck = new Deck(host)
+        deck.setShowing(true)
+        deck.songChanged(host.song().id)
+        wakeDeckAudio()
+        await settle()
+        const script = scripts.at(-1)
+        playBlocksQuietly(script, 1)
+        for (let i = 0; i < 4; i++) await settle()
+        const told = []
+        const own = voice.voiceCommand
+        voice.voiceCommand = (state, said, at, rate) => { told.push(said); return own(state, said, at, rate) }
+        const t0 = clock
+        deck.pressed(t0)
+        for (const [ms, offset] of [[10, 0.001], [40, 0.002], [80, 0.004], [age - 10, 0.006]]) deck.touched(t0 + ms, offset * 3, offset)
+        advance(age)
+        deck.takeOver(t0 + age - 10, true)
+        pump(script, 1)
+        voice.voiceCommand = own
+        const take = told.find((said) => said.type === 'take')
+        taken.push([round(deckModule.SCRIPT_TAKE_BACK_S, 6), round((take.time - (deckModule.SCRIPT_LAG_BLOCKS * 1024) / 48000 - stamp(t0)) * 1000, 3), round(take.at, 6)])
+        deck.release(clock, 'cancel')
+        deck.destroy()
+      }
+      check('on the main thread (its lag holding what it is told two blocks on): a press 110 ms old taken from the press itself; 130 ms old, from its oldest sample within SCRIPT_TAKE_BACK_S (115 ms) - 40 ms in',
+        taken, [[0.115, 0, 60], [0.115, 40, 60.002]])
+      noWorklet = false
+      delete globalThis.isSecureContext
+    }
+    {
+      //? the hand's samples inside the slop count toward the let-go's speed: a finger still for 20 ms, then fast
+      //? past the slop, let go 70 ms later - the speed over its last 90 ms reads the still start from the
+      //? samples themselves, not a straight line from the press to the crossing
+      const { host, deck } = await fresh()
+      host.isPlaying = false
+      deck.playingChanged(false)
+      advance(400)
+      const t0 = clock
+      deck.pressed(t0)
+      deck.touched(t0 + 10, 0, 0)
+      deck.touched(t0 + 20, 0, 0)
+      deck.touched(t0 + 30, 0.1, 0.1 / (2 * Math.PI) * SECONDS_PER_TURN)
+      advance(30)
+      const anchor = deck.takeOver(t0 + 30, true)
+      const samples = [{ time: t0, turned: 0 }, { time: t0 + 10, turned: 0 }, { time: t0 + 20, turned: 0 }, { time: t0 + 30, turned: 0.1 }]
+      for (let ms = 30; ms <= 100; ms += 10) {
+        const turned = 0.1 + ((ms - 30) / 1000) * 4 * Math.PI
+        if (ms > 30) samples.push({ time: t0 + ms, turned })
+        deck.hand(t0 + ms, turned, anchor + (turned / (2 * Math.PI)) * SECONDS_PER_TURN)
+      }
+      advance(70)
+      const released = deck.release(t0 + 100, 'up')
+      const at = anchor + (samples.at(-1).turned / (2 * Math.PI)) * SECONDS_PER_TURN
+      const wanted = platter.coast(at, platter.releaseSpeed(samples, t0 + 100), 425).x
+      const straight = platter.coast(at, platter.releaseSpeed([samples[0], ...samples.slice(3)], t0 + 100), 425).x
+      check('a quick flick let go 100 ms after the press: its speed read over the hand\'s own samples since the press, the still start inside the slop included - not a line from the press to the crossing',
+        [round(released.seek, 6), round(released.seek, 6) !== round(straight, 6)], [round(wanted, 6), true])
+      deck.destroy()
+    }
+    {
+      //? a press that rests HOLD_MS is taken as it was - at its own moment, where the song is then
+      const { host, deck } = await fresh()
+      const before = since()
+      const t0 = clock
+      deck.pressed(t0)
+      deck.touched(t0 + 30, 0.001, 0.0003)
+      advance(HOLD_MS + 1)
+      const out = sent(before)
+      check('a press that rests HOLD_MS (a move inside the slop meanwhile): taken as it was - at the timer\'s moment, where the song is then, at its speed', [host.calls, out.map((m) => m.type), out[0].at, out[0].rate, near(out[0].time, stamp(t0 + HOLD_MS)), deck.anchor()],
+        [['hold', 'grabbed'], ['take', 'hand'], 60, 1, true, 60])
+      deck.release(clock, 'cancel')
+      deck.destroy()
+    }
+    {
+      //? a record coasting with its sound, caught by a quick grab: where the plan had it at the press
+      const { host, deck } = await fresh()
+      host.isPlaying = false
+      deck.playingChanged(false)
+      advance(400)
+      deck.pressed(clock)
+      deck.takeOver()
+      flickBack(deck, 60)
+      deck.release(clock, 'up')
+      runFrames(4)
+      const motion = deck.motion
+      const before = since()
+      const t0 = clock
+      deck.pressed(t0)
+      runFrames(2)
+      deck.touched(clock, 0.05, 0.014)
+      const crossing = clock
+      deck.takeOver(crossing, true)
+      const out = sent(before)
+      const hand = out.find((m) => m.type === 'hand')
+      check('a coasting record caught by a quick grab: its sound followed from the press - the hand\'s first knot where the plan had the record as the finger went down, at that moment (the coast\'s frames after it let go of, in the voice)',
+        [motion.kind, motion.role, out.some((m) => m.type === 'take'), round(hand.at, 9), near(hand.time, stamp(t0))],
+        ['plan', 'coast', false, round(platter.planAt(motion.plan, (t0 - motion.since) / 1000).x, 9), true])
+      deck.release(clock, 'cancel')
+      deck.destroy()
+    }
+    //? review of 2.0.0-player.40: a MOVING record whose press is past the reach - a slow hand, or a press that waits
+    //? a moment before it turns, crossing the slop 100-250 ms on - was put back where it was at the press though the
+    //? voice had played it on since: a playing song's join came later (more of it heard again) and a sounding coast's
+    //? path stepped back, the voice rushing backwards under a near-still finger. Now it is taken where it had got to
+    //? on its own by the sample it is taken from, and the hand carries on from there
+    {
+      const lines = []
+      for (const speed of [1, 2]) {
+        for (const age of [160, 240]) {
+          const { host, deck } = await fresh()
+          deck.speedChanged(speed)
+          runFrames(3)
+          const before = since()
+          const t0 = clock
+          deck.pressed(t0)
+          //? a slow hand, a tenth of the record's speed: a sample a frame, the frames drawn, the platter turning on
+          const hand = 0.1 * speed
+          const samples = []
+          for (let ms = 16; ms <= age; ms += 16) {
+            runFrames(1)
+            const offset = (hand * ms) / 1000
+            samples.push({ time: clock, turned: (offset / SECONDS_PER_TURN) * 2 * Math.PI, offset })
+            deck.touched(clock, samples.at(-1).turned, offset)
+          }
+          const crossing = samples.at(-1)
+          //? handled 5 ms after the sample's own time, the song playing on to then
+          advance(5)
+          drawNow()
+          const drawn = host.angle
+          host.at = 60 + (speed * (clock - t0)) / 1000
+          const anchor = deck.takeOver(crossing.time, true)
+          deck.hand(crossing.time, crossing.turned, anchor + crossing.offset)
+          drawNow()
+          const out = sent(before)
+          const take = out.find((m) => m.type === 'take')
+          const from = samples.find((sample) => sample.time >= clock - TAKE_BACK_S * 1000)
+          //? the take's line (its place at its speed) carried to the crossing's moment, against where the song paused
+          //? there: HEAD's take, at the crossing, was on that very line - so the voice starts where it did
+          const joinMs = ((take.at + take.rate * (stamp(crossing.time) - take.time) - host.at) / speed) * 1000
+          const knots = out.filter((m) => m.type === 'hand')
+          lines.push([speed, age, near(take.time, stamp(from.time)), take.time > stamp(t0), round(joinMs, 6),
+            round(anchor + from.offset - take.at, 9), round(knots.at(-1).at - take.at - (crossing.offset - from.offset), 9),
+            round(host.angle + crossing.turned * DEG - drawn, 6)])
+          deck.release(clock, 'cancel')
+          deck.destroy()
+        }
+      }
+      check('a record playing at 1x and 2x, a slow hand (a tenth of its speed) crossing the slop 160 and 240 ms after the press - past TAKE_BACK_S: taken from its oldest sample within reach, on the song\'s own line there - the take carried to the crossing is where the song paused (the join as a take at the crossing had it, 0 ms), the hand\'s turn carrying on from the take - and the face, drawn, carrying straight on (as first built, at the press\'s place: 72 and 144 ms more of the song heard again)',
+        lines, [[1, 160, true, true, 0, 0, 0, 0], [1, 240, true, true, 0, 0, 0, 0], [2, 160, true, true, 0, 0, 0, 0], [2, 240, true, true, 0, 0, 0, 0]])
+    }
+    {
+      //? the same on the main thread, its reach SCRIPT_TAKE_BACK_S: a press 200 ms old
+      noWorklet = true
+      globalThis.isSecureContext = false
+      const lines = []
+      for (const speed of [1, 2]) {
+        const host = fakeHost({})
+        const deck = new Deck(host)
+        deck.setShowing(true)
+        deck.songChanged(host.song().id)
+        deck.speedChanged(speed)
+        wakeDeckAudio()
+        await settle()
+        const script = scripts.at(-1)
+        playBlocksQuietly(script, 1)
+        for (let i = 0; i < 4; i++) await settle()
+        const told = []
+        const own = voice.voiceCommand
+        voice.voiceCommand = (state, said, at, rate) => { told.push(said); return own(state, said, at, rate) }
+        const t0 = clock
+        deck.pressed(t0)
+        const samples = []
+        for (let ms = 20; ms <= 200; ms += 20) {
+          const offset = (0.1 * speed * ms) / 1000
+          samples.push({ time: t0 + ms, turned: (offset / SECONDS_PER_TURN) * 2 * Math.PI, offset })
+          deck.touched(t0 + ms, samples.at(-1).turned, offset)
+        }
+        advance(205)
+        host.at = 60 + (speed * 205) / 1000
+        const crossing = samples.at(-1)
+        const anchor = deck.takeOver(crossing.time, true)
+        pump(script, 1)
+        voice.voiceCommand = own
+        const lag = (deckModule.SCRIPT_LAG_BLOCKS * 1024) / 48000
+        const take = told.find((said) => said.type === 'take')
+        const from = samples.find((sample) => sample.time >= clock - deckModule.SCRIPT_TAKE_BACK_S * 1000)
+        const joinMs = ((take.at + take.rate * (stamp(crossing.time) + lag - take.time) - host.at) / speed) * 1000
+        lines.push([speed, round((take.time - lag - stamp(t0)) * 1000, 3), round((from.time - t0), 3), round(joinMs, 6), round(anchor + from.offset - take.at, 9)])
+        deck.release(clock, 'cancel')
+        deck.destroy()
+      }
+      check('...and on the main thread (SCRIPT_TAKE_BACK_S), a press 200 ms old at 1x and 2x: taken from its oldest sample within reach (100 ms in), on the song\'s line - the join as a take at the crossing had it (as first built: 90 ms more heard again)',
+        lines, [[1, 100, 100, 0, 0], [2, 100, 100, 0, 0]])
+      noWorklet = false
+      delete globalThis.isSecureContext
+    }
+    {
+      //? a record coasting with its sound, caught by a quick grab whose press is 48, 96, 160 and 224 ms before the
+      //? crossing (a hand all but still): the hand's first knot on the coast's own line at its moment - the press,
+      //? within reach; past it, the oldest sample within it - so the path doesn't step; the voice, replayed as the
+      //? worklet would run it, never rushing backwards; and the face, drawn, carrying straight on from the frame
+      //? before (as first built: the knot 132 and 242 ms of song behind the coast past the reach, the voice running
+      //? at -1.15x and -2.03x; the face stepping back 20 and 38 degrees within it)
+      const lines = []
+      for (const age of [48, 96, 160, 224]) {
+        const posts = []
+        const ownPush = portMessages.push
+        portMessages.push = (...messages) => {
+          for (const message of messages) posts.push({ message, clock })
+          return ownPush.apply(portMessages, messages)
+        }
+        const { host, deck } = await fresh()
+        host.isPlaying = false
+        deck.playingChanged(false)
+        advance(400)
+        deck.pressed(clock)
+        deck.takeOver()
+        //? a forward flick, a turn and a half a second for its last 100 ms
+        for (let ms = 0; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 2 * Math.PI * 1.5, 60 + (ms / 1000) * SECONDS_PER_TURN * 1.5)
+        clock += 100
+        deck.release(clock, 'up')
+        runFrames(4)
+        const motion = deck.motion
+        const t0 = clock
+        deck.pressed(t0)
+        let turned = 0
+        const samples = []
+        for (let i = 1; i <= Math.floor(age / 16); i++) {
+          runFrames(1)
+          turned += 0.001
+          samples.push({ time: clock, turned, offset: (turned / (2 * Math.PI)) * SECONDS_PER_TURN })
+          deck.touched(clock, turned, samples.at(-1).offset)
+        }
+        const crossing = samples.at(-1)
+        const drawn = host.angle
+        const firstPost = posts.length
+        deck.takeOver(crossing.time, true)
+        deck.hand(crossing.time, crossing.turned, deck.anchor() + crossing.offset)
+        drawNow()
+        const face = host.angle + crossing.turned * DEG - drawn
+        //? the hand holding still for 300 ms, a sample a frame
+        for (let i = 0; i < 18; i++) {
+          runFrames(1)
+          deck.hand(clock, crossing.turned, deck.anchor() + crossing.offset)
+        }
+        portMessages.push = ownPush
+        const knot = posts.slice(firstPost).find(({ message }) => message.type === 'hand').message
+        const from = age <= 96 ? t0 : samples.find((sample) => sample.time >= crossing.time - TAKE_BACK_S * 1000).time
+        //? the voice as the worklet runs it: each message applied at the first 128-frame render at or after it was posted
+        const toContext = (ms) => ms / 1000 + deckModule.deckClockMapping().offset
+        const state = voice.newVoiceState()
+        let k = 0
+        let now = toContext(posts[0].clock)
+        let slowest = Infinity
+        const heardFrom = toContext(t0) + voice.HAND_DELAY_S - 0.03, heardTo = toContext(crossing.time) + voice.HAND_DELAY_S + 0.25
+        while (now < toContext(clock) + 0.3) {
+          while (k < posts.length && toContext(posts[k].clock) <= now) voice.voiceCommand(state, posts[k++].message, now, SR)
+          voice.renderVoice(state, [new Float32Array(128), new Float32Array(128)], 128, SR, now)
+          if (now >= heardFrom && now <= heardTo) slowest = Math.min(slowest, state.rate)
+          now += 128 / SR
+        }
+        lines.push([age, motion.role, motion.sounding, near(knot.time, stamp(from)), round(knot.at - platter.planAt(motion.plan, (from - motion.since) / 1000).x, 9), slowest > -0.25, round(face, 6)])
+        deck.release(clock, 'cancel')
+        deck.destroy()
+      }
+      check('a sounding coast caught by a quick grab, the press 48, 96, 160 and 224 ms before the crossing: the hand\'s first knot on the coast\'s own line at its moment (the press within TAKE_BACK_S, the oldest sample within it past it) - no step - the voice never below -0.25x under a near-still finger, and the face, drawn, carrying straight on',
+        lines, [48, 96, 160, 224].map((age) => [age, 'coast', true, true, 0, true, 0]))
+    }
+  }
+  console.log('\n2.0.0-player.40: a recording in blocks of 512, and blocks that share a stamp - the hardware asking for two at once')
+  {
+    noWorklet = true
+    globalThis.isSecureContext = false
+    {
+      //? the recorder's file says the block, and the lag it makes - a replay reads them there
+      baseLatency = 128 / 48000
+      let captured = null
+      const makeUrl = globalThis.URL.createObjectURL
+      globalThis.URL.createObjectURL = (blob) => { captured = blob; return 'blob:deck-recording' }
+      const host = fakeHost()
+      const deck = new Deck(host)
+      deck.setShowing(true)
+      deck.songChanged(host.song().id)
+      wakeDeckAudio()
+      await settle()
+      const script = scripts.at(-1)
+      playBlocksQuietly(script, 1)
+      for (let i = 0; i < 4; i++) await settle()
+      check('recording in blocks of 512: started', deckModule.recordDeckSound(1), null)
+      const tap = scripts.at(-1)
+      deck.pressed(clock)
+      deck.takeOver()
+      pump(script, 3)
+      for (let i = 0; i < 2; i++) tap.onaudioprocess({ inputBuffer: { numberOfChannels: 2, getChannelData: () => new Float32Array(4096) }, playbackTime: 1 + i * 4096 / 48000 })
+      advance(1100)
+      await settle()
+      const file = JSON.parse(await captured.text())
+      check('...its file (version 3) says the voice rendered blocks of 512 - its lag two of them, 21.3 ms - and what the context said of its own latency',
+        [file.version, file.block, round(file.scriptLagSeconds, 9), file.latency?.block, file.latency?.base, deckModule.deckRecordingData()], [3, 512, round(1024 / 48000, 9), 512, 128 / 48000, null])
+      deck.release(clock, 'cancel')
+      deck.destroy()
+      globalThis.URL.createObjectURL = makeUrl
+    }
+    {
+      //? review of 2.0.0-player.40's fixes: a Safari - its context saying 128 frames, as every WebKit does - starts in
+      //? blocks of 1024, Debug saying so and the design figure 164.2 ms
+      const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+      Object.defineProperty(globalThis, 'navigator', { value: { vendor: 'Apple Computer, Inc.' }, configurable: true, writable: true })
+      baseLatency = 128 / 48000
+      const host = fakeHost()
+      const deck = new Deck(host)
+      deck.setShowing(true)
+      deck.songChanged(host.song().id)
+      wakeDeckAudio()
+      await settle()
+      const script = scripts.at(-1)
+      playBlocksQuietly(script, 1)
+      for (let i = 0; i < 4; i++) await settle()
+      const latency = deckReport().latency
+      check('a Safari (Apple\'s engine, its context saying 128 frames): the main-thread voice in blocks of 1024 - Debug says so, 164.2 ms by design',
+        [script.args, latency?.block, round((latency?.design ?? NaN) * 1000, 1)], [[1024, 0, 2], 1024, 164.2])
+      deck.destroy()
+      if (original) Object.defineProperty(globalThis, 'navigator', original)
+      else delete globalThis.navigator
+    }
+    {
+      //? a block of 512 written after it began to play: while the voice is silent, nothing heard of it; while it
+      //? sounds, a stretch heard twice - the page can't keep up with blocks that short, and the voice changes to
+      //? blocks of 1024 as it next falls silent. In a module of its own: the change is for the page
+      decodeTone = true
+      const own = path.join(OUT, 'player/deck.js')
+      delete require.cache[require.resolve(own)]
+      const page = require(own)
+      delete require.cache[require.resolve(own)]
+      require.cache[require.resolve(own)] = { id: own, filename: own, loaded: true, exports: deckModule }
+      baseLatency = 128 / 48000
+      const host = fakeHost()
+      const deck = new page.Deck(host)
+      deck.setShowing(true)
+      deck.songChanged(host.song().id)
+      page.wakeDeckAudio()
+      await settle()
+      const small = scripts.at(-1)
+      const block = 512 / 48000
+      let t = small.context.currentTime + 2 * block
+      const on = (count, late = false) => {
+        for (let i = 0; i < count; i++) {
+          small.context.currentTime = late ? t + 0.004 : t - 2 * block
+          fill(small, t)
+          t += block
+        }
+      }
+      on(4)
+      for (let i = 0; i < 4; i++) await settle()
+      on(1, true)
+      on(6)
+      const silentLate = scripts.at(-1) === small
+      //? a playing record taken and let go: the sound follows the run back to speed, then the handover - and
+      //? the song played meanwhile fades it out, the voice still following what is left of its path, silent
+      deck.pressed(clock)
+      deck.takeOver()
+      //? the player says it paused, as it does when the hand takes the record
+      deck.playingChanged(false)
+      for (let ms = 10; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 2 * Math.PI, 60 + (ms / 1000) * SECONDS_PER_TURN)
+      clock += 100
+      on(3)
+      on(1, true)
+      on(10)
+      deck.release(clock, 'up')
+      on(4)
+      const keptWhileSounding = scripts.at(-1) === small
+      host.isPlaying = true
+      deck.playingChanged(true)
+      for (let i = 0; i < 20 && scripts.at(-1) === small; i++) on(1)
+      const big = scripts.at(-1)
+      //? review of 2.0.0-player.40: the new node's clock is its own, counted afresh from its first stamp - which real
+      //? Chromium gives one block of 1024 past where the old count had its next block of 512 (21.3 ms on: a step
+      //? away, which the old count, kept, would have eased toward for 20-odd seconds, rendering each block that
+      //? much early - the sound that much later than the design). Each block rendered at its own stamp
+      const renderedAt = []
+      const ownRender = voice.renderVoice
+      voice.renderVoice = (state, outputs, frames, rate, now) => { renderedAt.push(now); return ownRender(state, outputs, frames, rate, now) }
+      let tb = t + 1024 / 48000
+      const stampsBig = []
+      for (let i = 0; i < 6; i++) { big.context.currentTime = tb - 2 * 1024 / 48000; fill(big, tb); stampsBig.push(tb); tb += 1024 / 48000 }
+      voice.renderVoice = ownRender
+      check('...the new node of 1024 counting its own clock from its first stamp (one block of 1024 past the old count\'s next, as Chromium gives it): every block rendered at its own playbackTime, to SCRIPT_STAMP_TOLERANCE_S',
+        renderedAt.map((at, i) => Math.abs(at - stampsBig[i]) <= deckModule.SCRIPT_STAMP_TOLERANCE_S), stampsBig.map(() => true))
+      //? and from there what it is told is heard two blocks of 1024 on: a take now, its time as the voice has it
+      const toldBig = []
+      const ownCommand = voice.voiceCommand
+      voice.voiceCommand = (state, said, at, rate) => { toldBig.push(said); return ownCommand(state, said, at, rate) }
+      const takeAt = clock
+      deck.pressed(takeAt)
+      deck.takeOver()
+      for (let i = 0; i < 2; i++) { big.context.currentTime = tb - 2 * 1024 / 48000; fill(big, tb); tb += 1024 / 48000 }
+      voice.voiceCommand = ownCommand
+      const lagAfter = round(((toldBig.find((said) => said.type === 'take')?.time ?? NaN) - (takeAt / 1000 + page.deckClockMapping().offset)) * 1000, 3)
+      deck.release(clock, 'cancel')
+      check('...and after the change, what it is told is heard two blocks of 1024 on: a take 42.7 ms after its own time', lagAfter, round((2 * 1024 / 48000) * 1000, 3))
+      check('a block of 512 written after it began to play: where the voice was silent (nothing played again that anyone hears) nothing changed; where it sounded - a hand, then a let-go\'s run back to speed - the voice kept its blocks until the song played and faded it out (the voice still following its path, silent), then changed to 1024 - Debug told',
+        [silentLate, keptWhileSounding, big !== small, big.args, small.disconnected, page.deckReport().latency?.block], [true, true, true, [1024, 0, 2], true, 1024])
+      deck.destroy()
+      decodeTone = false
+    }
+    {
+      //? blocks of 512 asked for two at a time, stamped alike - the hardware renders 1024 frames at once though
+      //? its context said 128 - the voice changes to blocks of 1024 at its next silent moment, never while it
+      //? sounds, and keeps them on this page
+      baseLatency = 128 / 48000
+      const host = fakeHost()
+      const deck = new Deck(host)
+      deck.setShowing(true)
+      deck.songChanged(host.song().id)
+      wakeDeckAudio()
+      await settle()
+      const small = scripts.at(-1)
+      const block = 512 / 48000
+      let t = small.context.currentTime + 2 * block
+      //? in pairs: the second of each stamped as the first
+      const pairs = (script, count) => {
+        for (let i = 0; i < count; i++) {
+          fill(script, t)
+          fill(script, t)
+          t += 2 * block
+        }
+      }
+      pairs(small, 2)
+      for (let i = 0; i < 4; i++) await settle()
+      deck.pressed(clock)
+      deck.takeOver()
+      pairs(small, 30)
+      const sounding = scripts.at(-1) === small
+      deck.release(clock, 'cancel')
+      pairs(small, 6)
+      const big = scripts.at(-1)
+      check(`blocks of 512 asked for in pairs, stamped alike (${deckModule.SCRIPT_SHARED_OF} of ${deckModule.SCRIPT_SHARED_WINDOW} at least): the voice kept them while it sounded, and changed to blocks of 1024 as it fell silent - the new node to the speakers, the old let go of - and Debug told`,
+        [sounding, big !== small, big.args, big.connected, small.disconnected, small.onaudioprocess, deckReport().latency?.block], [true, true, [1024, 0, 2], true, true, null, 1024])
+      //? its state carried over: the window still in it, so the record sounds without asking again
+      const asked0 = asked.length
+      t = big.context.currentTime + 2 * 1024 / 48000
+      for (let i = 0; i < 3; i++) { fill(big, t); t += 1024 / 48000 }
+      check('...the voice\'s state carried over - the window still in it, nothing asked again - and a press the deck\'s', [asked.length - asked0, deck.live()], [0, true])
+      //? review of 2.0.0-player.40's fixes: what taps the voice follows the new node - a recording started after the
+      //? change hangs off it, not the old one (disconnected, its onaudioprocess gone: a file of silence)
+      const startedAfter = deckModule.recordDeckSound(1)
+      const tapAfter = scripts.at(-1)
+      check('...a recording started after the change taps the new node of 1024, not the old one let go of',
+        [startedAfter, tapAfter !== big && tapAfter !== small, big.connections.includes(tapAfter), small.connections.includes(tapAfter)], [null, true, true, false])
+      deckModule.stopDeckRecording()
+      deck.destroy()
+      //? and the next context on this page starts there, whatever it says of its hardware
+      const again = new Deck(fakeHost())
+      again.setShowing(true)
+      wakeDeckAudio()
+      await settle()
+      check('...and the next turntable on this page starts in blocks of 1024, though its context says 128 frames', scripts.at(-1).args, [1024, 0, 2])
+      again.destroy()
+    }
+    //? a page of its own (the change to 1024 is the page's): a deck in blocks of 512 on a context saying 128 frames,
+    //? and `on`, the browser asking for its blocks one at a time - on time, or written after it began to play
+    const pageOf512 = async () => {
+      const own = path.join(OUT, 'player/deck.js')
+      delete require.cache[require.resolve(own)]
+      const page = require(own)
+      delete require.cache[require.resolve(own)]
+      require.cache[require.resolve(own)] = { id: own, filename: own, loaded: true, exports: deckModule }
+      baseLatency = 128 / 48000
+      const host = fakeHost()
+      const deck = new page.Deck(host)
+      deck.setShowing(true)
+      deck.songChanged(host.song().id)
+      page.wakeDeckAudio()
+      await settle()
+      const small = scripts.at(-1)
+      const block = 512 / 48000
+      let t = small.context.currentTime + 2 * block
+      const on = (count, late = false) => {
+        for (let i = 0; i < count; i++) {
+          small.context.currentTime = late ? t + 0.004 : t - 2 * block
+          fill(small, t)
+          t += block
+        }
+      }
+      on(4)
+      for (let i = 0; i < 4; i++) await settle()
+      return { page, host, deck, small, on }
+    }
+    {
+      //? review of 2.0.0-player.40: the late-where-heard rule looks at the two blocks before a late one too - the
+      //? one played again in its place. A silent block written late right after two loud ones (the tail of a stop,
+      //? say) changes the voice to 1024 - here at once, the voice idle; one after two silent blocks doesn't
+      //? and (review of 2.0.0-player.40's fixes) the block two before ALONE loud - loud, silent, then the late one:
+      //? that is the block played again in its place, so heard too; the case above, the block just before loud as
+      //? well, couldn't tell the two before from the one before
+      const results = []
+      for (const [before, count] of [[0.5, 2], [0, 2], [0.5, 1]]) {
+        const { deck, small, on } = await pageOf512()
+        let loud = 0
+        const ownRender = voice.renderVoice
+        voice.renderVoice = (state, outputs, frames, rate, now) => {
+          const done = ownRender(state, outputs, frames, rate, now)
+          if (loud > 0) {
+            loud--
+            for (const data of outputs) data.fill(before)
+          }
+          return done
+        }
+        loud = count
+        on(2)
+        on(1, true)
+        voice.renderVoice = ownRender
+        results.push([before, count, scripts.at(-1) !== small, scripts.at(-1).args])
+        deck.destroy()
+      }
+      check('a silent block of 512 written after it began to play, right after two blocks at 0.5 (-6 dBFS): heard - the block two before it is played again in its place - so the voice changes to 1024; after two silent blocks, nothing heard and nothing changed; after one at 0.5 then a silent one (the block two before alone loud): heard, changed',
+        results, [[0.5, 2, true, [1024, 0, 2]], [0, 2, false, [512, 0, 2]], [0.5, 1, true, [1024, 0, 2]]])
+    }
+    {
+      //? review of 2.0.0-player.40: no change of node while a recording is under way - its tap is on this node and
+      //? its file says this block. Recording in blocks of 512: a block late while the hand's sound is heard, the
+      //? let-go (a cancel) and silence after - the node kept; the recording done, it changes at the next block
+      decodeTone = true
+      const makeUrl = globalThis.URL.createObjectURL
+      globalThis.URL.createObjectURL = () => 'blob:deck-recording'
+      const { page, deck, small, on } = await pageOf512()
+      const started = page.recordDeckSound(1)
+      const tap = scripts.at(-1)
+      deck.pressed(clock)
+      deck.takeOver()
+      for (let ms = 10; ms <= 100; ms += 10) deck.hand(clock + ms, (ms / 1000) * 2 * Math.PI, 60 + (ms / 1000) * SECONDS_PER_TURN)
+      clock += 100
+      on(3)
+      on(1, true)
+      on(3)
+      deck.release(clock, 'cancel')
+      on(12)
+      const whileRecording = [scripts.at(-1) === tap, small.disconnected, small.connections.includes(tap), page.deckReport().latency?.block]
+      advance(1100)
+      await settle()
+      const recorded = page.deckRecordingData() === null && tap.onaudioprocess === null
+      on(2)
+      const after = scripts.at(-1)
+      check('recording in blocks of 512, a block written late while the hand\'s sound was heard, then silence: the node kept while the recording runs - its tap still on it, its block still 512 - and changed to 1024 at the first block after it is done, the old one let go of',
+        [started, whileRecording, recorded, after !== small && after !== tap, after.args, small.disconnected, page.deckReport().latency?.block],
+        [null, [true, false, true, 512], true, true, [1024, 0, 2], true, 1024])
+      deck.destroy()
+      globalThis.URL.createObjectURL = makeUrl
+      decodeTone = false
+    }
+    baseLatency = undefined
+    noWorklet = false
+    delete globalThis.isSecureContext
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

@@ -732,7 +732,23 @@ on your device: turn the record a few times, then open **•••** > **Info** 
 - **`N of M blocks late`** (only where the row above says the sound is "On the main thread", which is
   every page opened over plain `http://`): the record's sound is made by the same thread that draws the
   page there, and each late block is a gap or a click in it. Over `https://` (or `localhost`) the
-  browser gives it a thread of its own and this can't happen.
+  browser gives it a thread of its own and this can't happen. Until 2.0.0-player.40 this count could
+  never go up in Chrome (it compared the audio clock with a time Chrome works out from that same
+  clock); a block now counts as late when it was still being written once the browser had begun to
+  play it. In blocks of 512 (the next line says which) a late block where the record's sound is heard
+  moves the page to blocks of 1024 for the rest of the visit, a little later behind your hand and with
+  twice the room.
+- **`The record's sound: N ms behind the hand by design`** (since 2.0.0-player.40): 121.5 ms on its
+  own thread, 142.8 in blocks of 512 and 164.2 in blocks of 1024 on the main thread - then what this
+  device's own audio says it adds after that: `base` (in Chrome its hardware's own render; Safari always
+  says 2.7 ms, its own 128-frame step, whatever the hardware does), `output` (from there to the speaker -
+  a Bluetooth headset's delay included, where the browser knows it) and `from render to speaker` (`base`
+  and `output` together, read another way - not a third figure to add), each only where the browser
+  gives it - an older Safari may give only `base`. If the turntable feels slow under your finger, what
+  you hear is the design figure plus `from render to speaker` (or, where that isn't given, plus `base`
+  and `output`); a
+  Bluetooth headset is usually the biggest part of it, and no page can shorten that - wired headphones or
+  the speaker can.
 - **`N frames, K late, the longest gap G ms`**: how the picture kept up while your finger held the
   record. Late frames are the page itself stalling.
 - **`let-goes after which the song didn't start`**: the browser refused to start the song without a
@@ -750,8 +766,9 @@ Until 2.0.0-player.27 the record's sound had a fast flutter on it whenever your 
 changing, which is nearly always: "warbly, like there's a dragonfly sound on top of the music". The
 pitch followed the jitter in the phone's touch readings. It now works each touch's speed out from the
 touches either side of it and plays about an eighth of a second behind your hand (121.5 ms - 120 for
-that, and since 2.0.0-player.35 1.5 more for the limiter below; about 165 over plain `http://`) instead
-of a twentieth. If you still hear it:
+that, and since 2.0.0-player.35 1.5 more for the limiter below; over plain `http://` about 143 where the
+computer's audio works in 512 frames or fewer at a time, 164 elsewhere - since 2.0.0-player.40, 165
+everywhere before) instead of a twentieth. If you still hear it:
 
 - **A crackle or tick on the loudest drum hits, at any speed, its own included** was real until
   2.0.0-player.35, and it is what a recording found: on a loud song the record's sound went over full
@@ -873,9 +890,14 @@ iPhone moves in steps of about 21 ms, so its pitch swung many times a second. It
 your phone reports at the moment it was made, played back on one smooth clock - so a steady turn plays
 the song at your hand's speed. What's left is by design:
 
-- **It's a moment behind your finger**: about an eighth of a second on HTTPS (121.5 ms), about 0.165 s
-  over plain `http://` - always the same, so the touches around each moment have always arrived before
-  the sound gets there. Taking hold of a playing record, or pausing it with the wind-down, repeats the
+- **It's a moment behind your finger**: about an eighth of a second on HTTPS (121.5 ms), over plain
+  `http://` about 0.143 s where the computer's audio works in 512 frames or fewer at a time (Chrome on a
+  Mac) and about 0.164 s elsewhere (Safari and every iPhone browser, which can't say) - always the same, so the touches around each moment
+  have always arrived before the sound gets there - and since 2.0.0-player.40 a turn that starts as your
+  finger lands is timed from that moment, not from when it had gone the few pixels that tell a turn from
+  a tap (before, those added 35-95 ms, the more the slower your hand) - as far back as about a tenth of a
+  second before the record is taken, so a start slower than that keeps the rest. Info > Debug > **Turntable timing**
+  says what your device's audio adds on top - a Bluetooth headset's 150-250 ms most of all. Taking hold of a playing record, or pausing it with the wind-down, repeats the
   song's last eighth of a second as the record's sound takes over; letting go of a playing record at
   about its own speed skips it (the song plays on straight from where your hand let go, while the
   record's sound, that much behind, stops as you let go) - neither is a fault.

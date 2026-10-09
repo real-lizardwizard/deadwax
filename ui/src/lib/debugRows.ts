@@ -345,7 +345,10 @@ export function turntableRow(report: DeckReport | null | undefined): DebugRow {
  * its ceiling, half a decibel under it - on a loud song about a third of them over full scale too, which the
  * browser would have cut off - and the deepest it turned the sound down), how the frames kept up under a
  * hand, and what else got in the way. James: "the turntable player just feels like it hangs a lot,
- * especially when scrubbing" - nothing a lab's browser shows, so the phone says it here.
+ * especially when scrubbing" - nothing a lab's browser shows, so the phone says it here. And (2.0.0-player.40)
+ * how far behind the hand the record's sound is by design - the blocks the voice renders in, on the main
+ * thread - and what this device's audio says it adds after that (latencyNote), Bluetooth included where the
+ * browser knows it.
  */
 export function turntableTimingRow(report: DeckReport | null | undefined): DebugRow {
   const label = 'Turntable timing'
@@ -371,7 +374,29 @@ export function turntableTimingRow(report: DeckReport | null | undefined): Debug
     : 'Under a hand: no frames yet')
   if (health.notBack) notes.push(`${health.notBack} ${health.notBack === 1 ? 'let-go' : 'let-goes'} after which the song didn't start`)
   if (health.interruptions) notes.push(`The sound interrupted ${health.interruptions} ${health.interruptions === 1 ? 'time' : 'times'}`)
+  const latency = latencyNote(report)
+  if (latency) notes.push(latency)
   return { label, value, note: notes.join(' · ') }
+}
+
+/**
+ * The record's sound behind the hand (2.0.0-player.40, the deck's DeckLatency): by design - HAND_DELAY_S, the
+ * main-thread voice's two blocks and the limiter's lookahead: 121.5 ms on the worklet, 142.8 in blocks of 512,
+ * 164.2 in blocks of 1024 at 48 kHz - and then what this device's audio says it adds: the context's base
+ * latency, its output latency, and how far ahead of the speaker its render clock reads by getOutputTimestamp()
+ * - each only where the browser gives it (an older Safari may give neither of the last two - the spec says before
+ * 18.4; not checked on a phone). Null with no voice.
+ */
+export function latencyNote(report: DeckReport | null | undefined): string | null {
+  const latency = report?.latency
+  if (!latency || latency.design === null || !report?.voice) return null
+  const ms = (seconds: number) => `${(seconds * 1000).toFixed(1)} ms`
+  const how = report.voice === 'script' ? (latency.block ? ` (blocks of ${latency.block} on the main thread)` : ' (on the main thread)') : ' (on its own thread)'
+  const adds: string[] = []
+  if (latency.base !== null) adds.push(`base ${ms(latency.base)}`)
+  if (latency.output !== null) adds.push(`output ${ms(latency.output)}`)
+  if (latency.speaker !== null) adds.push(`${ms(latency.speaker)} from render to speaker`)
+  return `The record's sound: ${ms(latency.design)} behind the hand by design${how}, then what this device's audio adds - ${adds.length ? `it says ${adds.join(', ')}` : "it doesn't say"}`
 }
 
 /**

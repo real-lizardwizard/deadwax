@@ -113,6 +113,9 @@ export interface ReplaySource {
   /** the clock's mapping as the recording ended: context seconds less page seconds */
   offset: number
   scriptLagSeconds: number
+  /** the frames the voice rendered at a time, as the recording says (2.0.0-player.40: the main-thread voice's
+   *  512 or 1024) - a recording that doesn't say (one made before .40) rendered SCRIPT_BUFFER */
+  block?: number
 }
 
 export interface VoiceWindowIn {
@@ -153,16 +156,19 @@ export interface Replayed {
   firstTake: number
 }
 
-/** The voice's block, in samples: the main-thread voice's SCRIPT_BUFFER, the worklet's render quantum. */
-export function blockOf(voice: 'worklet' | 'script'): number {
-  return voice === 'script' ? SCRIPT_BUFFER : 128
+/** The voice's block, in samples: the main-thread voice's, as its recording says it (2.0.0-player.40 - read
+ *  from the file, never the build replaying it: a recording made in blocks of 512 replays in blocks of 512;
+ *  one that doesn't say was made in SCRIPT_BUFFER), and the worklet's render quantum. */
+export function blockOf(source: Pick<ReplaySource, 'voice' | 'block'>): number {
+  if (source.voice !== 'script') return 128
+  return typeof source.block === 'number' && source.block > 0 ? source.block : SCRIPT_BUFFER
 }
 
 /** The blocks' times: the main-thread voice's from its own reports, the worklet's on the context's frame
  *  grid (its currentTime is a whole number of frames over the rate). */
 function grid(source: ReplaySource, from: number) {
   const rate = source.sampleRate
-  const frames = blockOf(source.voice)
+  const frames = blockOf(source)
   const first = source.heard[0]?.time ?? from
   if (source.voice === 'script') {
     const seconds = frames / rate
@@ -348,7 +354,7 @@ export interface Timing {
  * one sent from a timer rather than a frame can reach the voice a block sooner or later than the rest.
  */
 export function planTiming(source: ReplaySource, from: number, to: number): Timing {
-  const block = blockOf(source.voice) / source.sampleRate
+  const block = blockOf(source) / source.sampleRate
   const { g, messages } = starting(source, from, to)
   const toldAt = (lead: number) => messages.map(({ at }) => {
     let b = g.index(at + lead)

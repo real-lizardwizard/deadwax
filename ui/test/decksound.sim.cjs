@@ -159,6 +159,8 @@ class FakeContext {
     this.destination = { speakers: true }
     this.changes = []
     if (world.host === 'worklet') this.audioWorklet = { addModule: () => Promise.resolve() }
+    //? what the context says of its hardware's render (2.0.0-player.40): nothing, unless a run says
+    if (world.baseLatency !== undefined) this.baseLatency = world.baseLatency
     contexts.push(this)
   }
   //? what the page reads: the frames the audio has rendered so far - a step at a time
@@ -218,10 +220,13 @@ voice.renderVoice = (state, outputs, frames, rate, now) => {
 /**
  * The hardware asks for `step` frames at a time - at the moment its clock reaches them, a little uneven.
  * The worklet renders them then, the messages posted since applied first, as of its `currentTime`; the
- * main-thread voice is asked for a block of 1024 each time the render passes 1024 more, to play a block
- * later (its `playbackTime`), a moment after on the main thread. What each renders is kept at the
- * context time it plays at.
+ * main-thread voice is asked for a block of its size (1024 - or 512, 2.0.0-player.40) each time the render
+ * passes that many more, to play a block later (its `playbackTime`), a moment after on the main thread. What
+ * each renders is kept at the context time it plays at.
  */
+const scriptBlock = () => world.script?.args[0] ?? 1024
+//? the main-thread voice's lag, in blocks of the size it renders
+const scriptLag = (w) => (w.host === 'script' ? (deckModule.SCRIPT_LAG_BLOCKS * (w.script?.args[0] ?? 1024)) / w.rate : 0)
 function burst() {
   const { rate, step } = world
   if (world.host === 'worklet') {
@@ -238,9 +243,10 @@ function burst() {
     }
   } else {
     const before = world.rendered
+    const size = scriptBlock()
     world.rendered += step
-    for (let boundary = Math.ceil(before / 1024) * 1024; boundary < world.rendered; boundary += 1024) {
-      const playbackTime = (boundary + 1024) / rate
+    for (let boundary = Math.ceil(before / size) * size; boundary < world.rendered; boundary += size) {
+      const playbackTime = (boundary + size) / rate
       world.calls.push({ at: real + 0.5 + random(), playbackTime })
     }
   }
@@ -248,10 +254,11 @@ function burst() {
 function scriptCall({ playbackTime }) {
   const script = world.script
   if (!script?.onaudioprocess) return
-  const channels = [new Float32Array(1024), new Float32Array(1024)]
-  script.onaudioprocess({ outputBuffer: { numberOfChannels: 2, length: 1024, getChannelData: (channel) => channels[channel] }, playbackTime })
+  const size = script.args[0]
+  const channels = [new Float32Array(size), new Float32Array(size)]
+  script.onaudioprocess({ outputBuffer: { numberOfChannels: 2, length: size, getChannelData: (channel) => channels[channel] }, playbackTime })
   const at = Math.round(playbackTime * world.rate)
-  if (at + 1024 <= world.output.length) world.output.set(channels[0], at)
+  if (at + size <= world.output.length) world.output.set(channels[0], at)
 }
 
 /**
@@ -338,15 +345,19 @@ function mount() {
     record: () => find('app-tt-record'),
   }
 }
-function livePlayer() {
+function livePlayer({ speed = null, moving = false } = {}) {
   const player = {
     track: { id: 'time', title: 'Time', coverArt: 'cover', albumId: 'dsotm', suffix: 'flac' },
-    playing: true, duration: 425, at: 151, listeners: new Set(),
-    seek(t) { this.at = t },
-    toggle() { this.playing = !this.playing },
-    position() { return this.at }, onPosition(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener) },
+    playing: true, duration: 425, at: 151, listeners: new Set(), since: real,
+    //? where it is: still - or, `moving` (2.0.0-player.40), playing on at its speed from where it was put
+    here() { return moving && this.playing ? this.at + ((speed ?? 1) * (real - this.since)) / 1000 : this.at },
+    seek(t) { this.at = t; this.since = real },
+    toggle() { this.at = this.here(); this.since = real; this.playing = !this.playing },
+    position() { return this.here() }, onPosition(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener) },
   }
-  for (const name of ['seek', 'toggle', 'position', 'onPosition']) player[name] = player[name].bind(player)
+  for (const name of ['seek', 'toggle', 'position', 'onPosition', 'here']) player[name] = player[name].bind(player)
+  //? the fader's speed (2.0.0-player.39), where a run sets one: the motor's
+  if (speed !== null) Object.assign(player, { speed: () => speed, onSpeed: () => () => {} })
   return player
 }
 
@@ -363,9 +374,10 @@ clockModule.clockReading = (clock, at, contextTime, held) => {
 }
 
 //? the deck's own calls, watched: what Turntable hands it, and when - and what the deck was doing after
-const calls = { hand: [], takeOver: [], release: [], pressed: [] }
-for (const name of ['hand', 'takeOver', 'release', 'pressed']) {
+const calls = { hand: [], takeOver: [], release: [], pressed: [], touched: [] }
+for (const name of ['hand', 'takeOver', 'release', 'pressed', 'touched']) {
   const own = deckModule.Deck.prototype[name]
+  if (!own) continue
   deckModule.Deck.prototype[name] = function (...args) {
     const result = own.apply(this, args)
     calls[name].push({ args, result, real, motion: this.motion })
@@ -384,18 +396,18 @@ const RADIANS_PER_SECOND_OF_SONG = (2 * Math.PI) / tt.SECONDS_PER_TURN
  * a second (coalesced two to a frame at 120), for `ms`, then let go. Returns what came out, and what it
  * should have been.
  */
-async function handRun({ host, rate, step, songAt, speedAt, hz = 60, ms = 3000, noise = 0.5, noiseKind = 'uniform', radius = RADIUS_PX, whole = false, paused = false, liftGap = null, rest = 0, cold = null, timeJitterMs = 0, placeJitterS = 0 }) {
+async function handRun({ host, rate, step, songAt, speedAt, hz = 60, ms = 3000, noise = 0.5, noiseKind = 'uniform', radius = RADIUS_PX, whole = false, paused = false, liftGap = null, rest = 0, cold = null, timeJitterMs = 0, placeJitterS = 0, baseLatency, speed = null, moving = false }) {
   real += 500
   timers = []
   frames = []
   world = {
     host, rate, step, rendered: 0, inbox: [], calls: [], jitter: 0, node: null, script: null,
-    audio0: real - 7.3, nextFrame: real + 3, positions: [], log: [],
+    audio0: real - 7.3, nextFrame: real + 3, positions: [], log: [], baseLatency,
     state: voice.newVoiceState(), output: new Float32Array(Math.round(((ms + 3000 + rest + (cold ? cold.idle : 0)) / 1000) * rate)),
   }
   define('AudioWorkletNode', host === 'worklet' ? FakeNode : undefined)
   for (const name of Object.keys(calls)) calls[name].length = 0
-  const player = livePlayer()
+  const player = livePlayer({ speed, moving })
   const deckRef = { current: null }
   const view = mount()
   const draw = (open = true) => view.render({ player, open, discArt: null, onPreview: () => {}, deck: deckRef })
@@ -503,7 +515,7 @@ async function handRun({ host, rate, step, songAt, speedAt, hz = 60, ms = 3000, 
  */
 function listen(run, { from = 500, to = 150 } = {}) {
   const { world, start, ms, offset, taken, songAt, speedAt } = run
-  const lag = world.host === 'script' ? (deckModule.SCRIPT_LAG_BLOCKS * 1024) / world.rate : 0
+  const lag = scriptLag(world)
   const handFor = (t) => (t - DELAY - lag - offset) * 1000
   const steady = (page) => page >= taken.args[0] + from && page <= start + ms - to
   const data = world.output
@@ -521,7 +533,9 @@ function listen(run, { from = 500, to = 150 } = {}) {
   }
   const within = cycles.filter((cycle) => Math.abs(cycle.rate / cycle.want - 1) <= 0.03).length / Math.max(1, cycles.length)
   const anchor = taken.result
-  const takenAt = songAt(taken.args[0] - start)
+  //? where the hand's turn counts from: a quick grab's press (2.0.0-player.40 - the record taken from the press,
+  //? where it was then, the slop's turn kept), or the take itself for a press that rested
+  const takenAt = songAt((taken.args[1] ? calls.pressed[0].args[0] : taken.args[0]) - start)
   let worst = 0
   for (const [t, pos] of world.positions) {
     const page = handFor(t)
@@ -543,7 +557,7 @@ function listen(run, { from = 500, to = 150 } = {}) {
  */
 function rateBands(run, { from = 500, to = 150, hz = 400 } = {}) {
   const { world, start, ms, offset, taken, speedAt, delay } = run
-  const lag = world.host === 'script' ? (deckModule.SCRIPT_LAG_BLOCKS * 1024) / world.rate : 0
+  const lag = scriptLag(world)
   const handFor = (t) => (t - delay - lag - offset) * 1000
   const data = world.output
   const points = []
@@ -595,7 +609,7 @@ function rateBands(run, { from = 500, to = 150, hz = 400 } = {}) {
  */
 function acrossRelease(run, { before = 30, after = 80 } = {}) {
   const { world, offset, lastMove, speedAt, start } = run
-  const lag = world.host === 'script' ? (deckModule.SCRIPT_LAG_BLOCKS * 1024) / world.rate : 0
+  const lag = scriptLag(world)
   const motion = calls.release[0].motion
   const want = (page) => {
     if (motion.kind !== 'plan' || page < motion.since) return speedAt(Math.min(page, lastMove) - start)
@@ -628,7 +642,7 @@ function acrossRelease(run, { before = 30, after = 80 } = {}) {
  */
 function gestureStart(run, { from = 30, to = 300 } = {}) {
   const { world, offset, speedAt, start } = run
-  const lag = world.host === 'script' ? (deckModule.SCRIPT_LAG_BLOCKS * 1024) / world.rate : 0
+  const lag = scriptLag(world)
   const took = calls.takeOver[0].args[0]
   const data = world.output
   let last = null, low = Infinity, high = -Infinity, n = 0, within = 0
@@ -662,6 +676,102 @@ function gestureStart(run, { from = 30, to = 300 } = {}) {
 }
 
 async function main() {
+  console.log('\na quick grab heard from the press (2.0.0-player.40): the sound at half the hand\'s speed that much sooner - the slop no longer in it')
+  {
+    //? the record's sound in a run: each cycle of the tone, at the moment the voice rendered it (page ms, by the
+    //? clock's mapping), and its rate
+    const cyclesOf = (run) => {
+      const data = run.world.output
+      const out = []
+      let last = null
+      for (let i = 1; i < data.length; i++) {
+        if (data[i - 1] < 0 && data[i] >= 0) {
+          const t = (i - 1 + -data[i - 1] / (data[i] - data[i - 1])) / run.world.rate
+          if (last !== null) out.push({ page: ((t + last) / 2 - run.offset) * 1000, rate: 1 / (440 * (t - last)) })
+          last = t
+        }
+      }
+      return out
+    }
+    //? from the press (page ms) to the first cycle of the record's sound half way from where it was going (`from`:
+    //? still, or the song's speed) to the hand's speed - and less the delay the design gives it (HAND_DELAY_S, the
+    //? main thread's lag, the limiter's lookahead): what the grab itself adds
+    const rise = (run, from, hand) => {
+      const press = calls.pressed[0].args[0]
+      const half = cyclesOf(run).find((cycle) => cycle.page >= press && Math.abs(cycle.rate - from) >= Math.abs(hand - from) / 2 && Math.sign(cycle.rate - from) === Math.sign(hand - from))
+      const design = (DELAY + scriptLag(run.world) + voice.VOICE_LOOKAHEAD_S) * 1000
+      return { halfMs: half ? round(half.page - press, 1) : null, riseMs: half ? round(half.page - press - design, 1) : null, slopMs: round(calls.takeOver[0].args[0] - press, 1) }
+    }
+    //? where the voice started at the take, against where the song had paused - the join
+    const joins = []
+    const ownCommand = voice.voiceCommand
+    voice.voiceCommand = (state, message, now, rate) => {
+      ownCommand(state, message, now, rate)
+      if (message.type === 'take') joins.push({ pos: state.pos, rate: state.rate, message })
+    }
+    const pausedAt = []
+    const ownTake = deckModule.Deck.prototype.takeOver
+    deckModule.Deck.prototype.takeOver = function (...args) {
+      const result = ownTake.apply(this, args)
+      pausedAt.push(this.host.position())
+      return result
+    }
+    const rows = []
+    //? the iPhone's clock (blocks of 1024 on the main thread: its context says nothing of its hardware) and a Mac's
+    //? (128-frame renders said - blocks of 512)
+    const devices = [['an iPhone\'s 21.3 ms steps', 48000, 1024, undefined], ['a Mac\'s 128-frame renders', 48000, 128, 128 / 48000]]
+    for (const host of ['worklet', 'script']) {
+      for (const [device, rate, step, base] of devices) {
+        for (const hand of [1, 0.5, 0.25]) {
+          joins.length = 0
+          const run = await handRun({ host, rate, step, baseLatency: base, hz: 60, ms: 700, paused: true, rest: 1200, songAt: (ms) => (hand * ms) / 1000, speedAt: () => hand })
+          rows.push({ host, device, block: host === 'script' ? scriptBlock() : 128, from: 'still', hand, ...rise(run, 0, hand) })
+        }
+        for (const [speed, hand] of [[0.5, 0.25], [2, 0.5]]) {
+          joins.length = 0
+          pausedAt.length = 0
+          const run = await handRun({ host, rate, step, baseLatency: base, hz: 60, ms: 700, speed, moving: true, songAt: (ms) => (hand * ms) / 1000, speedAt: () => hand })
+          const join = joins[0]
+          //? the song paused at the crossing; the voice, HAND_DELAY_S behind (and the lag), starts that far back
+          //? in it at the song's speed - the stretch heard twice (as it was, the same: 116-156 ms here, by when the
+          //? take lands). And the take now, at the press, puts the voice where a take at the crossing would have:
+          //? its place carried on at its speed to the crossing's own moment is where the song paused (ms of it)
+          const repeatMs = join ? round(((pausedAt[0] - join.pos) / speed) * 1000, 1) : null
+          const crossing = calls.takeOver[0].args[0] / 1000 + run.offset + scriptLag(run.world)
+          const joinErrMs = join ? round(((join.message.at + join.message.rate * (crossing - join.message.time) - pausedAt[0]) / speed) * 1000, 3) : null
+          rows.push({ host, device, block: host === 'script' ? scriptBlock() : 128, from: `playing at ${speed}x`, hand, ...rise(run, speed, hand), joinRate: join ? round(join.rate, 3) : null, repeatMs, joinErrMs, live: run.live })
+        }
+        //? review of 2.0.0-player.40: a slow hand on a playing record crosses the slop past the reach (TAKE_BACK_S,
+        //? SCRIPT_TAKE_BACK_S on the main thread) - 117-217 ms after the press here - and is taken from its
+        //? oldest sample within it, on the song's own line there: the join exactly a take at the crossing's
+        for (const [speed, hand] of [[1, 0.15], [1, 0.1], [0.5, 0.1], [2, 0.15]]) {
+          joins.length = 0
+          pausedAt.length = 0
+          const run = await handRun({ host, rate, step, baseLatency: base, hz: 60, ms: 700, speed, moving: true, songAt: (ms) => (hand * ms) / 1000, speedAt: () => hand })
+          const join = joins[0]
+          const repeatMs = join ? round(((pausedAt[0] - join.pos) / speed) * 1000, 1) : null
+          const lag = scriptLag(run.world)
+          const crossing = calls.takeOver[0].args[0] / 1000 + run.offset + lag
+          const joinErrMs = join ? round(((join.message.at + join.message.rate * (crossing - join.message.time) - pausedAt[0]) / speed) * 1000, 3) : null
+          //? how long after the press the take is stamped: 0 within reach - past it, the sample it was taken from
+          const takenAfterMs = join ? round((join.message.time - (calls.pressed[0].args[0] / 1000 + run.offset + lag)) * 1000, 1) : null
+          rows.push({ host, device, block: host === 'script' ? scriptBlock() : 128, from: `playing at ${speed}x`, pastReach: true, hand, slopMs: round(calls.takeOver[0].args[0] - calls.pressed[0].args[0], 1), takenAfterMs, joinRate: join ? round(join.rate, 3) : null, repeatMs, joinErrMs, live: run.live })
+        }
+      }
+    }
+    voice.voiceCommand = ownCommand
+    deckModule.Deck.prototype.takeOver = ownTake
+    console.log('    ' + rows.map((row) => JSON.stringify(row)).join('\n    '))
+    check('a quick grab of a still record, the hand at 1x, 0.5x and 0.25x, both hosts, an iPhone\'s and a Mac\'s clock: the sound half way to the hand\'s speed within 30 ms of the delay the design gives it (7-25 ms), counted from the PRESS - the slop (33-83 ms here) no longer in it (as it was, the slop and the same: 42-108 ms past the design)',
+      rows.filter((row) => row.from === 'still' && !(row.riseMs !== null && row.riseMs >= 0 && row.riseMs <= 30)).map((row) => JSON.stringify(row)), [])
+    check('...a record playing at 0.5x and 2x, grabbed quickly by a hand at half its speed or a quarter: the same - half way from the song\'s speed to the hand\'s within 30 ms of the design, from the press (as it was, 57-97 ms)',
+      rows.filter((row) => row.from !== 'still' && !row.pastReach && !(row.riseMs !== null && row.riseMs >= 0 && row.riseMs <= 30)).map((row) => JSON.stringify(row)), [])
+    check('...and its join with the song as it was: the voice starts at the song\'s own speed, where a take at the crossing would have it - the take\'s place carried on at its speed to the crossing\'s moment is where the song paused, to 0.5 ms',
+      rows.filter((row) => row.from !== 'still' && !(row.live && row.joinRate === Number(row.from.split(' ')[2].replace('x', '')) && Math.abs(row.joinErrMs) <= 0.5)).map((row) => JSON.stringify(row)), [])
+    check('...the join pinned past the reach too (review of 2.0.0-player.40): a record playing at 1x, 0.5x and 2x, a hand at 0.1x or 0.15x crossing the slop 117-217 ms after the press - taken from a sample after the press, and still on the song\'s line: the same join, to 0.5 ms - 115-145 ms of the song heard again, as before .40 (as first built, taken back at the press\'s place: 143-240, 28-121 more)',
+      rows.filter((row) => row.pastReach && !(row.takenAfterMs > 0 && row.live && Math.abs(row.joinErrMs) <= 0.5)).map((row) => JSON.stringify(row)), [])
+  }
+
 
   console.log('\nthe song at the hand\'s speed: at least 90% of cycles within 3% of it, the read head where the hand was HAND_DELAY_S before')
   const steadyHands = [['1x', 1], ['0.5x', 0.5], ['2x', 2], ['backwards, -1x', -1]]
@@ -880,10 +990,14 @@ async function main() {
     const posted = run.world.state
     check('...and each sample reached the voice as a knot of its path: no drive a frame under the hand', [posted.knotHand.some((h) => h === 1)], [true])
     const take = run.world.log.find((message) => message.type === 'take')
-    const hands = run.world.log.filter((message) => message.type === 'hand').slice(1)
+    const hands = run.world.log.filter((message) => message.type === 'hand')
     const stamp = (time) => time / 1000 + run.offset
-    check('...each stamped by the one clock at the sample\'s own time: the take, and every sample after it (within the half a millisecond a second the held mapping may move)',
-      [Math.abs(take.time - stamp(run.taken.args[0])) < 3e-4, hands.length, hands.every((message, i) => Math.abs(message.time - stamp(calls.hand[i].args[0])) < 3e-4)], [true, calls.hand.length, true])
+    //? taken FROM THE PRESS (2.0.0-player.40): the take and its first sample at the press's own time, then the
+    //? samples inside the slop (touched), then every sample from the one that crossed it (hand) - until .40 the
+    //? take was at the crossing, and the slop's samples went nowhere
+    const told = [calls.pressed[0].args[0], ...calls.touched.map((call) => call.args[0]).filter((time) => time < run.taken.args[0]), ...calls.hand.map((call) => call.args[0])]
+    check('...each stamped by the one clock at the sample\'s own time: the take at the press\'s, and every sample after it, those inside the slop included (within the half a millisecond a second the held mapping may move)',
+      [run.taken.args[1], Math.abs(take.time - stamp(calls.pressed[0].args[0])) < 3e-4, hands.length, hands.every((message, i) => Math.abs(message.time - stamp(told[i])) < 3e-4)], [true, true, told.length, true])
     check('the press and the release with their events\' own times too', [calls.pressed[0].args[0], calls.release[0].args[0]], [run.first.timeStamp, run.lift.timeStamp])
     const taking = calls.takeOver[0].real, letting = calls.release[0].real
     const between = readings.filter((reading) => reading.at > taking + 1 && reading.at < letting - 1)
@@ -921,8 +1035,10 @@ async function main() {
     for (let k = 1; k <= 30; k++) moves.push({ at: real + k * 16.7 + 3, run: ((time, degrees) => () => view.record().props.onPointerMove(event(degrees, time)))(real + k * 16.7, k * 3.3) })
     await runUntil(real + 30 * 16.7 + 10, moves)
     const under = kinds.slice(before)
-    check('under the hand: a take, then one \'hand\' message a sample - 30 samples, 30 knots - and not one drive in the 30 frames between them',
-      [under[0], under.filter((kind) => kind === 'hand').length, under.filter((kind) => kind === 'drive').length], ['take', 30, 0])
+    //? 31 since 2.0.0-player.40: the press is the take's first knot and the first move (inside the slop) its
+    //? next - until then the take was at the second move, which was sent twice (the take's knot, then its own)
+    check('under the hand: a take, then one \'hand\' message a moment - the press and 30 samples, 31 knots - and not one drive in the 30 frames between them',
+      [under[0], under.filter((kind) => kind === 'hand').length, under.filter((kind) => kind === 'drive').length], ['take', 31, 0])
     view.unmount()
   }
 

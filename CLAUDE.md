@@ -239,7 +239,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the desktop frame, the Edit panel, Needs a look, server settings and the log | `notes/app-desktop.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
 | the turntable's sound following the hand (.24) | `notes/turntable-sound.md` |
-| the turntable's sound since: warble, echo, kernel, first turn, clock, recorder, limiter (.27-.35) | `notes/turntable-fixes.md` |
+| the turntable's sound since: warble, echo, kernel, first turn, clock, recorder, limiter (.27-.35), less delay (.40) | `notes/turntable-fixes.md` |
 | the turntable's test bench at /player/lab/ (.36): signals, motions, A/B/C, Check this device | `notes/turntable-bench.md` |
 | the desktop visualizer, the Mandala, the music's feel | `notes/visualizer.md` |
 | windows cut straight from the FLAC | `notes/flac-windows.md` |

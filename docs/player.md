@@ -592,7 +592,18 @@ below.
     fader at 2x, where the record turns every 0.9 seconds, a turn every 1.8 seconds plays it at half
     the speed it was playing) (since 2.0.0-player.24; before, it warbled out of all recognition - see
     below). A press that stays put for a moment takes hold too, and a quick tap is
-    still a tap. Let go and the record carries on at the speed your hand gave it - the speed it had as
+    still a tap. A turn that starts the moment your finger lands is heard from that moment (since
+    2.0.0-player.40): the record isn't taken until your finger has gone a few pixels - it might yet be
+    a tap - but once it has, it is taken from where it was as your finger went down, and its sound
+    follows every touch since, so those few pixels no longer add to the delay (before, they added about
+    35 ms with your hand at the record's own speed, 70 at half of it and 95 at a quarter). It can reach
+    back only about a tenth of a second, though, counted from when the page hears your finger move: a
+    start slow enough to still be inside those pixels by then is heard from a tenth of a second before
+    the record is taken, not from the press - the slower your hand, the more of the old delay it keeps,
+    and a browser that passes touches on late leaves less room (measured in headless Chrome over HTTPS,
+    which passed them on about 30 ms late, a start at a quarter of the record's speed was heard about
+    60 ms sooner than before, not 95). A playing song still plays on under those few pixels, and pauses
+    as the record is taken. Let go and the record carries on at the speed your hand gave it - the speed it had as
     your finger last moved, not slowed by the moment between that and lifting it, and from where it
     was then, so its sound carries straight on without a stall. If the song was
     playing, the motor brings the platter back to its own speed - a backwards flick is stopped
@@ -635,9 +646,16 @@ below.
     before 2.0.0-player.14: silently, and with no momentum.
   - **It's about an eighth of a second behind your hand**, always the same: the record's sound
     follows every touch your phone reports, each at the moment it was made, and plays the path they
-    trace 120 ms later - and 1.5 ms more since 2.0.0-player.35, for the limiter below (about 165 ms
-    over plain `http://`, where the sound is made on the page's main thread) - late enough that the touches either side of each moment have arrived, so it never has to
-    guess where your hand is going. Each touch's place and speed are worked out from the touches
+    trace 120 ms later - and 1.5 ms more since 2.0.0-player.35, for the limiter below. Over plain
+    `http://`, where the sound is made on the page's main thread, it is later by two of the blocks it is
+    made in: about 143 ms in all where the computer's audio says it works 512 frames or fewer at a time
+    (Chrome on a Mac), and about 164 ms where it works more at a time, or can't say - Safari, on a Mac
+    and on every iPhone, whose browsers all report the same 128 frames whatever the hardware does
+    - since 2.0.0-player.40, which made the blocks half as long where the audio allows it; it was about
+    165 everywhere before. That is late enough that the touches either side of each moment have
+    arrived, so it never has to guess where your hand is going. What your device's own audio adds after
+    that - a Bluetooth headset's 150-250 ms included, which no page can shorten - is on top, and Info >
+    Debug's **Turntable timing** says what the browser knows of it. Each touch's place and speed are worked out from the touches
     around it, before and after, and the speed is smoothed, so a finger's own jitter stays out of the
     pitch whether your hand is steady or speeding up, slowing down or turning back. The coasts, the
     motor's run back to speed and the wind-down are timed the same smooth way, and are as far behind
@@ -678,8 +696,15 @@ below.
     this sound - an AudioWorklet, on an audio thread of its own - only to a page on HTTPS (or on the
     computer itself, `localhost`). Opened at a plain `http://` address on your network, deadwax plays
     the record's sound on the page's main thread instead, with the very same code, so it sounds the
-    same - only a few hundredths of a second later (about 0.165 s behind your hand in all, where it's
-    about 0.12 s - 121.5 ms - on HTTPS); on HTTPS it gets its own thread, which is steadier if the page is busy. From the first tap
+    same - only a few hundredths of a second later (about 0.143 s behind your hand in all where the
+    computer's audio works in 512 frames or fewer at a time, about 0.164 s elsewhere, where it's about
+    0.12 s - 121.5 ms - on HTTPS); on HTTPS it gets its own thread, which is steadier if the page is
+    busy. Its blocks are 512 frames long only where the browser says its audio renders that few at a
+    time (since 2.0.0-player.40 - Chrome and other browsers built on it say it truly; Safari, and every
+    browser on an iPhone, always says 128, so there they stay 1024), and deadwax goes back to 1024 - at the record's next silent moment,
+    for the rest of the visit - if they then come two at a time all the same, or if the page once
+    doesn't finish one in time while the record's sound is heard: a block of 512 has half the time a
+    block of 1024 has, and a late one plays a moment of the sound twice. From the first tap
     that starts the sound until the turntable goes (switched back to the cover), deadwax also tells an
     iPhone that the page plays music, so the ringer switch on silent doesn't mute the record's sound (while you turn it the song itself is paused, and iOS would
     otherwise treat the record's sound as the kind the switch silences - not yet checked on a phone).
@@ -1063,7 +1088,7 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
 | | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
 | The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why), how far the phone's audio clock moves at a time, and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
-| The turntable | **Turntable timing** | how the turntable is keeping up on this phone, counted since it last showed (2.0.0-player.28): `The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed`, and under it whether the sound - when it is made on the page's main thread - had gaps (`12 of 3400 blocks late, the worst by 38 ms`), how the picture kept up under your finger (`310 frames, 4 late, the longest gap 118 ms`), any let-go after which the song didn't start, and any time the browser interrupted the sound - and, since 2.0.0-player.35, how many peaks the record's sound held under full scale and the deepest it turned the sound down to do it (`Peaks held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB`: each of those went past half a decibel under full scale and was turned down; on a loud song about a third of them went over full scale too, where the browser would have cut them off - counted up to a quarter of a second or so after you let go, once the sound, an eighth of a second behind your hand, has caught up, coasts included). If the turntable feels like it hangs, these numbers say where |
+| The turntable | **Turntable timing** | how the turntable is keeping up on this phone, counted since it last showed (2.0.0-player.28): `The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed`, and under it whether the sound - when it is made on the page's main thread - had gaps (`12 of 3400 blocks late, the worst by 38 ms`), how the picture kept up under your finger (`310 frames, 4 late, the longest gap 118 ms`), any let-go after which the song didn't start, and any time the browser interrupted the sound - and, since 2.0.0-player.35, how many peaks the record's sound held under full scale and the deepest it turned the sound down to do it (`Peaks held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB`: each of those went past half a decibel under full scale and was turned down; on a loud song about a third of them went over full scale too, where the browser would have cut them off - counted up to a quarter of a second or so after you let go, once the sound, an eighth of a second behind your hand, has caught up, coasts included) - and, since 2.0.0-player.40, how far behind your hand the record's sound is by design and what this device's own audio says it adds after that (`The record's sound: 142.8 ms behind the hand by design (blocks of 512 on the main thread), then what this device's audio adds - it says base 2.7 ms, output 8.0 ms, 12.3 ms from render to speaker`: the browser's own figures, each only where it gives them - the output figures include a Bluetooth headset's delay where the browser knows it, and an older Safari may give only the first). The blocks-late count works in Chrome since 2.0.0-player.40 too: until then it compared the audio clock with a time Chrome makes from that same clock, and could never count one. If the turntable feels like it hangs, these numbers say where |
 | The turntable | **Recording** | a 20-second recording of the record's own sound, as a file to send with a bug report (2.0.0-player.32). **Record 20 s** starts it (the turntable showing, and its sound started - turn the record once first); close Info and turn the record as you would; when the row says `20 s recorded`, **Save the recording** downloads one JSON file (about 5 MB for 20 s) holding what the record's sound actually played on your device, every touch as it came, and what the sound made of it - exactly what's needed to hear and replay a sound no lab has reproduced; since 2.0.0-player.35 it also holds each moment's loudest sample as it was before the file's 16 bits cut it off, so it shows how far over anything went. Nothing is sent anywhere by itself |
 | The turntable | **Test bench** | a link, **Open the test bench**, that opens the turntable's test bench at `/player/lab/` in a tab of its own beside the app, so the song playing carries on (2.0.0-player.36) - see [Testing the turntable](#testing-the-turntable) |
 | Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |

@@ -31,7 +31,12 @@
  *    the click). The record is TAKEN as the press moves past the tap's few pixels, or rests longer than
  *    a tap (HOLD_MS): then the song pauses (`hold`) and the record's sound takes over at the song's
  *    position, at its own speed if it was playing, and follows the hand from there - silent while the
- *    finger rests. A press on a coasting record takes it at once.
+ *    finger rests. A press on a coasting record takes it at once. Since 2.0.0-player.40 a press taken by
+ *    moving (a QUICK GRAB) is taken from the press itself: the deck keeps the samples inside the slop
+ *    (`touched`), and the take is stamped at the press's moment, the record where it was then, with every
+ *    sample since after it - so the voice, HAND_DELAY_S behind, plays the hand from when the finger went down
+ *    (TAKE_BACK_S, takeOver: no further back than the voice can still be told of), and the face carries on
+ *    from where it was drawn as the slop was crossed.
  *  - THE SOUND FOLLOWS THE HAND'S OWN SAMPLES (2.0.0-player.24): each pointer sample goes to the voice as
  *    it comes (`hand`), with the time the event gives it - each of a move's coalesced events too - never
  *    one drive a frame; the voice plays the path through them HAND_DELAY_S behind (lib/deckVoice). Every
@@ -94,7 +99,7 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { clockReading, clockSettled, contextTimeAt, newDeckClock, resetDeckClock } from '../lib/deckClock'
 import {
   HAND_DELAY_S, REPORTS_PER_SECOND, VOICE_CEILING, VOICE_LOOKAHEAD_S, VOICE_PROCESSOR, newVoiceState, renderVoice, voiceCommand, voiceReport, voiceWorkletSource,
-  type DeckHealth, type DeckReport, type VoiceHeard, type VoiceMessage,
+  type DeckHealth, type DeckLatency, type DeckReport, type VoiceHeard, type VoiceMessage,
 } from '../lib/deckVoice'
 import {
   DEGREES_PER_SECOND, RELEASE_TAIL_MS, VELOCITY_WINDOW_MS, acceleration, coast, degreesFor, motor, phaseAt, planAt, releaseSpeed, voiceRate,
@@ -105,6 +110,22 @@ import { scrubWindow, type ScrubWindow } from './api'
 
 /** A press resting longer than a tap takes the record (and pauses a playing song), in ms. */
 export const HOLD_MS = 250
+/**
+ * A quick grab - a press that moves past a tap's few pixels, not one that rests - is taken FROM THE PRESS
+ * (2.0.0-player.40): stamped at the press's own moment, with the record where it was then, and every sample
+ * of the hand since handed to the voice, which plays HAND_DELAY_S behind - so a press that turns at once is
+ * heard from when the finger went down, not from when it had travelled the slop (35 ms at 1x, about 70 at
+ * 0.5x, 94 at 0.25x: that much sooner). The voice can still be told of a moment up to this long before the
+ * page tells it, in seconds: on the worklet HAND_DELAY_S less 20 ms for the message's delivery - it applies one
+ * up to 9 ms after its moment by the page's clock (the delay-chain research) - and the clock's mapping; on the
+ * main thread HAND_DELAY_S less 5 ms for the mapping alone (SCRIPT_TAKE_BACK_S), since its lag holds what it
+ * is told two blocks on, and the block a message waits for plays no more than two blocks after it is posted.
+ * A press older than that - counted from when the page hears of the move - is taken from its oldest sample that
+ * isn't: a still record at the hand's place then, a moving one (a playing song, a coast) where it had got to on
+ * its own by then, so a slower start keeps that much of the slop's delay.
+ */
+export const TAKE_BACK_S = HAND_DELAY_S - 0.02
+export const SCRIPT_TAKE_BACK_S = HAND_DELAY_S - 0.005
 /** How much of the song a window holds, how far before the playhead it starts, on what grid. A
  *  window is asked again whole, so what that costs over the song's own stream is WINDOW_S over the
  *  stretch the playhead crosses before the next (WINDOW_S - WINDOW_BACK_S - REFRESH_AHEAD_S): 40 over
@@ -257,12 +278,18 @@ type Motion =
 
 interface Press {
   taken: boolean
-  /** the song's position the record was taken at, seconds */
+  /** the song's position the record was taken at, seconds - for a quick grab, where it was at the press
+   *  (2.0.0-player.40): what the hand's turn since the press counts from */
   anchor: number
   /** where the hand has the record now, seconds */
   at: number
   intent: 'play' | 'pause'
   samples: HandSample[]
+  /** when it went down (page ms, its event's own time) */
+  since: number
+  /** the hand's samples inside a tap's few pixels, before the record is taken (touched): when, how far it had
+   *  turned since the press, and how far that moves the song (seconds) - a quick grab hands them on */
+  early: { time: number; turned: number; offset: number }[]
 }
 
 /* ===== the audio context, one for the page, made only in a gesture ===== */
@@ -295,9 +322,12 @@ interface DeckAudio {
   missing: 'unsupported' | 'no-voice' | null
   /** why the script voice plays it, not the worklet - for Debug */
   why: string | null
+  /** how many frames the voice renders at a time (2.0.0-player.40): the main-thread voice's block, the
+   *  worklet's render quantum (128) - for Debug and the recorder */
+  block: number | null
 }
 
-const audio: DeckAudio = { context: null, voice: null, node: null, loading: false, problem: null, missing: null, why: null }
+const audio: DeckAudio = { context: null, voice: null, node: null, loading: false, problem: null, missing: null, why: null, block: null }
 //? the page's clock mapped onto the context's (lib/deckClock, 2.0.0-player.24): everything the voice
 //? steers by is stamped through it - started again for each context, and as its clock stops and starts
 const clock = newDeckClock()
@@ -327,28 +357,192 @@ let healthMoved = false
 //? for the sound, or the turntable showing again, lets that go (review of 2.0.0-player.16)
 let sleepOnceRunning = false
 
-/** The main-thread voice's block, in samples: about 21 ms at 48 kHz (unmeasured on a phone). */
+/**
+ * The main-thread voice's block, in samples (2.0.0-player.40): SCRIPT_BUFFER_SMALL where the hardware renders
+ * that many frames or fewer at a time, SCRIPT_BUFFER everywhere else - and wherever that can't be told
+ * (scriptBlockFor). A message waits for the next block and is heard SCRIPT_LAG_BLOCKS blocks on, so the block
+ * is in the record's sound's delay twice over: 512 is 21 ms less than 1024 at 48 kHz - 142.8 ms from the hand
+ * to the sound in all where 1024 gives 164.2 (120 + 2 blocks + the limiter's 1.5). Smaller only where the
+ * hardware asks for no more than one block at a time: where it renders 1024 frames at once, it asks for two
+ * blocks of 512 together, both stamped alike, and the second plays a block before its stamp says (measured
+ * with a known impulse: 512 frames early) - and 256 would save 10 ms more for blocks played twice under a load
+ * that 512 and 1024 kept up with (the delay-blocks research, 2026-10-08).
+ */
 export const SCRIPT_BUFFER = 1024
+export const SCRIPT_BUFFER_SMALL = 512
 /** How many of its blocks after it is said the main-thread voice hears a take or a drive: a message
  *  waits up to one block for the next to be asked for, which plays a block after it is asked - 43 ms
- *  at 48 kHz, a constant lag on the record's sound and nothing more (startScript). */
+ *  at 48 kHz in blocks of 1024 (21 in blocks of 512), a constant lag on the record's sound and nothing more
+ *  (startScript). */
 export const SCRIPT_LAG_BLOCKS = 2
+/**
+ * Blocks sharing one playbackTime (2.0.0-player.40): the browser asked for two blocks together. Now and then
+ * that is the page late, or a stall's burst (below); but where SCRIPT_SHARED_OF of the last
+ * SCRIPT_SHARED_WINDOW blocks were (a pair, or a run, counted once), the hardware renders more than one block
+ * at a time - or the page can't keep up with blocks that short - and a voice in blocks of SCRIPT_BUFFER_SMALL
+ * changes to SCRIPT_BUFFER at its next silent moment, and keeps it on this page. Not counted for the first
+ * SCRIPT_SHARED_AFTER blocks: a context's first blocks come unevenly. And a small block written after it began
+ * to play where the voice sounds (SCRIPT_HEARD_LEVEL) - the page can't keep up with blocks that short, and
+ * the block two before it was heard again in its place - changes it the same way: a block of 512 has half the
+ * room a block of 1024 has for whatever else the page does (in headless Chromium the work of a let-go did
+ * it, 2 flicks in 5; never in blocks of 1024).
+ */
+export const SCRIPT_SHARED_OF = 8
+export const SCRIPT_SHARED_WINDOW = 32
+export const SCRIPT_SHARED_AFTER = 16
+/** A block late counts against blocks of 512 only where it, or one of the two before it - the one played again
+ *  in its place - is louder than this (-80 dBFS): a late block over a record held still is heard by no one. */
+export const SCRIPT_HEARD_LEVEL = 1e-4
 /**
  * The main-thread voice's clock is COUNTED (2.0.0-player.31): each block one block after the one before,
  * anchored on the first block's `playbackTime` - not read from each block's. WebKit stamps a block's
  * playbackTime on the MAIN thread, from the hardware clock as of whenever the main thread got to it,
  * quantised to the hardware buffer, so from block to block the stamp jitters by up to a buffer (21 ms on
  * an iPhone) - and a voice reading its path by it warbled at the block rate (James, with no block late:
- * "that digital buzz sound when scrubbing"; the lab's Chromium stamps exactly, so it never showed). The
- * count is anchored again only when the stamp has moved SCRIPT_REANCHOR_BLOCKS away (blocks the page
- * never rendered: the hardware played on without them), and meanwhile eased toward the stamp's running
- * mean by at most SCRIPT_SLEW_S a block - a hundredth of the step the ear could find.
+ * "that digital buzz sound when scrubbing"; the lab's Chromium stamps exactly, so it never showed). Since
+ * 2.0.0-player.40 its constants are in SECONDS, so they mean the same at any block size (countBlock):
+ *  - SCRIPT_STAMP_TOLERANCE_S: a stamp within this of the count is the count - an exact clock (Chromium's),
+ *    followed as it is.
+ *  - SCRIPT_SLEW_PER_S and SCRIPT_DRIFT_EASE_S: a stamp a step away (WebKit's jitter, or the page late with
+ *    one block) leaves the count holding, eased toward the stamps' lower edge - down at once to a stamp
+ *    earlier than the count, up over about SCRIPT_DRIFT_EASE_S (until .40: toward their running mean, which a
+ *    page late now and then eased AHEAD of the truth) - by at most SCRIPT_SLEW_PER_S a second: 0.02 ms a block
+ *    of 1024 at 48 kHz, as it was - a hundredth of the step the ear could find.
+ *  - SCRIPT_REANCHOR_S (64 ms: 3 blocks of 1024 at 48 kHz, as it was): a stamp this far EARLIER than the count
+ *    anchors it again - at once where it is later than the stamp before; one no later than the stamp before (as
+ *    it is while the count agrees with the stamps, a block being shorter than this) is first counted on as a
+ *    burst's, below, and anchored at the next callback. One this far LATER is blocks the page was never asked
+ *    for - WebKit drops them
+ *    while the page is busy, and the hardware plays on without them - or only the page late with this one,
+ *    or the first of a burst: the count goes on until the callbacks are evenly spaced again - two in a row,
+ *    each stamp one block after the one before, to SCRIPT_STAMP_TOLERANCE_S (one alone came in a page late
+ *    block after block, the research's 6x runs) - and is anchored then only if every stamp since stayed that
+ *    far later, by the least of them: a stamp can be late, never early. So a drop is anchored two callbacks
+ *    after its jump (until .40, at the jump itself), the count unproven again after it (SCRIPT_PROVE_S).
+ *  - A BURST: a stamp no later than the one before. After a stall Chromium runs the callbacks queued meanwhile
+ *    back to back, every one stamped alike - and each is the next block (the k-th callback is the k-th block,
+ *    over every recording the research made), so the count goes on through them as it is. Until .40 the
+ *    stall's stamp anchored the count and each callback of the burst then added a block, so it ran up to 3
+ *    blocks (64 ms) AHEAD of the real playbackTime, eased back at 0.02 ms a block - for up to a minute, the
+ *    delay and the hand's fit's look-ahead that much shorter (6 of 10 plain-http bench recordings).
+ *  - SCRIPT_PROVE_S: a count not yet seen to agree with a stamp - the first, or one moved forward - is set back
+ *    to any stamp earlier than it for this long (a first block asked for late anchored it late).
  */
-export const SCRIPT_REANCHOR_BLOCKS = 3
-export const SCRIPT_SLEW_S = 0.00002
-export const SCRIPT_DRIFT_EASE = 0.02
-/** A stamp within this of the count is the count: an exact clock, followed as it is. */
 export const SCRIPT_STAMP_TOLERANCE_S = 0.001
+export const SCRIPT_REANCHOR_S = 0.064
+export const SCRIPT_SLEW_PER_S = 0.0009375
+export const SCRIPT_DRIFT_EASE_S = 1.0666666666666667
+export const SCRIPT_PROVE_S = 1
+
+/** Whether the page runs on Apple's engine, WebKit - every browser on an iPhone, and Safari on a Mac:
+ *  `navigator.vendor` is "Apple Computer, Inc." there, or the old prefixed `webkitAudioContext` is still
+ *  given (Chromium and Firefox give neither). */
+export function isAppleEngine(): boolean {
+  try {
+    const scope = globalThis as { navigator?: { vendor?: unknown }; webkitAudioContext?: unknown }
+    return scope.navigator?.vendor === 'Apple Computer, Inc.' || typeof scope.webkitAudioContext === 'function'
+  } catch {
+    return false
+  }
+}
+
+/** The block the main-thread voice starts with on a context (2.0.0-player.40): SCRIPT_BUFFER_SMALL where the
+ *  context says its hardware renders that many frames or fewer at a time - `baseLatency` times the rate, which
+ *  in Chromium is exactly the hardware's 128, 512 or 1024 - and SCRIPT_BUFFER where it says more, or nothing
+ *  (no baseLatency, or 0). Within 2% of 512 counts as 512 (a rate that doesn't divide it evenly).
+ *  On WebKit (`apple`, isAppleEngine) always SCRIPT_BUFFER: its baseLatency is its render quantum, 128 frames
+ *  whatever buffer the hardware runs (AudioDestinationResampler::framesPerBuffer() is its render bus's
+ *  length), so it can't tell - and a voice that can't tell keeps 1024. */
+export function scriptBlockFor(context: { baseLatency?: number; sampleRate: number }, apple: boolean = isAppleEngine()): number {
+  if (apple) return SCRIPT_BUFFER
+  const base = (context as { baseLatency?: unknown }).baseLatency
+  if (typeof base !== 'number' || !Number.isFinite(base) || !(base > 0) || !(context.sampleRate > 0)) return SCRIPT_BUFFER
+  return base * context.sampleRate <= SCRIPT_BUFFER_SMALL * 1.02 ? SCRIPT_BUFFER_SMALL : SCRIPT_BUFFER
+}
+
+//? the smallest block the main-thread voice uses on this page: SCRIPT_BUFFER once its stamps have shown the
+//? hardware renders more than a small block at a time, or a small block was late where it sounded
+//? (SCRIPT_SHARED_OF) - so the next context starts there
+let scriptBlockFloor = SCRIPT_BUFFER_SMALL
+
+/** The main-thread voice's counted clock (countBlock): the next block's time (null before the first), the
+ *  stamps' drift from it, the stamp before and whether it was evenly spaced, the least distance of the stamps
+ *  waited on as far later (null: none), and how much longer, in seconds, the count is unproven. */
+export interface ScriptClock {
+  counted: number | null
+  drift: number
+  last: number | null
+  /** whether the stamp before was evenly spaced from the one before it (a block on, to the tolerance) */
+  even: boolean
+  hold: number | null
+  unproven: number
+}
+
+export function newScriptClock(): ScriptClock {
+  return { counted: null, drift: 0, last: null, even: false, hold: null, unproven: 0 }
+}
+
+/**
+ * The time the main-thread voice renders a block at (2.0.0-player.31, and .40's rules - SCRIPT_REANCHOR_S
+ * says them): `reported` is the block's playbackTime, `seconds` its length. Pure, and the clock moved on.
+ */
+export function countBlock(clock: ScriptClock, reported: number, seconds: number): number {
+  const counted = clock.counted
+  let at: number
+  let even = false
+  if (counted === null) {
+    //? the first block: anchored on its stamp, unproven yet
+    at = reported
+    clock.drift = 0
+    clock.unproven = SCRIPT_PROVE_S
+  } else {
+    const off = reported - counted
+    const last = clock.last!
+    even = Math.abs(reported - last - seconds) <= SCRIPT_STAMP_TOLERANCE_S
+    if (reported <= last + SCRIPT_STAMP_TOLERANCE_S / 2) {
+      //? a burst - stamped no later than the block before: the next block all the same, counted on
+      at = counted
+      clock.hold = null
+    } else if (off < -SCRIPT_REANCHOR_S || (clock.unproven > 0 && off < -SCRIPT_STAMP_TOLERANCE_S)) {
+      //? a stamp earlier than the count: a stamp is never early, so the count was ahead - anchored there
+      at = reported
+      clock.drift = 0
+      clock.hold = null
+    } else if (off > SCRIPT_REANCHOR_S) {
+      //? far later than the count: blocks never asked for - or the page late, or a burst to come. Counted on,
+      //? until two callbacks in a row are evenly spaced again, every stamp since as far on
+      if (clock.hold !== null && even && clock.even) {
+        at = counted + Math.min(clock.hold, off)
+        clock.drift = 0
+        clock.hold = null
+        clock.unproven = SCRIPT_PROVE_S
+      } else {
+        at = counted
+        clock.hold = clock.hold === null ? off : Math.min(clock.hold, off)
+      }
+    } else if (Math.abs(off) <= SCRIPT_STAMP_TOLERANCE_S) {
+      //? a stamp that agrees with the count: an exact clock (Chromium's), followed as it is
+      at = reported
+      clock.drift = 0
+      clock.hold = null
+      clock.unproven = 0
+    } else {
+      //? a stamp a step away from the count: WebKit's jitter, or the page late with this block - the count
+      //? holds, eased toward the stamps' LOWER edge (a stamp can be late, never early: down at once to one
+      //? earlier than it, up over SCRIPT_DRIFT_EASE_S), by at most SCRIPT_SLEW_PER_S a second. Until
+      //? 2.0.0-player.40 toward their running mean - so a page late now and then eased it ahead of the truth
+      clock.hold = null
+      clock.drift = off < clock.drift ? off : clock.drift + (off - clock.drift) * Math.min(1, seconds / SCRIPT_DRIFT_EASE_S)
+      const slew = SCRIPT_SLEW_PER_S * seconds
+      at = counted + Math.max(-slew, Math.min(slew, clock.drift))
+    }
+  }
+  clock.last = reported
+  clock.even = even
+  clock.unproven -= seconds
+  clock.counted = at + seconds
+  return at
+}
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
@@ -387,6 +581,8 @@ function startVoice(context: AudioContext): void {
     node.port.onmessage = (event: MessageEvent) => heard(event.data as VoiceHeard)
     node.connect(context.destination)
     audio.node = node
+    //? the render quantum, which a worklet renders a block of at a time
+    audio.block = 128
     audio.voice = { kind: 'worklet', ready: true, post: (said, transfer) => node.port.postMessage(said, transfer), disconnect: () => node.disconnect() }
   }).catch((error: unknown) => {
     if (audio.context === context && !audio.voice) startScript(context, `the AudioWorklet wouldn't load (${message(error)})`)
@@ -397,13 +593,14 @@ function startVoice(context: AudioContext): void {
 }
 
 /**
- * The script voice: a ScriptProcessorNode (no inputs, two output channels, SCRIPT_BUFFER a block) on
+ * The script voice: a ScriptProcessorNode (no inputs, two output channels, its block - SCRIPT_BUFFER_SMALL or
+ * SCRIPT_BUFFER, scriptBlockFor - a block) on
  * the page's main thread, running THE SAME functions the worklet runs - lib/deckVoice.ts's
  * newVoiceState, voiceCommand, renderVoice and voiceReport, never a copy of them. Each block is
  * rendered as of the context time it will play at (its `playbackTime`, a block ahead of `currentTime`
- * as the browser asks for it), and the messages that came since the last are applied to its state just
- * before, as of that same time - as the worklet applies each on the audio clock as it comes. And what
- * each says is heard SCRIPT_LAG_BLOCKS blocks after it was said - the most a message waits for the
+ * as the browser asks for it - counted, countBlock), and the messages that came since the last are applied to
+ * its state just before, as of that same time - as the worklet applies each on the audio clock as it comes. And
+ * what each says is heard SCRIPT_LAG_BLOCKS blocks after it was said - the most a message waits for the
  * block it is first heard in - so a take and the drives after it keep the same spacing they had as they
  * were said, and the voice plays exactly what the worklet would, that much later. Applied as they came,
  * as of `currentTime`, a take started a block or two behind where the record was by the time it was
@@ -414,6 +611,10 @@ function startVoice(context: AudioContext): void {
  * none replacing another, as the worklet keeps every one (until its review a drive replaced a drive held
  * just before it, a knot the worklet kept and this didn't); only a window replaces every window before
  * it. It says where it is as often as the worklet does. Ready once it has played its first block.
+ * Blocks of SCRIPT_BUFFER_SMALL whose stamps show the hardware asking for more than one at a time
+ * (SCRIPT_SHARED_OF), or one of which was late where the voice sounded, are given up for a node of
+ * SCRIPT_BUFFER, made as the voice next falls silent - its state, and what is held for it, carried over
+ * (2.0.0-player.40).
  */
 function startScript(context: AudioContext, why: string): void {
   if (typeof context.createScriptProcessor !== 'function') {
@@ -421,10 +622,11 @@ function startScript(context: AudioContext, why: string): void {
     return
   }
   try {
-    const node = context.createScriptProcessor(SCRIPT_BUFFER, 0, 2)
     const state = newVoiceState()
     const held: VoiceMessage[] = []
-    const lag = (SCRIPT_LAG_BLOCKS * SCRIPT_BUFFER) / context.sampleRate
+    let block = Math.max(scriptBlockFor(context), scriptBlockFloor)
+    let lag = (SCRIPT_LAG_BLOCKS * block) / context.sampleRate
+    let node: ScriptProcessorNode
     const voice: Voice = {
       kind: 'script',
       ready: false,
@@ -442,49 +644,88 @@ function startScript(context: AudioContext, why: string): void {
         node.disconnect()
       },
     }
-    //? the counted clock (SCRIPT_REANCHOR_BLOCKS): the next block's time, and the stamp's running drift from it
-    let counted: number | null = null
-    let drift = 0
-    node.onaudioprocess = (event: AudioProcessingEvent) => {
+    //? the counted clock (countBlock); and the stamps' watch (SCRIPT_SHARED_OF) - which of the last blocks
+    //? shared a stamp with the one before, the first of a pair or a run only, and how many of them did
+    let count = newScriptClock()
+    let blocks = 0
+    const sharing = new Uint8Array(SCRIPT_SHARED_WINDOW)
+    let shares = 0
+    let sharedBefore = false
+    let bigger = false
+    //? the loudest sample of the last two blocks the voice wrote
+    const peaks = [0, 0]
+    const onBlock = (event: AudioProcessingEvent) => {
       const out = event.outputBuffer
       const channels: Float32Array[] = []
       for (let channel = 0; channel < out.numberOfChannels; channel++) channels.push(out.getChannelData(channel))
       const reported = Number.isFinite(event.playbackTime) ? event.playbackTime : context.currentTime
       const blockSeconds = out.length / context.sampleRate
-      let at: number
-      const off = counted === null ? Infinity : reported - counted
-      if (Math.abs(off) > SCRIPT_REANCHOR_BLOCKS * blockSeconds) {
-        //? the first block, or blocks the page never rendered: anchored on the stamp
-        at = reported
-        drift = 0
-      } else if (Math.abs(off) <= SCRIPT_STAMP_TOLERANCE_S) {
-        //? a stamp that agrees with the count: an exact clock (Chromium's), followed as it is
-        at = reported
-      } else {
-        //? a stamp a step away from the count: WebKit's jitter - the count holds, eased toward the drift
-        drift += (off - drift) * SCRIPT_DRIFT_EASE
-        at = counted! + Math.max(-SCRIPT_SLEW_S, Math.min(SCRIPT_SLEW_S, drift))
-      }
-      counted = at + blockSeconds
-      //? asked for after it was due to play: the page was busy, and what was heard had a gap in it
-      const lateBy = context.currentTime - reported
-      soundHealth.blocks += 1
-      if (lateBy > 0) {
-        soundHealth.lateBlocks += 1
-        soundHealth.worstBlockMs = Math.max(soundHealth.worstBlockMs, lateBy * 1000)
-      }
+      const shared = count.last !== null && reported <= count.last + SCRIPT_STAMP_TOLERANCE_S / 2
+      const at = countBlock(count, reported, blockSeconds)
       for (const said of held.splice(0)) voiceCommand(state, said, at, context.sampleRate)
       renderVoice(state, channels, out.length, context.sampleRate, at)
       const said = voiceReport(state, out.length, context.sampleRate, at, REPORTS_PER_SECOND)
       if (said) heard(said)
+      //? how loud this block is, and the two before it: a block written late plays the one two before it again
+      //? in its place, which is heard only where one of them sounds
+      let peak = 0
+      for (const data of channels) for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]!))
+      const heardHere = Math.max(peak, peaks[0]!, peaks[1]!) > SCRIPT_HEARD_LEVEL
+      peaks[1] = peaks[0]!
+      peaks[0] = peak
+      //? asked for after it was due to play: the block's start, as counted, already past once it was written -
+      //? the page was busy, and what was heard there had a gap or a block played twice. Until 2.0.0-player.40
+      //? this compared currentTime with the stamp, which Chromium makes from currentTime as it asks - never late
+      const lateBy = context.currentTime - at
+      soundHealth.blocks += 1
+      if (lateBy > 0) {
+        soundHealth.lateBlocks += 1
+        soundHealth.worstBlockMs = Math.max(soundHealth.worstBlockMs, lateBy * 1000)
+        //? a small block late where the voice sounds: the page can't keep up with blocks that short
+        if (block < SCRIPT_BUFFER && heardHere) bigger = true
+      }
       if (!voice.ready && audio.voice === voice) {
         voice.ready = true
         audioChanged()
       }
+      if (block < SCRIPT_BUFFER) {
+        blocks += 1
+        const slot = blocks % SCRIPT_SHARED_WINDOW
+        const counts = shared && !sharedBefore && blocks > SCRIPT_SHARED_AFTER ? 1 : 0
+        shares += counts - sharing[slot]!
+        sharing[slot] = counts
+        if (shares >= SCRIPT_SHARED_OF) bigger = true
+      }
+      sharedBefore = shared
+      //? the hardware asks for more than one small block at a time, or the page can't keep up with them: a node
+      //? of SCRIPT_BUFFER as the voice next falls silent - faded or stopped, and heard no more (a let-go of a
+      //? playing record leaves it following the handover's run-out, silent), nothing held for it (the next
+      //? sound is a take, which starts its path afresh at the new lag), nothing being recorded - for good on
+      //? this page
+      if (bigger && state.gainTarget === 0 && !(state.gain > 1e-5) && !held.length && !recording && audio.voice === voice) {
+        bigger = false
+        scriptBlockFloor = SCRIPT_BUFFER
+        node.onaudioprocess = null
+        node.disconnect()
+        block = SCRIPT_BUFFER
+        lag = (SCRIPT_LAG_BLOCKS * block) / context.sampleRate
+        count = newScriptClock()
+        node = make(block)
+        audio.node = node
+        audio.block = block
+        audioChanged()
+      }
     }
-    node.connect(context.destination)
+    const make = (size: number): ScriptProcessorNode => {
+      const made = context.createScriptProcessor(size, 0, 2)
+      made.onaudioprocess = onBlock
+      made.connect(context.destination)
+      return made
+    }
+    node = make(block)
     audio.voice = voice
     audio.node = node
+    audio.block = block
     audio.why = why
   } catch (error) {
     audio.problem = `the sound's ScriptProcessorNode couldn't be made - ${message(error)}`
@@ -540,6 +781,8 @@ export function wakeDeckAudio(): void {
       audio.problem = null
       audio.missing = null
       audio.why = null
+      audio.block = null
+      speakerReadings.length = 0
       resetDeckClock(clock)
       //? suspended or resumed, its clock stood still meanwhile: the mapping starts again
       context.addEventListener?.('statechange', () => resetDeckClock(clock))
@@ -607,6 +850,9 @@ interface DeckRecording {
   until: number
   kind: 'worklet' | 'script'
   rate: number
+  /** the frames the voice renders at a time, as the recording began (2.0.0-player.40: 512 or 1024 on the main
+   *  thread, which doesn't change while one runs) */
+  block: number
   blocks: Float32Array[][]
   blockTimes: number[]
   /** each tapped block's loudest sample as a float, before the file's 16 bits clamp it (2.0.0-player.35) */
@@ -643,6 +889,9 @@ let recorded: DeckRecorded | null = null
 export interface DeckRecordingData {
   voice: 'worklet' | 'script'
   sampleRate: number
+  /** the frames the voice rendered at a time (2.0.0-player.40): the main-thread voice's block, 512 or 1024 -
+   *  what its lag is made of - or the worklet's 128 */
+  block: number
   /** the tapped audio, every channel, the blocks one after another */
   channels: Float32Array[]
   tapBlock: number
@@ -723,7 +972,7 @@ export function recordDeckSound(seconds = 20, keep = false): string | null {
     const tap = context.createScriptProcessor(4096, 2, 2)
     const started: DeckRecording = {
       seconds, since: now(), until: now() + seconds * 1000, kind: voice.kind, rate: context.sampleRate,
-      blocks: [], blockTimes: [], blockPeaks: [], messages: [], heard: [], tap,
+      block: audio.block ?? (voice.kind === 'script' ? SCRIPT_BUFFER : 128), blocks: [], blockTimes: [], blockPeaks: [], messages: [], heard: [], tap,
       timer: setTimeout(() => finishRecording(), seconds * 1000), keep,
     }
     tap.onaudioprocess = (event: AudioProcessingEvent) => {
@@ -794,11 +1043,16 @@ function finishRecording(): void {
   let base64 = ''
   for (let i = 0; i < bytes.length; i += PIECE) base64 += btoa(String.fromCharCode(...bytes.subarray(i, i + PIECE)))
   const payload = {
-    recording: 'deadwax turntable sound', version: 2, when: new Date().toISOString(),
+    recording: 'deadwax turntable sound', version: 3, when: new Date().toISOString(),
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
     secure: (globalThis as { isSecureContext?: boolean }).isSecureContext ?? null,
     voice: done.kind, sampleRate: done.rate, delaySeconds: HAND_DELAY_S,
-    scriptLagSeconds: done.kind === 'script' ? (SCRIPT_LAG_BLOCKS * SCRIPT_BUFFER) / done.rate : 0,
+    //? the block the voice rendered at a time, and the lag it makes on the main thread (2.0.0-player.40): a
+    //? replay reads them here, never from the build replaying it
+    block: done.block,
+    scriptLagSeconds: done.kind === 'script' ? (SCRIPT_LAG_BLOCKS * done.block) / done.rate : 0,
+    //? and what the device's audio adds after the voice, as its context said it
+    latency: deckLatency(),
     clock: deckClockMapping(), report: lastReport, pageTimeAtStart: done.since,
     tapBlock: 4096, blockTimes: done.blockTimes, blockPeaks: done.blockPeaks,
     limiter: { ceiling: VOICE_CEILING, lookaheadSeconds: VOICE_LOOKAHEAD_S },
@@ -822,7 +1076,7 @@ function finishRecording(): void {
       floats.push(channel)
     }
     kept = {
-      voice: done.kind, sampleRate: done.rate, channels: floats, tapBlock: 4096, blockTimes: done.blockTimes, blockPeaks: done.blockPeaks,
+      voice: done.kind, sampleRate: done.rate, block: done.block, channels: floats, tapBlock: 4096, blockTimes: done.blockTimes, blockPeaks: done.blockPeaks,
       since: done.since, until: now(), messages: done.messages, heard: done.heard, clock: payload.clock,
       delaySeconds: payload.delaySeconds, scriptLagSeconds: payload.scriptLagSeconds, file: text,
     }
@@ -900,6 +1154,7 @@ function closeDeckAudio(): void {
   audio.context = null
   audio.voice = null
   audio.node = null
+  audio.block = null
   audio.loading = false
   audio.problem = null
   audio.why = null
@@ -914,6 +1169,62 @@ function closeDeckAudio(): void {
  *  the smallest step the audio's clock has been seen to move by, and how many readings it is made of. */
 export function deckClockMapping(): { offset: number | null; step: number; count: number } {
   return { offset: clock.offset, step: clock.step, count: clock.count }
+}
+
+/* ----- what the device's audio adds (2.0.0-player.40) ----- */
+
+//? the render clock's lead over what is at the speaker, read from getOutputTimestamp() as the clock is read
+//? (seconds; the last few, for their median)
+const speakerReadings: number[] = []
+const SPEAKER_READINGS = 9
+
+/** One reading of how far the render clock is ahead of what is at the speaker now, where the browser says -
+ *  getOutputTimestamp(): the context time at the speaker as of a page time - and nothing where it doesn't
+ *  (an older Safari may not), isn't running or says nonsense. */
+function readSpeaker(context: AudioContext): void {
+  try {
+    if (context.state !== 'running' || typeof performance === 'undefined') return
+    const stamp = (context as { getOutputTimestamp?: () => AudioTimestamp }).getOutputTimestamp?.()
+    const at = stamp?.contextTime, page = stamp?.performanceTime
+    if (typeof at !== 'number' || typeof page !== 'number' || !(at > 0) || !(page > 0) || !Number.isFinite(at) || !Number.isFinite(page)) return
+    const lead = context.currentTime - (at + (performance.now() - page) / 1000)
+    if (!Number.isFinite(lead) || lead < 0 || lead > 2) return
+    speakerReadings.push(lead)
+    if (speakerReadings.length > SPEAKER_READINGS) speakerReadings.shift()
+  } catch {
+    //? a browser that throws for it: nothing said
+  }
+}
+
+/** A number the context gives, in seconds - or null where it gives none, or one that can't be. */
+function positive(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
+}
+
+/**
+ * What the device's audio adds after the voice, as the context says it (2.0.0-player.40) - so a phone says
+ * what a lab can't: `base` its base latency (in Chromium the hardware's render; in WebKit only its 128-frame
+ * render quantum, whatever the hardware runs), `output` its output latency (from there to the speaker - a
+ * Bluetooth headset's own included, where the browser knows it), `speaker` how far the render clock is ahead
+ * of what is at the speaker, read from getOutputTimestamp() (the median of the last few readings) - base and
+ * output together, read another way, each in seconds or null where the
+ * browser doesn't say (an older Safari may have neither of the last two); and `block`, the frames the voice
+ * renders at a time; and `design`, the record's sound behind the hand before any of that - HAND_DELAY_S, the
+ * main-thread voice's lag and the limiter's lookahead. Null with no context.
+ */
+export function deckLatency(): DeckLatency | null {
+  const context = audio.context
+  if (!context) return null
+  const sorted = [...speakerReadings].sort((a, b) => a - b)
+  const block = audio.block
+  const lag = audio.voice?.kind === 'script' && block ? (SCRIPT_LAG_BLOCKS * block) / context.sampleRate : 0
+  return {
+    base: positive((context as { baseLatency?: unknown }).baseLatency),
+    output: positive((context as { outputLatency?: unknown }).outputLatency),
+    speaker: sorted.length ? sorted[sorted.length >> 1]! : null,
+    block,
+    design: audio.voice ? HAND_DELAY_S + lag + VOICE_LOOKAHEAD_S : null,
+  }
 }
 
 /** Whether the audio context runs. */
@@ -1261,7 +1572,7 @@ export class Deck {
     this.dropPress()
     //? a new press before the song was back: that let-go isn't timed
     this.letGo = null
-    this.press = { taken: false, anchor: 0, at: 0, intent: 'pause', samples: [{ time, turned: 0 }] }
+    this.press = { taken: false, anchor: 0, at: 0, intent: 'pause', samples: [{ time, turned: 0 }], since: time, early: [] }
     this.holdTimer = setTimeout(() => {
       this.holdTimer = undefined
       if (this.press && !this.press.taken) {
@@ -1313,15 +1624,44 @@ export class Deck {
   }
 
   /**
+   * The hand moved inside a tap's few pixels, the record not taken yet (2.0.0-player.40): at `time` (the
+   * sample's own, ms) it had turned the record by `turned` since the press (radians), which moves the song by
+   * `offset` (seconds). Kept, and nothing else - it may yet be a tap - so a quick grab is heard from the press.
+   */
+  touched(time: number, turned: number, offset: number): void {
+    const press = this.press
+    if (!press || press.taken) return
+    const early = press.early
+    const last = early[early.length - 1]
+    if (time < (last?.time ?? press.since)) return
+    if (last && time === last.time) early.pop()
+    early.push({ time, turned, offset })
+  }
+
+  /**
    * The record taken. Turning at speed under the song: the song pauses (the player's own toggle,
    * through the host) and the record's sound starts at its position, at its own speed if it was
    * playing. Coasting, coming back to speed or winding down: caught where the platter is, its sound
    * carrying on from there, and whether the song is meant to play kept from what it was doing. Either
    * way the hand has it from here - the path the voice follows is the hand's from `time` (the pointer
-   * event's own time, ms: the move that crossed a tap's few pixels - or now, for a press that rested).
-   * Returns where it was taken.
+   * event's own time, ms - or now, for a press that rested HOLD_MS).
+   *
+   * A QUICK GRAB (`quick`: the move at `time` crossed a tap's few pixels - 2.0.0-player.40) is taken from the
+   * PRESS: the record where it was as the finger went down - a playing song where it was then, at its speed,
+   * though it played on under the slop until now (the tap's price) and pauses only now; a coast where the
+   * plan had it - with the take stamped at the press's own moment and every sample the hand made since
+   * (touched) handed to the voice after it, in order, so the voice, HAND_DELAY_S behind, plays the hand from
+   * the press. Its turn counts from the press (Turntable keeps the offset) and the time line follows; the face
+   * carries on from where it was drawn as the slop was crossed (the platter's angle then, less the hand's turn
+   * Turntable adds from now), so it doesn't jump. No further back than TAKE_BACK_S before now
+   * (SCRIPT_TAKE_BACK_S on the main thread): an older press is taken from its oldest sample within it - a still
+   * record at the hand's place then; a moving one (a playing song, a coast) where it had got to on its own by
+   * then, the voice having perhaps already played it there, so the hand carries on from that place, and its
+   * join with the song, or its path from the coast's, is as a take at the crossing's was.
+   * Returns where the hand's turn counts from: the record at the press (or the take) - or, a moving record past
+   * the reach, its place at that sample less the hand's turn by then.
    */
-  takeOver(time: number = now()): number {
+  takeOver(time: number = now(), quick = false): number {
     const press = this.press
     if (!press) return this.host.position()
     if (press.taken) return press.anchor
@@ -1330,37 +1670,76 @@ export class Deck {
     clearTimeout(this.settleTimer)
     this.settleTimer = undefined
     const motion = this.motion
+    //? a quick grab from the press; anything else from `time`, as ever
+    const since = quick && press.since < time ? press.since : time
+    //? the moments since then the voice can be told of: the press, and the hand's samples inside the slop - the
+    //? take at the oldest within TAKE_BACK_S of now (the crossing's own at the least), the rest after it
+    const moments = since < time ? [{ time: since, turned: 0, offset: 0 }, ...press.early.filter((sample) => sample.time > since && sample.time <= time)] : [{ time, turned: 0, offset: 0 }]
+    //? the crossing itself among them (Turntable tells it, touched) - or, untold, as the last the hand said
+    const lastMoment = moments[moments.length - 1]!
+    if (lastMoment.time < time) moments.push({ ...lastMoment, time })
+    const reach = now() - (audio.voice?.kind === 'script' ? SCRIPT_TAKE_BACK_S : TAKE_BACK_S) * 1000
+    let first = moments.findIndex((moment) => moment.time >= reach)
+    if (first < 0) first = moments.length - 1
+    const from = moments[first]!
+    //? the face carries on from where it is drawn now (Turntable adds the hand's turn since the press from here
+    //? on, the turn it had at the crossing included), so it doesn't jump as the record is taken - a quick grab's;
+    //? a press that rested HOLD_MS, at its own moment, as ever
+    const angle = quick ? this.angleNow() - (lastMoment.turned * 180) / Math.PI : this.angleAt(since)
+    //? where the record is at `from`, the take's moment: a still record where the hand had turned it since the
+    //? press; a moving one where it got to on its own - at the press itself, within reach; past it, where it
+    //? had got to by `from`, which the voice may have played already (2.0.0-player.40's review: from the press,
+    //? a coast's path stepped back and a playing song's join came later), so the hand carries on from there
     let at: number
+    let rate: number
+    let taking: boolean
     if (motion.kind === 'plan' && motion.role !== 'spin') {
       clearTimeout(this.planTimer)
       this.planTimer = undefined
       this.endHandover()
-      const { v } = planAt(motion.plan, (time - motion.since) / 1000)
-      at = this.recordAt(time)
+      const { v } = planAt(motion.plan, (from.time - motion.since) / 1000)
+      at = this.planHasRecord(motion) ? this.recordAt(from.time) : this.recordAt(since) + from.offset
       press.intent = motion.role === 'handover' ? 'play' : 'pause'
-      if (!motion.sounding && this.sounding(at)) this.take(at, motion.quiet ? 0 : voiceRate(v), time)
+      rate = motion.quiet ? 0 : voiceRate(v)
+      taking = !motion.sounding
     } else {
       const playing = this.host.playing()
       //? a song changed under the hand a moment ago, about to be played (songChanged): meant to play
       const pending = this.resumeTimer !== undefined
       clearTimeout(this.resumeTimer)
       this.resumeTimer = undefined
-      at = this.host.position()
+      //? a song playing on under the press: where it was at `from` (the press, within reach), at its speed - the
+      //? very line a take now would have it heard on, so the record's sound joins the song as it did
+      const position = this.host.position()
+      at = playing ? Math.max(0, position - (this.speed * Math.max(0, time - from.time)) / 1000) : position + from.offset
       if (playing) this.host.hold()
       press.intent = playing || pending ? 'play' : 'pause'
-      if (this.sounding(at)) this.take(at, playing ? this.speed : 0, time)
+      rate = playing ? this.speed : 0
+      taking = true
     }
+    //? where the hand's turn counts from (Turntable's `anchor() + offset`): the take's place less its turn by then
+    const anchor = at - from.offset
+    if (taking && this.sounding(at)) this.take(at, rate, from.time)
     press.taken = true
-    press.anchor = at
+    press.anchor = anchor
     press.at = at
-    this.angle = this.angleNow()
+    //? and the hand's samples since the press are the hand's - its speed as it lets go counts them too
+    if (since < time) press.samples = [{ time: since, turned: 0 }, ...moments.slice(1).map(({ time: when, turned }) => ({ time: when, turned }))]
+    this.angle = angle
     this.motion = { kind: 'hand' }
-    //? the hand has the record here, now: the path's first sample of it (a hand that rests sends no more,
-    //? and the record stops there)
-    this.post({ type: 'hand', at, time: this.stamp(time) })
-    this.keep(at)
+    //? the hand has the record here, then: the path's first sample of it (a hand that rests sends no more,
+    //? and the record stops there) - and each sample since, but the one at `time`, which the hand's own
+    //? call that follows sends (hand)
+    this.post({ type: 'hand', at, time: this.stamp(from.time) })
+    for (let i = first + 1; i < moments.length; i++) {
+      const moment = moments[i]!
+      if (moment.time >= time) break
+      press.at = anchor + moment.offset
+      this.post({ type: 'hand', at: press.at, time: this.stamp(moment.time) })
+    }
+    this.keep(press.at)
     this.loop()
-    return at
+    return anchor
   }
 
   /**
@@ -1520,10 +1899,14 @@ export class Deck {
    *  is where that put it. */
   private recordAt(time: number = now()): number {
     const motion = this.motion
-    if (motion.kind === 'plan' && motion.role !== 'spin' && !motion.quiet && (motion.sounding || motion.role !== 'winddown')) {
-      return planAt(motion.plan, (time - motion.since) / 1000).x
-    }
+    if (motion.kind === 'plan' && this.planHasRecord(motion)) return planAt(motion.plan, (time - motion.since) / 1000).x
     return this.host.position()
+  }
+
+  /** Whether a plan has the record where it has the platter (recordAt): not a spin, nor quiet, nor a wind-down
+   *  that made no sound. */
+  private planHasRecord(motion: PlanMotion): boolean {
+    return motion.role !== 'spin' && !motion.quiet && (motion.sounding || motion.role !== 'winddown')
   }
 
   /** Whether the song is meant to be playing when the deck lets go of it: the hand took it from
@@ -1541,10 +1924,15 @@ export class Deck {
   }
 
   private angleNow(): number {
+    return this.angleAt(now())
+  }
+
+  /** The face's angle at page time `time` (ms) - now, or a quick grab's press (2.0.0-player.40). */
+  private angleAt(time: number): number {
     const motion = this.motion
     if (this.reduced || this.stilled) return this.angle
-    if (motion.kind === 'turning') return motion.from + (DEGREES_PER_SECOND * this.speed * (now() - motion.since)) / 1000
-    if (motion.kind === 'plan') return motion.from + degreesFor(planAt(motion.plan, (now() - motion.since) / 1000).x - motion.x0)
+    if (motion.kind === 'turning') return motion.from + (DEGREES_PER_SECOND * this.speed * (time - motion.since)) / 1000
+    if (motion.kind === 'plan') return motion.from + degreesFor(planAt(motion.plan, (time - motion.since) / 1000).x - motion.x0)
     return this.angle
   }
 
@@ -1797,6 +2185,7 @@ export class Deck {
     const context = audio.context
     if (!context) return
     clockReading(clock, now(), context.currentTime, this.steering())
+    readSpeaker(context)
     if (Math.abs(clock.step - this.reportedStep) > 1e-4) this.report()
   }
 
@@ -2081,6 +2470,7 @@ export class Deck {
       lastFetchAt: this.lastFetchAt,
       clockStep: clock.step,
       health: this.health(),
+      latency: deckLatency(),
     })
     this.reportedStep = clock.step
     this.reportedAt = now()

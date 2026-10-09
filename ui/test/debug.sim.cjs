@@ -233,6 +233,20 @@ console.log('\nTurntable timing (2.0.0-player.28): how the turntable keeps up on
     ['Peaks held under full scale: 1 since it showed (1 sample), the deepest under 0.1 dB · Under a hand: 310 frames, 4 late, the longest gap 118 ms',
       'Peaks held under full scale: none since it showed · Under a hand: 310 frames, 4 late, the longest gap 118 ms'])
   check('...and no word of it with no voice yet (nothing has played)', rows.turntableTimingRow({ ...base, voice: null, health: held }).note, 'Under a hand: 310 frames, 4 late, the longest gap 118 ms')
+  //? 2.0.0-player.40: the record's sound behind the hand by design, and what this device's audio says it adds
+  //? after that - each only where the browser gives it
+  const mac = { base: 128 / 48000, output: 0.008, speaker: 0.0117, block: 512, design: 0.12 + 1024 / 48000 + 0.0015 }
+  check('2.0.0-player.40: behind the hand by design - blocks of 512 on the main thread - and what a Mac\'s Chrome says its audio adds: base, output, and the render clock\'s lead on the speaker',
+    rows.turntableTimingRow({ ...base, health, latency: mac }).note,
+    "The sound, on the main thread: 12 of 3400 blocks late, the worst by 38 ms · Under a hand: 310 frames, 4 late, the longest gap 118 ms · The record's sound: 142.8 ms behind the hand by design (blocks of 512 on the main thread), then what this device's audio adds - it says base 2.7 ms, output 8.0 ms, 11.7 ms from render to speaker")
+  check('...an iPhone before Safari 18.4: blocks of 1024, its base latency alone; the worklet on its own thread; a browser that says nothing; and nothing said with no voice or no figures',
+    [rows.latencyNote({ ...base, health, latency: { base: 1024 / 48000, output: null, speaker: null, block: 1024, design: 0.12 + 2048 / 48000 + 0.0015 } }),
+      rows.latencyNote({ ...base, voice: 'worklet', voiceWhy: null, health, latency: { base: 0.0107, output: 0.04, speaker: 0.0456, block: 128, design: 0.1215 } }),
+      rows.latencyNote({ ...base, health, latency: { base: null, output: null, speaker: null, block: 1024, design: 0.12 + 2048 / 48000 + 0.0015 } }),
+      rows.latencyNote({ ...base, voice: null, health, latency: mac }), rows.latencyNote({ ...base, health, latency: null }), rows.latencyNote({ ...base, health })],
+    ["The record's sound: 164.2 ms behind the hand by design (blocks of 1024 on the main thread), then what this device's audio adds - it says base 21.3 ms",
+      "The record's sound: 121.5 ms behind the hand by design (on its own thread), then what this device's audio adds - it says base 10.7 ms, output 40.0 ms, 45.6 ms from render to speaker",
+      "The record's sound: 164.2 ms behind the hand by design (blocks of 1024 on the main thread), then what this device's audio adds - it doesn't say", null, null, null])
 }
 
 console.log('\nTurntable sound (2.0.0-player.24): how far the audio\'s clock moves at a time')

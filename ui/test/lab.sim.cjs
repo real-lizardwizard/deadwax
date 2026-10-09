@@ -863,10 +863,12 @@ async function main() {
    * the song `playing` or paused; a motion run by lab/runner.ts and recorded with the deck's own recorder,
    * kept for the page. `probe` is handed the deck and the harness first, for the checks of its parts.
    */
-  async function deckRun({ host, playing = false, drift = false, jitter = true, probe = null, library = null }) {
+  async function deckRun({ host, playing = false, drift = false, jitter = true, probe = null, library = null, block = 1024 }) {
     const rate = 48000
     const song = await signals.makeSignal('sine1k', rate, { seconds: 40 })
-    const step = host === 'worklet' ? 256 : 1024
+    //? the main-thread voice in blocks of 512 (2.0.0-player.40) where its context says its hardware renders 128
+    //? frames at a time - here, renders of 512
+    const step = host === 'worklet' ? 256 : block
     const world = { host, rate, rendered: 0, inbox: [], calls: [], node: null, script: null, taps: [], gains: [], output: new Float32Array(rate * 60), state: voice.newVoiceState(), audio0: real, connections: [], fetches: 0, served: [] }
     //? deadwax: none for a song the bench made - its windows are the bench's own - and, for a song from the
     //? library (2.0.0-player.37), its scrub route faked at fetch: the song's samples [first, first + samples)
@@ -890,7 +892,7 @@ async function main() {
     }
     define('AudioWorkletNode', host === 'worklet' ? FakeNode : undefined)
     class FakeContext {
-      constructor() { this.state = 'suspended'; this.sampleRate = rate; this.destination = { speakers: true }; this.listeners = []; if (host === 'worklet') this.audioWorklet = { addModule: () => Promise.resolve() } }
+      constructor() { this.state = 'suspended'; this.sampleRate = rate; this.destination = { speakers: true }; this.listeners = []; if (host === 'worklet') this.audioWorklet = { addModule: () => Promise.resolve() }; if (block === 512) this.baseLatency = 128 / rate }
       get currentTime() { return world.rendered / rate }
       addEventListener(name, listener) { if (name === 'statechange') this.listeners.push(listener) }
       resume() { this.state = 'running'; for (const l of this.listeners) l(); return Promise.resolve() }
@@ -937,10 +939,11 @@ async function main() {
         }
       } else {
         const before = world.rendered
+        const size = world.script?.size ?? 1024
         world.rendered += step
-        for (let boundary = Math.ceil(before / 1024) * 1024; boundary < world.rendered; boundary += 1024) {
+        for (let boundary = Math.ceil(before / size) * size; boundary < world.rendered; boundary += size) {
           //? the stamp: the frame it plays at - or, drifting, 1023 frames a block from the first
-          const frame = boundary + 1024
+          const frame = boundary + size
           world.calls.push({ at: real + 0.7, frame, playbackTime: (drift ? frame * (1023 / 1024) : frame) / rate })
         }
       }
@@ -948,8 +951,9 @@ async function main() {
     }
     const scriptCall = ({ frame, playbackTime }) => {
       if (!world.script?.onaudioprocess) return
-      const channels = [new Float32Array(1024), new Float32Array(1024)]
-      world.script.onaudioprocess({ outputBuffer: { numberOfChannels: 2, length: 1024, getChannelData: (c) => channels[c] }, playbackTime })
+      const size = world.script.size
+      const channels = [new Float32Array(size), new Float32Array(size)]
+      world.script.onaudioprocess({ outputBuffer: { numberOfChannels: 2, length: size, getChannelData: (c) => channels[c] }, playbackTime })
       world.output.set(channels[0], frame)
     }
     let nextFrame = real + 3
@@ -1069,9 +1073,10 @@ async function main() {
     })
     const { data, result, compared } = run
     check(`${host}: a kept recording starts; the motion took the record through the deck, and let go of it after its last sample`, [run.started, !!result, result?.stopped, run.taken], [null, true, false, false])
-    check(`${host}: kept - the deck's own messages and reports, the file version 2 and the same audio`,
+    //? version 3 since 2.0.0-player.40 (the voice's block and the device's latencies in it)
+    check(`${host}: kept - the deck's own messages and reports, the file version 3 and the same audio`,
       [!!data, data.voice, data.messages.some((m) => m.type === 'take'), data.messages.filter((m) => m.type === 'hand').length >= 140, data.heard.length > 50, JSON.parse(data.file).version, JSON.parse(data.file).audio.frames === data.channels[0].length],
-      [true, host, true, true, true, 2, true])
+      [true, host, true, true, true, 3, true])
     check(`${host}: the motion's exact knots pair one to one with the deck's own hand samples`, [!!run.exactMotion, run.exactMotion?.knots.length], [true, result.samples.length])
     const nums = compared.numbers
     console.log(`    (${host}: replay ${round(nums.replayDb, 1)} dB under what was recorded, lined up at ${round(nums.alignScore, 6)}, lead ${round(nums.leadMs, 2)} ms, fit ${nums.fitMs === null ? 'none' : round(nums.fitMs, 6)} ms; strayed ${JSON.stringify(nums.strayed && { max: round(nums.strayed.maxMs, 3), typical: round(nums.strayed.typicalMs, 3) })} ms; wobble ${JSON.stringify(nums.wobble)}; A against B ${round(nums.stray?.db ?? NaN, 1)} dB, loudest ${JSON.stringify(nums.stray?.loudest)})`)
@@ -1146,6 +1151,18 @@ async function main() {
     console.log(`    (drifting stamps: replay ${round(n.replayDb, 1)} dB, fit ${n.fitMs === null ? 'none' : round(n.fitMs, 6)} ms, lined up at ${round(n.alignScore, 6)})`)
     check('the main-thread voice\'s stamps drifting a frame a block: the replay still reproduces it (more than 100 dB under, its read head within a microsecond of the song)',
       [n.replayDb < -100, n.fitMs !== null && n.fitMs < 0.001], [true, true])
+    //? 2.0.0-player.40: the main-thread voice in blocks of 512 - and the replay reads its block, and the lag it
+    //? makes, from the recording, never from the build replaying it: the same recording read as one made before
+    //? .40 (no block in it: blocks of 1024) doesn't come out the same
+    const small = await deckRun({ host: 'script', block: 512 })
+    const m = small.compared.numbers
+    const file = JSON.parse(small.data.file)
+    const unsaid = await small.compareWith(small.exact, false, { ...small.data, block: undefined, scriptLagSeconds: (2 * 1024) / small.rate })
+    const u = unsaid.numbers
+    console.log(`    (blocks of 512: replay ${round(m.replayDb, 1)} dB, fit ${m.fitMs === null ? 'none' : round(m.fitMs, 6)} ms; read as blocks of 1024: ${round(u.replayDb, 1)} dB, fit ${u.fitMs === null ? 'none' : round(u.fitMs, 6)} ms)`)
+    check('2.0.0-player.40: the main-thread voice in blocks of 512 (its context said 128-frame renders): its file says so - the block, and the lag two of them make - and the replay, reading them there, reproduces what it played (more than 100 dB under, within a microsecond); read as blocks of 1024, it does not',
+      [file.version, file.block, round(file.scriptLagSeconds, 9), m.replayDb < -100, m.fitMs !== null && m.fitMs < 0.001, !(u.replayDb < -100 && u.fitMs !== null && u.fitMs < 0.001)],
+      [3, 512, round(1024 / 48000, 9), true, true, true])
     //? a playing song taken and let go, each moved off the lead the rest were told at - the take two of
     //? the worklet's 128-frame blocks early, the stop two late, neither past a neighbour (the take goes
     //? out with the hand's first sample, the stop is the last thing said), so no one lead fits both. The
