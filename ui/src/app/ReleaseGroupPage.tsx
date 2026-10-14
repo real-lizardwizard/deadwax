@@ -183,11 +183,21 @@ function DeskTracklist({
  * the panel left open from this album's page as you went back and came to it again - the page asks App
  * to search again for the one it shows (`again`: the chips stay as set, nothing is picked for you).
  * Only the page that shows asks (`shown`): the same album open on two tabs never takes turns.
+ *
+ * ANOTHER PRESSING OF AN ALBUM YOU HOLD (2.0.0-player.41): the album you have links here ("Other
+ * pressings", by the group its folders carry), so the deluxe beside the standard you hold can be got.
+ * The pressing list marks every pressing your library holds ("In your library", by release id from
+ * /library/owned - the same answer the meta line reads), and never folds one away; Get on a held one
+ * goes the way it always went - the store line says "Already in your library", and the Sources sheet
+ * shows that box in place of any search (the server searches nothing for it). Opened from there it
+ * has no group from Search to draw its header from, so `title` - the album's name as the page that
+ * opened it knew it - stands in as the title until MusicBrainz's own group arrives with the pressings.
  */
 export function ReleaseGroupPage({
   id,
   release,
   preview,
+  title = '',
   shown,
   onBack,
   backLabel,
@@ -202,6 +212,9 @@ export function ReleaseGroupPage({
   release: string | null
   /** the group as Search showed it, for the header before (or without) the pressings */
   preview: ReleaseGroup | null
+  /** the album's name as the page that opened it knew it (2.0.0-player.41): the title until the
+   *  header has one - never used for what Get downloads */
+  title?: string
   /** the page is what shows - its tab current, no sheet over it, the app in front (App) */
   shown: boolean
   onBack: () => void
@@ -267,11 +280,16 @@ export function ReleaseGroupPage({
   }, [mbid, requests])
 
   const releases = (answer?.releases ?? []) as PageRelease[]
-  const view = useMemo(() => (releases.length ? pressingsView(releases, release) : null), [answer, release])
+  //? what the library holds of this album: its folders by the group's id or any pressing's - null
+  //? until the library has answered, and the meta line then says neither
+  const holding = owned ? ownedForGroup(owned.index, { groupId: mbid, releaseIds: releases.map((release) => release.id) }).held : null
+  const held = holding ? holding.length > 0 : null
+  //? ...and which pressings those are, by release id: each marked in the pressing list (2.0.0-player.41)
+  const heldKey = [...new Set((holding ?? []).map((album) => (album.release_mbid ?? '').trim().toLowerCase()).filter(Boolean))].sort().join(' ')
+  const heldIds = useMemo(() => new Set(heldKey ? heldKey.split(' ') : []), [heldKey])
+  const view = useMemo(() => (releases.length ? pressingsView(releases, release, heldIds) : null), [answer, release, heldIds])
   const chosen = releases.find((candidate) => candidate.id === view?.chosenId) ?? null
   const header = pageHeader(releases, chosen, preview)
-  //? null until the library has answered: the meta line then says neither
-  const held = owned ? ownedForGroup(owned.index, { groupId: mbid, releaseIds: releases.map((release) => release.id) }).held.length > 0 : null
   const diff = view && chosen ? view.diffs.get(chosen.id) ?? null : null
   const rows = trackRows(chosen, diff)
   const missing = leftOut(diff)
@@ -355,7 +373,7 @@ export function ReleaseGroupPage({
 
       <div class="pl-album-hero">
         <ArchiveCover addresses={mbid ? coverAddresses(chosen?.id ?? release, mbid) : []} class="pl-hero-cover" />
-        <h1 class="pl-hero-title">{header.title}</h1>
+        <h1 class="pl-hero-title">{header.title || title}</h1>
         {artistLink ? (
           <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist?.(artistLink)}>
             {header.artist}

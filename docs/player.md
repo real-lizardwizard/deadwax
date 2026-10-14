@@ -123,13 +123,20 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   names the tab it goes back to. The artist's name under the title opens [their page](#artist-pages).
   Under it, **In your library**, and an **Also: …** chip for each other pressing of the album you
   have that Navidrome has found ("Also: 20th Anniversary Reissue 180gram", or the year when a
-  pressing has no edition of its own) - tap it for that pressing's page. The pin at the top right
-  pins the album to Home ([Home and pins](#home-and-pins)).
+  pressing has no edition of its own) - tap it for that pressing's page - and, since
+  2.0.0-player.41, **Other pressings ›**: every pressing of the album as MusicBrainz lists them, the
+  ones you have marked **In your library**, with **Get the album** for another - the deluxe beside the
+  standard ([finding music](finding-music.md#another-pressing-of-an-album-you-have)). The row shows
+  once deadwax has said what you hold, in a place kept for it, so nothing in it moves as it fills.
+  Beside an Also chip, in a row too narrow for all three whole (a phone held upright), it reads
+  **Pressings**, and In your library keeps only its tick, to leave the Also chip room. The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
 - **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
-  source for me**) and the **Quality floor** (Any, 320 kbps, Lossless, 24-bit), kept for you on
-  deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax));
+  source for me**), the **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and, since
+  2.0.0-player.41, **Format** (Any, Prefer lossless, Lossless only - what a Get's sources are scored
+  by), kept for you on deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)),
+  then **Confirm before cancelling**, which is this device's;
   **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as** and
   **Pause winds the record down** ([the turntable](#the-turntable)) and **Maximum quality**
   ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
@@ -141,7 +148,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   **Needs a look**, then **Server settings** and **Log**, [below](#on-a-desktop)) - and **Open the
   main page** takes you there.
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
-  from, and **✕** to cancel, which asks in the card first: **Keep it** or **Cancel download**),
+  from, and **✕** to cancel, which asks in the card first - **Keep it** or **Cancel download** -
+  unless You's **Confirm before cancelling** is off),
   **Waiting** (its place in the user's queue, or "starting"), **Needs attention** (why it stopped,
   in red, with **Next peer · N left** and **Ask again**) and **Done** (how it ended and how long
   ago: "In your library · 12 minutes ago"), each heading only when it has something under it, and
@@ -176,7 +184,10 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   **Choose a source**, a sheet of the folders found on Soulseek, one card each: the score, the
   folder and who it's from, then **Speed** first and large (what you got from that user before, in
   green, or their own average, or none reported), Tracks, Quality, Size and when it **Starts**, and
-  what it's missing in amber. **Lossless**, **24-bit**, **Free slot** and the sort narrow the list.
+  what it's missing in amber - and, behind a tap on the score (since 2.0.0-player.41), why it scored
+  what it did: the score's six parts as chips and the edition words in the folder's name.
+  **Lossless**, **24-bit**, **Free slot** and the sort narrow the list, and **Search again** under
+  it opens the query to edit. The search is scored by You's **Format**.
   A card's **Get** queues it and switches to Requests, where it already shows. With **Pick the best
   source for me** in You, Get queues the best match itself when one scores 75 or more under your
   quality floor (never for the album as a whole, with no tracklist to judge by).
@@ -427,7 +438,8 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   panel beside the page, and shows pressed while the panel shows that pressing's sources: click it
   again to close them.
 - **The Sources panel** is the same cards as on a phone - the score, the folder and who it's from,
-  then Speed first, Tracks, Quality, Size and Starts in a row - with **Lossless**, **24-bit**,
+  then Speed first, Tracks, Quality, Size and Starts in a row, and the score's parts as chips, always
+  showing - with **Search again** under them, and **Lossless**, **24-bit**,
   **Free slot**, **Signals** and the sort. **Signals** sets the least each part of the match score
   may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a slider each -
   as the main page's candidates panel does, and its chip counts how many are set. They're the
@@ -1523,8 +1535,8 @@ question the whole player existed to answer. Still to find out:
   crackle on its drum hits, slowed, sped up or at its own speed; Debug's **Turntable timing** should
   count the peaks it held (`Peaks held under full scale: …`), and a recording made then should have no
   moment over half a decibel under full scale;
-- **Requests** on the phone: the ✕ asking in the card (a home-screen app always asks: it has its
-  own storage, and no Settings tab to turn that off), the count on the tab, Home's Arriving coming
+- **Requests** on the phone: the ✕ asking in the card (unless You's **Confirm before cancelling** is
+  off on the phone - it's kept per device, so a home-screen app has its own), the count on the tab, Home's Arriving coming
   and going, a download started on the main page showing up when you come back to the app, what
   VoiceOver reads out as downloads change, and the covers fetched from the Cover Art Archive over
   your VPN;

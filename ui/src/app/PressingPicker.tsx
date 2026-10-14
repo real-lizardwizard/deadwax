@@ -8,8 +8,9 @@ import { CheckIcon, ChevronDownIcon } from '../player/icons'
  * Which pressing the album-you-don't-have page shows (2.0.0-player.13), as Request.dc.html draws it:
  * a button saying the pressing ("Pressing" over "CD · 2008 · GB · Island"), opening a popover of the
  * album's pressings, each with a note of how it differs from the usual tracklist (amber when it
- * does), the chosen one ticked - and "N more pressings with the usual tracklist", which expands,
- * folding the identical ones away (lib/pressings.ts decides which show).
+ * does), the chosen one ticked, each one your library holds marked "In your library" under its note
+ * (2.0.0-player.41, never folded away) - and "N more pressings with the usual tracklist", which
+ * expands, folding the identical ones away (lib/pressings.ts decides which show).
  *
  * A listbox: the button says so (`aria-haspopup`, `aria-expanded`), each pressing is an option with
  * `aria-selected`; opening puts focus on the chosen one, the arrows (and Home, End) move it. Escape
@@ -152,6 +153,7 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
                 <span class="app-picker-text">
                   <span class="app-picker-option-label">{row.label}</span>
                   <span class={`app-picker-note${row.kind === 'differs' ? ' is-differs' : ''}`}>{row.note}</span>
+                  {row.held && <span class="app-picker-held">In your library</span>}
                 </span>
               </button>
             )

@@ -63,6 +63,10 @@ export const STORAGE_KEYS = {
    *  stored - nothing, a word, a number out of range - is 1, the song's own speed. Per device, like
    *  the others: a deck's pitch fader stays where you left it. */
   playerSpeed: 'deadwax-player-speed',
+  /** "Confirm before cancelling" in You > Getting albums (2.0.0-player.41), per device: 'off', 'on',
+   *  or 'default' - carried over from the main page's own setting in this browser, which said to ask
+   *  (or said nothing), so it reads as the default, on. Nothing stored: not yet carried over. */
+  playerConfirmCancel: 'deadwax-player-confirm-cancel',
 } as const
 
 /*
@@ -317,6 +321,29 @@ export function readPlayerWindDown(): boolean {
 
 export function writePlayerWindDown(on: boolean): void {
   writeRaw(STORAGE_KEYS.playerWindDown, on ? 'on' : 'off')
+}
+
+/* ===== deadwax-player-confirm-cancel ===== */
+
+/**
+ * "Confirm before cancelling" (2.0.0-player.41): whether the Requests tab's ✕ asks first, in the card,
+ * per device. On by default. The first time it is read on a device it is carried over, ONCE, from
+ * the main page's own setting in this browser (deadwax-preferences' confirmCancel, which the app read
+ * at every tap until now): 'off' if that said off, else 'default' - which marks it carried over
+ * without storing the default as if chosen, so it reads as whatever the default is. A choice made in
+ * You is 'on' or 'off'. Storage that can't be read or written: on, nothing thrown.
+ */
+export function readConfirmCancel(): boolean {
+  const stored = readRaw(STORAGE_KEYS.playerConfirmCancel)
+  if (stored === 'off') return false
+  if (stored !== null) return true
+  const carried = readPreferences().confirmCancel
+  writeRaw(STORAGE_KEYS.playerConfirmCancel, carried ? 'default' : 'off')
+  return carried
+}
+
+export function writeConfirmCancel(on: boolean): void {
+  writeRaw(STORAGE_KEYS.playerConfirmCancel, on ? 'on' : 'off')
 }
 
 /* ===== deadwax-player-speed ===== */

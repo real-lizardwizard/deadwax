@@ -1,12 +1,11 @@
 import { useMemo, useRef, useState } from 'preact/hooks'
 
 import * as api from '../api/download'
-import type { Candidate, DownloadRelease, FindCandidatesResponse } from '../api/types'
+import type { Candidate, DownloadRelease, FindCandidatesResponse, FormatPreference } from '../api/types'
 import { autoGrabPick, autoPickBlocked, candidateKey, queryOverride, type CandidateFilters, type CandidateSort } from '../lib/candidates'
 import { requestDownload } from '../lib/downloadRequests'
 import { notPickedLine } from '../lib/getSettings'
 import { isAbort, latestOnly } from '../lib/latest'
-import { readDownloadDefaults } from '../state/persisted'
 
 /**
  * One Soulseek search for a release, and a download from it - the app's Sources sheet's
@@ -32,6 +31,12 @@ import { readDownloadDefaults } from '../state/persisted'
  *  - A download sends up to ten runners-up, as they are SHOWN (filters and sort), for "next peer".
  *  - The main panel clears its format chips per search; the sheet has none - its chips are a
  *    quality floor's, which hold across searches as a choice of yours.
+ *  - THE FORMAT a search is scored by (`formatPreference`, 2.0.0-player.41) is read per search - You >
+ *    Getting albums' Format, kept for you on deadwax (it was the main page's own setting in this
+ *    browser's storage, which a home-screen app never had). A value in hand is sent at once; while a
+ *    read is out (the sheet's own, asked before each search it starts) or until deadwax has said what
+ *    it is, the search - already showing as asking - waits for its word (useGetSettings.ts
+ *    formatPreferenceNow). The search keeps the Format it was sent with (`format`).
  *
  * `picking` is read when an answer lands, not when the search began: the settings and the chips as
  * they are THEN, as the main panel reads its filters. `onPicked` is told when a pick has been asked
@@ -45,6 +50,12 @@ export interface CandidateSearch {
   result: FindCandidatesResponse | null
   /** what went wrong, in the server's words where it gave some (slskd logged out: its 409's) */
   error: string | null
+  /**
+   * the Format it was scored by (2.0.0-player.41) - null until deadwax's word on it is in. Lossless only
+   * can leave nothing of an answer Soulseek did give, and the sheet says so (lib/candidates.ts
+   * nothingLossless) rather than that nothing was found.
+   */
+  format: FormatPreference | null
 }
 
 export interface PickRule {
@@ -79,9 +90,11 @@ export interface CandidateSearchState {
   download: (candidate: Candidate, shown: readonly Candidate[]) => boolean
 }
 
-export function useCandidateSearch({ picking, onPicked }: {
+export function useCandidateSearch({ picking, onPicked, formatPreference }: {
   picking: () => PickRule
   onPicked: () => void
+  /** the Format to score by, read as each search begins: a value, or a promise of one (never rejected) */
+  formatPreference: () => FormatPreference | Promise<FormatPreference>
 }): CandidateSearchState {
   const [search, setSearch] = useState<CandidateSearch | null>(null)
   const [query, setQuery] = useState('')
@@ -95,6 +108,8 @@ export function useCandidateSearch({ picking, onPicked }: {
   pickingNow.current = picking
   const pickedNow = useRef(onPicked)
   pickedNow.current = onPicked
+  const formatNow = useRef(formatPreference)
+  formatNow.current = formatPreference
 
   function ask(release: DownloadRelease, candidate: Candidate, shown: readonly Candidate[]): boolean {
     if (askedFor.current === release) return false
@@ -122,16 +137,20 @@ export function useCandidateSearch({ picking, onPicked }: {
   async function run(release: DownloadRelease, override: string, fresh: boolean) {
     const request = requests.begin()
     askedFor.current = null
-    setSearch({ release, pending: true, result: null, error: null })
+    setSearch({ release, pending: true, result: null, error: null, format: null })
     setNotPicked(null)
     try {
+      //? read per search, so a Format changed in You applies to the next one - and waited for only
+      //? while deadwax is being asked what it is
+      const asked = formatNow.current()
+      const format = typeof asked === 'string' ? asked : await asked
+      if (!request.current()) return
       const result = await api.findCandidates(
-        //? read per search, so a format preference changed on the main page applies at once
-        { ...release, query_override: override, format_preference: readDownloadDefaults().formatPreference },
+        { ...release, query_override: override, format_preference: format },
         request.signal,
       )
       if (!request.current()) return
-      setSearch({ release, pending: false, result, error: null })
+      setSearch({ release, pending: false, result, error: null, format })
       setQuery(result.query)
       setShownQuery(result.query)
 
@@ -146,7 +165,7 @@ export function useCandidateSearch({ picking, onPicked }: {
       setNotPicked(notPickedLine(blocked))
     } catch (caught) {
       if (!request.current() || isAbort(caught)) return
-      setSearch({ release, pending: false, result: null, error: caught instanceof Error ? caught.message : 'the search failed' })
+      setSearch({ release, pending: false, result: null, error: caught instanceof Error ? caught.message : 'the search failed', format: null })
     }
   }
 

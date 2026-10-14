@@ -186,19 +186,27 @@ otherwise slskd keeps it, which is its normal behaviour.
 
 ## On the phone: Get, and choosing a source
 
-[The phone app](player.md) at `/player/` gets an album too (since 2.0.0-player.15). Two places
-start it, both in its **Search** tab:
+[The phone app](player.md) at `/player/` gets an album too (since 2.0.0-player.15). Three places
+start it:
 
 - **Get the album**, the purple button on [the album you don't have](finding-music.md#the-album-you-dont-have),
   under the **Pressing** button. It gets **the pressing chosen there** - the usual one unless you
-  picked another - and the sources are matched against that pressing's tracks.
-- **Get**, the small button at the end of each row under **Not in your library yet**. It gets the
-  album's usual pressing (the one its page opens on, and the main page's card **Find** downloads),
-  without opening the page. It reads **Get…** while it asks MusicBrainz for the album's pressings,
+  picked another - and the sources are matched against that pressing's tracks. That page is
+  reached from Search, from an artist's page, and - for **another pressing of an album you have**,
+  the deluxe beside the standard, say - from **Other pressings** on the album's own page (since
+  2.0.0-player.41; see [finding music](finding-music.md#another-pressing-of-an-album-you-have)).
+  Its **Pressing** list marks every pressing you already have **In your library**.
+- **Get**, the small button at the end of each row under **Not in your library yet**, in the
+  **Search** tab. It gets the album's usual pressing (the one its page opens on, and the main page's
+  card **Find** downloads), without opening the page. It reads **Get…** while it asks MusicBrainz for the album's pressings,
   which can take a few seconds; if you move on meanwhile - type in the box, open a row, Now Playing
   or another tab - it gives up and reads **Get** again, so the sheet never opens over where you went.
   If MusicBrainz can't list the album's pressings just then, it gets the album as a whole, as the
   main page's card does, and the sheet says so ("… · the album as a whole").
+- **Get**, the same small button on each album row of [an artist's page](player.md#artist-pages)
+  that isn't in your library. It works as Search's does - the usual pressing, **Get…** while it asks
+  MusicBrainz, the album as a whole when MusicBrainz can't list the pressings - and gives up if you
+  leave the page before MusicBrainz answers.
 
 Under **Get the album**, the album's page says what the library and the downloads already have of
 the pressing chosen - the same checks as [When you already have it](#when-you-already-have-it), made
@@ -229,12 +237,29 @@ by Portishead…**. Each folder found is a card:
   named, then how many more. A DVD's tracks are never counted, in Tracks or as missing: a CD+DVD
   shared whole is "14 of 14", its 20 film tracks left out. (The score still counts them, as the main
   page's does, so such a folder scores lower than its tracks deserve.)
+- **Why it scored what it did** (since 2.0.0-player.41), last on the card: the **edition words**
+  found in the folder's name (REMASTER, DELUXE, …, in the main page's colours), and the score
+  broken down as the main page's **signal chips** - **Titles**, **Count**, **Lengths**, **Edition**,
+  **Format** and **Peer**, each with its number out of 100: green from 75, amber from 40, red below.
+  A part that couldn't be judged (no track lengths reported, say) is left out. On a phone they're
+  behind a tap on the **score** (a small arrow beside it turns as they open, and the card grows
+  downward, so nothing above them moves); on a desktop they're always shown. How each part is
+  worked out is in [How matching works](matching.md).
 
 Above the cards are **Lossless** (every file lossless; a folder whose format couldn't be told never
 passes), **24-bit**, **Free slot** and the sort (**Best match**, **Highest quality**, **Largest
 first**, **Smallest first**). They start as your **quality floor** (You → Getting albums, below):
 Lossless or 24-bit pressed, or a **320 kbps** chip, which shows only while that's your floor. Under
-the cards: "Searched Soulseek for "Portishead Third" · 41 folders, 4 match your filters".
+the cards: "Searched Soulseek for "Portishead Third" · 41 folders, 4 match your filters", and
+**Search again** (since 2.0.0-player.41), which opens the query under it to edit: an unedited
+**Re-search** searches every name again, an edited one searches exactly what you typed - the same
+rule as when nothing was found. It's there under "none pass your filters" too.
+
+The search is scored by your **Format** (You → Getting albums, since 2.0.0-player.41; Prefer
+lossless unless you choose otherwise): **Any** - format doesn't count; **Prefer lossless** - a
+folder with no lossless file scores lower on Format; **Lossless only** - such folders are left out
+of the answer altogether. It's separate from the quality floor, which only filters what was found
+and never changes a score.
 
 **Get** on a card queues that folder with slskd, as **Download** does on the main page - the release
 the search was for, with the rest of the list as shown kept for **Next peer** - and the app switches
@@ -248,15 +273,21 @@ The sheet's other states:
 - **Already in your library** or **Already downloading**, in a box where the cards would be: Soulseek
   wasn't searched. A download in flight is cancelled in Requests, if you want another user.
 - Notes above the cards for a part held, a part downloading, and another pressing held.
-- **"41 folders on Soulseek, none pass your filters"**, with **Clear filters**.
+- **"41 folders on Soulseek, none pass your filters"**, with **Clear filters** and **Search again**.
 - **"Soulseek found nothing for "Portishead Third""**, with the query to edit and **Re-search**. An
   unedited Re-search searches every name again; an edited one searches exactly what you typed.
+- **"Nothing lossless on Soulseek for "Portishead Third""** (since 2.0.0-player.41), when your
+  **Format** is **Lossless only** and Soulseek did answer: every folder it found had no lossless file,
+  so all of them were left out. The sheet says so, and that the setting is in You → Getting albums;
+  choose **Prefer lossless** or **Any** there and **Get** again to see them. The query to edit is still
+  under it - a lossless copy may be shared under other words.
 - **slskd unable to search** - not logged in to Soulseek, waiting for its VPN, unreachable - in
   slskd's own words, in amber, with **Try again**.
 
 **Cancel**, Escape or a tap above the sheet closes it, and stops the search in slskd - at once, so
 an answer arriving as you close it picks nothing. With VoiceOver, each outcome is read out as it
-comes - "4 sources", "Soulseek found nothing for …", slskd's refusal, "Already in your library" - and
+comes - "4 sources", "Soulseek found nothing for …", "Nothing lossless on Soulseek for …", slskd's
+refusal, "Already in your library" - and
 **Try again**, **Re-search** and **Clear filters** leave the focus in the sheet.
 
 **When I tap Get** (You → Getting albums) can be **Pick the best source for me** instead of the
@@ -272,13 +303,13 @@ list the pressings - since with no tracklist a folder is scored on its edition, 
 and nearly any lossless folder reaches 75 however few of the tracks it holds ("Didn't pick a source
 for you: with no tracklist to match the folders against, no score can be trusted."). And it never
 picks on a **Re-search**, which you're steering by hand - only on Get itself (and on **Try again**
-after slskd couldn't search, which is that Get again). Both settings are kept for you on deadwax -
-see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax).
+after slskd couldn't search, which is that Get again). These settings, and Format, are kept for you
+on deadwax - see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax).
 
 **On a desktop** (since 2.0.0-player.19; the app in a window 1024 pixels wide or more - see
 [the phone player guide](player.md#on-a-desktop)) the sources open in a **Sources** panel beside the
 album rather than a sheet over it: a third column from 1280 pixels wide, over the right of the page
-below that. They're the same cards, with one more filter, **Signals**: the least each part of the
+below that. They're the same cards - each with its signal chips always showing - with one more filter, **Signals**: the least each part of the
 match score may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a
 slider each - as the main page's candidates panel has it, with a count on the chip of how many are
 set. Signals is the panel's alone: narrow the window to a phone's with the panel open and its
@@ -298,8 +329,9 @@ since 2.0.0-player.15 so does starting one ([above](#on-the-phone-get-and-choosi
   wanted with the live speed ("6 of 10 files · 1.8 MB/s"). **✕** cancels it. It asks first, in
   the card itself - "Cancel this download? You'll lose your place in this peer's queue.", with
   **Keep it** and **Cancel download** (tap the ✕ again to close the question) - unless **Confirm
-  before cancelling** is off on that device; the home-screen app keeps its own storage and always
-  asks. It never puts up a pop-up dialog, which would hold up the music playing in the same app.
+  before cancelling** is off on that device (You → Getting albums, since 2.0.0-player.41; see
+  [configuration](configuration.md#the-phone-players-settings-per-device)). It never puts up a
+  pop-up dialog, which would hold up the music playing in the same app.
   Once you cancel, the row reads "cancelling…" at once, its cover and title faded. A download
   being filed into your library reads "organizing", with nothing left to cancel.
 - **Waiting**: queued in the user's queue, with its place there when slskd says ("#4 in their

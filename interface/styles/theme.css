@@ -657,6 +657,12 @@
     --dw-bar-green:  linear-gradient(to bottom, #5ee39a, #34c47f);  /* a speed deadwax measured */
     --dw-best:       #7e4bb8;   /* the best match's card edge: STYLE.md's "selected / best match" */
 
+    /* --- Get, as the main page had it (2.0.0-player.41): a source's reasons, a signal under 40 and
+       the red edition words (SUPER DELUXE) - STYLE.md's badges have no red, so its green and amber
+       ones' weights in the failure text's red --- */
+    --dw-badge-red-bg:     rgba(248, 113, 113, 0.14);
+    --dw-badge-red-border: rgba(252, 165, 165, 0.3);
+
     /* --- Artists (2.0.0-player.17), as Artist.dc.html draws them --------- */
     --dw-artist-hero:  #3a2530;   /* the hero's own colour, under a picture or in place of one */
     /* over a picture: enough dark at the top for the back link, and from halfway down for the name

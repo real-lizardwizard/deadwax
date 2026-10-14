@@ -119,6 +119,15 @@
  *    the player bar, which only a desktop draws), and closed with it; nothing of it needs a secure
  *    page (no AudioWorklet), nothing of it is random, its frame loop stops while the page is hidden,
  *    and everything behind it is inert while it shows. Crossing back to a phone's width closes it.
+ *  - Get, as the main page had it (2.0.0-player.41): the album you have's "Other pressings" chip, last
+ *    in the row drawn from the first frame, opens its group's page through App with no preview (the
+ *    header and Get MusicBrainz's own; the album's name the title meanwhile); the pressing list marks
+ *    what the page's one /library/owned answer holds; Search's MusicBrainz half still leaves held
+ *    groups out and the artist page's held rows still open the album you have (James's decision,
+ *    pinned both ways); a card's reasons behind the score in a phone's sheet; Format sent from You's
+ *    store with every search (the main page's storage read only to seed it); Confirm before
+ *    cancelling read from this device at the tap; and Search again a disclosure closed as a search
+ *    starts. Nothing on the list below gains a file.
  *  - Editing an album on a desktop (2.0.0-player.21): the album page's Edit - handed to it only in the
  *    desktop frame and for an admin (/deadwax/me) - opens the Edit panel (app/EditPanel.tsx), a third
  *    kind of side panel by the same rule: drawn only in the desktop's frame (crossing to the phone
@@ -1028,8 +1037,10 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
     [true, true, true, true])
   check('...a held row\'s look called off with the chip\'s, when the box changes or the root stops showing',
     /function standDown\(\) \{\s*getRequests\.supersede\(\)\s*setResolving\(null\)\s*heldRequests\.supersede\(\)/.test(code(read('app/Search.tsx'))), true)
-  check('the album page\'s chip row is drawn from the first frame, so a chip landing moves nothing below it',
-    /<div class="app-album-chips">\s*<span class="app-held-badge">/.test(album), true)
+  check('the album page\'s chip row is drawn from the first frame, so a chip landing moves nothing below it - unseen until the bridge has answered or failed (2.0.0-player.41), so nothing in it slides',
+    [/<div class=\{`app-album-chips\$\{storeDone \? '' : ' is-waiting'\}`\}>\s*<span class="app-held-badge">/.test(album),
+      /const storeDone = store !== null \|\| storeFailed/.test(album)],
+    [true, true])
   check('Search\'s held row opens the album you have with its credited artist, so the page\'s artist line holds its place',
     /const artist = creditName\(group\['artist-credit'\]\)\s*if \(album\) onOpenAlbum\(\{ id: album, name: group\.title \?\? '', \.\.\.\(artist \? \{ artist \} : \{\}\) \}\)/.test(code(read('app/Search.tsx'))), true)
   check('an artist\'s name that isn\'t a link is drawn plain: on an album page only once the album has said so, never in a flash',
@@ -1190,7 +1201,7 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
     [/const sourcesGroup = desktop && sourcesOpen \? getting\?\.from \?\? null : null\s*const sourcesPressing = sourcesGroup \? getting\?\.release\.release_mbid \?\? null : null/.test(app),
       /sourcesPressing=\{sourcesGroup === page\.id \? sourcesPressing : null\}/.test(app),
       /if \(!shown \|\| sourcesPressing === null \|\| !download \|\| !chosen \|\| sourcesPressing === chosen\.id\) return\s*onGet\(\s*\{[^}]*from: id, again: true \},\s*getButton\.current,\s*\)\s*\}, \[shown, sourcesPressing, chosen\?\.id\]\)/.test(page),
-      /if \(request\.again\) \{\s*state\.start\(request\.release, false\)\s*return\s*\}/.test(sheet),
+      /if \(request\.again\) \{\s*begin\(request\.release, false\)\s*return\s*\}/.test(sheet),
       /start\(release, fresh = true\) \{[\s\S]*?void run\(release, '', fresh\)/.test(code(read('hooks/useCandidateSearch.ts')))],
     [true, true, true, true, true])
   //? the sidebar: its field types into Search's box and shows Search's results; its Library views are
@@ -1670,6 +1681,67 @@ console.log('\nthe checks themselves')
   check('...nor a link that saves a file', linksOut('<a href={row.action.href} download={row.action.download}>save</a>').length, 0)
   check('opening beside needs both target and noopener',
     [opensBeside('<a href="/" target="_blank" rel="noopener">'), opensBeside('<a href="/" target="_blank">'), opensBeside('<a href="/" rel="noopener">')], [true, false, false])
+}
+
+console.log('\nGet, as the main page had it (2.0.0-player.41)')
+{
+  const app = code(read('app/App.tsx'))
+  const album = code(read('player/AlbumPage.tsx'))
+  const page = code(read('app/ReleaseGroupPage.tsx'))
+  const sheet = code(read('app/Sources.tsx'))
+  const hook = code(read('hooks/useCandidateSearch.ts'))
+  //? another pressing of an album you hold: the album page's last chip, to the group's page with no preview
+  check('the album you have: "Other pressings" last in the chip row drawn from the first frame, opening its group',
+    [album.indexOf('<div class={`app-album-chips') >= 0 && album.indexOf('<div class={`app-album-chips') < album.indexOf('{chips.map(') && album.indexOf('{chips.map(') < album.indexOf('app-other-pressings')
+      && album.indexOf('app-other-pressings') < album.indexOf('<div class="pl-hero-actions">'),
+      /\{group && onOpenGroup && \(\s*<button\s+type="button"\s+class="app-chip app-other-pressings"\s+aria-label="Other pressings"\s+onClick=\{\(\) => onOpenGroup\(\{ id: group, title: shown\?\.name \?\? '' \}\)\}/.test(album),
+      /const group = otherPressingsGroup\(store\)/.test(album), /onOpenGroup=\{openHeldGroup\}/.test(app)],
+    [true, true, true, true])
+  const held = /const openHeldGroup = useCallback\(\(group: \{ id: string; title: string \}\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
+  check('...App opens it as a page on the tab showing, its name the label - and no preview, so the header and Get are MusicBrainz\'s own',
+    [/const page: Page = \{ kind: 'group', id: group\.id, \.\.\.\(group\.title \? \{ label: group\.title \} : \{\}\) \}/.test(held), /router\.open\(page\)/.test(held), /groupPreviews/.test(held),
+      /title=\{page\.label \?\? ''\}/.test(app), /<h1 class="pl-hero-title">\{header\.title \|\| title\}<\/h1>/.test(page), /getGroup\(mbid, preview, releases, chosen\)/.test(page)],
+    [true, true, false, true, true, true])
+  check('the pressing list marks what the library holds, from the page\'s one /library/owned answer',
+    [/const holding = owned \? ownedForGroup\(owned\.index, \{ groupId: mbid, releaseIds: releases\.map\(\(release\) => release\.id\) \}\)\.held : null/.test(page),
+      /pressingsView\(releases, release, heldIds\)/.test(page), /\{row\.held && <span class="app-picker-held">In your library<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
+    [true, true, true])
+  //? James's decision kept (pin both): Search's MusicBrainz half leaves held groups out, and the artist
+  //? page's held rows still open the album you have - the way to another pressing is the album page's
+  check('Search\'s MusicBrainz half still leaves out what the library holds by group; its held row still opens the album you have',
+    [/shown: notInLibrary\(groups, ownedNow\(\)\?\.index \?\? null\)/.test(code(read('app/Search.tsx'))),
+      /const releases = heldReleases\(owned\?\.index \?\? null, group\.id\)[\s\S]*?if \(album\) onOpenAlbum\(/.test(code(read('app/Search.tsx')))],
+    [true, true])
+  check('...and the artist page\'s held rows still open the album you have',
+    /if \(row\.albumId\) onOpenAlbum\(\{ id: row\.albumId[\s\S]*?navidromeAlbumFor\(row\.releases, request\.signal\)[\s\S]*?if \(album\) onOpenAlbum\(/.test(code(read('app/ArtistPage.tsx'))), true)
+  //? the score's reasons: on the card, behind the score on a phone
+  check('each card told how its reasons show: behind the score in a phone\'s sheet, always on a desktop\'s panel',
+    /<SourceCard\s+key=\{candidateKey\(candidate\)\}[\s\S]*?reasons=\{modal \? 'tap' : 'shown'\}/.test(sheet), true)
+  //? Format: You's, kept on deadwax, sent with every search - the main page's storage never read for it
+  const run = /async function run\([^)]*\) \{([\s\S]*?)\n  \}/.exec(hook)?.[1] ?? ''
+  check('Format: the search sends You\'s, read as it begins - waited for only while deadwax is being asked - and nothing after a superseded wait',
+    [/formatPreference: formatPreferenceNow/.test(sheet), /const asked = formatNow\.current\(\)\s*const format = typeof asked === 'string' \? asked : await asked\s*if \(!request\.current\(\)\) return\s*const result = await api\.findCandidates\(\s*\{ \.\.\.release, query_override: override, format_preference: format \}/.test(run),
+      /readDownloadDefaults/.test(hook)],
+    [true, true, false])
+  //? (review) a desktop panel stays open across Gets and pressings: only its opening asked, so a Format
+  //? changed elsewhere meanwhile never reached a search - every search the sheet starts asks first
+  check('...and every search the sheet starts asks deadwax for the settings first: one way to start one, which asks before it starts',
+    [/const begin = \(release: DownloadRelease, fresh\?: boolean\) => \{\s*void askGetSettings\(\)\s*state\.start\(release, fresh\)\s*\}/.test(sheet),
+      (sheet.match(/state\.start\(/g) || []).length, (sheet.match(/\bbegin\(/g) || []).length, (sheet.match(/state\.requery\(\)/g) || []).length],
+    [true, 1, 3, 1])
+  check('...and the app reads the main page\'s Format only to carry it over once (the seed), nowhere else',
+    files.filter((file) => (file.startsWith('app/') || file.startsWith('hooks/') || file.startsWith('player/')) && /readDownloadDefaults/.test(code(read(file)))), ['app/useGetSettings.ts'])
+  //? Confirm before cancelling: this device's, read at the tap
+  check('Confirm before cancelling: Requests reads this device\'s at the tap; the main page\'s preferences only seed (Getting albums)',
+    [/else if \(readConfirmCancel\(\)\) setAsking\(row\.key\)/.test(code(read('app/Requests.tsx'))),
+      files.filter((file) => file.startsWith('app/') && /readPreferences\(/.test(code(read(file))))], [true, ['app/useGetSettings.ts']])
+  //? Search again: a disclosure under folders found, its field focused as it opens, closed as a search starts
+  check('Search again: a disclosure controlling the query form, focus to its field as it opens, closed as a search starts',
+    [/<button type="button" class="app-text-button" aria-expanded=\{again\} aria-controls=\{againId\} onClick=\{\(\) => setAgain\(\(was\) => !was\)\}>/.test(sheet),
+      /useLayoutEffect\(\(\) => \{\s*if \(again\) againField\.current\?\.focus\(/.test(sheet),
+      /const requery = \(\) => \{\s*keepFocus\(\)\s*setAgain\(false\)\s*void askGetSettings\(\)\s*state\.requery\(\)/.test(sheet),
+      /if \(scroller\.current\) scroller\.current\.scrollTop = 0\s*setAgain\(false\)/.test(sheet)],
+    [true, true, true, true])
 }
 
 //? LOADING (the audit): the Library asks Navidrome for nothing until its tab has been shown once, and a

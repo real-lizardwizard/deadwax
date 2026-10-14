@@ -102,6 +102,12 @@ The sources sheet asks slskd to search Soulseek, as **Find** does, so the same t
   red](#the-slskd-pill-is-red). You's **Connections** says whether deadwax can reach slskd.
 - **"Soulseek found nothing for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
   query under it (to the album title alone, say) and **Re-search**.
+- **"Nothing lossless on Soulseek for …"** (since 2.0.0-player.41): your **Format** (You → Getting
+  albums) is **Lossless only**, and every folder Soulseek found had no lossless file, so all of them
+  were left out - a Re-search is scored the same way and finds the same. Choose **Prefer lossless**
+  or **Any** there and **Get** again to see them, or edit the query in case a lossless copy is shared
+  under other words. Format can be Lossless only without your choosing it in the app: the first time
+  the app asks, it carries over the main page's **Format** from that browser.
 - **"N folders on Soulseek, none pass your filters"**: the chips above the list are hiding them -
   **Lossless** and **24-bit** start pressed when your quality floor (You → Getting albums) says so.
   **Clear filters**, or tap the chip, to see them all.
@@ -156,6 +162,10 @@ running can be refused with "Only one concurrent operation is permitted": wait a
 - Try a longer `SLSKD_SEARCH_TIMEOUT` (Settings → Downloads): slow and firewalled peers answer
   last.
 - The panel says every name it searched under; hover over the query box to see them.
+- **Format** set to **Lossless only** leaves out every folder with no lossless file. On the main page
+  the panel then says "no matches from N responses"; in the app the sheet says "Nothing lossless on
+  Soulseek for …". Prefer lossless or Any shows them (the main page's Format is in Settings →
+  Downloads, the app's in You → Getting albums).
 
 ## A download sits at "queued"
 

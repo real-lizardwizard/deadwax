@@ -8,6 +8,9 @@
  *
  *  - the album page's "Also: <edition> ›" chips (`alsoChips`): another pressing you hold, that
  *    Navidrome has - a chip for one it hasn't found would open nothing;
+ *  - its "Other pressings ›" chip (`otherPressingsGroup`, 2.0.0-player.41): the album's MusicBrainz
+ *    release group, as its folders carry it - the album-you-don't-have page lists every pressing,
+ *    the ones you hold marked, and gets any of them;
  *  - Info's "This pressing: …" and its folder (`pressingLine`, `folderLine`);
  *  - which releases of a MusicBrainz album you hold (`heldReleases`), for opening the album you
  *    have from MusicBrainz's side - in the order every screen opens and plays one of several copies
@@ -39,6 +42,19 @@ export function alsoChips(answer: StoreAlbumResponse | null, showing: string): {
     if (chips.length >= ALSO_SHOWN) break
   }
   return chips
+}
+
+//? a MusicBrainz id as MusicBrainz writes one (lib/pressings.ts groupMbid's pattern)
+const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/**
+ * The release group the album page's "Other pressings" chip opens - the bridge's word, from the
+ * album's own folders (a folder tagged with a release id alone, an .m4a deadwax filed, carries none) -
+ * or null, and no chip: lowercased, and only an id as MusicBrainz writes one.
+ */
+export function otherPressingsGroup(answer: Pick<StoreAlbumResponse, 'release_group_mbid'> | null): string | null {
+  const id = (answer?.release_group_mbid ?? '').trim().toLowerCase()
+  return MBID.test(id) ? id : null
 }
 
 /** "This pressing: 20th Anniversary Reissue 180gram · 2014 · FLAC" - null when the store holds none. */

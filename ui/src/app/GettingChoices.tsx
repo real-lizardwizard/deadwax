@@ -1,8 +1,11 @@
-import { GET_MODES, QUALITY_FLOORS, type GetSettings } from '../lib/getSettings'
+import { FORMATS, GET_MODES, QUALITY_FLOORS, type GetSettings } from '../lib/getSettings'
 import { CheckIcon } from '../player/icons'
 
 /**
- * You > Getting albums (2.0.0-player.15): "When I tap Get" and "Quality floor", each a radio group
+ * You > Getting albums (2.0.0-player.15): "When I tap Get", "Quality floor" and - since
+ * 2.0.0-player.41, the main page's Settings -> Downloads setting carried into the app - "Format" (Any,
+ * Prefer lossless, Lossless only: what a Get's sources are scored by; Lossless only leaves out a
+ * folder with no lossless file), each a radio group
  * as "Now Playing opens as" and "Maximum quality" are - a tap picks; to the keyboard the arrows move
  * the choice and the focus with it, and only the chosen radio is a tab stop. The board draws them as
  * rows leading to a list; in the app they are the list, one tap rather than two.
@@ -41,6 +44,14 @@ export function GettingChoices({
         choices={QUALITY_FLOORS}
         chosen={settings?.quality_floor ?? null}
         onPick={(value) => onChoose({ quality_floor: value })}
+      />
+      <RadioGroup
+        id="app-format"
+        title="Format"
+        note="app-get-note"
+        choices={FORMATS}
+        chosen={settings?.format_preference ?? null}
+        onPick={(value) => onChoose({ format_preference: value })}
       />
     </>
   )

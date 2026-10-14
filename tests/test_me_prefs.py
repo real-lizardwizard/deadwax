@@ -1,7 +1,8 @@
 """
 GET and PUT /deadwax/me/preferences (2.0.0-player.15): what a user chose in the app's You > Getting
-albums - "When I tap Get" (show me the sources, or pick the best source for me) and the quality
-floor - kept per user on the server, through `current_user`, in store.user_prefs.
+albums - "When I tap Get" (show me the sources, or pick the best source for me), the quality floor
+and, since 2.0.0-player.41, Format (prefer lossless, any, lossless only) - kept per user on the
+server, through `current_user`, in store.user_prefs.
 
 - Only the allowlisted keys, each with only its listed values: anything else is a 422 and nothing
   is written. A stored value no longer allowed reads as the default.
@@ -10,6 +11,9 @@ floor - kept per user on the server, through `current_user`, in store.user_prefs
   every save writes a `_seeded` row beside what it sets - an empty one too - which is how the app
   seeds a user once from the old page's settings without storing the defaults as if they were chosen
   (review): an absent preference is its default, so a default changed later still reaches them.
+  `unseeded` names the preferences never carried over (2.0.0-player.41): every one for a user nothing
+  was saved for, only Format for one seeded before Format existed (the old row's "1"), none once any
+  save has listed them all - so Format is carried over once and nothing chosen since is overwritten.
 - Per user: the route reads the dependency, so step 3's logins change current_user and nothing here.
 - A PUT is a write, so the same-origin guard refuses one another website asks for - through the real
   app start() builds, every middleware in the way, as the page meets it.
@@ -30,6 +34,8 @@ from src.store import JobStore
 from src.users import current_user
 
 ROUTE = "/deadwax/me/preferences"
+#? what every save writes in `_seeded` since 2.0.0-player.41: every preference there is
+SEEDED_ALL = "format_preference,get_mode,quality_floor"
 GET_SETTINGS_TS = Path(__file__).resolve().parent.parent / "ui" / "src" / "lib" / "getSettings.ts"
 
 
@@ -55,7 +61,8 @@ def rows(store):
 
 def test_nothing_set_is_every_default_and_says_none_is_stored(store):
     assert client(store).get(ROUTE).json() == {
-        "get_mode": "sources", "quality_floor": "any", "stored": [], "seeded": False, "can_save": True,
+        "get_mode": "sources", "quality_floor": "any", "format_preference": "prefer_lossless", "stored": [], "seeded": False,
+        "unseeded": ["format_preference", "get_mode", "quality_floor"], "can_save": True,
     }
 
 
@@ -64,8 +71,8 @@ def test_an_empty_save_stores_no_preference_and_says_the_user_is_seeded(store):
     put = client(store).put(ROUTE, json={})
 
     assert put.status_code == 200
-    assert put.json() == {"get_mode": "sources", "quality_floor": "any", "stored": [], "seeded": True, "can_save": True}
-    assert rows(store) == [("local", "_seeded", "1")]
+    assert put.json() == {"get_mode": "sources", "quality_floor": "any", "format_preference": "prefer_lossless", "stored": [], "seeded": True, "unseeded": [], "can_save": True}
+    assert rows(store) == [("local", "_seeded", SEEDED_ALL)]
     assert client(store).get(ROUTE).json()["seeded"] is True
 
 
@@ -80,9 +87,12 @@ def test_a_preference_set_is_kept_and_read_back(store):
     put = client(store).put(ROUTE, json={"quality_floor": "lossless"})
 
     assert put.status_code == 200
-    assert put.json() == {"get_mode": "sources", "quality_floor": "lossless", "stored": ["quality_floor"], "seeded": True, "can_save": True}
+    assert put.json() == {
+        "get_mode": "sources", "quality_floor": "lossless", "format_preference": "prefer_lossless", "stored": ["quality_floor"],
+        "seeded": True, "unseeded": [], "can_save": True,
+    }
     assert client(store).get(ROUTE).json()["quality_floor"] == "lossless"
-    assert rows(store) == [("local", "_seeded", "1"), ("local", "quality_floor", "lossless")]
+    assert rows(store) == [("local", "_seeded", SEEDED_ALL), ("local", "quality_floor", "lossless")]
 
 
 def test_setting_one_leaves_the_other_as_it_was(store):
@@ -101,6 +111,10 @@ def test_setting_one_leaves_the_other_as_it_was(store):
     {"theme": "dark"},
     {"get_mode": "pick", "theme": "dark"},
     {"_seeded": "1"},
+    {"format_preference": "flac"},
+    {"format_preference": "lossless"},
+    {"format_preference": ""},
+    {"formatPreference": "any"},
 ])
 def test_a_key_or_value_not_on_the_list_is_refused_and_nothing_is_written(store, body):
     answer = client(store).put(ROUTE, json=body)
@@ -114,7 +128,9 @@ def test_a_stored_value_no_longer_allowed_reads_as_the_default(store):
         connection.execute("INSERT INTO user_prefs VALUES ('local', 'quality_floor', 'flac', 'then')")
         connection.execute("INSERT INTO user_prefs VALUES ('local', 'theme', 'dark', 'then')")
 
-    assert client(store).get(ROUTE).json() == {"get_mode": "sources", "quality_floor": "any", "stored": [], "seeded": True, "can_save": True}
+    assert client(store).get(ROUTE).json() == {
+        "get_mode": "sources", "quality_floor": "any", "format_preference": "prefer_lossless", "stored": [], "seeded": True, "unseeded": ["format_preference"], "can_save": True,
+    }
 
 
 def test_each_user_has_their_own(store):
@@ -122,7 +138,7 @@ def test_each_user_has_their_own(store):
 
     assert client(store, "james").get(ROUTE).json()["get_mode"] == "pick"
     assert client(store).get(ROUTE).json()["get_mode"] == "sources"
-    assert rows(store) == [("james", "_seeded", "1"), ("james", "get_mode", "pick")]
+    assert rows(store) == [("james", "_seeded", SEEDED_ALL), ("james", "get_mode", "pick")]
 
 
 def test_the_user_comes_from_the_dependency_never_middleware():
@@ -139,7 +155,7 @@ def test_a_put_another_website_asks_for_is_refused(store):
 
     allowed = client(store).put(ROUTE, json={"get_mode": "pick"}, headers={"Origin": "http://testserver"})
     assert allowed.status_code == 200
-    assert rows(store) == [("local", "_seeded", "1"), ("local", "get_mode", "pick")]
+    assert rows(store) == [("local", "_seeded", SEEDED_ALL), ("local", "get_mode", "pick")]
 
 
 def test_reading_is_not_a_write_and_is_never_refused(store):
@@ -149,7 +165,10 @@ def test_reading_is_not_a_write_and_is_never_refused(store):
 def test_an_unwritable_database_says_so_and_a_put_is_refused(tmp_path):
     broken = JobStore(str(tmp_path / "state" / "deadwax.db"))  # never init()ed: unavailable
 
-    assert client(broken).get(ROUTE).json() == {"get_mode": "sources", "quality_floor": "any", "stored": [], "seeded": False, "can_save": False}
+    assert client(broken).get(ROUTE).json() == {
+        "get_mode": "sources", "quality_floor": "any", "format_preference": "prefer_lossless", "stored": [], "seeded": False,
+        "unseeded": ["format_preference", "get_mode", "quality_floor"], "can_save": False,
+    }
     answer = client(broken).put(ROUTE, json={"get_mode": "pick"})
     assert answer.status_code == 503
     assert answer.json()["detail"] == "deadwax can't keep preferences: its database isn't writable"
@@ -189,7 +208,7 @@ def test_the_keys_and_values_are_one_list_here_in_the_put_and_in_the_app():
     assert set(fields) == set(me.PREFERENCES)
     for key, values in me.PREFERENCES.items():
         assert set(fields[key].annotation.__args__[0].__args__) == set(values)
-    assert me.DEFAULTS == {"get_mode": "sources", "quality_floor": "any"}
+    assert me.DEFAULTS == {"get_mode": "sources", "quality_floor": "any", "format_preference": "prefer_lossless"}
 
     #? ...and so does the app's: each key's values, in order, in lib/getSettings.ts
     text = GET_SETTINGS_TS.read_text()
@@ -197,3 +216,40 @@ def test_the_keys_and_values_are_one_list_here_in_the_put_and_in_the_app():
         listed = re.search(rf"export const {key.upper()}_VALUES = \[([^\]]*)\] as const", text)
         assert listed, key
         assert tuple(re.findall(r"'([^']*)'", listed.group(1))) == values
+
+
+def test_format_is_kept_read_back_and_left_alone_by_the_other_two(store):
+    put = client(store).put(ROUTE, json={"format_preference": "lossless_only"})
+
+    assert put.status_code == 200
+    assert (put.json()["format_preference"], put.json()["stored"]) == ("lossless_only", ["format_preference"])
+    client(store).put(ROUTE, json={"quality_floor": "24bit", "get_mode": "pick"})
+    answer = client(store).get(ROUTE).json()
+    assert (answer["format_preference"], answer["quality_floor"], answer["get_mode"]) == ("lossless_only", "24bit", "pick")
+    for value in ("any", "prefer_lossless"):
+        assert client(store).put(ROUTE, json={"format_preference": value}).json()["format_preference"] == value
+
+
+def test_a_user_seeded_before_format_has_format_alone_left_to_carry_over(store):
+    """A database the app seeded at 2.0.0-player.15 holds `_seeded` = "1": its two preferences were
+    carried over then, Format wasn't - so the app carries Format over once, and only Format, never
+    putting the floor back over what was chosen since."""
+    with sqlite3.connect(store.path) as connection:
+        connection.execute("INSERT INTO user_prefs VALUES ('local', '_seeded', '1', 'then')")
+        connection.execute("INSERT INTO user_prefs VALUES ('local', 'quality_floor', 'lossless', 'then')")
+
+    answer = client(store).get(ROUTE).json()
+    assert (answer["seeded"], answer["unseeded"], answer["quality_floor"]) == (True, ["format_preference"], "lossless")
+
+    #? the app's seeding of Format (here, nothing to carry over: an empty save) lists every preference
+    after = client(store).put(ROUTE, json={}).json()
+    assert (after["unseeded"], after["quality_floor"]) == ([], "lossless")
+    assert client(store).get(ROUTE).json()["unseeded"] == []
+    assert ("local", "_seeded", SEEDED_ALL) in rows(store)
+
+
+def test_a_seeded_row_naming_only_some_preferences_leaves_the_rest_to_carry_over(store):
+    with sqlite3.connect(store.path) as connection:
+        connection.execute("INSERT INTO user_prefs VALUES ('local', '_seeded', 'get_mode,format_preference', 'then')")
+
+    assert client(store).get(ROUTE).json()["unseeded"] == ["quality_floor"]

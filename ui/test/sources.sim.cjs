@@ -50,6 +50,26 @@
  *    phone's sheet (a window narrowed, an iPad turned) they filter nothing, and are back as they were
  *    on the panel. The panel's box takes focus from a click (a tab stop of -1); a sheet's has none.
  *
+ * And for Get, as the main page had it (2.0.0-player.41):
+ *
+ *  - The Format a search is scored by is You's (the store's formatPreferenceNow), sent as it is in
+ *    hand - and when it isn't yet, the search shows as asking and waits for deadwax's word, sending
+ *    nothing before it and nothing at all if the sheet was closed meanwhile.
+ *  - Each card's reasons: the edition words in its folder's name and the score's signals as chips,
+ *    last on the card - behind a tap on the score in a phone's sheet (a button, aria-expanded,
+ *    aria-controls the reasons, which are hidden until it is tapped) and always shown on a desktop's
+ *    panel (the score no button there).
+ *  - Search again, when folders were found - under the cards' footer, and under "none pass your
+ *    filters" - a disclosure opening the same query form: an unedited Re-search overrides nothing,
+ *    an edited one is searched as typed, and a search starting closes it. Never where the query form
+ *    already is (nothing found), nor while asking, failing, or the store's box stands in.
+ *  - (review) Every search the sheet starts asks deadwax for the settings BEFORE reading the Format - a
+ *    Get, another Get or the page's next pressing reaching a desktop panel already open, a Re-search,
+ *    Try again - so a Format changed on another device is the one searched by.
+ *  - (review) Scored Lossless only, an answer Soulseek gave with nothing left of it says "Nothing
+ *    lossless", and names the Format and where it is - with the query still there to edit - to the eye
+ *    and to VoiceOver; Soulseek answering nothing, or any other Format, still says it found nothing.
+ *
  * Run it with:  node ui/test/sources.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -104,13 +124,14 @@ exports.requestDownload = (body) => globalThis.__sources.request(body)
 `)
 fs.writeFileSync(path.join(OUT, 'app/useGetSettings.js'), `
 exports.useGetSettings = (ask) => { globalThis.__sources.settingsAsked.push(ask); return { settings: globalThis.__sources.settings, canSave: true, problem: null } }
-exports.getSettingsNow = () => globalThis.__sources.settings || { get_mode: 'sources', quality_floor: 'any' }
+exports.getSettingsNow = () => globalThis.__sources.settings || { get_mode: 'sources', quality_floor: 'any', format_preference: 'prefer_lossless' }
+exports.formatPreferenceNow = () => { globalThis.__sources.settingsLog.push('format'); return globalThis.__sources.format() }
+exports.askGetSettings = () => { globalThis.__sources.settingsLog.push('ask'); return Promise.resolve() }
 `)
 fs.writeFileSync(path.join(OUT, 'app/useSheet.js'), `
 exports.useSheet = (options) => { globalThis.__sources.sheet = options }
 `)
 fs.writeFileSync(path.join(OUT, 'player/icons.js'), `exports.ChevronDownIcon = function ChevronDownIcon() { return null }\nexports.CloseIcon = function CloseIcon() { return null }\n`)
-fs.writeFileSync(path.join(OUT, 'state/persisted.js'), `exports.readDownloadDefaults = () => ({ formatPreference: 'prefer_lossless' })\n`)
 
 function deferred() {
   const d = {}
@@ -123,7 +144,11 @@ const requested = []
 globalThis.__sources = {
   settings: { get_mode: 'sources', quality_floor: 'lossless' },
   settingsAsked: [],
+  //? the store asked (askGetSettings) and the Format read for a search (formatPreferenceNow), in order
+  settingsLog: [],
   sheet: null,
+  //? You's Format, as the store hands it: the settings', or a promise of it the test resolves
+  format: () => globalThis.__sources.settings?.format_preference ?? 'prefer_lossless',
   find(body, signal) { const d = deferred(); asks.push({ body, signal, ...d }); return d.promise },
   request(body) { requested.push(body); return Promise.resolve({ status: 'queued', queued: body.files.length, job_id: requested.length }) },
 }
@@ -199,6 +224,8 @@ const answer = (candidates, fields = {}) => ({
   held: null, downloading: null, downloading_part: null, other_pressings: [], ...fields,
 })
 const cards = () => find((node) => node.type === SourceCard)
+//? a card has state of its own since 2.0.0-player.41 (its reasons open or not): drawn through a root
+const drawCard = (props, render = hooks.root(SourceCard)) => { tree = render(props); return render }
 const chips = () => find(byClass('app-chip')).filter((node) => node.type === 'button').map((node) => [text(node), node.props['aria-pressed']])
 const chip = (label) => find(byClass('app-chip')).find((node) => node.type === 'button' && text(node) === label)
 
@@ -592,31 +619,257 @@ async function main() {
   console.log('\na card, drawn: Speed leading, the facts, the missing line')
   {
     const gets = []
-    tree = SourceCard({ candidate: source('vinylhead', { measured_speed: 2.1 * MB, measured_samples: 1 }), best: true, onGet: (c) => gets.push(c.username) })
+    drawCard({ candidate: source('vinylhead', { measured_speed: 2.1 * MB, measured_samples: 1 }), best: true, onGet: (c) => gets.push(c.username) })
     check('the score, the folder, who from, and Get - the best match\'s the solid purple, named for its folder and peer',
       [text(classed('app-source-score')[0]), classed('app-source-score')[0].props.class.includes('is-good'), text(classed('app-source-folder')[0]), text(classed('app-source-peer')[0]),
         classed('app-source-get')[0].props.class, classed('app-source-get')[0].props['aria-label']],
       ['90', true, 'Portishead - Third [vinylhead]', 'from vinylhead', 'app-source-get is-primary', 'Get Portishead - Third [vinylhead] from vinylhead'])
     //? one peer, two folders of the album (FLAC and MP3): two Gets VoiceOver's rotor can tell apart
-    const label = (fields) => { tree = SourceCard({ candidate: source('bob', fields), best: false, onGet() {} }); return classed('app-source-get')[0].props['aria-label'] }
+    const label = (fields) => { drawCard({ candidate: source('bob', fields), best: false, onGet() {} }); return classed('app-source-get')[0].props['aria-label'] }
     check('...so one peer\'s two folders are two different buttons', [label({ directory_name: 'Third [FLAC]' }), label({ directory_name: 'Third [MP3 320]' })],
       ['Get Third [FLAC] from bob', 'Get Third [MP3 320] from bob'])
-    tree = SourceCard({ candidate: source('vinylhead', { measured_speed: 2.1 * MB, measured_samples: 1 }), best: true, onGet: (c) => gets.push(c.username) })
+    drawCard({ candidate: source('vinylhead', { measured_speed: 2.1 * MB, measured_samples: 1 }), best: true, onGet: (c) => gets.push(c.username) })
     check('Speed: measured, green, said so, its bar', [text(classed('app-source-speed-text')[0]), classed('app-source-speed-text')[0].props.class.includes('is-measured'), text(classed('app-source-speed-note')[0]),
       classed('app-source-bar-fill')[0].props.style.width], ['2.1 MB/s', true, 'what you got from them', '70%'])
     check('the facts: Tracks, Quality, Size, Starts', classed('app-source-fact').map((fact) => [text(fact.props.children[0]), text(fact.props.children[1])]),
       [['Tracks', '11 of 11'], ['Quality', 'FLAC 16/44.1'], ['Size', '342 MB'], ['Starts', 'now']])
     classed('app-source-get')[0].props.onClick()
     check('Get is the tap', gets, ['vinylhead'])
-    tree = SourceCard({ candidate: source('crate_dig', { score: 0.63, upload_speed: 0, has_free_slot: false, queue_length: 3, matched_tracks: 10, missing_tracks: [{ position: 11, disc: 1, title: 'Threads' }], missing_count: 1, disc_folders: ['CD 1', 'CD 2'] }), best: false, onGet() {} })
+    drawCard({ candidate: source('crate_dig', { score: 0.63, upload_speed: 0, has_free_slot: false, queue_length: 3, matched_tracks: 10, missing_tracks: [{ position: 11, disc: 1, title: 'Threads' }], missing_count: 1, disc_folders: ['CD 1', 'CD 2'] }), best: false, onGet() {} })
     check('another: amber score, tinted Get, no speed, amber Tracks and Starts, and what is missing',
       [classed('app-source-score')[0].props.class.includes('is-low'), classed('app-source-get')[0].props.class, text(classed('app-source-speed-text')[0]), text(classed('app-source-speed-note')[0]),
         classed('app-source-value').filter((value) => value.props.class.includes('is-warning')).map(text), text(classed('app-source-missing')[0]), text(classed('app-source-peer')[0])],
       [true, 'app-source-get is-tinted', 'Unknown', 'no speed reported yet', ['10 of 11', '3 ahead'], 'Missing “Threads”', 'from crate_dig · 2 disc folders'])
-    tree = SourceCard({ candidate: source('bob', { upload_speed: 1.2 * MB }), best: false, onGet() {} })
+    drawCard({ candidate: source('bob', { upload_speed: 1.2 * MB }), best: false, onGet() {} })
     check('the peer\'s own average is never the download speed: grey, and says whose it is',
       [text(classed('app-source-speed-text')[0]), classed('app-source-speed-text')[0].props.class.includes('is-advertised'), text(classed('app-source-speed-note')[0])],
       ['1.2 MB/s', true, 'their own average'])
+  }
+
+  console.log('\na card\'s reasons (2.0.0-player.41): why it scored what it did, as the main page shows it')
+  {
+    const REASONED = source('vinylhead', {
+      detected_edition_tags: ['DELUXE', 'REMASTER'],
+      signals: { title_match: 1, track_count: 1, duration_match: null, edition: 0.5, format: 0.45, peer: 0.2 },
+    })
+    const reasons = () => classed('app-source-reasons')[0]
+    const render = drawCard({ candidate: REASONED, best: false, onGet() {}, reasons: 'tap' })
+    const score = () => classed('app-source-score')[0]
+    check('a phone\'s: the score is a button, closed, controlling the reasons - which are there, hidden',
+      [score().type, score().props['aria-expanded'], score().props['aria-controls'] === reasons().props.id, reasons().props.hidden, score().props['aria-label']],
+      ['button', false, true, true, 'Match score 90'])
+    check('...the reasons last on the card, so opening them moves nothing above',
+      find((node) => node.type === 'li' && byClass('app-source')(node))[0].props.children.filter(Boolean).at(-1)?.props.class, 'app-source-reasons')
+    check('...named for what they are, a group', [reasons().props.role, reasons().props['aria-label']], ['group', 'Why it scored 90'])
+    score().props.onClick()
+    tree = render({ candidate: REASONED, best: false, onGet() {}, reasons: 'tap' })
+    check('a tap on the score opens them', [score().props['aria-expanded'], reasons().props.hidden], [true, false])
+    check('the edition words in the folder\'s name, each in its colour',
+      classed('app-source-tag').map((tag) => [text(tag), tag.props.class]), [['DELUXE', 'app-source-tag is-purple'], ['REMASTER', 'app-source-tag is-amber']])
+    check('the signals: each judged one a chip - its word, its number, its band - the unjudged left out',
+      classed('app-source-signal').map((chip) => [text(chip), chip.props.class]),
+      [['Titles 100', 'app-source-signal is-good'], ['Count 100', 'app-source-signal is-good'], ['Edition 50', 'app-source-signal is-mid'],
+       ['Format 45', 'app-source-signal is-mid'], ['Peer 20', 'app-source-signal is-bad']])
+    score().props.onClick()
+    tree = render({ candidate: REASONED, best: false, onGet() {}, reasons: 'tap' })
+    check('...a second tap closes them', [score().props['aria-expanded'], reasons().props.hidden], [false, true])
+    drawCard({ candidate: REASONED, best: false, onGet() {}, reasons: 'shown' })
+    check('a desktop\'s: always shown - the score no button, nothing to open', [score().type, score().props['aria-expanded'], reasons().props.hidden, classed('app-source-signal').length],
+      ['span', undefined, false, 5])
+    drawCard({ candidate: source('bob'), best: false, onGet() {} })
+    check('...shown is the default, and no edition words found draws none', [reasons().props.hidden, classed('app-source-tags').length], [false, 0])
+  }
+
+  console.log('\nthe sheet hands each card how its reasons show, and You\'s Format goes with each search (2.0.0-player.41)')
+  {
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any', format_preference: 'lossless_only' }
+    const phone = sheet()
+    phone.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 410 } })
+    check('the search sends You\'s Format, as the store has it', asks.at(-1)?.body.format_preference, 'lossless_only')
+    asks.at(-1).resolve(answer([source('vinylhead'), source('bob', { score: 0.8 })]))
+    await settle()
+    phone.draw()
+    check('a phone\'s sheet: behind a tap on the score', cards().map((card) => card.props.reasons), ['tap', 'tap'])
+    phone.draw({ panel: 'column' })
+    check('a desktop\'s panel: always shown', cards().map((card) => card.props.reasons), ['shown', 'shown'])
+    phone.draw({ open: false, panel: 'sheet' })
+
+    //? nothing in hand yet: the store hands a promise - the search shows as asking, and waits
+    let answerFormat = null
+    globalThis.__sources.format = () => new Promise((resolve) => { answerFormat = resolve })
+    const before = asks.length
+    phone.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 411 } })
+    check('deadwax not yet asked: asking shows, and Soulseek is asked nothing before its word', [asks.length - before, classed('app-sweep').length], [0, 1])
+    answerFormat('any')
+    await settle()
+    check('...its word in: the search goes, with that Format', [asks.length - before, asks.at(-1)?.body.format_preference], [1, 'any'])
+    asks.at(-1).resolve(answer([]))
+    await settle()
+    phone.draw({ open: false })
+    phone.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 412 } })
+    phone.draw({ open: false })
+    answerFormat('any')
+    await settle()
+    check('...and the sheet closed while it waited: Soulseek is asked nothing at all', asks.length - before, 1)
+    globalThis.__sources.format = () => globalThis.__sources.settings?.format_preference ?? 'prefer_lossless'
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
+  }
+
+  console.log('\nevery search the sheet starts asks deadwax for the settings first - a desktop panel left open too (review)')
+  {
+    const log = globalThis.__sources.settingsLog
+    const desk = sheet()
+    log.length = 0
+    desk.draw({ open: true, panel: 'column', request: { release: RELEASE, subtitle: 'Third', key: 430 } })
+    check('a Get opening the panel: deadwax asked, then the Format read for its search', log, ['ask', 'format'])
+    asks.at(-1).resolve(answer([source('vinylhead')]))
+    await settle()
+    desk.draw()
+    log.length = 0
+    desk.draw({ request: { release: OTHER, subtitle: 'Dummy', key: 431 } })
+    check('another Get with the panel still open: asked again before its search reads the Format', [log, asks.at(-1)?.body.release_mbid], [['ask', 'format'], 'rel-dummy'])
+    asks.at(-1).resolve(answer([source('vinylhead')]))
+    await settle()
+    desk.draw()
+    log.length = 0
+    desk.draw({ request: { release: RELEASE, subtitle: 'Third', key: 432, again: true } })
+    check('...and the panel following the page to another pressing', [log, asks.at(-1)?.body.release_mbid], [['ask', 'format'], 'rel-third'])
+    asks.at(-1).resolve(answer([]))
+    await settle()
+    desk.draw()
+    log.length = 0
+    find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+    check('a Re-search', log, ['ask', 'format'])
+    asks.at(-1).reject(new Error("slskd isn't logged in to Soulseek, so it can't search."))
+    await settle()
+    desk.draw()
+    log.length = 0
+    find((node) => node.type === 'button' && text(node) === 'Try again')[0].props.onClick()
+    check('Try again', log, ['ask', 'format'])
+    asks.at(-1).resolve(answer([]))
+    await settle()
+    desk.draw({ open: false, panel: 'sheet' })
+  }
+
+  console.log('\nLossless only, and Soulseek answered with nothing lossless: said so, and why (review)')
+  {
+    const status = () => text(find((node) => node.props?.role === 'status')[0])
+    const NOTE = 'Soulseek answered, but your Format is Lossless only, which leaves out folders with no lossless files. You can change it in You, under Getting albums.'
+    const phone = sheet()
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any', format_preference: 'lossless_only' }
+    phone.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 440 } })
+    asks.at(-1).resolve(answer([], { response_count: 4 }))
+    await settle()
+    phone.draw()
+    check('nothing lossless on Soulseek - never "found nothing" - with the Format named, and where it is',
+      [text(classed('app-sources-state-text')[0]), text(classed('app-sources-state-note')[0])],
+      ['Nothing lossless on Soulseek for “Portishead Third”.', NOTE])
+    check('...the query still there to edit, and Re-search', [find((node) => node.type === 'form').length, find((node) => node.type === 'input')[0]?.props.value], [1, 'Portishead Third'])
+    check('...and VoiceOver told the same', status(), `Nothing lossless on Soulseek for “Portishead Third”. ${NOTE}`)
+    phone.draw({ request: { release: RELEASE, subtitle: 'Third', key: 441 } })
+    asks.at(-1).resolve(answer([], { response_count: 0 }))
+    await settle()
+    phone.draw()
+    check('Lossless only, and no peer answered at all: Soulseek found nothing, as ever', [text(classed('app-sources-state-text')[0]), classed('app-sources-state-note').length],
+      ['Soulseek found nothing for “Portishead Third”.', 0])
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any', format_preference: 'prefer_lossless' }
+    phone.draw({ request: { release: RELEASE, subtitle: 'Third', key: 442 } })
+    asks.at(-1).resolve(answer([], { response_count: 4 }))
+    await settle()
+    phone.draw()
+    check('another Format, answers in and nothing left: Soulseek found nothing, as ever', [text(classed('app-sources-state-text')[0]), status()],
+      ['Soulseek found nothing for “Portishead Third”.', 'Soulseek found nothing for “Portishead Third”.'])
+    //? the Format the search was SENT with, as the store answered it - not what the settings said before
+    let answerFormat = null
+    globalThis.__sources.format = () => new Promise((resolve) => { answerFormat = resolve })
+    phone.draw({ request: { release: RELEASE, subtitle: 'Third', key: 443 } })
+    answerFormat('lossless_only')
+    await settle()
+    check('...the search sent with the Format deadwax answered', asks.at(-1)?.body.format_preference, 'lossless_only')
+    asks.at(-1).resolve(answer([], { response_count: 2 }))
+    await settle()
+    phone.draw()
+    check('...and it is that Format the sheet speaks of', text(classed('app-sources-state-text')[0]), 'Nothing lossless on Soulseek for “Portishead Third”.')
+    globalThis.__sources.format = () => globalThis.__sources.settings?.format_preference ?? 'prefer_lossless'
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
+    phone.draw({ open: false })
+  }
+
+  console.log('\nSearch again, when folders were found (2.0.0-player.41)')
+  {
+    const again = () => find((node) => node.type === 'button' && text(node) === 'Search again')[0]
+    const forms = () => find((node) => node.type === 'form')
+    const fresh = sheet()
+    fresh.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 420 } })
+    check('not while asking', again(), undefined)
+    asks.at(-1).resolve(answer([source('vinylhead'), source('bob', { score: 0.8 })], { query: 'Portishead Third', queries: ['Portishead Third', 'Third Portishead'] }))
+    await settle()
+    fresh.draw()
+    const scroll = find(byClass('app-sources-scroll'))[0]
+    const list = scroll.props.children.props.children.filter(Boolean)
+    const order = list.at(-1).props.children.flat(Infinity).filter(Boolean).map((child) => child.props?.class ?? child.type)
+    check('under the cards and the line saying what was searched: Search again, closed - no query form yet',
+      [order.slice(-3, -1).concat(order.at(-1) === 'fragment' ? ['fragment'] : []), !!again(), again()?.props['aria-expanded'], forms().length],
+      [['app-sources-list', 'app-sources-footer', 'fragment'], true, false, 0])
+    again().props.onClick()
+    fresh.draw()
+    const form = forms()[0]
+    check('a tap opens the query to edit under it - the form it controls, holding what was searched',
+      [again()?.props['aria-expanded'], form?.props.id === again()?.props['aria-controls'], find((node) => node.type === 'input')[0]?.props.value, form?.props.class],
+      [true, true, 'Portishead Third', 'app-sources-state is-again'])
+    check('...its field the one focus goes to as it opens', find((node) => node.type === 'input')[0]?.props.ref !== undefined, true)
+    check('...the cards still there above it', cards().length, 2)
+    const before = asks.length
+    form.props.onSubmit({ preventDefault() {} })
+    check('an unedited Re-search overrides nothing - every name searched again', [asks.length - before, asks.at(-1)?.body.query_override], [1, ''])
+    fresh.draw()
+    check('...and a search starting closes Search again', [again(), forms().length], [undefined, 0])
+    asks.at(-1).resolve(answer([source('vinylhead')], { query: 'Portishead Third' }))
+    await settle()
+    fresh.draw()
+    check('the answer in: Search again closed', [again()?.props['aria-expanded'], forms().length], [false, 0])
+    again().props.onClick()
+    fresh.draw()
+    find((node) => node.type === 'input')[0].props.onInput({ currentTarget: { value: 'Portishead - Third (2008) FLAC' } })
+    fresh.draw()
+    forms()[0].props.onSubmit({ preventDefault() {} })
+    check('an edited one is searched as typed', asks.at(-1)?.body.query_override, 'Portishead - Third (2008) FLAC')
+    asks.at(-1).resolve(answer([source('vinylhead')]))
+    await settle()
+    fresh.draw()
+    again().props.onClick()
+    fresh.draw()
+    again().props.onClick()
+    fresh.draw()
+    check('a second tap on Search again closes it', [again()?.props['aria-expanded'], forms().length], [false, 0])
+
+    //? none passing the chips: folders were found, so Search again is there too
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'lossless' }
+    fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 421 } })
+    asks.at(-1).resolve(answer([source('mp3guy', { formats: ['mp3'], bitrates: [320], bit_depths: [], sample_rates: [] })]))
+    await settle()
+    fresh.draw()
+    check('none passing your filters: Search again under Clear filters', [text(classed('app-sources-state-text')[0]), !!again(), forms().length],
+      ['1 folder on Soulseek, none pass your filters', true, 0])
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
+
+    //? nothing found: the query form is already there - no Search again beside it
+    fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 422 } })
+    asks.at(-1).resolve(answer([]))
+    await settle()
+    fresh.draw()
+    check('nothing found: the one query form, as it always was, and no Search again', [forms().length, again()], [1, undefined])
+    fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 423 } })
+    asks.at(-1).reject(new Error("slskd isn't logged in to Soulseek, so it can't search."))
+    await settle()
+    fresh.draw()
+    check('slskd unable to search: no Search again (Try again is the way)', again(), undefined)
+    fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 424 } })
+    asks.at(-1).resolve(answer([], { held: { path: 'P/T', paths: ['P/T'], artist: 'P', album: 'T', edition: '', track_count: 11, expected_tracks: 11, formats: ['flac'], complete: true, fills_gaps: false, filed_to: null }, query: '', queries: [] }))
+    await settle()
+    fresh.draw()
+    check('held whole - the store\'s box, nothing searched: no Search again', again(), undefined)
+    fresh.draw({ open: false })
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

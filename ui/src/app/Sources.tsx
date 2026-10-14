@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import type { JSX } from 'preact'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import type { Candidate, DownloadRelease } from '../api/types'
 import { useCandidateSearch } from '../hooks/useCandidateSearch'
 import { useDismiss } from '../hooks/useDismiss'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import {
-  SIGNAL_LABELS, SORT_LABELS, candidateKey, noSignalMinimums, passesFilters, queriesText, searchedLine, searchingLine, sortCandidates,
-  sourcesAnnouncement, storeNotes, storeStatus, type CandidateSort,
+  NOTHING_LOSSLESS_NOTE, SIGNAL_LABELS, SORT_LABELS, candidateKey, noSignalMinimums, nothingLossless, nothingLosslessLine, passesFilters,
+  queriesText, searchedLine, searchingLine, sortCandidates, sourcesAnnouncement, storeNotes, storeStatus, type CandidateSort,
 } from '../lib/candidates'
 import {
   GET_SETTINGS_DEFAULT, NO_SOURCE_FILTERS, PICK_SORT, candidateFilters, floorFilters, pressedCount, signalsSet, sourceChips,
@@ -15,7 +16,7 @@ import {
 import { ChevronDownIcon, CloseIcon } from '../player/icons'
 import { SourceCard } from './SourceCard'
 import { StoreState } from './StoreState'
-import { getSettingsNow, useGetSettings } from './useGetSettings'
+import { askGetSettings, formatPreferenceNow, getSettingsNow, useGetSettings } from './useGetSettings'
 import { useSheet } from './useSheet'
 
 /** A Get: what it downloads, and what the sheet's heading says it is for. */
@@ -38,7 +39,8 @@ export interface GetRequest {
 
 //? each Signals chip's list its own id
 let signalLists = 0
-
+//? each sheet's query form its own id, for Search again's aria-controls
+let queryForms = 0
 /**
  * The desktop panel's Signals chip (2.0.0-player.19), as DesktopRequest.dc.html draws it beside the
  * phone's three: the least each of the score's six signals may be, as the main page's candidates
@@ -127,7 +129,8 @@ export function SignalsChip({
  *    pressing is held or on its way, the cards show with a line saying why.
  *  - THE STATES: asking (the sweep, and the names being asked for); slskd unable to search (its own
  *    words - "slskd isn't logged in to Soulseek...", the 409 explanation the server builds) with Try
- *    again; nothing found, with the query to edit and Re-search; folders found and none passing the
+ *    again; nothing found, with the query to edit and Re-search (scored Lossless only with answers in,
+ *    "nothing lossless", and the Format named - 2.0.0-player.41); folders found and none passing the
  *    chips, with Clear filters; and the store's answer - held whole or downloading whole stands where
  *    the cards would be (the server searched nothing), a part held, a part downloading and other
  *    pressings are notes above them. A Get slskd or deadwax refuses (deadwax's 409 "already
@@ -139,8 +142,28 @@ export function SignalsChip({
  * answer landing in between could still pick - and queue - a source after Cancel. Its list is the
  * one part that scrolls, and says so itself (`touch-action: pan-y`). It stays mounted, showing the
  * last Get, so it slides away still drawn. A leaf in all but the settings, which it reads from their
- * store (useGetSettings.ts): asked each time it opens, the defaults until the first answer is in - a
- * Get then shows the sources, the safe way round.
+ * store (useGetSettings.ts): asked each time it opens and before every search it starts (below), the
+ * defaults until the first answer is in - a Get then shows the sources, the safe way round.
+ *
+ * SEARCH AGAIN (2.0.0-player.41): when folders WERE found - the cards, or none passing the chips - a
+ * "Search again" text button under them, after the line saying what was searched, opens the same
+ * query to edit under it (a disclosure: aria-expanded, focus to the field, a second tap closes it),
+ * as the main page's candidates panel always had it. The edited-query rule is the hook's, unchanged.
+ * A search starting closes it again.
+ *
+ * WHY EACH SCORED AS IT DID (2.0.0-player.41): each card's signals and the edition words in its
+ * folder's name (SourceCard.tsx) - always shown on a desktop's panel, behind a tap on the score in a
+ * phone's sheet.
+ *
+ * THE FORMAT a search is scored by is You > Getting albums' Format (2.0.0-player.41), from the same
+ * store as the floor - waited for, the search already showing as asking, while a read is out or
+ * deadwax has not yet said what it is; at once otherwise. EVERY search the sheet starts - a Get, the
+ * desktop panel following the page, Try again, a Re-search - asks deadwax for the settings first
+ * (`begin`, review: a desktop panel stays open across Gets and pressings, and only its opening asked,
+ * so a Format changed on another device meanwhile never reached a search), so a Format changed
+ * elsewhere is the one searched by. Lossless only can leave nothing of an answer Soulseek did give
+ * (matching.py drops every folder with no lossless file): then the sheet says nothing lossless was
+ * found, and why, rather than that Soulseek found nothing (lib/candidates.ts nothingLossless).
  *
  * For VoiceOver (review): one live region, always in the sheet, says each outcome in a line
  * (lib/candidates.ts sourcesAnnouncement) - asking, slskd's refusal, the store's box, nothing found,
@@ -211,7 +234,23 @@ export function Sources({
       sort: PICK_SORT,
     }),
     onPicked: onQueued,
+    //? You's Format, per search - waited for while a read is out, or until deadwax has first answered
+    formatPreference: formatPreferenceNow,
   })
+
+  //? Search again, when folders were found: the query to edit, opened under them
+  const [again, setAgain] = useState(false)
+  const againId = useMemo(() => `app-sources-again-${++queryForms}`, [])
+  const againField = useRef<HTMLInputElement>(null)
+
+  //? Every search the sheet starts asks deadwax for the settings first (review): set going before the
+  //? search reads the Format, so formatPreferenceNow() waits for its answer - on a sheet just opened it
+  //? joins the read useGetSettings has just begun, and on a desktop panel already open (a Get, or the
+  //? panel following the page) it is the only one. The floor and the pick rule follow it as before.
+  const begin = (release: DownloadRelease, fresh?: boolean) => {
+    void askGetSettings()
+    state.start(release, fresh)
+  }
 
   //? Cancel, the backdrop and Escape: the search let go in the gesture, then the sheet closes
   const onClose = () => {
@@ -226,15 +265,17 @@ export function Sources({
   useEffect(() => {
     if (!open || !request) return
     if (scroller.current) scroller.current.scrollTop = 0
+    //? a new search - a Get, or the panel following the page - starts with Search again closed
+    setAgain(false)
     if (request.again) {
-      state.start(request.release, false)
+      begin(request.release, false)
       return
     }
     touched.current = false
     setFilters(floorFilters(getSettingsNow().quality_floor))
     setSignals(noSignalMinimums())
     setSort('score')
-    state.start(request.release)
+    begin(request.release)
   }, [open, request?.key])
 
   //? the backstop: however the sheet closed (a Get handing over, App), the search goes with it
@@ -249,6 +290,19 @@ export function Sources({
 
   const search = state.search
   const result = search?.result ?? null
+
+  //? Search again opened: focus in the field, the query ready to edit
+  useLayoutEffect(() => {
+    if (again) againField.current?.focus({ preventScroll: false })
+  }, [again])
+
+  //? a Re-search - from Search again or from nothing found - closes Search again as it starts
+  const requery = () => {
+    keepFocus()
+    setAgain(false)
+    void askGetSettings()
+    state.requery()
+  }
   const chosen = useMemo(() => candidateFilters(filters, minimums), [filters, minimums])
   const passing = useMemo(() => (result?.candidates ?? []).filter((candidate) => passesFilters(candidate, chosen)), [result, chosen])
   const shown = useMemo(() => sortCandidates(passing, sort), [passing, sort])
@@ -260,7 +314,59 @@ export function Sources({
   }, [passing])
 
   //? a button that ends the state it sits in hands focus to the list first, never to the page
-  const keepFocus = () => scroller.current?.focus({ preventScroll: true })
+  function keepFocus() {
+    scroller.current?.focus({ preventScroll: true })
+  }
+
+  /**
+   * The query to edit and search Soulseek with again (2.0.0-player.15's, when nothing was found; since
+   * 2.0.0-player.41 also behind "Search again" when folders were): the field holds what was searched,
+   * and only an EDITED query is searched as typed (the hook's queryOverride - the box shows the first
+   * of the names searched, and re-running it as typed would drop the rest). A `<form>`, so Enter works.
+   * Drawn in place (not a component of its own), so it is part of the sheet's own tree.
+   */
+  const queryForm = (said: JSX.Element | null, id?: string) => (
+    <form
+      {...(id ? { id } : {})}
+      class={`app-sources-state${id ? ' is-again' : ''}`}
+      onSubmit={(event) => {
+        event.preventDefault()
+        requery()
+      }}
+    >
+      {said}
+      <label class="app-sources-query">
+        <span class="app-sources-query-label">Search Soulseek for</span>
+        <input
+          {...(id ? { ref: againField } : {})}
+          class="app-sources-query-input"
+          type="search"
+          value={state.query}
+          onInput={(event) => state.setQuery((event.currentTarget as HTMLInputElement).value)}
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellcheck={false}
+        />
+      </label>
+      <button type="submit" class="app-button">
+        Re-search
+      </button>
+    </form>
+  )
+
+  //? "Search again" under folders found: a disclosure - the query to edit opens under it, and a second
+  //? tap closes it again
+  const searchAgain = (
+    <>
+      <div class="app-sources-again">
+        <button type="button" class="app-text-button" aria-expanded={again} aria-controls={againId} onClick={() => setAgain((was) => !was)}>
+          Search again
+        </button>
+      </div>
+      {again && queryForm(null, againId)}
+    </>
+  )
 
   const toggle = (key: keyof SourceFilters) => {
     touched.current = true
@@ -274,7 +380,10 @@ export function Sources({
   const status = result ? storeStatus(result, 'Requests') : null
   const notes = result ? storeNotes(result) : []
   const announcement = search
-    ? sourcesAnnouncement({ pending: search.pending, release: search.release, error: search.error, status, result, shown: shown.length, notPicked: state.notPicked })
+    ? sourcesAnnouncement({
+      pending: search.pending, release: search.release, error: search.error, status, result, shown: shown.length, notPicked: state.notPicked,
+      format: search.format,
+    })
     : ''
 
   return (
@@ -364,7 +473,7 @@ export function Sources({
                 class="app-button"
                 onClick={() => {
                   keepFocus()
-                  state.start(search.release)
+                  begin(search.release)
                 }}
               >
                 Try again
@@ -377,60 +486,57 @@ export function Sources({
               <StoreState status={null} notes={notes} />
               {state.notPicked && <p class="app-sources-not-picked">{state.notPicked}</p>}
               {!result!.candidates.length ? (
-                <form
-                  class="app-sources-state"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    keepFocus()
-                    state.requery()
-                  }}
-                >
-                  <p class="app-sources-state-text">Soulseek found nothing for {queriesText(result!)}.</p>
-                  <label class="app-sources-query">
-                    <span class="app-sources-query-label">Search Soulseek for</span>
-                    <input
-                      class="app-sources-query-input"
-                      type="search"
-                      value={state.query}
-                      onInput={(event) => state.setQuery((event.currentTarget as HTMLInputElement).value)}
-                      enterKeyHint="search"
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      spellcheck={false}
-                    />
-                  </label>
-                  <button type="submit" class="app-button">
-                    Re-search
-                  </button>
-                </form>
+                nothingLossless(result!, search.format) ? (
+                  //? Lossless only, and Soulseek answered: nothing lossless, and the setting that left
+                  //? the rest out named - the query is still there to edit, a lossless copy may be filed
+                  //? under other words
+                  queryForm(
+                    <>
+                      <p class="app-sources-state-text">{nothingLosslessLine(result!)}</p>
+                      <p class="app-sources-state-note">{NOTHING_LOSSLESS_NOTE}</p>
+                    </>,
+                  )
+                ) : (
+                  queryForm(<p class="app-sources-state-text">Soulseek found nothing for {queriesText(result!)}.</p>)
+                )
               ) : !shown.length ? (
-                <div class="app-sources-state">
-                  <p class="app-sources-state-text">
-                    {result!.candidates.length} {result!.candidates.length === 1 ? 'folder' : 'folders'} on Soulseek, none pass your filters
-                  </p>
-                  {pressedCount(filters, minimums) > 0 && (
-                    <button
-                      type="button"
-                      class="app-button"
-                      onClick={() => {
-                        keepFocus()
-                        touched.current = true
-                        setFilters(NO_SOURCE_FILTERS)
-                        setSignals(noSignalMinimums())
-                      }}
-                    >
-                      Clear filters
-                    </button>
-                  )}
-                </div>
+                <>
+                  <div class="app-sources-state">
+                    <p class="app-sources-state-text">
+                      {result!.candidates.length} {result!.candidates.length === 1 ? 'folder' : 'folders'} on Soulseek, none pass your filters
+                    </p>
+                    {pressedCount(filters, minimums) > 0 && (
+                      <button
+                        type="button"
+                        class="app-button"
+                        onClick={() => {
+                          keepFocus()
+                          touched.current = true
+                          setFilters(NO_SOURCE_FILTERS)
+                          setSignals(noSignalMinimums())
+                        }}
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                  {searchAgain}
+                </>
               ) : (
                 <>
                   <ul class="app-sources-list">
                     {shown.map((candidate) => (
-                      <SourceCard key={candidateKey(candidate)} candidate={candidate} best={candidateKey(candidate) === best} onGet={get} />
+                      <SourceCard
+                        key={candidateKey(candidate)}
+                        candidate={candidate}
+                        best={candidateKey(candidate) === best}
+                        onGet={get}
+                        reasons={modal ? 'tap' : 'shown'}
+                      />
                     ))}
                   </ul>
                   <p class="app-sources-footer">{searchedLine(result!, shown.length)}</p>
+                  {searchAgain}
                 </>
               )}
             </>

@@ -6,10 +6,12 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { needsLookLabel } from '../lib/needsLook'
 import { badgeText } from '../lib/requestsView'
 import { navidromeStatus, type NavidromeStatus } from '../player/api'
+import { readConfirmCancel, writeConfirmCancel } from '../state/persisted'
 import { ChevronRightIcon } from '../player/icons'
 import { usePlayerActions, usePlayerState } from './context'
 import type { Look } from '../lib/turntable'
 import { GaplessChoice } from './GaplessChoice'
+import { ConfirmCancelChoice } from './ConfirmCancelChoice'
 import { GettingChoices } from './GettingChoices'
 import { LookChoice } from './LookChoice'
 import { QualityChoice } from './QualityChoice'
@@ -55,10 +57,13 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * log and editing an album, none of which the app draws there yet.
  *
  * - Getting albums (2.0.0-player.15, GettingChoices.tsx): "When I tap Get" (Show me the sources, the
- *   default, or Pick the best source for me) and the quality floor - kept per USER on the server
+ *   default, or Pick the best source for me), the quality floor and Format (2.0.0-player.41) - kept per USER on the server
  *   (useGetSettings.ts), asked each time You's tab is opened and on "Check again", so one changed on
  *   another device shows here without the app being killed. A choice not kept ("Not saved: …") is
  *   said in a live region that is always in the page, so VoiceOver hears why the choice went back.
+ *   Under them (2.0.0-player.41, ConfirmCancelChoice.tsx) "Confirm before cancelling", which is this
+ *   DEVICE's - Requests' ✕ reads it at the tap - with a note saying so: after the three's note and
+ *   what went wrong keeping them, so neither reads as being about it.
  * - Playback: Gapless, a checkbox (GaplessChoice.tsx - moved here from the now-playing screen in
  *   2.0.0-player.10, where it was a switch), "Now Playing opens as" (LookChoice.tsx,
  *   2.0.0-player.11: the cover or the turntable - App keeps it, and hands it here), "Pause winds the
@@ -123,6 +128,8 @@ export function You({
   const pingRequests = useMemo(latestOnly, [])
   //? Getting albums: the server's answer, asked each time the tab is opened (the first time too)
   const getting = useGetSettings(current)
+  //? "Confirm before cancelling": this device's (2.0.0-player.41) - Requests reads it at the tap
+  const [confirmCancel, setConfirmCancel] = useState(readConfirmCancel)
 
   function askWho() {
     const request = meRequests.begin()
@@ -189,16 +196,30 @@ export function You({
         <p id="app-get-note" class="app-footnote">
           With “Pick the best source for me”, Get takes the best match that passes your quality floor,
           and shows you the sources when nothing matches well. The floor is also what the sources
-          start filtered by. Both are kept for you on deadwax, not on this device.
+          start filtered by. Format changes how sources are scored: Prefer lossless ranks lossless
+          folders higher, and Lossless only leaves out folders with no lossless file. All three are
+          kept for you on deadwax, not on this device.
         </p>
+        {/* what went wrong keeping those three, right under them and their note - never under this
+            device's own setting below, which deadwax's database has no part in */}
         {!getting.canSave && (
           <p class="app-footnote app-error">deadwax can't keep these: its database isn't writable.</p>
         )}
         {/* always in the page, so VoiceOver hears a choice that wasn't kept (it reads a region only
-            once it is already there) */}
-        <div aria-live="polite" aria-atomic="true">
+            once it is already there) - and, empty or not, the gap before the next choice */}
+        <div class="app-choice-gap" aria-live="polite" aria-atomic="true">
           {getting.problem && <p class="app-footnote app-error">{getting.problem}</p>}
         </div>
+        <ConfirmCancelChoice
+          on={confirmCancel}
+          onChange={(on) => {
+            writeConfirmCancel(on)
+            setConfirmCancel(on)
+          }}
+        />
+        <p id="app-confirm-cancel-note" class="app-footnote">
+          The ✕ on a download in Requests asks first. Kept on this device.
+        </p>
       </section>
 
       <section class="app-section" aria-labelledby="app-playback-title">

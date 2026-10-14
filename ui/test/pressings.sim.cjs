@@ -4,7 +4,8 @@
  * MusicBrainz answered them (tests/fixtures/pressings/).
  *
  * What a wrong answer would hide: the page opening on another pressing than Get will get; a bonus
- * track, a single mix or a missing track not shown; the dropdown burying the pressing you chose
+ * track, a single mix or a missing track not shown; the dropdown burying the pressing you chose (and,
+ * since 2.0.0-player.41, a pressing you hold - each marked by release id, never folded away)
  * under "N more"; disc headings without MusicBrainz's medium titles; a pressing called "the usual
  * tracklist" that isn't - or the page reading backwards because MusicBrainz listed a single mix
  * first (every pressing is compared at the DEFAULT pressing's lengths, so no order changes a
@@ -66,6 +67,24 @@ check('every pressing is in one list or the other, once', [...slow.shown, ...slo
 const folded = slow.more[0].id
 const picked = P.pressingsView(slowRush.releases, folded)
 check('a pressing chosen from under "N more" stays in view, and leaves the fold', [picked.shown.some((row) => row.id === folded), picked.more.some((row) => row.id === folded), picked.more.length], [true, false, 4])
+
+console.log('\nthe pressings you hold (2.0.0-player.41): each marked, none folded away')
+{
+  const [first, second] = slow.more
+  const held = new Set([first.id, second.id, slowRush.expected.representative])
+  const marked = P.pressingsView(slowRush.releases, null, held)
+  const all = [...marked.shown, ...marked.more]
+  check('every pressing held marked, by release id - and only those', all.filter((row) => row.held).map((row) => row.id).sort(), [...held].sort())
+  check('...two that were folded under "N more" now in view, in the fold\'s order, the fold two shorter',
+    [marked.shown.filter((row) => row.id === first.id || row.id === second.id).length, marked.more.some((row) => row.held), marked.more.length], [2, false, slow.more.length - 2])
+  check('...still every pressing once, and the order of the rest as it was',
+    [all.map((row) => row.id).sort().join() === slowRush.releases.map((release) => release.id).sort().join(), marked.shown.filter((row) => !row.held).map((row) => row.id).join() === slow.shown.filter((row) => !held.has(row.id)).map((row) => row.id).join()],
+    [true, true])
+  const capitals = slowRush.releases.map((release) => (release.id === first.id ? { ...release, id: release.id.toUpperCase() } : release))
+  check('...a pressing whose id MusicBrainz wrote in capitals still matches', P.pressingsView(capitals, null, new Set([first.id])).shown.some((row) => row.id === first.id.toUpperCase() && row.held), true)
+  check('nothing held: nothing marked, the fold as it was', [P.pressingsView(slowRush.releases).shown.some((row) => row.held), P.pressingsView(slowRush.releases).more.length], [false, slow.more.length])
+}
+
 const dum = P.pressingsView(dummy.releases)
 check('Dummy: the ten-track CDs say what they leave out; the vinyl, its 30s-short Biscuit too', [
   dum.shown.find((row) => row.id.startsWith('87888070')).note,

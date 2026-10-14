@@ -290,6 +290,16 @@ def px(token: str) -> float:
     return float(value[:-2])
 
 
+def length(token: str) -> float:
+    """A token that is a px length - plain, or a calc() of px tokens and plain numbers - as a number."""
+    value = ALL_TOKENS[token]
+    expression = re.sub(r"var\((--[\w-]+)\)", lambda found: f"({length(found.group(1))})", value)
+    expression = expression.replace("calc", "").replace("px", "")
+    #? nothing but arithmetic is ever evaluated
+    assert re.fullmatch(r"[\d\s.+\-*/()]+", expression), (token, value)
+    return float(eval(expression))
+
+
 def test_each_sheet_has_its_own_scroll_lock():
     assert declarations(PLAYER_CSS, "html.pl-sheet-open")["overflow"] == "hidden"
     for lock in ("html.app-menu-open", "html.app-info-open", "html.app-sources-open", "html.app-viz-open"):
@@ -1029,3 +1039,120 @@ def test_the_speed_chip_moves_nothing_and_shows_on_the_turntable_only_on_a_phone
     assert declarations(APP, ".app-is-turntable .app-speed-chip") == {"display": "none"}
     assert declarations(APP, ".app-is-turntable .app-speed-chip", "@media (max-height: 500px)") == {"display": "grid"}
 
+
+
+# ---------------------------------------------------------------- Get, as the main page had it (2.0.0-player.41)
+
+def test_a_sources_reasons_open_from_a_tap_target_on_the_score_and_hide_while_closed():
+    hit, hairline = px("--pl-hit"), px("--dw-hairline")
+    #? a phone's score is the button: the board's box widened by its chevron, 44px to a finger
+    toggle = declarations(APP, ".app-source-score.is-toggle")
+    assert (toggle["position"], toggle["min-width"], toggle["width"]) == ("relative", "var(--app-source-score-width)", "auto")
+    before = declarations(APP, ".app-source-score.is-toggle::before")
+    assert before["top"] == before["bottom"] == "calc(-1 * var(--app-source-score-reach))"
+    assert ALL_TOKENS["--app-source-score-reach"] == "calc((var(--pl-hit) - var(--app-source-score-height)) / 2 + var(--dw-hairline))"
+    #? ...reaching from the padding box of the box it widens (border-box, a hairline's border): that box's
+    #? own height, less its border, and the reach above and below, make a tap target at least
+    score = declarations(APP, ".app-source-score")
+    assert score["height"] == "var(--app-source-score-height)"
+    assert score["border"].startswith("var(--dw-hairline) ")
+    assert declarations(PLAYER_CSS, "*")["box-sizing"] == "border-box"
+    height = px("--app-source-score-height")
+    assert height - 2 * hairline + 2 * length("--app-source-score-reach") >= hit
+    assert "overflow" not in declarations(APP, ".app-source-score") and "overflow" not in toggle
+    #? the chevron turns as they open
+    assert declarations(APP, '.app-source-score[aria-expanded="true"] .app-source-score-icon')["transform"] == "rotate(var(--app-source-score-turn))"
+    #? no display of their own, anywhere, so `hidden` hides them on a phone (the gotcha: a display set
+    #? in CSS beats the attribute) - their two lines are the flex rows
+    desk = (PLAYER / "app-desktop.css").read_text()
+    for css in (APP, desk):
+        for _context, selector, values in rules(css):
+            if selector.endswith(".app-source-reasons"):
+                assert "display" not in values, selector
+    #? on a desktop's panel, across the card under the facts
+    assert declarations(desk, ".app-desk .app-layer.is-panel .app-source-reasons", "@media (min-width: 1024px)") == {"grid-column": "1 / -1"}
+
+
+def test_a_sources_signals_and_edition_words_are_drawn_in_their_bands_colours():
+    #? the signals: amber in the middle band, green from 75, red under 40 - STYLE.md's badges, and a red one
+    signal = declarations(APP, ".app-source-signal")
+    assert (signal["background"], signal["color"], signal["height"], signal["white-space"]) == (
+        "var(--dw-badge-amber-bg)", "var(--dw-amber-text)", "var(--app-source-signal)", "nowrap")
+    assert declarations(APP, ".app-source-signal.is-good")["color"] == "var(--dw-badge-green-text)"
+    bad = declarations(APP, ".app-source-signal.is-bad")
+    assert (bad["background"], bad["border-color"], bad["color"]) == ("var(--dw-badge-red-bg)", "var(--dw-badge-red-border)", "var(--dw-danger-text)")
+    assert {"--dw-badge-red-bg", "--dw-badge-red-border"} <= set(tokens(THEME_CSS))
+    #? the edition words in the folder's name, in the main page's colours
+    for tone, colour in (("amber", "var(--dw-amber-text)"), ("red", "var(--dw-danger-text)"), ("purple", "var(--dw-accent-text)"), ("green", "var(--dw-badge-green-text)")):
+        assert declarations(APP, f".app-source-tag.is-{tone}")["color"] == colour, tone
+    tag = declarations(APP, ".app-source-tag")
+    assert tag["color"] == "var(--dw-text-on-secondary)"
+    #? the words clear of the tag's border, as the main page's tag has them (review: the token was never
+    #? defined, so the padding fell back to 0 and the words touched the border)
+    assert tag["padding"] == "0 var(--app-source-tag-pad)"
+    assert ALL_TOKENS["--app-source-tag-pad"] == "6px"
+    #? both lines wrap on a narrow phone rather than run off it
+    assert declarations(APP, ".app-source-signals")["flex-wrap"] == declarations(APP, ".app-source-tags")["flex-wrap"] == "wrap"
+
+
+def test_other_pressings_never_gives_way_and_a_held_pressing_is_marked_green():
+    #? the album page's chip row stays one line; "Other pressings" never shortens - the Also chips do
+    assert "flex-wrap" not in declarations(APP, ".app-album-chips")
+    assert declarations(APP, ".app-album-chips > .app-other-pressings") == {"flex": "none"}
+    #? ...and is a chip, its reach unclipped
+    assert "overflow" not in declarations(APP, ".app-other-pressings")
+    #? beside an Also chip, in a row too narrow for the three whole: "Pressings", and the badge's words read
+    #? but never shown (the visually-hidden rule's own declarations) - so the Also chip keeps room to say
+    #? which pressing it is. By the ROW's width, a container query on the row itself (review: by the frame,
+    #? a desktop's column narrowed by the Edit panel crushed the Also chip to a bare "›", and a phone on
+    #? its side gave up words it had the room for)
+    assert declarations(APP, ".app-album-chips")["container"] == "app-album-chips / inline-size"
+    assert declarations(APP, ".app-other-short") == {"display": "none"}
+    narrow = "@container app-album-chips (max-width: 600px)"
+    assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-long", narrow) == {"display": "none"}
+    assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-short", narrow) == {"display": "inline"}
+    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge-text", narrow) == declarations(APP, ".app-visually-hidden")
+    #? ...never by the frame: no rule outside that query shortens them, and the desktop's stylesheet has none
+    desk = (PLAYER / "app-desktop.css").read_text()
+    for css in (APP, desk):
+        for context, selector, _values in rules(css):
+            if any(name in selector for name in (".app-other-long", ".app-held-badge-text")) or ".app-other-short" in selector and selector != ".app-other-short":
+                assert context == narrow, (context, selector)
+    #? the row's place held from the first frame, nothing in it shown until the bridge has answered - so
+    #? the badge first shows where it stays, never sliding along a phone's centred row (review)
+    assert declarations(APP, ".app-album-chips.is-waiting > *") == {"visibility": "hidden"}
+    assert declarations(APP, ".app-album-chips")["justify-content"] == "center"
+    held = declarations(APP, ".app-picker-held")
+    assert (held["color"], held["font-size"]) == ("var(--dw-badge-green-text)", "var(--dw-text-label)")
+    #? Search again centred under the line saying what was searched; the form it opens starts at once
+    assert declarations(APP, ".app-sources-again") == {"display": "flex", "justify-content": "center"}
+    assert declarations(APP, ".app-sources-state.is-again") == {"padding-top": "var(--app-sources-again-pad)"}
+    #? ...its field focused as it opens, so its ring - drawn outside - shows every time: the label keeps
+    #? room over it for the ring's width and its gap, and the label's own line gap (review: it touched)
+    assert declarations(APP, ".app-sources-query-input:focus-visible")["outline-offset"] == "var(--app-ring)"
+    assert declarations(APP, ".app-sources-query")["gap"] == "calc(var(--app-ring-room) + var(--app-line-gap))"
+    assert ALL_TOKENS["--app-ring-room"] == "calc(2 * var(--app-ring))"
+
+
+#? set inline by the components, never in a stylesheet: the turntable's stage's shape, and the speed
+#? fader's place on the plinth
+SET_INLINE = {"--app-tt-aspect": "player/Turntable.tsx", "--app-tt-fader-x": "player/SpeedFader.tsx", "--app-tt-fader-from": "player/SpeedFader.tsx"}
+
+
+def test_every_token_a_rule_reads_is_defined():
+    """
+    A var() with no fallback naming a token nobody defines makes its whole declaration invalid when the
+    page is drawn - a padding falls back to 0, and nothing says so (2.0.0-player.41's edition tags, found
+    in review). Every token the app's stylesheets read is defined in one of the four, or set inline by
+    the component that draws it.
+    """
+    desk = (PLAYER / "app-desktop.css").read_text()
+    sheets = (THEME_CSS, PLAYER_CSS, APP, desk)
+    defined = {name for css in sheets for _context, _selector, values in rules(css) for name in values if name.startswith("--")}
+    read = {name for css in sheets for _context, _selector, values in rules(css) for value in values.values()
+            for name in re.findall(r"var\((--[\w-]+)\)", value)}
+    assert sorted(read - defined - set(SET_INLINE)) == []
+    #? ...and each one said to be set inline is, by the component named - so the list can't outlive it
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    for name, component in SET_INLINE.items():
+        assert f"'{name}':" in (ui / component).read_text(), name

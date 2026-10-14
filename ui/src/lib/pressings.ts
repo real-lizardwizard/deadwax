@@ -20,7 +20,10 @@
  *    listed first the default read "another version of Borderline" against itself (review).
  *  - THE DROPDOWN shows the default, one pressing of each other format that has the usual tracklist
  *    (so a vinyl is one tap away), every pressing that differs, then "N more pressings with the
- *    usual tracklist", which expands. The pressing chosen is always in view.
+ *    usual tracklist", which expands. The pressing chosen is always in view - and since
+ *    2.0.0-player.41 so is every pressing you hold (`held`, by release id from /library/owned), each
+ *    marked "In your library": v0.9.1's ask, "a way to see which editions are already in my library
+ *    when I'm searching for new ones".
  *  - THE TRACKLIST is the chosen pressing's own - its titles, its lengths, its discs - with a Bonus
  *    row for a track the usual tracklist hasn't, "Other version" for one far enough from the usual
  *    length, "Renamed" for a new title at about the same length, and what it leaves out listed
@@ -71,6 +74,8 @@ export interface PressingRow {
   kind: PressingKind
   /** the one the page opens on */
   isDefault: boolean
+  /** a pressing your library holds (2.0.0-player.41): marked "In your library", never folded away */
+  held: boolean
 }
 
 export interface PressingsView {
@@ -159,9 +164,14 @@ const sortDate = (release: PressingRelease) => `${release.date || release['relea
 
 /**
  * Every pressing of a group as the dropdown lists them, and which is shown - `asked` is the one the
- * address names, when the group has it.
+ * address names, when the group has it; `held`, the release ids your library holds (lowercase), each
+ * marked and kept out of the fold.
  */
-export function pressingsView(releases: readonly PageRelease[], asked: string | null = null): PressingsView {
+export function pressingsView(
+  releases: readonly PageRelease[],
+  asked: string | null = null,
+  held: ReadonlySet<string> = new Set(),
+): PressingsView {
   const base = chooseBase(releases)
   const usualKey = base ? tracklistKey(base.tracks) : null
   const fallback = representativeRelease(releases)
@@ -184,7 +194,7 @@ export function pressingsView(releases: readonly PageRelease[], asked: string | 
       : diff && !differs(diff) && tracklistKey(tracks) === usualKey ? 'usual' : 'differs'
     const isDefault = release.id === defaultId
     return { id: release.id, label: pressingLabel(release), note: pressingNote(kind, diff, isDefault, base), kind, isDefault,
-      format: pressingFormat(release), date: sortDate(release) }
+      held: held.has(release.id.toLowerCase()), format: pressingFormat(release), date: sortDate(release) }
   })
 
   const byDate = (a: { date: string; label: string }, b: { date: string; label: string }) =>
@@ -201,8 +211,10 @@ export function pressingsView(releases: readonly PageRelease[], asked: string | 
     formats.add(row.format)
     return true
   })
-  const folded = usual.filter((row) => !formatShown.includes(row) && row.id !== chosenId)
-  const chosenFolded = usual.filter((row) => !formatShown.includes(row) && row.id === chosenId)
+  //? the chosen pressing and every pressing you hold stay out of the fold, in the list's own order
+  const keptOut = (row: { id: string; held: boolean }) => row.id === chosenId || row.held
+  const folded = usual.filter((row) => !formatShown.includes(row) && !keptOut(row))
+  const chosenFolded = usual.filter((row) => !formatShown.includes(row) && keptOut(row))
 
   const strip = ({ format: _format, date: _date, ...row }: PressingRow & { format: string; date: string }): PressingRow => row
   const shown = [...(first ? [first] : []), ...formatShown, ...chosenFolded, ...differing, ...none].map(strip)

@@ -187,7 +187,9 @@ album's pressings, which an album opened before already has, and gives up if you
 something or switch tab meanwhile); a row that turns out to be in your library has none, and a tap
 on it opens **the album you have** (since 2.0.0-player.17: deadwax looks up which album Navidrome
 holds for the pressing you have) - or, while Navidrome hasn't found it, the album you don't have,
-which says "in your library".
+which says "in your library". To get **another pressing** of an album you have, open the album you
+have and tap **Other pressings** ([below](#another-pressing-of-an-album-you-have)) - the list here
+keeps to albums you haven't got, and an artist's page opens the albums you have as yours.
 
 How the box is read, since there's only one:
 
@@ -252,6 +254,10 @@ player (it's never taller than that, and scrolls inside itself past that):
 - **No tracklist on MusicBrainz** for one nobody has entered the tracks of;
 - then **N more pressings with the usual tracklist**, folded away - tap it to show them.
 
+Since 2.0.0-player.41 every pressing you already have says **In your library** under its note, in
+green, and is never folded away - judged by the pressing's MusicBrainz id in your folders' tags, once
+deadwax has said what you have.
+
 Choosing one shows its tracklist and closes the list, and the page's address remembers it, so a
 reload or a saved link shows the same pressing; Back still leaves the page in one step. A tap
 outside the list, or Escape, closes it without choosing.
@@ -278,3 +284,25 @@ different about each pressing](#whats-different-about-each-pressing)) - 15 secon
 track, if that's more) for another version, within 5 seconds for a rename - but the app doesn't
 mark a small length change at all, where the main page shows it as an "N lengths" chip: such a
 pressing reads *Same tracklist as the usual one* here.
+
+### Another pressing of an album you have
+
+Since 2.0.0-player.41 an album you have - its own page in the app, played from your library - ends
+its row of chips under the meta line with **Other pressings ›** (after **In your library** and any
+**Also: …** chips for other pressings you hold). It opens [the album you don't
+have](#the-album-you-dont-have) for that album: every pressing MusicBrainz lists, the ones you have
+marked **In your library**, and **Get the album** for whichever you choose - the deluxe beside the
+standard you hold, say. Its title is the album's name until MusicBrainz's own arrives with the
+pressings. Choose a pressing you already have and the line under Get says **Already in your
+library**, as it always did; Get then shows that in the sources rather than searching.
+
+The chip appears once deadwax has said which MusicBrainz album yours is - from the album id in your
+folder's tags. Its row (**In your library** and the chips beside it) has its place kept from the
+start and shows once deadwax has answered, so nothing in it or under it moves as the chip lands. A
+folder tagged with no album id (an .m4a deadwax filed carries the pressing's id but not the
+album's) has no chip. Beside an **Also** chip, in a row too narrow for all three whole - a phone
+held upright, or a computer's album page with a panel open beside it - it reads **Pressings** and
+**In your library** keeps only its green tick, so the Also chip has room to say which pressing it
+is; a screen reader still hears "Other pressings" and "In your library". It's the row's own width
+that decides (600 pixels or less shortens), so a phone on its side, a tablet and a wide computer
+window say every word.

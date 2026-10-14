@@ -42,6 +42,13 @@
  *    it comes back to a panel left open for another; nothing asked by a page that isn't showing, nor
  *    once the panel shows something else. A phone's page is as it was: no pressed state on its Get.
  *
+ * And for another pressing of an album you hold (2.0.0-player.41): every pressing the library holds -
+ * by the group's folders or a release id alone, a release id tagged in capitals too - marked "In your
+ * library" in the list and never folded away (only those marked), Get still offered on one you hold and opening the sources for it (the
+ * existing path: the store line, and the sheet's box, say it is already there); and `title` - the
+ * album's name from the page that opened it - standing in as the title on a cold page until
+ * MusicBrainz's own group arrives, never over it.
+ *
  * Run it with:  node ui/test/group.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -599,6 +606,60 @@ async function main() {
     check('a page of the album that isn\'t showing asks for nothing', hidden.length, 0)
     other.draw({ shown: true })
     check('...until it shows: then its own pressing', [hidden.length, hidden[0]?.release.release_mbid, hidden[0]?.again], [1, japan.id, true])
+  }
+
+  console.log('\nanother pressing of an album you hold (2.0.0-player.41): held ones marked, Get as ever')
+  {
+    const japan = byPrefix(slowRush, '452ccdb4').id
+    //? the usual CD by the group's folders, the Japanese CD by a release id alone (an m4a deadwax filed)
+    globalThis.__group.owned = owning([
+      { path: 'Tame Impala/The Slow Rush (2020)', release_mbid: slowRush.expected.representative, release_group_mbid: slowRush.group.id },
+      { path: 'Tame Impala/The Slow Rush (2020) [Japan]', release_mbid: japan, release_group_mbid: '' },
+      { path: 'Portishead/Dummy (1994)', release_mbid: dummy.expected.representative, release_group_mbid: dummy.group.id },
+    ])
+    const gets = []
+    const { draw } = page({ id: slowRush.group.id, preview: PREVIEW, onGet: (request) => gets.push(request) })
+    draw()
+    const view = find((node) => node.type === PressingPicker)[0]?.props.view
+    const rows = [...(view?.shown ?? []), ...(view?.more ?? [])]
+    check('the list marks every pressing you hold - the usual CD by its folder\'s group, the Japanese CD by its id alone - and only those',
+      rows.filter((row) => row.held).map((row) => row.id).sort(), [slowRush.expected.representative, japan].sort())
+    check('...neither folded away', view?.more.filter((row) => row.held).length, 0)
+    check('Get still there on a pressing you hold, opening the sources for it - where the store line and the sheet say it is already here',
+      (classed('app-rg-get')[0]?.props.onClick({ currentTarget: null }), gets.map((request) => request.release.release_mbid)), [slowRush.expected.representative])
+    //? (review) a folder found by the group's own id whose release id tag was written in capitals, by
+    //? hand - its pressing is still the one marked
+    globalThis.__group.owned = owning([
+      { path: 'Tame Impala/The Slow Rush (2020) [Japan]', release_mbid: ` ${japan.toUpperCase()} `, release_group_mbid: slowRush.group.id },
+    ])
+    draw()
+    const capitals = find((node) => node.type === PressingPicker)[0]?.props.view
+    check('a held folder\'s release id in capitals (and spaced), found by the group\'s id: its pressing still marked, and only it',
+      [...(capitals?.shown ?? []), ...(capitals?.more ?? [])].filter((row) => row.held).map((row) => row.id), [japan])
+    globalThis.__group.owned = null
+    draw()
+    check('the library not answered: nothing marked', [...find((node) => node.type === PressingPicker)[0].props.view.shown].some((row) => row.held), false)
+
+    const render = hooks.root(PressingPicker)
+    const marked = P.pressingsView(slowRush.releases, null, new Set([japan]))
+    tree = render({ view: marked, onPick() {} })
+    classed('app-picker-button')[0].props.onClick()
+    tree = render({ view: marked, onPick() {} })
+    const held = find((node) => node.props?.role === 'option').filter((option) => find(byClass('app-picker-held'), option).length)
+    check('drawn: "In your library" under the held pressing\'s note, inside its option (read with it)',
+      held.map((option) => [option.key, text(find(byClass('app-picker-held'), option)[0])]), [[japan, 'In your library']])
+
+    asked.length = 0
+    //? a group the session hasn't kept yet (Dummy's pressings, under an id of their own)
+    const UNSEEN = '00000000-0000-4000-8000-000000000041'
+    answers.push(() => Promise.resolve({ id: UNSEEN, releases: dummy.releases, problem: null }))
+    const cold = page({ id: UNSEEN, title: 'Dummy (Remastered)' })
+    cold.draw()
+    check('opened from the album you have, no group from Search: its name as the title until MusicBrainz answers',
+      [text(classed('pl-hero-title')[0]), text(classed('pl-hero-meta')[0])], ['Dummy (Remastered)', ''])
+    await settle()
+    cold.draw()
+    check('...then MusicBrainz\'s own title for the album, never the name it was opened with', text(classed('pl-hero-title')[0]), 'Dummy')
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

@@ -27,6 +27,11 @@
  *  - Where they live now: You's Playback section - Gapless, then Now Playing opens as, then Pause
  *    winds the record down beside it, then Maximum quality - each on the storage key it always had,
  *    per device; the gear, the sheet and the switch are gone.
+ *  - "Confirm before cancelling" (app/ConfirmCancelChoice.tsx, 2.0.0-player.41) is a checkbox in You >
+ *    Getting albums, on by default, kept on its own key, per device - carried over ONCE from the main
+ *    page's own setting in this browser (deadwax-preferences' confirmCancel): off if that said off,
+ *    else marked 'default', which reads as on and stores no choice; never read from the main page
+ *    again. Requests reads it at the ✕'s tap; its own tap tells You, and calls no player action.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -41,7 +46,7 @@ const REPO = path.resolve(UI, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-settings-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', 'src/app/LookChoice.tsx', 'src/app/WindDownChoice.tsx', 'src/state/persisted.ts',
+  'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', 'src/app/LookChoice.tsx', 'src/app/WindDownChoice.tsx', 'src/app/ConfirmCancelChoice.tsx', 'src/state/persisted.ts',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -127,6 +132,7 @@ const { QualityChoice, QUALITIES } = require(path.join(OUT, 'app/QualityChoice.j
 const { GaplessChoice } = require(path.join(OUT, 'app/GaplessChoice.js'))
 const { LookChoice, LOOKS } = require(path.join(OUT, 'app/LookChoice.js'))
 const { WindDownChoice } = require(path.join(OUT, 'app/WindDownChoice.js'))
+const { ConfirmCancelChoice } = require(path.join(OUT, 'app/ConfirmCancelChoice.js'))
 const persisted = require(path.join(OUT, 'state/persisted.js'))
 
 //? each element of a tree, found by where it sits, keeps one FakeElement across renders; a ref names it
@@ -333,6 +339,55 @@ console.log('\n"Pause winds the record down" is a checkbox, on until turned off,
   refusing = false
 }
 
+console.log('\n"Confirm before cancelling" (2.0.0-player.41): a checkbox, on by default, this device\'s, carried over once')
+{
+  let on = true
+  const chosen = []
+  const view = mount(ConfirmCancelChoice, 'confirm cancel')
+  const render = () => view.render({ on, onChange: (next) => { chosen.push(next); on = next } })
+  render()
+  const box = () => view.find((node) => node.props?.role === 'checkbox')[0]
+  const drawn = () => view.find((node) => hasClass(node, 'app-checkbox'))[0]
+  check('a checkbox named as the main page names it, described by its note in You',
+    [box()?.type, words(box()), box()?.props['aria-describedby'], box()?.props['aria-checked']],
+    ['button', 'Confirm before cancelling', 'app-confirm-cancel-note', true])
+  check('on, as it ships: ticked', hasClass(drawn(), 'is-on'), true)
+  box().props.onClick()
+  render()
+  check('a tap turns it off - You is told, in the tap - and the tick goes', [chosen, box().props['aria-checked'], hasClass(drawn(), 'is-on')], [[false], false, false])
+  box().props.onClick()
+  render()
+  //? (review) a box that could only ever be turned off, or never drew its tick, passed before this
+  check('...and back on, ticked again', [chosen, box().props['aria-checked'], hasClass(drawn(), 'is-on')], [[false, true], true, true])
+  check('a click is the only thing it listens for', Object.keys(box().props).filter((name) => /^on[A-Z]/.test(name)), ['onClick'])
+
+  check('its key, per device', persisted.STORAGE_KEYS.playerConfirmCancel, 'deadwax-player-confirm-cancel')
+  stored.clear()
+  check('nothing kept here or on the main page: on - marked carried over as the default, no choice stored',
+    [persisted.readConfirmCancel(), stored.get('deadwax-player-confirm-cancel')], [true, 'default'])
+  stored.set('deadwax-preferences', JSON.stringify({ confirmCancel: false }))
+  check('...and the main page turned off since is never read again', persisted.readConfirmCancel(), true)
+  stored.clear()
+  stored.set('deadwax-preferences', JSON.stringify({ confirmCancel: false, searchLimit: 30 }))
+  check('the main page saying off on this browser, the first read: off, and kept as off',
+    [persisted.readConfirmCancel(), stored.get('deadwax-player-confirm-cancel')], [false, 'off'])
+  stored.set('deadwax-preferences', JSON.stringify({ confirmCancel: true }))
+  check('...once: the main page turned back on changes nothing here', persisted.readConfirmCancel(), false)
+  persisted.writeConfirmCancel(true)
+  check('chosen on in You: kept as a choice, and read back', [stored.get('deadwax-player-confirm-cancel'), persisted.readConfirmCancel()], ['on', true])
+  persisted.writeConfirmCancel(false)
+  check('...and off', [stored.get('deadwax-player-confirm-cancel'), persisted.readConfirmCancel()], ['off', false])
+  const readsAs = (value) => { stored.set('deadwax-player-confirm-cancel', value); return persisted.readConfirmCancel() }
+  check('off only when it says exactly that: anything else kept is on', ['off', 'Off', 'on', 'default', '', 'no'].map(readsAs), [false, true, true, true, true, true])
+  stored.clear()
+  refusing = true
+  let threw = false
+  try { persisted.writeConfirmCancel(false) } catch { threw = true }
+  check('storage refused: on, and nothing thrown either way', [persisted.readConfirmCancel(), threw], [true, false])
+  refusing = false
+  stored.clear()
+}
+
 console.log('\nwhere they live now')
 {
   const you = fs.readFileSync(path.join(UI, 'src/app/You.tsx'), 'utf8')
@@ -361,6 +416,15 @@ console.log('\nwhere they live now')
   check('the switch is gone from Now Playing', [/role="switch"/.test(nowPlaying), /pl-gapless/.test(nowPlaying), /setGapless/.test(nowPlaying)], [false, false, false])
   check('the gear is gone from the Library', [library.includes('aria-label="Settings"'), library.includes('onSettings')], [false, false])
   check('and the sheet with it', fs.existsSync(path.join(UI, 'src/player/Settings.tsx')), false)
+  //? Getting albums: from its labelled <section> to the one after it closes
+  const from = you.indexOf('aria-labelledby="app-getting-title"')
+  const getting = from === -1 ? '' : you.slice(from, you.indexOf('</section>', from))
+  check('"Confirm before cancelling" in You > Getting albums, after the three that are kept on deadwax, its note saying it is this device\'s',
+    [/<ConfirmCancelChoice\s+on=\{confirmCancel\}/.test(getting), getting.indexOf('<GettingChoices') < getting.indexOf('<ConfirmCancelChoice'),
+      /id="app-confirm-cancel-note"[^>]*>[^<]*Kept on this device\./.test(getting), /useState\(readConfirmCancel\)/.test(you), /writeConfirmCancel\(on\)\s*setConfirmCancel\(on\)/.test(you)],
+    [true, true, true, true, true])
+  const requests = fs.readFileSync(path.join(UI, 'src/app/Requests.tsx'), 'utf8')
+  check('...and Requests\' ✕ reads it at the tap, never the main page\'s key', [/else if \(readConfirmCancel\(\)\) setAsking\(row\.key\)/.test(requests), /readPreferences/.test(requests)], [true, false])
 }
 
 console.log('\nthe "Maximum quality" notes say what the code does')

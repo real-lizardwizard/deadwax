@@ -1,28 +1,33 @@
 import { useEffect, useState } from 'preact/hooks'
 
 import { getPreferences, putPreferences } from '../api/me'
+import type { FormatPreference } from '../api/types'
 import {
   GET_SETTINGS_DEFAULT, readGetSettings, seedFromPreferences, type GetSettings, type GetSettingsAnswer,
 } from '../lib/getSettings'
-import { readPreferences } from '../state/persisted'
+import { readDownloadDefaults, readPreferences } from '../state/persisted'
 
 /**
- * You > Getting albums, as the server keeps them (2.0.0-player.15): "When I tap Get" and the
- * quality floor, per user (GET/PUT /deadwax/me/preferences). One store for the app - a module, as
+ * You > Getting albums, as the server keeps them (2.0.0-player.15): "When I tap Get", the quality
+ * floor and (2.0.0-player.41) Format, per user (GET/PUT /deadwax/me/preferences). One store for the app - a module, as
  * useOwned is - so You, which changes them, and the Sources sheet, which acts on them, read one
  * answer.
  *
- *  - ASKED when You or Search first shows, each time You's tab is opened, on You's "Check again", and
- *    every time a Get opens the Sources sheet - never as the app starts. They are kept per user so
+ *  - ASKED when You or Search first shows, each time You's tab is opened, on You's "Check again", every
+ *    time a Get opens the Sources sheet, and before every search the sheet starts (a Get or a pressing
+ *    reaching a desktop panel already open, Try again, a Re-search - review) - never as the app starts. They are kept per user so
  *    they follow a person between devices, and a home-screen app stays open for days: an answer in
  *    hand is asked again rather than trusted for the page's life (review), and stands meanwhile.
  *    Until the first answer is in, the settings are the defaults, and a Get shows the sources: the
  *    safe way round, since picking for you is the one that acts without asking.
  *  - SEEDED ONCE: a user nothing was ever saved for (`seeded` false), on a database that can keep
  *    it, gets what this browser's main page already says carried over (deadwax-preferences' quality
- *    floors - lib/getSettings.ts seedFromPreferences) - only what differs from the defaults, and
- *    saved even when that is nothing, since the save is what marks them seeded. From then on the
- *    server's are the settings, and the main page keeps its own copies.
+ *    floors, and deadwax-download-defaults' Format - lib/getSettings.ts seedFromPreferences) - only
+ *    what differs from the defaults, and saved even when that is nothing, since the save is what
+ *    marks them seeded. From then on the server's are the settings, and the main page keeps its own
+ *    copies. A setting added in a later version is seeded once in the same way, alone (the server's
+ *    `unseeded`): Format, for a user seeded at 2.0.0-player.15 - never the floor again over a choice
+ *    made in the app since.
  *  - A CHOICE shows at once and is saved behind it. What shows is the server's last word with every
  *    choice still being saved laid over it, in the order made - so an answer arriving for an older
  *    choice can't put a newer one back, and a choice deadwax won't keep goes back (saying so) to what
@@ -66,14 +71,32 @@ function shown(): GetSettingsAnswer | null {
   if (!confirmed && !pending.length) return null
   return pending.reduce<GetSettingsAnswer>(
     (now, choice) => ({ ...now, ...choice.values }),
-    confirmed ?? { ...GET_SETTINGS_DEFAULT, stored: [], seeded: false, can_save: true },
+    confirmed ?? { ...GET_SETTINGS_DEFAULT, stored: [], seeded: false, unseeded: [], can_save: true },
   )
 }
 
 /** The settings as the server has them (and as chosen since), or the defaults until it has answered. */
 export function getSettingsNow(): GetSettings {
   const now = shown()
-  return now ? { get_mode: now.get_mode, quality_floor: now.quality_floor } : GET_SETTINGS_DEFAULT
+  return now ? { get_mode: now.get_mode, quality_floor: now.quality_floor, format_preference: now.format_preference } : GET_SETTINGS_DEFAULT
+}
+
+/**
+ * The Format a search is to be scored by (2.0.0-player.41): a promise of it once a read already out
+ * has answered - the sheet asks deadwax again just before each search it starts, and that read is
+ * what carries a Format changed on another device into a page left open for days (review: the answer
+ * in hand went out with the search, and the fresh one landed a moment later, changing nothing).
+ * With no read out: at once when the server has answered (or a choice is being saved), as a plain
+ * value; otherwise a promise of it once deadwax has been asked - the default if it doesn't answer. A
+ * Get reached without You or Search having shown (an album you have, opened from the Library, to its
+ * other pressings) would otherwise search by the default, never by the Format chosen. Never rejects
+ * (a read never does): a read that fails leaves the answer in hand, and a choice still being saved
+ * stays laid over whichever it is.
+ */
+export function formatPreferenceNow(): FormatPreference | Promise<FormatPreference> {
+  if (asking) return asking.then(() => getSettingsNow().format_preference)
+  if (shown()) return getSettingsNow().format_preference
+  return askGetSettings().then(() => getSettingsNow().format_preference)
 }
 
 /**
@@ -85,11 +108,14 @@ export function askGetSettings(): Promise<void> {
   asking = inTurn(async () => {
     try {
       let read = readGetSettings(await getPreferences())
-      //? nothing ever saved for this user: carry this browser's main-page floor over, once
-      if (read.can_save && !read.seeded && !seededHere) {
+      //? nothing ever saved for this user - or a setting new since it was - carry this browser's
+      //? main-page settings over, once: what is left to carry over (`unseeded`), only what differs
+      //? from the defaults
+      if (read.can_save && read.unseeded.length && !seededHere) {
         seededHere = true
         try {
-          read = readGetSettings(await putPreferences(seedFromPreferences(readPreferences())))
+          const main = { ...readPreferences(), formatPreference: readDownloadDefaults().formatPreference }
+          read = readGetSettings(await putPreferences(seedFromPreferences(main, read.unseeded)))
         } catch {
           //? not kept - the defaults stand, and the next page's first read seeds again
         }
@@ -161,7 +187,7 @@ export function useGetSettings(ask: boolean): {
   }, [ask])
   const now = shown()
   return {
-    settings: now ? { get_mode: now.get_mode, quality_floor: now.quality_floor } : null,
+    settings: now ? { get_mode: now.get_mode, quality_floor: now.quality_floor, format_preference: now.format_preference } : null,
     canSave: now?.can_save !== false,
     problem: saveProblem ?? readProblem,
   }

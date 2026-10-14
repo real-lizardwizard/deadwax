@@ -28,6 +28,8 @@
  *    album showing, never one it hasn't found, at most three), "This pressing: …", the folder, and
  *    the releases of a MusicBrainz album you hold.
  *  - Starting things a few at a time (inTurns), in order, stopping when superseded.
+ *  - (2.0.0-player.41) The album page's "Other pressings" chip opens the group the album's folders
+ *    carry - an id as MusicBrainz writes one, lowercased - and none without one.
  *
  * And the page itself (app/ArtistPage.tsx), compiled and rendered by the small stand-in for Preact the
  * other component sims use, with Navidrome, MusicBrainz, the bridge and /library/owned answering when
@@ -296,6 +298,12 @@ console.log('\nthe id bridge: Also, This pressing, the folder')
       { navidromeId: 'nd-b', label: 'Also: another pressing' },
     ])
   check('...none without an answer', B.alsoChips(null, 'nd-cd'), [])
+  //? "Other pressings ›" (2.0.0-player.41): the group the album's folders carry, as MusicBrainz writes an id
+  const RG = 'e9aff11d-e3a0-3f7b-8d7c-1a0ef7a48a57'
+  check('"Other pressings" opens the group its folders carry - lowercased, only an id as MusicBrainz writes one, none without',
+    [B.otherPressingsGroup({ release_group_mbid: RG }), B.otherPressingsGroup({ release_group_mbid: ` ${RG.toUpperCase()} ` }), B.otherPressingsGroup({ release_group_mbid: 'rg-dummy' }),
+      B.otherPressingsGroup({ release_group_mbid: null }), B.otherPressingsGroup({ release_group_mbid: `${RG}&inc=x` }), B.otherPressingsGroup(null)],
+    [RG, RG, null, null, null, null])
   check('This pressing: its edition, year and formats', B.pressingLine([{ edition: '20th Anniversary Reissue 180gram', year: '2014', formats: ['flac'] }]),
     'This pressing: 20th Anniversary Reissue 180gram · 2014 · FLAC')
   check('...a set kept one folder per disc: the formats of all of them', B.pressingLine([{ edition: '', year: '1994', formats: ['flac'] }, { edition: '', year: '1994', formats: ['mp3'] }]),

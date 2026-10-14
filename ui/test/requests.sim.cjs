@@ -847,9 +847,19 @@ console.log('\nthe Requests tab as a whole')
   all(draw(), (n) => n.type === 'button' && text(n) === 'Cancel download')[0].props.onClick()
   shown = draw()
   check('"Cancel download" cancels it, and the question goes', [calls.filter((c) => c[0] === 'cancel'), byClass(shown, 'app-job-confirm').length], [[['cancel', down.id]], 0])
+  //? "Confirm before cancelling" is this device's since 2.0.0-player.41 (You > Getting albums), carried
+  //? over ONCE from the main page's own: the first ✕ above read it, the main page said nothing, so
+  //? it was marked carried over as the default - and the main page turning it off now changes nothing
+  check('the first ✕ carried the main page\'s setting over, once: nothing said there, so the default - stored as such, not as a choice',
+    stored.get('deadwax-player-confirm-cancel'), 'default')
   stored.set('deadwax-preferences', JSON.stringify({ confirmCancel: false }))
   crossOf(draw()).props.onClick()
-  check('with "Confirm before cancelling" off, the ✕ cancels at once', [calls.filter((c) => c[0] === 'cancel').length, byClass(draw(), 'app-job-confirm').length], [2, 0])
+  check('...so the main page turned off since is not read again: the ✕ still asks', [calls.filter((c) => c[0] === 'cancel').length, byClass(draw(), 'app-job-confirm').length], [1, 1])
+  all(draw(), (n) => n.type === 'button' && text(n) === 'Keep it')[0].props.onClick()
+  stored.set('deadwax-player-confirm-cancel', 'off')
+  crossOf(draw()).props.onClick()
+  check('with You\'s "Confirm before cancelling" off, the ✕ cancels at once', [calls.filter((c) => c[0] === 'cancel').length, byClass(draw(), 'app-job-confirm').length], [2, 0])
+  stored.delete('deadwax-player-confirm-cancel')
   stored.delete('deadwax-preferences')
   check('and never a blocking dialog, all along', confirms.length, 0)
 

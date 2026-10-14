@@ -1084,6 +1084,8 @@
         overflow-wrap: break-word;
     }
     .app-desk .app-layer.is-panel .app-source-missing { grid-column: 1 / -1; font-size: var(--dw-text-data); }
+    /* why it scored what it did (2.0.0-player.41): always shown on the panel, across the card under the facts */
+    .app-desk .app-layer.is-panel .app-source-reasons { grid-column: 1 / -1; }
 
     /* ===== the Edit panel (2.0.0-player.21): the album page's editors beside it ===== */
 

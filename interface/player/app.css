@@ -215,6 +215,20 @@
     --app-source-bar: 8px;           /* the speed bar's sunken track */
     --app-source-facts-pad: 2px;
     --app-source-lines: 2px;         /* a fact's label to its value */
+    /* why a source scored what it did (2.0.0-player.41): the edition words in its folder's name and
+       the score's signals, as the main page's candidates panel shows them - last on the card */
+    --app-source-score-pad: 6px;     /* a phone's score is a button: the number and a chevron... */
+    --app-source-score-inner: 2px;
+    --app-source-score-icon: 12px;
+    --app-source-score-turn: 180deg; /* ...that turns as the reasons open */
+    --app-source-score-reach: calc((var(--pl-hit) - var(--app-source-score-height)) / 2 + var(--dw-hairline));
+    --app-source-reasons-gap: 6px;   /* chip to chip, and the tags' line to the signals' */
+    --app-source-signal: 22px;       /* a signal's chip, as the tracklist's Bonus chip is drawn */
+    --app-source-signal-pad: 7px;
+    --app-source-signal-inner: 4px;  /* its word to its number */
+    --app-source-tag-pad: 6px;       /* an edition word's sides, as the main page's tag has them */
+    /* Search again, when folders were found (2.0.0-player.41): the query opens under it */
+    --app-sources-again-pad: 0;      /* the query form under it starts at once, no state's gap above */
     /* the artist page (2.0.0-player.17), as Artist.dc.html draws it */
     --app-artist-hero: 240px;        /* the hero's height, its picture under it */
     --app-artist-hero-pad: 8px;      /* above the back link, under the status bar; the board's 52px in all */
@@ -2001,6 +2015,15 @@ button.app-result:active { background: var(--dw-pressed); }
 
 .app-picker-note.is-differs { color: var(--dw-amber-text); }
 
+/* a pressing your library holds (2.0.0-player.41): "In your library" under its note, in the green
+   the album page's own badge says it in */
+.app-picker-held {
+    color: var(--dw-badge-green-text);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-note);
+}
+
 .app-picker-more {
     width: 100%;
     min-height: var(--pl-hit);
@@ -2371,8 +2394,10 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-sources-footer { text-align: center; }
 .app-sources-state .app-button { min-width: 50%; }
 
-/* the query to edit when Soulseek found nothing: the search field's well, 17px so iOS doesn't zoom */
-.app-sources-query { display: flex; flex-direction: column; gap: var(--app-line-gap); width: 100%; text-align: left; }
+/* the query to edit when Soulseek found nothing: the search field's well, 17px so iOS doesn't zoom. Its
+   label keeps room over the field for the field's ring, drawn outside (2.0.0-player.41: Search again
+   opens with the field focused, so the ring shows every time - it touched the label) */
+.app-sources-query { display: flex; flex-direction: column; gap: calc(var(--app-ring-room) + var(--app-line-gap)); width: 100%; text-align: left; }
 .app-sources-query-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
 
 .app-sources-query-input {
@@ -2558,6 +2583,93 @@ button.app-result:active { background: var(--dw-pressed); }
     overflow-wrap: anywhere;
 }
 
+/* --- why it scored what it did (2.0.0-player.41): last on the card, so opening it moves nothing above --- */
+
+/* a phone's score is the button that opens them: the number and a chevron that turns, 44px to a
+   finger - the board's box widened by the chevron, never narrower than the number's own */
+.app-source-score.is-toggle {
+    position: relative;
+    gap: var(--app-source-score-inner);
+    width: auto;
+    min-width: var(--app-source-score-width);
+    padding: 0 var(--app-source-score-pad);
+}
+
+.app-source-score.is-toggle::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--app-source-score-reach));
+    right: 0;
+    bottom: calc(-1 * var(--app-source-score-reach));
+    left: 0;
+}
+
+.app-source-score.is-toggle:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+.app-source-score-icon {
+    flex: none;
+    width: var(--app-source-score-icon);
+    height: var(--app-source-score-icon);
+    transition: transform var(--dw-duration) var(--dw-ease);
+}
+
+.app-source-score[aria-expanded="true"] .app-source-score-icon { transform: rotate(var(--app-source-score-turn)); }
+
+/* no display of its own, so `hidden` hides it - its two lines are the flex rows */
+.app-source-reasons > * + * { margin-top: var(--app-source-reasons-gap); }
+
+.app-source-tags,
+.app-source-signals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-source-reasons-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* an edition word found in the folder's name, in its colour as the main page draws it */
+.app-source-tag {
+    padding: 0 var(--app-source-tag-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-tag);
+    background: var(--dw-secondary-bg);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-note);
+}
+
+.app-source-tag.is-amber { border-color: var(--dw-badge-amber-border); background: var(--dw-badge-amber-bg); color: var(--dw-amber-text); }
+.app-source-tag.is-red { border-color: var(--dw-badge-red-border); background: var(--dw-badge-red-bg); color: var(--dw-danger-text); }
+.app-source-tag.is-purple { border-color: var(--dw-badge-purple-border); background: var(--dw-badge-purple-bg); color: var(--dw-accent-text); }
+.app-source-tag.is-green { border-color: var(--dw-badge-green-border); background: var(--dw-badge-green-bg); color: var(--dw-badge-green-text); }
+
+/* a signal: its word and its number, in its band's colour - green from 75, amber from 40, red under */
+.app-source-signal {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-source-signal-inner);
+    height: var(--app-source-signal);
+    padding: 0 var(--app-source-signal-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-tag);
+    background: var(--dw-badge-amber-bg);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-label);
+    white-space: nowrap;
+}
+
+.app-source-signal.is-good { border-color: var(--dw-badge-green-border); background: var(--dw-badge-green-bg); color: var(--dw-badge-green-text); }
+.app-source-signal.is-bad { border-color: var(--dw-badge-red-border); background: var(--dw-badge-red-bg); color: var(--dw-danger-text); }
+
+/* Search again (2.0.0-player.41), under the line saying what was searched: the query opens under it */
+.app-sources-again { display: flex; justify-content: center; }
+.app-sources-state.is-again { padding-top: var(--app-sources-again-pad); }
+
 /* ===== Artists, and the two libraries joined (2.0.0-player.17) ===== */
 
 /* the artist page's hero: the picture under it, its own colour in place of one; the back link at
@@ -2731,16 +2843,24 @@ button.app-result:active { background: var(--dw-pressed); }
 
 /* "In your library" and an "Also: <edition> ›" chip for each other pressing, as Album.dc.html draws
    them, on ONE line drawn from the first frame: a chip landing in it moves nothing below, and a long
-   edition gives way with an ellipsis rather than wrapping the row onto a second line */
+   edition gives way with an ellipsis rather than wrapping the row onto a second line. Since
+   2.0.0-player.41 the row ends with "Other pressings ›" - the way to get another pressing - which
+   never gives way: the Also chips shorten, it doesn't. The row is a container: its own width, not the
+   frame's, says when its chips are too many to say every word (below). */
 .app-album-chips {
     display: flex;
     justify-content: center;
     gap: var(--app-chip-gap);
     width: 100%;
     margin-top: var(--app-album-chips-gap);
+    container: app-album-chips / inline-size;
 }
 
 .app-album-chips > * { min-width: 0; }
+/* its place held from the first frame, but nothing in it shown until the id bridge has answered (or
+   failed): a phone's row is centred, and "In your library", drawn alone, slid sideways as "Other
+   pressings" landed beside it - now it first shows where it stays (2.0.0-player.41) */
+.app-album-chips.is-waiting > * { visibility: hidden; }
 
 .app-held-badge {
     display: inline-flex;
@@ -2763,6 +2883,29 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-also { max-width: 100%; }
 .app-also-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-chip-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
+.app-album-chips > .app-other-pressings { flex: none; }
+/* ...and beside an Also chip, in a row too narrow for the three whole - "In your library" and "Other
+   pressings" take 288px between them, which leaves an Also chip under 312px of a 600px row - it says
+   "Pressings" (its name stays "Other pressings") and "In your library" keeps its green tick and gives
+   up its words - still read, never shown - leaving the Also chip room to say which pressing it is (at
+   320px it was a bare "›"). By the row's own width, so a phone on its side or a tablet says every word,
+   and a desktop's column narrowed by the Edit panel shortens too (at 1280px the Also chip was a bare
+   "›" there). Where container queries aren't known every word shows, and the Also chip gives way. */
+.app-other-short { display: none; }
+
+@container app-album-chips (max-width: 600px) {
+    .app-album-chips:has(.app-also) .app-other-long { display: none; }
+    .app-album-chips:has(.app-also) .app-other-short { display: inline; }
+
+    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge-text {
+        position: absolute;
+        width: var(--dw-hairline);
+        height: var(--dw-hairline);
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
 
 /* the Library's chips - Albums, Artists, Songs - and the sort under them, with the count */
 .app-library-views {

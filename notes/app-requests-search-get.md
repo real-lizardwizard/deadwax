@@ -132,7 +132,8 @@ persistent all the time".
   the music stopped at the end of the song - the engine's first rule broken by a cancel. The main
   page could use confirm() because it never hosted the player. Now the ✕ (by the main page's
   `confirmCancel` preference, read at the tap - which a home-screen app, own storage and no
-  Settings tab, always has on) opens a question in the card: "Cancel this download? You'll lose
+  Settings tab, always has on; since 2.0.0-player.41 this device's own "Confirm before cancelling"
+  in You, carried over once - see "Get, as the main page had it") opens a question in the card: "Cancel this download? You'll lose
   your place in this peer's queue.", **Keep it** (secondary) and **Cancel download** (secondary,
   red words - the one solid purple stays Next peer). The ✕ is `aria-expanded` with
   `aria-controls`, and a second tap on it closes the question; one card asks at a time (Requests'
@@ -571,7 +572,8 @@ and the sources are for; "Get the album" is the screen's ONE solid purple button
     old panel's close does; the `[open]` effect stays as the backstop. Left to the effect alone, an
     answer landing in the frame before it ran could still pick and queue a source after Cancel);
     each candidate downloads as the release IT was searched for; only an edited query overrides
-    (queryOverride); up to ten runners-up as SHOWN; the format preference read per search. The app
+    (queryOverride); up to ten runners-up as SHOWN; the format preference read per search (You's
+    Format, kept on deadwax, since 2.0.0-player.41 - see "Get, as the main page had it"). The app
     has no format chips, so "clear the format chips per search" has nothing to clear - its chips are
     a floor's, a choice that holds. One download per search (`askedFor`): a second tap before the
     sheet goes asks nothing.
@@ -642,7 +644,8 @@ and the sources are for; "Get the album" is the screen's ONE solid purple button
   refused through start(), per user, and the three lists (here, the model, lib/getSettings.ts) read
   as one. The client store `app/useGetSettings.ts` (a module, as useOwned): asked when Search first
   shows, each time You's tab is opened (its new `current` prop) and on Check again, and each time
-  the sheet opens - never at start-up - an answer in hand ASKED AGAIN and standing meanwhile (a
+  the sheet opens (since 2.0.0-player.41 before every search it starts - see "Get, as the main page
+  had it") - never at start-up - an answer in hand ASKED AGAIN and standing meanwhile (a
   change made on another device arrives in a home-screen app left open for days - review); the
   defaults until the first answer (a Get then shows the sources: the safe way round); SEEDED ONCE -
   a read with `seeded` false and `can_save` PUTs `seedFromPreferences(readPreferences())`, which is
@@ -739,3 +742,238 @@ and the sources are for; "Get the album" is the screen's ONE solid purple button
   After review, also for the real page: a chip's slow lookup with Now Playing opened meanwhile
   (nothing opens), the subtitle wrapping at 320/375/390, and the store line under Get coming back
   as "Already downloading" after a Get.
+
+### Get, as the main page had it (2.0.0-player.41)
+
+James (2026-10-14): "Finish the web app" - the app at /player/ replaces the main page, which retires once
+the app covers what it does. The parity audit (`uplan/parity-audit.json`, the "find" rows) found five gaps
+in finding and getting music, on phone and desktop, none needing a decision of James's; this closes them
+(`uplan/slice-get-parity.md`). The main page is untouched: CandidatesPanel, its settings and its storage
+keys read and write as before.
+
+- **Another pressing of an album you hold** (v0.9.1's ask: "a way to see which editions are already in my
+  library when I'm searching for new ones"). Search's MusicBrainz half still leaves held groups out
+  (James's decision) and the artist page's held rows still open the album you have - app-rules pins both -
+  so the way in is the album you have:
+  - **"Other pressings ›"** ends the album page's chip row (`app-other-pressings`, after the Also chips),
+    once the bridge's answer names the album's group (`otherPressingsGroup` in lib/idBridge.ts: the
+    `release_group_mbid` the album's folders carry, lowercased, only an id as MusicBrainz writes one -
+    an .m4a deadwax filed has none, and no chip). The row is drawn from the first frame, so it lands
+    moving nothing below - and, after review, shown only once the bridge has answered or failed
+    (`is-waiting`: its place held, nothing in it seen), so nothing in it slides either. It opens the group's page through App's new `openHeldGroup` - **with no
+    preview**: Search's previews are real release groups, and a group built from Navidrome's name for
+    the album would have given Get's payload no first-release-date and no credited ids (`getGroup` reads
+    the preview first). The album's name is the page's `label`, and ReleaseGroupPage's new `title` prop
+    shows it as the title until MusicBrainz's own arrives with the pressings (`header.title || title`) -
+    never over it.
+  - **The crowded row** (found in the real page): badge 134px + "Other pressings" 138px left an Also
+    chip 62px at 390 ("A… ›") and nothing at all at 320 ("›"). Beside an Also chip, in a row too narrow
+    for the three whole, the chip says **"Pressings"** (`app-other-short`; its name stays "Other
+    pressings", an aria-label) and the "In your library" badge keeps its green tick and gives up its
+    words (`app-held-badge-text`, the visually-hidden rule's declarations under
+    `.app-album-chips:has(.app-also):has(.app-other-pressings)` - still read). The Also label then has
+    85px at 320, 140 at 375, 155 at 390, measured. "Too narrow" is the ROW's own width since review - the
+    row is a container (`container: app-album-chips / inline-size`) and the rules sit in
+    `@container app-album-chips (max-width: 600px)`: the badge and "Other pressings" take 288px with
+    their gaps, leaving an Also chip 312px of a 600px row (Dummy's whole is 285). It was the frame's (a
+    phone shortened, app-desktop.css undid it), which crushed the Also chip to a bare "›" (26px) on a
+    1280 desktop with the Edit panel's column open, cut it at 1024 with no panel and at 1440 with Edit, and gave up words
+    on a phone on its side and a tablet that had 230px to spare. Measured since: rows of 280-524px
+    shorten (Also label 85-244px - 115 at 1280 with Edit, whole at 1024 and 1440 with it), rows of
+    780-940px (844x390, 820x1180, 1280 and 1440 with no panel) say every word. Where container queries
+    aren't known (Safari before 16) every word shows and the Also chip gives way, as before the change.
+    Without an Also chip nothing changes but the new chip. "Other pressings" never shortens (`flex:
+    none`); the Also chips do, as before.
+  - **The pressing list marks every pressing you hold** - "In your library" in the badge green under its
+    note (`app-picker-held`) - from the page's one /library/owned answer (`ownedForGroup` by the group's
+    id and every pressing's, the release ids lowercased, memoised on their sorted join), and
+    `pressingsView(releases, asked, held)` keeps a held pressing out of the fold as it keeps the chosen
+    one (`keptOut`), in the fold's own order. `PressingRow.held` is new; pressings.sim's existing checks
+    read fields, so the shape change cost nothing.
+  - **Get on a held pressing goes the way it always went**: the store line under Get says "Already in
+    your library", and the Sources sheet shows the store's box with nothing searched (the find route
+    answers `held` without asking slskd). group.sim pins Get still offered on one; the real page drove it.
+- **The score's reasoning on every source card** (README :54 and :123, CLAUDE.md's "ranked candidates
+  with visible reasoning"): `signalChips` (lib/candidates.ts, pure) - each judged signal in SIGNAL_LABELS's
+  order (an unknown one after, by name), its word capitalised as the Signals chip names them, its value as
+  a percentage, its band by scoreClass (good from 75, mid from 40, bad under; null left out, as the main
+  panel leaves it) - and `editionTags`, the folder name's edition words in EDITION_TAG_COLORS' families
+  (yellow amber, red red, main purple, green green, white plain). Drawn LAST on the card
+  (`app-source-reasons`, a group named "Why it scored 92"), so opening them grows the card downward and
+  moves nothing above - the real page measured the score and the speed well at the same y. **On a phone
+  (`reasons` 'tap', the modal sheet) the score is the button**: aria-expanded, aria-controls the
+  reasons (rendered always, `hidden` until open - the region has no display of its own, so `hidden`
+  hides it; test_app_css holds that for both stylesheets), a chevron that turns, the board's box widened
+  to hold it and reaching 44px. **On a desktop's panel ('shown')** the score stays a span and the
+  reasons span the card's grid under the facts. Six chips need two lines at 390, hence the tap.
+  Colours: STYLE.md's green and amber badges and a red one new in theme.css section 10
+  (`--dw-badge-red-bg`, `--dw-badge-red-border`, text `--dw-danger-text`).
+- **Format** - Any / Prefer lossless / Lossless only - in You > Getting albums, the third radio group
+  (`FORMATS` in You's order; the server's tuple `("prefer_lossless", "any", "lossless_only")`, the
+  default first, is `FORMAT_PREFERENCE_VALUES`, which test_me_prefs reads as one list with PREFERENCES
+  and the PUT's model). Kept per user in `user_prefs` (key `format_preference`, the find route's own
+  name). **The search sends it** in place of `readDownloadDefaults()`: useCandidateSearch takes a
+  `formatPreference` getter, read as each search begins; Sources hands it `formatPreferenceNow`
+  (useGetSettings.ts) - a promise of the answer to a read already out, if one is (after review: the
+  sheet asks again just before each search it starts - `begin`, below - and the answer in hand went
+  out with the search while the fresh one - a Format changed on another device - landed a moment
+  later and changed nothing; the floor re-seeds and the pick rule is read late, but Format is sent
+  once); else
+  the store's value when the server has answered (or a choice is being saved), else a promise of it
+  after one ask (the default if deadwax won't answer, never a rejection). The
+  search already shows as asking while it waits, and a wait the sheet closed on asks Soulseek nothing
+  (`request.current()` after the await). Without the wait, a Get reached without You or Search having
+  shown - the album you have, from the Library, to its other pressings - searched by the default
+  whatever was chosen. Separate from the floor: Format changes the score (score_format: 0.45 for a
+  folder with no lossless file under Prefer lossless) and Lossless only leaves such folders out
+  server-side; the floor only filters. A pick reads the same store as the answer lands, as before.
+  - **Seeded once, per setting** (a builder's choice; the spec said "the existing seeding"): James's
+    database was seeded at .15, so the existing gate (`seeded` false) would never have carried his
+    main-page Format over - and his desktop browser's app, which until now sent that Format, would have
+    silently gone back to Prefer lossless. So `_seeded` now LISTS the keys carried over (every save
+    writes them all, `_seeded_value`); a row from before says "1", read as `SEEDED_BEFORE` (get_mode,
+    quality_floor); the answer gains `unseeded`, and the store seeds when it is non-empty, passing it as
+    `seedFromPreferences(main, keys)` - so Format alone is carried over for an older user, never the
+    floor again over a choice made since, and still only what differs from the default (an empty save
+    marks it). `readGetSettings` reads `unseeded` safely (known keys only; missing: every key before a
+    first save, none after).
+- **Confirm before cancelling** in You > Getting albums, under the three kept on deadwax - after their
+  note and what went wrong keeping them (after review: between them, "deadwax can't keep these" read as
+  being about it, and a refused Format said "Not saved" under it; the live region, always there, keeps
+  the gap before it with `app-choice-gap`) - with its own note ("Kept on this device."): a checkbox leaf (`ConfirmCancelChoice.tsx`, WindDownChoice's shape),
+  You's own state (`useState(readConfirmCancel)`, written in the tap) - App untouched for it, so the
+  .42 merge stays small. `deadwax-player-confirm-cancel`: 'off' or 'on' when chosen; nothing stored -
+  not carried over yet - reads `deadwax-preferences`.confirmCancel ONCE and writes 'off' if it said off,
+  else **'default'**, which marks it carried over without storing the default as if chosen (reads as
+  on, whatever the default becomes). Requests reads `readConfirmCancel()` at the tap; no app file but
+  the seed reads the main page's preferences any more (app-rules).
+- **Search again when folders were found**: under the footer saying what was searched - the board puts
+  that line at the cards' foot - a "Search again" text button, a disclosure (aria-expanded,
+  aria-controls the form, a second tap closes it) opening the nothing-found state's query form
+  (`queryForm`, one copy drawn in place so the sims' trees hold it; `is-again` starts it without the
+  state's top padding), its field focused as it opens - so its ring, drawn outside, shows every time:
+  the form's label keeps room over the field for it (`calc(var(--app-ring-room) + var(--app-line-gap))`,
+  6px; after review - at 2px the ring touched the label). Under "none pass your filters" too; never
+  where the form already is, nor while asking, failing, or with the store's box. The edited-query rule
+  is the hook's, unchanged. A Re-search (`requery`) and a new search (the request effect) close it
+  explicitly - an effect watching for a pending search missed the sim's render-less path and would rely
+  on an intermediate render.
+- **Style** (tokens only): app.css `--app-source-score-*`, `--app-source-reasons-gap`,
+  `--app-source-signal*`, `--app-source-tag-pad` (6px, the main page's tag's), `--app-sources-again-pad`;
+  theme.css the red badge. test_app_css.py gains four (67): the score's reach (from the box's own height
+  token, its border and border-box) and turning chevron and the reasons' hide-ability in both sheets,
+  the bands' and edition words' colours and the words' padding, the crowded row (Pressings and the
+  badge's words by the row's container query and nowhere else, the waiting row unseen), the picker's
+  green mark, Search again's place and its field's room for its ring - and, after review, **every token
+  a rule in the four stylesheets reads is defined** in one of them or set inline by the component named
+  (`SET_INLINE`: the turntable's `--app-tt-aspect`, `--app-tt-fader-x` and `-from`, each checked to be
+  set where it says).
+- **Real page** (the builder's own deadwax on 8110, its own fake slskd on 8111 - a copy of
+  app/slskd_sources.py - the stand-in Navidrome, live MusicBrainz, headless Chromium as `deadwax.test`
+  over plain http; `work/get41-builder/drive.cjs`, 83 checks, all passing, no console errors): the chip
+  row at 320, 375 and 390 with and without an Also chip (one line, on screen, every label whole or
+  ellipsized as meant, no overflow); Dummy → Other pressings → its group, "Dummy" titled from the first
+  frame, both held pressings marked and in view; Get on one you don't hold → cards with Prefer lossless
+  sent; the score's tap opening the reasons with nothing above moving; Search again opening the query
+  focused, an edited Re-search sent as typed and closing it; a held pressing's store line and the
+  sheet's box; You's Format (default checked, Lossless only saved on deadwax, then sent with the next
+  Get, the MP3 folders left out by the server); Confirm before cancelling carried over as 'default',
+  turned off, and a card's Get to Requests whose ✕ cancelled with no question; and at 1440x900 the chip
+  row whole, the marks, the panel's cards with their reasons always showing, Search again focused. Two
+  harness traps on the way, not the app's: a tab keeps its pages mounted hidden, so the first `.app-rg-get`
+  in the document can be another tab's (tap the visible one), and a cold group page from the Library
+  may already be on a held pressing.
+- **Verified**: 2406 Python tests (2404 passed, 2 skipped; 11 new: test_me_prefs.py 29 - three new and
+  four refused bodies - and four in test_app_css.py), pyflakes, tsc, the build, and all 47 sims
+  (`candidates` 122, `sources` 130, `you` 86, `settings` 77, `requests` 190, `pressings` 63, `group` 99,
+  `artist` 128 and `app-rules` 304 extended; the counts after the second review). 48 mutations, one or more per rule pinned - the server's
+  allowlist, default, legacy seed, every-key save and unseeded; the client's reading, the seed's keys and
+  defaults, the store's gate, keys, carried Format and wait; the hook's Format and its superseded wait;
+  the chips' rules and colours; the card's hidden reasons, button and aria-expanded; the sheet's tap or
+  shown and Format; Search again's closes, place and toggle; the fold, the case, the page's held ids and
+  title both ways; the picker's mark; the bridge's id; the album page's and App's wiring; the cancel
+  setting's carry, once, reading and Requests; You's Format; and six CSS rules - each caught, the tree
+  byte-identical afterwards (`work/get41-builder/mutate.py`). The engine guard is empty;
+  `player.sim.cjs`, `useDownloadJobs.ts`, `CandidatesPanel.tsx` and the main page are untouched.
+  **NOT verified here**: the iPhone - the score's tap and the chevron under a finger, the crowded row's
+  tick on a real 390 and 320, Search again's field taking focus (WebKit shows the keyboard only for a
+  focus in the gesture; Preact's render comes after it, so the field may take focus without the
+  keyboard), VoiceOver on the reasons' group, the score button and the badge's hidden words; a real
+  slskd's signals (the fake's are nearly all 100); James's own database's `_seeded` "1" carrying his
+  main-page Format over once (pinned in test_me_prefs and you.sim, not run against his row).
+- **After review** (15 findings, 10 once merged, every one fixed, each with a test that fails without it):
+  - the edition words had no side padding - `--app-source-tag-pad` was read and never defined, so the
+    declaration fell back to 0 (three reviewers); defined, and the general token check added above;
+  - on a phone the badge slid ~73px sideways on nearly every album as "Other pressings" landed in the
+    centred row - the row is now unseen until the bridge answers (`is-waiting`), its place held;
+  - the shortening followed the frame, not the room (above);
+  - You's server-setting errors sat under the device's Confirm before cancelling (three reviewers);
+    put back under the three, as before the change;
+  - a Get sent the Format in hand while the sheet's own fresh read was out (two reviewers) -
+    `formatPreferenceNow` waits for a read already out;
+  - Search again's focused field's ring touched its label - room made;
+  - docs/player.md's phone list still said a home-screen app always asks before cancelling; store.py's
+    schema comment and me.py's SEEDED comment still called `_seeded` a plain marker for the floor -
+    both say what it holds now;
+  - test_app_css's 44px "reach" assertion was an identity (hit >= hit) - it now reads the score's height
+    rule, its border and border-box and evaluates the reach token (`length()`);
+  - the group page's lowercasing of held release ids was unpinned - group.sim holds a capitals tag.
+  Real page after the fixes (the fixer's own deadwax on 8112 and fake slskd on 8113;
+  `work/get41-fixer/rows.cjs` 26 checks and `sources.cjs` 18, all passing, no console errors): the chip
+  row at 320/375/390/844x390/820x1180 and 1024/1280/1440 with and without Edit; on every cold load the
+  badge unseen for its first frames, then in one place and one width, the row's height held (from a
+  Library tile nothing above the row moves either; a cold load from an address fills the title in, as
+  ever); a Format set by another device meanwhile sent with the next Get (`lossless_only`, after the
+  sheet's read answered) and the MP3 folders left out, at 390 and 1440; REMASTER 6px inside its border;
+  Search again's ring 2px clear of the label; a refused Format's "Not saved" under the three's note and
+  above Confirm before cancelling, clear of the tab bar at 390x844. **Still**: at 375x667 with the
+  Format group centred, "Not saved" lands 2px under the tab bar's top edge (611 against 613) - the
+  three's note above it runs to seven lines at that width; it is said in the live region all the same.
+  14 more mutations, each caught (`work/get41-fixer/mutate.py`), the tree identical afterwards.
+- **After a second review** (5 findings, each confirmed by skeptics, every one fixed):
+  - a search reaching a desktop's Sources panel ALREADY OPEN - another Get, the page's next pressing
+    (`again`), a Re-search, Try again - never asked deadwax: `useGetSettings(open)` asks only as `open`
+    turns true, and the panel stays open across pages and Gets, so `asking` was null and
+    formatPreferenceNow sent the Format in hand (the floor and "When I tap Get" had the same gap since
+    .19). Every search the sheet starts now goes through `begin` (or `requery`), which calls
+    `askGetSettings()` before the search reads the Format - set going synchronously, so the read is
+    waited for; on a sheet just opened it joins the read useGetSettings began (one GET, measured with
+    the real store under the real Sources: `work/get41-fixer2/repro-format.sim.cjs`). One GET
+    /me/preferences per search on a panel already open. sources.sim logs the store's ask and the
+    Format's read in order for each kind of search; app-rules pins `begin` as the one way to start one;
+  - with Format Lossless only, an album shared only as MP3 said "Soulseek found nothing" and offered the
+    query: matching.py drops every folder with no lossless file then, and the find route still sends
+    `response_count`. The search now keeps the Format it was SENT with (`CandidateSearch.format`, null
+    until deadwax's word is in), and `nothingLossless(result, format)` (lib/candidates.ts, pure) - Lossless
+    only, no candidates, `response_count > 0` - makes the sheet and its live region say "Nothing lossless
+    on Soulseek for …" with a note naming the Format and where it is; the query stays to edit.
+    `response_count` counts peers' answers, not folders (one of only scans counts), so it never says how
+    many lossy folders there were. troubleshooting.md and downloading.md say what to do; the main page's
+    "no matches from N responses" is left as it is;
+  - downloading.md said "Two places start" Get in the sentence this change rewrote - the artist page's
+    row Get (since .17) is the third, now its own bullet;
+  - You's Format radio shows the hook's own copy of the settings, which nothing read whole - a
+    hard-coded field passed every sim; you.sim reads the whole object after a read where every setting
+    is off its default;
+  - ConfirmCancelChoice's check tapped only from on to off and never looked at the tick - a box that
+    could never be turned back on, or never ticked, passed; settings.sim now taps back on and reads
+    `is-on` both ways, as WindDownChoice's does.
+  20 mutations, one or more per fix - `begin` asking nothing or asking after the search, each of its
+  four callers bypassing it, the Re-search's ask; nothingLossless for any Format or with no answers, the
+  announcement and the sheet not told the Format, the search forgetting or inventing it, the note and
+  the query form dropped; the hook's three settings each made up; the checkbox only ever off and never
+  ticked - each typechecking and each failing its sim on a check, not a crash, the tree identical
+  afterwards (`work/get41-fixer2/mutate.py`). Real page (the second fixer's own deadwax on 8110 and fake
+  slskd on 8111, a switch making Dummy's search answer its two MP3 folders alone;
+  `work/get41-fixer2/checks.cjs`, 29 checks, all passing, no console errors): Lossless only at 390, 320
+  and 1440 - "Nothing lossless on Soulseek for “Portishead Dummy”.", the note, the query and Re-search,
+  the live region saying the same, nothing wider than the screen - and Prefer lossless then showing the
+  two MP3 cards; on a 1440 desktop with the panel left open, the first Get one read shared then the
+  search, and the page's next pressing (Lossless only set elsewhere: no MP3 card), a Re-search (Prefer
+  lossless back: the MP3 cards back) and another album's Get (Third, held: its box) each asking deadwax
+  and waiting for its answer before the search went.
+- **Not built, on purpose**: per-pressing Also links inside the group page (it gets; the album page
+  opens); Complete albums only, Min score, a sample-rate floor and more results from MusicBrainz (the
+  audit's "should" rows - another slice); the main page's own Format and Confirm before cancelling
+  following the app's (the main page keeps its copies until it retires, configuration.md says so).
+

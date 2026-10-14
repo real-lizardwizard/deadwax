@@ -38,6 +38,14 @@
  *    saved behind it, and put back - saying so - when deadwax won't keep it, to what the server
  *    holds; saves one at a time, in the order chosen, so an answer for an older choice never shows
  *    over a newer one, and a refused older choice goes back without taking a newer one with it.
+ *  - (2.0.0-player.41) Format is the third of them - Any, Prefer lossless, Lossless only, described
+ *    by the same note, which says what it does - and the store seeds it from this browser's
+ *    main-page Format (deadwax-download-defaults) only when it isn't the default, and for a user
+ *    seeded before Format existed (the server's `unseeded`) seeds Format alone, never the floor
+ *    again; a search's Format is the store's at once once deadwax has answered, and waits for its
+ *    answer until then - and for a read already out (the sheet's, asked as it opened), never sending
+ *    the answer that read replaces. Under the three, "Confirm before cancelling" - this device's -
+ *    with its note, after what went wrong keeping the three.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -116,7 +124,7 @@ const ANSWERS = {
 globalThis.__you = {
   player: { maxRate: '48000', gapless: false, setGapless() {} },
   //? Getting albums: what the store says, what it was asked, and what was chosen
-  getting: { settings: { get_mode: 'sources', quality_floor: 'lossless' }, canSave: true, problem: null },
+  getting: { settings: { get_mode: 'sources', quality_floor: 'lossless', format_preference: 'lossless_only' }, canSave: true, problem: null },
   gettingAsked: [],
   gettingAsks: 0,
   chosen: [],
@@ -278,12 +286,16 @@ async function main() {
     draw({ shown: true, current: true, ...LOOK })
     check('...and the tab opened again asks again - a change made on another device shows', globalThis.__you.gettingAsked.slice(-2), [false, true])
     const choices = named('GettingChoices')[0]
-    check('GettingChoices is handed the server\'s settings', choices?.props.settings, { get_mode: 'sources', quality_floor: 'lossless' })
+    check('GettingChoices is handed the server\'s settings', choices?.props.settings, { get_mode: 'sources', quality_floor: 'lossless', format_preference: 'lossless_only' })
     choices?.props.onChoose({ get_mode: 'pick' })
     check('...and a choice goes to the store, which saves it on deadwax', globalThis.__you.chosen, [{ get_mode: 'pick' }])
-    check('the note says what picking does, what the floor does, and where both are kept',
+    check('the note says what picking does, what the floor does, what Format does, and where all three are kept',
       find((node) => node.props?.id === 'app-get-note').map(text),
-      ['With “Pick the best source for me”, Get takes the best match that passes your quality floor, and shows you the sources when nothing matches well. The floor is also what the sources start filtered by. Both are kept for you on deadwax, not on this device.'])
+      ['With “Pick the best source for me”, Get takes the best match that passes your quality floor, and shows you the sources when nothing matches well. The floor is also what the sources start filtered by. Format changes how sources are scored: Prefer lossless ranks lossless folders higher, and Lossless only leaves out folders with no lossless file. All three are kept for you on deadwax, not on this device.'])
+    const confirm = named('ConfirmCancelChoice')[0]
+    check('under them, "Confirm before cancelling" - this device\'s, on as it ships - and its note says so',
+      [!!confirm, confirm?.props.on, find((node) => node.props?.id === 'app-confirm-cancel-note').map(text)],
+      [true, true, ['The ✕ on a download in Requests asks first. Kept on this device.']])
     check('nothing failed, nothing said', failure().filter((line) => !line.startsWith("deadwax didn't answer")), [])
     //? the connection rows are live regions too, but list items; this one is the section's own div
     const problemRegion = () => find((node) => node.type === 'div' && node.props?.['aria-live'] === 'polite' && node.props?.['aria-atomic'] === 'true')
@@ -293,7 +305,24 @@ async function main() {
     check('a database that can\'t keep them, and a save that failed, are said', failure().filter((line) => !line.startsWith("deadwax didn't answer")),
       ["deadwax can't keep these: its database isn't writable.", 'Not saved: the database is locked'])
     check('...the failure inside that region, so VoiceOver hears why the choice went back', text(problemRegion()[0]), 'Not saved: the database is locked')
-    globalThis.__you.getting = { settings: { get_mode: 'sources', quality_floor: 'lossless' }, canSave: true, problem: null }
+    //? (review) in the section, in order: what went wrong keeping the three sits right under them and their
+    //? note, never under this device's own setting - "can't keep these" read as being about it
+    const section = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-getting-title')[0]
+    const marker = (node) => (node.props?.id === 'app-get-note' ? 'note' : byClass('app-error')(node) ? text(node).slice(0, 9)
+      : node.type === 'div' && node.props?.['aria-live'] === 'polite' ? 'region' : node.type?.name === 'ConfirmCancelChoice' ? 'confirm'
+      : node.props?.id === 'app-confirm-cancel-note' ? 'its note' : null)
+    const inOrder = []
+    const walk = (node) => {
+      if (!node || typeof node !== 'object') return
+      if (Array.isArray(node)) { node.forEach(walk); return }
+      if (marker(node)) inOrder.push(marker(node))
+      walk(node.props?.children)
+    }
+    walk(section)
+    check('...both right under the three and their note, before "Confirm before cancelling" - which deadwax\'s database has no part in',
+      inOrder, ['note', "deadwax c", 'region', 'Not saved', 'confirm', 'its note'])
+    check('...the gap before "Confirm before cancelling" kept by the region, there even when it is empty', byClass('app-choice-gap')(problemRegion()[0]), true)
+    globalThis.__you.getting = { settings: { get_mode: 'sources', quality_floor: 'lossless', format_preference: 'lossless_only' }, canSave: true, problem: null }
     draw({ shown: true, current: true, ...LOOK })
 
     //? the two radio groups, drawn: GettingChoices is a leaf, and its groups are components of their own
@@ -315,22 +344,31 @@ async function main() {
       return found
     }
     const groupOf = (group) => group.props.children.find((child) => child?.props?.role === 'radiogroup')
-    const [mode, floor] = groupsOf({ get_mode: 'pick', quality_floor: 'lossless' })
-    check('the titles and the words, as the board has them',
-      [text(mode.props.children[0]), radios(mode).map((radio) => text(radio)), text(floor.props.children[0]), radios(floor).map((radio) => text(radio))],
-      ['When I tap Get', ['Show me the sources', 'Pick the best source for me'], 'Quality floor', ['Any', '320 kbps', 'Lossless', '24-bit']])
-    check('the chosen ones checked, and the only tab stops', [radios(mode).map((r) => [r.props['aria-checked'], r.props.tabIndex]), radios(floor).map((r) => [r.props['aria-checked'], r.props.tabIndex])],
-      [[[false, -1], [true, 0]], [[false, -1], [false, -1], [true, 0], [false, -1]]])
+    const [mode, floor, format] = groupsOf({ get_mode: 'pick', quality_floor: 'lossless', format_preference: 'prefer_lossless' })
+    check('the titles and the words, as the board has them - and Format as the main page words it',
+      [text(mode.props.children[0]), radios(mode).map((radio) => text(radio)), text(floor.props.children[0]), radios(floor).map((radio) => text(radio)),
+        text(format.props.children[0]), radios(format).map((radio) => text(radio))],
+      ['When I tap Get', ['Show me the sources', 'Pick the best source for me'], 'Quality floor', ['Any', '320 kbps', 'Lossless', '24-bit'],
+        'Format', ['Any', 'Prefer lossless', 'Lossless only']])
+    check('the chosen ones checked, and the only tab stops',
+      [radios(mode).map((r) => [r.props['aria-checked'], r.props.tabIndex]), radios(floor).map((r) => [r.props['aria-checked'], r.props.tabIndex]),
+        radios(format).map((r) => [r.props['aria-checked'], r.props.tabIndex])],
+      [[[false, -1], [true, 0]], [[false, -1], [false, -1], [true, 0], [false, -1]], [[false, -1], [true, 0], [false, -1]]])
     radios(mode)[0].props.onClick()
     groupOf(floor).props.onKeyDown({ key: 'ArrowDown', preventDefault() {}, currentTarget: { querySelector: () => null } })
-    check('a tap picks; an arrow moves the choice round the group', picks, [{ get_mode: 'sources' }, { quality_floor: '24bit' }])
-    const [waitingMode, waitingFloor] = groupsOf(null)
+    radios(format)[2].props.onClick()
+    groupOf(format).props.onKeyDown({ key: 'ArrowUp', preventDefault() {}, currentTarget: { querySelector: () => null } })
+    check('a tap picks; an arrow moves the choice round the group', picks,
+      [{ get_mode: 'sources' }, { quality_floor: '24bit' }, { format_preference: 'lossless_only' }, { format_preference: 'any' }])
+    const [waitingMode, waitingFloor, waitingFormat] = groupsOf(null)
     radios(waitingMode)[1].props.onClick()
+    radios(waitingFormat)[2].props.onClick()
     groupOf(waitingFloor).props.onKeyDown({ key: 'ArrowDown', preventDefault() {}, currentTarget: { querySelector: () => null } })
     check('before deadwax has answered: nothing checked, busy, the first a tab stop, and nothing can be chosen',
-      [radios(waitingMode).map((r) => r.props['aria-checked']), groupOf(waitingMode).props['aria-busy'], radios(waitingFloor).map((r) => r.props.tabIndex), picks.length],
-      [[false, false], true, [0, -1, -1, -1], 2])
-    check('both groups are described by the section\'s note', [groupOf(mode).props['aria-describedby'], groupOf(floor).props['aria-describedby']], ['app-get-note', 'app-get-note'])
+      [radios(waitingMode).map((r) => r.props['aria-checked']), groupOf(waitingMode).props['aria-busy'], radios(waitingFloor).map((r) => r.props.tabIndex),
+        radios(waitingFormat).map((r) => r.props['aria-checked']), picks.length],
+      [[false, false], true, [0, -1, -1, -1], [false, false, false], 4])
+    check('all three groups are described by the section\'s note', [mode, floor, format].map((group) => groupOf(group).props['aria-describedby']), ['app-get-note', 'app-get-note', 'app-get-note'])
   }
 
   console.log('\nthe store of Getting albums (app/useGetSettings.ts, the real one)')
@@ -349,20 +387,27 @@ exports.putPreferences = (values) => globalThis.__getting.put(values)
 `)
     fs.writeFileSync(path.join(OUT2, 'state/persisted.js'), `
 exports.readPreferences = () => globalThis.__getting.preferences
+exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
 `)
     //? deadwax, faked: what it stores (and whether anything was ever saved), each GET and PUT. With
     //? `hold`, a PUT waits for the test to let it in: it is taken - and answered - when released
-    const server = { stored: {}, seeded: false, canSave: true, refuse: false, hold: false, gets: 0, puts: [], held: [] }
-    const answerOf = () => ({ get_mode: server.stored.get_mode ?? 'sources', quality_floor: server.stored.quality_floor ?? 'any', stored: Object.keys(server.stored).sort(),
-      seeded: server.seeded, can_save: server.canSave })
+    //? `unseeded` as routes/me.py says it: every key until a first save; then what `unseeded` holds -
+    //? Format alone for a user seeded before it - until any save, which lists them all
+    const KEYS = ['format_preference', 'get_mode', 'quality_floor']
+    const server = { stored: {}, seeded: false, unseeded: [], canSave: true, refuse: false, hold: false, gets: 0, puts: [], held: [] }
+    const answerOf = () => ({ get_mode: server.stored.get_mode ?? 'sources', quality_floor: server.stored.quality_floor ?? 'any',
+      format_preference: server.stored.format_preference ?? 'prefer_lossless', stored: Object.keys(server.stored).sort(),
+      seeded: server.seeded, unseeded: server.seeded ? server.unseeded : KEYS, can_save: server.canSave })
     const take = (values) => {
       if (!server.canSave || server.refuse) throw new Error("deadwax can't keep preferences: its database isn't writable")
       Object.assign(server.stored, values)
       server.seeded = true
+      server.unseeded = []
       return answerOf()
     }
     globalThis.__getting = {
       preferences: { candidateMinBitrate: 0, candidateMinBitDepth: 24 },
+      downloadDefaults: { formatPreference: 'prefer_lossless', autoGrab: false },
       get() { server.gets += 1; return Promise.resolve(answerOf()) },
       put(values) {
         server.puts.push(values)
@@ -375,17 +420,17 @@ exports.readPreferences = () => globalThis.__getting.preferences
       },
     }
     const G = require(path.join(OUT2, 'app/useGetSettings.js'))
-    const fresh = (stored = {}, seeded = Object.keys(stored).length > 0) => { G.forgetGetSettings(); server.stored = { ...stored }; server.seeded = seeded; server.puts = []; server.gets = 0 }
+    const fresh = (stored = {}, seeded = Object.keys(stored).length > 0) => { G.forgetGetSettings(); server.stored = { ...stored }; server.seeded = seeded; server.unseeded = []; server.puts = []; server.gets = 0 }
     const settle = () => new Promise((resolve) => setImmediate(() => setImmediate(resolve)))
 
-    check('before deadwax answers: the defaults - a Get shows the sources', G.getSettingsNow(), { get_mode: 'sources', quality_floor: 'any' })
+    check('before deadwax answers: the defaults - a Get shows the sources', G.getSettingsNow(), { get_mode: 'sources', quality_floor: 'any', format_preference: 'prefer_lossless' })
     const one = G.askGetSettings()
     const two = G.askGetSettings()
     await settle()
     check('one ask at a time', [one === two, server.gets], [true, 1])
     await one
     check('a first read of a user nothing was saved for carries the main page\'s floor over (bit depth 24: 24-bit) - and only that, never "When I tap Get"',
-      [server.puts, G.getSettingsNow()], [[{ quality_floor: '24bit' }], { get_mode: 'sources', quality_floor: '24bit' }])
+      [server.puts, G.getSettingsNow()], [[{ quality_floor: '24bit' }], { get_mode: 'sources', quality_floor: '24bit', format_preference: 'prefer_lossless' }])
     await G.askGetSettings()
     check('an answer in hand is asked again - a change made on another device must arrive - and seeds nothing more', [server.gets, server.puts.length], [2, 1])
 
@@ -409,6 +454,63 @@ exports.readPreferences = () => globalThis.__getting.preferences
     await G.askGetSettings()
     check('a database that can\'t keep them is never seeded', server.puts.length, 0)
     server.canSave = true
+
+    console.log('\n  Format (2.0.0-player.41): carried over once, as the floor is - and alone for a user seeded before it')
+    fresh()
+    globalThis.__getting.preferences = { candidateMinBitrate: 0, candidateMinBitDepth: 0 }
+    globalThis.__getting.downloadDefaults = { formatPreference: 'lossless_only', autoGrab: true }
+    await G.askGetSettings()
+    check('a first read carries the main page\'s Format over (deadwax-download-defaults), never its auto-grab',
+      [server.puts, G.getSettingsNow()], [[{ format_preference: 'lossless_only' }], { get_mode: 'sources', quality_floor: 'any', format_preference: 'lossless_only' }])
+    fresh()
+    globalThis.__getting.downloadDefaults = { formatPreference: 'prefer_lossless', autoGrab: false }
+    await G.askGetSettings()
+    check('...Prefer lossless, the default, is nothing to carry over: an empty save', [server.puts, server.stored], [[{}], {}])
+    fresh({ quality_floor: 'lossless' })
+    server.unseeded = ['format_preference']
+    globalThis.__getting.preferences = { candidateMinBitrate: 0, candidateMinBitDepth: 24 }
+    globalThis.__getting.downloadDefaults = { formatPreference: 'any', autoGrab: false }
+    await G.askGetSettings()
+    check('a user seeded before Format existed: Format alone carried over - the floor chosen in the app since left as it is',
+      [server.puts, G.getSettingsNow()], [[{ format_preference: 'any' }], { get_mode: 'sources', quality_floor: 'lossless', format_preference: 'any' }])
+    G.forgetGetSettings()
+    await G.askGetSettings()
+    check('...once: the next page seeds nothing', server.puts.length, 1)
+    fresh({ quality_floor: 'lossless' })
+    server.unseeded = ['format_preference']
+    globalThis.__getting.downloadDefaults = { formatPreference: 'prefer_lossless', autoGrab: false }
+    await G.askGetSettings()
+    check('...with nothing to carry, an empty save still marks it carried over', [server.puts, server.unseeded], [[{}], []])
+
+    console.log('\n  a search\'s Format (2.0.0-player.41): the store\'s at once once deadwax has answered, waited for until then')
+    fresh({ format_preference: 'lossless_only' })
+    const early = G.formatPreferenceNow()
+    check('nothing in hand: a promise', typeof early?.then, 'function')
+    check('...which is the server\'s Format once deadwax is asked and answers', [await early, server.gets], ['lossless_only', 1])
+    check('in hand: the value itself, asked of nobody', [G.formatPreferenceNow(), server.gets], ['lossless_only', 1])
+    //? (review) what You draws its three choices from is the hook's own copy: every setting as stored,
+    //? none of them its default - a Format, a floor or a mode the hook made up would show here
+    fresh({ get_mode: 'pick', quality_floor: 'lossless', format_preference: 'lossless_only' })
+    await G.askGetSettings()
+    check('the hook hands You every setting as deadwax holds it', G.useGetSettings(false).settings,
+      { get_mode: 'pick', quality_floor: 'lossless', format_preference: 'lossless_only' })
+    const choosing41 = G.chooseGetSettings({ format_preference: 'any' })
+    check('a choice being saved: that choice', G.formatPreferenceNow(), 'any')
+    await choosing41
+    //? (review) a page left open: Lossless only chosen on the phone meanwhile, then a Get here - the
+    //? sheet opening asks again just before its search begins, and the search waits for that answer
+    server.stored.format_preference = 'lossless_only'
+    const reread = G.askGetSettings()
+    const during = G.formatPreferenceNow()
+    check('in hand with a read out (the sheet\'s, as it opened): a promise of that read\'s answer - never the one it replaces',
+      [typeof during?.then, await during, server.gets], ['function', 'lossless_only', 2])
+    await reread
+    check('...and once it has landed, the value itself again', G.formatPreferenceNow(), 'lossless_only')
+    G.forgetGetSettings()
+    const getFine = globalThis.__getting.get
+    globalThis.__getting.get = () => Promise.reject(new Error('Failed to fetch'))
+    check('deadwax not answering: the default, never a rejection', await G.formatPreferenceNow(), 'prefer_lossless')
+    globalThis.__getting.get = getFine
 
     console.log('\n  asked again: what another device changed arrives, and never over a choice being saved')
     fresh({ get_mode: 'sources', quality_floor: 'lossless' })
@@ -470,11 +572,11 @@ exports.readPreferences = () => globalThis.__getting.preferences
     server.held.shift().let(true)
     await mode
     check('an older choice refused goes back - to the server\'s, saying so - and the newer one still shows',
-      [G.getSettingsNow(), G.useGetSettings(false).problem], [{ get_mode: 'sources', quality_floor: 'lossless' }, 'Not saved: the database is locked'])
+      [G.getSettingsNow(), G.useGetSettings(false).problem], [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, 'Not saved: the database is locked'])
     server.held.shift().let()
     await floor
     check('...the newer one saved, and what was refused said still', [G.getSettingsNow(), server.stored, G.useGetSettings(false).problem],
-      [{ get_mode: 'sources', quality_floor: 'lossless' }, { get_mode: 'sources', quality_floor: 'lossless' }, 'Not saved: the database is locked'])
+      [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, { get_mode: 'sources', quality_floor: 'lossless' }, 'Not saved: the database is locked'])
 
     fresh({ get_mode: 'sources', quality_floor: 'any' })
     await G.askGetSettings()

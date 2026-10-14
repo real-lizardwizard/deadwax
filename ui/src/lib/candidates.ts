@@ -1,4 +1,4 @@
-import type { Candidate, DownloadInFlight, FindCandidatesResponse, HeldPressing } from '../api/types'
+import type { Candidate, DownloadInFlight, FindCandidatesResponse, FormatPreference, HeldPressing } from '../api/types'
 import { formatSpeed } from './format'
 
 /**
@@ -380,6 +380,51 @@ export function tracksText(candidate: Candidate): string {
 }
 
 /**
+ * A source card's reasoning (2.0.0-player.41): the score's signals, each as a chip the way the main
+ * page's candidates panel draws them - its word (SIGNAL_LABELS, capitalised as the desktop's Signals
+ * chip names them: "Titles", "Count", "Lengths", "Edition", "Format", "Peer"), its value as a
+ * percentage, and its band (scoreClass: good from 75, mid from 40, bad under). A signal that couldn't
+ * be judged (null - no tracklist to match, no lengths reported) is left out, as the panel leaves it
+ * out; one the panel doesn't name keeps its own name, after the six.
+ */
+export interface SignalChip {
+  signal: string
+  label: string
+  /** 0-100 */
+  value: number
+  band: 'good' | 'mid' | 'bad'
+}
+
+export function signalChips(candidate: Pick<Candidate, 'signals'>): SignalChip[] {
+  const signals = (candidate.signals ?? {}) as unknown as Readonly<Record<string, number | null | undefined>>
+  const order = [...Object.keys(SIGNAL_LABELS), ...Object.keys(signals).filter((name) => !(name in SIGNAL_LABELS))]
+  const chips: SignalChip[] = []
+  for (const signal of order) {
+    const raw = signals[signal]
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) continue
+    const value = Math.round(raw * 100)
+    const word = SIGNAL_LABELS[signal] ?? signal
+    chips.push({ signal, label: word.charAt(0).toUpperCase() + word.slice(1), value, band: scoreClass(value) })
+  }
+  return chips
+}
+
+/**
+ * The edition words found in a folder's name (the server's detected_edition_tags: "REMASTER",
+ * "DELUXE" ...), each with its colour as the main page's panel gives it (EDITION_TAG_COLORS), in the
+ * app's own few: the yellows amber, the reds red, the purples purple, green green, the whites plain.
+ */
+export type EditionTone = 'amber' | 'red' | 'purple' | 'green' | 'plain'
+
+export function editionTags(candidate: Pick<Candidate, 'detected_edition_tags'>): { tag: string; tone: EditionTone }[] {
+  const tone = (colour: string | undefined): EditionTone => {
+    const family = (colour ?? '').split('-')[0]
+    return family === 'yellow' ? 'amber' : family === 'red' ? 'red' : family === 'main' ? 'purple' : family === 'green' ? 'green' : 'plain'
+  }
+  return (candidate.detected_edition_tags ?? []).filter(Boolean).map((tag) => ({ tag, tone: tone(EDITION_TAG_COLORS[tag]) }))
+}
+
+/**
  * The card's amber line, or null: 'Missing “Threads”', 'Missing “Threads” and “Small”', 'Missing
  * “Silence”, “Hunter”, “Small” and 2 more' - up to three named, the rest counted. From what the
  * server worked out before it dropped the pairing (missing_tracks, missing_count); a video track
@@ -414,6 +459,31 @@ export function queriesText(result: Pick<FindCandidatesResponse, 'query' | 'quer
   const queries = result.queries?.length ? result.queries : result.query ? [result.query] : []
   return listed(queries.map((query) => `“${query}”`))
 }
+
+/**
+ * A search scored Lossless only that Soulseek answered and nothing came of (2.0.0-player.41, review):
+ * matching.py leaves out every folder with no lossless file when the Format is Lossless only, so an
+ * album shared only as MP3 comes back with no folders at all - and "Soulseek found nothing", with the
+ * query to edit, would be false and point at the wrong thing (a re-search is scored the same way).
+ * True when the search was sent Lossless only, nothing is left, and slskd had answers. Its
+ * `response_count` counts peers' answers, not folders - one holding only scans counts too - so what is
+ * said never claims how many lossy folders there were.
+ */
+export function nothingLossless(
+  result: Pick<FindCandidatesResponse, 'candidates' | 'response_count'>,
+  format: FormatPreference | null | undefined,
+): boolean {
+  return format === 'lossless_only' && !result.candidates.length && result.response_count > 0
+}
+
+/** What the sheet says then: 'Nothing lossless on Soulseek for “Portishead Third”.' */
+export function nothingLosslessLine(result: Pick<FindCandidatesResponse, 'query' | 'queries'>): string {
+  return `Nothing lossless on Soulseek for ${queriesText(result)}.`
+}
+
+/** ...and under it, why - and where the setting is. */
+export const NOTHING_LOSSLESS_NOTE =
+  'Soulseek answered, but your Format is Lossless only, which leaves out folders with no lossless files. You can change it in You, under Getting albums.'
 
 /** The line under the cards: 'Searched Soulseek for “Portishead Third” · 41 folders, 4 match your filters'. */
 export function searchedLine(result: Pick<FindCandidatesResponse, 'query' | 'queries' | 'candidates'>, shown: number): string {
@@ -460,9 +530,11 @@ export function sourcesAnnouncement(state: {
   release: { artist: string; album_artist?: string | null; album: string } | null
   error: string | null
   status: { title: string } | null
-  result: Pick<FindCandidatesResponse, 'query' | 'queries' | 'candidates'> | null
+  result: Pick<FindCandidatesResponse, 'query' | 'queries' | 'candidates' | 'response_count'> | null
   shown: number
   notPicked: string | null
+  /** the Format the search was scored by (2.0.0-player.41): Lossless only can leave nothing of an answer */
+  format?: FormatPreference | null
 }): string {
   if (state.pending && state.release) return searchingLine(state.release)
   if (state.error) return state.error
@@ -470,7 +542,9 @@ export function sourcesAnnouncement(state: {
   if (!state.result) return ''
   const total = state.result.candidates.length
   const line = !total
-    ? `Soulseek found nothing for ${queriesText(state.result)}.`
+    ? nothingLossless(state.result, state.format)
+      ? `${nothingLosslessLine(state.result)} ${NOTHING_LOSSLESS_NOTE}`
+      : `Soulseek found nothing for ${queriesText(state.result)}.`
     : !state.shown
       ? `${total} ${total === 1 ? 'folder' : 'folders'} on Soulseek, none pass your filters`
       : `${state.shown} ${state.shown === 1 ? 'source' : 'sources'}`

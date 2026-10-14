@@ -1,6 +1,12 @@
+import { useMemo, useState } from 'preact/hooks'
+
 import type { Candidate } from '../api/types'
 import { formatSize } from '../lib/format'
-import { missingLine, qualityText, scoreClass, speedFact, startsFact, tracksText } from '../lib/candidates'
+import { editionTags, missingLine, qualityText, scoreClass, signalChips, speedFact, startsFact, tracksText } from '../lib/candidates'
+import { ChevronDownIcon } from '../player/icons'
+
+//? each card's reasons its own id, for the score's aria-controls
+let reasonLists = 0
 
 /**
  * One place an album can come from, in the Sources sheet (2.0.0-player.15) - James chose cards over
@@ -20,19 +26,32 @@ import { missingLine, qualityText, scoreClass, speedFact, startsFact, tracksText
  *  - Then Tracks ("11 of 11", against the release's audio tracks - a CD+DVD's films aren't counted;
  *    amber when tracks are missing), Quality ("FLAC 16/44.1"), Size, and Starts ("now", "3 ahead").
  *  - What it is missing, on its own amber line: "Missing “Threads”".
+ *  - WHY IT SCORED WHAT IT DID (2.0.0-player.41) - the README's promise, "ranked candidates with
+ *    visible reasoning": the edition words found in the folder's name (REMASTER, DELUXE...) in their
+ *    colours, and the score's signals as chips - Titles, Count, Lengths, Edition, Format, Peer, each
+ *    with its value and its band's colour - as the main page's candidates panel shows them. Last on
+ *    the card, so opening them moves nothing above. On a desktop's panel they are always shown
+ *    (`reasons` 'shown'); on a phone, where 390px can't hold six chips beside the facts, they are
+ *    behind a tap on the score ('tap'): the score is then a button - aria-expanded, a chevron that
+ *    turns - and the reasons open under the facts, the card growing downward, nothing moving under
+ *    the finger.
  *
- * Every word is lib/candidates.ts's, pinned by candidates.sim.cjs. A leaf: props only. `onGet` is
- * the tap - it asks for the download in the same turn, and the sheet hands over to Requests.
+ * Every word is lib/candidates.ts's, pinned by candidates.sim.cjs. A leaf but for whether its reasons
+ * are open. `onGet` is the tap - it asks for the download in the same turn, and the sheet hands over
+ * to Requests.
  */
 export function SourceCard({
   candidate,
   best,
   onGet,
+  reasons = 'shown',
 }: {
   candidate: Candidate
   /** the best match through the chips (wherever the sort puts it): a purple edge and the solid Get */
   best: boolean
   onGet: (candidate: Candidate) => void
+  /** why it scored as it did: always shown (a desktop's panel), or behind a tap on the score (a phone) */
+  reasons?: 'shown' | 'tap'
 }) {
   const percent = Math.round(candidate.score * 100)
   const good = scoreClass(percent) === 'good'
@@ -40,13 +59,34 @@ export function SourceCard({
   const starts = startsFact(candidate)
   const missing = missingLine(candidate)
   const discs = candidate.disc_folders?.length ?? 0
+  const signals = signalChips(candidate)
+  const tags = editionTags(candidate)
+  const reasonsId = useMemo(() => `app-source-reasons-${++reasonLists}`, [])
+  const [open, setOpen] = useState(false)
+  const tap = reasons === 'tap'
+  const scoreClasses = `app-source-score app-mono ${good ? 'is-good' : 'is-low'}`
 
   return (
     <li class={`app-card app-source${best ? ' is-best' : ''}`}>
       <div class="app-source-top">
-        <span class={`app-source-score app-mono ${good ? 'is-good' : 'is-low'}`} aria-label={`Match score ${percent}`}>
-          {percent}
-        </span>
+        {tap ? (
+          //? a phone's: the score opens why it is what it is, under the facts
+          <button
+            type="button"
+            class={`${scoreClasses} is-toggle`}
+            aria-label={`Match score ${percent}`}
+            aria-expanded={open}
+            aria-controls={reasonsId}
+            onClick={() => setOpen((was) => !was)}
+          >
+            {percent}
+            <ChevronDownIcon class="app-source-score-icon" />
+          </button>
+        ) : (
+          <span class={scoreClasses} aria-label={`Match score ${percent}`}>
+            {percent}
+          </span>
+        )}
         <span class="app-source-name">
           <span class="app-source-folder" title={candidate.directory}>{candidate.directory_name}</span>
           <span class="app-source-peer">
@@ -97,6 +137,32 @@ export function SourceCard({
       </dl>
 
       {missing && <p class="app-source-missing">{missing}</p>}
+
+      {/* why it scored what it did: last, so opening it moves nothing above - hidden on a phone until
+          the score is tapped, always there on a desktop */}
+      <div
+        id={reasonsId}
+        class="app-source-reasons"
+        role="group"
+        aria-label={`Why it scored ${percent}`}
+        hidden={tap && !open}
+      >
+        {tags.length > 0 && (
+          <p class="app-source-tags">
+            <span class="app-visually-hidden">In the folder's name: </span>
+            {tags.map(({ tag, tone }) => (
+              <span key={tag} class={`app-source-tag is-${tone}`}>{tag}</span>
+            ))}
+          </p>
+        )}
+        <ul class="app-source-signals">
+          {signals.map((chip) => (
+            <li key={chip.signal} class={`app-source-signal is-${chip.band}`}>
+              {chip.label} <span class="app-mono">{chip.value}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </li>
   )
 }

@@ -8,7 +8,7 @@ import { sayPins, setPinned, usePins } from '../app/usePins'
 import { discHeadings } from '../lib/discTitles'
 import { formatDuration, sharedFormat, trackTime } from '../lib/format'
 import { editAlbum, type EditAlbum } from '../lib/albumEdit'
-import { alsoChips } from '../lib/idBridge'
+import { alsoChips, otherPressingsGroup } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import { album as fetchAlbum, prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
@@ -40,6 +40,18 @@ import type { Player } from './usePlayer'
  * own latestOnly) says which. The row is drawn from the first frame, so a chip arriving moves
  * nothing a finger is reaching for; a chip opens that pressing's page over this one.
  *
+ * Since 2.0.0-player.41 the row ends with "Other pressings ›" once the bridge says which MusicBrainz
+ * album this is (the release group its folders carry): the album you don't have's page for it, over
+ * this one - every pressing in its list, the ones you hold marked, Get on any - so the deluxe beside
+ * the standard you have can be got (v0.9.1's ask). It lands with the Also chips, in the row drawn from
+ * the first frame, and never gives way to them: they shorten, it doesn't. The row is unseen until the
+ * bridge has answered (or failed) - its place held, so nothing below moves - and so what is in it,
+ * the badge too, first shows where it stays: a phone's row is centred, and the badge slid sideways as
+ * the chip landed. Beside an Also chip, in a row too narrow for all three whole (its own width, by a
+ * container query - a phone, or a desktop's column narrowed by the Edit panel), it says "Pressings"
+ * (its name still "Other pressings") and "In your library" keeps its green tick and gives its words
+ * up (still read, never shown), leaving the Also chip room to say which pressing it is.
+ *
  * Since 2.0.0-player.18 the bar's top right has the pin (Album.dc.html's): it pins the album to Home
  * by its release - the bridge's answer says which - and deadwax keys the pin on the store's row for
  * it, so it follows the album through a re-file. Drawn from the first frame, waiting until the bridge
@@ -64,6 +76,7 @@ export function AlbumPage({
   backLabel,
   onArtist,
   onOpenAlbum,
+  onOpenGroup,
   onEdit,
   editing = false,
   refresh = 0,
@@ -77,6 +90,8 @@ export function AlbumPage({
   onArtist?: (artist: { id: string; name: string }) => void
   /** another pressing's page, from its "Also" chip */
   onOpenAlbum?: (album: Album) => void
+  /** the album's MusicBrainz group, from "Other pressings" (2.0.0-player.41): every pressing, to get one */
+  onOpenGroup?: (group: { id: string; title: string }) => void
   /** Edit, on a desktop and for an admin (2.0.0-player.21): the Edit panel for this album, or closed */
   onEdit?: ((event: MouseEvent, album: EditAlbum) => void) | undefined
   /** the Edit panel shows this album: Edit pressed */
@@ -147,6 +162,7 @@ export function AlbumPage({
   const total = songs.reduce((sum, song) => sum + (song.duration ?? 0), 0)
 
   const chips = alsoChips(store, id)
+  const group = otherPressingsGroup(store)
   const artistId = shown?.artistId ?? album?.artistId
   const artistName = shown?.artist ?? ''
 
@@ -199,11 +215,13 @@ export function AlbumPage({
           {[shown?.genre, shown?.year, format].filter(Boolean).join(' · ')}
         </p>
 
-        {/* drawn from the first frame: an "Also" chip landing in it moves nothing below */}
-        <div class="app-album-chips">
+        {/* drawn from the first frame: an "Also" chip landing in it moves nothing below. Unseen until the
+            bridge has answered or failed (2.0.0-player.41), so "In your library" first shows where it
+            stays - on a phone's centred row it slid sideways as "Other pressings" landed beside it */}
+        <div class={`app-album-chips${storeDone ? '' : ' is-waiting'}`}>
           <span class="app-held-badge">
             <CheckIcon class="app-held-badge-icon" />
-            In your library
+            <span class="app-held-badge-text">In your library</span>
           </span>
           {chips.map((chip) => (
             <button
@@ -216,6 +234,21 @@ export function AlbumPage({
               <ChevronRightIcon class="app-chip-icon" />
             </button>
           ))}
+          {/* every pressing of the album, to get another (2.0.0-player.41) - last, and never shortened */}
+          {group && onOpenGroup && (
+            <button
+              type="button"
+              class="app-chip app-other-pressings"
+              aria-label="Other pressings"
+              onClick={() => onOpenGroup({ id: group, title: shown?.name ?? '' })}
+            >
+              {/* "Pressings" where an Also chip shares a row too narrow for all three whole (app.css's
+                  container query), so the Also chip keeps what room there is */}
+              <span class="app-other-long">Other pressings</span>
+              <span class="app-other-short">Pressings</span>
+              <ChevronRightIcon class="app-chip-icon" />
+            </button>
+          )}
         </div>
 
         <div class="pl-hero-actions">

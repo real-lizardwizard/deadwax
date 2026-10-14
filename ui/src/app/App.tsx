@@ -442,6 +442,18 @@ export function App() {
   }, [])
 
   /**
+   * Another pressing of an album you have (2.0.0-player.41): its group's page, from the album page's
+   * "Other pressings" - with no preview, so the header and what Get downloads come from MusicBrainz's
+   * own group, never from Navidrome's name for the album, which stands in as the title meanwhile.
+   */
+  const openHeldGroup = useCallback((group: { id: string; title: string }) => {
+    const page: Page = { kind: 'group', id: group.id, ...(group.title ? { label: group.title } : {}) }
+    const address = scrollKey({ tab: router.nav.tab, page })
+    if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
+    router.open(page)
+  }, [])
+
+  /**
    * An artist's page (2.0.0-player.17), on the tab showing: by Navidrome's id for them, or - known only
    * by MusicBrainz - `mb:<mbid>`. Drawn at once from what the row that opened it knew.
    */
@@ -947,6 +959,7 @@ export function App() {
         id={page.id}
         release={page.release ?? null}
         preview={groupPreviews.current.get(page.id) ?? null}
+        title={page.label ?? ''}
         shown={pageShown && nav.tab === tab && !sourcesOver}
         onBack={back}
         backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
@@ -967,6 +980,7 @@ export function App() {
           backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
           onArtist={openAlbumArtist}
           onOpenAlbum={openAlbum}
+          onOpenGroup={openHeldGroup}
           onEdit={desktop && admin ? toggleEdit : undefined}
           editing={editOpen && edit?.album?.id === page.id}
           refresh={refreshes.get(page.id) ?? 0}

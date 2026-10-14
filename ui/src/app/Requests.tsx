@@ -8,7 +8,7 @@ import {
   SECTIONS, SECTION_TITLES, changes, doneLooks, type RequestRow, type RequestsView, type Section,
 } from '../lib/requestsView'
 import { prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from '../player/api'
-import { readPreferences } from '../state/persisted'
+import { readConfirmCancel } from '../state/persisted'
 import { usePlayerActions } from './context'
 import { AttentionCard, DoneRow, DownloadingCard, WaitingCard } from './JobCard'
 
@@ -47,7 +47,8 @@ const without = <V,>(map: ReadonlyMap<string, V>, key: string): Map<string, V> =
  * aside) waits a round trip, and longer while slskd is slow to answer deadwax.
  *
  * Cancelling asks first, IN the card - "Keep it" or "Cancel download" - unless "Confirm before
- * cancelling" is turned off on this device (the main page's preference, read at the tap): a cancel
+ * cancelling" is turned off on this device (You > Getting albums since 2.0.0-player.41, carried
+ * over once from the main page's preference of that name; read at the tap): a cancel
  * gives up the place in the peer's queue, and with SLSKD_INCOMPLETE_PATH set deletes the
  * part-downloaded file. Never window.confirm(), which would hold the page that plays the music
  * (JobCard.tsx says why). One card asks at a time.
@@ -316,7 +317,7 @@ export function Requests({
   const cancel = (row: RequestRow) => {
     if (row.jobId === null || row.cancel !== 'ready') return
     if (asking === row.key) setAsking(null)
-    else if (readPreferences().confirmCancel) setAsking(row.key)
+    else if (readConfirmCancel()) setAsking(row.key)
     else cancelNow(row)
   }
 

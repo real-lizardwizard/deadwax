@@ -17,6 +17,12 @@
  * whole scores on edition, format and peer alone); the one line the sheet says to VoiceOver for
  * each outcome; a seed that carries over only what differs from the defaults; `seeded` read.
  *
+ * And for Get, as the main page had it (2.0.0-player.41): Format in You's words and the server's
+ * values, Prefer lossless the default; a server answer's Format and `unseeded` read safely; the seed
+ * carrying the main page's Format over (only when it isn't the default) and only the keys left to
+ * carry over; and a card's reasons - the score's signals as chips (word, value, band; an unjudged
+ * one left out, in the panel's order) and the edition words found in the folder's name, coloured.
+ *
  * Run it with:  node ui/test/candidates.sim.cjs
  */
 
@@ -225,7 +231,7 @@ console.log('\nthe quality floor (You > Getting albums): the chips it starts as,
 {
   check('the floors and the modes, as You words them', [G.QUALITY_FLOORS.map((f) => [f.value, f.label]), G.GET_MODES.map((m) => [m.value, m.label])],
     [[['any', 'Any'], ['320', '320 kbps'], ['lossless', 'Lossless'], ['24bit', '24-bit']], [['sources', 'Show me the sources'], ['pick', 'Pick the best source for me']]]);
-  check('the default shows the sources, at any quality', G.GET_SETTINGS_DEFAULT, { get_mode: 'sources', quality_floor: 'any' });
+  check('the default shows the sources, at any quality (and, since 2.0.0-player.41, prefers lossless)', G.GET_SETTINGS_DEFAULT, { get_mode: 'sources', quality_floor: 'any', format_preference: 'prefer_lossless' });
   check('each floor is a chip pressed: Lossless, 24-bit, 320 kbps - Any none',
     ['any', '320', 'lossless', '24bit'].map((floor) => G.floorFilters(floor)),
     [{ lossless: false, bit24: false, freeSlot: false, kbps320: false }, { lossless: false, bit24: false, freeSlot: false, kbps320: true },
@@ -247,13 +253,60 @@ console.log('\nthe quality floor (You > Getting albums): the chips it starts as,
   check('pressed chips are counted, so Clear filters shows only with some', [G.pressedCount(G.NO_SOURCE_FILTERS), G.pressedCount({ ...G.floorFilters('lossless'), freeSlot: true })], [0, 2]);
   check('a server answer read safely: what it doesn\'t know is the default',
     [G.readGetSettings({ get_mode: 'pick', quality_floor: 'flac', stored: ['get_mode'], seeded: true, can_save: true }), G.readGetSettings(null)],
-    [{ get_mode: 'pick', quality_floor: 'any', stored: ['get_mode'], seeded: true, can_save: true }, { get_mode: 'sources', quality_floor: 'any', stored: [], seeded: false, can_save: true }]);
+    [{ get_mode: 'pick', quality_floor: 'any', format_preference: 'prefer_lossless', stored: ['get_mode'], seeded: true, unseeded: [], can_save: true },
+     { get_mode: 'sources', quality_floor: 'any', format_preference: 'prefer_lossless', stored: [], seeded: false, unseeded: ['get_mode', 'quality_floor', 'format_preference'], can_save: true }]);
   check('...seeded as the server says, and always when something is stored',
     [G.readGetSettings({ stored: [], seeded: true }).seeded, G.readGetSettings({ stored: ['quality_floor'] }).seeded, G.readGetSettings({ stored: [], seeded: false }).seeded], [true, true, false]);
   check('a first read carries the floor over from the main page\'s settings: 24-bit, 16-bit (lossless only), 320 - only what differs from the defaults, and never picks for you',
     [{ candidateMinBitrate: 0, candidateMinBitDepth: 24 }, { candidateMinBitrate: 320, candidateMinBitDepth: 16 }, { candidateMinBitrate: 320, candidateMinBitDepth: 0 }, { candidateMinBitrate: 256, candidateMinBitDepth: 0 }]
       .map((preferences) => G.seedFromPreferences(preferences)),
     [{ quality_floor: '24bit' }, { quality_floor: 'lossless' }, { quality_floor: '320' }, {}]);
+}
+
+console.log('\nFormat, kept for you on deadwax (2.0.0-player.41)');
+{
+  check('the default is Prefer lossless, as the main page\'s', G.GET_SETTINGS_DEFAULT.format_preference, 'prefer_lossless');
+  check('You\'s words, in the main page\'s order', G.FORMATS.map((format) => [format.value, format.label]),
+    [['any', 'Any'], ['prefer_lossless', 'Prefer lossless'], ['lossless_only', 'Lossless only']]);
+  check('...the server\'s values, the default first', G.FORMAT_PREFERENCE_VALUES, ['prefer_lossless', 'any', 'lossless_only']);
+  check('a server answer\'s Format read safely: a known one kept, anything else the default',
+    ['lossless_only', 'any', 'flac', undefined, 'LOSSLESS_ONLY'].map((format) => G.readGetSettings({ format_preference: format }).format_preference),
+    ['lossless_only', 'any', 'prefer_lossless', 'prefer_lossless', 'prefer_lossless']);
+  check('...and `unseeded` as the server says - only keys there are, in their order; none said: every key before a first save, none after',
+    [G.readGetSettings({ seeded: true, unseeded: ['format_preference', 'theme'] }).unseeded, G.readGetSettings({ seeded: true }).unseeded,
+     G.readGetSettings({ seeded: false }).unseeded, G.readGetSettings({ seeded: true, unseeded: 'format_preference' }).unseeded],
+    [['format_preference'], [], ['get_mode', 'quality_floor', 'format_preference'], []]);
+  const main = (fields) => ({ candidateMinBitrate: 0, candidateMinBitDepth: 0, ...fields });
+  check('the seed carries the main page\'s Format over - only when it isn\'t Prefer lossless, the default - beside the floor',
+    [main({ formatPreference: 'lossless_only' }), main({ formatPreference: 'any', candidateMinBitDepth: 24 }), main({ formatPreference: 'prefer_lossless' }), main({ formatPreference: 'flac' }), main({})]
+      .map((preferences) => G.seedFromPreferences(preferences)),
+    [{ format_preference: 'lossless_only' }, { quality_floor: '24bit', format_preference: 'any' }, {}, {}, {}]);
+  check('...and only the keys left to carry over: a user seeded before Format gets Format alone, never the floor again',
+    [G.seedFromPreferences(main({ formatPreference: 'any', candidateMinBitDepth: 24 }), ['format_preference']),
+     G.seedFromPreferences(main({ formatPreference: 'any', candidateMinBitDepth: 24 }), ['quality_floor']),
+     G.seedFromPreferences(main({ formatPreference: 'any', candidateMinBitDepth: 24 }), [])],
+    [{ format_preference: 'any' }, { quality_floor: '24bit' }, {}]);
+}
+
+console.log('\na card\'s reasons (2.0.0-player.41): the signals and the edition words, as the main page shows them');
+{
+  check('each judged signal a chip: its word, its value, its band - in the panel\'s order, the unjudged left out',
+    C.signalChips(candidate({ signals: { peer: 0.2, format: 0.45, edition: 0.5, duration_match: null, track_count: 1, title_match: 0.745 } })),
+    [{ signal: 'title_match', label: 'Titles', value: 75, band: 'good' }, { signal: 'track_count', label: 'Count', value: 100, band: 'good' },
+     { signal: 'edition', label: 'Edition', value: 50, band: 'mid' }, { signal: 'format', label: 'Format', value: 45, band: 'mid' },
+     { signal: 'peer', label: 'Peer', value: 20, band: 'bad' }]);
+  check('...the words are SIGNAL_LABELS\'s, capitalised as the Signals chip names them; the bands scoreClass\'s (75 good, 40 mid)',
+    [C.signalChips(candidate({ signals: { duration_match: 0.39 } })).map((chip) => [chip.label, chip.band]),
+     C.signalChips(candidate({ signals: { duration_match: 0.4 } }))[0].band, C.signalChips(candidate({ signals: { duration_match: 0.744 } }))[0].band],
+    [[['Lengths', 'bad']], 'mid', 'mid']);
+  check('...a signal the panel doesn\'t name keeps its own name, after the six; nothing judged, no chips',
+    [C.signalChips(candidate({ signals: { peer: 1, tempo: 0.9 } })).map((chip) => chip.label), C.signalChips(candidate({ signals: { title_match: null } }))],
+    [['Peer', 'Tempo'], []]);
+  check('the edition words found in the folder\'s name, each in its colour: yellow amber, red red, purple purple, green green, white plain',
+    C.editionTags(candidate({ detected_edition_tags: ['ANNIVERSARY', 'BOX SET', 'DELUXE', 'LIMITED', 'REMASTER', 'SUPER DELUXE', 'SOMETHING NEW'] })),
+    [{ tag: 'ANNIVERSARY', tone: 'plain' }, { tag: 'BOX SET', tone: 'green' }, { tag: 'DELUXE', tone: 'purple' }, { tag: 'LIMITED', tone: 'purple' },
+     { tag: 'REMASTER', tone: 'amber' }, { tag: 'SUPER DELUXE', tone: 'red' }, { tag: 'SOMETHING NEW', tone: 'plain' }]);
+  check('...none found, none drawn', C.editionTags(candidate()), []);
 }
 
 console.log('\nwhat the Sources sheet says to VoiceOver, one line for each outcome');
@@ -269,6 +322,21 @@ console.log('\nwhat the Sources sheet says to VoiceOver, one line for each outco
      'Soulseek found nothing for “Portishead Third”.', '3 folders on Soulseek, none pass your filters', '1 folder on Soulseek, none pass your filters', '4 sources', '1 source',
      "2 sources. Didn't pick a source for you: you already have part of it."]);
   check('...and nothing before a search has begun', said({}), '');
+  //? (review) Lossless only can leave nothing of an answer Soulseek gave: matching.py drops every folder
+  //? with no lossless file then - "found nothing" would be false, and send you to the query
+  const answered = (n, responses) => ({ ...result(n), response_count: responses });
+  check('Lossless only, answers in, nothing left: nothing lossless, and the Format named - never "found nothing"',
+    said({ result: answered(0, 3), format: 'lossless_only' }),
+    'Nothing lossless on Soulseek for “Portishead Third”. Soulseek answered, but your Format is Lossless only, which leaves out folders with no lossless files. You can change it in You, under Getting albums.');
+  check('...but no peer answering, another Format, or no Format known: found nothing, as ever',
+    [said({ result: answered(0, 0), format: 'lossless_only' }), said({ result: answered(0, 3), format: 'prefer_lossless' }), said({ result: answered(0, 3), format: 'any' }), said({ result: answered(0, 3) })],
+    Array(4).fill('Soulseek found nothing for “Portishead Third”.'));
+  check('nothingLossless: only Lossless only, nothing left, and answers in',
+    [C.nothingLossless(answered(0, 1), 'lossless_only'), C.nothingLossless(answered(1, 1), 'lossless_only'), C.nothingLossless(answered(0, 0), 'lossless_only'),
+     C.nothingLossless(answered(0, 1), 'prefer_lossless'), C.nothingLossless(answered(0, 1), null)],
+    [true, false, false, false, false]);
+  check('...its line names every query searched', C.nothingLosslessLine({ query: 'Kanye West Donda', queries: ['Kanye West Donda', 'Ye Donda'] }),
+    'Nothing lossless on Soulseek for “Kanye West Donda” and “Ye Donda”.');
 }
 
 console.log('\nalready in the store (step 2)');

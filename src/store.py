@@ -207,17 +207,21 @@ CREATE INDEX IF NOT EXISTS idx_jobs_release ON jobs(release_mbid);
 
 CREATE TABLE IF NOT EXISTS user_prefs (
     -- What each user chose for themselves in the app (2.0.0-player.15): You > Getting albums -
-    -- "When I tap Get" and the quality floor. PER USER and on the SERVER, unlike a device's own
-    -- settings (Gapless, Maximum quality), because getting an album is something a person does
-    -- from any device and expects the same of. Keyed on src/users.py's user: always `local` while
-    -- logins are off, which is what step 3's take-over (adopt_local) looks for.
+    -- "When I tap Get", the quality floor and (2.0.0-player.41) Format. PER USER and on the SERVER,
+    -- unlike a device's own settings (Gapless, Maximum quality), because getting an album is
+    -- something a person does from any device and expects the same of. Keyed on src/users.py's
+    -- user: always `local` while logins are off, which is what step 3's take-over (adopt_local)
+    -- looks for.
     --
     -- Only keys the user has SET live here, as in `settings`: an absent key is the default, so a
     -- default changed later reaches everyone who never chose. Which keys and values are allowed
     -- is routes/me.py's (PREFERENCES); a row it doesn't recognise reads as the default. Beside
-    -- them, every save writes one more row, routes/me.py's SEEDED (`_seeded`), which only says the
-    -- app has written for this user - so it carries the main page's quality floor over once, and
-    -- never by storing the defaults as if they were chosen.
+    -- them, every save writes one more row, routes/me.py's SEEDED (`_seeded`): the preferences the
+    -- app has carried over from the main page, comma-separated - every key there is, since a save
+    -- comes after the carrying over. A "1" there, from before 2.0.0-player.41, means the two there
+    -- were then, get_mode and quality_floor; routes/me.py's `_unseeded` reads it, and the app
+    -- carries over once what is left (Format, for a user seeded before it) - never by storing the
+    -- defaults as if they were chosen.
     user        TEXT NOT NULL,
     key         TEXT NOT NULL,
     value       TEXT NOT NULL,
