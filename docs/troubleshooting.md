@@ -269,7 +269,8 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
 - **An empty library** when you know it isn't empty usually means the volume isn't mounted in
   the container. Settings → Library shows whether the path exists.
 - **A change made by another program doesn't show up**: tags edited elsewhere don't change a
-  folder's date, which is what the library watches. Press **Rescan**.
+  folder's date, which is what the library watches. Press **Rescan** (in the app on a desktop:
+  **Managing → Library care**).
 
 ## Lots of albums say "Folder off-convention"
 
@@ -289,15 +290,20 @@ since 1.0.2 are filed under the album's year.
 
 The Cover Art Archive has no front cover for that release. It's a fact about the release, not
 a failure. Pick a different release in the metadata editor if a sibling pressing has one. If it
-says the request **failed**, the Archive was unreachable; try again later.
+says the request **failed** (*the Cover Art Archive couldn't be reached - try again*, or *the cover
+couldn't be downloaded*), the Archive was unreachable or answered with an error - it goes away for
+minutes at a time; try again later. Before 2.0.0-player.42 an Archive that was down was reported as
+having no cover.
 
 ## Lyrics are missing, or land late
 
 - LRCLIB doesn't have every song, and instrumentals get no `.lrc` by design. When LRCLIB is under
   load it asks clients to back off, and a track is retried a few times before it's counted as
   failed; **Get lyrics** tries again.
-- If lines light up a beat after they're sung, set `LYRICS_LEAD_MS` (try `300`) and press
-  **Re-time saved lyrics**.
+- If lines light up a beat after they're sung, set `LYRICS_LEAD_MS` (try `300`), save, and press
+  **Re-time saved lyrics** beside it - on the main page's Settings tab, or in the app's **Managing →
+  Settings**, under **Library**. It's refused while the lead has an unsaved change ("Save the new lead
+  first."), since it re-times to the saved lead.
 
 ## A song shows a different picture from its album
 
@@ -484,12 +490,16 @@ finds it](library.md#editing-an-album-in-the-app)). What it says when it can't:
 - **"deadwax has no folder of this album: Navidrome knows it by a MusicBrainz release no folder in
   the library is tagged with"**: the files Navidrome scanned carry a release id that no folder in the
   library has - usually an album added by another program since the library was last read, or a
-  Navidrome looking at a different folder from `LIBRARY_PATH`. **Look again** reads the library again;
-  if that doesn't find it, check the two paths point at the same music.
+  Navidrome looking at a different folder from `LIBRARY_PATH`. **Look again** reads the library again.
+  If its tags were changed by another program, **Rescan** (**Managing → Library care**) first - a
+  retag in place isn't noticed otherwise. Or **Choose the folder** and pick it from the list. If it
+  isn't there at all, check the two paths point at the same music.
 - **"deadwax can't tell which folder this album is: Navidrome knows it by no MusicBrainz release, and
   no untagged folder in the library has its name"**: the album's name or artist in Navidrome isn't the
-  one in its files' tags as deadwax reads them, or its folder does carry a release id. **Open the main
-  page** and find it in the Library tab, where its editor works the same.
+  one in its files' tags as deadwax reads them, or its folder does carry a release id. **Choose the
+  folder** lists every folder in the library's scan; type part of its name, artist or folder to narrow
+  the list, and click the one this album is - the panel edits that folder from then on (until the next
+  **Edit**). Until 2.0.0-player.42 the only way on was the main page's Library tab.
 - **"Which one is it?"**, with a list of folders: more than one untagged folder has the album's name
   and artist (its number of tracks didn't tell them apart). Pick the one this page plays.
 - **"The library's scan doesn't list … yet"**: the store knows the folder but the library's last scan
@@ -522,6 +532,32 @@ album with an issue you haven't accepted, and every album deadwax filed that nob
   the page once the page has read the library.
 - **The page is missing on a phone**: it's a short note there, pointing at the main page, which has
   the same queue (**Review N**). There's no editor on a phone yet.
+
+## Ignored albums come back to the review queue
+
+**It's fine as it is** saves which issues you accepted in deadwax's database. When deadwax couldn't
+open it (`DB_PATH` - the log says "could not open the job store" as deadwax starts), nothing can be
+kept: the album comes back on the next read. The main page's Library tab says so under its views
+("ignores can't be saved"), and the app's **Needs a look** says so above its list ("Ignores can't be
+saved: deadwax couldn't open its job store (DB_PATH)…"). Check `DB_PATH` and that the folder it's in
+can be written as `PUID`/`PGID`, then restart deadwax.
+
+## Library care's runs don't do what I expect
+
+- **No Get covers · N, Get CD art · N or Get lyrics · N**: nothing in the library (or among the folders
+  **Narrow to** matches) needs one - each run says so - or the page is still on the saved scan
+  (*Checking the library…*): the runs are offered once the disk has been read. A run that has just
+  saved something says *Checking the library…* too, for the moment it takes to read the library again.
+- **"had none on the Archive"** / **"had none to find"**: the Cover Art Archive (and, for CD art,
+  fanart.tv) answered that it has no picture for that release - a fact about the release.
+  **"failed - try those again"**: the request didn't get an answer - the Archive couldn't be reached
+  or answered with an error, as it does for minutes at a time - so run it again later. Both stay in
+  the next run's count, since neither album has its picture yet.
+- **Lyrics counted in tracks**: "not on LRCLIB or instrumental" is final; "failed" is worth another
+  go. An album that already has some lyrics isn't offered - finish it from its own **Get lyrics**, in
+  its Edit panel.
+- **A run's words went**: they're kept while the app stays open, also on another page; a reload
+  forgets them.
 
 ## The app's Log is missing lines, says "The stream was lost", or starts empty
 

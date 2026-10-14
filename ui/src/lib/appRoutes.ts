@@ -20,6 +20,8 @@
  *   #/<tab>/settings/server                            the server's settings (2.0.0-player.33), and
  *   #/<tab>/log/all                                    the event log - pushed on You, one page each,
  *                                                      as the queue page is
+ *   #/<tab>/care/library                               Library care (2.0.0-player.42): Rescan and the
+ *                                                      bulk runs - pushed on You, one page, as they are
  *
  * The player's old `#/album/<id>` links still open: they are the Library's album, and the address
  * is rewritten to `#/library/album/<id>` in place. An empty hash is Home.
@@ -55,10 +57,11 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
 
 /** What a page can be: an album in the library (Navidrome's id), a MusicBrainz release group -
  *  the album you don't have (2.0.0-player.13) - an artist (2.0.0-player.17), Needs a look, the
- *  review queue (2.0.0-player.25), or the server's settings or the event log (2.0.0-player.33). */
-export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log'
+ *  review queue (2.0.0-player.25), the server's settings or the event log (2.0.0-player.33), or
+ *  Library care (2.0.0-player.42). */
+export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log' | 'care'
 
-const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log']
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log', 'care']
 
 /** There is one queue page: its id is always this. */
 export const QUEUE_ID = 'all'
@@ -74,8 +77,12 @@ export const SETTINGS_PAGE: Page = { kind: 'settings', id: SETTINGS_ID, label: '
 export const LOG_ID = 'all'
 export const LOG_PAGE: Page = { kind: 'log', id: LOG_ID, label: 'Log' }
 
+/** Library care (2.0.0-player.42): Rescan and the bulk runs - one page, whatever id an address gives it. */
+export const CARE_ID = 'library'
+export const CARE_PAGE: Page = { kind: 'care', id: CARE_ID, label: 'Library care' }
+
 /** The Managing pages that are one page each, by kind: an address's id is made this one. */
-const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID }
+const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID, care: CARE_ID }
 
 /** A page pushed on a tab. `label` names it on the back button of a page pushed over it - never
  *  part of the address, and never part of what makes two pages the same one. `release` is a group

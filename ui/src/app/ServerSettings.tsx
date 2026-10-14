@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 
 import { getServerSettings, saveServerSettings, type ServerSetting, type ServerSettings as Settings, type SettingUpdate } from '../api/settings'
 import { OrganizeModes, OrganizingVerdict, ServerGroup, editedEnvDraft, tabForGroup, tabMarks, type SettingsTab } from '../components/SettingsView'
+import { RetimeLyrics } from '../components/RetimeLyrics'
 import { SERVER_TABS, SETTINGS_PHONE, draftsAfterSave, serverTabAfter } from '../lib/serverSettings'
 import { isAbort, latestOnly } from '../lib/latest'
 import { ChevronLeftIcon } from '../player/icons'
@@ -51,8 +52,11 @@ export function forgetServerSettingsPage(): void {
  * Save is the screen's one solid purple button.
  *
  * NOT here, on purpose: the main page's browser preferences (search, candidates, auto-grab, the
- * interface) - they are that page's, kept in that browser - and Re-time lyrics, a bulk run. One line
- * says so, with the main page beside the app.
+ * interface) - they are that page's, kept in that browser. One line says so, with the main page beside
+ * the app. RE-TIME SAVED LYRICS is here since 2.0.0-player.42, beside LYRICS_LEAD_MS as on the main
+ * page (components/RetimeLyrics.tsx, the tab's own, moved where both can draw it): refused while the
+ * lead has a draft - it re-times to the SAVED lead - reading a real scan, its run kept in its module so
+ * it goes on (and can be stopped) when this page goes.
  *
  * Read the first time the page shows, and again each time it comes back into view WITH NO UNSAVED
  * DRAFT - a volume just fixed shows as fixed, and a draft is never read over; never at start-up. Each
@@ -226,8 +230,7 @@ export function ServerSettings({
       <div class="app-settings-body">
         <p class="app-settings-line">
           What deadwax itself runs with, from your compose file or <code>.env</code>. Changing one here stores an override
-          that wins over the environment and applies without a restart. This browser's preferences and re-timing saved
-          lyrics are on{' '}
+          that wins over the environment and applies without a restart. This browser's preferences are on{' '}
           <a class="app-queue-link" href="/" target="_blank" rel="noopener">
             the main page
           </a>
@@ -274,7 +277,10 @@ export function ServerSettings({
             <div id="app-settings-panel" class="app-settings-panel" role="tabpanel" aria-labelledby={`app-settings-tab-${tab}`}>
               {tab === 'library' && <OrganizingVerdict organizing={server.organizing} />}
               {groups.map((group) => (
-                <ServerGroup key={group.id} group={group} server={server} draftEnv={draftEnv} onEdit={edit} onRevert={revert} />
+                <ServerGroup key={group.id} group={group} server={server} draftEnv={draftEnv} onEdit={edit} onRevert={revert}>
+                  {/* beside the lead, as on the main page's tab - refused while the lead is a draft */}
+                  {group.id === 'lyrics' && <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />}
+                </ServerGroup>
               ))}
               {tab === 'library' && <OrganizeModes modes={server.organize_modes} />}
             </div>

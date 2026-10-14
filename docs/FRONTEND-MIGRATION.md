@@ -31,9 +31,13 @@ move. Cross-tree DOM writes go in the shell, synchronously.
 artist/album names hand off to the vanilla search rather than reimplementing it. It retires
 when the search view is ported.
 
-**What the one app still lacks before the main page can retire** (2.0.0-player.33): the bulk runs
-(covers, CD art, lyrics, re-timing lyrics), artist images and re-filing an artist (**Move albums to
-…**), and an editor on the phone. Editing one album - its release, its tags, its cover, CD art and
+**What the one app still lacks before the main page can retire** (2.0.0-player.42): artist images
+and re-filing an artist (**Move albums to …**), and an editor on the phone. Rescan and the bulk runs
+(covers, CD art, lyrics) are the desktop's **Library care** since 2.0.0-player.42, over the target rules
+both pages take from `lib/bulkTargets.ts`, and **Re-time saved lyrics** is on its Server settings page
+(`components/RetimeLyrics.tsx`, the settings tab's own, moved where both draw it); the Edit panel's
+"can't tell which folder" case chooses the folder from the scan rather than sending you to the main
+page. Editing one album - its release, its tags, its cover, CD art and
 lyrics, deleting it - is in the app on a desktop since 2.0.0-player.21, the review queue since
 2.0.0-player.25 (**Needs a look**: stepping the editor through the albums that need a look, ignoring
 and un-ignoring, the New count, with a count in the sidebar and You), and the server settings and

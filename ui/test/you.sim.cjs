@@ -18,6 +18,8 @@
  *  - The link to the main page opens beside the app.
  *  - On a desktop (2.0.0-player.25), "Albums that need a look" in Managing, with its count (none
  *    drawn while it isn't known), above that link and going to the queue's page; on a phone no row.
+ *    Under it (2.0.0-player.42) "Library care", then (.33) "Server settings" and "Log", each opening its
+ *    page; the desktop's footnote names only what is still the main page's: artist images, re-filing.
  *  - Playback holds Gapless, then "Now Playing opens as" (2.0.0-player.11), then Maximum quality:
  *    Gapless is handed the player itself - the object whose setGapless its tap calls - the look
  *    the setting App keeps and App's way to change it, and the notes say where the button that
@@ -617,9 +619,10 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     const opened = []
     draw({ shown: true, current: true, ...LOOK, desktop: true, needsLook: 3, onNeedsLook: () => opened.push(true) })
     const order = find(byClass('app-link-row')).map(text)
-    //? (2.0.0-player.33) Server settings and Log between it and the link to the main page
+    //? (2.0.0-player.33) Server settings and Log between it and the link to the main page - and (.42)
+    //? Library care first of them
     check('a desktop: "Albums that need a look" with its count, above the link to the main page',
-      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order[3]],
+      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order[4]],
       ['Albums that need a look', '3', 'Albums that need a look, 3 albums', true, 'Open the main page'])
     row().props.onClick()
     check('...a tap goes to its page', opened, [true])
@@ -636,13 +639,19 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     check('a phone: neither row - only the link to the main page', rows(), ['Open the main page'])
     const opened = []
     draw({ shown: true, current: true, ...LOOK, desktop: true, needsLook: 2, onNeedsLook: () => {}, onManaging: (kind) => opened.push(kind) })
-    check('a desktop: under "Albums that need a look", Server settings then Log, then the main page', rows().map((words) => words.replace(/\d+$/, '')),
-      ['Albums that need a look', 'Server settings', 'Log', 'Open the main page'])
+    check('a desktop: under "Albums that need a look", Library care, Server settings then Log, then the main page', rows().map((words) => words.replace(/\d+$/, '')),
+      ['Albums that need a look', 'Library care', 'Server settings', 'Log', 'Open the main page'])
     const button = (words) => find((node) => node.type === 'button' && text(node) === words)[0]
+    button('Library care').props.onClick()
     button('Server settings').props.onClick()
     button('Log').props.onClick()
-    check('...each opening its page', opened, ['settings', 'log'])
+    check('...each opening its page', opened, ['care', 'settings', 'log'])
     check('...and the footnote no longer says settings and the log are on the main page', footnotes().some((words) => /settings|the log/i.test(words)), false)
+    //? (2.0.0-player.42) nor the bulk runs: what is left there is artist images and re-filing an artist
+    check('...nor the bulk runs - only artist images and re-filing an artist', [footnotes().some((words) => /bulk/i.test(words)), footnotes().some((words) => words.includes('Artist images and re-filing an artist are on the main page for now.'))],
+      [false, true])
+    draw({ shown: true, current: true, ...LOOK })
+    check('...and a phone still has no Library care row', rows().includes('Library care'), false)
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

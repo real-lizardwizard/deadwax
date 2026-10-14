@@ -710,6 +710,9 @@ Capitalist".
   bulk covers. **It reads a REAL scan, not the snapshot**: writing a `.lrc` forgets that album
   from the saved scan, so a snapshot after an earlier run is missing exactly the albums that run
   touched - measured, 87 tracks of 104 on a second run.
+  Since 2.0.0-player.42 the same component (`components/RetimeLyrics.tsx`) is on the app's Server
+  settings page too, under the lyrics group, and its run is kept in its module so it outlives the page
+  that draws it (notes/app-desktop.md "Looking after the library").
 - **Verified** in the real page on the scratch library: a 300ms lead re-timed 102 files written
   by 0.7.0 ("Roads" 50.30 -> 50.00), then both "Wandering Star"s once matching used every entry;
   a file edited by hand stayed byte-for-byte; a second and third run changed nothing and covered

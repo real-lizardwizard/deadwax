@@ -53,6 +53,12 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   their own class names under `.app-settings` (this page loads no main.css); fields iOS won't zoom into
   and a finger's targets where the pointer is coarse; the log's words broken anywhere, its errors red and
   warnings amber; long values and paths broken, never run out; both pages clear of a drawer.
+- Looking after the library (2.0.0-player.42), with no board: Library care kept to the Managing pages'
+  readable width and clear of a drawer, its parts cards, its words broken anywhere, no solid purple, its
+  field a finger's and never small enough for iOS to zoom into, each run's words a live region drawn
+  even while empty; "Choose the folder"'s field the Edit panel's well and its folders a finger's target,
+  their focus rings drawn inside the panel's clipping body, no link to the main page left in the panel;
+  Needs a look's warning amber; Re-time saved lyrics in Server settings, the tab's own classes styled here.
 """
 
 import re
@@ -66,6 +72,8 @@ THEME = (REPO / "interface" / "styles" / "theme.css").read_text()
 FRAME = (REPO / "ui" / "src" / "lib" / "appFrame.ts").read_text()
 APP = (REPO / "interface" / "player" / "app.css").read_text()
 SRC = REPO / "ui" / "src"
+#? the token a ring drawn inside a clipping box takes (app.css)
+APP_TOKENS_RING = "--app-ring-inset: calc(-1 * var(--app-ring));"
 
 DESK = "@media (min-width: 1024px)"
 COLUMN = "@media (min-width: 1280px)"
@@ -564,8 +572,9 @@ def test_a_tick_box_is_a_fingers_target_where_the_pointer_is_coarse():
     assert (hit["min-width"], hit["min-height"], hit["display"]) == ("var(--app-desk-edit-tick)", "var(--app-desk-edit-tick)", "flex")
     assert declarations(DESKTOP, ".app-desk .app-edit-tracks .app-edit-tick", DESK)["width"] == \
         "calc(var(--app-desk-edit-tick) + 2 * var(--app-desk-cell-gap))"
+    #? (2.0.0-player.42: the link to the main page's library is gone - "Choose the folder" took its place)
     for selector in (".app-desk .app-edit-choice", ".app-desk .app-edit .tags-tracks > summary", ".app-desk .app-edit .tags-revert",
-                     ".app-desk .app-edit .metadata-issue-undo", ".app-desk .app-edit-link"):
+                     ".app-desk .app-edit .metadata-issue-undo"):
         assert declarations(DESKTOP, selector, COARSE)["min-height"] == "var(--pl-hit)", selector
     #? and the box sits in its label in the markup
     panel = (SRC / "app" / "EditPanel.tsx").read_text()
@@ -719,3 +728,96 @@ def test_the_speeds_chip_sits_in_the_bars_tools_at_their_height():
     #? the tools hold their buttons at the row's right end, so the chip coming and going moves none of them
     assert declarations(DESKTOP, ".app-desk .app-playbar-tools", DESK)["justify-content"] == "flex-end"
 
+
+
+# ---------------------------------------------------------------- looking after the library (2.0.0-player.42)
+
+def test_library_care_keeps_to_the_managing_pages_width_and_clear_of_a_drawer():
+    body = declarations(DESKTOP, ".app-desk .app-care-body", DESK)
+    assert body["max-width"] == declarations(DESKTOP, ".app-desk .app-settings-body", DESK)["max-width"]
+    assert body["padding"] == declarations(DESKTOP, ".app-desk .app-settings-body", DESK)["padding"]
+    assert declarations(DESKTOP, ".app-desk.has-drawer .app-care-body", DESK)["max-width"] == \
+        "calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap))"
+    #? each part a card, as a settings group is
+    card = declarations(DESKTOP, ".app-desk .app-care-section", DESK)
+    assert (card["background"], card["border-radius"], card["min-width"]) == ("var(--dw-card)", "var(--dw-radius-card)", "0")
+
+
+def test_library_cares_words_break_and_it_has_no_solid_purple_button():
+    """A folder typed into the field, a stranger's album name in a summary: broken, never run out. And
+    nothing on the page asks to be pressed above the rest - its buttons are STYLE.md's secondary ones."""
+    for selector in (".app-desk .app-care-line", ".app-desk .app-care-note", ".app-desk .app-care-facts",
+                     ".app-desk .app-care-result", ".app-desk .app-care-problem", ".app-desk .app-care-state"):
+        assert declarations(DESKTOP, selector, DESK)["overflow-wrap"] == "anywhere", selector
+    page = (SRC / "app" / "LibraryCare.tsx").read_text()
+    assert "is-primary" not in page and "app-primary" not in page
+    assert page.count('class="app-button app-care-button') == 3
+    for _where, selector, values in rules(DESKTOP):
+        if "app-care" in selector:
+            assert "--dw-primary-bg" not in values.get("background", ""), selector
+    #? a run's busy ring is the player's own, and the words focus goes to as a run's button goes draw no ring
+    assert declarations(DESKTOP, ".app-desk .app-care-spin", DESK)["animation"] == "pl-spin var(--app-desk-spin-time) linear infinite"
+    assert declarations(DESKTOP, ".app-desk .app-care-result:focus", DESK)["outline"] == "none"
+
+
+def test_a_runs_words_are_drawn_while_empty_so_a_screen_reader_hears_them_arrive():
+    """Each run's result is a live region (role="status"), empty until the run ends. VoiceOver reads a region
+    only once it is already there - a hidden one isn't - so empty it takes no room by giving back the row's
+    gap before it (as app-rg-store does), never by `display: none` (review: it was hidden until its words
+    came, in the same moment)."""
+    empty = declarations(DESKTOP, ".app-desk .app-care-result:empty", DESK)
+    assert "display" not in empty and "visibility" not in empty
+    assert empty["margin-top"] == "calc(-1 * var(--app-desk-care-row-gap))"
+    assert declarations(DESKTOP, ".app-desk .app-care-run", DESK)["gap"] == "var(--app-desk-care-row-gap)"
+    page = (SRC / "app" / "LibraryCare.tsx").read_text()
+    assert re.search(r'class="app-care-result"\s+role="status"', page)
+    #? and the result is the run's last part, so the gap given back is the one before it
+    assert page.index('class="app-care-result"') > page.index("planWords(kind")
+
+
+def test_library_cares_field_and_controls_are_a_fingers_where_the_pointer_is_coarse():
+    field = declarations(DESKTOP, ".app-desk .app-care-input", DESK)
+    assert (field["background"], field["height"], field["min-width"]) == ("var(--dw-well)", "var(--app-desk-control)", "0")
+    assert declarations(DESKTOP, ".app-desk .app-care-button", DESK)["min-height"] == "var(--app-desk-control)"
+    assert media_tokens(DESKTOP, COARSE)["--app-desk-control"] == "var(--pl-hit)"
+    assert declarations(DESKTOP, ".app-desk .app-care-input", COARSE)["font-size"] == "var(--dw-text-body)"
+    assert declarations(DESKTOP, ".app-desk .app-care .app-text-button", COARSE)["min-height"] == "var(--pl-hit)"
+
+
+def test_choose_the_folders_field_is_the_panels_well_and_its_folders_a_fingers():
+    """The Edit panel's "Choose the folder": its field the panel's own well (a finger's height and 17px where
+    the pointer is coarse), each folder the "Which one is it?" list's button - and no link to the main page
+    is left in the panel."""
+    well = declarations(DESKTOP, ".app-desk .app-edit-pick-input", DESK)
+    assert (well["background"], well["height"]) == ("var(--dw-well)", "var(--app-desk-edit-control)")
+    assert media_tokens(DESKTOP, COARSE)["--app-desk-edit-control"] == "var(--pl-hit)"
+    assert declarations(DESKTOP, ".app-desk .app-edit-pick-input", COARSE)["font-size"] == "var(--dw-text-body)"
+    assert declarations(DESKTOP, ".app-desk .app-edit-choice", COARSE)["min-height"] == "var(--pl-hit)"
+    assert 'class="app-edit-choice app-edit-pick-choice"' in (SRC / "app" / "FolderPicker.tsx").read_text()
+    panel = (SRC / "app" / "EditPanel.tsx").read_text()
+    assert "<FolderPicker" in panel
+    assert 'href="/"' not in panel and "app-edit-link" not in panel and "app-edit-link" not in DESKTOP
+
+
+def test_choose_the_folders_rings_are_drawn_inside_the_panels_clipping_body():
+    """The panel's body clips sideways (overflow-x hidden, no side padding), and the field and each folder run
+    to its edges: a ring drawn outside was cut off at the field's right and both sides of every folder
+    (review). Inside, by --app-ring-inset, with a class more than the panel's ring rule, which would win
+    otherwise."""
+    body = declarations(DESKTOP, ".app-desk .app-edit-body", DESK)
+    assert body["overflow-x"] == "hidden" and "padding" not in body
+    ring = declarations(DESKTOP, ".app-desk .app-edit button:focus-visible", DESK)
+    assert ring["outline-offset"] == "var(--app-ring)"
+    for selector in (".app-desk .app-edit .app-edit-pick-input:focus-visible", ".app-desk .app-edit .app-edit-choice:focus-visible"):
+        assert declarations(DESKTOP, selector, DESK)["outline-offset"] == "var(--app-ring-inset)", selector
+    assert APP_TOKENS_RING in APP
+
+
+def test_needs_a_looks_warning_is_amber_and_retime_is_styled_in_server_settings():
+    warning = declarations(DESKTOP, ".app-desk .app-queue-warning", DESK)
+    assert (warning["color"], warning["background"]) == ("var(--dw-amber-text)", "var(--dw-tint-amber)")
+    button = declarations(DESKTOP, ".app-desk .app-settings .settings-retime .win-button", DESK)
+    assert (button["min-height"], button["background"]) == ("var(--app-desk-control)", "var(--dw-secondary-bg)")
+    assert declarations(DESKTOP, ".app-desk .app-settings .settings-retime-note", DESK)["overflow-wrap"] == "anywhere"
+    assert declarations(DESKTOP, ".app-desk .app-settings .loading-blocks::before", DESK)["animation"] == \
+        "pl-spin var(--app-desk-spin-time) linear infinite"

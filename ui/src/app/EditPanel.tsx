@@ -21,6 +21,7 @@ import { isAbort, latestOnly } from '../lib/latest'
 import type { FolderChange } from '../lib/needsLook'
 import { tickTracks } from '../lib/tagEdit'
 import { CloseIcon } from '../player/icons'
+import { FolderPicker } from './FolderPicker'
 import { useSheet } from './useSheet'
 
 /** An Edit pressed on an album page: the album as the page had it, and a new number each time, so
@@ -157,7 +158,11 @@ function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean })
  * taken only from the real one - and read again underneath on every Edit after, the album taken from
  * the scan in hand at once and followed to the fresh one when it lands. Several found by name alone,
  * and the user says which; a set kept one folder per disc starts on the first, the others a choice
- * away. The album is HELD as the album itself, set once, and updated explicitly from the array a
+ * away. NONE found - by release or by name - and the user can CHOOSE THE FOLDER from the scan
+ * (2.0.0-player.42: a list of its folders, narrowed by typing - lib/albumEdit.ts folderChoices): the one
+ * chosen is the subject from then on, as a folder request's is (`folderOnly`), for the rest of that Edit
+ * - where the panel's one way on was a link to the main page's library. The album is HELD as the album
+ * itself, set once, and updated explicitly from the array a
  * reload resolves with - never derived from the list a write reloads (the main page's lesson: a rename
  * landed as two commits, and between them neither path resolved). What the body says instead of an
  * album is lib/albumEdit.ts's editStatus.
@@ -233,6 +238,10 @@ export function EditPanel({
   //? that changed underneath it)
   const [editingTags, setEditingTags] = useState<{ path: string; filenames: string[] } | null>(null)
   const [deleted, setDeleted] = useState<string | null>(null)
+  //? "Choose the folder" (2.0.0-player.42): the folder chosen from the scan for the Edit it was chosen
+  //? in, and the list open to choose from (what has been typed to narrow it)
+  const [chosen, setChosen] = useState<{ key: number; path: string } | null>(null)
+  const [picking, setPicking] = useState<{ key: number; typed: string } | null>(null)
   const afterWrites = useMemo(latestOnly, [])
   const follows = useMemo(latestOnly, [])
   //? every write the panel makes, counted: a read of the library begun before one is older than what
@@ -328,6 +337,8 @@ export function EditPanel({
     setTicked(null)
     setEditingTags(null)
     setDeleted(null)
+    setChosen(null)
+    setPicking(null)
     lookUp(request)
     if (!library.loaded || library.loading) return
     //? a step through the queue: the scan in hand is the one the session began on
@@ -373,11 +384,13 @@ export function EditPanel({
     follows.supersede()
   }, [])
 
+  //? the folder chosen from the scan, for this Edit: from then on the subject's folder, as a folder request's
+  const chosenPath = request && chosen?.key === request.key ? chosen.path : null
   const folders = useMemo(
     () => (request && asked && libraryReady
-      ? (isFolderRequest(request) ? folderOnly(request.folder) : editFolders(answer, library.albums, request.album))
+      ? (chosenPath ? folderOnly(chosenPath) : isFolderRequest(request) ? folderOnly(request.folder) : editFolders(answer, library.albums, request.album))
       : null),
-    [request, asked, libraryReady, answer, library.albums],
+    [request, asked, libraryReady, answer, library.albums, chosenPath],
   )
 
   //? the album, once its folder is known and the real scan is in - taken once, and again should a
@@ -403,11 +416,31 @@ export function EditPanel({
     scrollTop()
   }
 
-  /** The album as a reload has it: followed to its new folder only while it is still the one shown. */
+  /** The album as a reload has it: followed to its new folder only while it is still the one shown -
+   *  and a folder chosen from the scan followed with it. */
   const follow = (fresh: readonly LibraryAlbum[], oldPath: string, newPath = oldPath): LibraryAlbum | null => {
     const updated = fresh.find((album) => album.path === newPath) ?? null
-    if (updated) setSubject((current) => (current && current.path === oldPath ? updated : current))
+    if (updated) {
+      setSubject((current) => (current && current.path === oldPath ? updated : current))
+      if (newPath !== oldPath) setChosen((was) => (was && was.path === oldPath ? { ...was, path: newPath } : was))
+    }
     return updated
+  }
+
+  /** "Choose the folder": the list opened, focus into its field once it has drawn. */
+  const openPicker = () => {
+    if (!request) return
+    setPicking({ key: request.key, typed: '' })
+    focusNext.current = () => box.current?.querySelector<HTMLElement>('.app-edit-pick-input')
+  }
+
+  /** A folder chosen from the scan: the subject from now on, for this Edit. */
+  const pickFolder = (path: string) => {
+    if (!request) return
+    setChosen({ key: request.key, path })
+    setPicking(null)
+    chooseFolder(path)
+    focusNext.current = toTab(tab)
   }
 
   /** The id the Edit a write was made under names the album by now: App moves it with the page. */
@@ -608,6 +641,8 @@ export function EditPanel({
   }) : null
 
   const choosing = !!folders && needsChoice(folders) && !subject && !deleted
+  //? "Choose the folder"'s list, while it is open for this Edit
+  const pickingNow = request && picking?.key === request.key ? picking : null
   //? where the album sits in the queue, when it was opened from Needs a look
   const queue = isFolderRequest(request) ? request.queue : undefined
 
@@ -672,10 +707,11 @@ export function EditPanel({
                   Look again
                 </button>
               )}
-              {status.mainPage && (
-                <a class="app-edit-link" href="/" target="_blank" rel="noopener">
-                  Open the main page
-                </a>
+              {/* no folder found: the user chooses it from the scan (2.0.0-player.42) */}
+              {status.choose && !pickingNow && (
+                <button type="button" class="app-edit-button" onClick={openPicker}>
+                  Choose the folder
+                </button>
               )}
               {/* deleted from Needs a look: the queue goes on from here */}
               {deleted && queue && queue.position < queue.total && (
@@ -684,6 +720,15 @@ export function EditPanel({
                 </button>
               )}
             </div>
+          )}
+
+          {pickingNow && status?.choose && (
+            <FolderPicker
+              albums={library.albums}
+              typed={pickingNow.typed}
+              onType={(typed) => setPicking((was) => (was ? { ...was, typed } : was))}
+              onPick={pickFolder}
+            />
           )}
 
           {choosing && (
@@ -916,7 +961,7 @@ function LyricsTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void 
         </p>
         <GetLyricsButton album={album} onDone={onDone} class="app-edit-button" />
         {album.lyrics_count >= album.track_count && <p class="app-edit-note">Every track has lyrics.</p>}
-        <p class="app-edit-note">The lyrics lead, and re-timing what is saved, are in the main page's settings.</p>
+        <p class="app-edit-note">The lyrics lead, and re-timing the lyrics already saved, are in Managing's Settings, under Library.</p>
       </section>
     </div>
   )

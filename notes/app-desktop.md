@@ -822,3 +822,225 @@ drafts: identical), and init.js ignores the new fields on an event.
   ended; Cleared kept through leaving; no console error, no dialog.
   After the rebase onto 2.0.0-player.32 the merged tree is 2373 Python tests (the four of "Loading,
   audited" joining) and `app-rules` 269 checks, every sim passing and the engine guard empty.
+
+### Looking after the library (2.0.0-player.42)
+
+James (2026-10-14): "Finish the web app". The parity audit (`uplan/parity-audit.json`, its "library"
+and "manage" areas) found the main page's library care missing from the app: Rescan, the bulk runs,
+re-timing lyrics, the queue's warning that ignores can't be saved, and the Edit panel's one way on for
+an album it can't find a folder for being a link to the main page. Desktop only (1024px and up); the
+phone is decided separately. The spec is `uplan/slice-library-care.md`. There is no board; it is the
+Managing pages' parts and STYLE.md. Built beside 2.0.0-player.41 (Get parity) and landing after it.
+
+- **Where it is**: the sidebar's Managing gains **Library care** straight after Needs a look
+  (`SIDEBAR_CARE`, `SidebarId` 'care', current while its page is on top), and You's Managing a desktop
+  row of the same name under "Albums that need a look" - both an admin's, as the others. The route is
+  `#/you/care/library` (`PageKind` 'care', `CARE_ID`, `CARE_PAGE` labelled "Library care", one page:
+  `ONE_PAGE`), a sibling of Needs a look, Settings and Log (`MANAGING_KINDS`, `openManagingPage`:
+  one replaces another, never piles up). `ManagingKind` ('care' | 'settings' | 'log') names what
+  `openManaging` and You's `onManaging` take. The main page's link (sidebar title, You's footnote) now
+  names only artist images and re-filing.
+- **The page: `app/LibraryCare.tsx`**, its words `lib/libraryCare.ts` (pure), its runs
+  `app/useLibraryCare.ts`. The library through the main page's own `useLibrary(desktop && live)` -
+  the saved scan at once, a real one underneath - read only once it shows (App's `managingLive`), read
+  again quietly as it shows again with nothing under way. Two cards:
+  - **Rescan**: `reload(true)` (POST /library/rescan), refused (aria-disabled) while ours is out or a
+    plain read over a real scan is - and offered while the saved scan is on screen with the first real
+    one under way, as the main page offers it (`disabled={loading && !stale}`; useLibrary draws only the
+    newest answer, so the rescan wins); once it answers the library's listeners are told
+    (`announceAlbumsFiled` - the count, the owned marks, the Edit panel's and Needs a look's scans: a
+    retag elsewhere moves all of them). Under it what the scan holds and how old it is, as the main
+    page's status bar says them (`scanTotals`: albums grouped as the main page groups them, tracks,
+    size; `scanAge`: "Saved scan from…" with "· checking for changes" while the real scan runs,
+    "Scanned 3 min ago in 2s", "Rescanning - reading every file again…" while ours is out - a plain
+    scan under way is never called a rescan), a status region; and `RESCAN_WORDS`, what it is for.
+  - **The bulk runs**: Covers, CD art, Lyrics - each a row with its heading, its button
+    (`BULK_LABELS` · N, the main page's words), what it will act on before it starts (`planWords`:
+    how many album FOLDERS - as `scopeLine` counts them, beside the scan line's grouped albums - which,
+    where - "in the whole library" or "among the folders matching “x”" - and what it writes, CD art by
+    the names `disc_art_filename` gives), and what the last run did (`bulkSummary`, a status region,
+    empty until a run ends - and drawn even then, taking no room: the row's gap given back by a
+    negative margin, as `app-rg-store` does, since VoiceOver reads only a region already there).
+    **Narrow to** (`narrowAlbums`: every word typed somewhere in the folder's artist, album,
+    edition or path, accents and case aside - `lib/typedMatch.ts`) decides what the runs act on,
+    `scopeLine` saying so; the main page narrows by its tree's filter and facets, which the app has no
+    tree for, so typed words it is. **Offered only from a REAL scan** (`loaded && !stale`): the saved
+    one can be behind what is on disk ("Checking the library…" meanwhile) - stricter than the main
+    page, which offers them over the saved scan.
+- **The targets are `lib/bulkTargets.ts`'s, on BOTH pages**: `coverTargets` (a release, no cover),
+  `discTargets` (a release, none of deadwax's own `disc*` - a download's `cd.jpg` doesn't count),
+  `lyricsTargets` (no lyrics at all); LibraryView.tsx now takes them (its only diff besides the import),
+  and care.sim holds them to the main page's inline rules as they stood, over 108 combinations - same
+  albums, same order. The main page's loops and status bar are untouched.
+- **A run** (`runBulk`): one album at a time - the next only once the last has answered, a plain
+  `for` with an `await` - through the route a single click uses (`fetchCoverArt`, `fetchDiscArt`,
+  `fetchLyrics`), never a loop of its own on the server (notes/decisions.md); Stop asked before each
+  album, landing after the one being fetched ("Stopping after 3 of 12", aria-disabled); what each came
+  to counted apart (`addOutcome`): a 404 none to find, anything else failed; lyrics in TRACKS (saved,
+  not on LRCLIB or instrumental, failed - a lookup that failed outright counts its album's tracks,
+  `failedAs`), as the main page counts. `bulkSummary` is the main page's status bar's template, word
+  for word (held to it in care.sim). Each kind runs on its own, as on the main page.
+- **The runs outlive the page** (`app/useLibraryCare.ts`, a module store with listeners, as the
+  server settings' drafts and the log's lines are): App draws only a tab's top page, so the sidebar's
+  Log or Settings, Back, Go to album would unmount it, and a run over a whole library takes minutes.
+  Kept there, a run goes on while you look at the Log, its Stop still works when you come back, and
+  each run's result stays until the next of its kind (and the narrowing with them) - until a reload.
+  One of a kind at a time (asked again while running, nothing); each kind through a latestOnly() of its
+  own, so nothing of an older run (`forgetLibraryCare`, the sims') is drawn over a newer; the library
+  told once at a run's END, only when something was written (the main page reloads once at its end).
+  **A run that wrote leaves its kind `behind`** (set in the same telling as its end): the scan the page
+  holds still lists what it just did as missing, so the page reads the library again at once (as the
+  main page does after a run) and holds that kind's button back ("Checking the library…") until a read
+  begun after the run ended has landed - its own read answered and no newer one out (useLibrary draws
+  only the newest), `caughtUp` - never drawing it again over the albums it just did. A page drawn fresh
+  begins every read after any run that ended while it was away, so it clears `behind` as it mounts. A
+  catch-up read that fails lets go too (the page says the read failed, with Try again). A run's button
+  that goes as the run ends hands focus to the run's words (`tabIndex -1`, no ring) - only when focus
+  was on that button and fell to the page. Focus moving on is asked a microtask after the blur: Chromium
+  blurs a focused button AS it removes it, while it is still connected, and that is the button going
+  (handed on by the layout effect in the same commit), not focus moving on.
+- **Re-time saved lyrics in the app**: `components/RetimeLyrics.tsx` is the settings tab's own
+  component moved out of SettingsView.tsx so both draw it (`ServerGroup`'s children for the `lyrics`
+  group on both pages), refused (`disabled`, "Save the new lead first.") while `LYRICS_LEAD_MS` has a
+  draft - a revert of it too - and reading a REAL scan (`listAlbums`, never the snapshot: notes/library.md
+  "The lead"). **Its run moved into the module** too, with a latestOnly(): the app's settings page goes
+  whenever another page takes its place, and the main page's settings tab draws nothing while another
+  tab shows - there a run went on invisibly with no Stop, and a second could be started beside it;
+  now it is drawn again, Stop and all. Its DOM on the main page is unchanged in every state. **How a
+  run ended is said once**: one that ended is let go as the last thing drawing it goes (and one that
+  ended while nothing drew it is said on coming back, then let go the same way), and as soon as a new
+  lead is typed - its words were at the old lead. A lead typed WHILE it runs lets it go as it ends
+  (`leadMoved`, cleared as a run starts), saved by then or not: the server reads `LYRICS_LEAD_MS` on each
+  album's request (routes/library.py, `Config.lyrics_lead_ms()`), so a save mid-run left the albums
+  before it at the old lead, and "re-timed 5 tracks." under the new one said the job was done (second
+  review; the old component had the same gap). A change on the main page, on purpose: there, as the
+  component's state, an ended run's words went with a tab switch but stayed through a new lead saved on
+  the same visit ("re-timed 29 tracks." under a lead it wasn't timed to); kept in the module without
+  letting go, they outlived every visit (review). The app's
+  settings line no longer sends re-timing to the main page, nor does the Edit panel's Lyrics tab ("in
+  Managing's Settings, under Library").
+- **Needs a look warns when ignores can't be saved** (`IGNORES_UNSAVED`, `ignoresUnsaved`): the
+  library's answer saying review tracking is off (`review_tracking_enabled`, once a read has landed -
+  useLibrary's default says nothing) or the count's route (`tracking_enabled` - useQueueSummary.ts now
+  keeps it, `queueTrackingNow`/`useQueueTracking`, null until answered). Amber, above the list, as the
+  main page's queue warns under its views.
+- **Choose the folder** (`app/FolderPicker.tsx`, pure rules `folderChoices`/`folderChoicesWords` in
+  lib/albumEdit.ts): where the Edit panel finds NO folder - by release ("has no folder of this album")
+  or by name ("can't tell which folder") - `editStatus` says `choose` (was `mainPage`) and the panel
+  draws **Choose the folder** beside Look again, in place of "Open the main page" (the panel has no
+  link out now). It opens a field (focus into it) over the scan's folders, by path, each with its
+  artist and album and "no release" when untagged, narrowed by every word typed (path, artist, album),
+  the first `FOLDER_CHOICES_SHOWN` (50) drawn and how many match said in a status. A folder clicked is
+  `chosen` for that Edit (keyed on the request, reset with the next): `folders` becomes `folderOnly`
+  of it - the subject taken from the scan by path, as a folder request's is - followed through a
+  rename by `follow`; the rest of the panel is the album page's (its writes ask the page again and,
+  after a release changes, look for the new id - the staged rip's case). Focus goes to the Release tab.
+  Offered for the release case too: there the album's tags were often changed by another program
+  (Rescan first) or it lives somewhere deadwax can't match - picking it beats leaving.
+- **Style** (app-desktop.css, its own section at the end; tokens `--app-desk-care-*`): the page at the
+  Managing pages' readable width and clear of a drawer; its two parts cards as the settings groups are;
+  runs as rows inside the second card; STYLE.md's secondary buttons at the frame's control height (no
+  solid purple on the page); a running one with the player's busy ring (`pl-spin`); the field the well;
+  words broken anywhere. Choose the folder's field joins the panel's well rule; Needs a look's warning
+  amber on the amber tint; Re-time styled by the tab's own classes under `.app-settings` (a row under
+  the lyrics group's rows, aligned with them by a transparent edge; its spinner the busy ring). The Edit
+  panel's `.app-edit-link` rules went with the link. Choose the folder's field and every
+  `.app-edit-choice` (the "Which one is it?" list's too) draw their focus rings inside
+  (`--app-ring-inset`, a class more than the panel's ring rule): the panel's body clips sideways and
+  they run to its edges, which cut the ring off. A coarse pointer: the field 17px, Try again 44px.
+- **Not built, on purpose**: anything on the phone (the page is a note there); the main page's facets
+  as the runs' narrowing (typed words instead); Rescan or the runs anywhere but Library care; the
+  main page's loops moved onto `runBulk` (only the targets are shared, as the spec asked - its words
+  are pinned equal instead); artist images and re-filing; showing which album a run is on.
+- **The cover route tells "none" from "no answer"** (after review): `/library/art/fetch` answered 404
+  "has no front cover" for EVERY way no cover came back - `fetch_front` drops `_fetch`'s reason - so a
+  run of Get covers during one of the Archive's outages said "N had none on the Archive", on both
+  pages, against notes/decisions.md's split. `CoverArtClient.fetch_front_why` keeps the reason - after
+  the 1200px fallback (`full`, an original that isn't an image) that request's own (`fetch_front`, which
+  retag uses, is unchanged); the route answers 404 only for "missing" (the Archive's
+  404, or no release) and 502 otherwise ("couldn't be reached - try again", or "the cover couldn't be
+  downloaded … - try again"), as `/disc_art/fetch` already did - counted failed by both pages' runs.
+  The single Get cover button and the editor's save treat any failure alike and show the message.
+- **Seen, not changed** (pre-existing, outside the slice): deadwax counts a macOS AppleDouble
+  `._cover.jpg` as a cover (the scratch library has them beside every track - removing `cover.jpg` left
+  the album "with a cover" until `._cover.jpg` went too). Re-time's button says "reading the library"
+  until its first album is done (its count starts there), as before.
+- **After review** (fourteen findings, merged to eleven fixes; each with a check that fails without it):
+  Re-time's ended run said once (let go as the last thing drawing it goes and as a new lead is typed -
+  above); a run that wrote holding its kind back until the library is read again (above, `behind`);
+  `/library/art/fetch` 502 for an Archive that gave no answer (above); Rescan's rule written as the code
+  and the main page have it (a comment and this file said the opposite); the CD art plan naming the
+  writer's files; focus moving on asked after Chromium's blur-on-removal; the empty result regions drawn
+  (no `display: none`); the picker's rings inside; the plans counting album folders, not albums (a library
+  of 7 albums said "8 albums with no lyrics" - `scopeWords` now says "among the folders matching"); the
+  store's listeners pinned (care.sim counts each page's redraws - LibraryCare told as a run starts, as each
+  album answers, on Stop, at the end and as the narrowing changes, Re-time as its run moves, a page gone
+  told nothing; needslook.sim the same for useQueueTracking); the Edit panel's Lyrics note and the
+  sidebar's main-page title pinned in app-rules; "Under it" for the facts line here and in
+  docs/library.md.
+- **After a second review** (three findings, each confirmed by skeptics, all fixed with a check that
+  fails without it): Re-time's words let go as a run ends when a new lead was typed while it ran, saved
+  by then or not (`leadMoved`, above - care.sim types and saves a lead mid-run and expects the prompt, a
+  run after it its own words again, and a read that failed the same; app-rules pins the effect, every
+  ending through `ended()` and the flag cleared as a run starts); Library care's two guards against
+  reading over a read still out pinned - shown again with a read out asks nothing, nor does either Try
+  again while one is (care.sim; the code was right, nothing held it); and the cover client's reason
+  after the 1200px fallback pinned - at `COVER_ART_SIZE=full` with an original that isn't an image, the
+  1200px copy's own answer is the reason (a 404 "missing" and the route's 404, unreachable a 502), never
+  "not an image" (six tests in `test_coverart_client.py`).
+- **Verified**: 2420 Python tests (2418 passed, 2 skipped; at the build, 2400 - five new in
+  `test_app_desktop_css.py`, one changed, the link it pinned gone - and after review 14 more: 12 in
+  `test_coverart_client.py`, the reasons and the route's 404/502 through the real client over a fake
+  Archive, and two in `test_app_desktop_css.py`, the drawn live region and the inside rings - and after
+  the second review six more in `test_coverart_client.py`, the 1200px fallback's reason), pyflakes,
+  tsc, the bundle, all 48 sims (`care` new, 129 checks; `routes` 271, `app-rules` 315, `you` 72,
+  `needslook` 121, `settingslog` 146 extended - app-rules' links-out list, Managing order and siblings
+  checks moved to the new spelling, none weakened). At the build, 62 mutations, one or more per rule
+  pinned, each restored byte for byte (checked by hash): 61 caught at once; the one that got past (the
+  store ignoring Stop - the check pressed Stop only on a run's last album, and a sim whose awaited answer
+  never comes lets Node exit 0) gained a mid-run Stop check and care.sim a guard that fails it should it
+  end early, and is caught; a mutation first caught only by tsc (Re-time reading the snapshot) was redone
+  so it is caught at run time. After review, 23 more, one or more per fix, all caught by the suite named
+  (the reviewer's five unpinned redraws among them), every file restored byte for byte; after the second
+  review 9 more, all caught (the lead's flag not set, not cleared, an ending not through `ended()`, the
+  old effect; each Library care guard dropped; the fallback's reason dropped). `sidebarMove`'s
+  'care' is pinned by the type system as well as routes.sim. The engine guard is empty.
+- **Checked in a real page** (headless Chromium over plain http as `deadwax.test`, real mouse input,
+  this change's own instance on :8115 with a scratch database and a COPY of the builder36 library -
+  covers removed from two albums, one album retagged in place with its folder's date put back - and a
+  second on :8116 with no job store; the live Cover Art Archive and LRCLIB; 45 checks): the sidebar's
+  and You's Managing order; Library care at its address, its item current, back "You"; the facts line;
+  the three runs' counts and their plans; Rescan finding the in-place retag a plain scan didn't; Get
+  covers to its end ("fetched 2 covers", both on disk) and the page's scan read again by itself, the
+  button gone (a first run, before the checks were tightened, had the Archive answer 500 for one album:
+  "fetched 1 cover, 1 had none on the Archive", and a fresh page then offered "Get covers · 1");
+  Get CD art stopped after its first album
+  ("Stopping after 1 of 7", then "stopped at 1 of 7"); Get lyrics narrowed to "portishead" (3 albums,
+  32 tracks saved, no other album touched); Re-time under Lyrics, refused with 300 typed, run after
+  saving ("re-timed 29 tracks."); the runs' words still there after Settings; Choose the folder on the
+  retagged album (focus in the field, 8 folders, narrowed to one by "test signal", the editors drawn for
+  it, focus on Release; its Lyrics tab pointing at Settings); the warning with no job store, none with
+  one; at 1440x900 and 1024x768 no sideways scroll and nothing past the window on the page, Settings,
+  the panel (a drawer at 1024) and Needs a look; a phone's note; no console error or dialog.
+- **Checked in a real page after review** (the fixer's own instances: :8117 with a scratch database and a
+  fresh COPY of the builder36 library - Third's and BULLY's covers and their `._cover.jpg` removed, Test
+  Signal retagged in place - and :8118 over a copy of those two albums with the Cover Art Archive
+  unreachable, `HTTPS_PROXY` at a closed port; headless Chromium at 1440x900 and 1024x768 as
+  `deadwax.test`, 34 checks, 33 passed): the plans in album folders beside "7 albums" in the scan line, CD
+  art's file names, the facts under Rescan; the three empty result regions `display: block`, 0px, the row
+  ending where its plan does, and five status nodes in the accessibility tree before any run; Get covers
+  started from the keyboard (Enter on a focused button) to "fetched 2 covers", both on disk, sampled every
+  ~25 ms for 4 s after: "Get covers · 2" never again, "Checking the library…" seen, then no button, and
+  focus on the run's words - Chromium's blur as the button went no longer dropping it to the page; a
+  lyrics run narrowed to "third" (11 tracks) not offered again; Re-time run on the app's Settings and on
+  the main page's, then the Log or the Library tab and back: the prompt both times; Choose the folder's
+  field and a folder reached by Tab with `outline-offset: -2px`, the ring whole (the field runs to the
+  body's edge, the folder to both), at 1440 and in the 1024 drawer; :8118's route answering 502 "couldn't
+  be reached - try again" and its run "fetched 0 covers, 2 failed - try those again", offered again at
+  once, its words kept across the Log and back at 1024; no sideways scroll; no console error. (A check
+  that a run's words outlive a full navigation to the main page and back failed, as designed: a reload
+  forgets them.)
+- **NOT verified**: an iPad on its side (17px field, 44px targets), VoiceOver (the facts', a run's and
+  the picker's status regions), a library of thousands (the picker draws 50; the runs' counts work over
+  the whole scan each render), a run left going while the app is backgrounded on a phone-sized iPad,
+  the real :8081 setup, and the merge with 2.0.0-player.41.

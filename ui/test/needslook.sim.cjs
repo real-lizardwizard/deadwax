@@ -26,8 +26,13 @@
  *    not reset on a SAVED scan; disc_label before the edition; a failed cover's plain tile; Try again
  *    aria-disabled and refused while a read is out; a write about a path two rows share (merged disc
  *    folders) the current row's.
+ *  - IGNORES THAT CAN'T BE SAVED (2.0.0-player.42): warned of, in the page, as the main page's queue
+ *    warns, when the library's answer (review_tracking_enabled) or the count's (tracking_enabled) says
+ *    deadwax has no job store - never on a phone, never before either has said so.
  *  - THE COUNT'S STORE: the real app/useQueueSummary.ts against a faked deadwax - one request out and
- *    exactly one more, a failure keeping the last number (null with none), the page's count first.
+ *    exactly one more, a failure keeping the last number (null with none), the page's count first;
+ *    whether ignores can be kept, and useQueueTracking's caller told to draw again as an answer lands
+ *    (a caller gone told nothing more).
  *
  * Run it with:  node ui/test/needslook.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -202,22 +207,23 @@ write('api/library.js', `exports.markReviewed = (path) => {
 }
 `)
 write('app/useQueueSummary.js', `
+exports.useQueueTracking = () => globalThis.__page.tracking
 exports.askQueueSummary = () => { globalThis.__page.asked++ }
 exports.setPageQueueCount = (count) => { globalThis.__page.counts.push(count) }
 `)
 write('app/useSheet.js', `exports.takeOpener = (event) => event?.currentTarget ?? null\n`)
 write('player/icons.js', `exports.ChevronLeftIcon = function Icon() { return null }\n`)
 
-const W = globalThis.__page = { enabled: [], reviewed: [], asked: 0, counts: [], reloads: [], library: null, holdMarks: false, marks: [] }
+const W = globalThis.__page = { enabled: [], reviewed: [], asked: 0, counts: [], reloads: [], library: null, holdMarks: false, marks: [], tracking: null }
 function libraryOf(albums, more = {}) {
   W.library = {
-    albums, issueTypes: TYPES, problem: null, error: null, loading: false, loaded: true, stale: false,
+    albums, issueTypes: TYPES, problem: null, error: null, loading: false, loaded: true, stale: false, reviewTracking: true,
     reload: (force) => new Promise((resolve) => W.reloads.push({ force, resolve })), ...more,
   }
 }
 function reset() {
   W.enabled.length = 0; W.reviewed.length = 0; W.asked = 0; W.counts.length = 0; W.reloads.length = 0
-  W.holdMarks = false; W.marks.length = 0
+  W.holdMarks = false; W.marks.length = 0; W.tracking = null
 }
 
 const hooks = require(path.join(PAGE, 'node_modules/preact/hooks.js'))
@@ -587,6 +593,36 @@ async function page() {
     click(find((node) => node.type === 'button' && words(node) === 'Try again')[0])
     check('...ready again: it reads the library', W.reloads.length - reads, 1)
   }
+
+  console.log('\nthe page: ignores that can\'t be saved are warned of (2.0.0-player.42)')
+  {
+    const warning = () => classed('app-queue-warning').map(words)
+    reset()
+    libraryOf(LIBRARY)
+    const one = mount()
+    one.draw()
+    check('deadwax can keep them (both say so, or the count hasn\'t said): no warning', warning(), [])
+    W.tracking = true
+    one.draw()
+    check('...the count saying it can: none either', warning(), [])
+    libraryOf(LIBRARY, { reviewTracking: false })
+    one.draw()
+    check('the library\'s answer says it can\'t: the main page\'s warning, in the app\'s words', warning(), [N.IGNORES_UNSAVED])
+    check('...which says what comes of it', /can't be saved/.test(N.IGNORES_UNSAVED) && /come back/.test(N.IGNORES_UNSAVED) && /DB_PATH/.test(N.IGNORES_UNSAVED), true)
+    libraryOf([], { loaded: false, reviewTracking: false })
+    W.tracking = null
+    one.draw()
+    check('...but not from a library that hasn\'t answered yet (its default says nothing)', warning(), [])
+    W.tracking = false
+    one.draw()
+    check('the count\'s route saying so is enough - before the library has answered too', warning(), [N.IGNORES_UNSAVED])
+    one.draw({ desktop: false })
+    check('...never on a phone', warning(), [])
+    check('the rule: either one saying so, a library only once it has answered',
+      [N.ignoresUnsaved({ loaded: true, reviewTracking: true }, null), N.ignoresUnsaved({ loaded: true, reviewTracking: false }, null),
+        N.ignoresUnsaved({ loaded: false, reviewTracking: false }, true), N.ignoresUnsaved({ loaded: true, reviewTracking: true }, false), N.ignoresUnsaved({ loaded: false, reviewTracking: true }, true)],
+      [false, true, false, true, false])
+  }
 }
 
 /* ===== the count's store: app/useQueueSummary.ts itself, against a faked deadwax ===== */
@@ -600,7 +636,11 @@ async function store() {
     '--lib', 'es2022,dom', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
   ], { cwd: UI, stdio: 'inherit' })
   fs.mkdirSync(path.join(DIR, 'node_modules/preact'), { recursive: true })
-  fs.writeFileSync(path.join(DIR, 'node_modules/preact/hooks.js'), `exports.useState = (v) => [v, () => {}]\nexports.useEffect = () => {}\n`)
+  //? a caller: its setter counts the times it is told to draw again, its effect run at once, the cleanup kept
+  fs.writeFileSync(path.join(DIR, 'node_modules/preact/hooks.js'), `
+exports.useState = (v) => [v, () => { globalThis.__store.told++ }]
+exports.useEffect = (f) => { globalThis.__store.cleanups.push(f()) }
+`)
   //? deadwax answering when the test says, and the downloads' "an album was filed"
   fs.writeFileSync(path.join(DIR, 'api/library.js'), `
 exports.queueSummary = () => new Promise((resolve, reject) => globalThis.__store.asks.push({ resolve, reject }))
@@ -608,7 +648,7 @@ exports.queueSummary = () => new Promise((resolve, reject) => globalThis.__store
   fs.writeFileSync(path.join(DIR, 'lib/libraryEvents.js'), `
 exports.onAlbumsFiled = (listener) => { globalThis.__store.filed.push(listener); return () => {} }
 `)
-  const S = globalThis.__store = { asks: [], filed: [] }
+  const S = globalThis.__store = { asks: [], filed: [], told: 0, cleanups: [] }
   const Q = require(path.join(DIR, 'app/useQueueSummary.js'))
   const answer = async (reply) => { const ask = S.asks.shift(); if (reply instanceof Error) ask.reject(reply); else ask.resolve(reply); await settle() }
 
@@ -638,18 +678,45 @@ exports.onAlbumsFiled = (listener) => { globalThis.__store.filed.push(listener);
   await answer({ total: 5, imports: 1, known: true })
   check('...and the count moves', Q.queueCountNow(), 5)
   check('the filing listener added once, however many asks', S.filed.length, 1)
+  //? (2.0.0-player.42) whether deadwax can keep ignores, as the route says it - for Needs a look's warning
+  check('whether ignores can be kept: what the route last said (true when it says nothing of it)', Q.queueTrackingNow(), true)
+  Q.askQueueSummary()
+  await answer({ total: 5, imports: 1, known: true, tracking_enabled: false })
+  check('...false once it says so', Q.queueTrackingNow(), false)
+  Q.askQueueSummary()
+  await answer(new Error('HTTP 502'))
+  check('...kept through a failed ask', Q.queueTrackingNow(), false)
+  Q.askQueueSummary()
+  await answer({ total: 5, imports: 1, known: true, tracking_enabled: true })
+  check('...and true again when it says so', Q.queueTrackingNow(), true)
+  //? Needs a look's warning is drawn from useQueueTracking: its caller has to be told as an answer lands
+  //? (review: nothing pinned it - dropping the hook's listener left the page as it was)
+  check('useQueueTracking: what the route last said', Q.useQueueTracking(), true)
+  let told = S.told
+  Q.askQueueSummary()
+  await answer({ total: 5, imports: 1, known: true, tracking_enabled: false })
+  check('...its caller told to draw again as an answer lands', S.told > told, true)
+  told = S.told
+  Q.askQueueSummary()
+  await answer(new Error('HTTP 502'))
+  check('...a failed ask, nothing new: not told', S.told, told)
+  for (const cleanup of S.cleanups.splice(0)) cleanup()
+  Q.askQueueSummary()
+  await answer({ total: 5, imports: 1, known: true, tracking_enabled: true })
+  check('...a caller gone told nothing more (its listener let go)', S.told, told)
   return DIR
 }
 
 async function storeFailingFirst(DIR) {
   //? a fresh module: the first ask failing leaves the count unknown, never 0
   delete require.cache[require.resolve(path.join(DIR, 'app/useQueueSummary.js'))]
-  const S = globalThis.__store = { asks: [], filed: [] }
+  const S = globalThis.__store = { asks: [], filed: [], told: 0, cleanups: [] }
   const Q = require(path.join(DIR, 'app/useQueueSummary.js'))
   Q.askQueueSummary()
   S.asks.shift().reject(new Error('down'))
   await settle()
   check('a first ask that fails: still null - no badge of 0 over an unknown', Q.queueCountNow(), null)
+  check('...and whether ignores can be kept unknown too: null, no warning over it', Q.queueTrackingNow(), null)
 }
 
 page().then(store).then(storeFailingFirst).then(() => {

@@ -1189,8 +1189,6 @@
         overflow-wrap: anywhere;
     }
 
-    .app-desk .app-edit-link { color: var(--dw-accent); font-size: var(--app-desk-text-sm); }
-
     .app-desk .app-edit-choices {
         display: flex;
         flex-direction: column;
@@ -1322,9 +1320,11 @@
     .app-desk .app-edit .red { color: var(--dw-danger-text); }
     .app-desk .app-edit .green { color: var(--dw-badge-green-text); }
 
-    /* a text field: STYLE.md's well, its edge the best match's purple with focus */
+    /* a text field: STYLE.md's well, its edge the best match's purple with focus - the release editor's
+       search, the Folder choice, and "Choose the folder"'s field (2.0.0-player.42) */
     .app-desk .app-edit .releases-filter-input,
-    .app-desk .app-edit-select {
+    .app-desk .app-edit-select,
+    .app-desk .app-edit-pick-input {
         width: 100%;
         min-width: 0;
         height: var(--app-desk-edit-control);
@@ -1340,9 +1340,11 @@
     }
 
     .app-desk .app-edit .releases-filter-input:focus,
-    .app-desk .app-edit-select:focus { border-color: var(--dw-best); }
+    .app-desk .app-edit-select:focus,
+    .app-desk .app-edit-pick-input:focus { border-color: var(--dw-best); }
 
-    .app-desk .app-edit .releases-filter-input::placeholder { color: var(--dw-text-3); }
+    .app-desk .app-edit .releases-filter-input::placeholder,
+    .app-desk .app-edit-pick-input::placeholder { color: var(--dw-text-3); }
 
     .app-desk .app-edit input[type="checkbox"] {
         width: var(--app-desk-edit-check);
@@ -1933,20 +1935,20 @@
     .app-desk .app-edit-tab { min-height: var(--pl-hit); }
 
     /* ...and its smaller targets too - a tick box's label (the token above), a folder to choose, the
-       tag editor's list of tracks and undo, the issue's un-ignore, the link to the main page */
+       tag editor's list of tracks and undo, the issue's un-ignore */
     .app-desk .app-edit-choice { min-height: var(--pl-hit); }
     .app-desk .app-edit .tags-tracks > summary { min-height: var(--pl-hit); line-height: var(--pl-hit); }
 
     .app-desk .app-edit .tags-revert,
-    .app-desk .app-edit .metadata-issue-undo,
-    .app-desk .app-edit-link {
+    .app-desk .app-edit .metadata-issue-undo {
         display: inline-flex;
         align-items: center;
         min-height: var(--pl-hit);
     }
 
     .app-desk .app-edit .releases-filter-input,
-    .app-desk .app-edit-select { font-size: var(--dw-text-body); }
+    .app-desk .app-edit-select,
+    .app-desk .app-edit-pick-input { font-size: var(--dw-text-body); }
 
     .app-desk .app-edit .hint-pointer { display: none; }
     .app-desk .app-edit .hint-touch { display: inline; }
@@ -2908,4 +2910,249 @@
     .app-desk .app-settings-discard,
     .app-desk .app-settings-save,
     .app-desk .app-log-clear { min-height: var(--pl-hit); }
+}
+
+/* ===== Looking after the library (2.0.0-player.42): app/LibraryCare.tsx, and its pieces elsewhere =====
+   No board draws it; it is the Managing pages' parts and STYLE.md. LIBRARY CARE is a page under You with
+   its title and a line saying what it is, kept to the readable width the other Managing pages keep (and
+   clear of a drawer): two cards - Rescan, with what the scan holds and how old it is, and the bulk runs,
+   with the field that narrows them and a row per run (its heading, its button, what it will act on and
+   what the last one did). Its buttons are STYLE.md's secondary ones at the frame's control height - no
+   solid purple: nothing here asks to be pressed above the rest - a running one carrying the player's
+   own busy ring. Long words (a folder typed into the field, a stranger's album name) break, never run
+   out. Beside it: "Choose the folder"'s list in the Edit panel (each folder its path, monospace, and its
+   tags under it), Needs a look's warning that ignores can't be saved (amber, as the main page's), and
+   Re-time saved lyrics in Server settings, the settings tab's own parts styled by their class names. */
+@media (min-width: 1024px) {
+    :root {
+        --app-desk-care-lines: 12px;      /* between the page's parts */
+        --app-desk-care-row-gap: 6px;     /* a card's lines */
+        --app-desk-care-pad-y: 14px;      /* a card's padding */
+        --app-desk-care-pad-x: 16px;
+        --app-desk-care-note: 66ch;       /* a note's measure */
+    }
+
+    .app-desk .app-care-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-care-lines);
+        max-width: calc(var(--app-desk-content-max) + var(--pl-edge-left) + var(--pl-edge-right));
+        padding: 0 var(--pl-edge-right) var(--app-desk-gap) var(--pl-edge-left);
+    }
+
+    /* a drawer over the page's edge: the page keeps to the part left in view */
+    .app-desk.has-drawer .app-care-body {
+        max-width: calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap));
+    }
+
+    .app-desk .app-care-line,
+    .app-desk .app-care-state,
+    .app-desk .app-care-note,
+    .app-desk .app-care-facts,
+    .app-desk .app-care-problem,
+    .app-desk .app-care-result {
+        max-width: var(--app-desk-care-note);
+        margin: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+        overflow-wrap: anywhere;
+    }
+
+    .app-desk .app-care-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-desk-care-lines); }
+    .app-desk .app-care-facts { color: var(--dw-text); }
+    .app-desk .app-care-problem { color: var(--dw-danger-text); }
+
+    /* what the last run did: said as it ends, kept until the next - and where focus goes should the
+       run's button go with it (words, no ring). Empty, it takes no room but is still drawn - a live
+       region VoiceOver reads only once it is already there (a hidden one isn't): the row's gap before
+       it taken back, as app-rg-store does */
+    .app-desk .app-care-result { color: var(--dw-text); }
+    .app-desk .app-care-result:empty { margin-top: calc(-1 * var(--app-desk-care-row-gap)); }
+    .app-desk .app-care-result:focus { outline: none; }
+
+    /* each part a card, as the settings' groups are */
+    .app-desk .app-care-section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-care-row-gap);
+        min-width: 0;
+        padding: var(--app-desk-care-pad-y) var(--app-desk-care-pad-x);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-card);
+        box-shadow: var(--dw-highlight);
+    }
+
+    .app-desk .app-care-run {
+        display: flex;
+        flex-direction: column;
+        gap: var(--app-desk-care-row-gap);
+        min-width: 0;
+        padding-top: var(--app-desk-care-pad-y);
+        border-top: var(--dw-hairline) solid var(--dw-row-border);
+    }
+
+    .app-desk .app-care-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--app-desk-field-gap);
+        min-width: 0;
+    }
+
+    .app-desk .app-care-title,
+    .app-desk .app-care-heading {
+        margin: 0;
+        color: var(--dw-text-heading-color);
+        font-size: var(--dw-text-heading);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-care-heading { color: var(--dw-text); font-size: var(--app-desk-text); }
+
+    /* STYLE.md's secondary button at the frame's control height; busy, the player's own ring */
+    .app-desk .app-care-button {
+        gap: var(--app-desk-field-gap);
+        min-height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad);
+        font-size: var(--app-desk-text-sm);
+        white-space: nowrap;
+    }
+
+    .app-desk .app-care-button:hover:not([aria-disabled='true']) { background: var(--dw-secondary-bg-active); }
+    .app-desk .app-care [aria-disabled='true'] { opacity: var(--app-job-busy); cursor: progress; }
+
+    .app-desk .app-care-spin {
+        flex: none;
+        width: var(--app-desk-spin);
+        height: var(--app-desk-spin);
+        border: var(--app-desk-spin-ring) solid var(--dw-border-cover);
+        border-top-color: var(--dw-text-2);
+        border-radius: var(--dw-radius-round);
+        animation: pl-spin var(--app-desk-spin-time) linear infinite;
+    }
+
+    /* the words that narrow the runs: STYLE.md's well, its edge the best match's purple with focus */
+    .app-desk .app-care-narrow { display: flex; align-items: center; gap: var(--app-desk-field-gap); min-width: 0; }
+    .app-desk .app-care-label { flex: none; color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+    .app-desk .app-care-input {
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
+        height: var(--app-desk-control);
+        padding: 0 var(--app-desk-item-pad);
+        border: var(--dw-hairline) solid var(--dw-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-well);
+        box-shadow: var(--dw-well-inset);
+        color: var(--dw-text);
+        font: inherit;
+        font-size: var(--app-desk-text-sm);
+        outline: none;
+    }
+
+    .app-desk .app-care-input:focus { border-color: var(--dw-best); }
+    .app-desk .app-care-input::placeholder { color: var(--dw-text-3); }
+
+    /* --- the Edit panel's "Choose the folder": a folder's path, and its tags under it --- */
+
+    .app-desk .app-edit-pick { align-self: stretch; }
+    .app-desk .app-edit-pick-field { display: flex; align-items: center; gap: var(--app-desk-field-gap); align-self: stretch; min-width: 0; }
+    .app-desk .app-edit-pick-choice { display: flex; flex-direction: column; gap: var(--app-desk-edit-lines); }
+    .app-desk .app-edit-pick-path { color: var(--dw-text); }
+
+    .app-desk .app-edit-pick-sub {
+        color: var(--dw-text-2);
+        font-family: var(--pl-font);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    /* the panel's body clips sideways and these run to its edges - the field, and every folder (the
+       "Which one is it?" list's too): their rings drawn inside, where they can be seen whole. A class
+       more than the panel's ring rule, which draws it outside */
+    .app-desk .app-edit .app-edit-pick-input:focus-visible,
+    .app-desk .app-edit .app-edit-choice:focus-visible { outline-offset: var(--app-ring-inset); }
+
+    /* --- Needs a look: ignores that can't be saved, said as the main page says it, in amber --- */
+
+    .app-desk .app-queue-warning {
+        margin: 0;
+        padding: var(--app-desk-edit-pad-y) var(--app-desk-edit-pad-x);
+        border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-tint-amber);
+        color: var(--dw-amber-text);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+    }
+
+    /* --- Server settings: Re-time saved lyrics, under the lyrics group's rows (the tab's own parts) --- */
+
+    .app-desk .app-settings .settings-retime {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--app-desk-field-gap);
+        padding: var(--app-desk-set-row-pad-y) var(--app-desk-set-row-pad-x);
+        border-top: var(--dw-hairline) solid var(--dw-row-border);
+        border-left: var(--app-desk-set-edge) solid transparent;   /* in line with the rows above it */
+    }
+
+    .app-desk .app-settings .settings-retime .win-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--app-desk-field-gap);
+        min-height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad-sm);
+        border: var(--dw-hairline) solid var(--dw-secondary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-secondary-bg);
+        box-shadow: var(--dw-highlight);
+        color: var(--dw-text-on-secondary);
+        font-size: var(--app-desk-text-sm);
+        font-weight: var(--dw-weight-medium);
+        white-space: nowrap;
+    }
+
+    .app-desk .app-settings .settings-retime .win-button:hover:not(:disabled) { background: var(--dw-secondary-bg-active); }
+    .app-desk .app-settings .settings-retime .win-button:disabled { opacity: var(--app-job-busy); cursor: not-allowed; }
+
+    .app-desk .app-settings .settings-retime .win-button:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring);
+    }
+
+    .app-desk .app-settings .settings-retime-note {
+        flex: 1 1 auto;
+        min-width: 0;
+        color: var(--dw-text-2);
+        font-size: var(--app-desk-text-sm);
+        line-height: var(--dw-leading-note);
+        overflow-wrap: anywhere;
+    }
+
+    /* a re-time under way: the player's own ring beside its words, in the button */
+    .app-desk .app-settings .loading-blocks { display: inline-flex; align-items: center; gap: var(--app-desk-field-gap); color: inherit; }
+
+    .app-desk .app-settings .loading-blocks::before {
+        content: '';
+        flex: none;
+        width: var(--app-desk-spin);
+        height: var(--app-desk-spin);
+        border: var(--app-desk-spin-ring) solid var(--dw-border-cover);
+        border-top-color: var(--dw-text-2);
+        border-radius: var(--dw-radius-round);
+        animation: pl-spin var(--app-desk-spin-time) linear infinite;
+    }
+}
+
+/* a finger where the pointer is coarse: the page's controls a finger's (--app-desk-control already is),
+   and fields iOS won't zoom into */
+@media (min-width: 1024px) and (pointer: coarse) {
+    .app-desk .app-care-input { font-size: var(--dw-text-body); }
+    .app-desk .app-care .app-text-button { min-height: var(--pl-hit); }
 }

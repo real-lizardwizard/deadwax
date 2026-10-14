@@ -36,10 +36,20 @@ settings**. It is the same server half of the settings tab - the same rows, the 
 in the same database. Changes stay drafts until **Save changes**, which saves every page's changes
 at once or, if deadwax refuses one, none of them, saying why. A change made while a save is still
 on its way stays a draft for the next save, and drafts are kept if you go to another page - the Log,
-say - and come back, until the app is reloaded. The browser preferences (search,
-candidates, auto-grab, the interface) and **Re-time saved lyrics** are still the main page's
-settings tab's; the page says so and links to it. On a phone the page only says it needs a wider
-screen.
+say - and come back, until the app is reloaded. **Re-time saved lyrics** is there too (since
+2.0.0-player.42), under **Library**'s Lyrics group beside `LYRICS_LEAD_MS`, as on the settings tab: it
+is refused while the lead has an unsaved change ("Save the new lead first." - it re-times to the
+saved lead), reads the library from the disk, re-times one album at a time with a **stop** on its
+button, and says what it did; a run keeps going, and can still be stopped, if you go to another page
+and come back. What it did is said once - where it ended, or when you come back to a run that ended
+while you were away - and on your next visit the line is back to its prompt. Typing a new lead lets
+it go too: what it said was at the old lead, so once the new one is saved the line says its prompt,
+not the old run's words. The same goes for a lead typed while a run is still going, even if you save
+it before the run ends: deadwax reads the lead as it does each album, so the albums done before the
+save moved to the old lead and the rest to the new one, and the line goes back to its prompt as the
+run ends. Pressing it again is safe - it moves what is still at the old lead and leaves the rest. The browser preferences (search, candidates, auto-grab, the interface) are
+still the main page's settings tab's; the page says so and links to it. On a phone the page only says
+it needs a wider screen.
 
 ## Server settings
 
@@ -133,7 +143,7 @@ can land seconds off.
 | setting | default | what it does |
 | --- | --- | --- |
 | `FETCH_LYRICS` | `on` | look up lyrics on [LRCLIB](https://lrclib.net) for each album as it's filed, and save them as a `.lrc` file beside each track. It only ever adds files, and nothing is fetched in dry run. |
-| `LYRICS_LEAD_MS` | `0` | milliseconds to move synced lyrics *earlier* as they're written (negative moves them later), from −5000 to 5000. LRCLIB's timings are tapped along by people and tend to trail the singing a little, so if lines light up a beat late in your player, try `300`. **Re-time saved lyrics**, beside it, applies a new value to lyrics already saved. |
+| `LYRICS_LEAD_MS` | `0` | milliseconds to move synced lyrics *earlier* as they're written (negative moves them later), from −5000 to 5000. LRCLIB's timings are tapped along by people and tend to trail the singing a little, so if lines light up a beat late in your player, try `300`. **Re-time saved lyrics**, beside it (on the settings tab, and in the app's **Managing → Settings**), applies the saved value to lyrics already saved - refused while the lead has an unsaved change. |
 
 ### The container
 

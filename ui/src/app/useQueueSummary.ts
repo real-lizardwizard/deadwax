@@ -21,6 +21,8 @@ import { onAlbumsFiled } from '../lib/libraryEvents'
  */
 
 let server: number | null = null
+//? whether deadwax can keep ignores (the route's tracking_enabled) - null until it has answered
+let tracking: boolean | null = null
 let page: number | null = null
 let asking = false
 let again = false
@@ -36,6 +38,7 @@ function ask(): void {
   queueSummary().then(
     (answer) => {
       server = answer.total
+      tracking = answer.tracking_enabled !== false
       tell()
     },
     () => {
@@ -74,8 +77,14 @@ export function queueCountNow(): number | null {
   return page ?? server
 }
 
-/** The count, re-rendering as it moves - null until deadwax has first said. */
-export function useQueueSummary(): number | null {
+/** Whether deadwax can keep ignores, as the count's route last said (2.0.0-player.42: Needs a look warns
+ *  when it can't) - null until it has answered. */
+export function queueTrackingNow(): boolean | null {
+  return tracking
+}
+
+/** Re-render the caller as the store moves. */
+function useHeard(): void {
   const [, setSeen] = useState(0)
   useEffect(() => {
     const listener = () => setSeen((count) => count + 1)
@@ -84,5 +93,16 @@ export function useQueueSummary(): number | null {
       listeners.delete(listener)
     }
   }, [])
+}
+
+/** The count, re-rendering as it moves - null until deadwax has first said. */
+export function useQueueSummary(): number | null {
+  useHeard()
   return queueCountNow()
+}
+
+/** Whether deadwax can keep ignores, re-rendering as an answer says (null until one has). */
+export function useQueueTracking(): boolean | null {
+  useHeard()
+  return queueTrackingNow()
 }

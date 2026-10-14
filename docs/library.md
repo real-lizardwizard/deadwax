@@ -20,7 +20,8 @@ again.
 
 Albums filed from a download appear by themselves. **Rescan** re-reads everything, and is what
 to press after changing files with another program: a tag edited elsewhere doesn't change a
-folder's date, so it isn't noticed otherwise.
+folder's date, so it isn't noticed otherwise. In the app on a desktop it's on **Library care**
+([below](#library-care-in-the-app)).
 
 The status bar at the bottom counts albums, artists, tracks and size, and says when the library
 was last scanned.
@@ -191,7 +192,8 @@ disc's tracks and type it once.
   metadata editor, where you can compare the two. **Get covers · N** in the toolbar does every
   album in view that's missing one, one at a time; press it again to stop. "No cover on the
   Archive" and "the request failed" are counted separately, because only the second is worth
-  trying again.
+  trying again: an Archive that couldn't be reached, or answered with an error, counts as failed
+  (since 2.0.0-player.42 - before, it was counted as having no cover).
 - **Get CD art** saves a picture of the disc itself, as `disc.jpg` (or `disc1.jpg`,
   `disc2.jpg`… per disc of a set), from the Cover Art Archive's scans of that exact release, and
   otherwise from fanart.tv if you've set a key. Navidrome shows it for the songs on that disc,
@@ -201,6 +203,9 @@ disc's tracks and type it once.
   `.lrc` beside its track. The button then reports how many it found (**Lyrics · 9 of 10**, with
   the details in its tooltip). **Get lyrics · N** does every album in view that has no lyrics at
   all.
+
+The three **· N** runs are also the app's, on a desktop: **Library care**
+([below](#library-care-in-the-app)) runs them over the same albums by the same rules.
 
 ![A track's synced lyrics, with the time beside each line](../assets/images/lyrics.png)
 
@@ -274,9 +279,10 @@ Library:
 - **Editing an album** - this page's metadata editor, tag editor, covers, lyrics and delete - is on
   the album's own page, its **Edit** button (since 2.0.0-player.21; [below](#editing-an-album-in-the-app)).
   The albums that need a look are the sidebar's **Needs a look**, under **Managing** (since
-  2.0.0-player.25; [below](#needs-a-look-in-the-app)). The bulk runs (**Get covers · N** and the
-  rest), an artist's pictures and **Move albums to …** are still this page's: **Managing**'s **Open
-  the main page** opens it in a new tab. The server settings and the log are **Managing**'s
+  2.0.0-player.25; [below](#needs-a-look-in-the-app)), and **Rescan** and the bulk runs (**Get
+  covers · N** and the rest) are **Library care**, after it (since 2.0.0-player.42;
+  [below](#library-care-in-the-app)). An artist's pictures and **Move albums to …** are still this
+  page's: **Managing**'s **Open the main page** opens it in a new tab. The server settings and the log are **Managing**'s
   **Settings** and **Log** (since 2.0.0-player.33; see [Configuration](configuration.md#in-the-app-on-a-desktop)
   and [Troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)).
 
@@ -303,7 +309,8 @@ them is true there too:
   album's release id, so an untagged album is matched in **Release** first. A cover you have is
   replaced from **Release**, comparing the two.
 - **Lyrics** says how many tracks have a `.lrc`, with **Get lyrics** for the rest. The lyrics lead,
-  and re-timing what is saved, are in this page's settings.
+  and re-timing the lyrics already saved, are in the server settings - this page's Settings tab, or
+  the app's **Managing → Settings**, under **Library** ([Configuration](configuration.md#in-the-app-on-a-desktop)).
 - **Delete** is [the delete confirmation](#deleting-an-album): what the folder holds, read as you
   open the tab, and **delete permanently**. **Cancel** (or Escape) goes back to **Release**.
 
@@ -314,7 +321,12 @@ never tagged, exactly what the release editor is for - is found among the librar
 carry no release id either, by its name and artist (and its track count, when that still leaves
 several); when more than one folder fits, the panel asks which. A release kept one folder per disc
 starts on the first folder, with a **Folder** choice above the tabs for the others - apply the
-release to each, as here, and they merge. The panel reads the library the first time you press
+release to each, as here, and they merge. When **no** folder is found - by release or by name - the
+panel says so, with **Look again** and **Choose the folder** (since 2.0.0-player.42): a list of every
+folder in the library's scan, each with its artist and album tags (and "no release" for one with no
+release id), narrowed as you type - every word you type has to be somewhere in the folder's path,
+artist or album, accents and capitals aside; the first 50 are listed, and it says how many match.
+Click the one this album is, and the panel edits it from then on, until the next **Edit**. The panel reads the library the first time you press
 **Edit**, and again, behind what it shows, each time after - the app can be left open for hours, and
 an album changed meanwhile from this page or another device is shown as it is now.
 
@@ -355,6 +367,10 @@ admin, which with logins off is everyone. It's this page's review queue (**Revie
   its outstanding issues (hover one for what it means). The list is read the first time you open the
   page - the saved scan at once, then the disk, with *Checking the library…* meanwhile.
 
+**Ignores can't be saved without the job store.** When deadwax couldn't open its database
+(`DB_PATH`), the page says so above the list (since 2.0.0-player.42), as this page's queue does: an
+album you accept with **It's fine as it is** comes back. See [Troubleshooting](troubleshooting.md#ignored-albums-come-back-to-the-review-queue).
+
 **Click a row** and the **Edit album** panel opens on that album's folder, beside the list - the same
 panel as an album page's **Edit**, all five tabs ([above](#editing-an-album-in-the-app)), the row
 highlighted. **Release** says where the album is in the queue (*3 of 17*), with **◁** and **skip ▷**,
@@ -371,6 +387,40 @@ strength.
 On a phone the page says fixing albums needs a wider screen for now, with a link to this page; there's
 no editor on a phone yet. An album page showing the same album elsewhere in the app isn't asked again
 after an edit made from **Needs a look** - go back to it, or reload, to see the change.
+
+## Library care in the app
+
+In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), the sidebar's **Managing**
+has **Library care** after **Needs a look** (since 2.0.0-player.42), and You's **Managing deadwax** has
+the same row. It's there for an admin, which with logins off is everyone. It holds what this page's
+toolbar does beyond the review queue:
+
+- **Rescan** - the same as here: every file read again, ignoring the saved scan. Under it, what the
+  library holds and how old the scan is, as this page's status bar says them (*7 albums · 87 tracks ·
+  425 MB · Scanned 3 min ago in 2s*, or *Saved scan from 2 h ago* while the saved copy is what's on
+  screen). Press it after changing tags with another program.
+- **Covers**, **CD art** and **Lyrics** - **Get covers · N**, **Get CD art · N** and **Get lyrics · N**,
+  this page's three runs ([above](#covers-cd-art-and-lyrics)) over the same albums: a cover for an album
+  with a release id and no cover, CD art for one with a release id and no `disc*` image of deadwax's
+  own, lyrics for one with no lyrics at all. Each run asks for one album at a time, through the same
+  step as that album's own **Get** button, so you can watch it and stop it: while it runs its button is
+  **Stop · 3 of 12**, and **Stop** finishes the album being fetched and goes no further. When it ends it
+  says what it did in this page's words (*fetched 10 covers, 1 had none on the Archive, 1 failed - try
+  those again*; lyrics are counted in tracks), and that stays on the page until that run is started
+  again - also when you go to another page, the **Log** say, and come back. A run goes on while you're on
+  another page of the app; reloading the app forgets what the last ones said. The three can run at
+  once, as here. When a run that saved something ends, the page reads the library again before it
+  offers that run again - its line says *Checking the library…* for that moment - so its button never
+  comes back over the albums it has just done.
+- **Narrow to** - the runs act on the whole library, or on the album folders whose artist, album,
+  edition or folder name hold every word you type there (*The runs act on 3 of 8 album folders: those
+  matching "portishead"*). Before you start one, each says how many album folders it will take and
+  what it writes - folders, as the line above counts them: an album you keep in two pressings is one
+  album in the scan's count and two folders here.
+
+The runs are offered once the library has been read from the disk - with the saved copy on screen
+the page says *Checking the library…* first, since the saved copy can be behind. On a phone the page
+says it needs a wider screen, with a link to this page.
 
 ## Deleting an album
 

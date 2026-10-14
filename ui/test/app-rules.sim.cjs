@@ -165,6 +165,20 @@
  *    off. What both pages hold - the drafts, the refusal, the tab, the lines - is kept in their modules,
  *    never as component state, so a page left and come back to still has it. The sidebar's Settings and
  *    Log are an admin's, after Needs a look; You's rows a desktop's.
+ *  - Looking after the library (2.0.0-player.42): Library care (app/LibraryCare.tsx) calls no playback
+ *    action, reads the library through the main page's hook only once it shows on a desktop, and on a
+ *    phone draws a note before anything; its runs are app/useLibraryCare.ts's - kept in the module, never
+ *    component state, each through a latestOnly() of its own, one album at a time through the routes a
+ *    single click uses (never a loop of its own on the server), started and stopped from a click - and
+ *    the targets are lib/bulkTargets.ts's, which the main page's Library tab takes too; a run that
+ *    wrote leaves its kind behind, held back until the library is read again; focus moving on from a
+ *    run's button is asked after the blur of its removal. Re-time saved lyrics is one component
+ *    (components/RetimeLyrics.tsx) both settings pages draw beside the lead, its run in its module,
+ *    reading a REAL scan, an ended run let go once said and as a new lead is typed. The sidebar's
+ *    Library care is an admin's, after Needs a look; You's row a desktop's; it is a sibling of the other
+ *    Managing pages. Needs a look warns when ignores can't be saved. The Edit panel has no link to the
+ *    main page left ("Choose the folder"), and its Lyrics note names Managing's Settings; the sidebar's
+ *    "Open the main page" names only artist images and re-filing.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -455,8 +469,10 @@ console.log('\na link out of the app opens beside it')
   //? (an album it can't find a folder for) in 2.0.0-player.21, and Needs a look's phone note in .25
   //? and (2.0.0-player.33) the server settings' line and its phone note, and the log's phone note
   //? (2.0.0-player.36: and Info > Debug's link to the turntable's test bench, a page of its own)
-  check('...and there are links to look at (You, the gate, the desktop sidebar, the Edit panel, Needs a look on a phone, the server settings, the log on a phone, Info > Debug\'s test bench)',
-    [...new Set(out.map(([file]) => file))].sort(), ['app/EditPanel.tsx', 'app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+  check('...and there are links to look at (You, the gate, the desktop sidebar, Needs a look, Library care and the log on a phone, the server settings, Info > Debug\'s test bench)',
+    //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
+    //? phone note came)
+    [...new Set(out.map(([file]) => file))].sort(), ['app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/LibraryCare.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -1645,20 +1661,124 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
   check('...drawn from the main page\'s settings tab\'s own parts, not copies',
     [/from '\.\.\/components\/SettingsView'/.test(settings), /<ServerGroup\b/.test(settings), /\bfunction SettingRow\b|settings-env-head/.test(settings)],
     [true, true, false])
-  check('the sidebar\'s Settings and Log: an admin\'s, after Needs a look, before the main page',
-    [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_SETTINGS\)\}\s*\{item\(SIDEBAR_LOG\)\}\s*<li>\s*<a/.test(sidebar)], [true])
+  //? (2.0.0-player.42: Library care between Needs a look and them)
+  check('the sidebar\'s Settings and Log: an admin\'s, after Needs a look and Library care, before the main page',
+    [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_CARE\)\}\s*\{item\(SIDEBAR_SETTINGS\)\}\s*\{item\(SIDEBAR_LOG\)\}\s*<li>\s*<a/.test(sidebar)], [true])
   check('You\'s rows: a desktop\'s, opening the pages through App',
-    [(you.match(/\{desktop && \(\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('(settings|log)'\)\}>/g) ?? []).length,
+    //? (2.0.0-player.42: and Library care's)
+    [(you.match(/\{desktop && \(\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('(care|settings|log)'\)\}>/g) ?? []).length,
       /onManaging=\{openManaging\}/.test(app), /move\.how === 'managing'\) \{\s*openManaging\(move\.kind\)/.test(app)],
-    [2, true, true])
+    [3, true, true])
   check('the Managing pages are siblings: each opened through one helper, one over another REPLACING it (never piled up)',
     [/const openQueue = useCallback\(\(\) => openManagingPage\(QUEUE_PAGE\), \[\]\)/.test(app),
-      /const openManaging = useCallback\(\(kind: 'settings' \| 'log'\) => openManagingPage\(kind === 'settings' \? SETTINGS_PAGE : LOG_PAGE\), \[\]\)/.test(app),
+      //? (2.0.0-player.42: Library care one of them)
+      /const openManaging = useCallback\(\(kind: ManagingKind\) => openManagingPage\(kind === 'care' \? CARE_PAGE : kind === 'settings' \? SETTINGS_PAGE : LOG_PAGE\), \[\]\)/.test(app),
       /if \(top\?\.kind === page\.kind\) return[\s\S]{0,120}if \(top && MANAGING_KINDS\.includes\(top\.kind\)\) router\.become\(top, page\)\s*else router\.open\(page\)/.test(app),
-      /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'settings', 'log'\]/.test(app)],
+      /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'care', 'settings', 'log'\]/.test(app)],
     [true, true, true, true])
   check('the pages memo is keyed on what they read - the visualizer too',
     [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown\]/.test(app)], [true, true])
+}
+
+console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.42)')
+{
+  const care = code(read('app/LibraryCare.tsx'))
+  const store = code(read('app/useLibraryCare.ts'))
+  const targets = code(read('lib/bulkTargets.ts'))
+  const retime = code(read('components/RetimeLyrics.tsx'))
+  const main = code(read('components/LibraryView.tsx'))
+  const tab = code(read('components/SettingsView.tsx'))
+  const server = code(read('app/ServerSettings.tsx'))
+  const panel = code(read('app/EditPanel.tsx'))
+  const queue = code(read('app/NeedsALook.tsx'))
+  const app = code(read('app/App.tsx'))
+  check('no playback action from Library care, its store, the targets or Re-time', [actionsIn(care), actionsIn(store), actionsIn(targets), actionsIn(retime)], [[], [], [], []])
+  check('the library read through the main page\'s hook, only once the page shows on a desktop; a phone\'s note drawn before anything',
+    [/const library = useLibrary\(desktop && live\)/.test(care), care.indexOf('if (!desktop) {') < care.indexOf('const real = library.loaded'), /app-care-phone/.test(care)],
+    [true, true, true])
+  check('App draws it a desktop\'s and an admin\'s, `live` as the other Managing pages\' - from the pages memo\'s one view',
+    [/<LibraryCare desktop=\{desktop && admin\} live=\{managingLive\(tab\)\}/.test(app), /page\.kind === 'care' \? careView\(tab\)/.test(app)],
+    [true, true])
+  check('Rescan is the scan that ignores the cache - refused while one is out; the library\'s listeners told once it has answered',
+    [/void library\.reload\(true\)\.then\(/.test(care), /if \(scanBusy \|\| library\.problem\) return/.test(care), /if \(albums\.length\) announceAlbumsFiled\(\)/.test(care)],
+    [true, true, true])
+  //? the bulk runs are driven from the client, one album at a time (notes/decisions.md): each step is the
+  //? route a single click uses, in a plain for loop, the next only once the last has answered
+  check('a run: one album at a time, the next only once the last has answered, Stop asked before each',
+    [/for \(const album of targets\) \{\s*if \(stopped\(\)\) break\s*let outcome: BulkOutcome\s*try \{\s*outcome = await step\(album\)/.test(targets), /Promise\.all|allSettled/.test(targets + store)],
+    [true, false])
+  check('...each step the route a single click uses - Get cover, Get CD art, Get lyrics - and no route of its own',
+    [/covers: pictureStep\(\(path\) => libraryApi\.fetchCoverArt\(path\)\)/.test(store), /disc: pictureStep\(\(path\) => libraryApi\.fetchDiscArt\(path\)\)/.test(store),
+      /await libraryApi\.fetchLyrics\(album\.path\)/.test(store), /\bpost\(|\bfetch\(/.test(store)],
+    [true, true, true, false])
+  check('...a 404 told apart from a failure, as the main page tells them',
+    [/caught instanceof ApiError && caught\.status === 404 \? \{ missing: 1 \} : \{ failed: 1 \}/.test(store)], [true])
+  check('...kept in the module (it outlives the page), each kind through a latestOnly() of its own, nothing of an older run drawn',
+    [/^let kept: CareState = fresh\(\)$/m.test(store), /useState<BulkRun|useState<CareState/.test(care + store), /tickets\[kind\]\.begin\(\)/.test(store),
+      /if \(!ticket\.current\(\)\) return\s*if \(now\.running\) keep\(\{ runs: \{ \.\.\.kept\.runs, \[kind\]: now \} \}\)/.test(store), /\(\) => kept\.stopping\[kind\] \|\| !ticket\.current\(\)/.test(store)],
+    [true, false, true, true, true])
+  check('...started and stopped from a click, over the targets worked out as it is pressed; the library told once at its end',
+    [/onClick=\{\(\) => void startBulk\(kind, targets\)\}/.test(care), /onClick=\{\(\) => stopBulk\(kind\)\}/.test(care), /if \(run\.written > 0\) announceAlbumsFiled\(\)/.test(store)],
+    [true, true, true])
+  check('...offered only from a REAL scan', [/const targets = real && !care\.behind\[kind\] \? bulkTargets\(kind, inScope\) : null/.test(care), /const real = library\.loaded && !library\.stale/.test(care)], [true, true])
+  //? (review: right after a run that wrote, its button came back over the albums it had just done)
+  check('...and not while a run of that kind that wrote is newer than the scan in hand: its kind behind as it ends, the library read again at once, a page drawn fresh behind nothing',
+    [/behind: now\.written > 0 \? \{ \.\.\.kept\.behind, \[kind\]: true \} : kept\.behind/.test(store),
+      /const kinds = BULK_KINDS\.filter\(\(kind\) => libraryCareNow\(\)\.behind\[kind\]\)[\s\S]{0,200}void library\.reload\(false\)\.then\(/.test(care),
+      /if \(pending\.answered && !library\.loading\) \{\s*catchUp\.current = null\s*caughtUp\(pending\.kinds\)/.test(care),
+      /useEffect\(\(\) => \{\s*caughtUp\(BULK_KINDS\)\s*\}, \[\]\)/.test(care)],
+    [true, true, true, true])
+  //? (review: Chromium blurs a focused button AS it removes it, still in the page - read at once, that
+  //? blur cleared the run whose words focus was to go to, and focus fell to the page)
+  check('...focus moving on from a run\'s button asked once the turn is over, never during the blur of its removal',
+    [/const leftRun = \(kind: BulkKind\) => \(event: FocusEvent\) => \{\s*const button = event\.currentTarget as HTMLElement\s*void Promise\.resolve\(\)\.then\(\(\) => \{\s*if \(focusedRun\.current === kind && button\.isConnected\) focusedRun\.current = null/.test(care)],
+    [true])
+  check('the targets are lib/bulkTargets.ts\'s, on BOTH pages - the main page\'s Library tab keeps no copy of its own',
+    [/coverTargets\(visibleGroups\.flatMap/.test(main), /lyricsTargets\(visibleGroups\.flatMap/.test(main), /discTargets\(visibleGroups\.flatMap/.test(main),
+      /!album\.art && album\.release_mbid|startsWith\('disc'\)|!album\.lyrics_count/.test(main)],
+    [true, true, true, false])
+  check('Re-time saved lyrics: one component both settings pages draw beside the lead, refused while the lead is a draft',
+    [/import \{ RetimeLyrics \} from '\.\/RetimeLyrics'/.test(tab), /\bfunction RetimeLyrics\b/.test(tab), /import \{ RetimeLyrics \} from '\.\.\/components\/RetimeLyrics'/.test(server),
+      (tab.match(/\{group\.id === 'lyrics' && \(?\s*<RetimeLyrics unsaved=\{draftEnv\['LYRICS_LEAD_MS'\] !== undefined\} \/>/g) ?? []).length,
+      (server.match(/\{group\.id === 'lyrics' && <RetimeLyrics unsaved=\{draftEnv\['LYRICS_LEAD_MS'\] !== undefined\} \/>\}/g) ?? []).length],
+    [true, false, true, 1, 1])
+  check('...reading a REAL scan (never the saved one), its run in its module, through a latestOnly()',
+    [/albums = \(await libraryApi\.listAlbums\(\)\)\.albums/.test(retime), /snapshot/.test(retime.replace(/\/\/.*$/gm, '')), /^let run: RetimeRun \| null = null$/m.test(retime), /const ticket = runs\.begin\(\)/.test(retime), /useState<RetimeRun/.test(retime)],
+    [true, false, true, true, false])
+  //? (review: kept in the module, an ended run's words outlived every later visit to the main page's tab)
+  check('...how a run ended said once: let go as the last thing drawing it goes, and as a new lead is typed',
+    [/listeners\.delete\(listener\)\s*if \(!listeners\.size && run && !run\.running\) run = null/.test(retime),
+      /useEffect\(\(\) => \{\s*if \(!unsaved \|\| !run\) return\s*if \(run\.running\) leadMoved = true\s*else run = null\s*\}\)/.test(retime)],
+    [true, true])
+  //? (second review: a lead typed AND saved while it ran left "re-timed 5 tracks." under the new lead, part
+  //? of it timed to the old - the server reads the lead as each album is asked for)
+  check('...and a lead typed while it ran lets it go as it ends: every ending through ended(), the flag cleared as a run starts',
+    [/const ended = \(last: RetimeRun\): RetimeRun \| null => \(leadMoved \? null : last\)/.test(retime),
+      (retime.match(/keep\(ended\(\{/g) ?? []).length, (retime.match(/keep\(\{[^}]*running: false/g) ?? []).length,
+      /if \(run\?\.running\) return\s*stop = false\s*leadMoved = false/.test(retime)],
+    [true, 2, 0, true])
+  check('the sidebar\'s Library care: an admin\'s, straight after Needs a look; You\'s row a desktop\'s',
+    [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_CARE\)\}/.test(code(read('app/Sidebar.tsx'))),
+      /\{desktop && \(\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('care'\)\}>/.test(code(read('app/You.tsx')))],
+    [true, true])
+  check('Needs a look warns when ignores can\'t be saved: the library\'s answer or the count\'s',
+    [/\{ignoresUnsaved\(library, tracking\) && <p class="app-queue-warning">\{IGNORES_UNSAVED\}<\/p>\}/.test(queue), /const tracking = useQueueTracking\(\)/.test(queue)],
+    [true, true])
+  //? the spec: "the two places that send you to the main page for it (ServerSettings.tsx, EditPanel.tsx) stop
+  //? doing so" - ServerSettings' line is pinned in settingslog.sim; the Edit panel's Lyrics note is words, not a
+  //? link, so the links-out count can't see it (review). Read raw: an apostrophe in JSX text isn't a string
+  const lyricsNote = (read('app/EditPanel.tsx').match(/<h3 id="app-edit-lyrics"[\s\S]*?<\/section>/) ?? [''])[0]
+  check('the Edit panel\'s Lyrics tab: re-timing named where it is - Managing\'s Settings, under Library - never the main page',
+    [/re-timing the lyrics already saved, are in Managing's Settings, under Library\./.test(lyricsNote), /main page/i.test(lyricsNote)], [true, false])
+  //? and the sidebar's link to the main page names only what is left there, as You's footnote does (you.sim)
+  const mainLink = (read('app/Sidebar.tsx').match(/<a\s+class="app-side-item"\s+href="\/"[\s\S]*?>/) ?? [''])[0]
+  check('the sidebar\'s "Open the main page": its title names only artist images and re-filing - not the bulk runs, Rescan or re-timing',
+    [/title="Artist images and re-filing - on the main page for now"/.test(mainLink), /bulk|covers|CD art|lyrics|rescan|re-tim/i.test(mainLink)], [true, false])
+  check('the Edit panel: no link to the main page left - "Choose the folder" over the scan, the folder chosen its subject for that Edit',
+    [linksOut(panel).length, /status\.choose && !pickingNow/.test(panel), /chosenPath \? folderOnly\(chosenPath\)/.test(panel),
+      /setChosen\(\{ key: request\.key, path \}\)\s*setPicking\(null\)\s*chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),
+      /setChosen\(null\)\s*setPicking\(null\)\s*lookUp\(request\)/.test(panel)],
+    [0, true, true, true, true])
 }
 
 console.log('\nthe checks themselves')

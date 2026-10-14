@@ -118,9 +118,9 @@ export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: b
  */
 export type LibraryPick = 'recent' | 'albums' | 'artists' | 'songs'
 
-/** The sidebar's items - `queue` is Managing's "Needs a look" (2.0.0-player.25), `settings` and `log`
- *  its "Settings" and "Log" (2.0.0-player.33) - an admin's. */
-export type SidebarId = 'home' | 'requests' | LibraryPick | 'queue' | 'settings' | 'log' | 'you'
+/** The sidebar's items - `queue` is Managing's "Needs a look" (2.0.0-player.25), `care` its "Library
+ *  care" (2.0.0-player.42), `settings` and `log` its "Settings" and "Log" (2.0.0-player.33) - an admin's. */
+export type SidebarId = 'home' | 'requests' | LibraryPick | 'queue' | 'care' | 'settings' | 'log' | 'you'
 
 export interface SidebarItem {
   id: SidebarId
@@ -152,7 +152,10 @@ export const LIBRARY_TITLES: Readonly<Record<LibraryPick, string>> = {
 /** Managing's own item (2.0.0-player.25): the review queue, above the link to the main page. */
 export const SIDEBAR_QUEUE: SidebarItem = { id: 'queue', label: 'Needs a look' }
 
-/** Managing's server settings and event log (2.0.0-player.33), after Needs a look. */
+/** Managing's Library care (2.0.0-player.42), after Needs a look: Rescan and the bulk runs. */
+export const SIDEBAR_CARE: SidebarItem = { id: 'care', label: 'Library care' }
+
+/** Managing's server settings and event log (2.0.0-player.33), after Library care. */
 export const SIDEBAR_SETTINGS: SidebarItem = { id: 'settings', label: 'Settings' }
 export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Log' }
 
@@ -175,6 +178,8 @@ export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Fr
  *  while its page is the one on top (`page`, the tab's top page), whatever tab it was pushed on. */
 export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null): SidebarId | null {
   if (page?.kind === 'queue') return 'queue'
+  //? Library care (2.0.0-player.42), the same way
+  if (page?.kind === 'care') return 'care'
   //? the server's settings and the log, the same way (2.0.0-player.33)
   if (page?.kind === 'settings') return 'settings'
   if (page?.kind === 'log') return 'log'
@@ -182,6 +187,10 @@ export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | 
   if (tab === 'library') return shownPick(pick, hasSongs, 'desktop')
   return tab
 }
+
+/** The Managing pages but Needs a look, which opens through its own move: Library care
+ *  (2.0.0-player.42), the server's settings and the log (2.0.0-player.33). */
+export type ManagingKind = 'care' | 'settings' | 'log'
 
 /**
  * What a sidebar item does, from where the app is. Home, Requests and You are their tabs' buttons -
@@ -193,12 +202,12 @@ export type SidebarMove =
   | { how: 'view'; tab: 'library'; pick: LibraryPick }
   /** Needs a look: its page, on You (App's openQueue) */
   | { how: 'queue'; tab: 'you' }
-  /** the server's settings, or the log: its page, on You (App's openManaging) */
-  | { how: 'managing'; tab: 'you'; kind: 'settings' | 'log' }
+  /** Library care, the server's settings, or the log: its page, on You (App's openManaging) */
+  | { how: 'managing'; tab: 'you'; kind: ManagingKind }
 
 export function sidebarMove(item: SidebarId, pick: LibraryPick, hasSongs: boolean | null): SidebarMove {
   if (item === 'queue') return { how: 'queue', tab: 'you' }
-  if (item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
+  if (item === 'care' || item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
   if (item === 'home' || item === 'requests' || item === 'you') return { how: 'tab', tab: item }
   if (item === shownPick(pick, hasSongs, 'desktop')) return { how: 'tab', tab: 'library' }
   return { how: 'view', tab: 'library', pick: item }

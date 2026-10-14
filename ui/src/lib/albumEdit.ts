@@ -29,9 +29,16 @@
  *
  * WHAT THE PANEL SAYS (`editStatus`) while it has no album to edit, and `deletesAll`: whether a
  * delete leaves Navidrome's album with nothing, so the page goes back from it.
+ *
+ * CHOOSE THE FOLDER (2.0.0-player.42, `folderChoices`): when no folder is found - by release or by name
+ * - the user picks it from the library's scan, typing to narrow the list (every word somewhere in the
+ * folder's path, artist or album), and the folder chosen is the subject from then on, as an album opened
+ * from Needs a look by its folder is (`folderOnly`). It replaced the panel's one way on, a link to the
+ * main page's library.
  */
 
 import { foldName } from './owned'
+import { matchesTyped } from './typedMatch'
 
 /** What the panel reads of the id bridge's answer (api/types.ts StoreAlbumResponse). */
 export interface BridgeFolders {
@@ -136,6 +143,31 @@ export function folderOnly(path: string): EditFolders {
   return path ? { paths: [path], from: 'folder' } : NOWHERE
 }
 
+/** How many of the scan's folders "Choose the folder" lists at once - type more to narrow the rest. */
+export const FOLDER_CHOICES_SHOWN = 50
+
+/** "Choose the folder": the scan's folders matching what was typed (every word somewhere in the
+ *  folder's path, artist or album - accents and case aside), by path, the first `limit` of them, and
+ *  how many match in all. */
+export function folderChoices<T extends ScanAlbum>(
+  albums: readonly T[],
+  typed: string,
+  limit = FOLDER_CHOICES_SHOWN,
+): { shown: T[]; matching: number } {
+  const matching = albums
+    .filter((album) => matchesTyped(`${album.path} ${album.artist} ${album.album}`, typed))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+  return { shown: matching.slice(0, Math.max(0, limit)), matching: matching.length }
+}
+
+/** What "Choose the folder" says over its list: how many it shows of how many match. */
+export function folderChoicesWords(shown: number, matching: number, typed: string): string {
+  const narrowed = typed.trim() !== ''
+  if (!matching) return narrowed ? "No folder in the library's scan matches that." : "The library's scan lists no folders."
+  if (shown < matching) return `The first ${shown} of ${matching} folders${narrowed ? ' that match' : ''} - type more of the folder's name to narrow them.`
+  return `${matching} folder${matching === 1 ? '' : 's'}${narrowed ? (matching === 1 ? ' matches' : ' match') : ''} - pick the one this album is.`
+}
+
 /** Whether the user has to say which folder it is: several found by name alone. Several of the
  *  release (a set kept one folder per disc) start on the first, with the others a choice away. */
 export function needsChoice(folders: EditFolders): boolean {
@@ -157,8 +189,9 @@ export interface EditStatus {
   busy?: boolean
   /** "Look again": the bridge asked again, and the library read again */
   retry?: boolean
-  /** a link to the main page's library, to find the album there */
-  mainPage?: boolean
+  /** "Choose the folder" (2.0.0-player.42): the user picks the album's folder from the scan - where
+   *  until then the only way on was the main page's library */
+  choose?: boolean
 }
 
 export interface EditStatusFacts {
@@ -206,7 +239,7 @@ export function editStatus(facts: EditStatusFacts): EditStatus | null {
         ? 'deadwax has no folder of this album: Navidrome knows it by a MusicBrainz release no folder in the library is tagged with.'
         : "deadwax can't tell which folder this album is: Navidrome knows it by no MusicBrainz release, and no untagged folder in the library has its name.",
       retry: true,
-      mainPage: true,
+      choose: true,
     }
   }
   //? the panel draws the folders to choose from instead

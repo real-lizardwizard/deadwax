@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 
-import { SIDEBAR_LOG, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
+import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
 import { needsLookLabel } from '../lib/needsLook'
 import { badgeLabel, badgeText } from '../lib/requestsView'
 import { SEARCH_MAX_CHARS } from '../lib/searchQuery'
@@ -25,10 +25,11 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
  * the desktop frame shows; with logins off, everyone is, as You's row, which asks the same): "Needs a
  * look" first (2.0.0-player.25), the review queue's page, with how many albums need one
  * (`needsLook`, app/useQueueSummary.ts - no badge while that isn't known, never a 0 over an unknown);
- * then "Settings" and "Log" (2.0.0-player.33), the server's settings and the event log as pages of the
- * app - no unread count on the Log, which would need its stream held open; then the link to the main
- * page (James: "Managing links to / for now"), for what the app doesn't have yet - the bulk runs,
- * artist images, re-filing. It opens BESIDE the app, as
+ * then "Library care" (2.0.0-player.42), Rescan and the bulk runs; then "Settings" and "Log"
+ * (2.0.0-player.33), the server's settings and the event log as pages of the app - no unread count on
+ * the Log, which would need its stream held open; then the link to the main page (James: "Managing
+ * links to / for now"), for what the app doesn't have yet - artist images and re-filing. It opens
+ * BESIDE the app, as
  * every link out does - in the same tab it would unload the player.
  *
  * A leaf: props, and the search box's store.
@@ -135,6 +136,7 @@ export function Sidebar({
           </h2>
           <ul class="app-side-list">
             {item(SIDEBAR_QUEUE)}
+            {item(SIDEBAR_CARE)}
             {item(SIDEBAR_SETTINGS)}
             {item(SIDEBAR_LOG)}
             <li>
@@ -143,7 +145,7 @@ export function Sidebar({
                 href="/"
                 target="_blank"
                 rel="noopener"
-                title="The bulk runs, artist images and re-filing - on the main page for now"
+                title="Artist images and re-filing - on the main page for now"
               >
                 <span class="app-side-item-label">Open the main page</span>
               </a>

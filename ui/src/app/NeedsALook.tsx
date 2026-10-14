@@ -6,13 +6,13 @@ import { useLibrary } from '../hooks/useLibrary'
 import { albumArtUrl } from '../lib/format'
 import { isNewImport, issueLabel, outstandingIssues } from '../lib/metadataQueue'
 import {
-  MARK_WORDS, NEEDS_LOOK_LINE, NEEDS_LOOK_PHONE, facetAlbums, facetShown, facets, leavingAtEnd, rowChanged, startSession,
-  stepTarget, summaryTotal,
+  IGNORES_UNSAVED, MARK_WORDS, NEEDS_LOOK_LINE, NEEDS_LOOK_PHONE, facetAlbums, facetShown, facets, ignoresUnsaved, leavingAtEnd,
+  rowChanged, startSession, stepTarget, summaryTotal,
   type Facet, type FolderChange, type LookSession, type RowMark,
 } from '../lib/needsLook'
 import { ChevronLeftIcon } from '../player/icons'
 import type { FolderRequest } from './EditPanel'
-import { askQueueSummary, setPageQueueCount } from './useQueueSummary'
+import { askQueueSummary, setPageQueueCount, useQueueTracking } from './useQueueSummary'
 import { takeOpener } from './useSheet'
 
 /** A row as drawn: the album, the key it keeps for the session, what became of it. */
@@ -67,6 +67,9 @@ const focusLost = (): boolean => {
  * Its count: while it shows with a REAL scan in hand, and no session, its All count stands in for the
  * server's (useQueueSummary.ts's setPageQueueCount) - one function over the same albums.
  *
+ * IGNORES THAT CAN'T BE SAVED are warned of (2.0.0-player.42), as the main page's queue warns: when the
+ * library's answer or the count's says deadwax has no job store, an "It's fine as it is" comes back.
+ *
  * On a PHONE it is a short note, asking nothing: no editor has a board there yet.
  */
 export function NeedsALook({
@@ -97,6 +100,8 @@ export function NeedsALook({
   //? read only once it shows on a desktop - a phone asks nothing at all
   const library = useLibrary(desktop && shown)
   const real = library.loaded && !library.stale && !library.error
+  //? whether deadwax can keep ignores, as the count's route last said (null: not yet)
+  const tracking = useQueueTracking()
 
   const [session, setSession] = useState<LookSession | null>(null)
   //? read by the callbacks the panel's request carries, which outlive the render that made them
@@ -339,6 +344,7 @@ export function NeedsALook({
       {header}
       <div ref={body} class="app-queue-body" tabIndex={-1}>
         <p class="app-queue-line">{NEEDS_LOOK_LINE}</p>
+        {ignoresUnsaved(library, tracking) && <p class="app-queue-warning">{IGNORES_UNSAVED}</p>}
 
         {library.problem ? (
           <p class="app-queue-state">{library.problem}</p>

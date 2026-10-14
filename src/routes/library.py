@@ -915,12 +915,21 @@ async def fetch_cover_art(request: Request, body: CoverArtRequest):
         if plan["problem"]:
             raise HTTPException(status_code=400, detail=plan["problem"])
 
-        art = await coverart_client.fetch_front(plan["release_mbid"] or "")
+        art, why = await coverart_client.fetch_front_why(plan["release_mbid"] or "")
 
-        if art is None:
+        #? a 404 only for a release the Archive has no cover for - a fact about the release, which
+        #? a bulk run counts apart; an Archive that couldn't be reached or answered badly is worth
+        #? trying again, and says so (2.0.0-player.42, as /disc_art/fetch already did)
+        if art is None and why == "missing":
             raise HTTPException(
                 status_code=404,
                 detail="the Cover Art Archive has no front cover for that release",
+            )
+        if art is None:
+            raise HTTPException(
+                status_code=502,
+                detail="the Cover Art Archive couldn't be reached - try again" if why == "unreachable"
+                else "the cover couldn't be downloaded from the Cover Art Archive - try again",
             )
 
         results = await asyncio.to_thread(

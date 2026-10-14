@@ -8,8 +8,9 @@
  *
  * What it pins:
  *
- *  - SERVER SETTINGS: the server's groups only - no browser preference of the main page's, no Re-time
- *    lyrics (one line says they are the main page's, its link beside the app); every rule of a row (a
+ *  - SERVER SETTINGS: the server's groups only - no browser preference of the main page's (one line
+ *    says they are the main page's, its link beside the app) - and, since 2.0.0-player.42, Re-time saved
+ *    lyrics under the Lyrics group alone, refused while the lead is a draft; every rule of a row (a
  *    secret masked, choices a dropdown, a locked one saying why, revert, the retype note); drafts kept
  *    across the tabs (a tab holding one marked) and ONE save sending them all in one batch; a refusal
  *    said in the bar with every draft still there, until the next save or Discard; Save the one solid
@@ -104,6 +105,9 @@ globalThis.fetch = (address, init) => new Promise((resolve, reject) => globalThi
 write('player/icons.js', `exports.ChevronLeftIcon = function Icon() { return null }\n`)
 //? the main page's settings tab pulls in modules the server half never calls
 write('components/Loading.js', `exports.Loading = () => null; exports.LoadingPanel = () => null\n`)
+//? Re-time saved lyrics (2.0.0-player.42), the tab's own, drawn where the page draws it - itself pinned
+//? in care.sim.cjs: here a stand-in that says where it went and what it was told
+write('components/RetimeLyrics.js', `exports.RetimeLyrics = ({ unsaved }) => ({ type: 'div', props: { class: 'retime-stub', 'data-unsaved': unsaved, children: 'Re-time saved lyrics' } })\n`)
 write('state/persisted.js', `
 exports.readSettingsTab = () => null; exports.writeSettingsTab = () => {}
 exports.useDownloadDefaults = () => [{}, () => {}]; exports.usePreferences = () => [{}, () => {}, () => {}]
@@ -322,14 +326,18 @@ async function settingsPage() {
   check('Library: the organizing verdict, its blockers, the library groups, then the organize modes',
     [words(classed('settings-verdict-title')[0]), classed('settings-verdict-list')[0] && words(classed('settings-verdict-list')[0]), classed('settings-section-title').map(words)],
     ['Organizing will not file anything right now.', 'SLSKD_DOWNLOAD_PATH is not set', ['Paths', 'Organizing', 'Lyrics', 'Organize modes']])
-  check('no browser preference of the main page\'s, no Re-time lyrics',
+  check('no browser preference of the main page\'s',
     [find((node) => /Results per search|Auto-grab|Studio albums|Open the log on start/.test(typeof node === 'string' ? node : '')).length,
-      words(tree).includes('Results per search'), words(tree).includes('Auto-grab'), words(tree).includes('Re-time saved lyrics')],
-    [0, false, false, false])
+      words(tree).includes('Results per search'), words(tree).includes('Auto-grab')],
+    [0, false, false])
+  //? (2.0.0-player.42) Re-time saved lyrics is here now, beside the lead as on the main page's tab
+  const lyricsGroup = find((node) => byClass('settings-section')(node) && words(classed('settings-section-title', node)[0]) === 'Lyrics')[0]
+  check('Re-time saved lyrics: once, inside the Lyrics group, after its rows - the lead saved, so not refused',
+    [classed('retime-stub').length, classed('retime-stub', lyricsGroup).length, classed('retime-stub')[0]?.props['data-unsaved']], [1, 1, false])
   const line = classed('app-settings-line')[0]
   const lineLink = find((node) => node.type === 'a', line)[0]
-  check('...one line says they are the main page\'s, its link beside the app',
-    [words(line).includes("This browser's preferences and re-timing saved lyrics are on"), lineLink.props.href, lineLink.props.target, lineLink.props.rel], [true, '/', '_blank', 'noopener'])
+  check('...one line says the browser\'s preferences are the main page\'s, its link beside the app - re-timing no longer',
+    [words(line).includes("This browser's preferences are on"), /re-tim/i.test(words(line)), lineLink.props.href, lineLink.props.target, lineLink.props.rel], [true, false, '/', '_blank', 'noopener'])
   check('a row: where its value came from, its status, what it does',
     [words(row('LIBRARY_PATH')).includes('Set here'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Needs attention'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Not set: nothing can be filed.'), words(row('LIBRARY_PATH')).includes('what LIBRARY_PATH does')],
     [true, true, true, true])
@@ -683,6 +691,31 @@ async function settingsPage() {
     keys.draw()
     check('...any other key moves nothing and is left to the page', [tab('connections').props['aria-selected'], prevented], [true, 3])
     keys.unmount()
+  }
+
+  console.log('\nserver settings: Re-time saved lyrics refused while the lead is a draft (2.0.0-player.42)')
+  {
+    reset()
+    const lead = mount(ServerSettings)
+    lead.draw()
+    W.reads[0].resolve(SETTINGS())
+    await settle()
+    lead.draw()
+    const refused = () => classed('retime-stub')[0]?.props['data-unsaved']
+    check('the lead as saved: re-timing offered', refused(), false)
+    type('LYRICS_LEAD_MS', '300')
+    lead.draw()
+    check('the lead typed: refused - it re-times to the SAVED lead', refused(), true)
+    type('LYRICS_LEAD_MS', '0')
+    lead.draw()
+    check('...typed back to the saved value: no draft, offered again', refused(), false)
+    type('ORGANIZE_MODE', 'move')
+    lead.draw()
+    check('...another setting\'s draft refuses nothing', refused(), false)
+    button('Revert to the environment (/data/music)').props.onClick()
+    lead.draw()
+    check('...nor does a revert of another setting', refused(), false)
+    lead.unmount()
   }
 }
 

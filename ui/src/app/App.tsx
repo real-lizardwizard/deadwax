@@ -4,9 +4,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
-import { closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type SidebarId } from '../lib/appFrame'
+import { closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type ManagingKind, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
-import { LOG_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
+import { CARE_PAGE, LOG_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
@@ -33,6 +33,7 @@ import { EventLog } from './EventLog'
 import { EditPanel, isFolderRequest, type AlbumChange, type EditRequest, type FolderRequest } from './EditPanel'
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
+import { LibraryCare } from './LibraryCare'
 import { chooseLibrary, libraryPick, librarySongs, useLibraryPick } from './libraryPick'
 import { NeedsALook } from './NeedsALook'
 import { NeedsNavidrome } from './NeedsNavidrome'
@@ -66,7 +67,7 @@ function sessionStore(): StorageLike | null {
 const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
 
 /** The Managing pages, siblings in the sidebar: one opened over another replaces it. */
-const MANAGING_KINDS: readonly PageKind[] = ['queue', 'settings', 'log']
+const MANAGING_KINDS: readonly PageKind[] = ['queue', 'care', 'settings', 'log']
 
 /** Nothing arriving: one array for every render, so Home's element holds still while it stays so. */
 const NOTHING_ARRIVING: readonly RequestRow[] = []
@@ -614,7 +615,7 @@ export function App() {
     setInfoPanel(false)
   }, [])
 
-  //? A Managing page - Needs a look (2.0.0-player.25), the server's settings or the log (2.0.0-player.33) -
+  //? A Managing page - Needs a look (2.0.0-player.25), Library care (.42), the server's settings or the log (.33) -
   //? from the sidebar or You's rows: its page, on You - the tab shown as it was left and the page pushed
   //? over it, or nothing when it is already the page on top there. Another Managing page on top is
   //? REPLACED by it (`router.become`: its entry replaced, never a page pushed over it - the three are
@@ -631,7 +632,7 @@ export function App() {
     else router.open(page)
   }
   const openQueue = useCallback(() => openManagingPage(QUEUE_PAGE), [])
-  const openManaging = useCallback((kind: 'settings' | 'log') => openManagingPage(kind === 'settings' ? SETTINGS_PAGE : LOG_PAGE), [])
+  const openManaging = useCallback((kind: ManagingKind) => openManagingPage(kind === 'care' ? CARE_PAGE : kind === 'settings' ? SETTINGS_PAGE : LOG_PAGE), [])
   //? a facet chosen there: the page's address replaced, as a pressing chosen on a group page
   const pickFacet = useCallback((facet: string | null) => {
     router.update({ kind: 'queue', id: QUEUE_ID, ...(facet ? { facet } : {}) })
@@ -952,9 +953,13 @@ export function App() {
   const logView = (tab: Tab) => (
     <EventLog desktop={desktop && admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
+  //? Library care (2.0.0-player.42): Rescan and the bulk runs, a desktop's and an admin's, by the same rule
+  const careView = (tab: Tab) => (
+    <LibraryCare desktop={desktop && admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+  )
 
   const pageView = (tab: Tab, page: Page, player: Player) =>
-    page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
+    page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'care' ? careView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}

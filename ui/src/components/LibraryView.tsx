@@ -6,6 +6,7 @@ import type { LibraryAlbum } from '../api/types'
 import { bridge } from '../bridge'
 import { useLibrary } from '../hooks/useLibrary'
 import { useTrackDetails } from '../hooks/useTrackDetails'
+import { coverTargets, discTargets, lyricsTargets } from '../lib/bulkTargets'
 import { formatAge, formatSize } from '../lib/format'
 import { groupAlbums, type AlbumGroup } from '../lib/groupAlbums'
 import {
@@ -328,40 +329,25 @@ export function LibraryView({ active, onNavigate }: Props) {
     duration: albums.reduce((n, a) => n + a.duration, 0),
   }), [albums])
 
-  /**
-   * Albums IN VIEW that a cover could be fetched for.
-   *
-   * Scoped to what the tree is showing so the views compose with it - narrow to "no cover art",
-   * or search for one artist, and the bulk action follows. They must already name a release,
-   * because that is what the Archive is asked about.
+  /*
+   * Albums IN VIEW that each bulk run would take - scoped to what the tree is showing so the views
+   * compose with it: narrow to "no cover art", or search for one artist, and the bulk action
+   * follows. Which albums each run takes is lib/bulkTargets.ts's (2.0.0-player.42: the app's Library
+   * care page runs the same three over the same rules): a cover or CD art needs a release to ask
+   * about, and lyrics are offered only to an album with none at all.
    */
   const artCandidates = useMemo(
-    () => visibleGroups.flatMap((group) => group.editions)
-                       .filter((album) => !album.art && album.release_mbid),
+    () => coverTargets(visibleGroups.flatMap((group) => group.editions)),
     [visibleGroups],
   )
 
-  /**
-   * Albums IN VIEW with no lyrics on disk at all.
-   *
-   * Not "any track missing": an album with one instrumental track would then be offered for
-   * ever, and every run would ask LRCLIB about it again. A partly-covered album is finished
-   * from its own Get lyrics button, which looks up only the tracks still without them.
-   */
   const lyricsCandidates = useMemo(
-    () => visibleGroups.flatMap((group) => group.editions)
-                       .filter((album) => !album.lyrics_count),
+    () => lyricsTargets(visibleGroups.flatMap((group) => group.editions)),
     [visibleGroups],
   )
 
-  /**
-   * Albums IN VIEW that CD art could be fetched for: they name a release, and have none of
-   * deadwax's own `disc*` images. A download's `cd.jpg` scan doesn't count - see GetDiscArtButton.
-   */
   const discCandidates = useMemo(
-    () => visibleGroups.flatMap((group) => group.editions)
-                       .filter((album) => album.release_mbid
-                         && !(album.disc_art ?? []).some((name) => name.toLowerCase().startsWith('disc'))),
+    () => discTargets(visibleGroups.flatMap((group) => group.editions)),
     [visibleGroups],
   )
 

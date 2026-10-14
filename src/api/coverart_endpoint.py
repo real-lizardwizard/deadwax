@@ -113,8 +113,23 @@ class CoverArtClient:
         the release has no art, the Archive is down, the download is truncated - because none of
         them are errors worth failing a retag over. The tags are the point; the art is a bonus.
         """
+        art, _reason = await self.fetch_front_why(release_mbid, size)
+        return art
+
+    async def fetch_front_why(
+        self, release_mbid: str, size: str | int | None = None,
+    ) -> tuple[tuple[bytes, str] | None, str]:
+        """
+        fetch_front, and why not when there's no cover: "missing" when the Archive answered that the
+        release has none (or there is no release to ask about) - a fact about the release - and
+        "unreachable", "failed", "truncated" or "not an image" when the request didn't come back with
+        one, which is worth trying again (2.0.0-player.42: /library/art/fetch tells the two apart, as
+        /library/disc_art/fetch does, so a run of Get covers during one of the Archive's outages says
+        "failed - try those again" rather than "had none on the Archive"). After the 1200px fallback the
+        reason is that request's own: a release whose 1200px copy is a 404 has no cover.
+        """
         if not release_mbid:
-            return None
+            return None, "missing"
 
         size = str(size or Config.COVER_ART_SIZE or DEFAULT_SIZE)
         if size not in COVER_ART_SIZES:
@@ -127,9 +142,9 @@ class CoverArtClient:
                 f"the original cover for {release_mbid} isn't an image that can be saved, "
                 f"so using the Archive's {FULL_SIZE_FALLBACK}px copy instead"
             )
-            art, _ = await self._fetch(release_mbid, FULL_SIZE_FALLBACK)
+            art, reason = await self._fetch(release_mbid, FULL_SIZE_FALLBACK)
 
-        return art
+        return art, reason
 
     async def _fetch(self, release_mbid: str, size: str) -> tuple[tuple[bytes, str] | None, str]:
         """One request: the art, or None and a short reason why not."""

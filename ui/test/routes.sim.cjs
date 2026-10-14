@@ -63,6 +63,11 @@
  *    one page each as the queue's is (any id made canonical, nothing more in the address), back saying
  *    "You", a reload keeping them; the sidebar's "Settings" and "Log", current while their page is on
  *    top and opening it on You.
+ *  - Looking after the library (2.0.0-player.42): Library care at `#/you/care/library`, one page as
+ *    they are, a sibling of theirs (made from and into them by `become`); its sidebar item, after Needs a
+ *    look; and the Edit panel's "Choose the folder" - offered wherever no folder was found (by release
+ *    or by name), its list the scan's folders narrowed by typing (every word, accents and case aside),
+ *    by path, the first 50 drawn and the rest counted, and what it says over them.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -737,10 +742,40 @@ console.log('\nediting an album: the panel\'s rules (2.0.0-player.21, lib/albumE
     [{ text: "deadwax couldn't read the library: down", retry: true }, null, { text: "The library's scan doesn't list P/Dummy yet.", retry: true }])
   check('...an album held keeps its editors, whatever a later read finds (a hand edit renamed it out of the name it was found by)',
     E.editStatus(facts({ holding: true, folders: { paths: [], from: 'none' }, release: null })), null)
-  check('...no folder: by release, or by name - Look again, and the main page',
+  //? (2.0.0-player.42: "Choose the folder" over the scan where the main page's library was the one way on)
+  check('...no folder: by release, or by name - Look again, and Choose the folder (no main page any more)',
     [E.editStatus(facts({ folders: { paths: [], from: 'none' } })).text.startsWith('deadwax has no folder of this album'),
       E.editStatus(facts({ folders: { paths: [], from: 'none' }, release: null })).text.startsWith("deadwax can't tell which folder"),
-      E.editStatus(facts({ folders: null })).retry, E.editStatus(facts({ folders: null })).mainPage], [true, true, true, true])
+      E.editStatus(facts({ folders: null })).retry, E.editStatus(facts({ folders: null })).choose,
+      E.editStatus(facts({ folders: { paths: [], from: 'none' }, release: null })).choose, 'mainPage' in E.editStatus(facts({ folders: null }))],
+    [true, true, true, true, true, false])
+  check('...offered only where nothing was found: not over the busy states, a scan that doesn\'t list one folder, a failed read',
+    [E.editStatus(facts({ asked: false })).choose, E.editStatus(facts({})).choose, E.editStatus(facts({ stale: true, error: 'x' })).choose, E.editStatus(facts({ folders: twoByName }))],
+    [undefined, undefined, undefined, null])
+
+  //? "Choose the folder" (2.0.0-player.42): the scan's folders, narrowed by typing
+  const scanned = [
+    { path: 'Sigur Rós/( ) (2002)', album: '( )', artist: 'Sigur Rós', release_mbid: 'r1', track_count: 8 },
+    { path: 'Old Rips/Third rip', album: 'Third', artist: 'Portishead', release_mbid: '', track_count: 11 },
+    { path: 'Portishead/Dummy (1994)', album: 'Dummy', artist: 'Portishead', release_mbid: 'r2', track_count: 11 },
+    { path: 'Björk/Homogenic (1997)', album: 'Homogenic', artist: 'Björk', release_mbid: 'r3', track_count: 10 },
+  ]
+  const shownPaths = (choice) => choice.shown.map((album) => album.path)
+  check('Choose the folder: nothing typed lists every folder, by path', [shownPaths(E.folderChoices(scanned, '')), E.folderChoices(scanned, '').matching],
+    [['Björk/Homogenic (1997)', 'Old Rips/Third rip', 'Portishead/Dummy (1994)', 'Sigur Rós/( ) (2002)'], 4])
+  check('...every word typed somewhere in the path, artist or album - accents and case aside',
+    [shownPaths(E.folderChoices(scanned, 'PORTISHEAD')), shownPaths(E.folderChoices(scanned, 'portishead third')), shownPaths(E.folderChoices(scanned, 'sigur ros 2002')), shownPaths(E.folderChoices(scanned, 'bjork')), shownPaths(E.folderChoices(scanned, 'rip dummy'))],
+    [['Old Rips/Third rip', 'Portishead/Dummy (1994)'], ['Old Rips/Third rip'], ['Sigur Rós/( ) (2002)'], ['Björk/Homogenic (1997)'], []])
+  const many = Array.from({ length: 120 }, (_, n) => ({ path: `A/${String(n).padStart(3, '0')}`, album: `${n}`, artist: 'A', release_mbid: '', track_count: 1 }))
+  check('...the first 50 drawn, every match counted', [E.FOLDER_CHOICES_SHOWN, E.folderChoices(many, '').shown.length, E.folderChoices(many, '').matching, E.folderChoices(many, '').shown[49].path],
+    [50, 50, 120, 'A/049'])
+  check('...and what it says over them',
+    [E.folderChoicesWords(50, 120, ''), E.folderChoicesWords(50, 60, 'a'), E.folderChoicesWords(2, 2, 'portishead'), E.folderChoicesWords(1, 1, 'third'), E.folderChoicesWords(4, 4, ''), E.folderChoicesWords(0, 0, 'zzz'), E.folderChoicesWords(0, 0, '')],
+    ["The first 50 of 120 folders - type more of the folder's name to narrow them.", "The first 50 of 60 folders that match - type more of the folder's name to narrow them.",
+      '2 folders match - pick the one this album is.', '1 folder matches - pick the one this album is.', '4 folders - pick the one this album is.',
+      "No folder in the library's scan matches that.", "The library's scan lists no folders."])
+  check('...and the folder chosen is the panel\'s as a folder request\'s is: that one, nothing to choose', [E.folderOnly('Old Rips/Third rip'), E.needsChoice(E.folderOnly('Old Rips/Third rip'))],
+    [{ paths: ['Old Rips/Third rip'], from: 'folder' }, false])
   check('...several by name: the choice drawn instead; deleted, the folder named; LIBRARY_PATH unset, said first',
     [E.editStatus(facts({ folders: twoByName })), E.editStatus(facts({ deleted: 'P/Dummy', holding: true })), E.editStatus(facts({ problem: 'LIBRARY_PATH is not set', asked: false }))],
     [null, { text: 'Deleted P/Dummy.' }, { text: 'LIBRARY_PATH is not set' }])
@@ -1034,6 +1069,38 @@ console.log('\nThe server\'s settings and the log: one page each, as the queue\'
     ['settings', 'log', 'settings', 'queue', 'you'])
   check('...a tap opens its page, on You', [F.sidebarMove('settings', 'albums', true), F.sidebarMove('log', 'albums', true)],
     [{ how: 'managing', tab: 'you', kind: 'settings' }, { how: 'managing', tab: 'you', kind: 'log' }])
+}
+
+console.log('\nLibrary care: one page, a sibling of the other Managing pages (2.0.0-player.42)')
+{
+  check('pushed on You: #/you/care/library', R.parseHash('#/you/care/library'),
+    { route: { tab: 'you', page: { kind: 'care', id: 'library' } }, canonical: '#/you/care/library' })
+  check('...one page: any other id is it, nothing more kept; with no id, the tab\'s root',
+    [R.parseHash('#/you/care/whatever?facet=new&release=x').canonical, R.parseHash('#/you/care').canonical], ['#/you/care/library', '#/you'])
+  check('the page App opens, labelled for the back button above it', R.CARE_PAGE, { kind: 'care', id: 'library', label: 'Library care' })
+  check('its scroll under its address; not the same page as any other Managing page',
+    [R.scrollKey({ tab: 'you', page: R.CARE_PAGE }), R.samePage(R.CARE_PAGE, R.QUEUE_PAGE), R.samePage(R.CARE_PAGE, R.SETTINGS_PAGE), R.samePage(R.CARE_PAGE, R.LOG_PAGE)],
+    ['#/you/care/library', false, false, false])
+  const nav = R.openPage(R.startNav({ tab: 'you', page: null }), R.CARE_PAGE)
+  check('back from it says "You"; from a page over it, "Library care"', [R.backLabel(nav), R.backLabel(R.openPage(nav, R.LOG_PAGE))], ['You', 'Library care'])
+  const c = makeBrowser('#/you/care/library')
+  c.load()
+  check('a reload (or a link) opens it', c.router.nav.stacks.you, [{ kind: 'care', id: 'library' }])
+  const d = makeBrowser('#/you')
+  d.load()
+  d.router.open(R.QUEUE_PAGE)
+  d.router.become(R.QUEUE_PAGE, R.CARE_PAGE)
+  check('made from Needs a look by `become`: the entry replaced, back still "You"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
+    [['#/you', '#/you/care/library'], [R.CARE_PAGE], 'You'])
+  d.router.become(R.CARE_PAGE, R.SETTINGS_PAGE)
+  d.router.back()
+  d.settle()
+  check('...made into Settings, and back leaves them all in one step', [where(d), d.index], [['you', []], 0])
+
+  check('the sidebar: Library care is Managing\'s item', F.SIDEBAR_CARE, { id: 'care', label: 'Library care' })
+  check('...current while its page is on top, whatever its tab', [F.sidebarCurrent('you', 'albums', true, R.CARE_PAGE), F.sidebarCurrent('home', 'albums', true, R.CARE_PAGE), F.sidebarCurrent('search', 'albums', true, R.CARE_PAGE)],
+    ['care', 'care', 'care'])
+  check('...a tap opens its page, on You, as Settings and Log do', F.sidebarMove('care', 'albums', true), { how: 'managing', tab: 'you', kind: 'care' })
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

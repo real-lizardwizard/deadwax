@@ -205,6 +205,21 @@ export const NEEDS_LOOK_LINE =
  *  to "the main page", opening beside the app. */
 export const NEEDS_LOOK_PHONE = 'Fixing albums needs a wider screen for now - or'
 
+/** Said when ignores can't be saved (2.0.0-player.42) - the main page's warning, in the app's words. */
+export const IGNORES_UNSAVED = "Ignores can't be saved: deadwax couldn't open its job store (DB_PATH), so an album you "
+  + "accept with \u201cIt's fine as it is\u201d will come back."
+
+/**
+ * Whether to warn that ignores can't be saved (2.0.0-player.42), as the main page's queue warns: the
+ * library's own answer says review tracking is off (`review_tracking_enabled`, once a read has landed),
+ * or the count's route does (`tracking_enabled` - null until it has answered). Either one is enough:
+ * both are deadwax saying it has no job store, and an "It's fine as it is" that silently comes back
+ * is the thing to warn of.
+ */
+export function ignoresUnsaved(library: { loaded: boolean; reviewTracking: boolean }, summaryTracking: boolean | null): boolean {
+  return (library.loaded && !library.reviewTracking) || summaryTracking === false
+}
+
 /** What VoiceOver hears for "Needs a look" with its count: "Needs a look, 3 albums". */
 export function needsLookLabel(label: string, count: number | null): string {
   return count && count > 0 ? `${label}, ${count} album${count === 1 ? '' : 's'}` : label
