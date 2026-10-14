@@ -1052,7 +1052,7 @@ and the critic's gap list, section 4 - "Looking inside a track") found the main 
 from the app: a track's fields, "All tags in this file", "Pictures in this file", its lyrics, Previous and
 Next, and the cover viewer. James chose **a per-track inspector in the Edit panel's Tags tab** over the main
 page's wide table: the column table and its drag and resize go with the main page. The spec is
-`uplan/slice-track-inspector.md`. Built beside 2.0.0-player.43 (the artist page), from .42.
+`uplan/slice-track-inspector.md`. Built beside the artist page (2.0.0-player.45, which landed after it), from .42.
 
 - **The inspector: `app/TrackInspector.tsx`**, its words `lib/trackInspector.ts` (pure). In the Tags tab a
   track's NAME is a button of its own (`app-edit-track-open`, `data-file`), apart from its tick box (which
@@ -1249,4 +1249,4 @@ page's wide table: the column table and its drag and resize go with the main pag
   step, the viewer as a dialog), an iPad on its side (44px targets in the panel), a track with dozens of
   pictures or a huge raw tag list, a real Navidrome's untagged album saying "Not tagged" (its
   `musicBrainzId: ""`, read from 0.64.2's source, never seen from a running one), and the merge with
-  2.0.0-player.43.
+  2.0.0-player.45.

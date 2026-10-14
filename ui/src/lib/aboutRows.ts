@@ -30,7 +30,7 @@
  * Pure, like the rest of lib/; ui/test/info.sim.cjs holds it to the answers.
  */
 
-import type { ArtistFactsLight, StoreAlbumResponse } from '../api/types'
+import type { ArtistFacts, StoreAlbumResponse } from '../api/types'
 import { albumCountLine, factsLine } from './artistPage'
 import { discHeadings, type DiscTitleEntry } from './discTitles'
 import { sharedFormat, trackTime } from './format'
@@ -79,7 +79,7 @@ export interface AboutDetails {
   /** the artist the card goes to, as Navidrome has them: how many albums of theirs you have */
   artist?: { id?: string; albumCount?: number } | null
   /** who they are, from MusicBrainz - the artist the card goes to (`artist.id`) */
-  facts?: ArtistFactsLight | null
+  facts?: ArtistFacts | null
 }
 
 export interface About {

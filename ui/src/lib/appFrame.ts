@@ -68,14 +68,16 @@ export function panelIsModal(panel: PanelStyle): boolean {
 /* ===== the desktop's one side panel ===== */
 
 /** What the desktop's side panel shows - one at a time: the column has room for one, and opening
- *  any puts the others away (App). `edit` is the album page's Edit panel (2.0.0-player.21). */
-export type Side = 'none' | 'sources' | 'info' | 'edit'
+ *  any puts the others away (App). `edit` is the album page's Edit panel (2.0.0-player.21), `artist`
+ *  the artist page's (2.0.0-player.45: Artist images…, Move albums to …, Which artist is this?). */
+export type Side = 'none' | 'sources' | 'info' | 'edit' | 'artist'
 
 /** What the side panel shows, from what is open: Info when it is (it is opened over the others -
- *  opening any puts the rest away), then the Edit panel, then Sources; on a phone none is a panel. */
-export function sideOf(frame: Frame, open: { sources: boolean; info: boolean; edit: boolean }): Side {
+ *  opening any puts the rest away), then the Edit panel, then the artist's, then Sources; on a phone
+ *  none is a panel (the artist's is a sheet there, as Sources is). */
+export function sideOf(frame: Frame, open: { sources: boolean; info: boolean; edit: boolean; artist?: boolean }): Side {
   if (frame === 'phone') return 'none'
-  return open.info ? 'info' : open.edit ? 'edit' : open.sources ? 'sources' : 'none'
+  return open.info ? 'info' : open.edit ? 'edit' : open.artist ? 'artist' : open.sources ? 'sources' : 'none'
 }
 
 /** Whether the main area makes room for the panel: only a third column does; a drawer lies over it. */
@@ -99,7 +101,9 @@ export function liesOver(panel: PanelStyle, side: Side): boolean {
  * (its menu, Info as its sheet) - the desktop has no Now Playing sheet (its player bar is the
  * player, and the turntable is the phone's alone); the Sources sheet stays open, becoming the panel.
  * Back to the phone: the Info panel - Info is a sheet over Now Playing there, which isn't open - and
- * the Edit panel (2.0.0-player.21), which a phone has no board for, and so no sheet.
+ * the Edit panel (2.0.0-player.21), which a phone has no board for, and so no sheet. The artist page's
+ * panel (2.0.0-player.45) stays open either way, a panel on one side and a full-screen sheet on the
+ * other, as Sources does.
  */
 export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: boolean; editPanel: boolean } {
   return to === 'desktop'

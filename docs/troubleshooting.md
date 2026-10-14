@@ -315,7 +315,28 @@ track view shows them. **Get CD art** saves a proper `disc.jpg`, which Navidrome
 ## The artist page can't work out who this is
 
 When the files have no MusicBrainz artist ids and the name is shared by more than one artist,
-the page asks you to choose, with each one's description. Choosing one uses its id from then on.
+the page asks you to choose, with each one's description: on the main page in **Artist images…**,
+for the pictures it saves; in the app with **Which artist is this?** (an admin's), which gives the
+page that artist's albums, facts and pictures for this visit, and **Not them?** in its **Artist
+images…**. Neither is kept: applying one of the artist's albums' releases in the metadata editor
+writes their MusicBrainz id into the files, and the page knows them from then on.
+
+## The app's Artist images… is greyed out, or Move albums to … isn't there
+
+**Artist images…** needs the one folder the artist's albums share, and says under it why there
+isn't one: their albums are filed under two names (move them under the current one first, with
+**Move albums to …**), or sit in two places, or one sits at the top of the library - or "deadwax
+couldn't read their folder just now", when the library didn't answer for it. When it answered for
+none of their names, In your library above says "deadwax couldn't read your library just now" too,
+with **Try again** (what it said before stays on screen meanwhile); if it keeps saying so, the library
+isn't answering deadwax, or its last scan doesn't list them yet - see
+[the library tab is empty](#the-library-tab-is-empty-or-doesnt-show-a-change). **Move albums to …**
+shows only when MusicBrainz's name for them differs from a name your library files their albums
+under (the **Now** row), and only once MusicBrainz has answered; both are an admin's. A move that says
+an album stays names why - a collaboration, one tagged as another artist, a folder of that name
+already there under the new name (or another of their albums moving there), or a track that can't be
+read ("'03 Three.flac' can't be read, so its tags can't be written": a file cut short or damaged, or
+one the user deadwax runs as can't read - check its permissions, or replace it, and move again).
 
 ## Settings I changed in compose don't take effect
 
@@ -410,8 +431,9 @@ needs to know which MusicBrainz artist it is.
   here."**: neither Navidrome nor your files say. Navidrome reads an artist's MusicBrainz id from
   the album artist's `musicbrainz_albumartistid` tag, which deadwax writes on every album it files
   or you apply a release to (since v0.6.15); albums tagged by something else, or long ago, may lack
-  it. Applying the album's release in the main page's metadata editor writes it, and the page
-  finds them once Navidrome has rescanned.
+  it. Applying the album's release in the metadata editor writes it, and the page finds them once
+  Navidrome has rescanned. Meanwhile **Which artist is this?** under the words (an admin's) lets you
+  choose who they are for this visit ([Managing an artist](player.md#managing-an-artist)).
 - **"MusicBrainz isn't answering just now"**, with **Try again**: MusicBrainz is slow or down (see
   [below](#musicbrainz-is-slow-or-searches-fail)). The albums you have are still listed.
 - **An artist opened from an album you don't have shows none of your albums**: deadwax looks for

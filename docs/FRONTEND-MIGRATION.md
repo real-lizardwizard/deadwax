@@ -31,13 +31,18 @@ move. Cross-tree DOM writes go in the shell, synchronously.
 artist/album names hand off to the vanilla search rather than reimplementing it. It retires
 when the search view is ported.
 
-**What the one app still lacks before the main page can retire** (2.0.0-player.42): artist images
-and re-filing an artist (**Move albums to …**), and an editor on the phone. Rescan and the bulk runs
-(covers, CD art, lyrics) are the desktop's **Library care** since 2.0.0-player.42, over the target rules
-both pages take from `lib/bulkTargets.ts`, and **Re-time saved lyrics** is on its Server settings page
+**What the one app still lacks before the main page can retire** (2.0.0-player.45): an editor on the
+phone, and the phone's Needs a look, settings and log. Rescan and the bulk runs (covers, CD art, lyrics)
+are the desktop's **Library care** since 2.0.0-player.42, over the target rules both pages take from
+`lib/bulkTargets.ts`, and **Re-time saved lyrics** is on its Server settings page
 (`components/RetimeLyrics.tsx`, the settings tab's own, moved where both draw it); the Edit panel's
 "can't tell which folder" case chooses the folder from the scan rather than sending you to the main
-page. Editing one album - its release, its tags, its cover, CD art and
+page. An artist's managing is the app's artist page since 2.0.0-player.45, on a phone and a desktop:
+**Artist images…**, **Move albums to …** and **Which artist is this?** in the artist page's panel
+(`ArtistPanel.tsx` - the main page's `ArtistImagePicker` and `ArtistRefileDialog` in `ArtistDetails.tsx`
+drawn for the app over the same routes, ArtistDetails.tsx itself unchanged), and MusicBrainz's facts in
+full, In your library and the hero's background and logo on the page (`lib/artistManage.ts`). Editing
+one album - its release, its tags, its cover, CD art and
 lyrics, deleting it - is in the app on a desktop since 2.0.0-player.21, the review queue since
 2.0.0-player.25 (**Needs a look**: stepping the editor through the albums that need a look, ignoring
 and un-ignoring, the New count, with a count in the sidebar and You), and the server settings and
@@ -178,7 +183,7 @@ the reference. All prefixed `/deadwax/`.
 | `navidrome/search?q=&artistCount=&albumCount=&songCount=&…Offset=` | GET | the app's Search, library half (2.0.0-player.13): Navidrome's search3 as `{artists, albums, songs}`; counts capped at 50/50/500. An empty `q` lists everything, a page at a time - the app's Library > Songs (2.0.0-player.17). |
 | `navidrome/artists`, `navidrome/artists/{id}`, `navidrome/songs/{id}` | GET | the app's Library > Artists, its artist page, and Info's play count and writers (2.0.0-player.17): getArtists flattened to `{artists}`, getArtist and getSong as Navidrome sent them. An id past 256 characters is a 422. |
 | `store/album?release_mbid=` or `?navidrome_id=` | GET | the id bridge (2.0.0-player.17): `{release_mbid, release_group_mbid, navidrome_id, present[], other_pressings[]}` - the store's live folders of the release, the album's other pressings, and Navidrome's album id for each (looked up by deadwax itself; null when Navidrome hasn't got it). Exactly one of the two, or a 422. Read through `ui/src/api/store.ts`. |
-| `search_musicbrainz/artist?mbid=` | GET | an artist's light facts (2.0.0-player.17): `artist_facts` less its links and members. 503 when MusicBrainz can't be reached; a malformed id is a 422. |
+| `search_musicbrainz/artist?mbid=` | GET | an artist's facts (2.0.0-player.17): `artist_facts` - since 2.0.0-player.45 in full, its links and members too (the light facts left them out), from the one `get_artist` request. 503 when MusicBrainz can't be reached; a malformed id is a 422. |
 | `me/pins` | GET, PUT | what the user pinned to the app's Home (2.0.0-player.18): `{pins[], can_save}`, each `{kind, ref, label, sub, state, navidrome_id, cover}` plus `release_mbid` (an album) or `mbid` (an artist); `state` is `present`, `missing` or `gone`. PUT takes the whole ordered list `{pins: [{kind, ref}], known?: [{kind, ref}]}` - it reorders and unpins, never adds; `known` (every pin the list was made from) leaves a pin stored since that the page was never told of where it is. A 503 when the database can't be read just now (never "nothing pinned"). Deadwax's own, never Navidrome's stars. Typed in `ui/src/lib/pins.ts`, read through `ui/src/api/me.ts`. |
 | `me/pins/toggle` | POST | pin or unpin one album (`release_mbid` or `navidrome_id`) or artist (`mbid`, or `navidrome_id` and `name`), `pinned` saying which it should end up; answers as GET. A 422 for an album with no release id (or one Navidrome doesn't have), a 409 past 50 pins, a 503 when the database can't keep them or Navidrome can't be asked for the album's release. |
 | `search_musicbrainz/discography?artist_mbid=&types=album&studio_only=` | GET | every release group credited to the artist - a browse, complete unless `truncated`; `problem` when it broke off. The app's artist page reads its albums (`getDiscography`). |

@@ -28,6 +28,7 @@ import { usePlayer, type Player } from '../player/usePlayer'
 import { readPlayerOpensAs, readPlayerWindDown, writePlayerOpensAs, writePlayerWindDown } from '../state/persisted'
 import { ActionMenu } from './ActionMenu'
 import { ArtistPage, type ArtistPreview } from './ArtistPage'
+import { ArtistPanel, type ArtistManageRequest } from './ArtistPanel'
 import { ActionsContext, PlayerContext, pickActions } from './context'
 import { EventLog } from './EventLog'
 import { EditPanel, isFolderRequest, type AlbumChange, type EditRequest, type FolderRequest } from './EditPanel'
@@ -211,6 +212,20 @@ function usePageShown(): boolean {
  * it on a folder. How many albums need a look is useQueueSummary.ts's store, asked here as the desktop
  * frame shows for an admin and as the app comes back to the front, and after every change the panel
  * reports - never on a timer; the sidebar and You draw it. A phone draws the page as a short note.
+ *
+ * THE ARTIST PAGE, AS THE MAIN PAGE HAD IT (2.0.0-player.45, ArtistPanel.tsx): for an admin (/deadwax/me
+ * - asked on a phone too as an artist page shows), the artist page's Artist images…, Move albums to …
+ * and Which artist is this? open the artist page's panel - a fourth kind of side panel on a desktop, by
+ * the same rule (one at a time: it puts Sources, Info and Edit away, and each of them puts it away), and
+ * on a phone a sheet over the whole screen, the page behind inert, as Sources is. It is the page's, on
+ * its tab: it closes as that page stops being the one on top there, and stays open across 1024px, a
+ * panel one side and a sheet the other. Albums moved (artistMoved): the library's listeners told; a
+ * page of a name every album of which moved becomes the artist's by their MusicBrainz id (`mb:<mbid>` -
+ * Navidrome's artist of that name goes with the albums), its scroll put back once it has drawn
+ * (artistDrawn, on that page's own word), the move remembered (`artistMoves`) for a page of the old id
+ * coming back on top - any other page (their name now, a name an album stayed under) stays where it
+ * is; and the page they were moved from is asked again under the id it has now (`artistRefreshes`)
+ * when the panel's wait of EDIT_SETTLE_MS says so.
  */
 export function App() {
   const player = usePlayer()
@@ -286,6 +301,24 @@ export function App() {
   //? the albums an apply gave a new id in Navidrome this session, old id to new (lib/albumEdit.ts
   //? noteMove): a page of the old id coming back on top is the new one's
   const moves = useRef(new Map<string, string>())
+  //? the artist page's panel (2.0.0-player.45): whether it shows, the last request it was opened for
+  //? (kept as it slides away) and what it gives focus back to - and the artists whose albums moved
+  //? under their current name, old page id to new, and each artist page's asks after a move
+  const [artistOpen, setArtistOpen] = useState(false)
+  const artistOpenNow = useRef(false)
+  artistOpenNow.current = artistOpen
+  //? (the request is the page's on the tab it was opened on - the same artist can be on top of two - review)
+  const [artistManage, setArtistManage] = useState<(ArtistManageRequest & { tab: Tab }) | null>(null)
+  const artistManageNow = useRef<(ArtistManageRequest & { tab: Tab }) | null>(null)
+  artistManageNow.current = artistManage
+  const artistOpener = useRef<HTMLElement | null>(null)
+  const artistKeys = useRef(0)
+  const artistMoves = useRef(new Map<string, string>())
+  const [artistRefreshes, setArtistRefreshes] = useState<ReadonlyMap<string, number>>(() => new Map())
+  //? the scroll of an artist page a move made of another, to put back once the new one has drawn enough
+  //? to hold it - it draws nothing on its first frame, where the route's own scroll is put back. Keyed
+  //? as its route is: only that page drawing puts it back (review: any tab's artist page did)
+  const artistScroll = useRef<{ key: string; y: number } | null>(null)
   //? a desktop's Info: the side panel, opened from the player bar (2.0.0-player.19)
   const [infoPanel, setInfoPanel] = useState(false)
   const infoPanelOpen = useRef(false)
@@ -513,6 +546,8 @@ export function App() {
     setInfoPanel(false)
     editOpener.current = null
     setEditOpen(false)
+    artistOpener.current = null
+    setArtistOpen(false)
   }, [])
   const closeSources = useCallback(() => setSourcesOpen(false), [])
   //? a download asked for from the sheet: it goes - focus going nowhere it would land - and Requests shows
@@ -567,6 +602,8 @@ export function App() {
     setSourcesOpen(false)
     editOpener.current = null
     setEditOpen(false)
+    artistOpener.current = null
+    setArtistOpen(false)
     setInfoPanel(true)
   }, [])
   const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
@@ -598,6 +635,8 @@ export function App() {
     setSourcesOpen(false)
     infoOpener.current = null
     setInfoPanel(false)
+    artistOpener.current = null
+    setArtistOpen(false)
   }, [])
   const closeEdit = useCallback(() => setEditOpen(false), [])
 
@@ -613,6 +652,77 @@ export function App() {
     setSourcesOpen(false)
     infoOpener.current = null
     setInfoPanel(false)
+    artistOpener.current = null
+    setArtistOpen(false)
+  }, [])
+
+  //? The artist page's panel (2.0.0-player.45): for one of its jobs - a new request each press, so it
+  //? starts afresh - and pressed again for the job it shows on that page, closed. One panel at a time:
+  //? it puts Sources (and its search, by Sources' backstop), Info and Edit away, focus going to it.
+  const toggleArtistManage = useCallback((request: Omit<ArtistManageRequest, 'key'>, opener: HTMLElement | null) => {
+    const now = artistManageNow.current
+    if (artistOpenNow.current && now?.page === request.page && now.mode === request.mode) {
+      setArtistOpen(false)
+      return
+    }
+    artistOpener.current = opener
+    artistKeys.current += 1
+    setArtistManage({ ...request, key: artistKeys.current, tab: router.nav.tab })
+    setArtistOpen(true)
+    sourcesOpener.current = null
+    setSourcesOpen(false)
+    infoOpener.current = null
+    setInfoPanel(false)
+    editOpener.current = null
+    setEditOpen(false)
+  }, [])
+  const closeArtistManage = useCallback(() => setArtistOpen(false), [])
+
+  /**
+   * An artist's albums moved under their current name (2.0.0-player.45): the library's listeners told
+   * (the owned marks, the folders the page reads) and the count of albums that need a look asked again
+   * ("Artist under two names" was theirs). `follow` (the page's word: its name has no album left - review)
+   * - the page showing them becomes the artist's by their MusicBrainz id, Navidrome's artist of the old
+   * name going with the albums - its entry replaced, its scroll put back once it has drawn, the panel
+   * following it; and the move remembered for a page of the old id coming back on top. Otherwise (their
+   * page by the name they have now, a name an album stayed under) the page stays as it is.
+   */
+  const artistMoved = useCallback((from: string, to: { mbid: string; name: string }, follow: boolean) => {
+    announceAlbumsFiled()
+    askQueueSummary()
+    const id = artistPageId({ mbid: to.mbid })
+    if (!follow || !id || id === from) return
+    const preview = artistPreviews.current.get(from)
+    artistPreviews.current.set(id, { ...(preview?.coverArt ? { coverArt: preview.coverArt } : {}), name: to.name })
+    artistMoves.current.set(from, id)
+    setArtistManage((was) => (was && was.page === from ? { ...was, page: id } : was))
+    const top = currentRoute(router.nav).page
+    if (top?.kind === 'artist' && top.id === from) {
+      const key = scrollKey({ tab: router.nav.tab, page: { kind: 'artist', id } })
+      scrolls.current.set(key, window.scrollY)
+      artistScroll.current = { key, y: window.scrollY }
+      router.become(top, { kind: 'artist', id, label: to.name })
+    }
+  }, [])
+  //? ...the page that became theirs has drawn its albums (`all`: and the sections under them): its scroll
+  //? put back, now there is room for it - only while it is still the route showing, and only for that
+  //? page's own word (`drawn`, the route of the page that drew): an artist page on another tab, hidden,
+  //? drawing in the meantime never uses it up (review)
+  const artistDrawn = useCallback((drawn: string, all: boolean) => {
+    const want = artistScroll.current
+    if (!want || drawn !== want.key) return
+    if (want.key !== scrollKey(currentRoute(router.nav))) {
+      artistScroll.current = null
+      return
+    }
+    if (window.scrollY < want.y) window.scrollTo(0, want.y)
+    if (all || window.scrollY >= want.y) artistScroll.current = null
+  }, [])
+  //? ...and once Navidrome has had time to scan it (the panel's wait, EDIT_SETTLE_MS): the page they were
+  //? moved from asked again, under the id it has now
+  const artistSettled = useCallback((page: string) => {
+    const id = artistMoves.current.get(page) ?? page
+    setArtistRefreshes((was) => new Map(was).set(id, (was.get(id) ?? 0) + 1))
   }, [])
 
   //? A Managing page - Needs a look (2.0.0-player.25), Library care (.42), the server's settings or the log (.33) -
@@ -674,6 +784,46 @@ export function App() {
     editOpener.current = null
     setEditOpen(false)
   }, [editOpen, editShown])
+
+  //? The artist page's panel is that page's (2.0.0-player.45): as it stops being the one on top - another
+  //? page, a tab, the sidebar - the panel closes, focus given back to nothing. Its tab's: the same artist
+  //? on top of another tab is another copy of the page, which its answers wouldn't reach (review)
+  const artistShown = artistManage !== null && nav.tab === artistManage.tab && topNow?.kind === 'artist' && topNow.id === artistManage.page
+  useEffect(() => {
+    if (!artistOpen || artistShown) return
+    artistOpener.current = null
+    setArtistOpen(false)
+  }, [artistOpen, artistShown])
+
+  //? ...a page of an artist whose albums moved, back on top - back to it, its tab chosen: it becomes the
+  //? artist's page by their MusicBrainz id, as the move itself makes the page showing
+  useEffect(() => {
+    if (topNow?.kind !== 'artist') return
+    const to = artistMoves.current.get(topNow.id)
+    if (to) router.become(topNow, { kind: 'artist', id: to, ...(topNow.label ? { label: topNow.label } : {}) })
+  }, [nav])
+
+  //? ...and what the panel gives focus back to, once the page it was opened from has become the artist's
+  //? by id: that page's back link, on the tab showing (what opened it went with the old page)
+  useEffect(() => {
+    const was = artistOpener.current
+    if (!artistOpen || !was || was.isConnected) return
+    artistOpener.current = document.querySelector<HTMLElement>(`.app-pane[data-tab="${nav.tab}"] .app-artist-back`)
+  })
+
+  //? An artist page on a phone (2.0.0-player.45): its managing is an admin's, so /deadwax/me is asked as
+  //? one comes on top there too - the desktop frame asks as it shows (above)
+  const artistOnTop = topNow?.kind === 'artist'
+  useEffect(() => {
+    if (desktop || !artistOnTop) return
+    const request = meRequests.begin()
+    me(request.signal).then(
+      (who) => {
+        if (request.current()) setAdmin(who.admin)
+      },
+      () => {},
+    )
+  }, [desktop, artistOnTop])
 
   /**
    * What the Edit panel wrote (2.0.0-player.21), for the album it names. A write: the library's
@@ -917,6 +1067,12 @@ export function App() {
         onOpenAlbum={openAlbum}
         onOpenGroup={openGroup}
         onGet={openSources}
+        admin={admin}
+        onManage={toggleArtistManage}
+        managing={artistOpen && artistManage?.tab === tab && artistManage.page === page.id ? artistManage.mode : null}
+        refresh={artistRefreshes.get(page.id) ?? 0}
+        onMoved={artistMoved}
+        onDrawn={(all) => artistDrawn(scrollKey({ tab, page }), all)}
       />
     )
     return page.id.startsWith(MB_PREFIX) ? artist : (
@@ -1009,7 +1165,7 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes],
   )
 
   const playing = player.track
@@ -1022,10 +1178,10 @@ export function App() {
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows; a desktop's
   //? side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
-  const covered = (!desktop && (sheetOpen || sourcesOpen)) || visualizerShown
+  const covered = (!desktop && (sheetOpen || sourcesOpen || artistOpen)) || visualizerShown
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)
-  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen })
+  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen })
 
   //? The ••• menu's pin (2.0.0-player.18): the playing song's album, by its release where the answer
   //? it was played from says it (none at all, "", and it can't be pinned), else by Navidrome's id,
@@ -1126,6 +1282,8 @@ export function App() {
           />
           {/* the album page's Edit panel (2.0.0-player.21) - the desktop's alone, in its frame only */}
           {desktop && <EditPanel open={editOpen} request={edit} opener={editOpener} onClose={closeEdit} onChanged={albumChanged} panel={panel} covered={visualizerShown} />}
+          {/* the artist page's panel (2.0.0-player.45) - a side panel on a desktop, a sheet on a phone */}
+          <ArtistPanel open={artistOpen} request={artistManage} opener={artistOpener} onClose={closeArtistManage} onSettled={artistSettled} panel={panel} covered={visualizerShown} />
           {/* what became of a pin, said over everything (2.0.0-player.18) */}
           <PinNotice />
           {/* the desktop's full-screen visualizer, over everything (2.0.0-player.20) */}

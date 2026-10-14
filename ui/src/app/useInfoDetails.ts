@@ -23,10 +23,11 @@ export const INFO_SETTLE_MS = 500
  *    "This pressing: …" and the folder;
  *  - the artist the card goes to (getArtist): how many albums of theirs you have, and their
  *    MusicBrainz id - Navidrome's, else what /library/owned's folders say, when the library has been
- *    asked already - and then who they are (MusicBrainz's light facts). The song's own artist, or the
- *    album's when that is them (aboutRows.ts's cardArtist); two artists of different names and ids
- *    are both asked about, and the album's is the card's only when their MusicBrainz ids are one -
- *    a renamed artist's old credit, never a compilation's Various Artists (review).
+ *    asked already - and then who they are (MusicBrainz's facts, GET /search_musicbrainz/artist).
+ *    The song's own artist, or the album's when that is them (aboutRows.ts's cardArtist); two
+ *    artists of different names and ids are both asked about, and the album's is the card's only
+ *    when their MusicBrainz ids are one - a renamed artist's old credit, never a compilation's
+ *    Various Artists (review).
  *
  * Asked only while Info is open, again for another song: one latestOnly() for the song, so a song
  * changing under an open Info never has the last one's details drawn for it. The song's and the

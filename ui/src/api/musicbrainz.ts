@@ -1,6 +1,6 @@
 import { ApiError, MusicBrainzUnavailable, get } from './http'
 import type {
-  ArtistFactsLight, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse,
+  ArtistFacts, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse,
 } from './types'
 
 /**
@@ -107,12 +107,13 @@ export async function getDiscography(artistMbid: string, studioOnly: boolean, si
   }
 }
 
-/** Who an artist is (2.0.0-player.17): MusicBrainz's light facts, cached on the server. */
-export async function getArtistFacts(artistMbid: string, signal?: AbortSignal): Promise<ArtistFactsLight> {
+/** Who an artist is (2.0.0-player.17): MusicBrainz's facts - in full since 2.0.0-player.45, their links and
+ *  line-up too, from the same one request - cached on the server. */
+export async function getArtistFacts(artistMbid: string, signal?: AbortSignal): Promise<ArtistFacts> {
   const params = new URLSearchParams({ mbid: artistMbid })
 
   try {
-    return await get<ArtistFactsLight>(`/search_musicbrainz/artist?${params}`, signal)
+    return await get<ArtistFacts>(`/search_musicbrainz/artist?${params}`, signal)
   } catch (error) {
     throw asUnavailable(error)
   }

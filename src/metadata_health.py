@@ -71,8 +71,8 @@ ISSUE_TYPES: dict[str, dict] = {
     "artist_split": {
         "label": "Artist under two names",
         "hint": "this artist's albums are filed under more than one folder name - usually a "
-                "rename, like Kanye West and Ye. The artist page can move them all under the "
-                "name MusicBrainz uses now.",
+                "rename, like Kanye West and Ye. Move albums to … on the artist's page moves "
+                "them all under the name MusicBrainz uses now.",
         "severity": WRONG,
     },
     "misfiled": {

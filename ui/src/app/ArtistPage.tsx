@@ -1,13 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { MusicBrainzUnavailable } from '../api/http'
+import { fetchArtist } from '../api/library'
 import { getArtistFacts, getDiscography, getReleaseGroup } from '../api/musicbrainz'
 import { navidromeAlbumFor } from '../api/store'
-import type { ArtistFactsLight, ReleaseGroup, ReleaseGroupResponse } from '../api/types'
+import type { ArtistFacts, ArtistSummary, ReleaseGroup, ReleaseGroupResponse } from '../api/types'
 import {
-  artistMbid, artistRef, artistRows, factsLine, inTurns, libraryArtistFor, playOrder, playsLine, rowLine, type ArtistRow,
+  LINKS_SHOWN, MEMBERS_SHOWN, aboutRows, folded, imagesFolder, libraryFacts, libraryNames, listed, memberRoles, memberYears, namesToMove,
+  type LibraryFacts,
+} from '../lib/artistManage'
+import {
+  MB_PREFIX, artistMbid, artistRef, artistRows, factsLine, inTurns, libraryArtistFor, playOrder, playsLine, rowLine, type ArtistRow,
 } from '../lib/artistPage'
+import { artistArtUrl } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
+import { foldName } from '../lib/owned'
 import { pinOf, type ArtistPinTarget } from '../lib/pins'
 import { coverAddresses } from '../lib/pressings'
 import {
@@ -15,8 +22,9 @@ import {
   type Album, type AlbumWithSongs, type ArtistWithAlbums,
 } from '../player/api'
 import { Cover } from '../player/Cover'
-import { CheckIcon, ChevronLeftIcon, PlayIcon, ShuffleIcon } from '../player/icons'
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, ShuffleIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
+import type { ArtistManageMode, ArtistManageRequest } from './ArtistPanel'
 import { usePlayerActions } from './context'
 import { PINS_UNSAVED, PinToggle } from './PinToggle'
 import { keep, kept as keptPressings, usualGet } from './pressingLists'
@@ -67,22 +75,53 @@ export const ARTIST_INDEX_STALE_MS = 15_000
 /** How many artists' answers the session keeps, so a page come back to draws at once. */
 export const ARTISTS_KEPT = 20
 
+/** How long the page's About, Line-up and In your library wait for MusicBrainz and the library to
+ *  answer, once the albums are drawn, before they are drawn with what has (2.0.0-player.45) - drawn
+ *  under the albums, and in one go, so nothing above them moves and they don't build up in pieces. */
+export const ABOUT_WAIT_MS = 3000
+
+/** The library's word on each name it files the artist's albums under (2.0.0-player.45): an answer
+ *  of /library/artist, or null for one that couldn't be had - `key` the names it answers, in order. */
+interface Summaries {
+  key: string
+  map: ReadonlyMap<string, ArtistSummary | null>
+}
+
+/** Who a page's artist is, chosen with "Which artist is this?" (2.0.0-player.45) - for the visit. */
+export interface ChosenArtist {
+  mbid: string
+  name: string
+  disambiguation: string
+}
+
 /** What the session keeps of an artist's page, by its id: each answer as it last landed. */
 interface KeptArtist {
   foundId: string | null
   /** Navidrome's artist and their albums; undefined until Navidrome has answered */
   library: ArtistWithAlbums | null | undefined
-  facts: { mbid: string; facts: ArtistFactsLight } | null
+  facts: { mbid: string; facts: ArtistFacts } | null
   studioOnly: boolean
   /** complete answers only, by "<mbid>|<studio only>" */
   discography: Map<string, { groups: ReleaseGroup[]; truncated: boolean }>
+  /** the library's word on each of their names (2.0.0-player.45) */
+  summaries: Summaries | null
+  /** who they are, chosen here this visit (2.0.0-player.45) */
+  chosen: ChosenArtist | null
+  /** what their pictures on disk are asked with - a new number after each save this visit */
+  version: number
 }
 
 const keptArtists = new Map<string, KeptArtist>()
 
+/** Forget what the session kept of an artist's page - their albums moved under another name
+ *  (2.0.0-player.45), so every answer it holds is of folders that have gone. */
+export function forgetKeptArtist(id: string): void {
+  keptArtists.delete(id)
+}
+
 /** The session's copy of an artist's page, as the newest - made empty the first time. */
 function keptArtist(id: string): KeptArtist {
-  const entry = keptArtists.get(id) ?? { foundId: null, library: undefined, facts: null, studioOnly: true, discography: new Map() }
+  const entry = keptArtists.get(id) ?? { foundId: null, library: undefined, facts: null, studioOnly: true, discography: new Map(), summaries: null, chosen: null, version: 0 }
   keptArtists.delete(id)
   keptArtists.set(id, entry)
   while (keptArtists.size > ARTISTS_KEPT) {
@@ -137,10 +176,31 @@ function keptArtist(id: string): KeptArtist {
  * board has it) browses again leaving out live albums and compilations - never an album you have,
  * which is shown whatever it is.
  *
+ * AS THE MAIN PAGE HAD IT (2.0.0-player.45; lib/artistManage.ts): under the albums, once they are
+ * drawn and MusicBrainz and the library have answered (or ABOUT_WAIT_MS), in one go - "In your
+ * library" (albums, tracks, size, years, the folder, or why there isn't one, from /library/artist for
+ * each name the library files them under), "About" (MusicBrainz's facts in full: what tells them
+ * apart, "Now: <name>" when the library files them under a name that isn't theirs now, type, where
+ * from, Born/Died or Founded/Dissolved with dates, other names, genres, links opening beside the app)
+ * and "Line-up", long lists folded. The hero shows their background (fanart.*) and logo (logo.*)
+ * where those are on disk. For an admin (App's /deadwax/me): Artist images…, Move albums to <name>,
+ * and - where the page says MusicBrainz doesn't know who this is - Which artist is this?, each opening
+ * the artist page's panel (ArtistPanel.tsx, App's: a side panel on a desktop, a sheet on a phone).
+ * Albums moved (App's onMoved): a page of a name every album of which moved follows them - it
+ * becomes the artist's by their MusicBrainz id, App putting its scroll back once it has drawn
+ * (onDrawn); any other page (of their name now, or of a name an album stayed under) stays, and is
+ * asked again once Navidrome has had time to scan. Pictures saved, it asks for its folder again; an
+ * artist chosen, the page is theirs for the visit. Should In your library still be out when the
+ * sections are drawn (ABOUT_WAIT_MS), it is drawn last, saying it is looking, so it lands under what
+ * is on screen rather than above it; once drawn it stays, and a library that couldn't be read for any
+ * of their names says so, with Try again, over what it said before - Artist images… stepped back,
+ * saying why (review).
+ *
  * Every fetch that draws goes through its own latestOnly(): the library's answer, the facts, the
- * discography, the prefetches, a row's bridge and a chip's pressings. A row's or a chip's lookup
- * still out is called off when the page stops being what shows (`shown`), so its late answer opens
- * nothing on whatever tab you went to (review). A page: it reads the player's actions from context.
+ * discography, the prefetches, a row's bridge and a chip's pressings - and the library's summaries.
+ * A row's or a chip's lookup still out is called off when the page stops being what shows (`shown`),
+ * so its late answer opens nothing on whatever tab you went to (review). A page: it reads the
+ * player's actions from context.
  */
 export function ArtistPage({
   id,
@@ -152,6 +212,12 @@ export function ArtistPage({
   onOpenAlbum,
   onOpenGroup,
   onGet,
+  admin = false,
+  onManage,
+  managing = null,
+  refresh = 0,
+  onMoved,
+  onDrawn,
 }: {
   id: string
   preview: ArtistPreview | null
@@ -165,6 +231,19 @@ export function ArtistPage({
   onOpenGroup: (group: ReleaseGroup) => void
   /** a row's Get: open the Sources sheet for its usual pressing, focus given back to `opener` */
   onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
+  /** deadwax says this user is an admin - with logins off, everyone (App's /deadwax/me) */
+  admin?: boolean
+  /** open the artist page's panel (2.0.0-player.45); `opener` the control it gives focus back to */
+  onManage?: (request: Omit<ArtistManageRequest, 'key'>, opener: HTMLElement | null) => void
+  /** what the panel is open for on this page, null while it isn't */
+  managing?: ArtistManageMode | null
+  /** a new number: ask Navidrome and the library again (App, once Navidrome has had time to scan a move) */
+  refresh?: number
+  /** their albums moved under their current name (App): `follow`, this page's name has none left - the
+   *  page becomes theirs by their MusicBrainz id; otherwise it stays */
+  onMoved?: (from: string, to: { mbid: string; name: string }, follow: boolean) => void
+  /** the albums drawn (`all`: and the sections under them) - App puts back a scroll it couldn't yet */
+  onDrawn?: (all: boolean) => void
 }) {
   const actions = usePlayerActions()
   const { pins, known: pinsKnown, canSave } = usePins(true)
@@ -187,13 +266,45 @@ export function ArtistPage({
   //? Try again on an artist opened from MusicBrainz whose look in the library failed
   const [finds, setFinds] = useState(0)
   const [studioOnly, setStudioOnly] = useState(kept.studioOnly)
+  //? who they are, chosen with "Which artist is this?" - used only when nothing else says (2.0.0-player.45)
+  const [chosen, setChosen] = useState<ChosenArtist | null>(kept.chosen)
 
   const artist = library.state === 'done' ? library.artist : null
   const held: Album[] = artist?.album ?? []
-  const mbid = ref.mbid ?? artistMbid(artist, held, owned?.index ?? null)
+  const said = ref.mbid ?? artistMbid(artist, held, owned?.index ?? null)
+  const mbid = said ?? chosen?.mbid ?? null
   const discKey = mbid ? `${mbid}|${studioOnly}` : null
 
-  const [facts, setFacts] = useState<ArtistFactsLight | null>(() => (kept.facts && kept.facts.mbid === mbid ? kept.facts.facts : null))
+  //? who they are, as MusicBrainz last answered - with the id it answered for: another artist chosen,
+  //? the last one's facts are never shown as theirs (review, 2.0.0-player.45)
+  const [factsOf, setFactsOf] = useState<{ mbid: string; facts: ArtistFacts } | null>(() => kept.facts)
+  const facts = factsOf && factsOf.mbid === mbid ? factsOf.facts : null
+  //? MusicBrainz didn't answer for who they are (the id it didn't answer for): said in About, with Try again
+  const [factsFailedFor, setFactsFailedFor] = useState<string | null>(null)
+  const factsFailed = !!mbid && factsFailedFor === mbid
+  const [factsAsks, setFactsAsks] = useState(0)
+  //? the library's word on each name it files them under, and a count that asks it again
+  const [summaries, setSummaries] = useState<Summaries | null>(kept.summaries)
+  const [summaryAsks, setSummaryAsks] = useState(0)
+  //? the names the library couldn't say a word about, not one of them (their key): said, with Try again -
+  //? what it said before staying (review, 2.0.0-player.45) - and a request for its word out, which Try
+  //? again shows
+  const [summaryFailedFor, setSummaryFailedFor] = useState<string | null>(null)
+  const [summaryAsking, setSummaryAsking] = useState(false)
+  //? what their pictures on disk are asked with: a new number after a save, past the browser's cache
+  const [version, setVersion] = useState(kept.version)
+  //? the long lists, opened
+  const [allMembers, setAllMembers] = useState(false)
+  const [allLinks, setAllLinks] = useState(false)
+  //? About and the rest have waited ABOUT_WAIT_MS: drawn with whatever has answered
+  const [aboutWaited, setAboutWaited] = useState(false)
+  //? the pictures on disk that wouldn't load: the hero falls back past them
+  const [brokenArt, setBrokenArt] = useState<ReadonlySet<string>>(() => new Set())
+  //? Navidrome asked afresh by the next find - App's refresh, once a move has been scanned
+  const freshFind = useRef(false)
+  //? an artist just chosen: focus goes to its Change once drawn (the panel that chose has closed)
+  const focusChange = useRef(false)
+  const changeButton = useRef<HTMLButtonElement>(null)
   const [discography, setDiscography] = useState<Discography>(() => {
     const found = discKey ? kept.discography.get(discKey) : undefined
     return found ? { state: 'done', groups: found.groups, truncated: found.truncated, of: discKey } : { state: 'idle', groups: null, truncated: false, of: null }
@@ -214,6 +325,7 @@ export function ArtistPage({
   const prefetches = useMemo(latestOnly, [])
   const openRequests = useMemo(latestOnly, [])
   const getRequests = useMemo(latestOnly, [])
+  const summaryRequests = useMemo(latestOnly, [])
 
   useEffect(() => {
     if (ownedKnown) return
@@ -228,6 +340,11 @@ export function ArtistPage({
 
   useEffect(() => {
     const timer = setTimeout(() => setWaited(true), ROWS_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAboutWaited(true), ABOUT_WAIT_MS)
     return () => clearTimeout(timer)
   }, [])
 
@@ -254,7 +371,10 @@ export function ArtistPage({
         setLibrary({ state: 'done', artist: null })
       }
     }
-    libraryArtists()
+    //? asked afresh once, after a move Navidrome has since scanned (App's refresh)
+    const fresh = freshFind.current
+    freshFind.current = false
+    libraryArtists(fresh)
       .then((artists) => {
         if (!request.current()) return
         const found = look(artists)
@@ -305,22 +425,81 @@ export function ArtistPage({
   useEffect(() => {
     if (!mbid) return
     if (kept.facts?.mbid === mbid) {
-      setFacts(kept.facts.facts)
+      setFactsOf(kept.facts)
+      setFactsFailedFor(null)
       return
     }
     const request = factsRequests.begin()
+    setFactsFailedFor(null)
     getArtistFacts(mbid, request.signal).then(
       (found) => {
         if (!request.current()) return
         kept.facts = { mbid, facts: found }
-        setFacts(found)
+        setFactsOf(kept.facts)
       },
-      () => {
-        //? the facts are a line under the name: without them, the line is left out
+      (reason: unknown) => {
+        //? the line under the name is left out; About says MusicBrainz didn't answer, with Try again
+        if (request.current() && !isAbort(reason)) setFactsFailedFor(mbid)
       },
     )
     return () => factsRequests.supersede()
-  }, [mbid])
+  }, [mbid, factsAsks])
+
+  //? (2.0.0-player.45) every name the library files their albums under, and its word on each - asked
+  //? again as the names change (the library's folders, who they are), after a save, and on App's refresh
+  const releases = useMemo(() => held.map((album) => album.musicBrainzId ?? '').filter(Boolean), [artist])
+  const whoName = artist?.name ?? facts?.name ?? preview?.name ?? null
+  const names = useMemo(() => libraryNames(owned?.index ?? null, { mbid, name: whoName, releases }), [owned, mbid, whoName, releases])
+  const namesKey = names.join('\n')
+  useEffect(() => {
+    if (!names.length) {
+      summaryRequests.supersede()
+      setSummaryAsking(false)
+      setSummaryFailedFor(null)
+      const none: Summaries = { key: namesKey, map: new Map() }
+      kept.summaries = none
+      setSummaries(none)
+      return
+    }
+    const request = summaryRequests.begin()
+    setSummaryAsking(true)
+    Promise.all(names.map((name) => fetchArtist(name, request.signal).then(
+      (summary) => [name, summary] as const,
+      (reason: unknown) => {
+        if (isAbort(reason)) throw reason
+        return [name, null] as const
+      },
+    ))).then(
+      (answers) => {
+        if (!request.current()) return
+        setSummaryAsking(false)
+        //? not one name answered (review): no word on them at all - said, with Try again, what it said
+        //? before staying; and never kept, so a visit to come asks rather than drawing a failure
+        if (answers.every(([, summary]) => summary === null)) {
+          setSummaryFailedFor(namesKey)
+          return
+        }
+        const answered: Summaries = { key: namesKey, map: new Map(answers) }
+        kept.summaries = answered
+        setSummaryFailedFor(null)
+        setSummaries(answered)
+      },
+      () => {},
+    )
+    return () => summaryRequests.supersede()
+  }, [namesKey, summaryAsks])
+
+  //? App's refresh (a move Navidrome has since scanned): Navidrome's artist found afresh and asked
+  //? again, and the library's word on their names
+  const refreshed = useRef(refresh)
+  useEffect(() => {
+    if (refreshed.current === refresh) return
+    refreshed.current = refresh
+    freshFind.current = !ref.navidrome
+    if (libraryId) loadLibrary()
+    if (!ref.navidrome) setFinds((count) => count + 1)
+    setSummaryAsks((count) => count + 1)
+  }, [refresh])
 
   /** MusicBrainz's albums for the artist - the session's when it has them, else asked, the last
    *  answer staying on screen meanwhile (Studio only toggled, Try again). */
@@ -412,7 +591,7 @@ export function ArtistPage({
   }, [shown])
 
   useEffect(() => () => {
-    for (const requests of [findRequests, libraryRequests, factsRequests, discRequests, prefetches, openRequests, getRequests]) requests.supersede()
+    for (const requests of [findRequests, libraryRequests, factsRequests, discRequests, prefetches, openRequests, getRequests, summaryRequests]) requests.supersede()
   }, [])
 
   //? every album answered - asked for only once the library has said which of Navidrome's albums
@@ -506,10 +685,214 @@ export function ArtistPage({
   const drawRows = rowsDrawn.current
   const asking = discography.state === 'asking' || !drawRows
 
+  /* ===== as the main page had it (2.0.0-player.45): what the library holds, who they are, managing ===== */
+
+  //? the library's word on the names as they are now - a summary of names since changed isn't theirs.
+  //? Not one of them read (review): what it last said of these names, else a word on none of them
+  const summariesFailed = names.length > 0 && summaryFailedFor === namesKey
+  const summaryMap: ReadonlyMap<string, ArtistSummary | null> = summaries && summaries.key === namesKey ? summaries.map
+    : summariesFailed ? new Map(names.map((one) => [one, null])) : new Map()
+  const summariesKnown = summaries?.key === namesKey || summariesFailed
+  const inLibrary = libraryFacts(names.map((name) => summaryMap.get(name)).filter((one): one is ArtistSummary => !!one))
+  const folder = imagesFolder(names, facts?.name, summaryMap)
+  const folderSummary = folder.name ? summaryMap.get(folder.name) ?? null : null
+  const imagesReady = !folder.reason && !!folderSummary?.path
+  const moveNames = namesToMove(names, facts?.name)
+  //? "Now: <name>": a name the library files them under isn't MusicBrainz's for them now
+  const renamed = !!facts?.name && moveNames.length > 0
+
+  //? the hero: their background where it is on disk, else Navidrome's picture - or, once pictures were
+  //? saved here, the square on disk (Navidrome's own copy of it is cached); their logo for their name
+  const onDisk = (kind: string): string | null => {
+    const path = folderSummary?.path
+    if (!path || !folderSummary?.art?.[kind]) return null
+    const address = artistArtUrl(path, kind, version || undefined)
+    return brokenArt.has(address) ? null : address
+  }
+  const fanart = onDisk('fanart')
+  const square = version > 0 || !picture ? onDisk('thumb') : null
+  const logo = onDisk('logo')
+  const broken = (address: string) => () => setBrokenArt((was) => new Set(was).add(address))
+
+  //? About, Line-up and In your library: drawn under the albums once they are, when MusicBrainz and the
+  //? library have answered (or ABOUT_WAIT_MS) - in one go, and they stay drawn
+  const libraryHalfKnown = ownedKnown && libraryKnown && (!names.length || summariesKnown)
+  const factsKnown = !mbid || facts !== null || factsFailed
+  const aboutShown = useRef(false)
+  if (drawRows && ((libraryHalfKnown && factsKnown) || aboutWaited)) aboutShown.current = true
+  const drawAbout = aboutShown.current
+  //? ...In your library still out when they are drawn (ABOUT_WAIT_MS - /library/owned walking a
+  //? spun-down array after a restart): drawn LAST, saying it is looking, so it lands under what is on
+  //? screen rather than above it (review). And once it has said something, that stays while the
+  //? library is asked again (the names changed), as the albums do - and when the library couldn't be
+  //? read (review: a failed re-ask took In your library away, About jumping up under the finger)
+  const libraryLast = useRef<boolean | null>(null)
+  if (drawAbout && libraryLast.current === null) libraryLast.current = !libraryHalfKnown
+  const lastInLibrary = useRef<LibraryFacts | null>(null)
+  const libraryAnswered = libraryHalfKnown && (!!inLibrary || !summariesFailed)
+  if (libraryAnswered) lastInLibrary.current = inLibrary
+  const shownLibrary = libraryAnswered ? inLibrary : lastInLibrary.current
+  //? ...and once drawn, In your library stays drawn - saying it is looking, or that there is nothing,
+  //? rather than going
+  const libraryOnScreen = useRef(false)
+  if (drawAbout && (shownLibrary || libraryLast.current || summariesFailed)) libraryOnScreen.current = true
+  //? Try again on a library that couldn't be read: its word asked for again - once at a time
+  const retrySummaries = () => {
+    if (!summaryAsking) setSummaryAsks((count) => count + 1)
+  }
+
+  //? the albums drawn, and then the sections under them: App puts back a scroll it couldn't as the page
+  //? came - a page a move made of another draws nothing on its first frame (review)
+  useLayoutEffect(() => {
+    if (drawRows) onDrawn?.(drawAbout)
+  }, [drawRows, drawAbout])
+
+  const members = folded(facts?.members ?? [], MEMBERS_SHOWN, allMembers)
+  const links = folded(facts?.links ?? [], LINKS_SHOWN, allLinks)
+  const factRows = aboutRows(facts)
+  //? chosen here, and nothing else says who they are: the page says so, with Change - whatever
+  //? MusicBrainz has said of them yet, so a choice whose facts won't come can still be changed
+  const byChoice = !said && !!chosen && chosen.mbid === mbid
+  //? "Now: Ye" on a page of another name; on their page by the name they have now, the other names
+  //? the library still files them under (review: "Now: Ye" on Ye's own page said nothing)
+  const ownName = !!facts?.name && name === facts.name
+
+  //? an artist just chosen: its Change takes focus once drawn - the panel that chose has closed, and the
+  //? "Which artist is this?" it gives focus back to went with the words around it
+  useLayoutEffect(() => {
+    if (!focusChange.current || !changeButton.current) return
+    focusChange.current = false
+    changeButton.current.focus({ preventScroll: true })
+  })
+
+  /** The artist page's panel, for one of its three jobs - or, open for that already, closed (App). */
+  const manage = (mode: ArtistManageMode, event: MouseEvent) => {
+    if (!onManage) return
+    onManage({
+      mode,
+      page: id,
+      name,
+      mbid,
+      currentName: facts?.name ?? null,
+      moveNames,
+      imagesName: folder.name,
+      version,
+      onMoved: ({ mbid: to, name: now, emptied }) => {
+        //? what the session kept of this page and of theirs by id is of folders that have moved
+        forgetKeptArtist(id)
+        forgetKeptArtist(`${MB_PREFIX}${to}`)
+        //? followed only from a page of a name every album of which moved - Navidrome's artist of that
+        //? name goes with them; a page of their name now, or of a name an album stayed under, is still
+        //? Navidrome's artist, and stays (review: it followed from Ye's own page, and after a move that
+        //? left an album behind, onto a page that couldn't find them until Navidrome had scanned)
+        const own = artist?.name ?? null
+        const follow = ref.navidrome === null || (own !== null && emptied.some((one) => foldName(one) === foldName(own)))
+        onMoved?.(id, { mbid: to, name: now }, follow)
+      },
+      onSaved: () => {
+        kept.version += 1
+        setVersion(kept.version)
+        setSummaryAsks((count) => count + 1)
+      },
+      onChosen: (match) => {
+        kept.chosen = match
+        focusChange.current = true
+        setChosen(match)
+      },
+    }, takeOpener(event))
+  }
+  const manages = admin && !!onManage
+
+  /** In your library: what the library last said of them - or, drawn last while it is still out, that
+   *  it is looking, and once it has answered with nothing, so; couldn't be read, that (with Try again),
+   *  over what it said before - with an admin's Artist images… under it. Drawn first, it is drawn only
+   *  once it has something to say; once drawn, it stays. */
+  const librarySection = !libraryOnScreen.current ? null : (
+    <section class="app-artist-section" aria-labelledby="app-artist-library-title" aria-busy={!libraryHalfKnown}>
+      <h2 id="app-artist-library-title" class="app-section-title">In your library</h2>
+      {shownLibrary && summariesFailed && (
+        <p class="app-footnote app-artist-stale">
+          deadwax couldn't read your library just now - this is what it said before.{' '}
+          <button type="button" class="app-text-button app-artist-retry is-inline" aria-busy={summaryAsking} onClick={retrySummaries}>
+            Try again
+          </button>
+        </p>
+      )}
+      {shownLibrary ? (
+        <dl class="app-group app-artist-list">
+          <div class="app-row app-artist-fact">
+            <dt class="app-row-label">Albums</dt>
+            <dd class="app-row-value">{shownLibrary.albums}</dd>
+          </div>
+          <div class="app-row app-artist-fact">
+            <dt class="app-row-label">Tracks</dt>
+            <dd class="app-row-value">{shownLibrary.tracks}</dd>
+          </div>
+          {shownLibrary.size && (
+            <div class="app-row app-artist-fact">
+              <dt class="app-row-label">Size</dt>
+              <dd class="app-row-value">{shownLibrary.size}</dd>
+            </div>
+          )}
+          {shownLibrary.years && (
+            <div class="app-row app-artist-fact">
+              <dt class="app-row-label">Years</dt>
+              <dd class="app-row-value">{shownLibrary.years}</dd>
+            </div>
+          )}
+          <div class="app-row app-artist-fact is-folder">
+            <dt class="app-row-label">{shownLibrary.folders.length > 1 ? 'Folders' : 'Folder'}</dt>
+            <dd class="app-row-value app-artist-folder">{shownLibrary.folders.length ? shownLibrary.folders.join('\n') : '-'}</dd>
+            {shownLibrary.problem && <p class="app-row-detail">{shownLibrary.problem}</p>}
+          </div>
+        </dl>
+      ) : !libraryHalfKnown ? (
+        <div class="app-asking" role="status">
+          <span class="app-sweep" aria-hidden="true" />
+          <span class="app-asking-text">Looking in your library…</span>
+        </div>
+      ) : summariesFailed ? (
+        <div class="app-search-problem">
+          <p class="app-search-empty">deadwax couldn't read your library just now.</p>
+          <button type="button" class="app-button app-artist-retry" aria-busy={summaryAsking} onClick={retrySummaries}>
+            Try again
+          </button>
+        </div>
+      ) : (
+        <p class="app-search-empty">Nothing of theirs in your library.</p>
+      )}
+      {/* couldn't be read: still drawn, stepped back, saying why (review) */}
+      {manages && (shownLibrary || summariesFailed) && (
+        <div class="app-artist-manage">
+          {/* aria-disabled, so it keeps focus and says why; a tap while it can't do anything is refused */}
+          <button
+            type="button"
+            class="app-button app-artist-manage-button"
+            aria-disabled={imagesReady ? undefined : 'true'}
+            aria-pressed={managing === 'images'}
+            {...(folder.reason ? { 'aria-describedby': 'app-artist-images-why' } : {})}
+            onClick={(event) => {
+              if (imagesReady) manage('images', event)
+            }}
+          >
+            Artist images…
+          </button>
+          {folder.reason && <p id="app-artist-images-why" class="app-footnote app-artist-why">{folder.reason}</p>}
+        </div>
+      )}
+    </section>
+  )
+
   return (
     <section class="app-artist">
       <div class="app-artist-hero">
-        {picture && <Cover id={picture} size={800} class="app-artist-picture" />}
+        {fanart ? (
+          <img class="app-artist-picture is-fanart" src={fanart} alt="" decoding="async" onError={broken(fanart)} />
+        ) : square ? (
+          <img class="app-artist-picture" src={square} alt="" decoding="async" onError={broken(square)} />
+        ) : (
+          picture && <Cover id={picture} size={800} class="app-artist-picture" />
+        )}
         <div class="app-artist-top">
           <button type="button" class="app-artist-back" onClick={onBack}>
             <ChevronLeftIcon class="pl-back-icon" />
@@ -527,7 +910,9 @@ export function ArtistPage({
           )}
         </div>
         <div class="app-artist-names">
-          <h1 class="app-artist-name">{name}</h1>
+          <h1 class="app-artist-name">
+            {logo ? <img class="app-artist-logo" src={logo} alt={name} decoding="async" onError={broken(logo)} /> : name}
+          </h1>
           {about && <p class="app-artist-facts">{about}</p>}
         </div>
       </div>
@@ -634,15 +1019,154 @@ export function ArtistPage({
             ) : discography.state === 'done' && discography.truncated ? (
               <p class="app-search-empty">MusicBrainz lists more albums than the first 500 shown here.</p>
             ) : !mbid && library.state === 'done' && ownedKnown ? (
-              <p class="app-search-empty">
-                {held.length
-                  ? "MusicBrainz doesn't know who this is from your files, so only the albums you have are here."
-                  : "Nothing of theirs in your library, and MusicBrainz doesn't know who this is."}
-              </p>
+              <div class="app-artist-unknown">
+                <p class="app-search-empty">
+                  {held.length
+                    ? "MusicBrainz doesn't know who this is from your files, so only the albums you have are here."
+                    : "Nothing of theirs in your library, and MusicBrainz doesn't know who this is."}
+                </p>
+                {/* (2.0.0-player.45) the picker's MusicBrainz search, for a shared name or files that don't say */}
+                {manages && (
+                  <button
+                    type="button"
+                    class="app-button app-artist-manage-button"
+                    aria-pressed={managing === 'who'}
+                    onClick={(event) => manage('who', event)}
+                  >
+                    Which artist is this?
+                  </button>
+                )}
+              </div>
             ) : discography.state === 'done' && !rows.length ? (
               <p class="app-search-empty">{studioOnly ? 'No studio albums on MusicBrainz.' : 'No albums on MusicBrainz.'}</p>
             ) : null}
           </section>
+
+          {/* (2.0.0-player.45) what the library holds of them, who they are, their line-up - under the
+              albums, drawn in one go once they have answered, so nothing above moves as they land; the
+              library's half drawn last when it was still out then (libraryLast) */}
+          {drawAbout && (
+            <div class="app-artist-more">
+              {!libraryLast.current && librarySection}
+
+              {mbid && (
+                <section class="app-artist-section" aria-labelledby="app-artist-about-title">
+                  <h2 id="app-artist-about-title" class="app-section-title">About</h2>
+                  {facts?.disambiguation && <p class="app-artist-disambiguation">{facts.disambiguation}</p>}
+                  {byChoice && (
+                    <p class="app-footnote app-artist-chosen">
+                      You chose who this is, for this visit.{' '}
+                      {manages && (
+                        <button
+                          ref={changeButton}
+                          type="button"
+                          class="app-text-button app-artist-change"
+                          aria-pressed={managing === 'who'}
+                          onClick={(event) => manage('who', event)}
+                        >
+                          Change
+                        </button>
+                      )}
+                    </p>
+                  )}
+                  {facts ? (
+                    <>
+                      {(renamed || factRows.length > 0) && (
+                        <dl class="app-group app-artist-list">
+                          {renamed && (
+                            <div class="app-row app-artist-fact is-now">
+                              <dt class="app-row-label">{ownName ? 'Also filed as' : 'Now'}</dt>
+                              <dd class="app-row-value">{ownName ? listed(moveNames) : facts.name}</dd>
+                              {/* the fix for an artist filed under an old name (v0.9.14) */}
+                              {manages && (
+                                <div class="app-artist-now-move">
+                                  <button
+                                    type="button"
+                                    class="app-button app-artist-manage-button"
+                                    aria-pressed={managing === 'refile'}
+                                    onClick={(event) => manage('refile', event)}
+                                  >
+                                    Move albums to {facts.name}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {factRows.map((row) => (
+                            <div key={row.label} class="app-row app-artist-fact">
+                              <dt class="app-row-label">{row.label}</dt>
+                              <dd class="app-row-value">{row.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+                      {facts.genres.length > 0 && (
+                        <ul class="app-artist-genres" aria-label="Genres">
+                          {facts.genres.map((genre) => <li key={genre} class="app-artist-genre">{genre}</li>)}
+                        </ul>
+                      )}
+                      {links.items.length > 0 && (
+                        <>
+                          <ul class="app-group app-artist-links" aria-label="Links">
+                            {links.items.map((link) => (
+                              <li key={link.url}>
+                                <a class="app-row app-link-row app-artist-link" href={link.url} title={link.url} target="_blank" rel="noopener">
+                                  <span class="app-row-label app-artist-link-label">{link.label}</span>
+                                  <ChevronRightIcon class="app-chevron" />
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                          {(links.more > 0 || allLinks) && (
+                            <button type="button" class="app-text-button app-artist-fold" aria-expanded={allLinks} onClick={() => setAllLinks((was) => !was)}>
+                              {allLinks ? 'Fewer links' : `${links.more} more link${links.more === 1 ? '' : 's'}`}
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </>
+                  ) : factsFailed ? (
+                    <div class="app-search-problem">
+                      <p class="app-search-empty">MusicBrainz isn't answering just now, so who they are isn't here.</p>
+                      <button type="button" class="app-button" onClick={() => setFactsAsks((count) => count + 1)}>
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <div class="app-asking" role="status">
+                      <span class="app-sweep" aria-hidden="true" />
+                      <span class="app-asking-text">Asking MusicBrainz…</span>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {members.items.length > 0 && (
+                <section class="app-artist-section" aria-labelledby="app-artist-lineup-title">
+                  <h2 id="app-artist-lineup-title" class="app-section-title">Line-up</h2>
+                  <ul class="app-group app-artist-members">
+                    {members.items.map((member, at) => (
+                      //? one person can be in a band twice - left, and back - so the place keeps keys apart
+                      <li key={`${member.mbid ?? member.name}:${at}`} class={`app-row app-artist-member${member.current ? '' : ' is-past'}`}>
+                        <span class="app-artist-member-text">
+                          <span class="app-artist-member-name">{member.name}</span>
+                          {member.roles.length > 0 && <span class="app-artist-member-roles">{memberRoles(member)}</span>}
+                        </span>
+                        <span class="app-row-value app-artist-member-years">{memberYears(member)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {(members.more > 0 || allMembers) && (
+                    <button type="button" class="app-text-button app-artist-fold" aria-expanded={allMembers} onClick={() => setAllMembers((was) => !was)}>
+                      {allMembers ? 'Fewer members' : `${members.more} earlier member${members.more === 1 ? '' : 's'}`}
+                    </button>
+                  )}
+                </section>
+              )}
+
+              {libraryLast.current && librarySection}
+            </div>
+          )}
         </div>
       )}
     </section>

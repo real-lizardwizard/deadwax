@@ -810,6 +810,14 @@ console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
       F.sideOf('desktop', { sources: true, info: false, edit: true }), F.sideOf('phone', { sources: false, info: false, edit: true })], ['edit', 'info', 'edit', 'none'])
   check('...making room as a column, lying over the page as a drawer',
     [F.makesRoom('column', 'edit'), F.makesRoom('drawer', 'edit'), F.liesOver('drawer', 'edit'), F.liesOver('column', 'edit')], [true, false, true, false])
+  //? 2.0.0-player.45: the artist page's panel, a fourth kind - a sheet on a phone (so no side there)
+  check('the artist page\'s panel is a side panel too: shown alone, under Info and Edit, over Sources - and a sheet, no side, on a phone',
+    [F.sideOf('desktop', { sources: false, info: false, edit: false, artist: true }), F.sideOf('desktop', { sources: false, info: true, edit: false, artist: true }),
+      F.sideOf('desktop', { sources: false, info: false, edit: true, artist: true }), F.sideOf('desktop', { sources: true, info: false, edit: false, artist: true }),
+      F.sideOf('phone', { sources: false, info: false, edit: false, artist: true })], ['artist', 'info', 'edit', 'artist', 'none'])
+  check('...making room as a column, lying over the page as a drawer - and left open as the window crosses 1024px, either way',
+    [F.makesRoom('column', 'artist'), F.makesRoom('drawer', 'artist'), F.liesOver('drawer', 'artist'), F.liesOver('column', 'artist'),
+      'artistPanel' in F.closesOnCrossing('phone'), 'artistPanel' in F.closesOnCrossing('desktop')], [true, false, true, false, false, false])
   check('the main area makes room only for a third column - a drawer lies over it',
     [F.makesRoom('column', 'sources'), F.makesRoom('column', 'info'), F.makesRoom('column', 'none'), F.makesRoom('drawer', 'sources'), F.makesRoom('sheet', 'sources')],
     [true, true, false, false, false])

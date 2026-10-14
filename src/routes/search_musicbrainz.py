@@ -147,11 +147,13 @@ async def release_group(
         raise HTTPException(status_code=500, detail=f"Error retrieving pressings from MusicBrainz: {e}")
 
 
-#? What an artist's facts carry to the app - who they are, and nothing a page of theirs would need
-#? more requests to show: no pictures (those are the main page's artist page, and three hosts deep),
-#? no links or members.
+#? What an artist's facts carry to the app - who they are, in full: since 2.0.0-player.45 their links
+#? (told apart, artists._tell_apart) and their line-up too, which the light facts of 2.0.0-player.17
+#? left out as a build trim. They come in the very answer get_artist already asks for - its `inc`
+#? has the relations - so the whole set costs no request more. No pictures: those are three hosts
+#? deep, and the artist images picker's to ask for.
 ARTIST_FACT_FIELDS = ("mbid", "name", "sort_name", "type", "disambiguation", "country", "area",
-                      "begin_area", "began", "ended_on", "ended", "genres", "aliases")
+                      "begin_area", "began", "ended_on", "ended", "genres", "aliases", "links", "members")
 
 
 @router.get("/artist")
@@ -160,10 +162,11 @@ async def artist(
     mbid: str = Query(..., pattern=MBID_PATTERN),
 ):
     """
-    Who an artist is, by their MusicBrainz id - the LIGHT facts (2.0.0-player.17): type, where
-    they're from, when they began and ended, their genres and the names they also go by, as
-    artists.artist_facts shapes them. For the app's artist page (under their name) and Info > About's
-    artist card ("Group · Bristol · 1991 to now").
+    Who an artist is, by their MusicBrainz id (2.0.0-player.17; in full since 2.0.0-player.45):
+    type, where they're from, when they began and ended, their genres, the names they also go by,
+    their links and their line-up, as artists.artist_facts shapes them. For the app's artist page
+    (the line under their name, its About and its Line-up) and Info > About's artist card ("Group ·
+    Bristol · 1991 to now").
 
     One request (get_artist, the main page's artist page's own, so the two share a cache entry),
     cached for the process like every MusicBrainz answer - SUCCESSES only: request_with_retries

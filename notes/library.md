@@ -75,6 +75,24 @@ showed two artists, which v0.6.18 left as "at least visible".
   dialog previewed `Kanye West/Donda (2021) → Ye/Donda (2021) · 2 tracks, 2 retagged`, and moving
   left one Ye with two albums, `Kanye West/` gone, album artist "Ye" and track artist still
   "Kanye West".
+- **A Mac's AppleDouble twins are never retagged (2.0.0-player.45)**: the plan counted every `*.flac` by
+  name, so `._01 - Donda Chant.flac` (a resource fork) was planned as a retag and failed the album; a
+  name starting `._` is passed over now, and the twin moves with its folder. Found by the app's real
+  page - notes/app-artists-pins.md "The artist page, as the main page had it", where the app's artist
+  page drives this writer too. **After review, only those**: the first fix passed over every file mutagen
+  couldn't open, so a track cut short, damaged, or unreadable by deadwax's user moved with its old album
+  artist still in it (Navidrome, reading as another user or more forgivingly, would split the artist
+  again) - and the execute's own rule, "a tag that won't write keeps that album where it is", no longer
+  held. Any other audio file that won't open is now a REFUSAL in the plan ("'03 Three.flac' can't be
+  read, so its tags can't be written"), so the preview says it before anything is written - where it
+  used to be planned, half the album retagged, then failed. Each file is opened once (`retag.current_tags_of`).
+  `test_a_track_cut_short_keeps_its_album_where_it_is_and_the_preview_says_why`, the MP3 whose ID3 reads
+  over nothing mutagen can sync to, two such files in one reason, and a file chmod 0 (skipped as root).
+  Those four all make mutagen RAISE; an .m4a, .ogg or .opus it doesn't recognise (an incomplete
+  download, pre-allocated and never filled) makes it answer None instead - MP4 and Ogg are known by
+  their header, FLAC and MP3 by their name too - and that branch was unpinned (second review: taken for
+  a file with no tags, the half-retag came back and every test passed).
+  `test_a_track_mutagen_cannot_even_recognise_keeps_its_album_where_it_is`, one per extension.
 
 ### Naming album folders from a template (v0.9.17)
 

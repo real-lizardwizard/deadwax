@@ -123,6 +123,22 @@ And for inside a track, the cover viewer and an album's Properties (2.0.0-player
   moving its line - worked out from the list's own type tokens, all of it hit (positioned over the rows
   either side).
 
+And for the artist page as the main page had it (2.0.0-player.45):
+
+- Its panel on a phone: a sheet over the whole screen - from the very top, its words clear of the status
+  bar by its padding, placed clear of a notch rather than padded by it, its foot over the home
+  indicator - with a scroll lock of its own and a body that is the one part that scrolls (saying so: the
+  layer takes every touch); its asking bar stops moving as it closes; its close button, its buttons, the
+  checkbox's label and its inline buttons a finger's target; its search box never small enough for iOS
+  to zoom into; a path broken anywhere; Save's line held at its height; a body with no foot under it
+  clear of the home indicator by its own padding; on a phone on its side the sheet scrolling as one; and
+  each picture to choose in a box of its slot's shape, the picture fitted inside, so one loading late
+  moves nothing beside it.
+- On the page: their logo in their name's place, never wider than the hero; Artist images…, Move albums
+  to … and Which artist is this? the secondary button a finger tall, toggled while the panel shows them
+  and stepped back (still in reach) while they can't be used; the folder a path, a folder per line,
+  broken anywhere; a link and a fold a finger's target; a past member stepped back by a token.
+
 And for the speed fader (2.0.0-player.39):
 
 - The fader takes every touch on it (touch-action: none), a tap target wide - a share of the plinth on
@@ -1171,6 +1187,88 @@ def test_every_token_a_rule_reads_is_defined():
     ui = Path(__file__).resolve().parent.parent / "ui" / "src"
     for name, component in SET_INLINE.items():
         assert f"'{name}':" in (ui / component).read_text(), name
+
+
+# ---------------------------------------------------------------- the artist page as the main page had it (2.0.0-player.45)
+
+def test_the_artist_pages_panel_is_a_sheet_over_the_whole_screen_on_a_phone():
+    """From the very top, its words clear of the status bar and its foot of the home indicator by padding,
+    placed clear of a notch by left and right - never padded by it; its own scroll lock; the body the one
+    part that scrolls, saying its touches pan; its asking bar stopped as it slides away."""
+    assert declarations(APP, "html.app-artist-panel-open") == {"overflow": "hidden"}
+    box = declarations(APP, ".app-artist-panel")
+    assert (box["position"], box["top"], box["bottom"], box["right"], box["left"]) == ("absolute", "0", "0", "var(--pl-safe-right)", "var(--pl-safe-left)")
+    assert box["padding"].startswith("calc(var(--pl-safe-top) + var(--app-artist-panel-pad))")
+    assert "safe" not in box["padding"].split(" ", 2)[-1].replace("var(--pl-safe-top)", "")
+    assert (box["transform"], declarations(APP, ".app-layer.is-open .app-artist-panel")["transform"]) == ("translateY(100%)", "translateY(0)")
+    body = declarations(APP, ".app-artist-panel-body")
+    assert (body["flex"], body["min-height"], body["overflow-y"], body["overflow-x"], body["touch-action"]) == ("1", "0", "auto", "hidden", "pan-y")
+    foot = declarations(APP, ".app-artist-panel-foot")
+    assert foot["padding"] == "var(--app-artist-panel-pad) 0 calc(var(--pl-safe-bottom) + var(--app-artist-panel-pad))"
+    assert declarations(APP, ".app-artist-panel-layer:not(.is-open) .app-sweep::before") == {"animation-play-state": "paused"}
+
+
+def test_the_artist_pages_panel_is_a_fingers_and_ios_never_zooms_into_its_search():
+    close = declarations(APP, ".app-artist-panel-close")
+    assert (close["width"], close["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
+    #? Move, Cancel, Save, Done and Search are the player's pills (48px)
+    assert px("--pl-pill-height") >= px("--pl-hit")
+    for selector in (".app-artist-panel-inline", ".app-artist-replace", ".app-artist-change"):
+        assert declarations(APP, selector)["min-height"] == "var(--pl-hit)", selector
+    field = declarations(APP, ".app-artist-search-input")
+    assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-pill-height)")
+    assert px("--dw-text-body") >= 16
+    #? a row a match is: the grouped list's, a finger tall
+    assert declarations(APP, ".app-row")["min-height"] == "var(--dw-row)" and px("--dw-row") >= px("--pl-hit")
+    for selector in (".app-artist-move-path", ".app-artist-move-to", ".app-artist-match-name", ".app-artist-panel-note"):
+        assert declarations(APP, selector)["overflow-wrap"] == "anywhere", selector
+    assert declarations(APP, ".app-artist-panel-said")["min-height"] == "var(--app-artist-said)"
+    assert ALL_TOKENS["--app-artist-said"] == "calc(var(--dw-text-footnote) * var(--dw-leading-note))"
+
+
+def test_the_artist_page_draws_its_logo_its_managing_and_its_facts_as_said():
+    logo = declarations(APP, ".app-artist-logo")
+    assert (logo["max-width"], logo["max-height"], logo["object-fit"]) == ("100%", "var(--app-artist-logo)", "contain")
+    #? Artist images… and the rest are the app's secondary button - a finger tall - toggled while the
+    #? panel shows them, and stepped back while they can't be used (aria-disabled: still focusable)
+    assert declarations(APP, ".app-button")["min-height"] == "var(--dw-row)"
+    pressed = declarations(APP, ".app-artist-manage-button[aria-pressed='true']")
+    assert (pressed["background"], pressed["color"]) == ("var(--dw-toggled-bg)", "var(--dw-accent-text)")
+    assert declarations(APP, ".app-artist-manage-button[aria-disabled='true']") == {"opacity": "var(--app-pin-off)"}
+    folder = declarations(APP, ".app-artist-folder")
+    assert (folder["white-space"], folder["overflow-wrap"], folder["font-family"]) == ("pre-line", "anywhere", "var(--dw-font-mono)")
+    assert declarations(APP, ".app-row.app-artist-link")["flex-wrap"] == "nowrap"
+    assert declarations(APP, ".app-artist-link-label")["overflow-wrap"] == "anywhere"
+    #? a fold is the app's text button, a finger tall, whatever its words
+    assert declarations(APP, ".app-text-button")["min-height"] == "var(--dw-row)" and "min-height" not in declarations(APP, ".app-artist-fold")
+    past = declarations(APP, ".app-artist-member.is-past .app-artist-member-text")
+    assert past == {"opacity": "var(--app-artist-past)"} and ALL_TOKENS["--app-artist-past"] == "0.6"
+
+
+def test_the_artist_pages_panel_keeps_a_footless_body_clear_of_the_home_indicator():
+    """Review: Which artist is this? has no foot, and the foot's padding was the sheet's only clearance -
+    its last match sat under the home indicator. Its end is padded as Info's and the Sources sheet's are."""
+    assert declarations(APP, ".app-artist-panel-body:last-child")["padding-bottom"] == "calc(var(--pl-safe-bottom) + var(--pl-gutter))"
+    assert declarations(APP, ".app-info-scroll")["padding-bottom"] == "calc(var(--pl-safe-bottom) + var(--pl-gutter))"
+
+
+def test_the_artist_pages_panel_scrolls_as_one_on_a_phone_on_its_side():
+    """Review: at 844x390 the fixed head and foot left the pictures about 140px. Under 500px tall the sheet
+    scrolls as one - its touches panning it - and the body grows with what it holds."""
+    short = "@media (max-height: 500px)"
+    box = declarations(APP, ".app-artist-panel", short)
+    assert (box["overflow-y"], box["overflow-x"], box["touch-action"], box["overscroll-behavior"]) == ("auto", "hidden", "pan-y", "contain")
+    assert declarations(APP, ".app-artist-panel-body", short) == {"flex": "none", "overflow": "visible"}
+
+
+def test_a_picture_to_choose_sits_in_a_box_of_its_slots_shape():
+    """Review: the box followed each picture's shape as it loaded (lazily, full size from fanart.tv), so the
+    options after it moved and wrapped under a finger. Square slots square, every other wide, fitted inside."""
+    image = declarations(APP, ".app-artist-option-image")
+    assert (image["width"], image["height"], image["object-fit"]) == ("var(--app-artist-option-wide)", "var(--app-artist-option)", "contain")
+    assert not {"min-width", "max-width"} & set(image)
+    assert declarations(APP, ".app-artist-option-image.is-square") == {"width": "var(--app-artist-option)"}
+    assert px("--app-artist-option-wide") > px("--app-artist-option")
 
 
 # ---------------------------------------------------------------- inside a track (2.0.0-player.44)

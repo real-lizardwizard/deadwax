@@ -59,7 +59,8 @@ finished Home").
   artist page's own call, so one cache entry serves both) shaped by `artist_facts`, less its links
   and members (`ARTIST_FACT_FIELDS`). Successes cached like every MusicBrainz answer; a failure (an
   error dict from request_with_retries, or MusicBrainzUnavailable) is a 503, never facts made of an
-  error. Three tests in `test_musicbrainz_routes.py` (and five MBID cases).
+  error. Three tests in `test_musicbrainz_routes.py` (and five MBID cases). **In full since
+  2.0.0-player.45** - the trim was the build's, not James's ("The artist page, as the main page had it").
 - **The artist page** (`app/ArtistPage.tsx` at `#/<tab>/artist/<id>`, `PageKind` 'artist'): the id
   is Navidrome's artist, or `mb:<mbid>` for one known only by MusicBrainz (the album you don't have
   links so). `lib/artistPage.ts` (pure, `artist.sim.cjs`) finds each side from the other: Navidrome's
@@ -444,3 +445,292 @@ said Home "looks a bit empty" and accepted that these two are what fill it.
   notice at the top over Now Playing, one column of cards at 320, an artist opened from a long-titled
   album keeping its chip in the hero), and everything on the iPhone: the drag under a real finger with
   the page still, VoiceOver's focus after an unpin, and whether 0.64.2 sends `played`.
+
+### The artist page, as the main page had it (2.0.0-player.45)
+
+James (2026-10-14): finish the web app. The parity audit (`uplan/parity-audit.json`, the "manage" area
+and the critic's gap list, section 3) found the main page's artist page (`components/ArtistDetails.tsx`
+and its two dialogs, `ArtistImagePicker` and `ArtistRefileDialog` - notes/library.md "The artist page",
+"One artist under two names", notes/names.md "Artists who have renamed") missing from the app's. James
+decided the phone gets all managing, so this is both frames: a side panel on a desktop, a sheet over
+the whole screen on a phone. The spec: `uplan/slice-artists-manage.md`.
+
+- **The MusicBrainz half, in full**: `ARTIST_FACT_FIELDS` gains `links` and `members` - the light facts
+  were a build trim, not a decision, and they ride in the very answer `get_artist` already asks for
+  (its `inc` has url-rels and artist-rels), so the whole set is still ONE request, cached. The TS type
+  `ArtistFactsLight` is gone (`ArtistFacts` for both); Info's artist card reads the same answer.
+  `test_artist_is_the_full_facts_in_one_request`: the links told apart (`_tell_apart`), the same page
+  once however written, the line-up current first and only the members OF the band, every field and
+  no other, one request whose `inc` carries the relations.
+- **Which names** (`lib/artistManage.ts`, pure, artist.sim). The main page's artist routes all take the
+  LIBRARY's name for an artist (the scan's album artist - how its tree groups), while the app's page is
+  one per artist: Ye's holds Donda, filed as "Kanye West", and BULLY, filed as "Ye". `libraryNames`
+  reads /library/owned's folders: a folder of several artists (a collaboration) never counts, even one
+  Navidrome lists under them; a folder of one artist counts when that is the page's MusicBrainz id -
+  or, with no id known, when it goes by the page's name (folded as `foldName` folds); a folder carrying
+  no artist id counts when Navidrome lists its album under them (by release) or it goes by their name.
+  Each name is one `GET /library/artist?name=` (through one latestOnly; a name that fails is null,
+  and every name failing is no answer at all - below), kept in the session with the page's other
+  answers. It is NAMES the routes take, not folders: a name
+  two acts share (the US and UK Nirvanas both tagged "Nirvana") answers for both - one summary, one
+  images folder - as the main page, which groups by name too, always has (review: a sim's label said
+  "only its own folder").
+- **Under the albums, drawn in one go** - "In your library", "About", "Line-up" - once the albums are
+  drawn and the library's word (owned, Navidrome, every summary) and MusicBrainz's facts have answered,
+  or `ABOUT_WAIT_MS` (3 s, from the page opening) has gone; once drawn they stay drawn. Under the
+  albums so nothing above moves as they land (the page's rule from 2.0.0-player.17); In your library
+  first (local, fast), the facts-fed parts after it. A fact landing late fills About in place, with
+  only the Line-up under it. The library ISN'T always fast (review): the first /library/owned after a
+  restart walks the whole library, so when the wait draws the sections with the library's half still
+  out, In your library is drawn LAST (`libraryLast`, latched as they are drawn) saying "Looking in your
+  library…", filled in where it is - "Nothing of theirs in your library." if it comes back empty - so
+  it never lands above an About on screen (on a desktop, never a third column appearing ahead of the
+  other two). Once it has said something, that stays while the library is asked again (the names
+  changed), as the albums do; once drawn, it stays drawn. The library answering for NONE of their names
+  (second review) is said - "deadwax couldn't read your library just now", with Try again, busy while
+  it asks and asking once at a time - over what it said before when it had said something ("... - this
+  is what it said before."; the hero and Artist images… keep that word too), and with nothing said
+  before, Artist images… is still drawn, stepped back with `imagesFolder`'s reason. Such an answer is
+  never kept in the session, so the page come back to asks rather than drawing a failure. **In your library** (`libraryFacts`): albums, tracks, size, years and the
+  folder (a folder per line, broken anywhere) - added up over every name, and under several names the
+  folders and "Their albums are filed under 2 names - Kanye West and Ye"; one name's own
+  `folder_problem` otherwise. **About**: the disambiguation, **Now: <name>** when a name the library
+  files them under isn't MusicBrainz's for them now (`namesToMove` - the main page's own test: the names
+  differ as written), Type, From (where they began, else their area, else country), `lifeRows` - Born
+  and Died for a person, Founded and Dissolved for a group (an orchestra, a choir), Began and Ended
+  otherwise, dates in words (`factDate`: "8 June 1977"), an end with no date "yes, date not known" -
+  and Other names; genres as tags; the links (`LINKS_SHOWN` 8, then "N more links") as rows opening
+  beside the app (`target="_blank" rel="noopener"`, the address in the tooltip). MusicBrainz failing:
+  About says so, with Try again (it used to leave only the line under the name out). **Line-up**:
+  `MEMBERS_SHOWN` 10, current first, roles (three) and years, a past member stepped back
+  (`--app-artist-past`), then "N earlier members". Each fold opens downward (`aria-expanded`).
+- **The hero**: their `fanart.*` where it is in the images folder (`artistArtUrl`), else Navidrome's
+  picture - or, once pictures were saved this visit (or with no Navidrome picture), the `artist.*` on
+  disk, asked with the session's `version` past the browser's five-minute cache; their `logo.*` in the
+  name's place (`<img alt={name}>` inside the h1), at most `--app-artist-logo` (72px) tall. A picture
+  that won't load falls back.
+- **Managing, an admin's** (`admin` from App's `/deadwax/me` - asked on a phone too now, as an artist
+  page comes on top there; true with logins off): **Artist images…** under In your library,
+  **Move albums to <name>** in About's Now row, **Which artist is this?** under "MusicBrainz doesn't
+  know who this is" - each `aria-pressed` while the panel shows it, and pressed again on its page,
+  closed. Artist images… writes into ONE folder (`imagesFolder`): the current name's where the library
+  files them under it, else the only name's; under several names and none current it is aria-disabled
+  with the reason under it ("move them under Ye first"), as for a name whose albums share no folder
+  (the summary's own words). An artist chosen is the page's for the visit (`kept.chosen`, used only when
+  nothing else says who they are): About says "You chose who this is, for this visit." with Change, and
+  focus goes to Change as the panel that chose closes. The facts are kept WITH the id they answered for
+  (`factsOf`, review): another artist chosen, the last one's are never shown as theirs - About asks,
+  then fills or says MusicBrainz didn't answer, with Try again - and Change is drawn whatever the facts
+  are doing, so a choice whose facts won't come can still be changed. On their page by the name they
+  have now (Navidrome's "Ye", or `mb:<Ye>`), the Now row reads **Also filed as: Kanye West** - "Now: Ye"
+  there said nothing.
+- **The artist page's panel** (`app/ArtistPanel.tsx`): the main page's two dialogs drawn for the app over
+  the same routes (ArtistDetails.tsx has no diff - its dialogs are modal floating windows that take
+  Escape on `window`'s capture, which the frame's panel rule can't host), plus "Which artist is this?" on
+  its own. **By the frame's rule** (`lib/appFrame.ts`: `Side` gains `'artist'`; `sideOf` Info, then
+  Edit, then the artist's, then Sources): a side panel on a desktop (the shared side panel rules,
+  470px, a column from 1280 or a drawer, not modal, Escape only from inside it); a sheet over the whole
+  screen on a phone (modal: App's `covered` gains it, so the page behind is inert; its own scroll lock,
+  `app-artist-panel-open`). One at a time: it puts Sources, Info and Edit away and each of them puts it
+  away. It is the page's, on the tab it was opened on (App's request keeps `tab`): it closes as that page
+  stops being on top there (`artistShown`) - the same artist on top of another tab is another copy of the
+  page, which the panel's answers (a choice, a save) wouldn't reach, and only the opening tab's copy
+  shows its button pressed (second review) - and it stays open across 1024px, a panel one side and a sheet the other, as Sources does. Each request is a new body
+  (keyed): **RefileBody** previews every name in `moveNames` through the refile route (one latestOnly),
+  drawn as one (`refileView`): each move (path → where it goes, "27 tracks, 27 retagged"), each album
+  that stays and why, the problems; **Move N albums** (`canMove`) applies each name with something to
+  move in turn - the route recomputing its plan every time - and says what became of it with Done
+  (focus to Done); **ImagesBody** is the picker: who it shows with **Not them?** (the search, for the
+  pictures alone, as on the main page), the notes on keys not set (`imageNotes`: keys go "in deadwax's
+  settings, under Connections"), slot by slot with the file on disk or "none found for this", best
+  chosen first, a tap to choose and again to leave the slot (`toggleChoice`), **Use another picture
+  (N)**, **Replace pictures that are already there**, **Save** (the route honours only a picture the
+  artist's own sources just offered); an ambiguous preview opens the search with MusicBrainz's matches;
+  **WhoBody** searches the page's name as it opens and lists MusicBrainz's artists for it (`matchLine`:
+  "as Kanye West · US rapper · Person · US"). Every preview and search through a latestOnly with its
+  signal; **a write is never called off**: a move's and a save's requests carry no signal, and what they
+  did is told whether the panel still shows or not - the page follows albums that moved even from a
+  panel closed mid-move; only the drawing waits on the ticket.
+- **The page follows the artist - from an old name's page only** (App's `artistMoved`, from the page's
+  `onMoved`): the library's listeners told (`announceAlbumsFiled` - the owned marks, the folders the
+  page reads) and the count asked again ("Artist under two names" was theirs). The page FOLLOWS only
+  when it says to: it is a page by MusicBrainz id (already where a move takes it - App changes nothing),
+  or its Navidrome artist's name is one of the names every album of which moved (`refileAfter`'s
+  `emptied`: nothing refused at the preview or the apply, nothing failed). Then it becomes `mb:<their id>`
+  (`router.become` - its entry replaced, the panel's request following it), the move is remembered
+  (`artistMoves`) for a page of the old id coming back on top, and its scroll is put back once it has
+  drawn: the page it became has nothing kept, so it draws nothing on its first frame and App's own
+  scrollTo clamps to 0 - the page tells App as its albums, then its sections, are drawn (`onDrawn`), and
+  App scrolls to where it was (`artistDrawn`, only while that route still shows, and only on that page's
+  own word: App hands each artist page an `onDrawn` that names its route, so an artist page in a hidden
+  tab drawing meanwhile can't use the scroll up - second review). Any OTHER page stays
+  (review): Navidrome's "Ye" is still Navidrome's artist after Kanye West's albums join it, and an old
+  name an album stayed under still has a Navidrome artist - following from either sent the page to
+  `mb:<Ye>`, where two Navidrome artists carry the id until the scan (for good, after a partial move)
+  and `libraryArtistFor` finds neither, and redirected the old id there for the session. What the
+  session kept of both pages is forgotten (`forgetKeptArtist`). The panel's wait of `EDIT_SETTLE_MS`
+  (10 s - by when Navidrome's watcher has usually scanned; nothing watches the scan itself), the panel
+  being never unmounted, App holding no timer (app-rules): App bumps the `refresh` of the page they were
+  moved from under the id it has now (`artistRefreshes`, through `artistMoves`) - Navidrome's artist found
+  afresh (`libraryArtists(true)`) and asked again, and the library's word on their names. What the
+  panel gives focus back to is re-pointed to the new page's back link while the old opener is gone.
+  A Navidrome slower than ten seconds leaves the page as it was before the scan until it is opened again.
+- **Needs a look's "Artist under two names"** says how the app fixes it: its hint (metadata_health.py,
+  server-side for both pages) now names the button - "Move albums to … on the artist's page moves them
+  all under the name MusicBrainz uses now"; artist.sim holds the hint to the page's button.
+- **A fix to the eighth writer, found by the real page**: `plan_artist_refile` counted every `*.flac` by
+  name, so a Mac's AppleDouble twin (`._01 - Donda Chant.flac`, the resource fork a Mac leaves beside
+  every file it copies to a share; the stub library has them) was planned as a retag, failed ("a tag
+  wouldn't write: ... is not a valid FLAC file") and kept the whole album where it was - on the main
+  page too. A name starting `._` is passed over now and the twin moves with its folder
+  (`test_an_appledouble_twin_is_never_retagged_and_moves_with_its_folder`); any OTHER audio file that
+  won't open keeps its album where it is, refused in the plan with its name (notes/library.md "One
+  artist under two names" - the first fix passed over every unreadable file, review). The old artist
+  folder holding only the twin of the moved album folder stays (rmdir only, never rmtree - the standing
+  decision).
+- **Style** (tokens only): app.css `--app-artist-logo`, `--app-artist-list-gap`, `--app-artist-genre*`,
+  `--app-artist-member-gap`, `--app-artist-past`, `--app-artist-panel-*`, `--app-artist-close-icon`,
+  `--app-artist-option*`, `--app-artist-chosen-ring`, `--app-artist-move-gap`, `--app-artist-said`; the
+  page's lists are the app's grouped lists (`.app-group`, `.app-row`), its buttons the secondary
+  `.app-button`, toggled while its panel shows and stepped back (`--app-pin-off`) while aria-disabled;
+  the sheet from the very top, its words clear of the status bar and its foot of the home indicator by
+  padding, placed clear of a notch by left and right, its body the one part that scrolls (touch-action
+  pan-y), its search 17px. app-desktop.css: the panel joins the side panels' shared rules and close
+  button; In your library, About and Line-up side by side (`--app-desk-artist-column` 300px, auto-fit),
+  their rows a desktop row's (`--app-desk-row`, a finger's where the pointer is coarse); the panel's
+  pills and field at the panel's sizes, a finger's and 17px where the pointer is coarse.
+- **No playback action from any new file**: ArtistPanel reaches no action and reads no player (app-rules);
+  the allowlist is unchanged; the engine files have no diff.
+- **Not built, on purpose**: keeping "Which artist is this?"'s choice past the visit (a store of its
+  own; the release editor writes who an album is by into its files, which is how it sticks); a picture
+  for a name whose albums sit in several folders (the main page refuses it too); refiling a
+  collaboration (its folder is its own); telling apart two acts the files give one album-artist name
+  (the US and UK Nirvanas both "Nirvana" share one In your library and one images folder - the library's
+  routes take a name, as the main page's tree groups by one); the main page's dialogs reused as they are (above); the
+  Sidebar's and You's "Open the main page" still say what is left there (the bulk runs, in this base).
+- **After review** (each confirmed by a majority of skeptics; the fixes, beyond the bullets above):
+  - **Two names moving folders of one name to one place** (`Kanye/Graduation (2007)` and `Kanye
+    West/Graduation (2007)`, both to `Ye/Graduation (2007)`): each name's plan is the route's for it
+    alone, so both planned the move and the button said "Move 2 albums" while one silently stayed.
+    `refileView` now shows the later staying ("another album moves to 'Ye/Graduation (2007)'"), and the
+    loop applies only names with a move left. And whatever an apply's recomputed plan refuses that the
+    preview showed moving (a folder come since) is said in the outcome (`refileAfter`'s `stayed`),
+    never dropped - the main page's dialog drops it too, one name at a time.
+  - **The Move loop's rules pinned**: the page told only when something moved (an apply where every tag
+    failed tells it nothing and starts no wait), no apply after one that fails (what the preview said
+    is no longer what is on disk), and the failure's words said.
+  - **The Move panel's subtitle** is the names whose albums move → the current name ("Kanye West → Ye",
+    "Kanye and Kanye West → Ye"); it was the page's own name, "Ye → Ye" on Ye's page.
+  - **Artist images…'s Save** can't be pressed while another artist's pictures are being looked for -
+    the slots give way to "Looking for pictures of Nirvana…" - nor after that look failed and took the
+    slots away: both times what it would have written was the last artist's, rejected or not on screen.
+    Try again asks for the artist last picked, not the page's. A search has its own latestOnly (it no
+    longer calls off a look out), its button busy while out.
+  - **A picture to choose sits in a box of its slot's shape** (`.is-square` for the square, wide for the
+    rest, the picture fitted inside): the box followed each picture's shape as it loaded - lazily, full
+    size from fanart.tv - so the options after it moved and wrapped under a finger.
+  - **Which artist is this?'s body**, the one with no foot, pads its own end clear of the home indicator
+    (`.app-artist-panel-body:last-child`, as Info's scroller); on a desktop off the panel's foot.
+  - **On a phone on its side** (`max-height: 500px`) the sheet scrolls as one, head, body and foot: the
+    fixed head and foot left the pictures about 140px at 844x390, a slot taller than its window.
+  - **Docs**: the page asks again "ten seconds later, by when Navidrome has usually scanned the move"
+    (it said "once Navidrome has scanned"); the README's hero is the background in the picture's place
+    and the logo in the name's (it said "behind their picture"); In your library goes by name, as the
+    main page does; a stale "light facts" comment in useInfoDetails.ts.
+  - **Pinned where only wiring was**: the re-ask after a move (artist.sim re-renders the page with a new
+    `refresh` - Navidrome's albums and every summary asked again, a page by MusicBrainz id finding its
+    artist in a fresh list; app-rules pins `artistSettled`'s body and the `refresh` wiring), App's
+    follow (its guard, the old id's page redirected, the focus re-point, the scroll put back), the
+    sections' wait (artist.sim's timers fire by delay now: nothing under albums still to come, the
+    facts waited for until ABOUT_WAIT_MS and not after), and the smaller rules: the years across names
+    in any order, the choice kept for the visit (its check was always true), a save or a search
+    answered after the panel closed, a failed summary saying "deadwax couldn't read their folder just
+    now", a tap on the stepped-back Artist images… refused, the square on disk only once saved here.
+  - Left as found: `askQueueSummary()` in `artistMoved` is redundant with `announceAlbumsFiled()`
+    (useQueueSummary listens for it) - kept, as albumChanged has both, and not pinned.
+- **After the second review** (each confirmed by a majority of skeptics):
+  - **In your library when the library couldn't be read** for any of their names (a dropped request
+    over WireGuard, a 5xx, a scan snapshot behind /library/owned): the all-null answer counted as an
+    answer, so the section either vanished (and Artist images… and its "couldn't read their folder"
+    reason with it - the docs said the button greys), said "Nothing of theirs in your library." under
+    their albums (drawn last), or - a re-ask after a save or a move failing - took away the section
+    already on screen, About jumping up. Now `summaryFailedFor` holds the names whose ask failed
+    entirely: `summaries` keeps the last real answer, the section stays drawn once drawn
+    (`libraryOnScreen`), the failure is said with Try again over what it said before, and it is never
+    written to `kept.summaries` (on the next visit it made About draw at once, In your library then
+    landing above it). The main page's ArtistDetails turned a failure into null too but kept the
+    section and a disabled Artist images….
+  - **The panel and the same artist on two tabs**: `artistShown` and `managing` compared only the page
+    id, so the non-modal desktop panel stayed open over another tab's copy (pressed there), and a choice
+    or a save updated the hidden copy - the request's callbacks belong to the copy that opened it. The
+    request keeps its tab; both compare it.
+  - **The scroll put back after a follow** was taken by whichever artist page drew - one in a hidden tab
+    could use it up (narrow: a page opened within ~3 s of a slow apply finishing). `artistDrawn` now
+    takes the drawing page's route key and acts only for the one `artistMoved` recorded.
+  - **Pinned where nothing held it** (each rule mutated, every sim passing): mutagen ANSWERING None for an
+    .m4a, .ogg or .opus it can't recognise (the four refile tests all made it raise - notes/library.md);
+    `refileAfter`'s "nothing refused at the apply" for `emptied`; the files' word over a choice
+    (`said ?? chosen`); the sections waiting for Navidrome too (`libraryKnown`); a picture on disk that
+    won't load falling back (the background, the logo); "Fewer members"; a choir Founded; the move's
+    problems said once; and the facts' Try again showing "Asking MusicBrainz…" while it asks.
+- **Verified**: 2412 Python tests (2410 passed, 2 skipped; six new - the AppleDouble refile test, three in
+  `test_app_css.py`, two in `test_app_desktop_css.py` - and the light facts' route test rewritten for the
+  full facts), pyflakes, tsc, the bundle,
+  and all 47 sims (`artist` 224 - its pure rules in `lib/artistManage.ts`, the page's new sections,
+  hero and managing rendered with every answer given by hand, and the panel's three bodies and its
+  frame; `app-rules` 317 and `routes` 256 extended). 52 mutations, one or more per rule pinned, each
+  restored byte for byte: 49 caught at once; one got past (a collaboration's folder counted - no case
+  reached it) and gained the check that catches it; one was equivalent (imagesFolder's two branches
+  swapped give the same answer for every input) and was replaced by one that isn't, caught. The engine
+  guard is empty; `ui/src/components/` and `ui/src/hooks/` have no diff.
+  **After review**: 2420 Python tests (2418 passed, 2 skipped; eight more - four in
+  `test_artist_refile.py` for the tracks that won't open, three in `test_app_css.py`, one in
+  `test_app_desktop_css.py`), pyflakes, tsc, the bundle, all 47 sims (`artist` 270, `app-rules` 320,
+  `routes` 256). 51 mutations of the fixes, each restored byte for byte (sha256 checked): 50 caught at
+  once; one got past (a name counted empty with a failure in it - the moved count already said so,
+  except when an album was filed under the name between the preview and the apply) and gained the case
+  that catches it.
+  **After the second review**: 2423 Python tests (2421 passed, 2 skipped; three more - the None branch,
+  one per extension), pyflakes, tsc, the bundle, all 47 sims (`artist` 291, `app-rules` 321, `routes`
+  256). 26 mutations of the fixes in a scratch copy, each restored byte for byte (sha256
+  checked): all 26 caught first time - ten of the failed-library rules, two of the scroll's own word,
+  three of the panel's tab, the None branch, the apply's refusal, and nine for the seven rules pinned
+  (a picture that won't load three ways: the background's onError dropped, the logo's, an address never
+  matched).
+- **Verified in the real page** (headless Chromium over plain http as `deadwax.test`, the builder's own
+  deadwax on 8110 against its own stand-in Navidrome on 8111 over a copy of the stub library with
+  `Kanye West/Donda (2021)` staged - album artist "Kanye West", Ye's MusicBrainz id - MusicBrainz live;
+  31 checks, no console errors): at 390x844 Navidrome's "Kanye West" page draws In your library (two
+  names, 2 albums, both folders, why there is no one), About (Now: Ye with Move albums to Ye, Person,
+  Atlanta, Born 8 June 1977, other names, "formerly Kanye West", genres, eight links opening beside and
+  a fold) and no line-up; Move albums to Ye opens the sheet over the whole screen (page inert, focus on
+  its close) previewing `Kanye West/Donda (2021) → Ye/Donda (2021) · 27 tracks, 27 retagged`; Move moves
+  it (album artist Ye, each track still Kanye West, Ye's id, the AppleDouble twins along), says so with
+  Done, the page becomes `mb:<Ye>`, Done gives focus to its back link, and once the stand-in has scanned
+  the page plays both albums, one folder, no Now; Artist images… shows the six slots, the note on keys,
+  the best chosen, and Save writes `artist.jpg` and `logo.png` into `Ye/` (Commons and Wikidata, no key
+  needed), the hero then the saved square and the logo in the name's place; at 375x667 "Which artist is
+  this?" on Test Signal lists MusicBrainz's artists, a pick gives the page About and "You chose who this
+  is" with focus on Change; at 1440x900 Portishead's page draws the three sections side by side, the
+  line-up's past members stepped back, Artist images… opens as a 470px third column (`.has-side`, not
+  modal, the page live, the button pressed), Escape in the page leaves it and from inside closes it. No
+  overflow at any size, the sheets open or not.
+  **After review, in the real page** (the fixer's own deadwax on 8112 against its own stand-in Navidrome
+  on 8113, the same staged copy; 18 checks, no console errors): at 390x844 Navidrome's "Ye" reads
+  **Also filed as: Kanye West**, the sheet's subtitle "Kanye West → Ye", the move leaves the page on
+  `ar-6f59522e3981` with Play live, and once the stand-in has scanned it plays both albums from there;
+  Kanye West's page with a copy of Donda whose first track is chmod 000 previews Donda moving and the
+  copy staying ("'01 - Donda Chant.flac' can't be read, so its tags can't be written"), moves one, and
+  stays on Kanye West's page; at 1440x900 Kanye West's page scrolled to About (4030) follows to
+  `mb:<Ye>` and, two frames at 0 later, is put back (4016, the new page 14px shorter); at 390x844 with a
+  34px home indicator, Which artist is this?'s eighth match ends at 788 (body padded 54px); at 844x390
+  Artist images… scrolls as one (body 715px in a 390px sheet), Save on screen at its end, the square's
+  box 72px and the logo's 168px. No overflow at any of them.
+  **NOT verified here**: an iPhone (the sheet's safe areas, VoiceOver through the panel), fanart.tv and
+  TheAudioDB's pictures (no keys here), a real Navidrome 0.64.2 (whether it keeps an artist's id across
+  the move - the page follows by MusicBrainz id either way), the drawer between 1024 and 1279px, a
+  coarse pointer, a move of several old names at once against a real library (the sim has it), a phone
+  on its side on a real iPhone, and a Navidrome slower than ten seconds to scan a move (the page shows
+  what it had until it is opened again). The second review's fixes were not run in a real page: a
+  /library/artist that fails (the note, Try again, the stepped-back Artist images…), the panel with
+  the same artist on top of two tabs, and the scroll put back with another tab's artist page drawing.

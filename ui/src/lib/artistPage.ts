@@ -40,7 +40,7 @@
  * order - never both editions of Dummy, which would play every song twice.
  */
 
-import type { ArtistCredit, ArtistFactsLight, ReleaseGroup } from '../api/types'
+import type { ArtistCredit, ArtistFacts, ReleaseGroup } from '../api/types'
 import { heldInOrder } from './idBridge'
 import { foldName, ownedForGroup, type OwnedAlbum, type OwnedIndex } from './owned'
 import { groupKind, groupYear } from './searchResults'
@@ -93,7 +93,7 @@ export interface HeldAlbumFields {
 }
 
 /** Every album /library/owned listed, once each, whichever way the index holds it. */
-function everyOwned(index: OwnedIndex | null): OwnedAlbum[] {
+export function everyOwned(index: OwnedIndex | null): OwnedAlbum[] {
   if (!index) return []
   const seen = new Map<string, OwnedAlbum>()
   for (const map of [index.byRelease, index.byGroup, index.byName]) {
@@ -339,7 +339,7 @@ export function playsLine(albums: number, inHand: number, settled: boolean, libr
 }
 
 /** Who they are, in a line: "Group · Bristol · since 1991", "Group · London · 1965 to 2014". */
-export function factsLine(facts: Pick<ArtistFactsLight, 'type' | 'area' | 'begin_area' | 'country' | 'began' | 'ended' | 'ended_on' | 'disambiguation'> | null): string {
+export function factsLine(facts: Pick<ArtistFacts, 'type' | 'area' | 'begin_area' | 'country' | 'began' | 'ended' | 'ended_on' | 'disambiguation'> | null): string {
   if (!facts) return ''
   const began = (facts.began ?? '').slice(0, 4)
   const ended = (facts.ended_on ?? '').slice(0, 4)

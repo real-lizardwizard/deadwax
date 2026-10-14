@@ -19,7 +19,7 @@
  *  - On a desktop (2.0.0-player.25), "Albums that need a look" in Managing, with its count (none
  *    drawn while it isn't known), above that link and going to the queue's page; on a phone no row.
  *    Under it (2.0.0-player.42) "Library care", then (.33) "Server settings" and "Log", each opening its
- *    page; the desktop's footnote names only what is still the main page's: artist images, re-filing.
+ *    page; the desktop's footnote says everything is in the app now (2.0.0-player.45).
  *  - Playback holds Gapless, then "Now Playing opens as" (2.0.0-player.11), then Maximum quality:
  *    Gapless is handed the player itself - the object whose setGapless its tap calls - the look
  *    the setting App keeps and App's way to change it, and the notes say where the button that
@@ -647,8 +647,9 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     button('Log').props.onClick()
     check('...each opening its page', opened, ['care', 'settings', 'log'])
     check('...and the footnote no longer says settings and the log are on the main page', footnotes().some((words) => /settings|the log/i.test(words)), false)
-    //? (2.0.0-player.42) nor the bulk runs: what is left there is artist images and re-filing an artist
-    check('...nor the bulk runs - only artist images and re-filing an artist', [footnotes().some((words) => /bulk/i.test(words)), footnotes().some((words) => words.includes('Artist images and re-filing an artist are on the main page for now.'))],
+    //? (2.0.0-player.42) nor the bulk runs, and (2.0.0-player.45) nor an artist's pictures and re-filing: nothing
+    //? a desktop needs is left only on the main page
+    check('...nor anything else - the footnote says everything is in the app now', [footnotes().some((words) => /bulk|artist images|re-filing/i.test(words)), footnotes().some((words) => words.includes('Everything here is in the app now; the main page stays until it retires.'))],
       [false, true])
     draw({ shown: true, current: true, ...LOOK })
     check('...and a phone still has no Library care row', rows().includes('Library care'), false)

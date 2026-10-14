@@ -268,10 +268,11 @@ An artist's page (since 2.0.0-player.17) opens from Search (the **Top result** a
 artists), **Library → Artists**, the artist's name on an album you have and on the album you don't
 have, and Info's artist card.
 
-- **At the top**, their picture - the one Navidrome has for them, which is the `artist.jpg` the main
-  page's [artist images](library.md#artist-pages) saves into their folder - or a plain coloured
-  band, with their name at its foot and who they are under it ("Group · Bristol · since 1991",
-  from MusicBrainz). **Pin** at its top right pins them to Home (it reads **Pinned** once they
+- **At the top**, their picture - their background (`fanart.*`) where it's in their folder, else the
+  one Navidrome has for them, which is the `artist.jpg` **Artist images…** saves into their folder
+  ([below](#managing-an-artist)) - or a plain coloured band, with their name at its foot (their logo
+  in its place where `logo.*` is in their folder) and who they are under it ("Group · Bristol · since
+  1991", from MusicBrainz). **Pin** at its top right pins them to Home (it reads **Pinned** once they
   are); it waits, greyed, until the page knows who they are on MusicBrainz, or that nobody can say -
   [Home and pins](#home-and-pins).
 - **Play** and **Shuffle** play every album of theirs you have, one copy of each (the plain edition
@@ -297,12 +298,82 @@ have, and Info's artist card.
 - **Which artist** it is on MusicBrainz comes from Navidrome (the album artist's MusicBrainz id it
   reads from your files), else from the MusicBrainz ids deadwax wrote into the albums of theirs you
   have. With neither - files tagged by something else, or not at all - the page says MusicBrainz
-  doesn't know who this is and lists only what you have. An artist opened from MusicBrainz is
+  doesn't know who this is and lists only what you have, with **Which artist is this?** to choose
+  ([below](#managing-an-artist)). An artist opened from MusicBrainz is
   matched to Navidrome's the same way, and by name only when exactly one artist in your library
   goes by it.
 - The page works with Navidrome down for an artist opened from MusicBrainz (their albums, without
   what you have); one opened from your library needs Navidrome, like an album you have. If deadwax
   couldn't ask Navidrome for them, the page says why, with **Try again**.
+
+Under the albums (since 2.0.0-player.45, as the main page's artist page has them), once the albums are
+drawn and MusicBrainz and your library have answered - or after three seconds - and all at once, so
+nothing above them moves as they come. If your library still hasn't answered by then (its first look
+after deadwax restarts can take a while), **In your library** comes last instead of first, saying it's
+looking, and fills in where it is:
+
+- **In your library**: how many albums and tracks you have under their names, their size, the years,
+  and the folder they share - or the folders, and why there isn't one (their albums filed under two
+  names, say, or in two places). It's every name your library files their albums under: Ye's page
+  counts Donda, filed as "Kanye West", and BULLY, filed as "Ye". It goes by the album artist your
+  files carry, as the main page does, so two artists your files give the same name (two bands called
+  Nirvana) are counted together. If deadwax couldn't read your library for them just then, it says so,
+  with **Try again** - over what it said before, when it had said anything - rather than claiming
+  there's nothing of theirs.
+- **About**, from MusicBrainz: what tells them apart from others of the name ("formerly Kanye West"),
+  **Now: …** when your library files their albums under a name that isn't theirs now (on their page by
+  the name they have now, **Also filed as: …** names the others instead), then **Type**,
+  **From**, when they began and ended in words - **Born** and **Died** for a person, **Founded** and
+  **Dissolved** for a group, **Began** and **Ended** otherwise ("8 June 1977") - and **Other names**;
+  their genres; and their links, the first eight with the rest behind "N more links", each opening
+  beside the app, two of a kind told apart (**Official site · portishead.co.uk**). If MusicBrainz
+  doesn't answer, About says so, with **Try again**.
+- **Line-up**, for a group: its members, the current ones first, with their roles and years, past
+  members stepped back, the first ten with the rest behind "N earlier members".
+
+### Managing an artist
+
+For an admin (everyone, while logins are off), on a phone and on a desktop:
+
+- **Artist images…** (under In your library) shows every picture of them found - Wikimedia Commons
+  always, TheAudioDB and fanart.tv when deadwax's settings have their keys (under **Connections**;
+  the picker says which is missing) - slot by slot: square image, banner, background, logo, wide
+  image and clear art, each with where it's from, and the file already in their folder or "none
+  found for this". The best of each is chosen to start with; tap a picture to choose it, tap it again
+  to leave that slot alone; **Use another picture** puts any picture found in any slot. **Save**
+  writes them into their folder (`artist.*`, `banner.*`, `fanart.*`, `logo.*`, `landscape.*`,
+  `clearart.*` - [the library guide](library.md#artist-pages) has which app reads which); **Replace
+  pictures that are already there** says whether a file already in a slot is replaced. **Not them?**
+  searches MusicBrainz for another artist, for the pictures alone; while that artist's pictures are
+  being looked for, or if that look fails, **Save** waits (and **Try again** looks for that artist
+  again). It needs one folder: greyed, it says why - their albums filed under two names (move them
+  first, below), or in two places, or that deadwax couldn't read their folder just then.
+- **Move albums to …** (in About's **Now** row, when your library files their albums under a name
+  that isn't theirs now) previews every album that would move - where it is, where it goes, how many
+  tracks and how many are retagged - every album that stays and why (a collaboration, one tagged as
+  another artist, a folder of that name already there or another album moving there, a track deadwax
+  can't read), then **Move N albums** moves them: each album's folder goes under the current name
+  keeping its own name, its album artist tag becomes the current name, and each track's own artist
+  (what the sleeve credited) stays. The old folder goes once it's empty, and their pictures come with
+  it. What happened is said, with **Done** - every album that didn't move, and why. On the page of an
+  old name every album of which moved, the page follows them: it becomes their page by their
+  MusicBrainz id, where you were on it. Any other page - theirs by the name they have now, or a name
+  an album stayed under - stays as it is. Ten seconds after the move the page asks Navidrome again, by
+  when it has usually scanned the move. A Mac's hidden `._` twin of a track (its resource fork) is
+  never retagged; it moves with its folder. A track deadwax can't read - cut short, damaged, or not
+  readable by the user deadwax runs as - keeps its album where it is: its tags can't be rewritten, and
+  moved it would still name the old artist.
+- **Which artist is this?** - where the page says MusicBrainz doesn't know who this is (the files
+  don't say, or several artists share the name: there are eight called Nirvana) - searches MusicBrainz
+  for the name and lists every artist going by it, with what tells them apart ("as Kanye West" when an
+  old name of theirs matched). Choosing one gives the page their albums, About and pictures for this
+  visit (the page says so, with **Change**); applying an album's release in the metadata editor writes
+  who it's by into its files, for good.
+
+These open as a sheet over the whole screen on a phone (on its side, the sheet scrolls as one), and
+on a desktop as a panel beside the page (by the same rule as Sources and the Edit panel: one panel at
+a time, a third column from 1280 pixels, over the page's right edge below that). **Escape** closes it -
+on a desktop, from inside it.
 
 ## Home and pins
 
@@ -391,8 +462,9 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   and its one save ([Configuration](configuration.md#in-the-app-on-a-desktop) has it) - and **Log**,
   deadwax's event log: the last 500 lines since it started, then new ones as they come, while the page
   shows ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)),
-  and **Open the main page**, which opens the main page in a new tab (artist pictures and re-filing
-  an artist are there for now; an album is edited from its own page, below), and
+  and **Open the main page**, which opens the main page in a new tab (a desktop needs nothing that is
+  only there now: an album is edited from its own page, below, the bulk runs are **Library care**'s, and
+  an artist's pictures and **Move albums to …** are on the artist's page, [above](#managing-an-artist)), and
   **You** at the foot. Where you are is highlighted. Home, Requests and You work as the phone's tabs
   do: a click shows it as you left it, and a click on the one showing goes back to its first page
   (and, there, to the top). So does the Library view showing. Another Library view shows that view -
@@ -1470,9 +1542,9 @@ fixes that.
 - **On a desktop**, the sidebar's **Managing** has **Needs a look**, **Library care**, **Settings** and **Log**, and otherwise opens the main page;
   between 1024 and 1279 pixels wide a panel lies over the right of the page, the end of a long
   tracklist under it. The Edit panel edits one album, from its page or from **Needs a look**; the bulk
-  runs are **Library care**'s; an artist's pictures and **Move albums to …** are the main page's, and so
-  are the browser preferences of its settings tab. On a phone **Needs a look**, **Library care**,
-  **Settings** and **Log** are short notes pointing at the main page. The [visualizer](#the-visualizer)
+  runs are **Library care**'s; an artist's pictures and **Move albums to …** are on the artist's page, on
+  a phone too; the browser preferences of its settings tab stay the main page's. On a phone **Needs a
+  look**, **Library care**, **Settings** and **Log** are short notes pointing at the main page. The [visualizer](#the-visualizer)
   sees FLAC songs only; its play/pause is its one control of the music (skip and seek from the player
   bar, after leaving it).
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from

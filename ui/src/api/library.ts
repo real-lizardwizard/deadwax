@@ -298,8 +298,8 @@ export function deleteAlbum(albumPath: string): Promise<DeleteResult> {
  * Drawn immediately, the way the library tab draws its snapshot; what needs MusicBrainz and the
  * image hosts arrives separately, because those can take seconds or be down altogether.
  */
-export function fetchArtist(name: string): Promise<ArtistSummary> {
-  return get<ArtistSummary>(`/library/artist?name=${encodeURIComponent(name)}`)
+export function fetchArtist(name: string, signal?: AbortSignal): Promise<ArtistSummary> {
+  return get<ArtistSummary>(`/library/artist?name=${encodeURIComponent(name)}`, signal)
 }
 
 /**
@@ -309,12 +309,13 @@ export function fetchArtist(name: string): Promise<ArtistSummary> {
 export function previewArtistImages(
   artist: string,
   options: { artistMbid?: string | null; replace?: boolean } = {},
+  signal?: AbortSignal,
 ): Promise<ArtistImagesPreview> {
   return post<ArtistImagesPreview>('/library/artist/images/preview', {
     artist,
     artist_mbid: options.artistMbid ?? null,
     replace: options.replace ?? false,
-  })
+  }, signal)
 }
 
 /**
@@ -343,8 +344,8 @@ export function applyArtistImages(
  * The way past the two things the automatic match refuses to guess at: files carrying no
  * MusicBrainz ids, and the several bands that share a name.
  */
-export function searchArtists(query: string): Promise<ArtistSearchResult> {
-  return post<ArtistSearchResult>('/library/artist/search', { query })
+export function searchArtists(query: string, signal?: AbortSignal): Promise<ArtistSearchResult> {
+  return post<ArtistSearchResult>('/library/artist/search', { query }, signal)
 }
 
 /** One album the re-filing would move (v0.9.14). */
@@ -374,8 +375,8 @@ export interface ArtistRefileResults {
 }
 
 /** Which of an artist's albums would move under the name MusicBrainz uses now. Writes nothing. */
-export function previewArtistRefile(artist: string, artistMbid: string | null): Promise<ArtistRefilePlan> {
-  return post<ArtistRefilePlan>('/library/artist/refile/preview', { artist, artist_mbid: artistMbid })
+export function previewArtistRefile(artist: string, artistMbid: string | null, signal?: AbortSignal): Promise<ArtistRefilePlan> {
+  return post<ArtistRefilePlan>('/library/artist/refile/preview', { artist, artist_mbid: artistMbid }, signal)
 }
 
 /** Move them. The server recomputes the plan rather than taking this one back. */

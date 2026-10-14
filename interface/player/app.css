@@ -305,6 +305,27 @@
     --app-pin-notice-pad-y: 10px;
     --app-pin-notice-pad-x: 14px;
     --app-z-notice: 40;              /* over Now Playing's menu and Info (30) */
+    /* the artist page as the main page had it (2.0.0-player.45): their logo in their name's place, In
+       your library, About and Line-up under the albums, and the artist page's panel (ArtistPanel.tsx) -
+       a sheet over the whole screen on a phone */
+    --app-artist-logo: 72px;         /* the logo's height at most */
+    --app-artist-list-gap: 12px;     /* a section's card to what follows it: the genres, the links, a fold */
+    --app-artist-genre: 26px;        /* a genre's tag */
+    --app-artist-genre-pad: 10px;
+    --app-artist-genres-gap: 6px;
+    --app-artist-member-gap: 2px;    /* a member's name to their roles */
+    --app-artist-past: 0.6;          /* a past member, stepped back */
+    --app-artist-panel-pad: 16px;    /* the sheet's top under the status bar, and its foot over the home indicator */
+    --app-artist-panel-gap: 14px;    /* between its parts */
+    --app-artist-close-icon: 22px;   /* its close button's cross, in a 44px box */
+    --app-artist-option: 72px;       /* a picture to choose: its box's height, and a square slot's width... */
+    --app-artist-option-wide: 168px; /* ...and every other slot's (a banner, a background, a logo) */
+    --app-artist-option-pad: 4px;
+    --app-artist-options-gap: 8px;
+    --app-artist-option-tick: 12px;
+    --app-artist-chosen-ring: 2px;   /* a chosen picture's edge, in the accent */
+    --app-artist-move-gap: 2px;      /* a move's lines */
+    --app-artist-said: calc(var(--dw-text-footnote) * var(--dw-leading-note));   /* Save's line, held */
 }
 
 /* ===== the shell: room for the tab bar, and the mini player docked above it ===== */
@@ -3310,6 +3331,378 @@ button.app-pin-card:active { background: linear-gradient(var(--dw-pressed), var(
 }
 
 .app-pin-notice:not(.is-shown) { clip-path: inset(50%); }
+
+/* ===== The artist page, as the main page had it (2.0.0-player.45) ===== */
+
+/* their logo (logo.* on disk) in their name's place, at its foot, as wide as the hero lets it */
+.app-artist-logo {
+    display: block;
+    max-width: 100%;
+    max-height: var(--app-artist-logo);
+    object-fit: contain;
+    object-position: left bottom;
+}
+
+/* "MusicBrainz doesn't know who this is" and, for an admin, Which artist is this? */
+.app-artist-unknown { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-heading-gap); }
+
+/* Artist images…, Move albums to …, Which artist is this?: the toggled tint while the panel shows it,
+   stepped back while it can't be used (aria-disabled: it keeps focus, and the line under it says why) */
+.app-artist-manage-button[aria-pressed='true'] {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    box-shadow: none;
+    color: var(--dw-accent-text);
+}
+
+.app-artist-manage-button[aria-disabled='true'] { opacity: var(--app-pin-off); }
+.app-artist-manage-button[aria-disabled='true']:active { background: var(--dw-secondary-bg); }
+
+.app-artist-manage {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--app-heading-gap);
+    margin-top: var(--app-artist-list-gap);
+}
+
+.app-artist-why { margin: 0; }
+
+/* In your library, About and Line-up: under the albums, each a card of rows */
+.app-artist-more { display: flex; flex-direction: column; gap: var(--app-artist-gap); }
+.app-artist-section { min-width: 0; }
+.app-artist-list { margin: 0; }
+.app-artist-fact > dt,
+.app-artist-fact > dd { margin: 0; }
+
+/* the folder is a path - each on a line of its own, broken anywhere */
+.app-artist-fact.is-folder { align-items: flex-start; }
+
+.app-artist-folder {
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-data);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* "Now: Ye" and, for an admin, Move albums to Ye on a line of its own under it */
+.app-artist-now-move { display: flex; flex-basis: 100%; }
+
+.app-artist-disambiguation,
+.app-artist-chosen,
+.app-artist-stale {
+    margin: 0 0 var(--app-heading-gap);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-artist-change,
+.app-artist-retry.is-inline { min-height: var(--pl-hit); padding: 0; font-size: var(--dw-text-footnote); }
+
+/* In your library that couldn't be read: its Try again faded while it asks (review) */
+.app-artist-retry[aria-busy='true'] { opacity: var(--app-job-busy); }
+
+.app-artist-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-artist-genres-gap);
+    margin: var(--app-artist-list-gap) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-artist-genre {
+    display: inline-flex;
+    align-items: center;
+    height: var(--app-artist-genre);
+    padding: 0 var(--app-artist-genre-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-label);
+}
+
+/* a link a row, opening beside the app; its label - "Official site · portishead.co.uk" - wraps */
+.app-artist-links { margin-top: var(--app-artist-list-gap); }
+.app-row.app-artist-link { flex-wrap: nowrap; }
+.app-artist-link-label { flex: 1; overflow-wrap: anywhere; }
+
+/* "4 more links", "3 earlier members": the fold opens downward, moving nothing above it */
+.app-artist-fold { display: block; padding: 0; font-size: var(--dw-text-footnote); }
+
+.app-row.app-artist-member { flex-wrap: nowrap; }
+.app-artist-member-text { display: flex; flex: 1; flex-direction: column; gap: var(--app-artist-member-gap); min-width: 0; }
+.app-artist-member-name { overflow-wrap: anywhere; }
+
+.app-artist-member-roles {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-artist-member-years { flex: none; font-family: var(--dw-font-mono); font-size: var(--dw-text-data); }
+.app-artist-member.is-past .app-artist-member-text,
+.app-artist-member.is-past .app-artist-member-years { opacity: var(--app-artist-past); }
+
+/* --- the artist page's panel: on a phone a sheet over the whole screen, clear of the status bar, the
+   notch and the home indicator by where it is placed and how its top and foot are padded --- */
+
+html.app-artist-panel-open { overflow: hidden; }
+
+.app-artist-panel {
+    position: absolute;
+    top: 0;
+    right: var(--pl-safe-right);
+    bottom: 0;
+    left: var(--pl-safe-left);
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-artist-panel-gap);
+    max-width: var(--pl-content-max);
+    margin: 0 auto;
+    padding: calc(var(--pl-safe-top) + var(--app-artist-panel-pad)) var(--dw-gutter-grouped) 0;
+    background: var(--dw-bg-sheet);
+    box-shadow: var(--dw-highlight);
+    transform: translateY(100%);
+    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.app-layer.is-open .app-artist-panel { transform: translateY(0); }
+
+/* closed mid-ask: its asking bar stops moving as it slides away */
+.app-artist-panel-layer:not(.is-open) .app-sweep::before { animation-play-state: paused; }
+
+.app-artist-panel-head {
+    display: flex;
+    flex: none;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--app-artist-panel-gap);
+}
+
+.app-artist-panel-heading { display: flex; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+
+.app-artist-panel-title {
+    margin: 0;
+    font-size: var(--dw-text-title);
+    font-weight: var(--dw-weight-bold);
+    line-height: var(--dw-leading-tight);
+}
+
+.app-artist-panel-subtitle {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-artist-panel-close {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    border-radius: var(--dw-radius-control);
+    color: var(--dw-text-2);
+}
+
+.app-artist-panel-close:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+}
+
+.app-artist-panel-close-icon { width: var(--app-artist-close-icon); height: var(--app-artist-close-icon); }
+
+/* the one part that scrolls, saying so itself: the layer it sits in takes every touch */
+.app-artist-panel-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--app-artist-panel-gap);
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+}
+
+.app-artist-panel-body:focus { outline: none; }
+
+/* a body with no foot under it (Which artist is this?): its own end clear of the home indicator, as
+   Info's and the Sources sheet's are (review: its last match sat under it) */
+.app-artist-panel-body:last-child { padding-bottom: calc(var(--pl-safe-bottom) + var(--pl-gutter)); }
+
+.app-artist-panel-foot {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-heading-gap) var(--app-artist-options-gap);
+    padding: var(--app-artist-panel-pad) 0 calc(var(--pl-safe-bottom) + var(--app-artist-panel-pad));
+    border-top: var(--dw-hairline) solid var(--dw-border);
+}
+
+.app-artist-panel-foot .pl-pill { flex: 1 1 0; min-width: 0; }
+.app-artist-panel-primary[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
+.app-artist-panel-note,
+.app-artist-panel-who,
+.app-artist-panel-said {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-artist-panel-note strong { color: var(--dw-text); font-weight: var(--dw-weight-semibold); }
+.app-artist-panel-note.is-warning,
+.app-artist-move-line.is-warning { color: var(--dw-amber-text); }
+.app-artist-panel-outcome { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-heading-gap); }
+.app-artist-panel-inline { min-height: var(--pl-hit); padding: 0; font-size: var(--dw-text-footnote); }
+
+/* Save's line: held at its height, so a save's words arriving move nothing beside it */
+.app-artist-panel-said { flex-basis: 100%; min-height: var(--app-artist-said); }
+
+.app-artist-replace {
+    display: flex;
+    flex-basis: 100%;
+    align-items: center;
+    gap: var(--app-row-pad);
+    min-height: var(--pl-hit);
+    font-size: var(--dw-text-footnote);
+}
+
+.app-artist-replace-box {
+    flex: none;
+    width: var(--dw-checkbox);
+    height: var(--dw-checkbox);
+    margin: 0;
+    accent-color: var(--dw-accent);
+}
+
+/* the MusicBrainz artist search: its box never small enough for iOS to zoom into */
+.app-artist-search { display: flex; flex-direction: column; gap: var(--app-heading-gap); }
+.app-artist-search-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+.app-artist-search-row { display: flex; gap: var(--app-artist-options-gap); }
+.app-artist-search-row .pl-pill { flex: none; }
+
+.app-artist-search-input {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--pl-pill-height);
+    padding: 0 var(--dw-gutter-grouped);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font-size: var(--dw-text-body);
+}
+
+.app-artist-search-input:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring); }
+
+.app-artist-matches { flex: none; }
+.app-row.app-artist-match { width: 100%; flex-direction: column; align-items: flex-start; text-align: left; }
+.app-artist-match-name { overflow-wrap: anywhere; }
+
+.app-artist-match-line {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+/* each move: where it is, where it goes, its tracks - paths broken anywhere */
+.app-artist-moves { display: flex; flex: none; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+.app-artist-move {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-artist-move-gap);
+    padding: var(--app-row-pad) 0;
+    border-top: var(--dw-hairline) solid var(--dw-border);
+}
+
+.app-artist-move-path,
+.app-artist-move-to {
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-data);
+    overflow-wrap: anywhere;
+}
+
+.app-artist-move-path { color: var(--dw-text-2); }
+.app-artist-move-line { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+
+/* a slot of the picker: its name, the file on disk or none found, Use another picture, and the pictures */
+.app-artist-slot { display: flex; flex: none; flex-direction: column; gap: var(--app-artist-options-gap); }
+
+.app-artist-slot-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--app-artist-options-gap);
+}
+
+.app-artist-slot-title { margin: 0; font-size: var(--dw-text-heading); font-weight: var(--dw-weight-semibold); }
+.app-artist-slot-line { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+.app-artist-slot-more { margin-left: auto; padding: 0; font-size: var(--dw-text-footnote); }
+.app-artist-options { display: flex; flex-wrap: wrap; gap: var(--app-artist-options-gap); }
+
+.app-artist-option {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-artist-option-pad);
+    padding: var(--app-artist-option-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-card);
+}
+
+.app-artist-option.is-chosen {
+    border-color: var(--dw-accent);
+    box-shadow: 0 0 0 var(--app-artist-chosen-ring) var(--dw-accent);
+}
+
+.app-artist-option:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring); }
+
+/* each picture in a box of its slot's shape - square for the square, wide for the rest - fitted inside
+   it: a picture loading late (they load lazily, full size from fanart.tv and TheAudioDB) moves nothing
+   beside it under a finger (review) */
+.app-artist-option-image {
+    display: block;
+    width: var(--app-artist-option-wide);
+    height: var(--app-artist-option);
+    border-radius: var(--dw-radius-tag);
+    background: var(--dw-well);
+    object-fit: contain;
+}
+
+.app-artist-option-image.is-square { width: var(--app-artist-option); }
+
+.app-artist-option-source {
+    display: flex;
+    align-items: center;
+    gap: var(--app-line-gap);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+}
+
+.app-artist-option-tick { flex: none; width: var(--app-artist-option-tick); height: var(--app-artist-option-tick); color: var(--dw-accent); }
+
+/* A phone on its side (390px tall): the artist page's sheet scrolls as one - head, body and foot - so
+   the pictures and the moves have the screen, not the strip a fixed head and foot leave of it (review:
+   about 140px at 844x390, a slot taller than its window) */
+@media (max-height: 500px) {
+    .app-artist-panel { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+    .app-artist-panel-body { flex: none; overflow: visible; }
+}
 
 /* ===== inside a track, the cover viewer and an album's Properties (2.0.0-player.44) =====
    On both frames, so nothing here is a desktop's alone: the track inspector fits a 390px panel as well

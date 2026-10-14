@@ -46,6 +46,10 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   panel has open in Explorer's selection, a row dealt with faded but never its word, the quiet
   "Checking the library…" in a line always a row tall, the list clear of a drawer, and no solid purple.
 - The speed's chip (2.0.0-player.39) first in the player bar's tools, the tools' height, its face smaller.
+- The artist page's panel (2.0.0-player.45) a fourth side panel by the same rule, its close button the
+  others', its buttons and field the panel's sizes (a finger's, the field 17px, where the pointer is
+  coarse); the page's In your library, About and Line-up side by side where there is room, their rows a
+  desktop row's; a body with no foot off the panel's foot; a picture to choose in its slot's box.
 - Server settings and the log (2.0.0-player.33), with no board: the page at least the page area's height
   and its save bar sticky at the foot above the player bar, taking no clicks while it says nothing and
   keeping keyboard focus clear of it while it says something, Save its one solid purple button; the
@@ -732,6 +736,40 @@ def test_the_speeds_chip_sits_in_the_bars_tools_at_their_height():
     #? the tools hold their buttons at the row's right end, so the chip coming and going moves none of them
     assert declarations(DESKTOP, ".app-desk .app-playbar-tools", DESK)["justify-content"] == "flex-end"
 
+
+def test_the_artist_pages_panel_is_a_side_panel_by_the_same_rule():
+    """2.0.0-player.45: beside the page as Sources, Info and Edit are - sliding over its edge as a drawer,
+    there in place as a column, focusable by a click with no ring, its close button theirs."""
+    box = declarations(DESKTOP, ".app-desk .app-layer.is-panel .app-artist-panel", DESK)
+    assert (box["inset"], box["transform"], box["background"], box["border-radius"], box["max-width"]) == (
+        "0", "translateX(100%)", "var(--dw-side-panel)", "0", "none")
+    assert declarations(DESKTOP, ".app-desk .app-layer.is-panel.is-open .app-artist-panel", DESK)["transform"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-layer.is-column .app-artist-panel", DESK)["transition"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-layer.is-panel .app-artist-panel:focus", DESK)["outline"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-artist-panel", DESK)["position"] == "absolute"
+    close = declarations(DESKTOP, ".app-desk .app-artist-panel-close", DESK)
+    assert (close["width"], close["height"]) == ("var(--app-desk-close)", "var(--app-desk-close)")
+    #? ...a finger's where the pointer is coarse (the token the coarse block sets), its field 17px there
+    assert declarations(DESKTOP, ":root", COARSE)["--app-desk-close"] == "var(--pl-hit)"
+    field = declarations(DESKTOP, ".app-desk .app-artist-search-input", COARSE)
+    assert (field["min-height"], field["font-size"]) == ("var(--pl-hit)", "var(--dw-text-body)")
+    assert declarations(DESKTOP, ".app-desk .app-artist-panel-foot .pl-pill", COARSE)["height"] == "var(--pl-hit)"
+
+
+def test_the_artist_pages_sections_stand_side_by_side_their_rows_a_desktop_rows():
+    more = declarations(DESKTOP, ".app-desk .app-artist-more", DESK)
+    assert (more["display"], more["grid-template-columns"]) == ("grid", "repeat(auto-fit, minmax(var(--app-desk-artist-column), 1fr))")
+    rows = declarations(DESKTOP, ".app-desk .app-artist-more .app-row", DESK)
+    assert (rows["min-height"], rows["font-size"]) == ("var(--app-desk-row)", "var(--app-desk-text)")
+    assert declarations(DESKTOP, ":root", COARSE)["--app-desk-row"] == "var(--pl-hit)"
+
+
+def test_the_artist_pages_panel_at_the_panels_sizes_footless_and_picker():
+    """Review: Which artist is this? ended flush against the player bar; a picture's box followed its shape."""
+    assert declarations(DESKTOP, ".app-desk .app-artist-panel-body:last-child", DESK)["padding-bottom"] == "var(--app-desk-panel-pad)"
+    image = declarations(DESKTOP, ".app-desk .app-artist-option-image", DESK)
+    assert (image["width"], image["height"]) == ("var(--app-desk-artist-option-wide)", "var(--app-desk-artist-option)")
+    assert declarations(DESKTOP, ".app-desk .app-artist-option-image.is-square", DESK) == {"width": "var(--app-desk-artist-option)"}
 
 
 # ---------------------------------------------------------------- looking after the library (2.0.0-player.42)

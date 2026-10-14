@@ -32,7 +32,8 @@ from src.artists import ARTIST_ART_STEMS
 from src.logger import logger
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import is_within, sanitize_filename
-from src.retag import _tidy_emptied_artist, read_current_tags
+from src.retag import _tidy_emptied_artist, current_tags_of
+from src.tagkeys import easy_file
 
 
 def plan_artist_refile(library_root: str, albums: list[dict], current_name: str,
@@ -79,10 +80,26 @@ def plan_artist_refile(library_root: str, albums: list[dict], current_name: str,
                                     "reason": f"'{folder}/{source.name}' is already there"})
             continue
 
-        audio = sorted(p for p in source.iterdir() if p.is_file() and file_extension(p.name) in AUDIO_EXTENSIONS)
+        #? the folder's audio: every file whose tag must be written before the folder may move. A Mac
+        #? copying to a share leaves an AppleDouble twin beside every file (`._01 - Donda Chant.flac`,
+        #? its resource fork, named as the track) - no audio and no tag, never counted by the scan - and
+        #? it moves with its folder as any other file does (2.0.0-player.45, found by the app's real-page
+        #? check: planned as a retag, it failed the whole album). Any OTHER audio file that can't be read
+        #? - cut short, damaged, or not readable by deadwax's user - keeps its album where it is, said
+        #? here before anything is written: its tag can't be rewritten, and moved it would still name the
+        #? old artist under the new one, which Navidrome (reading as another user, or more forgivingly)
+        #? would show as two artists again.
+        audio = sorted(p for p in source.iterdir()
+                       if p.is_file() and file_extension(p.name) in AUDIO_EXTENSIONS and not p.name.startswith("._"))
+        tags = {path: _tags_or_none(path) for path in audio}
+        unreadable = [path.name for path, current in tags.items() if current is None]
+        if unreadable:
+            plan["refused"].append({"album": label, "path": album["path"], "reason": _unreadable_reason(unreadable)})
+            continue
+
         retag = []
         for path in audio:
-            current = read_current_tags(path)
+            current = tags[path] or {}
             changes = {}
             if current.get("albumartist", "") != current_name:
                 changes["albumartist"] = {"from": current.get("albumartist", ""), "to": current_name}
@@ -151,6 +168,22 @@ def execute_artist_refile(plan: dict, library_root: str) -> dict:
             results["removed_folders"].append(old.name)
 
     return results
+
+
+def _tags_or_none(path: Path) -> dict | None:
+    """The tags a file carries now (retag's keys), or None for one that won't open as audio."""
+    try:
+        audio = easy_file(path)
+    except Exception:
+        return None
+    return None if audio is None else current_tags_of(audio)
+
+
+def _unreadable_reason(names: list[str]) -> str:
+    """Why an album with files that won't open stays: '03 Three.flac' can't be read..."""
+    if len(names) == 1:
+        return f"'{names[0]}' can't be read, so its tags can't be written"
+    return f"{len(names)} of its files can't be read ('{names[0]}' and {len(names) - 1} more), so their tags can't be written"
 
 
 def _write_artist_tags(path: Path, changes: dict) -> None:

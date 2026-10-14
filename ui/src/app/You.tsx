@@ -53,8 +53,9 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * You: how Get works for you, what this device plays like, whether deadwax can reach what it needs,
  * and what version it is - and, on a DESKTOP, the way to the app's own Managing pages: the albums that
  * need a look, the server's settings and the log (below). What is left of looking after deadwax is on
- * the main page for now, and this says so and links there: on a desktop artist images and re-filing an
- * artist; on a PHONE all of it - server settings, the albums that need a look, the
+ * the main page for now, and this says so and links there: on a desktop nothing (an artist's pictures and
+ * re-filing are the artist page's since 2.0.0-player.45, the bulk runs Library care's since .42); on a
+ * PHONE all of it - server settings, the albums that need a look, the
  * log and editing an album, none of which the app draws there yet.
  *
  * - Getting albums (2.0.0-player.15, GettingChoices.tsx): "When I tap Get" (Show me the sources, the
@@ -321,7 +322,7 @@ export function You({
           </div>
           {desktop ? (
             <p class="app-footnote">
-              Artist images and re-filing an artist are on the main page for now.
+              Everything here is in the app now; the main page stays until it retires.
             </p>
           ) : (
             <p class="app-footnote">

@@ -54,6 +54,12 @@
  *    their id whatever Navidrome's id was, and not live while deadwax can't keep pins - a tap then
  *    saying why in the app's notice.
  *
+ * And the artist page as the main page had it (2.0.0-player.45): lib/artistManage.ts's rules - which
+ * names the library files an artist under (a collaboration's folder never theirs), In your library
+ * over them, where their pictures go, About's rows (Born/Founded, dates in words), the folds, the
+ * picker's and the move's rules, Needs a look's hint naming the page's button - and the page's new
+ * sections, hero and managing rendered, and app/ArtistPanel.tsx's three bodies and its frame.
+ *
  * Run it with:  node ui/test/artist.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -64,13 +70,14 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-artist-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/artistPage.ts', 'src/lib/idBridge.ts', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022',
+  'src/lib/artistPage.ts', 'src/lib/idBridge.ts', 'src/lib/artistManage.ts', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022',
   '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' })
 
 const A = require(path.join(OUT, 'lib/artistPage.js'))
 const B = require(path.join(OUT, 'lib/idBridge.js'))
 const O = require(path.join(OUT, 'lib/owned.js'))
+const M = require(path.join(OUT, 'lib/artistManage.js'))
 
 //? checks that wait for promises to settle: run in turn, after what came before has settled
 const later = []
@@ -315,11 +322,196 @@ console.log('\nthe id bridge: Also, This pressing, the folder')
     [[CD, VINYL], [], [], []])
 }
 
+/* ===== the artist page, as the main page had it (2.0.0-player.45): lib/artistManage.ts ===== */
+
+const JAYZ = '66666666-6666-4666-8666-666666666666'
+const NIRVANA_US = '77777777-7777-4777-8777-777777777777'
+const NIRVANA_UK = '88888888-8888-4888-8888-888888888888'
+const YE_LIBRARY = O.buildOwnedIndex([
+  { path: 'Kanye West/Donda (2021)', artist: 'Kanye West', album: 'Donda', release_mbid: DONDA, release_group_mbid: 'rg-donda', albumartist_mbids: [YE] },
+  { path: 'Ye/BULLY (2025)', artist: 'Ye', album: 'BULLY', release_mbid: BULLY, release_group_mbid: 'rg-bully', albumartist_mbids: [YE] },
+  //? a collaboration's folder is its own, whoever is in it
+  { path: 'JAY-Z & Ye/Watch the Throne (2011)', artist: 'JAY‐Z & Ye', album: 'Watch the Throne', release_mbid: SELFTITLED, albumartist_mbids: [JAYZ, YE] },
+  //? an untagged rip that goes by their name, and one Navidrome lists under them by its release
+  { path: 'Ye/Tapes (2003)', artist: 'Ye', album: 'Tapes', release_mbid: null, albumartist_mbids: [] },
+  { path: 'Misc/Graduation (2007)', artist: 'Kanye', album: 'Graduation', release_mbid: ROSELAND, albumartist_mbids: [] },
+  //? somebody else's, tagged so
+  { path: 'Portishead/Dummy (1994)', artist: 'Portishead', album: 'Dummy', release_mbid: CD, albumartist_mbids: [PORTISHEAD] },
+])
+const NIRVANAS = O.buildOwnedIndex([
+  { path: 'Nirvana/Nevermind (1991)', artist: 'Nirvana', album: 'Nevermind', release_mbid: null, albumartist_mbids: [NIRVANA_US] },
+  { path: 'Nirvana (UK)/Local Anaesthetic (1971)', artist: 'Nirvana', album: 'Local Anaesthetic', release_mbid: null, albumartist_mbids: [NIRVANA_UK] },
+  { path: 'Nirvana/Bleach (1989)', artist: 'nirvana', album: 'Bleach', release_mbid: null, albumartist_mbids: [] },
+])
+const summaryOf = (artist, path, more = {}) => ({ artist, path, folder_problem: null, album_count: 1, track_count: 10, total_size: 400 * 1024 * 1024, first_year: '2021', last_year: '2021', albums: [], art: {}, ...more })
+
+console.log('\nthe artist page as the main page had it: which names the library files them under')
+{
+  check('Ye: every folder tagged with their one id (both names), an untagged one by their name, one Navidrome lists by its release - never a collaboration, never another artist',
+    M.libraryNames(YE_LIBRARY, { mbid: YE, name: 'Ye', releases: [ROSELAND] }), ['Kanye', 'Kanye West', 'Ye'])
+  check('...Navidrome\'s "Kanye West" page, who MusicBrainz says is Ye: the same albums, the untagged one by that name',
+    M.libraryNames(YE_LIBRARY, { mbid: YE, name: 'Kanye West', releases: [] }), ['Kanye West', 'Ye'])
+  check('...a folder tagged as somebody else never theirs by name', M.libraryNames(YE_LIBRARY, { mbid: YE, name: 'Portishead', releases: [CD] }), ['Kanye West', 'Ye'])
+  check('...nor a collaboration, even one Navidrome lists under them - by its release or by the name it goes by',
+    [M.libraryNames(YE_LIBRARY, { mbid: YE, name: 'Ye', releases: [SELFTITLED] }), M.libraryNames(YE_LIBRARY, { mbid: YE, name: 'JAY‐Z & Ye', releases: [] }),
+      M.libraryNames(YE_LIBRARY, { mbid: null, name: 'JAY‐Z & Ye', releases: [SELFTITLED] })],
+    [['Kanye West', 'Ye'], ['Kanye West', 'Ye'], []])
+  check('nobody can say who they are (two Nirvanas tagged apart): every folder going by the name, as Navidrome shows them',
+    M.libraryNames(NIRVANAS, { mbid: null, name: 'Nirvana', releases: [] }), ['nirvana', 'Nirvana'])
+  //? NAMES, not folders (review): the library's routes take a name, so a name two acts share answers
+  //? for both - "Nirvana" here is the US band's Nevermind and the UK band's Local Anaesthetic alike, as
+  //? on the main page, which groups by name too
+  check('...the US band\'s page: the name of its own folder, and the untagged one\'s by name - the UK band\'s folder giving no name of its own',
+    M.libraryNames(NIRVANAS, { mbid: NIRVANA_US, name: 'Nirvana', releases: [] }), ['nirvana', 'Nirvana'])
+  check('...the UK band\'s, by the name of the folder only it carries the id of - and the untagged folder\'s by name (its aside folded away), which nobody can say is not theirs',
+    M.libraryNames(NIRVANAS, { mbid: NIRVANA_UK, name: 'Nirvana (UK)', releases: [] }), ['nirvana', 'Nirvana'])
+  check('...a folder tagged as the other band never theirs, by name or not', M.libraryNames(O.buildOwnedIndex([
+    { path: 'Nirvana/Nevermind (1991)', artist: 'Nirvana', album: 'Nevermind', release_mbid: null, albumartist_mbids: [NIRVANA_US] }]), { mbid: NIRVANA_UK, name: 'Nirvana', releases: [] }), [])
+  check('no library answer, or nothing of theirs: no names', [M.libraryNames(null, { mbid: YE, name: 'Ye', releases: [] }), M.libraryNames(LIBRARY, { mbid: YE, name: 'Ye', releases: [] })], [[], []])
+  check('Move albums to <name>: the names that aren\'t MusicBrainz\'s for them now - the main page\'s test, the names differing as written',
+    [M.namesToMove(['Kanye West', 'Ye'], 'Ye'), M.namesToMove(['Ye'], 'Ye'), M.namesToMove(['Kanye West'], null), M.namesToMove(['JAY-Z'], 'JAY‐Z')],
+    [['Kanye West'], [], [], ['JAY-Z']])
+}
+
+console.log('\n...what the library holds of them, and where their pictures go')
+{
+  check('one name: its albums, tracks, size, years and folder - or why there is no one folder',
+    [M.libraryFacts([summaryOf('Portishead', 'Portishead', { album_count: 3, track_count: 33, first_year: '1994', last_year: '2008' })]),
+      M.libraryFacts([summaryOf('Portishead', null, { folder_problem: 'this artist\'s albums are in 2 different folders, so there is no one folder to put their pictures in' })]).problem],
+    [{ albums: 3, tracks: 33, size: '400 MB', years: '1994–2008', folders: ['Portishead'], problem: null },
+      'this artist\'s albums are in 2 different folders, so there is no one folder to put their pictures in'])
+  check('two names: added up, the years across both, each folder - and why there is no one',
+    M.libraryFacts([summaryOf('Kanye West', 'Kanye West', { total_size: 1024 ** 3 }), summaryOf('Ye', 'Ye', { first_year: '2025', last_year: '2025', total_size: 1024 ** 3 })]),
+    { albums: 2, tracks: 20, size: '2.0 GB', years: '2021–2025', folders: ['Kanye West', 'Ye'], problem: 'Their albums are filed under 2 names - Kanye West and Ye' })
+  check('...none: nothing to say', M.libraryFacts([]), null)
+  check('...the years across names in any order: the earliest to the latest (Prince, filed after The Artist)',
+    M.libraryFacts([summaryOf('The Artist', 'The Artist', { first_year: '1994', last_year: '1999' }), summaryOf('Prince', 'Prince', { first_year: '1978', last_year: '2016' })]).years, '1978–2016')
+  check('the years: one, a span, or none', [M.yearsText('1994', '1994'), M.yearsText('1994', '2008'), M.yearsText('', ''), M.yearsText('', '2008')], ['1994', '1994–2008', '', '2008'])
+  const both = new Map([['Kanye West', summaryOf('Kanye West', 'Kanye West')], ['Ye', summaryOf('Ye', 'Ye')]])
+  check('their pictures go into the current name\'s folder where the library has it, else the only name\'s',
+    [M.imagesFolder(['Kanye West', 'Ye'], 'Ye', both), M.imagesFolder(['Kanye West'], 'Ye', both), M.imagesFolder(['Ye'], null, both)],
+    [{ name: 'Ye', reason: null }, { name: 'Kanye West', reason: null }, { name: 'Ye', reason: null }])
+  check('...under several names, none of them current: none, until they are moved',
+    [M.imagesFolder(['Kanye', 'Kanye West'], 'Ye', both), M.imagesFolder(['Kanye', 'Kanye West'], null, both)],
+    [{ name: null, reason: 'Their albums are filed under 2 names - move them under Ye first, so their pictures have one folder' },
+      { name: null, reason: "Their albums are filed under 2 names, so there's no one folder for their pictures" }])
+  check('...a name whose albums share no folder says why (the main page\'s words); one deadwax couldn\'t read says so; not yet answered, no reason',
+    [M.imagesFolder(['Ye'], 'Ye', new Map([['Ye', summaryOf('Ye', null, { folder_problem: 'an album by this artist sits at the top of the library' })]])),
+      M.imagesFolder(['Ye'], 'Ye', new Map([['Ye', null]])), M.imagesFolder(['Ye'], 'Ye', new Map()), M.imagesFolder([], 'Ye', both)],
+    [{ name: 'Ye', reason: 'An album by this artist sits at the top of the library' }, { name: 'Ye', reason: "deadwax couldn't read their folder just now" },
+      { name: 'Ye', reason: null }, { name: null, reason: null }])
+}
+
+console.log('\n...who they are, in full')
+{
+  check('a date as MusicBrainz writes one, in words', ['1991', '1977-06', '1977-06-08', '2008-04-00', '', 'circa 1990'].map(M.factDate),
+    ['1991', 'June 1977', '8 June 1977', 'April 2008', '', 'circa 1990'])
+  check('a person is Born and Died, a group Founded and Dissolved, anything else Began and Ended - an end with no date said so',
+    [M.lifeRows({ type: 'Person', began: '1977-06-08', ended: false, ended_on: '' }), M.lifeRows({ type: 'Group', began: '1991', ended: true, ended_on: '2014-05' }),
+      M.lifeRows({ type: 'Orchestra', began: '', ended: true, ended_on: '' }), M.lifeRows({ type: 'Character', began: '1990', ended: false, ended_on: '' }), M.lifeRows(null),
+      //? review: a choir is a group too, and was unpinned
+      M.lifeRows({ type: 'Choir', began: '1950-03', ended: false, ended_on: '' })],
+    [[{ label: 'Born', value: '8 June 1977' }], [{ label: 'Founded', value: '1991' }, { label: 'Dissolved', value: 'May 2014' }],
+      [{ label: 'Dissolved', value: 'yes, date not known' }], [{ label: 'Began', value: '1990' }], [], [{ label: 'Founded', value: 'March 1950' }]])
+  const facts = { name: 'Portishead', type: 'Group', begin_area: 'Bristol', area: 'United Kingdom', country: 'GB', began: '1991', ended: false, ended_on: '', aliases: ['Portis Head', 'ポーティスヘッド'], genres: [], links: [], members: [], disambiguation: '', sort_name: '' }
+  check('the About rows: type, where from (where they began, else their area, else country), when, their other names',
+    [M.aboutRows(facts), M.aboutRows({ ...facts, begin_area: '', area: '', aliases: [], type: '' }).map((row) => row.label), M.aboutRows(null)],
+    [[{ label: 'Type', value: 'Group' }, { label: 'From', value: 'Bristol' }, { label: 'Founded', value: '1991' }, { label: 'Other names', value: 'Portis Head, ポーティスヘッド' }],
+      ['From', 'Began'], []])
+  check('a member\'s years and first three roles', [M.memberYears({ began: '1991-04', ended: null, current: true }), M.memberYears({ began: null, ended: '1999', current: false }),
+    M.memberYears({ began: '1991', ended: '1999-01-01', current: false }), M.memberRoles({ roles: ['lead vocals', 'guitar', 'bass', 'drums'] })],
+    ['1991–', '?–1999', '1991–1999', 'lead vocals, guitar, bass'])
+  check('a long list folded: what shows, and how many wait behind "N more" - none once opened', [M.folded([1, 2, 3, 4], 3, false), M.folded([1, 2, 3, 4], 3, true), M.folded([1, 2], 3, false)],
+    [{ items: [1, 2, 3], more: 1 }, { items: [1, 2, 3, 4], more: 0 }, { items: [1, 2], more: 0 }])
+  check('ten members and eight links before the fold, as the main page showed them', [M.MEMBERS_SHOWN, M.LINKS_SHOWN], [10, 8])
+}
+
+console.log('\n...Artist images…, the main page\'s picker\'s rules')
+{
+  const thumb = { kind: 'thumb', url: 'https://commons/a.jpg', preview: 'https://commons/a.jpg?w=600', source: 'wikidata', label: 'Wikidata image' }
+  const banner = { kind: 'banner', url: 'https://fanart/b.jpg', preview: 'https://fanart/b.jpg', source: 'fanarttv', label: 'fanart.tv Banner' }
+  check('everything, best source first, to start with', M.bestUrls({ best: { thumb, banner } }), { thumb: thumb.url, banner: banner.url })
+  check('a picture chosen for a slot - again, and that slot is left as it is - any picture in any slot',
+    [M.toggleChoice({ thumb: thumb.url }, 'thumb', thumb.url), M.toggleChoice({}, 'fanart', thumb.url), M.toggleChoice({ thumb: 'x' }, 'thumb', thumb.url)],
+    [{}, { fanart: thumb.url }, { thumb: thumb.url }])
+  check('the pictures by slot', Object.keys(M.byKind([thumb, banner, { ...thumb, url: 'u2' }])).map((kind) => [kind, M.byKind([thumb, banner, { ...thumb, url: 'u2' }])[kind].length]), [['thumb', 2], ['banner', 1]])
+  check('a slot\'s line: the file on disk, nothing found, or nothing to say', [M.slotLine('artist.jpg', 2), M.slotLine(null, 0), M.slotLine(undefined, 3)], ['artist.jpg on disk', 'none found for this', ''])
+  check('the notes on keys not set: neither, fanart.tv\'s, none', [M.imageNotes({ has_key: false, sources: { fanarttv: false, theaudiodb: false } }).length,
+    M.imageNotes({ has_key: true, sources: { fanarttv: false, theaudiodb: true } })[0].startsWith('fanart.tv isn\'t set up'), M.imageNotes({ has_key: true, sources: { fanarttv: true, theaudiodb: false } })],
+    [1, true, []])
+  check('...and where the keys go said as deadwax\'s settings has them (Connections)', M.imageNotes({ has_key: false, sources: {} })[0].includes('under Connections'), true)
+  check('what a save says', [M.savedLine({ written: ['artist.jpg', 'banner.png'], problems: [] }), M.savedLine({ written: [], problems: ['the banner could not be fetched'] }), M.savedLine({ written: [], problems: [] })],
+    ['Saved artist.jpg, banner.png.', 'the banner could not be fetched', 'Nothing needed writing.'])
+  check('an artist found: the name they matched as, what tells them apart',
+    [M.matchLine({ name: 'Ye', matched_as: 'Kanye West', disambiguation: 'US rapper', type: 'Person', country: 'US' }), M.matchLine({ name: 'Nirvana', matched_as: 'Nirvana', disambiguation: '', type: 'Group', country: 'GB' }), M.matchLine({ name: 'X', matched_as: '', disambiguation: '', type: '', country: '' })],
+    ['as Kanye West · US rapper · Person · US', 'Group · GB', ''])
+}
+
+console.log('\n...Move albums to …, across every name')
+{
+  const plan = (moves, refused = [], problems = []) => ({ current_name: 'Ye', to_folder: 'Ye', artist_mbid: YE, moves, refused, problems, empty: !moves.length })
+  const move = (path, target, files, retagged) => ({ album: path, path, target_path: target, files, retag: Array.from({ length: retagged }, (_, n) => ({ filename: `${n}.flac`, changes: {} })) })
+  const view = M.refileView([{ name: 'Kanye West', plan: plan([move('Kanye West/Donda (2021)', 'Ye/Donda (2021)', 2, 2)]) },
+    { name: 'Kanye', plan: plan([], [{ album: 'Graduation', path: 'Misc/Graduation (2007)', reason: 'tagged as a different artist' }]) }])
+  check('every name\'s plan as one: each move and refusal, empty only when no name has anything to move',
+    [view.moves.map((one) => one.path), view.refused.map((one) => one.reason), view.empty, view.currentName, view.toFolder],
+    [['Kanye West/Donda (2021)'], ['tagged as a different artist'], false, 'Ye', 'Ye'])
+  //? review: two names each holding a folder of one name - each name's plan is the route's for it alone,
+  //? so both planned the move to Ye/Graduation (2007), and the button said "Move 2 albums"
+  const twice = M.refileView([{ name: 'Kanye', plan: plan([move('Kanye/Graduation (2007)', 'Ye/Graduation (2007)', 3, 3)]) },
+    { name: 'Kanye West', plan: plan([move('Kanye West/Graduation (2007)', 'Ye/Graduation (2007)', 3, 3), move('Kanye West/Donda (2021)', 'Ye/Donda (2021)', 2, 2)]) }])
+  check('two names moving folders to one place: the later shown staying, and why - the button counting what can move',
+    [twice.moves.map((one) => one.path), twice.refused, M.moveButton(twice.moves.length)],
+    [['Kanye/Graduation (2007)', 'Kanye West/Donda (2021)'], [{ album: 'Kanye West/Graduation (2007)', path: 'Kanye West/Graduation (2007)', reason: "another album moves to 'Ye/Graduation (2007)'" }], 'Move 2 albums'])
+  const result = (moved, failed = []) => ({ moved: moved.map((from) => ({ from, to: `Ye/${from.split('/')[1]}` })), failed, pictures_moved: [], removed_folders: [] })
+  const previewed = [{ name: 'Kanye', plan: plan([move('Kanye/Graduation (2007)', 'Ye/Graduation (2007)', 3, 3)]) },
+    { name: 'Kanye West', plan: plan([move('Kanye West/Graduation (2007)', 'Ye/Graduation (2007)', 3, 3), move('Kanye West/Donda (2021)', 'Ye/Donda (2021)', 2, 2)]) }]
+  check('after the applies: each album the preview showed moving that the apply\'s own plan kept is said, never dropped; the names every album of which moved',
+    M.refileAfter(previewed, [{ name: 'Kanye', plan: plan([move('x', 'y', 1, 0)]), results: result(['Kanye/Graduation (2007)']) },
+      { name: 'Kanye West', plan: plan([move('Kanye West/Donda (2021)', 'Ye/Donda (2021)', 2, 2)], [{ album: 'Graduation', path: 'Kanye West/Graduation (2007)', reason: "'Ye/Graduation (2007)' is already there" },
+        { album: 'Donda', path: 'Kanye West/Donda (2021)', reason: "'Ye/Donda (2021)' is already there" }]), results: result([]) }], twice),
+    { stayed: ["Donda: stays - 'Ye/Donda (2021)' is already there"], emptied: ['Kanye'] })
+  const one = [{ name: 'Kanye West', plan: plan([move('Kanye West/Donda (2021)', 'Ye/Donda (2021)', 2, 2)]) }]
+  const oneView = M.refileView(one)
+  check('...a name is empty only when every album of it moved: none refused at the preview or the apply, none failed - and not one never applied',
+    [M.refileAfter(one, [{ name: 'Kanye West', plan: plan([]), results: result(['Kanye West/Donda (2021)']) }], oneView).emptied,
+      M.refileAfter(one, [{ name: 'Kanye West', plan: plan([]), results: result([], [{ album: 'Donda', reason: "a tag wouldn't write" }]) }], oneView).emptied,
+      M.refileAfter([{ name: 'Kanye West', plan: plan([move('Kanye West/Donda (2021)', 'Ye/Donda (2021)', 2, 2)], [{ album: 'X', path: 'Kanye West/X', reason: 'tagged as a different artist' }]) }],
+        [{ name: 'Kanye West', plan: plan([]), results: result(['Kanye West/Donda (2021)']) }], oneView).emptied,
+      M.refileAfter(one, [], oneView).emptied,
+      //? an album filed under the name since the preview, its tag refusing at the apply: as many moved as
+      //? were previewed, and still the name isn't empty
+      M.refileAfter(one, [{ name: 'Kanye West', plan: plan([]), results: result(['Kanye West/Donda (2021)'], [{ album: 'Late Orchestration', reason: "a tag wouldn't write" }]) }], oneView).emptied,
+      //? review: an album filed under the name since the preview, REFUSED by the apply's own plan (a
+      //? collaboration): every album the preview showed moved, nothing failed - and the name still holds one
+      M.refileAfter(one, [{ name: 'Kanye West', plan: plan([], [{ album: 'X', path: 'Kanye West/X', reason: 'a collaboration - its folder is its own' }]), results: result(['Kanye West/Donda (2021)']) }], oneView).emptied],
+    [['Kanye West'], [], [], [], [], []])
+  check('names listed: "a", "a and b", "a, b and c"', [M.listed(['a']), M.listed(['a', 'b']), M.listed(['a', 'b', 'c']), M.listed([])], ['a', 'a and b', 'a, b and c', ''])
+  check('Move only with something to move and no problem', [M.canMove(view), M.canMove(M.refileView([{ name: 'x', plan: plan([]) }])), M.canMove(M.refileView([{ name: 'x', plan: plan([move('a', 'b', 1, 0)], [], ['MusicBrainz could not be reached just now']) }])), M.canMove(null)],
+    [true, false, false, false])
+  //? review: each name's plan says MusicBrainz's problem of its own - said once, not once a name
+  check('...the problems every name\'s plan has, said once',
+    M.refileView([{ name: 'Kanye', plan: plan([move('Kanye/Graduation (2007)', 'Ye/Graduation (2007)', 3, 3)], [], ['MusicBrainz could not be reached just now']) },
+      { name: 'Kanye West', plan: plan([], [], ['MusicBrainz could not be reached just now', 'another problem']) }]).problems,
+    ['MusicBrainz could not be reached just now', 'another problem'])
+  check('a move\'s line and the button', [M.moveLine({ files: 2, retag: [1, 2] }), M.moveLine({ files: 1, retag: [] }), M.moveButton(1), M.moveButton(3)],
+    ['2 tracks, 2 retagged', '1 track', 'Move 1 album', 'Move 3 albums'])
+  check('what became of it, every name\'s results joined',
+    [M.refileOutcome([{ moved: [{ from: 'a', to: 'b' }], failed: [], pictures_moved: ['artist.jpg'], removed_folders: ['Kanye West'] }], 'Ye'),
+      M.refileOutcome([{ moved: [], failed: [{ album: 'Donda', reason: "a tag wouldn't write" }], pictures_moved: [], removed_folders: [] }], 'Ye')],
+    [{ moved: 1, text: 'Moved 1 album into Ye/. Their pictures came too: artist.jpg. Kanye West/ was left empty and removed.', failures: [] },
+      { moved: 0, text: 'Nothing was moved.', failures: ["Donda: a tag wouldn't write"] }])
+  //? Needs a look's "Artist under two names" says how to fix it - in words the artist page's button carries
+  const hint = /"artist_split": \{[\s\S]*?"hint": ([\s\S]*?),\n\s*"severity"/.exec(fs.readFileSync(path.join(UI, '..', 'src/metadata_health.py'), 'utf8'))?.[1].replace(/"\s*\n\s*"/g, '') ?? ''
+  check('Needs a look\'s "Artist under two names" hint names the button the artist page draws',
+    [hint.includes('Move albums to … on the artist\'s page'), /Move albums to \{facts\.name\}/.test(fs.readFileSync(path.join(UI, 'src/app/ArtistPage.tsx'), 'utf8'))], [true, true])
+}
+
 /* ===== the page itself: app/ArtistPage.tsx, rendered with every answer given by hand ===== */
 
 const PAGE = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-artist-page-'))
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/ArtistPage.tsx', '--rootDir', 'src', '--outDir', PAGE,
+  'src/app/ArtistPage.tsx', 'src/app/ArtistPanel.tsx', '--rootDir', 'src', '--outDir', PAGE,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -380,7 +572,18 @@ exports.sayPins = (text) => globalThis.__page.said.push(text)
 write('app/ArchiveCover.js', `exports.ArchiveCover = function ArchiveCover() { return null }\n`)
 write('app/context.js', `exports.usePlayerActions = () => ({ playTracks: (...args) => globalThis.__page.plays.push(args) })\n`)
 write('app/pressingLists.js', `exports.keep = () => {}\nexports.kept = () => null\nexports.usualGet = (group) => ({ release: { title: group.title }, subtitle: group.title })\n`)
-write('app/useSheet.js', `exports.takeOpener = (event) => event?.currentTarget ?? null\n`)
+write('app/useSheet.js', `exports.takeOpener = (event) => event?.currentTarget ?? null
+exports.useSheet = (options) => { globalThis.__page.sheets.push(options) }
+`)
+//? the library's routes the artist page and its panel ask (2.0.0-player.45), each answered when the test says
+write('api/library.js', `
+exports.fetchArtist = (name, signal) => globalThis.__page.ask('summary', name, !!signal)
+exports.previewArtistRefile = (name, mbid, signal) => globalThis.__page.ask('refilePreview', name, mbid, !!signal)
+exports.applyArtistRefile = (name, mbid) => globalThis.__page.ask('refileApply', name, mbid)
+exports.previewArtistImages = (name, options, signal) => globalThis.__page.ask('imagesPreview', name, options.artistMbid ?? null, !!signal)
+exports.applyArtistImages = (name, choices, options) => globalThis.__page.ask('imagesApply', name, choices, options)
+exports.searchArtists = (query, signal) => globalThis.__page.ask('artistSearch', query, !!signal)
+`)
 write('app/useOwned.js', `
 exports.ownedNow = () => globalThis.__page.owned
 exports.useOwned = () => globalThis.__page.owned
@@ -388,7 +591,7 @@ exports.whenOwned = () => globalThis.__page.owned ? Promise.resolve() : new Prom
 `)
 
 const W = globalThis.__page = {
-  asks: [], open: [], owned: null, ownedWaiting: [], indexAge: 0, plays: [], remembered: [],
+  asks: [], open: [], owned: null, ownedWaiting: [], indexAge: 0, plays: [], remembered: [], sheets: [],
   pins: { pins: [], known: true, canSave: true, problem: null }, pinned: [], said: [],
   ask(name, ...args) {
     W.asks.push([name, ...args])
@@ -412,18 +615,25 @@ function ownedAnswers(index) {
   for (const resolve of W.ownedWaiting.splice(0)) resolve()
 }
 function reset() {
-  W.asks.length = 0; W.open.length = 0; W.owned = null; W.ownedWaiting.length = 0; W.indexAge = 0; W.plays.length = 0; W.remembered.length = 0
+  W.asks.length = 0; W.open.length = 0; W.owned = null; W.ownedWaiting.length = 0; W.indexAge = 0; W.plays.length = 0; W.remembered.length = 0; W.sheets.length = 0
   W.pins = { pins: [], known: true, canSave: true, problem: null }; W.pinned.length = 0; W.said.length = 0
 }
 
-//? the albums' wait (ROWS_WAIT_MS): a timer the test fires by hand
+//? the albums' wait (ROWS_WAIT_MS) and the sections' (ABOUT_WAIT_MS): timers the test fires by hand -
+//? every one at once, or (review) only those of one delay
 const timers = []
-globalThis.setTimeout = (fn) => { const timer = { fn, live: true }; timers.push(timer); return timer }
+globalThis.setTimeout = (fn, ms) => { const timer = { fn, ms, live: true }; timers.push(timer); return timer }
 globalThis.clearTimeout = (timer) => { if (timer) timer.live = false }
 const waitOver = () => { for (const timer of timers.splice(0)) if (timer.live) timer.fn() }
+const fire = (ms) => {
+  const due = timers.filter((timer) => timer.ms === ms)
+  for (const timer of due) timers.splice(timers.indexOf(timer), 1)
+  for (const timer of due) if (timer.live) timer.fn()
+  return due.length
+}
 
 const hooks = require(path.join(PAGE, 'node_modules/preact/hooks.js'))
-const { ArtistPage, PREFETCH_AT_ONCE } = require(path.join(PAGE, 'app/ArtistPage.js'))
+const { ArtistPage, PREFETCH_AT_ONCE, forgetKeptArtist } = require(path.join(PAGE, 'app/ArtistPage.js'))
 const { PINS_UNSAVED: P_UNSAVED } = require(path.join(PAGE, 'app/PinToggle.js'))
 
 let tree = null
@@ -714,12 +924,854 @@ async function page() {
   }
 }
 
+async function manage() {
+  const { RefileBody, ImagesBody, WhoBody, ArtistPanel } = require(path.join(PAGE, 'app/ArtistPanel.js'))
+  const link = (n) => ({ label: `Link ${n}`, url: `https://example.org/${n}` })
+  const member = (n, current) => ({ name: `Member ${n}`, mbid: `m${n}`, began: '1991', ended: current ? null : '1999', current, roles: n === 1 ? ['lead vocals', 'guitar'] : [] })
+  const FULL = {
+    mbid: PORTISHEAD, name: 'Portishead', sort_name: 'Portishead', type: 'Group', disambiguation: 'Bristol trip hop band', country: 'GB', area: 'United Kingdom',
+    begin_area: 'Bristol', began: '1991', ended_on: '', ended: false, genres: ['trip hop', 'electronic'], aliases: ['Portis Head'],
+    links: Array.from({ length: 10 }, (_, n) => link(n + 1)), members: [...Array.from({ length: 3 }, (_, n) => member(n + 1, true)), ...Array.from({ length: 9 }, (_, n) => member(n + 4, false))],
+  }
+  const titles = () => find((node) => node.type === 'h2' && byClass('app-section-title')(node)).map(words)
+  const manageButtons = () => classed('app-artist-manage-button').map((node) => [words(node), node.props['aria-disabled'] ?? null])
+  const factRows = () => classed('app-artist-fact').map((node) => [words(find((one) => one.type === 'dt', node)[0]), words(find((one) => one.type === 'dd', node)[0])])
+  //? MusicBrainz's artists for a name: MatchList, a leaf with no hooks, drawn as it draws itself
+  const matchRows = () => find((node) => typeof node.type === 'function' && node.type.name === 'MatchList')
+    .flatMap((element) => find(byClass('app-artist-match'), element.type(element.props)))
+
+  console.log('\nas the main page had it: the page\'s In your library, About and Line-up - drawn under the albums, in one go')
+  {
+    reset()
+    const managed = [], followed = []
+    const drawn = []
+    const one = mount({ id: 'ar-portishead-full', admin: true, onManage: (request, opener) => managed.push([request, opener]), onMoved: (...args) => followed.push(args), onDrawn: (all) => drawn.push(all) })
+    one.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-full' })
+    await one.settled()
+    check('who they are asked of MusicBrainz once their id is known - one request, the full facts', asked('facts'), [[PORTISHEAD]])
+    check('...nothing drawn under the albums before they are', classed('app-artist-more').length, 0)
+    ownedAnswers(LIBRARY)
+    await one.settled()
+    check('the library answered: each name it files them under asked of /library/artist, through a latestOnly (a signal)', asked('summary'), [['Portishead', true]])
+    answer('discography', DISCOGRAPHY)
+    answer('facts', FULL)
+    await one.settled()
+    check('...the albums drawn, the library\'s word still out: In your library and the rest wait for it', [rowKeys().length, classed('app-artist-more').length], [3, 0])
+    answer('summary', summaryOf('Portishead', 'Portishead', { album_count: 3, track_count: 33, first_year: '1994', last_year: '2008', art: { fanart: 'fanart.jpg', logo: 'logo.png', thumb: 'artist.jpg' } }))
+    await one.settled()
+    check('everything answered: drawn, under the albums - In your library, About, Line-up', titles(), ['Albums', 'In your library', 'About', 'Line-up'])
+    check('In your library: albums, tracks, size, years, the folder', factRows().slice(0, 5),
+      [['Albums', '3'], ['Tracks', '33'], ['Size', '400 MB'], ['Years', '1994–2008'], ['Folder', 'Portishead']])
+    check('About: what tells them apart, then type, where from, founded, other names - no "Now" (the library files them as MusicBrainz names them)',
+      [words(classed('app-artist-disambiguation')[0]), factRows().slice(5)],
+      ['Bristol trip hop band', [['Type', 'Group'], ['From', 'Bristol'], ['Founded', '1991'], ['Other names', 'Portis Head']]])
+    check('their genres, as tags', classed('app-artist-genre').map(words), ['trip hop', 'electronic'])
+    const links = () => classed('app-artist-link')
+    check('the links: eight, then a fold for the rest - each opening beside the app, its address in its tooltip',
+      [links().length, links().every((a) => a.type === 'a' && a.props.target === '_blank' && a.props.rel === 'noopener' && a.props.title === a.props.href),
+        words(classed('app-artist-fold')[0]), classed('app-artist-fold')[0].props['aria-expanded']],
+      [8, true, '2 more links', false])
+    classed('app-artist-fold')[0].props.onClick()
+    one.draw()
+    check('...opened: all ten, the fold saying Fewer', [links().length, words(classed('app-artist-fold')[0]), classed('app-artist-fold')[0].props['aria-expanded']], [10, 'Fewer links', true])
+    const members = () => classed('app-artist-member')
+    check('the line-up: the first ten (the current ones first), a past member stepped back, roles and years - "2 earlier members" behind a fold',
+      [members().length, members()[0].props.class, words(members()[0]), members()[3].props.class, words(classed('app-artist-fold')[1])],
+      [10, 'app-row app-artist-member', 'Member 1lead vocals, guitar1991–', 'app-row app-artist-member is-past', '2 earlier members'])
+    //? review: the links' fold was pinned both ways, the line-up's only shut
+    classed('app-artist-fold')[1].props.onClick()
+    one.draw()
+    check('...opened: all twelve, the fold saying Fewer members', [members().length, words(classed('app-artist-fold')[1]), classed('app-artist-fold')[1]?.props['aria-expanded']],
+      [12, 'Fewer members', true])
+    const hero = classed('app-artist-picture')[0]
+    check('the hero: their background on disk, and their logo in their name\'s place (named as the name)',
+      [hero.type, hero.props.src, find((node) => node.type === 'img' && byClass('app-artist-logo')(node))[0]?.props.alt,
+        find((node) => node.type === 'img' && byClass('app-artist-logo')(node))[0]?.props.src],
+      ['img', '/deadwax/library/artist/art?artist=Portishead&kind=fanart', 'Portishead', '/deadwax/library/artist/art?artist=Portishead&kind=logo'])
+    check('an admin\'s: Artist images…, live - their one folder', manageButtons(), [['Artist images…', null]])
+    classed('app-artist-manage-button')[0].props.onClick({ currentTarget: 'images-button' })
+    const [request, opener] = managed[0]
+    check('...its tap opens the panel for the pictures, for the folder of the name the library files them under',
+      [request.mode, request.page, request.mbid, request.currentName, request.moveNames, request.imagesName, request.version, opener],
+      ['images', 'ar-portishead-full', PORTISHEAD, 'Portishead', [], 'Portishead', 0, 'images-button'])
+    one.draw({ managing: 'images' })
+    check('...pressed while the panel shows it', classed('app-artist-manage-button')[0].props['aria-pressed'], true)
+    request.onSaved()
+    await one.settled()
+    check('pictures saved: the library asked again, and the pictures on disk asked past the browser\'s cache',
+      [asked('summary').length, classed('app-artist-picture')[0].props.src], [2, '/deadwax/library/artist/art?artist=Portishead&kind=fanart&v=1'])
+    check('App told as the albums were drawn, then the sections under them - what it puts a scroll back on (review: a page a move made of another drew nothing on its first frame)',
+      drawn, [false, true])
+    answer('summary', summaryOf('Portishead', 'Portishead', { album_count: 3, track_count: 33, first_year: '1994', last_year: '2008', art: { fanart: 'fanart.jpg', logo: 'logo.png', thumb: 'artist.jpg' } }))
+    await one.settled()
+    //? review: the re-ask after a move was pinned only as wiring
+    const albumsAsked = asked('artistAlbums').length, summariesAsked = asked('summary').length
+    await one.settled({ refresh: 1 })
+    check('App\'s refresh (a move Navidrome has had time to scan): Navidrome\'s albums and the library\'s word on their names asked again',
+      [asked('artistAlbums').length - albumsAsked, asked('summary').length - summariesAsked], [1, 1])
+    await one.settled({ refresh: 1 })
+    check('...once for each new number, never again for the same one', [asked('artistAlbums').length - albumsAsked, asked('summary').length - summariesAsked], [1, 1])
+
+    reset()
+    ownedAnswers(LIBRARY)
+    const plain = mount({ id: 'ar-portishead-full', admin: false, onManage: () => {} })
+    plain.draw()
+    check('not an admin: the same sections, no managing (the session\'s answers drawn at once)', [titles(), manageButtons()], [['Albums', 'In your library', 'About', 'Line-up'], []])
+  }
+
+  console.log('\n...a renamed artist: "Now: Ye", Move albums to Ye, and the page following them')
+  {
+    reset()
+    ownedAnswers(YE_LIBRARY)
+    const managed = [], followed = []
+    const one = mount({ id: 'ar-kanye', admin: true, onManage: (request) => managed.push(request), onMoved: (...args) => followed.push(args) })
+    one.draw()
+    answer('artistAlbums', { id: 'ar-kanye', name: 'Kanye West', album: [nd('nd-donda', 'Donda', 2021, DONDA)] })
+    await one.settled()
+    check('Navidrome\'s "Kanye West", whose folder says Ye\'s id: both names the library files them under asked', asked('summary').map((one) => one[0]), ['Kanye West', 'Ye'])
+    answer('discography', { 'release-groups': [group('rg-donda', 'Donda', '2021-08-29'), group('rg-bully', 'BULLY', '2025-03-01')] })
+    answer('facts', { ...FULL, mbid: YE, name: 'Ye', type: 'Person', disambiguation: 'US rapper', began: '1977-06-08', begin_area: 'Atlanta', links: [], members: [], genres: [], aliases: ['Kanye West'] })
+    answer('summary', summaryOf('Kanye West', 'Kanye West'), (name) => name === 'Kanye West')
+    answer('summary', summaryOf('Ye', 'Ye', { first_year: '2025', last_year: '2025', art: { thumb: 'artist.jpg' } }), (name) => name === 'Ye')
+    await one.settled()
+    check('In your library: both names added up, each folder, and why there is no one folder',
+      [factRows().slice(0, 1), words(classed('is-folder')[0])],
+      [[['Albums', '2']], 'FoldersKanye West\nYeTheir albums are filed under 2 names - Kanye West and Ye'])
+    check('About: "Now: Ye" first - Move albums to Ye on its row - then type and where from', [factRows().slice(5, 8).map((row) => row.join(': ')), words(classed('is-now')[0])],
+      [['Now: Ye', 'Type: Person', 'From: Atlanta'], 'NowYeMove albums to Ye'])
+    check('...and Born', factRows().find((row) => row[0] === 'Born'), ['Born', '8 June 1977'])
+    check('an admin\'s: Artist images… (their pictures into Ye\'s folder) and Move albums to Ye', manageButtons().map((one) => one[0]), ['Artist images…', 'Move albums to Ye'])
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Move albums to Ye')[0].props.onClick({ currentTarget: null })
+    check('...Move opens the panel for the names that aren\'t Ye, Ye\'s folder kept for the pictures',
+      [managed[0].mode, managed[0].moveNames, managed[0].currentName, managed[0].imagesName, managed[0].mbid], ['refile', ['Kanye West'], 'Ye', 'Ye', YE])
+    //? review: followed only from a page of a name every album of which moved
+    managed[0].onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: [] })
+    managed[0].onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: ['Kanye'] })
+    managed[0].onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: ['kanye west'] })
+    check('moved: the page told - to follow them by their MusicBrainz id, under their name now, only when its own name (Navidrome\'s "Kanye West") has no album left',
+      followed, [['ar-kanye', { mbid: YE, name: 'Ye' }, false], ['ar-kanye', { mbid: YE, name: 'Ye' }, false], ['ar-kanye', { mbid: YE, name: 'Ye' }, true]])
+    const back = mount({ id: 'ar-kanye', admin: true })
+    back.draw()
+    check('...and what the session kept of the page forgotten (its folders have moved): nothing drawn from it', [rowKeys(), classed('app-artist-more').length], [[], 0])
+  }
+
+  console.log('\n...their page by the name they have now: the other names still in use, Move albums to Ye - and the page stays')
+  {
+    reset()
+    ownedAnswers(YE_LIBRARY)
+    const managed = [], followed = []
+    const one = mount({ id: 'ar-ye', admin: true, onManage: (request) => managed.push(request), onMoved: (...args) => followed.push(args) })
+    one.draw()
+    answer('artistAlbums', { id: 'ar-ye', name: 'Ye', musicBrainzId: YE, album: [nd('nd-bully', 'BULLY', 2025, BULLY)] })
+    await one.settled()
+    answer('discography', { 'release-groups': [group('rg-donda', 'Donda', '2021-08-29'), group('rg-bully', 'BULLY', '2025-03-01')] })
+    answer('facts', { ...FULL, mbid: YE, name: 'Ye', type: 'Person', disambiguation: 'US rapper', began: '1977-06-08', begin_area: 'Atlanta', links: [], members: [], genres: [], aliases: ['Kanye West'] })
+    answer('summary', summaryOf('Kanye West', 'Kanye West'), (name) => name === 'Kanye West')
+    answer('summary', summaryOf('Ye', 'Ye', { first_year: '2025', last_year: '2025' }), (name) => name === 'Ye')
+    await one.settled()
+    check('Navidrome\'s "Ye", Donda still filed as Kanye West: never "Now: Ye" on Ye\'s own page - the name still in use, with Move albums to Ye',
+      [words(classed('is-now')[0]), manageButtons().map((one) => one[0])], ['Also filed asKanye WestMove albums to Ye', ['Artist images…', 'Move albums to Ye']])
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Move albums to Ye')[0].props.onClick({ currentTarget: null })
+    check('...Move moves the other name\'s albums, from this page', [managed[0].page, managed[0].name, managed[0].moveNames, managed[0].currentName], ['ar-ye', 'Ye', ['Kanye West'], 'Ye'])
+    managed[0].onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: ['Kanye West'] })
+    check('...moved, every album of Kanye West\'s included: this page - still Navidrome\'s Ye - stays where it is', followed, [['ar-ye', { mbid: YE, name: 'Ye' }, false]])
+    managed[0].onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: [] })
+    const mbPage = mount({ id: `mb:${YE}`, admin: true, onManage: (request) => managed.push(request), onMoved: (...args) => followed.push(args) })
+    mbPage.draw()
+    answer('libraryArtists', [{ id: 'ar-ye', name: 'Ye', musicBrainzId: YE }])
+    answer('facts', { ...FULL, mbid: YE, name: 'Ye', links: [], members: [], genres: [], aliases: [] })
+    answer('discography', { 'release-groups': [group('rg-bully', 'BULLY', '2025-03-01')] })
+    await mbPage.settled()
+    answer('artistAlbums', { id: 'ar-ye', name: 'Ye', musicBrainzId: YE, album: [nd('nd-bully', 'BULLY', 2025, BULLY)] })
+    await mbPage.settled()
+    while (outstanding('summary').length) answer('summary', (name) => summaryOf(name, name))
+    await mbPage.settled()
+    managed.length = 0
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Move albums to Ye')[0]?.props.onClick({ currentTarget: null })
+    managed[0]?.onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: [] })
+    check('...their page by MusicBrainz id is already where a move would take it (App changes nothing for it)', followed.slice(-1), [[`mb:${YE}`, { mbid: YE, name: 'Ye' }, true]])
+    const findsBefore = asked('libraryArtists').length, albumsBefore = asked('artistAlbums').length
+    await mbPage.settled({ refresh: 1 })
+    check('App\'s refresh on a page by MusicBrainz id: Navidrome\'s artist for them found in a FRESH list (the scan may have made a new one), their albums asked again',
+      [asked('libraryArtists').slice(findsBefore), asked('artistAlbums').length - albumsBefore], [[[true]], 1])
+  }
+
+  console.log('\n...MusicBrainz doesn\'t know who this is: Which artist is this?')
+  {
+    reset()
+    ownedAnswers(O.buildOwnedIndex([{ path: 'Nirvana/Bleach (1989)', artist: 'Nirvana', album: 'Bleach', release_mbid: null, albumartist_mbids: [] }]))
+    const managed = []
+    const one = mount({ id: 'ar-nirvana', admin: true, onManage: (request) => managed.push(request) })
+    one.draw()
+    answer('artistAlbums', { id: 'ar-nirvana', name: 'Nirvana', album: [nd('nd-bleach', 'Bleach', 1989)] })
+    await one.settled()
+    waitOver()
+    await one.settled()
+    check('said, and for an admin, Which artist is this?', [words(classed('app-search-empty')[0]).startsWith("MusicBrainz doesn't know who this is"), manageButtons().map((one) => one[0]).includes('Which artist is this?')],
+      [true, true])
+    find((node) => words(node) === 'Which artist is this?' && node.type === 'button')[0].props.onClick({ currentTarget: null })
+    check('...its tap opens the panel to choose, with the page\'s name to search for', [managed[0].mode, managed[0].name, managed[0].mbid], ['who', 'Nirvana', null])
+    managed[0].onChosen({ mbid: NIRVANA_US, name: 'Nirvana', disambiguation: '90s US grunge band' })
+    await one.settled()
+    check('chosen: the page is theirs - who they are and their albums asked by that id', [asked('facts'), asked('discography')], [[[NIRVANA_US]], [[NIRVANA_US, true]]])
+    answer('facts', { ...FULL, mbid: NIRVANA_US, name: 'Nirvana', disambiguation: '90s US grunge band', links: [], members: [] })
+    answer('discography', { 'release-groups': [group('rg-bleach', 'Bleach', '1989-06-15')] })
+    if (outstanding('summary').length) answer('summary', summaryOf('Nirvana', 'Nirvana'))
+    await one.settled()
+    check('...the page says it was chosen here, with Change', [words(classed('app-artist-chosen')[0]), find((node) => byClass('app-artist-change')(node)).length],
+      ['You chose who this is, for this visit. Change', 1])
+    //? review: this was `asked('discography').length >= 1 && rowKeys().length > 0`, true whether the
+    //? choice was kept or not - Navidrome's own Bleach drew a row either way
+    const discAsked = asked('discography').length
+    const again = mount({ id: 'ar-nirvana', admin: true })
+    again.draw()
+    check('...kept for the visit: the page come back to is theirs at once - their album (MusicBrainz\'s row) drawn from what was kept, nothing asked again',
+      [rowKeys(), asked('discography').length - discAsked], [['group:rg-bleach'], 0])
+
+    //? review: choosing another left the first one's facts up - for good, if MusicBrainz failed for the new one
+    tree = null
+    one.draw({ managing: null })
+    find((node) => byClass('app-artist-change')(node))[0].props.onClick({ currentTarget: null })
+    managed[1].onChosen({ mbid: NIRVANA_UK, name: 'Nirvana', disambiguation: '60s UK band' })
+    await one.settled()
+    const aboutOf = () => find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0]
+    check('another chosen (Change): asked for by its id - and meanwhile nothing of the last one\'s said as theirs, Change still there',
+      [asked('facts').slice(-1), classed('app-artist-disambiguation').length, classed('app-artist-facts').length, words(find(byClass('app-asking-text'), aboutOf())[0]),
+        find((node) => byClass('app-artist-change')(node)).length],
+      [[[NIRVANA_UK]], 0, 0, 'Asking MusicBrainz…', 1])
+    answer('facts', new Error('MusicBrainz is unreachable right now'), (mbid) => mbid === NIRVANA_UK)
+    await one.settled()
+    check('...MusicBrainz failing for them: said, with Try again - and Change, the way to another', [words(find(byClass('app-search-empty'), aboutOf())[0]),
+      find((node) => node.type === 'button' && words(node) === 'Try again', aboutOf()).length, find((node) => byClass('app-artist-change')(node)).length, classed('app-artist-disambiguation').length],
+      ["MusicBrainz isn't answering just now, so who they are isn't here.", 1, 1, 0])
+
+    reset()
+    ownedAnswers(O.buildOwnedIndex([]))
+    const plain = mount({ id: 'ar-nirvana-2', admin: false, onManage: () => {} })
+    plain.draw()
+    answer('artistAlbums', { id: 'ar-nirvana-2', name: 'Nirvana', album: [nd('nd-bleach', 'Bleach', 1989)] })
+    await plain.settled()
+    check('not an admin: said, and no way to choose', [words(classed('app-search-empty')[0]).startsWith("MusicBrainz doesn't know"), manageButtons()], [true, []])
+  }
+
+  console.log('\n...MusicBrainz not answering for who they are')
+  {
+    reset()
+    ownedAnswers(LIBRARY)
+    const one = mount({ id: 'ar-portishead-down' })
+    one.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-down' })
+    await one.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('facts', new Error('MusicBrainz is unreachable right now'))
+    answer('summary', summaryOf('Portishead', 'Portishead'))
+    await one.settled()
+    const about = find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0]
+    check('About says so, with Try again - the albums and the library half drawn all the same',
+      [words(find((node) => byClass('app-search-empty')(node), about)[0]), titles()], ["MusicBrainz isn't answering just now, so who they are isn't here.", ['Albums', 'In your library', 'About']])
+    find((node) => node.type === 'button' && words(node) === 'Try again', about)[0].props.onClick()
+    await one.settled()
+    //? review: only the second ask was pinned - the failure could have stayed on screen while it asked
+    const aboutNow = find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0]
+    check('...which asks again - the failure giving way to "Asking MusicBrainz…" while it does',
+      [asked('facts').length, words(find(byClass('app-asking-text'), aboutNow)[0]), find(byClass('app-search-empty'), aboutNow).length], [2, 'Asking MusicBrainz…', 0])
+  }
+
+  console.log('\n...the sections\' wait: under the albums once they are drawn, for MusicBrainz and the library, or ABOUT_WAIT_MS (review: none of it was pinned)')
+  {
+    const PORTISHEAD_SUMMARY = summaryOf('Portishead', 'Portishead', { album_count: 3, track_count: 33, first_year: '1994', last_year: '2008' })
+    reset()
+    ownedAnswers(LIBRARY)
+    const norows = mount({ id: 'ar-portishead-norows' })
+    norows.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-norows' })
+    await norows.settled()
+    answer('facts', FULL)
+    answer('summary', PORTISHEAD_SUMMARY)
+    await norows.settled()
+    check('the library and MusicBrainz answered, MusicBrainz\'s albums still out: no albums yet, so nothing under them', [rowKeys().length, classed('app-artist-more').length], [0, 0])
+    check('...not even once ABOUT_WAIT_MS is over - never drawn above albums still to come', [fire(3000) > 0, await norows.settled() && classed('app-artist-more').length], [true, 0])
+    fire(1500)
+    await norows.settled()
+    check('...the albums drawn (ROWS_WAIT_MS): then the sections, in one go', [rowKeys().length > 0, titles()], [true, ['Albums', 'In your library', 'About', 'Line-up']])
+
+    reset()
+    ownedAnswers(LIBRARY)
+    const slowmb = mount({ id: 'ar-portishead-slowmb' })
+    slowmb.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-slowmb' })
+    await slowmb.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('summary', PORTISHEAD_SUMMARY)
+    await slowmb.settled()
+    check('the albums drawn and the library answered, MusicBrainz\'s facts still out: the sections wait for them', [rowKeys().length, classed('app-artist-more').length], [3, 0])
+    fire(1500)
+    await slowmb.settled()
+    check('...past ROWS_WAIT_MS, still', classed('app-artist-more').length, 0)
+    fire(3000)
+    await slowmb.settled()
+    check('...ABOUT_WAIT_MS over: drawn with what has answered - In your library first, About saying it is asking',
+      [titles(), words(find(byClass('app-asking-text'), find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0])[0])],
+      [['Albums', 'In your library', 'About'], 'Asking MusicBrainz…'])
+    //? the names change once drawn (a folder of theirs filed under another name): what it said stays while it is asked
+    W.owned = { index: O.buildOwnedIndex([...A.everyOwned(LIBRARY), { path: 'Portishead Live/Roseland (1998)', artist: 'Portishead Live', album: 'Roseland', release_mbid: ROSELAND, albumartist_mbids: [PORTISHEAD] }]), artists: [] }
+    await slowmb.settled()
+    check('...their names changing once drawn: what In your library said stays, in its place, while the library is asked again',
+      [titles(), factRows()[0], asked('summary').slice(-2).map((one) => one[0])], [['Albums', 'In your library', 'About'], ['Albums', '3'], ['Portishead', 'Portishead Live']])
+
+    reset()
+    const late = mount({ id: 'ar-portishead-late' })
+    late.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-late' })
+    await late.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('facts', FULL)
+    await late.settled()
+    fire(1500)
+    await late.settled()
+    check('/library/owned slow (a restart walking a spun-down array): the albums drawn at ROWS_WAIT_MS, the sections waiting for the library', [rowKeys().length, classed('app-artist-more').length], [3, 0])
+    fire(3000)
+    await late.settled()
+    check('...ABOUT_WAIT_MS over: drawn - In your library LAST, saying it is looking, so it can\'t land above About (review)',
+      [titles(), words(find(byClass('app-asking-text'), find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-library-title')[0])[0])],
+      [['Albums', 'About', 'Line-up', 'In your library'], 'Looking in your library…'])
+    ownedAnswers(LIBRARY)
+    await late.settled()
+    answer('summary', PORTISHEAD_SUMMARY)
+    await late.settled()
+    check('...the library answering: filled in where it is, under what was already on screen', [titles(), factRows().slice(-5, -4)], [['Albums', 'About', 'Line-up', 'In your library'], [['Albums', '3']]])
+
+    reset()
+    const nothing = mount({ id: `mb:${NIRVANA_UK}` })
+    nothing.draw()
+    answer('libraryArtists', [])
+    answer('facts', { ...FULL, mbid: NIRVANA_UK, name: 'Nirvana', links: [], members: [] })
+    answer('discography', { 'release-groups': [group('rg-anaesthetic', 'Local Anaesthetic', '1971-01-01')] })
+    await nothing.settled()
+    fire(1500)
+    fire(3000)
+    await nothing.settled()
+    ownedAnswers(LIBRARY)
+    await nothing.settled()
+    check('...drawn last and the library having nothing of theirs: said so, in its place', [titles(), words(find(byClass('app-search-empty'), find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-library-title')[0])[0])],
+      [['Albums', 'About', 'In your library'], 'Nothing of theirs in your library.'])
+  }
+
+  console.log('\n...Artist images…: why it can\'t be used, a tap then refused, and the square on disk only once saved here')
+  {
+    reset()
+    ownedAnswers(YE_LIBRARY)
+    const managed = []
+    const one = mount({ id: 'ar-kanye-unread', admin: true, onManage: (request) => managed.push(request) })
+    one.draw()
+    answer('artistAlbums', { id: 'ar-kanye-unread', name: 'Kanye West', album: [nd('nd-donda', 'Donda', 2021, DONDA)] })
+    await one.settled()
+    answer('discography', { 'release-groups': [group('rg-donda', 'Donda', '2021-08-29')] })
+    answer('facts', { ...FULL, mbid: YE, name: 'Ye', links: [], members: [], genres: [], aliases: [] })
+    answer('summary', summaryOf('Kanye West', 'Kanye West'), (name) => name === 'Kanye West')
+    answer('summary', new Error('deadwax is unreachable'), (name) => name === 'Ye')
+    await one.settled()
+    check('the library couldn\'t say of the name their pictures go under: In your library from the rest, and Artist images… stepped back, saying why',
+      [factRows()[0], manageButtons(), words(classed('app-artist-why')[0])],
+      [['Albums', '1'], [['Artist images…', 'true'], ['Move albums to Ye', null]], "deadwax couldn't read their folder just now"])
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Artist images…')[0].props.onClick({ currentTarget: null })
+    check('...a tap on it, while it can\'t be used, opens nothing', managed.length, 0)
+
+    reset()
+    ownedAnswers(LIBRARY)
+    const thumbs = []
+    const square = mount({ id: 'ar-portishead-square', admin: true, onManage: (request) => thumbs.push(request) })
+    square.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-square' })
+    await square.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('facts', FULL)
+    answer('summary', summaryOf('Portishead', 'Portishead', { art: { thumb: 'artist.jpg' } }))
+    await square.settled()
+    check('their square on disk and Navidrome\'s picture: Navidrome\'s shown (its own copy of that square)', typeof classed('app-artist-picture')[0].type, 'function')
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Artist images…')[0].props.onClick({ currentTarget: null })
+    thumbs[0].onSaved()
+    await square.settled()
+    check('...pictures saved here: the square on disk, past the browser\'s cache - Navidrome\'s copy is cached', [classed('app-artist-picture')[0].type, classed('app-artist-picture')[0].props.src],
+      ['img', '/deadwax/library/artist/art?artist=Portishead&kind=thumb&v=1'])
+  }
+
+  //? review (2.0.0-player.45): a failed /library/artist read drew "nothing of theirs" - or nothing at all
+  console.log('\n...the library not answering for their names: said so, with Try again - never "nothing of theirs", never gone')
+  {
+    const PORTISHEAD_SUMMARY = summaryOf('Portishead', 'Portishead', { album_count: 3, track_count: 33, first_year: '1994', last_year: '2008', art: { fanart: 'fanart.jpg' } })
+    const librarySection = () => find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-library-title')[0]
+    const retry = () => find(byClass('app-artist-retry'), librarySection())[0]
+    reset()
+    ownedAnswers(LIBRARY)
+    const managed = []
+    const one = mount({ id: 'ar-portishead-unread-1', admin: true, onManage: (request) => managed.push(request) })
+    one.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-unread-1' })
+    await one.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('facts', FULL)
+    answer('summary', new Error('deadwax is unreachable'))
+    await one.settled()
+    check('the library couldn\'t say a word of their one name: In your library drawn all the same, in its place - saying so, with Try again',
+      [titles(), words(find(byClass('app-search-empty'), librarySection())[0]), words(retry())],
+      [['Albums', 'In your library', 'About', 'Line-up'], "deadwax couldn't read your library just now.", 'Try again'])
+    check('...Artist images… still drawn, stepped back, saying why',
+      [manageButtons(), words(classed('app-artist-why')[0])], [[['Artist images…', 'true']], "deadwax couldn't read their folder just now"])
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Artist images…')[0].props.onClick({ currentTarget: null })
+    check('...a tap on it opening nothing', managed.length, 0)
+    const back = mount({ id: 'ar-portishead-unread-1' })
+    back.draw()
+    check('...and the failure not kept: the page come back to asks the library again rather than drawing it', [rowKeys().length, classed('app-artist-more').length, outstanding('summary').length], [3, 0, 1])
+    answer('summary', PORTISHEAD_SUMMARY)
+    await back.settled()
+    one.draw()
+    retry().props.onClick()
+    await one.settled()
+    check('Try again: the library asked again, the button busy while it is',
+      [outstanding('summary').length, retry().props['aria-busy']], [1, true])
+    retry().props.onClick()
+    await one.settled()
+    check('...a second tap meanwhile asking nothing more', outstanding('summary').length, 1)
+    answer('summary', PORTISHEAD_SUMMARY)
+    await one.settled()
+    check('...answered: what the library holds, where the failure was - Artist images… live', [titles(), factRows()[0], manageButtons()],
+      [['Albums', 'In your library', 'About', 'Line-up'], ['Albums', '3'], [['Artist images…', null]]])
+
+    reset()
+    ownedAnswers(LIBRARY)
+    const saved = []
+    const two = mount({ id: 'ar-portishead-unread-2', admin: true, onManage: (request) => saved.push(request) })
+    two.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-unread-2' })
+    await two.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('facts', FULL)
+    answer('summary', PORTISHEAD_SUMMARY)
+    await two.settled()
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Artist images…')[0].props.onClick({ currentTarget: null })
+    saved[0].onSaved()
+    await two.settled()
+    answer('summary', new Error('deadwax is unreachable'))
+    await two.settled()
+    check('pictures saved, the library\'s word asked again and not had: what In your library said stays, in its place, saying so - About doesn\'t move up',
+      [titles(), factRows()[0], words(classed('app-artist-stale')[0])],
+      [['Albums', 'In your library', 'About', 'Line-up'], ['Albums', '3'], "deadwax couldn't read your library just now - this is what it said before. Try again"])
+    check('...the hero keeping their picture on disk (asked past the cache), and Artist images… its folder as the library last said',
+      [classed('app-artist-picture')[0].props.src, manageButtons()], ['/deadwax/library/artist/art?artist=Portishead&kind=fanart&v=1', [['Artist images…', null]]])
+    retry().props.onClick()
+    await two.settled()
+    answer('summary', PORTISHEAD_SUMMARY)
+    await two.settled()
+    check('...Try again answered: the note gone', [classed('app-artist-stale').length, factRows()[0]], [0, ['Albums', '3']])
+    //? their names changing (a folder of theirs filed under another), and the library answering for none of them
+    W.owned = { index: O.buildOwnedIndex([...A.everyOwned(LIBRARY), { path: 'Portishead Live/Roseland (1998)', artist: 'Portishead Live', album: 'Roseland', release_mbid: ROSELAND, albumartist_mbids: [PORTISHEAD] }]), artists: [] }
+    await two.settled()
+    while (outstanding('summary').length) answer('summary', new Error('deadwax is unreachable'))
+    await two.settled()
+    check('...their names changing and the library answering for none of them: what it said of the old ones stays, saying so',
+      [titles(), factRows()[0], classed('app-artist-stale').length], [['Albums', 'In your library', 'About', 'Line-up'], ['Albums', '3'], 1])
+
+    reset()
+    const three = mount({ id: 'ar-portishead-unread-3' })
+    three.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-unread-3' })
+    await three.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('facts', FULL)
+    await three.settled()
+    fire(1500)
+    fire(3000)
+    await three.settled()
+    ownedAnswers(LIBRARY)
+    await three.settled()
+    answer('summary', new Error('deadwax is unreachable'))
+    await three.settled()
+    check('drawn last (/library/owned slow) and then not answering for them: said so, where it is - never "Nothing of theirs" under their albums',
+      [titles(), words(find(byClass('app-search-empty'), librarySection())[0])], [['Albums', 'About', 'Line-up', 'In your library'], "deadwax couldn't read your library just now."])
+  }
+
+  //? review: these rules were stated in the notes, and nothing held them there
+  console.log('\n...the rules under them: who wins, what the sections wait for, a picture that won\'t load')
+  {
+    reset()
+    const BLEACH = { path: 'Nirvana/Bleach (1989)', artist: 'Nirvana', album: 'Bleach', release_mbid: null, albumartist_mbids: [] }
+    ownedAnswers(O.buildOwnedIndex([BLEACH]))
+    const managed = []
+    const one = mount({ id: 'ar-nirvana-tagged', admin: true, onManage: (request) => managed.push(request) })
+    one.draw()
+    answer('artistAlbums', { id: 'ar-nirvana-tagged', name: 'Nirvana', album: [nd('nd-bleach', 'Bleach', 1989)] })
+    await one.settled()
+    while (outstanding('summary').length) answer('summary', summaryOf('Nirvana', 'Nirvana'))
+    waitOver()
+    await one.settled()
+    find((node) => words(node) === 'Which artist is this?' && node.type === 'button')[0].props.onClick({ currentTarget: null })
+    managed[0].onChosen({ mbid: NIRVANA_UK, name: 'Nirvana', disambiguation: '60s UK band' })
+    await one.settled()
+    answer('facts', { ...FULL, mbid: NIRVANA_UK, name: 'Nirvana', disambiguation: '60s UK band', links: [], members: [] })
+    await one.settled()
+    check('an artist chosen: the page is theirs', [asked('facts').slice(-1), classed('app-artist-chosen').length], [[[NIRVANA_UK]], 1])
+    //? an Edit panel apply writes the US band's id into the folder
+    W.owned = { index: O.buildOwnedIndex([{ ...BLEACH, albumartist_mbids: [NIRVANA_US] }]), artists: [] }
+    await one.settled()
+    check('...the files then saying who they are: their word wins over the choice - asked by their id, "You chose" gone',
+      [asked('facts').slice(-1), classed('app-artist-chosen').length], [[[NIRVANA_US]], 0])
+
+    reset()
+    ownedAnswers(LIBRARY)
+    forgetKeptArtist(`mb:${PORTISHEAD}`)
+    const slow = mount({ id: `mb:${PORTISHEAD}` })
+    slow.draw()
+    answer('facts', FULL)
+    answer('discography', DISCOGRAPHY)
+    await slow.settled()
+    while (outstanding('summary').length) answer('summary', summaryOf('Portishead', 'Portishead'))
+    await slow.settled()
+    fire(1500)
+    await slow.settled()
+    check('opened from MusicBrainz, Navidrome still looking for them: the albums drawn at ROWS_WAIT_MS, the sections still waiting - Navidrome is the library\'s word too',
+      [rowKeys().length, classed('app-artist-more').length, outstanding('libraryArtists').length > 0], [3, 0, true])
+    while (outstanding('libraryArtists').length) answer('libraryArtists', [])
+    await slow.settled()
+    check('...Navidrome answered: drawn', titles(), ['Albums', 'In your library', 'About', 'Line-up'])
+
+    reset()
+    ownedAnswers(LIBRARY)
+    const pics = []
+    const broken = mount({ id: 'ar-portishead-broken', admin: true, onManage: (request) => pics.push(request) })
+    broken.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-portishead-broken' })
+    await broken.settled()
+    answer('discography', DISCOGRAPHY)
+    answer('facts', FULL)
+    answer('summary', summaryOf('Portishead', 'Portishead', { art: { fanart: 'fanart.jpg', logo: 'logo.png' } }))
+    await broken.settled()
+    const logo = () => find((node) => node.type === 'img' && byClass('app-artist-logo')(node))[0]
+    const heroWords = () => words(find((node) => node.type === 'h1' && byClass('app-artist-name')(node))[0])
+    check('their background and logo on disk drawn', [classed('app-artist-picture')[0].props.src, logo()?.props.src],
+      ['/deadwax/library/artist/art?artist=Portishead&kind=fanart', '/deadwax/library/artist/art?artist=Portishead&kind=logo'])
+    classed('app-artist-picture')[0].props.onError()
+    logo().props.onError()
+    broken.draw()
+    check('...neither loading: the hero falls back past them - to Navidrome\'s picture - and their name written out in the logo\'s place',
+      [typeof classed('app-artist-picture')[0].type, logo(), heroWords()], ['function', undefined, 'Portishead'])
+    find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Artist images…')[0].props.onClick({ currentTarget: null })
+    pics[0].onSaved()
+    await broken.settled()
+    check('...pictures saved: asked for again, past the cache', classed('app-artist-picture')[0].props.src, '/deadwax/library/artist/art?artist=Portishead&kind=fanart&v=1')
+  }
+
+  console.log('\nthe artist page\'s panel: Move albums to …, across every name')
+  {
+    reset()
+    const moved = [], settled = [], closed = []
+    const request = { key: 1, mode: 'refile', page: 'ar-kanye', name: 'Kanye West', mbid: YE, currentName: 'Ye', moveNames: ['Kanye West', 'Kanye'], imagesName: 'Ye', version: 0,
+      onMoved: (outcome) => moved.push(outcome) }
+    const render = hooks.root(RefileBody)
+    const props = { request, live: true, onClose: () => closed.push(1), onSettle: (mbid) => settled.push(mbid) }
+    const draw = () => { tree = render(props); render.commit(); return tree }
+    const drawn = async () => { for (let n = 0; n < 4; n++) { draw(); await settle() } }
+    draw()
+    check('each name\'s plan asked of the refile route\'s preview, by the artist\'s id, through a latestOnly', asked('refilePreview'), [['Kanye West', YE, true], ['Kanye', YE, true]])
+    check('...meanwhile it says so, and Move can\'t be pressed', [words(classed('app-asking-text')[0]), classed('app-artist-panel-primary')[0].props.disabled], ['Working out the moves…', true])
+    const plan = (moves, refused = [], problems = []) => ({ current_name: 'Ye', to_folder: 'Ye', artist_mbid: YE, moves, refused, problems, empty: !moves.length })
+    answer('refilePreview', plan([{ album: 'Donda', path: 'Kanye West/Donda (2021)', target_path: 'Ye/Donda (2021)', files: 2, retag: [{}, {}] }]), (name) => name === 'Kanye West')
+    answer('refilePreview', plan([], [{ album: 'Graduation', path: 'Misc/Graduation (2007)', reason: 'tagged as a different artist' }]), (name) => name === 'Kanye')
+    await drawn()
+    check('drawn as one: each move (where it is, where it goes, its tracks) and each album that stays, and why',
+      [classed('app-artist-move').map((li) => classed('app-artist-move-path').length && words(li)), words(classed('app-artist-panel-primary')[0]), classed('app-artist-panel-primary')[0].props.disabled],
+      [['Kanye West/Donda (2021)→ Ye/Donda (2021)2 tracks, 2 retagged', 'Misc/Graduation (2007)stays - tagged as a different artist'], 'Move 1 album', false])
+    classed('app-artist-panel-primary')[0].props.onClick()
+    draw()
+    check('Move: the apply for each name with something to move - the route recomputing its plan - and none for a name with nothing',
+      [asked('refileApply'), words(classed('app-artist-panel-primary')[0]), classed('app-artist-panel-primary')[0].props['aria-disabled']],
+      [[['Kanye West', YE]], 'Moving…', 'true'])
+    answer('refileApply', { plan: {}, results: { moved: [{ from: 'Kanye West/Donda (2021)', to: 'Ye/Donda (2021)' }], failed: [], pictures_moved: [], removed_folders: ['Kanye West'] } })
+    await drawn()
+    check('moved: the page told (by the artist\'s id, under their name now, the names left empty), the wait for Navidrome begun for the page moved from, and what happened said with Done',
+      [moved, settled, words(classed('app-artist-panel-outcome')[0]), words(classed('app-artist-panel-primary')[0])],
+      [[{ mbid: YE, name: 'Ye', moved: 1, emptied: ['Kanye West'] }], ['ar-kanye'], 'Moved 1 album into Ye/. Kanye West/ was left empty and removed.', 'Done'])
+    classed('app-artist-panel-primary')[0].props.onClick()
+    check('...Done closes the panel', closed.length, 1)
+
+    reset()
+    const told = []
+    const two = hooks.root(RefileBody)
+    const twoProps = { request: { ...request, moveNames: ['Kanye West', 'Kanye'], onMoved: (outcome) => told.push(outcome) }, live: true, onClose: () => {} }
+    const drawTwo = async () => { for (let n = 0; n < 4; n++) { tree = two(twoProps); two.commit(); await settle() } }
+    await drawTwo()
+    answer('refilePreview', plan([{ album: 'Donda', path: 'Kanye West/Donda (2021)', target_path: 'Ye/Donda (2021)', files: 2, retag: [] }]), (name) => name === 'Kanye West')
+    answer('refilePreview', plan([{ album: 'Graduation', path: 'Kanye/Graduation (2007)', target_path: 'Ye/Graduation (2007)', files: 3, retag: [] }]), (name) => name === 'Kanye')
+    await drawTwo()
+    classed('app-artist-panel-primary')[0].props.onClick()
+    await drawTwo()
+    check('two names to move: one at a time - the second only once the first has answered', asked('refileApply'), [['Kanye West', YE]])
+    answer('refileApply', { plan: {}, results: { moved: [{ from: 'a', to: 'b' }], failed: [], pictures_moved: [], removed_folders: [] } })
+    await drawTwo()
+    check('...then the second', asked('refileApply'), [['Kanye West', YE], ['Kanye', YE]])
+    twoProps.live = false
+    await drawTwo()
+    answer('refileApply', { plan: {}, results: { moved: [], failed: [{ album: 'Graduation', reason: "a tag wouldn't write" }], pictures_moved: [], removed_folders: [] } })
+    await drawTwo()
+    check('closed while the move was out: the page still told what moved - the outcome not drawn into a closed panel - and Kanye, whose album didn\'t, not left empty',
+      [told, classed('app-artist-panel-outcome').length], [[{ mbid: YE, name: 'Ye', moved: 1, emptied: ['Kanye West'] }], 0])
+
+    reset()
+    const stuck = hooks.root(RefileBody)
+    const stuckProps = { request: { ...request, moveNames: ['Kanye West'] }, live: true, onClose: () => {} }
+    tree = stuck(stuckProps); stuck.commit()
+    answer('refilePreview', plan([{ album: 'Donda', path: 'Kanye West/Donda (2021)', target_path: 'Ye/Donda (2021)', files: 2, retag: [] }], [], ['MusicBrainz could not be reached just now']))
+    for (let n = 0; n < 4; n++) { tree = stuck(stuckProps); stuck.commit(); await settle() }
+    check('a problem: said, and Move can\'t be pressed', [classed('is-warning').map(words), classed('app-artist-panel-primary')[0].props.disabled], [['MusicBrainz could not be reached just now'], true])
+
+    //? review: what the loop does when nothing moved, when an apply fails, and what an apply's own plan refuses
+    const body = (moveNames, more = {}) => {
+      const told = [], waits = []
+      const root = hooks.root(RefileBody)
+      const props = { request: { ...request, moveNames, onMoved: (outcome) => told.push(outcome) }, live: true, onClose: () => {}, onSettle: (page) => waits.push(page), ...more }
+      const drawn = async () => { for (let n = 0; n < 4; n++) { tree = root(props); root.commit(); await settle() } }
+      return { told, waits, drawn }
+    }
+    const donda = { album: 'Donda', path: 'Kanye West/Donda (2021)', target_path: 'Ye/Donda (2021)', files: 2, retag: [] }
+    const failures = () => classed('app-artist-panel-outcome').flatMap((node) => find(byClass('is-warning'), node)).map(words)
+
+    reset()
+    const none = body(['Kanye West'])
+    await none.drawn()
+    answer('refilePreview', plan([donda]))
+    await none.drawn()
+    classed('app-artist-panel-primary')[0].props.onClick()
+    await none.drawn()
+    answer('refileApply', { plan: plan([donda]), results: { moved: [], failed: [{ album: 'Donda', reason: "a tag wouldn't write: Permission denied" }], pictures_moved: [], removed_folders: [] } })
+    await none.drawn()
+    check('nothing moved (every tag refused): the page not told and no wait begun - nothing changed - and why said',
+      [none.told, none.waits, words(find(byClass('app-artist-panel-note'), classed('app-artist-panel-outcome')[0])[0]), failures()],
+      [[], [], 'Nothing was moved.', ["Donda: a tag wouldn't write: Permission denied"]])
+
+    reset()
+    const broke = body(['Kanye West', 'Kanye'])
+    await broke.drawn()
+    answer('refilePreview', plan([donda]), (name) => name === 'Kanye West')
+    answer('refilePreview', plan([{ album: 'Graduation', path: 'Kanye/Graduation (2007)', target_path: 'Ye/Graduation (2007)', files: 3, retag: [] }]), (name) => name === 'Kanye')
+    await broke.drawn()
+    classed('app-artist-panel-primary')[0].props.onClick()
+    await broke.drawn()
+    answer('refileApply', new Error('deadwax is unreachable'))
+    await broke.drawn()
+    check('an apply that fails: none after it (what the preview said is no longer what is on disk), and the failure said',
+      [asked('refileApply').map((one) => one[0]), broke.told, failures()], [['Kanye West'], [], ['deadwax is unreachable']])
+
+    reset()
+    const same = body(['Kanye', 'Kanye West'])
+    await same.drawn()
+    answer('refilePreview', plan([{ album: 'Graduation', path: 'Kanye/Graduation (2007)', target_path: 'Ye/Graduation (2007)', files: 3, retag: [] }]), (name) => name === 'Kanye')
+    answer('refilePreview', plan([{ album: 'Graduation', path: 'Kanye West/Graduation (2007)', target_path: 'Ye/Graduation (2007)', files: 3, retag: [] }]), (name) => name === 'Kanye West')
+    await same.drawn()
+    check('two names moving folders of one name to one place: one move shown, the other staying and why - "Move 1 album"',
+      [classed('app-artist-move').map(words), words(classed('app-artist-panel-primary')[0])],
+      [['Kanye/Graduation (2007)→ Ye/Graduation (2007)3 tracks', "Kanye West/Graduation (2007)stays - another album moves to 'Ye/Graduation (2007)'"], 'Move 1 album'])
+    classed('app-artist-panel-primary')[0].props.onClick()
+    await same.drawn()
+    answer('refileApply', { plan: plan([]), results: { moved: [{ from: 'Kanye/Graduation (2007)', to: 'Ye/Graduation (2007)' }], failed: [], pictures_moved: [], removed_folders: ['Kanye'] } })
+    await same.drawn()
+    check('...only the name with a move applied; the page told Kanye is empty, Kanye West not', [asked('refileApply').map((one) => one[0]), same.told.map((one) => one.emptied), same.waits],
+      [['Kanye'], [['Kanye']], ['ar-kanye']])
+
+    reset()
+    const raced = body(['Kanye West'])
+    await raced.drawn()
+    answer('refilePreview', plan([donda]))
+    await raced.drawn()
+    classed('app-artist-panel-primary')[0].props.onClick()
+    await raced.drawn()
+    answer('refileApply', { plan: plan([], [{ album: 'Donda', path: 'Kanye West/Donda (2021)', reason: "'Ye/Donda (2021)' is already there" }]), results: { moved: [], failed: [], pictures_moved: [], removed_folders: [] } })
+    await raced.drawn()
+    check('an album the preview showed moving that the apply\'s own plan kept where it is: said, never dropped',
+      [raced.told, failures()], [[], ["Donda: stays - 'Ye/Donda (2021)' is already there"]])
+
+    reset()
+    const stays = body(['Kanye West'])
+    await stays.drawn()
+    answer('refilePreview', plan([], [{ album: 'Donda', path: 'Kanye West/Donda (2021)', reason: "'03 Three.flac' can't be read, so its tags can't be written" }]))
+    await stays.drawn()
+    check('every album staying: each said with why, nothing to press - never "every album is already filed under Ye"',
+      [classed('app-artist-move').map(words), classed('app-artist-panel-note').map(words).slice(-1), classed('app-artist-panel-primary')[0].props.disabled],
+      [["Kanye West/Donda (2021)stays - '03 Three.flac' can't be read, so its tags can't be written"], ['Nothing can move - every album stays where it is, for the reason beside it.'], true])
+    reset()
+    const none2 = body(['Kanye West'])
+    await none2.drawn()
+    answer('refilePreview', plan([]))
+    await none2.drawn()
+    check('...and with nothing left under the old name at all, that it is all filed under Ye', classed('app-artist-panel-note').map(words).slice(-1), ['Nothing to move - every album is already filed under Ye.'])
+  }
+
+  console.log('\nthe artist page\'s panel: Artist images…')
+  {
+    reset()
+    const saved = []
+    const request = { key: 2, mode: 'images', page: 'ar-ye', name: 'Ye', mbid: YE, currentName: 'Ye', moveNames: [], imagesName: 'Ye', version: 0, onSaved: () => saved.push(1) }
+    const render = hooks.root(ImagesBody)
+    const props = { request, live: true }
+    const drawn = async () => { for (let n = 0; n < 4; n++) { tree = render(props); render.commit(); await settle() } }
+    await drawn()
+    check('the pictures asked for, of the folder\'s name, by the artist\'s id, through a latestOnly', asked('imagesPreview'), [['Ye', YE, true]])
+    const thumb = { kind: 'thumb', url: 'https://c/a.jpg', preview: 'https://c/a.jpg?w=600', source: 'wikidata', label: 'Wikidata image' }
+    const banner = { kind: 'banner', url: 'https://f/b.jpg', preview: 'https://f/b.jpg', source: 'theaudiodb', label: 'TheAudioDB Banner' }
+    const preview = {
+      artist: 'Ye', path: 'Ye', folder_problem: null, album_count: 1, track_count: 2, total_size: 1, first_year: '2025', last_year: '2025', albums: [], art: { thumb: 'artist.jpg' },
+      mbid: YE, mbid_source: 'given', matches: [], facts: { name: 'Ye', disambiguation: 'US rapper' }, candidates: [thumb, banner], best: { thumb, banner },
+      kinds: [{ kind: 'thumb', label: 'Square image' }, { kind: 'banner', label: 'Banner' }, { kind: 'fanart', label: 'Background' }], plan: null,
+      sources: { fanarttv: false, theaudiodb: true }, has_key: true, problems: [],
+    }
+    answer('imagesPreview', preview)
+    await drawn()
+    check('who the pictures are of, with Not them?', words(classed('app-artist-panel-who')[0]), 'Showing Ye (US rapper) Not them?')
+    check('the note on the key not set', classed('app-artist-panel-note').map(words).some((text) => text.startsWith('fanart.tv isn\'t set up')), true)
+    check('each slot: its name, the file on disk or none found, and Use another picture',
+      classed('app-artist-slot').map((slot) => [words(find((node) => node.type === 'h3', slot)[0]), words(find((node) => byClass('app-artist-slot-line')(node), slot)[0] ?? ''), words(find((node) => byClass('app-artist-slot-more')(node), slot)[0] ?? '')]),
+      [['Square image', 'artist.jpg on disk', 'Use another picture (1)'], ['Banner', '', 'Use another picture (1)'], ['Background', 'none found for this', 'Use another picture (2)']])
+    const options = () => classed('app-artist-option').map((node) => [node.props['aria-label'], node.props['aria-pressed']])
+    check('the best of each chosen to start with', options(), [['Wikidata image, from wikidata', true], ['TheAudioDB Banner, from theaudiodb', true]])
+    classed('app-artist-option')[0].props.onClick()
+    find((node) => byClass('app-artist-slot-more')(node))[2].props.onClick()
+    await drawn()
+    check('a tap on a chosen picture leaves its slot as it is; Use another picture puts any picture in any slot',
+      [options(), find((node) => byClass('app-artist-slot-more')(node))[2].props['aria-expanded']],
+      [[['Wikidata image, from wikidata', false], ['TheAudioDB Banner, from theaudiodb', true], ['Wikidata image, from wikidata', false], ['TheAudioDB Banner, from theaudiodb', false]], true])
+    classed('app-artist-option')[2].props.onClick()
+    find((node) => byClass('app-artist-replace-box')(node))[0].props.onChange({ currentTarget: { checked: true } })
+    await drawn()
+    classed('app-artist-panel-primary')[0].props.onClick()
+    await drawn()
+    check('Save: the pictures chosen, by slot, the artist\'s id and Replace - the route honours only what their sources offered',
+      asked('imagesApply'), [['Ye', { banner: banner.url, fanart: thumb.url }, { artistMbid: YE, replace: true }]])
+    answer('imagesApply', { artist: 'Ye', path: 'Ye', results: { mode: 'apply', dry_run: false, written: ['banner.jpg', 'fanart.jpg'], skipped: [], problems: [] }, art: { thumb: 'artist.jpg', banner: 'banner.jpg', fanart: 'fanart.jpg' } })
+    await drawn()
+    check('saved: said, the page told, and the slots now say the files are on disk',
+      [words(classed('app-artist-panel-said')[0]), saved.length, words(find((node) => byClass('app-artist-slot-line')(node))[1])],
+      ['Saved banner.jpg, fanart.jpg.', 1, 'banner.jpg on disk'])
+    check('each picture in a box of its slot\'s shape - square for the square, wide for the rest, whatever the picture - so one loading moves nothing',
+      classed('app-artist-slot').map((slot) => [...new Set(find((node) => node.type === 'img', slot).map((node) => node.props.class))]),
+      [['app-artist-option-image is-square'], ['app-artist-option-image'], ['app-artist-option-image']])
+
+    //? review: Save, while another artist's pictures were coming or after that look failed, wrote the last artist's
+    find((node) => byClass('app-artist-panel-inline')(node))[0].props.onClick()
+    await drawn()
+    find((node) => node.type === 'form' && byClass('app-artist-search')(node))[0].props.onSubmit({ preventDefault() {} })
+    await drawn()
+    check('Not them?: a search for the name, its button busy while it is out - Save still live, the pictures still the ones shown',
+      [asked('artistSearch').slice(-1), find((node) => node.type === 'button' && node.props.type === 'submit')[0].props['aria-busy'], classed('app-artist-panel-primary')[0].props.disabled],
+      [[['Ye', true]], true, false])
+    answer('artistSearch', { query: 'Ye', matches: [{ mbid: NIRVANA_UK, name: 'Nirvana', disambiguation: '60s UK band', country: 'GB', type: 'Group', matched_as: 'Nirvana' }] })
+    await drawn()
+    matchRows()[0].props.onClick()
+    await drawn()
+    check('another artist picked: their pictures asked for - and meanwhile Save can\'t be pressed, the slots giving way to saying whose pictures are coming',
+      [asked('imagesPreview').slice(-1), classed('app-artist-panel-primary')[0].props.disabled, words(classed('app-asking-text')[0]), classed('app-artist-slot').length, classed('app-artist-panel-who').length],
+      [[['Ye', NIRVANA_UK, true]], true, 'Looking for pictures of Nirvana…', 0, 0])
+    classed('app-artist-panel-primary')[0].props.onClick()
+    await drawn()
+    check('...a press on it then sends nothing', asked('imagesApply').length, 1)
+    answer('imagesPreview', new Error('fanart.tv is unreachable'))
+    await drawn()
+    check('...the look failing: said, with Try again - and Save still can\'t be pressed, nothing it would write on screen',
+      [classed('is-warning').map(words), classed('app-artist-panel-primary')[0].props.disabled], [['fanart.tv is unreachable'], true])
+    find((node) => node.type === 'button' && words(node) === 'Try again')[0].props.onClick()
+    check('...Try again asks again for the artist last picked, not the page\'s', asked('imagesPreview').slice(-1), [['Ye', NIRVANA_UK, true]])
+
+    reset()
+    const shut = hooks.root(ImagesBody)
+    const shutProps = { request: { ...request, onSaved: () => saved.push(2) }, live: true }
+    const drawShut = async () => { for (let n = 0; n < 4; n++) { tree = shut(shutProps); shut.commit(); await settle() } }
+    await drawShut()
+    answer('imagesPreview', preview)
+    await drawShut()
+    classed('app-artist-panel-primary')[0].props.onClick()
+    shutProps.live = false
+    await drawShut()
+    answer('imagesApply', { artist: 'Ye', path: 'Ye', results: { mode: 'apply', dry_run: false, written: ['artist.jpg'], skipped: [], problems: [] }, art: { thumb: 'artist.jpg' } })
+    await drawShut()
+    check('closed while a save was out: the page still told - what it says not drawn into a closed panel', [saved.slice(-1), words(classed('app-artist-panel-said')[0])], [[2], ''])
+
+    reset()
+    const ambiguous = hooks.root(ImagesBody)
+    const ambiguousProps = { request: { ...request, mbid: null, name: 'Nirvana', imagesName: 'Nirvana' }, live: true }
+    const drawAmbiguous = async () => { for (let n = 0; n < 4; n++) { tree = ambiguous(ambiguousProps); ambiguous.commit(); await settle() } }
+    await drawAmbiguous()
+    const m1 = { mbid: NIRVANA_US, name: 'Nirvana', disambiguation: '90s US grunge band', country: 'US', type: 'Group', matched_as: 'Nirvana' }
+    const m2 = { mbid: NIRVANA_UK, name: 'Nirvana', disambiguation: '60s UK band', country: 'GB', type: 'Group', matched_as: 'Nirvana' }
+    answer('imagesPreview', { ...preview, mbid: null, facts: null, candidates: [], best: {}, matches: [m1, m2], problems: ['more than one artist in MusicBrainz goes by this name'] })
+    await drawAmbiguous()
+    check('nobody can say who: said, the search open, MusicBrainz\'s artists of the name to choose from - Save not live',
+      [classed('is-warning').map(words), matchRows().map(words), classed('app-artist-panel-primary')[0].props.disabled],
+      [['more than one artist in MusicBrainz goes by this name'], ['Nirvana90s US grunge band · Group · US', 'Nirvana60s UK band · Group · GB'], true])
+    matchRows()[1].props.onClick()
+    await drawAmbiguous()
+    check('...one chosen: their pictures asked for by its id', asked('imagesPreview').slice(-1), [['Nirvana', NIRVANA_UK, true]])
+  }
+
+  console.log('\nthe artist page\'s panel: Which artist is this?')
+  {
+    reset()
+    const chosen = [], closed = []
+    const render = hooks.root(WhoBody)
+    const props = { request: { key: 3, mode: 'who', page: 'ar-nirvana', name: 'Nirvana', mbid: null, currentName: null, moveNames: [], imagesName: null, version: 0, onChosen: (match) => chosen.push(match) }, live: true, onClose: () => closed.push(1) }
+    const drawn = async () => { for (let n = 0; n < 4; n++) { tree = render(props); render.commit(); await settle() } }
+    await drawn()
+    check('the page\'s name searched as it opens, through a latestOnly', asked('artistSearch'), [['Nirvana', true]])
+    answer('artistSearch', { query: 'Nirvana', matches: [
+      { mbid: NIRVANA_US, name: 'Nirvana', disambiguation: '90s US grunge band', country: 'US', type: 'Group', matched_as: 'Nirvana' },
+      { mbid: YE, name: 'Ye', disambiguation: 'US rapper', country: 'US', type: 'Person', matched_as: 'Kanye West' }] })
+    await drawn()
+    check('each with what tells them apart - and the name an alias matched', matchRows().map(words),
+      ['Nirvana90s US grunge band · Group · US', 'Yeas Kanye West · US rapper · Person · US'])
+    matchRows()[0].props.onClick()
+    check('one chosen: the page told, and the panel closed', [chosen, closed.length], [[{ mbid: NIRVANA_US, name: 'Nirvana', disambiguation: '90s US grunge band' }], 1])
+
+    reset()
+    const shut = hooks.root(WhoBody)
+    const shutProps = { ...props, live: true }
+    const drawShut = async () => { for (let n = 0; n < 4; n++) { tree = shut(shutProps); shut.commit(); await settle() } }
+    await drawShut()
+    shutProps.live = false
+    await drawShut()
+    answer('artistSearch', { query: 'Nirvana', matches: [{ mbid: NIRVANA_US, name: 'Nirvana', disambiguation: '', country: 'US', type: 'Group', matched_as: 'Nirvana' }] })
+    await drawShut()
+    check('closed while its search was out: the answer not drawn into a closed panel', matchRows().length, 0)
+  }
+
+  console.log('\nthe artist page\'s panel itself: a sheet on a phone, a side panel on a desktop')
+  {
+    reset()
+    const request = { key: 4, mode: 'refile', page: 'ar-kanye', name: 'Kanye West', mbid: YE, currentName: 'Ye', moveNames: ['Kanye West'], imagesName: 'Ye', version: 0 }
+    //? each drawn by a root of its own (it has hooks: useRef, and useSheet's stand-in, which notes what it was asked)
+    const drawPanel = (props) => hooks.root(ArtistPanel)(props)
+    const sheet = drawPanel({ open: true, request, opener: { current: null }, onClose: () => {}, panel: 'sheet' })
+    const box = (tree) => find((node) => byClass('app-artist-panel')(node), tree)[0]
+    check('a phone\'s: modal, its own scroll lock, focus to its close button', [W.sheets[0].modal, W.sheets[0].lockClass, sheet.props.class, box(sheet).props['aria-modal'], box(sheet).props.tabIndex],
+      [true, 'app-artist-panel-open', 'app-layer app-artist-panel-layer is-open', 'true', undefined])
+    check('...titled for its job, and for whom', [words(find((node) => node.type === 'h2', sheet)[0]), words(find((node) => node.type === 'p', sheet)[0])], ['Move albums', 'Kanye West → Ye'])
+    const panel = drawPanel({ open: true, request: { ...request, mode: 'images' }, opener: { current: null }, onClose: () => {}, panel: 'column' })
+    check('a desktop\'s: a panel beside the page - not modal, its box a tab stop', [W.sheets[1].modal, panel.props.class, box(panel).props['aria-modal'], box(panel).props.tabIndex],
+      [false, 'app-layer app-artist-panel-layer is-open is-panel is-column', 'false', -1])
+    const shut = drawPanel({ open: false, request, opener: { current: null }, onClose: () => {}, panel: 'drawer', covered: false })
+    const under = drawPanel({ open: true, request, opener: { current: null }, onClose: () => {}, panel: 'drawer', covered: true })
+    check('inert while closed, and under the visualizer', [shut.props.inert, under.props.inert, W.sheets[3].covered], [true, true, true])
+    const subtitle = (more) => words(find((node) => byClass('app-artist-panel-subtitle')(node), drawPanel({ open: true, request: { ...request, ...more }, opener: { current: null }, onClose: () => {}, panel: 'sheet' }))[0])
+    check('...the names whose albums move, never the page\'s own (review: "Ye → Ye" on Ye\'s page)',
+      [subtitle({ name: 'Ye', moveNames: ['Kanye West'] }), subtitle({ name: 'Ye', moveNames: ['Kanye', 'Kanye West'] }), subtitle({ mode: 'images', name: 'Ye' })],
+      ['Kanye West → Ye', 'Kanye and Kanye West → Ye', 'Ye'])
+  }
+}
+
 ;(async () => {
   while (later.length) {
     await settle()
     later.shift()()
   }
   await page()
+  await manage()
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')
   process.exit(failures ? 1 : 0)
 })()

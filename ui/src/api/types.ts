@@ -512,9 +512,6 @@ export interface DiscographyResponse {
   problem?: string | null
 }
 
-/** GET /search_musicbrainz/artist (2.0.0-player.17): who an artist is - ArtistFacts without the
- *  links and members, which the light route leaves out. */
-export type ArtistFactsLight = Omit<ArtistFacts, 'links' | 'members'>
 
 /** One folder of the store index (2.0.0-player.17's id bridge), as GET /store/album answers it. */
 export interface StoreRow {
@@ -1127,6 +1124,9 @@ export interface ArtistMember {
   roles: string[]
 }
 
+/** Who an artist is, as artists.artist_facts shapes MusicBrainz's answer - the main page's artist page
+ *  (in its images preview) and, since 2.0.0-player.45 in full, GET /search_musicbrainz/artist: the
+ *  app's artist page and Info's artist card (2.0.0-player.17 sent it less its links and members). */
 export interface ArtistFacts {
   mbid?: string | null
   name: string

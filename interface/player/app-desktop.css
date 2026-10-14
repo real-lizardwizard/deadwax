@@ -899,7 +899,8 @@
 
     .app-desk .app-layer.is-panel .app-sources,
     .app-desk .app-layer.is-panel .app-info,
-    .app-desk .app-layer.is-panel .app-edit {
+    .app-desk .app-layer.is-panel .app-edit,
+    .app-desk .app-layer.is-panel .app-artist-panel {
         inset: 0;
         max-width: none;
         margin: 0;
@@ -913,17 +914,20 @@
 
     .app-desk .app-layer.is-panel.is-open .app-sources,
     .app-desk .app-layer.is-panel.is-open .app-info,
-    .app-desk .app-layer.is-panel.is-open .app-edit { transform: none; }
+    .app-desk .app-layer.is-panel.is-open .app-edit,
+    .app-desk .app-layer.is-panel.is-open .app-artist-panel { transform: none; }
 
     /* the box takes focus from a click on something in it that can't (so Escape there is from inside
        it) - a click, never a ring: it isn't in the tab order */
     .app-desk .app-layer.is-panel .app-sources:focus,
     .app-desk .app-layer.is-panel .app-info:focus,
-    .app-desk .app-layer.is-panel .app-edit:focus { outline: none; }
+    .app-desk .app-layer.is-panel .app-edit:focus,
+    .app-desk .app-layer.is-panel .app-artist-panel:focus { outline: none; }
 
     .app-desk .app-layer.is-column .app-sources,
     .app-desk .app-layer.is-column .app-info,
-    .app-desk .app-layer.is-column .app-edit { transition: none; }
+    .app-desk .app-layer.is-column .app-edit,
+    .app-desk .app-layer.is-column .app-artist-panel { transition: none; }
 
     .app-desk .app-layer.is-panel .app-sources { gap: var(--app-desk-panel-gap); }
 
@@ -950,7 +954,8 @@
 
     .app-desk .app-sources-close,
     .app-desk .app-edit-close,
-    .app-desk .app-edit .window-close {
+    .app-desk .app-edit .window-close,
+    .app-desk .app-artist-panel-close {
         display: flex;
         flex: none;
         align-items: center;
@@ -965,13 +970,15 @@
     }
 
     .app-desk .app-sources-close:focus-visible,
-    .app-desk .app-edit-close:focus-visible {
+    .app-desk .app-edit-close:focus-visible,
+    .app-desk .app-artist-panel-close:focus-visible {
         outline: var(--app-ring) solid var(--dw-accent);
         outline-offset: var(--app-ring);
     }
 
     .app-desk .app-sources-close-icon,
-    .app-desk .app-edit-close-icon { width: var(--app-desk-close-icon); height: var(--app-desk-close-icon); }
+    .app-desk .app-edit-close-icon,
+    .app-desk .app-artist-panel-close-icon { width: var(--app-desk-close-icon); height: var(--app-desk-close-icon); }
 
     /* the chips, the board's 26px */
     .app-desk .app-layer.is-panel .app-sources-chips { column-gap: var(--app-desk-chips-gap); }
@@ -1898,6 +1905,73 @@
     .app-desk .app-edit .art-viewer-footer { display: flex; flex: none; align-items: center; gap: var(--app-desk-field-gap); }
     .app-desk .app-edit .art-viewer-hint { margin-right: auto; font-size: var(--dw-text-label); }
     .app-desk .app-edit .hint-touch { display: none; }
+}
+
+/* ===== The artist page, as the main page had it (2.0.0-player.45) =====
+   The artist page's panel (ArtistPanel.tsx) is a fourth side panel, by the frame's rule: the shared
+   rules above place it, as Sources', Info's and the Edit panel's; here its head is the board's
+   (heading and the close button, at the panel's sizes) and its foot sits at the panel's foot. On the
+   page, In your library, About and Line-up stand side by side under the albums where there is room. */
+@media (min-width: 1024px) {
+    :root {
+        --app-desk-artist-column: 300px;  /* the narrowest of In your library, About and Line-up, side by side */
+        --app-desk-artist-option: 64px;   /* a picture to choose, at the panel's size: its box's height and a square's width... */
+        --app-desk-artist-option-wide: 150px;  /* ...and every other slot's */
+    }
+
+    .app-desk .app-artist-more {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(var(--app-desk-artist-column), 1fr));
+        align-items: start;
+        gap: var(--app-desk-gap);
+    }
+
+    /* their rows at a desktop row's height and words - a finger's (the coarse pointer's token) on an iPad */
+    .app-desk .app-artist-more .app-row { min-height: var(--app-desk-row); font-size: var(--app-desk-text); }
+
+    .app-desk .app-artist-panel {
+        position: absolute;
+        gap: var(--app-desk-panel-gap);
+        transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+    }
+
+    .app-desk .app-artist-panel-head { align-items: center; }
+
+    .app-desk .app-artist-panel-title {
+        color: var(--dw-text-heading-color);
+        font-size: var(--dw-text-heading);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-artist-panel-subtitle { font-size: var(--dw-text-label); }
+    .app-desk .app-artist-panel-body { font-size: var(--app-desk-text-sm); }
+
+    .app-desk .app-artist-panel-foot {
+        padding: var(--app-desk-panel-pad) 0;
+    }
+
+    /* ...and with no foot (Which artist is this?), the body's end off the panel's foot by the same */
+    .app-desk .app-artist-panel-body:last-child { padding-bottom: var(--app-desk-panel-pad); }
+
+    .app-desk .app-artist-panel-foot .pl-pill,
+    .app-desk .app-artist-search-row .pl-pill {
+        height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad);
+        font-size: var(--app-desk-text-sm);
+    }
+
+    .app-desk .app-artist-search-input { min-height: var(--app-desk-control); font-size: var(--app-desk-text-sm); }
+
+    .app-desk .app-artist-option-image { width: var(--app-desk-artist-option-wide); height: var(--app-desk-artist-option); }
+    .app-desk .app-artist-option-image.is-square { width: var(--app-desk-artist-option); }
+}
+
+/* the artist page's panel (2.0.0-player.45) for a finger: its buttons and field a tap target, the field
+   never small enough for iOS to zoom into */
+@media (min-width: 1024px) and (pointer: coarse) {
+    .app-desk .app-artist-search-input { min-height: var(--pl-hit); font-size: var(--dw-text-body); }
+    .app-desk .app-artist-panel-foot .pl-pill,
+    .app-desk .app-artist-search-row .pl-pill { height: var(--pl-hit); }
 }
 
 /* A FINGER, NOT A POINTER YOU AIM: an iPad on its side is 1024px wide and more, and gets this frame.

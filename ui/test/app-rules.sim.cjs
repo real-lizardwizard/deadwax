@@ -165,6 +165,16 @@
  *    off. What both pages hold - the drafts, the refusal, the tab, the lines - is kept in their modules,
  *    never as component state, so a page left and come back to still has it. The sidebar's Settings and
  *    Log are an admin's, after Needs a look; You's rows a desktop's.
+ *  - The artist page as the main page had it (2.0.0-player.45): its panel (app/ArtistPanel.tsx) plays
+ *    nothing and reads no player; a sheet on a phone (the page behind inert - App's `covered`) and a
+ *    side panel on a desktop, under the visualizer inert; one panel at a time with Sources, Info and
+ *    Edit, pressed again for its job closed, the page's own (closed off its page, left open across
+ *    1024px); albums moved, a page whose name has none left follows them by the artist's MusicBrainz
+ *    id (the guard, the old id's page redirected, focus to the back link, the scroll put back once the
+ *    page has drawn - review), and the page moved from is asked again after the panel's wait, under the
+ *    id it has now (App holds no timer); a write never called off; every preview and search
+ *    through a latestOnly with its signal; the managing an admin's, App asking /me on a phone as an
+ *    artist page comes on top; the page's summaries through their own latestOnly.
  *  - Looking after the library (2.0.0-player.42): Library care (app/LibraryCare.tsx) calls no playback
  *    action, reads the library through the main page's hook only once it shows on a desktop, and on a
  *    phone draws a note before anything; its runs are app/useLibraryCare.ts's - kept in the module, never
@@ -178,7 +188,7 @@
  *    Library care is an admin's, after Needs a look; You's row a desktop's; it is a sibling of the other
  *    Managing pages. Needs a look warns when ignores can't be saved. The Edit panel has no link to the
  *    main page left ("Choose the folder"), and its Lyrics note names Managing's Settings; the sidebar's
- *    "Open the main page" names only artist images and re-filing.
+ *    "Open the main page" names nothing left only there (2.0.0-player.45).
  *  - Inside a track (2.0.0-player.44): the Edit panel's track inspector (app/TrackInspector.tsx), the cover
  *    viewer (app/CoverViewer.tsx) and an album page's Properties (app/AlbumProperties.tsx) call no playback
  *    action - nothing on the list below gains a file. The inspector is drawn by the Edit panel alone, in
@@ -451,7 +461,8 @@ console.log('\nan album page is memoised on what it reads of the player')
     //? 2.0.0-player.19: and the frame, and which album - and pressing - a desktop's Sources panel shows)
     //? 2.0.0-player.21: and the Edit toggle's state - admin, the panel, its album - and an edit's refresh)
     //? 2.0.0-player.33: and the visualizer, which the server settings' and the log's `live` read)
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? 2.0.0-player.45: and the artist page's panel - open, its request - and an artist page's refresh)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -485,10 +496,11 @@ console.log('\na link out of the app opens beside it')
   //? (an album it can't find a folder for) in 2.0.0-player.21, and Needs a look's phone note in .25
   //? and (2.0.0-player.33) the server settings' line and its phone note, and the log's phone note
   //? (2.0.0-player.36: and Info > Debug's link to the turntable's test bench, a page of its own)
-  check('...and there are links to look at (You, the gate, the desktop sidebar, Needs a look, Library care and the log on a phone, the server settings, Info > Debug\'s test bench)',
+  //? (2.0.0-player.45: and an artist page's links - their site, their socials - in its About)
+  check('...and there are links to look at (You, the gate, the desktop sidebar, Needs a look, Library care and the log on a phone, the server settings, Info > Debug\'s test bench, an artist\'s About)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
     //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/LibraryCare.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/LibraryCare.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -500,9 +512,10 @@ console.log('\nNow Playing covers everything behind it')
     [!!behind, /TABS\.map/.test(behind?.[1] ?? ''), /<MiniPlayer\b/.test(behind?.[1] ?? ''), /<TabBar\b/.test(behind?.[1] ?? '')], [true, true, true, true])
   //? 2.0.0-player.19: on a phone - a desktop's side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
-  check('...inert while Now Playing or the Sources sheet shows, on a phone - or the visualizer, on a desktop',
+  check('...inert while Now Playing, the Sources sheet or the artist page\'s sheet shows, on a phone - or the visualizer, on a desktop',
     //? (2.0.0-player.33: visualizerShown is worked out earlier now - the pages memo reads it)
-    [/const visualizerShown = desktop && visualizing\n/.test(app), /const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen\)\) \|\| visualizerShown/.test(app),
+    //? (2.0.0-player.45: the artist page's panel is a sheet over the whole screen on a phone)
+    [/const visualizerShown = desktop && visualizing\n/.test(app), /const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen \|\| artistOpen\)\) \|\| visualizerShown/.test(app),
       (app.match(/const visualizerShown =/g) ?? []).length], [true, true, 1])
   //? (2.0.0-player.20) ...and a desktop's Sources or Info panel left open goes inert under the visualizer
   //? too - outside that wrapper, each takes it as `covered`, as Now Playing takes what is over it
@@ -538,15 +551,17 @@ console.log('\nevery sheet is a sheet by the one hook')
     'app/Sources.tsx': 'app-sources-open',
     //? the desktop's Edit panel (2.0.0-player.21) - never a sheet, so its lock is never taken
     'app/EditPanel.tsx': 'app-edit-open',
+    //? the artist page's panel (2.0.0-player.45) - a sheet on a phone, a side panel on a desktop
+    'app/ArtistPanel.tsx': 'app-artist-panel-open',
   }
   const texts = Object.fromEntries(Object.keys(SHEETS).map((file) => [file, code(read(file))]))
   check('each calls useSheet with a scroll lock of its own',
     Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, /useSheet\(\{[^}]*lockClass: '([^']+)'/.exec(text)?.[1] ?? null])), SHEETS)
   check('...and they are the only ones', files.filter((file) => /\buseSheet\(/.test(code(read(file))) && file !== 'app/useSheet.ts').sort(), Object.keys(SHEETS).sort())
-  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true, true, true])
+  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true, true, true, true])
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
-  check('the menu, Info, the sources and the Edit panel close on their backdrop (a panel\'s is not drawn)',
-    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/EditPanel.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true])
+  check('the menu, Info, the sources, the Edit panel and the artist page\'s close on their backdrop (a panel\'s is not drawn)',
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/EditPanel.tsx', 'app/ArtistPanel.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true, true])
   //? (2.0.0-player.19: a desktop's side panel is no sheet over the page - no lock - and Escape closes
   //? it only from inside it; a sheet is modal unless it says otherwise)
   check('the hook: the lock on <html> (a sheet\'s, never a panel\'s), focus in, focus back, Escape for the one on top',
@@ -1195,16 +1210,17 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
       /export function panelIsModal\(panel: PanelStyle\): boolean \{\s*return panel === 'sheet'\s*\}/.test(code(read('lib/appFrame.ts')))],
     [true, [true, true], true])
   //? (2.0.0-player.21: and the Edit panel, each putting it away too)
-  check('one side panel at a time: Sources puts Info and Edit away, and Info Sources and Edit',
-    [/setSourcesOpen\(true\)[\s\S]{0,250}?infoOpener\.current = null\s*setInfoPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
-      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*setInfoPanel\(true\)/.test(app)],
+  //? (2.0.0-player.45: and the artist page's panel, each putting it away and it every other)
+  check('one side panel at a time: Sources puts Info, Edit and the artist\'s away, and Info Sources, Edit and the artist\'s',
+    [/setSourcesOpen\(true\)[\s\S]{0,250}?infoOpener\.current = null\s*setInfoPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
+      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*setInfoPanel\(true\)/.test(app)],
     [true, true])
   //? (review) the player bar's Info closes the panel it opened - "the Info button again"
   check('...and the player bar\'s Info, pressed again, closes it',
     /const toggleInfo = useCallback\(\(event: MouseEvent\) => \{\s*if \(infoPanelOpen\.current\) \{\s*setInfoPanel\(false\)\s*return\s*\}/.test(app), true)
   //? (review) which panel shows feeds both the shell's classes: room made for a column, a drawer over the page
   check('what the panel shows - Sources or Info - makes room for a column (`.has-side`) and marks a drawer (`.has-drawer`)',
-    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel, edit: editOpen \}\)/.test(app),
+    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen \}\)/.test(app),
       /\$\{makesRoom\(panel, side\) \? ' has-side' : ''\}\$\{liesOver\(panel, side\) \? ' has-drawer' : ''\}/.test(app)],
     [true, true])
   //? (review) a drawer lies over the page Go to album and Info's artist open: the Info drawer goes with them
@@ -1618,7 +1634,7 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       (panel.match(/onApplied=\{written\(request, subject\)\}|onDone=\{written\(request, subject\)\}/g) ?? []).length],
     [2, true, true, true, true, 3])
   check('the pages memo is keyed on what the queue page reads (the frame, the page shown, the panel and its request)',
-    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown\]/.test(app),
+    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes\]/.test(app),
       /page\.kind === 'queue' \? queueView\(tab, page\)/.test(app)],
     [true, true])
 }
@@ -1696,7 +1712,82 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
       /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'care', 'settings', 'log'\]/.test(app)],
     [true, true, true, true])
   check('the pages memo is keyed on what they read - the visualizer too',
-    [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown\]/.test(app)], [true, true])
+    [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes\]/.test(app)], [true, true])
+}
+
+console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
+{
+  const app = code(read('app/App.tsx'))
+  const panel = code(read('app/ArtistPanel.tsx'))
+  const page = code(read('app/ArtistPage.tsx'))
+  check('the artist page\'s panel plays nothing and reads no player',
+    [actionsIn(panel), /useContext|usePlayerActions|PlayerContext/.test(panel)], [[], false])
+  check('it is the frame\'s side panel on a desktop and a sheet on a phone: modal only as a sheet, inert while closed or under the visualizer',
+    [/const modal = panelIsModal\(panel\)/.test(panel), /useSheet\(\{ open, covered, onClose, lockClass: 'app-artist-panel-open', first: close, opener, modal, area: box \}\)/.test(panel),
+      /aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(panel), /<ArtistPanel\b[^\n]*\bcovered=\{visualizerShown\}[^\n]*\/>/.test(app),
+      /<ArtistPanel\b[^\n]*\bpanel=\{panel\}[^\n]*\/>/.test(app)],
+    [true, true, true, true, true])
+  const toggle = /const toggleArtistManage = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''
+  check('one panel at a time: it puts Sources, Info and Edit away - and Edit, on an album or a folder, puts it away',
+    [/sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(toggle),
+      /setEdit\(\{ album, key: editKeys\.current \}\)[\s\S]{0,300}?artistOpener\.current = null\s*setArtistOpen\(false\)\s*\}, \[\]\)/.test(app),
+      /setEdit\(\{ \.\.\.request, key: editKeys\.current \}\)[\s\S]{0,300}?artistOpener\.current = null\s*setArtistOpen\(false\)\s*\}, \[\]\)/.test(app)],
+    [true, true, true])
+  check('...pressed again for the job it shows on that page, it closes',
+    /if \(artistOpenNow\.current && now\?\.page === request\.page && now\.mode === request\.mode\) \{\s*setArtistOpen\(false\)\s*return\s*\}/.test(toggle), true)
+  check('it is the page\'s: it closes as that page stops being the one on top',
+    [/const artistShown = artistManage !== null && nav\.tab === artistManage\.tab && topNow\?\.kind === 'artist' && topNow\.id === artistManage\.page/.test(app),
+      /if \(!artistOpen \|\| artistShown\) return\s*artistOpener\.current = null\s*setArtistOpen\(false\)/.test(app)], [true, true])
+  //? review: the same artist on top of two tabs - the panel stayed open over the other tab's copy, pressed
+  //? there, while its answers went to the hidden one
+  check('...the page on the tab it was opened on: the request keeps its tab, the panel closes on another, and only that tab\'s copy shows it pressed',
+    [/setArtistManage\(\{ \.\.\.request, key: artistKeys\.current, tab: router\.nav\.tab \}\)/.test(toggle),
+      /managing=\{artistOpen && artistManage\?\.tab === tab && artistManage\.page === page\.id \? artistManage\.mode : null\}/.test(app)], [true, true])
+  check('...and it stays open across 1024px - a panel one side, a sheet the other (crossing closes only Now Playing, Info and Edit)',
+    [/if \(closes\.editPanel\) \{\s*editOpener\.current = null\s*setEditOpen\(false\)\s*\}/.test(app), /closes\.\w+\) \{[^}]*setArtistOpen/.test(app)], [true, false])
+  //? review: the conditions were unpinned - the guard could go and the page never follow, or follow from any page
+  const moved = /const artistMoved = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''
+  check('albums moved: the library told; the page follows by the artist\'s MusicBrainz id only when it said to (its name has no album left) and that id is another',
+    [/^const artistMoved = useCallback\(\(from: string, to: \{ mbid: string; name: string \}, follow: boolean\) => \{\s*announceAlbumsFiled\(\)/.test(moved),
+      /const id = artistPageId\(\{ mbid: to\.mbid \}\)\s*if \(!follow \|\| !id \|\| id === from\) return\s*[\s\S]*?artistMoves\.current\.set\(from, id\)/.test(moved),
+      /setArtistManage\(\(was\) => \(was && was\.page === from \? \{ \.\.\.was, page: id \} : was\)\)/.test(moved),
+      /if \(top\?\.kind === 'artist' && top\.id === from\) \{[\s\S]*?router\.become\(top, \{ kind: 'artist', id, label: to\.name \}\)\s*\}\s*\}, \[\]\)$/.test(moved),
+      /onMoved=\{artistMoved\}/.test(app)],
+    [true, true, true, true, true])
+  check('...the page it became has its scroll put back once it has drawn (App\'s first try lands on a page with nothing drawn), only while still showing - and on that page\'s own word',
+    [/const key = scrollKey\(\{ tab: router\.nav\.tab, page: \{ kind: 'artist', id \} \}\)\s*scrolls\.current\.set\(key, window\.scrollY\)\s*artistScroll\.current = \{ key, y: window\.scrollY \}\s*router\.become/.test(moved),
+      /const artistDrawn = useCallback\(\(drawn: string, all: boolean\) => \{\s*const want = artistScroll\.current\s*if \(!want \|\| drawn !== want\.key\) return\s*if \(want\.key !== scrollKey\(currentRoute\(router\.nav\)\)\) \{\s*artistScroll\.current = null\s*return\s*\}\s*if \(window\.scrollY < want\.y\) window\.scrollTo\(0, want\.y\)\s*if \(all \|\| window\.scrollY >= want\.y\) artistScroll\.current = null/.test(app),
+      //? review: on the page's own word - its route, which App knows - so a hidden tab's artist page drawing can't use it up
+      /onDrawn=\{\(all\) => artistDrawn\(scrollKey\(\{ tab, page \}\), all\)\}/.test(app), /useLayoutEffect\(\(\) => \{\s*if \(drawRows\) onDrawn\?\.\(drawAbout\)\s*\}, \[drawRows, drawAbout\]\)/.test(page)],
+    [true, true, true, true])
+  check('...a page of the old id back on top becomes the new one - and the panel\'s focus goes back to the page it became\'s back link',
+    [/useEffect\(\(\) => \{\s*if \(topNow\?\.kind !== 'artist'\) return\s*const to = artistMoves\.current\.get\(topNow\.id\)\s*if \(to\) router\.become\(topNow, \{ kind: 'artist', id: to, [^\n]*\}\)\s*\}, \[nav\]\)/.test(app),
+      /const was = artistOpener\.current\s*if \(!artistOpen \|\| !was \|\| was\.isConnected\) return\s*artistOpener\.current = document\.querySelector<HTMLElement>\(`\.app-pane\[data-tab="\$\{nav\.tab\}"\] \.app-artist-back`\)/.test(app)],
+    [true, true])
+  check('...the page\'s own word on following: a page by MusicBrainz id, or one whose Navidrome name every album of moved',
+    /const own = artist\?\.name \?\? null\s*const follow = ref\.navidrome === null \|\| \(own !== null && emptied\.some\(\(one\) => foldName\(one\) === foldName\(own\)\)\)\s*onMoved\?\.\(id, \{ mbid: to, name: now \}, follow\)/.test(page), true)
+  check('...the page moved from asked again once Navidrome has had time to scan - under the id it has now; the wait the panel\'s (never unmounted), never a timer in App',
+    [/onSettle=\{\(page\) => setTimeout\(\(\) => onSettled\?\.\(page\), EDIT_SETTLE_MS\)\}/.test(panel), /onSettled=\{artistSettled\}/.test(app), /setInterval|setTimeout/.test(app),
+      /const artistSettled = useCallback\(\(page: string\) => \{\s*const id = artistMoves\.current\.get\(page\) \?\? page\s*setArtistRefreshes\(\(was\) => new Map\(was\)\.set\(id, \(was\.get\(id\) \?\? 0\) \+ 1\)\)\s*\}, \[\]\)/.test(app),
+      /refresh=\{artistRefreshes\.get\(page\.id\) \?\? 0\}/.test(app)],
+    [true, true, false, true, true])
+  check('a write is never called off: the moves and the save are sent with no signal, and what they did is told whether the panel still shows or not',
+    [/applyArtistRefile\(name, request\.mbid\)\)/.test(panel),
+      /if \(told\.moved && request\.mbid\) \{\s*request\.onMoved\?\.\(\{[^}]*\}\)\s*onSettle\?\.\(request\.page\)\s*\}\s*if \(!ticket\.current\(\)\) return/.test(panel),
+      /applyArtistImages\(request\.imagesName, chosen, \{ artistMbid: preview\.mbid, replace \}\)\s*\/\/\?[^\n]*\s*request\.onSaved\?\.\(\)\s*if \(!ticket\.current\(\)\) return/.test(read('app/ArtistPanel.tsx'))],
+    [true, true, true])
+  const asks = [...panel.matchAll(/\b(previewArtistRefile|previewArtistImages|searchArtists)\(([^;]*?)\)\.then/g)]
+  check('every fetch that draws goes through a latestOnly(): each preview and search sent with its ticket\'s signal',
+    [asks.length, asks.every((match) => /ticket\.signal/.test(match[2]))], [4, true])
+  check('the managing is an admin\'s: handed `admin` and the panel\'s opener by App, each control drawn only for an admin',
+    [/admin=\{admin\}\s*onManage=\{toggleArtistManage\}/.test(app), /const manages = admin && !!onManage/.test(page),
+      (page.match(/\{manages && (?:\(shownLibrary \|\| summariesFailed\) && )?\(/g) ?? []).length, (page.match(/manage\('(?:who|images|refile)', event\)/g) ?? []).length],
+    [true, true, 4, 4])
+  check('...and a phone asks /deadwax/me as an artist page comes on top there (the desktop frame asks as it shows)',
+    /const artistOnTop = topNow\?\.kind === 'artist'\s*useEffect\(\(\) => \{\s*if \(desktop \|\| !artistOnTop\) return\s*const request = meRequests\.begin\(\)/.test(app), true)
+  check('the page\'s summaries are asked through their own latestOnly()',
+    [/const summaryRequests = useMemo\(latestOnly, \[\]\)/.test(page), /fetchArtist\(name, request\.signal\)/.test(page), /if \(!request\.current\(\)\) return\s*setSummaryAsking\(false\)[\s\S]{0,400}?const answered: Summaries/.test(page)],
+    [true, true, true])
 }
 
 console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.42)')
@@ -1789,10 +1880,11 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   const lyricsNote = (read('app/EditPanel.tsx').match(/<h3 id="app-edit-lyrics"[\s\S]*?<\/section>/) ?? [''])[0]
   check('the Edit panel\'s Lyrics tab: re-timing named where it is - Managing\'s Settings, under Library - never the main page',
     [/re-timing the lyrics already saved, are in Managing's Settings, under Library\./.test(lyricsNote), /main page/i.test(lyricsNote)], [true, false])
-  //? and the sidebar's link to the main page names only what is left there, as You's footnote does (you.sim)
+  //? and the sidebar's link to the main page names nothing left only there (2.0.0-player.45: an artist's
+  //? pictures and re-filing came to the artist page), as You's footnote says (you.sim)
   const mainLink = (read('app/Sidebar.tsx').match(/<a\s+class="app-side-item"\s+href="\/"[\s\S]*?>/) ?? [''])[0]
-  check('the sidebar\'s "Open the main page": its title names only artist images and re-filing - not the bulk runs, Rescan or re-timing',
-    [/title="Artist images and re-filing - on the main page for now"/.test(mainLink), /bulk|covers|CD art|lyrics|rescan|re-tim/i.test(mainLink)], [true, false])
+  check('the sidebar\'s "Open the main page": its title says everything is in the app now - not the bulk runs, Rescan, re-timing, artist images or re-filing',
+    [/title="The main page, until it retires - everything here is in the app now"/.test(mainLink), /bulk|covers|CD art|lyrics|rescan|re-tim|artist images|re-fil/i.test(mainLink)], [true, false])
   check('the Edit panel: no link to the main page left - "Choose the folder" over the scan, the folder chosen its subject for that Edit',
     [linksOut(panel).length, /status\.choose && !pickingNow/.test(panel), /chosenPath \? folderOnly\(chosenPath\)/.test(panel),
       /setChosen\(\{ key: request\.key, path \}\)\s*setPicking\(null\)\s*chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),

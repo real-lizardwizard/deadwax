@@ -196,7 +196,17 @@ PORTISHEAD_ANSWER = {
     "life-span": {"begin": "1991", "ended": False},
     "genres": [{"name": "trip hop", "count": 9}, {"name": "electronic", "count": 3}],
     "aliases": [{"name": "Portis Head", "type": "Search hint"}],
-    "relations": [{"type": "official homepage", "url": {"resource": "https://portishead.co.uk/"}}],
+    "relations": [
+        {"type": "official homepage", "url": {"resource": "https://portishead.co.uk/"}},
+        {"type": "official homepage", "url": {"resource": "http://www.portishead.co.uk/"}},
+        {"type": "official homepage", "url": {"resource": "https://web.archive.org/web/2001/http://godiscs.co.uk/portishead"}},
+        {"type": "member of band", "direction": "backward", "begin": "1991", "ended": False,
+         "artist": {"id": "b1", "name": "Beth Gibbons"}, "attributes": ["lead vocals"]},
+        {"type": "member of band", "direction": "backward", "begin": "1991", "end": "1999", "ended": True,
+         "artist": {"id": "d1", "name": "Dave McDonald"}, "attributes": []},
+        #? the other way round: Portishead is a member of nothing on its own page
+        {"type": "member of band", "direction": "forward", "artist": {"id": "x1", "name": "Somebody"}},
+    ],
 }
 
 
@@ -213,7 +223,7 @@ class Artist:
         return Answer(self.payload, status_code=self.status_code)
 
 
-def test_artist_is_the_light_facts(app_client, musicbrainz):
+def test_artist_is_the_full_facts_in_one_request(app_client, musicbrainz):
     fake = Artist(PORTISHEAD_ANSWER)
     musicbrainz[1]["fake"] = fake
 
@@ -223,10 +233,22 @@ def test_artist_is_the_light_facts(app_client, musicbrainz):
     facts = answer.json()
     assert (facts["name"], facts["type"], facts["begin_area"], facts["began"], facts["ended"], facts["genres"]) == (
         "Portishead", "Group", "Bristol", "1991", False, ["trip hop", "electronic"])
-    #? light: who they are, and nothing a page would need more requests for
-    assert "links" not in facts and "members" not in facts
+    #? in full since 2.0.0-player.45 (the light facts were a build trim): the links, the same page once
+    #? however it was written and told apart where two share a label, and the line-up - its current
+    #? members first, and only the members OF this band
+    assert facts["links"] == [
+        {"label": "Official site · portishead.co.uk", "url": "https://portishead.co.uk/"},
+        {"label": "Official site · godiscs.co.uk (archived)", "url": "https://web.archive.org/web/2001/http://godiscs.co.uk/portishead"},
+    ]
+    assert [(m["name"], m["current"], m["began"], m["ended"], m["roles"]) for m in facts["members"]] == [
+        ("Beth Gibbons", True, "1991", None, ["lead vocals"]), ("Dave McDonald", False, "1991", "1999", [])]
+    #? ...and every field artist_facts shapes, nothing else
+    assert set(facts) == {"mbid", "name", "sort_name", "type", "disambiguation", "country", "area", "begin_area",
+                          "began", "ended_on", "ended", "genres", "aliases", "links", "members"}
+    #? one request - get_artist's, whose `inc` carries the relations the links and members come from
     [(endpoint, params)] = fake.calls
     assert endpoint == f"artist/{PORTISHEAD}"
+    assert {"url-rels", "artist-rels"} <= set(params["inc"].split("+"))
 
 
 def test_artist_is_cached_and_its_failure_is_not(app_client, musicbrainz):

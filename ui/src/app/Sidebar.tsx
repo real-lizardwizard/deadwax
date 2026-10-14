@@ -28,7 +28,8 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
  * then "Library care" (2.0.0-player.42), Rescan and the bulk runs; then "Settings" and "Log"
  * (2.0.0-player.33), the server's settings and the event log as pages of the app - no unread count on
  * the Log, which would need its stream held open; then the link to the main page (James: "Managing
- * links to / for now"), for what the app doesn't have yet - artist images and re-filing. It opens
+ * links to / for now"), which a desktop no longer needs for anything (an artist's pictures and re-filing
+ * are the artist page's since 2.0.0-player.45) and which goes when the main page retires. It opens
  * BESIDE the app, as
  * every link out does - in the same tab it would unload the player.
  *
@@ -145,7 +146,7 @@ export function Sidebar({
                 href="/"
                 target="_blank"
                 rel="noopener"
-                title="Artist images and re-filing - on the main page for now"
+                title="The main page, until it retires - everything here is in the app now"
               >
                 <span class="app-side-item-label">Open the main page</span>
               </a>

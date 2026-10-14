@@ -45,7 +45,15 @@ def read_current_tags(path: Path) -> dict:
 
     if audio is None:
         return {}
+    return current_tags_of(audio)
 
+
+def current_tags_of(audio) -> dict:
+    """
+    read_current_tags, of a file already opened with easy_file - for a caller that must also know
+    whether it opened at all (src/artist_refile.py refuses an album with a file that won't), so
+    each file is read once.
+    """
     current = {}
     for key in ("album", "albumartist", "artist", "date", "originaldate", "title", "tracknumber",
                 "discnumber", "discsubtitle", "musicbrainz_albumid", "musicbrainz_releasegroupid",

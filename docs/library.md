@@ -246,7 +246,7 @@ and fanart.tv (with a key), and saves your choices into the artist's folder:
 | saved as | is | read by |
 | --- | --- | --- |
 | `artist.*` | the square photo | Navidrome (no configuration needed), Jellyfin, Kodi |
-| `banner.*`, `fanart.*`, `logo.*`, `landscape.*`, `clearart.*` | wide banners, backgrounds, logos | Jellyfin, Kodi, and this page |
+| `banner.*`, `fanart.*`, `logo.*`, `landscape.*`, `clearart.*` | wide banners, backgrounds, logos | Jellyfin, Kodi, this page, and the app's artist page (`fanart.*` and `logo.*`) |
 
 The extension is the picture's own (`.jpg`, `.png`…). Any picture can go in any slot, and a
 folder that holds tracks is refused, since an `artist.jpg` there would mean something else.
@@ -256,13 +256,24 @@ folder that holds tracks is refused, since an `artist.jpg` there would mean some
 **An artist who has renamed.** When MusicBrainz knows the artist by another name now, the page
 says **Now: …**. If their albums are filed under two folder names, **Move albums to …** moves
 them all under the current name, with a preview first. It rewrites the album-artist tag, leaves
-each track's credited artist alone, and removes the old folder once it's empty.
+each track's credited artist alone, and removes the old folder once it's empty. A Mac's hidden `._`
+twin of a track (its resource fork, left beside every file copied from a Mac to a share) isn't
+retagged - no tag can be written to it - and moves with its folder (since 2.0.0-player.45; before,
+it failed the album with "a tag wouldn't write"). Any other track deadwax can't read - cut short,
+damaged, or not readable by the user deadwax runs as - keeps its album where it is, and the preview
+says so ("'03 Three.flac' can't be read, so its tags can't be written"): moved, it would still name
+the old artist, and Navidrome would show them as two artists again.
 
 **In the phone app** an artist has a page too (since 2.0.0-player.17; [the phone player
 guide](player.md#artist-pages) has it): the square `artist.*` picture saved here is its hero, as
-Navidrome serves it, and the MusicBrainz artist ids deadwax writes into your files are how it
-finds the artist's discography when Navidrome doesn't say who they are. An album filed by
-another tool, without those ids, still shows there - just without MusicBrainz's albums beside it.
+Navidrome serves it - and since 2.0.0-player.45 its `fanart.*` fills the hero and its `logo.*` stands
+for the name, read from the folder by deadwax - and the MusicBrainz artist ids deadwax writes into your files are how it finds the artist's discography when Navidrome
+doesn't say who they are. An album filed by another tool, without those ids, still shows there -
+just without MusicBrainz's albums beside it. Since 2.0.0-player.45 it has all of this page's too, on a
+phone and a desktop: In your library, MusicBrainz's facts in full (other names, dates, genres,
+links, the line-up), and for an admin **Artist images…**, **Move albums to …** and **Which artist is
+this?** ([Managing an artist](player.md#managing-an-artist)) - one page for every name the library
+files the artist under, so Ye's page moves Donda out of `Kanye West/`.
 
 ## The app on a desktop
 
@@ -287,8 +298,9 @@ Library:
   The albums that need a look are the sidebar's **Needs a look**, under **Managing** (since
   2.0.0-player.25; [below](#needs-a-look-in-the-app)), and **Rescan** and the bulk runs (**Get
   covers · N** and the rest) are **Library care**, after it (since 2.0.0-player.42;
-  [below](#library-care-in-the-app)). An artist's pictures and **Move albums to …** are still this
-  page's: **Managing**'s **Open the main page** opens it in a new tab. The server settings and the log are **Managing**'s
+  [below](#library-care-in-the-app)). An artist's pictures and **Move albums to …** are on the artist's
+  page (since 2.0.0-player.45; [Managing an artist](player.md#managing-an-artist)), so a desktop needs
+  nothing that is only this page's. The server settings and the log are **Managing**'s
   **Settings** and **Log** (since 2.0.0-player.33; see [Configuration](configuration.md#in-the-app-on-a-desktop)
   and [Troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)).
 
