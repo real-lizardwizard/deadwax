@@ -983,6 +983,33 @@ class JobStore:
             logger.error(f"failed to record albums for review: {e}")
             return 0
 
+    async def album_seen(self, album_paths: list[str]) -> dict[str, dict]:
+        """
+        When each of these albums was first seen, and whether deadwax filed it - `first_seen` and
+        `source` of their review rows, keyed on the path. An album never recorded is left out.
+
+        For a few folders at a time (the id bridge's rows of one album, 2.0.0-player.44 - an album
+        page's Properties), where album_reviews() would read every album in the library.
+        """
+        paths = [path for path in dict.fromkeys(album_paths) if path]
+        if not self.available or not paths:
+            return {}
+
+        def read():
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"SELECT album_path, source, first_seen FROM album_review "
+                    f"WHERE album_path IN ({', '.join('?' for _ in paths)})",
+                    paths,
+                ).fetchall()
+            return {row["album_path"]: {"first_seen": row["first_seen"], "source": row["source"]} for row in rows}
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not read when albums were first seen ({e})")
+            return {}
+
     async def album_reviews(self) -> dict[str, dict]:
         """
         Everything remembered about every album, keyed on its relative path.

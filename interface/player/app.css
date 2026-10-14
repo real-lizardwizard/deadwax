@@ -3310,3 +3310,520 @@ button.app-pin-card:active { background: linear-gradient(var(--dw-pressed), var(
 }
 
 .app-pin-notice:not(.is-shown) { clip-path: inset(50%); }
+
+/* ===== inside a track, the cover viewer and an album's Properties (2.0.0-player.44) =====
+   On both frames, so nothing here is a desktop's alone: the track inspector fits a 390px panel as well
+   as the 470px one (the phone gets the Edit panel in a later slice), the cover viewer is the album page's
+   on a phone as on a desktop, and Properties sit at the foot of every album page. Inside the Edit panel
+   on a desktop, app-desktop.css's rules for the panel's buttons, words and the viewer win where they say
+   more (they are a class or two more particular), so the inspector looks like the panel it sits in. */
+
+:root {
+    /* the cover viewer (components/ArtViewer.tsx), over the whole window */
+    --app-z-viewer: 35;              /* over Now Playing (20), Sources (25), Info and the Edit panel (30), under the pin notice (40) */
+    --app-viewer-pad: 8px;           /* round its frame, inside the screen's safe areas */
+    --app-viewer-max: 100%;          /* its frame at its widest and tallest: a phone's whole screen */
+    --app-viewer-height: 100%;
+    --app-viewer-frame-pad: 10px;
+    --app-viewer-gap: 8px;
+    --app-viewer-button-pad: 14px;
+    /* an album page's Properties */
+    --app-props-top: 8px;            /* under the songs' footer */
+    --app-props-bottom: 20px;
+    --app-props-heading-gap: 8px;
+    --app-props-label: 92px;         /* the labels' column: "First seen" */
+    --app-props-row-gap: 6px;
+    --app-props-col-gap: 12px;
+    /* the release's link: the list's line (its own), and the reach above and below it that makes a
+       finger's height in all (review: worked out from the tokens, so a smaller footnote can't shrink it) */
+    --app-props-link-line: calc(var(--dw-text-footnote) * var(--dw-leading-note));
+    --app-props-link-reach: calc((var(--pl-hit) - var(--app-props-link-line)) / 2);
+    /* the track inspector, in the Edit panel's Tags tab */
+    --app-inspect-gap: 18px;         /* between its parts */
+    --app-inspect-lines: 6px;        /* between a part's lines */
+    --app-inspect-label: 112px;      /* a field's label: "Release group ID" on one line */
+    --app-inspect-row-gap: 5px;
+    --app-inspect-col-gap: 12px;
+    --app-inspect-button-pad: 12px;
+    --app-inspect-icon: 16px;
+    --app-inspect-icon-gap: 4px;
+    --app-inspect-off: 0.4;          /* Previous at the first track, Next at the last: still focusable, seen to refuse */
+    --app-inspect-picture: 56px;     /* a picture in the file */
+    --app-inspect-picture-pad: 6px;
+    --app-inspect-time: 3.4em;       /* a synced line's time */
+    --app-inspect-verse: 10px;       /* the gap a blank synced line leaves between verses */
+    --app-inspect-mark-pad: 5px;
+    /* Artwork's CD art, each a picture to open */
+    --app-edit-disc: 88px;
+    --app-edit-disc-gap: 8px;
+}
+
+/* --- the cover viewer: the frame over a scrim, its panes, its hint and its buttons --- */
+
+html.app-viewer-open { overflow: hidden; }
+
+.app-viewer #art-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--app-z-viewer);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--pl-safe-top) + var(--app-viewer-pad)) calc(var(--pl-safe-right) + var(--app-viewer-pad))
+        calc(var(--pl-safe-bottom) + var(--app-viewer-pad)) calc(var(--pl-safe-left) + var(--app-viewer-pad));
+    background: var(--dw-scrim);
+    touch-action: none;
+}
+
+.app-viewer .art-viewer-frame {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-viewer-gap);
+    width: min(var(--app-viewer-max), 100%);
+    height: min(var(--app-viewer-height), 100%);
+    padding: var(--app-viewer-frame-pad);
+    overflow: hidden;
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-bg-sheet);
+    box-shadow: var(--dw-highlight), var(--dw-shadow);
+}
+
+.app-viewer .window-titlebar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-viewer-gap);
+}
+
+.app-viewer .window-title {
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* the ✕: a tap target, its glyph the heading's size */
+.app-viewer .window-close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    border-radius: var(--dw-radius-control);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-heading);
+}
+
+.app-viewer .art-viewer-panes {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--dw-hairline);
+    min-height: 0;
+    background: var(--dw-border);
+}
+
+.app-viewer .art-viewer-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    background: var(--dw-field);
+}
+
+.app-viewer .art-viewer-caption {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-viewer-gap);
+    padding: var(--app-inspect-lines) var(--app-viewer-frame-pad);
+    border-bottom: var(--dw-hairline) solid var(--dw-border);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+}
+
+/* a label typed by whoever made the file: broken, never run off the frame */
+.app-viewer .art-viewer-label { min-width: 0; color: var(--dw-text); font-weight: var(--dw-weight-medium); overflow-wrap: anywhere; }
+.app-viewer .art-viewer-dims { color: var(--dw-text-3); font-family: var(--dw-font-mono); }
+
+.app-viewer .art-viewer-largest {
+    padding: 0 var(--app-inspect-mark-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-green-border);
+    border-radius: var(--dw-radius-tag);
+    color: var(--dw-badge-green-text);
+}
+
+.app-viewer .art-viewer-stage {
+    position: relative;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: var(--app-viewer-frame-pad);
+    overflow: hidden;
+}
+
+/* moved and zoomed by a transform the viewer sets, clipped by the stage */
+.app-viewer .art-viewer-stage > img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    box-shadow: var(--dw-shadow);
+    cursor: zoom-in;
+    touch-action: none;
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+.app-viewer .art-viewer-stage.is-zoomed > img { cursor: grab; }
+.app-viewer .art-viewer-stage.is-panning > img { cursor: grabbing; }
+
+.app-viewer .art-viewer-status {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--app-viewer-frame-pad);
+    color: var(--dw-text-3);
+    font-size: var(--dw-text-label);
+    text-align: center;
+}
+
+.app-viewer .art-viewer-footer { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: var(--app-viewer-gap); }
+.app-viewer .art-viewer-hint { margin-right: auto; color: var(--dw-text-3); font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+.app-viewer .hint-touch { display: none; }
+
+/* STYLE.md's secondary button: Close */
+.app-viewer .win-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--pl-hit);
+    padding: 0 var(--app-viewer-button-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+}
+
+.app-viewer .win-button:active { background: var(--dw-secondary-bg-active); }
+
+.app-viewer .window-close:focus-visible,
+.app-viewer .win-button:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+}
+
+/* a hand that taps and pinches is told so */
+@media (pointer: coarse) {
+    .app-viewer .hint-pointer { display: none; }
+    .app-viewer .hint-touch { display: inline; }
+}
+
+/* --- an album page's cover, a button that opens it full size (its class is the hero cover's) --- */
+
+.app-cover-open { display: block; overflow: hidden; cursor: zoom-in; }
+.app-cover-open-img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.app-cover-open:active .app-cover-open-img { opacity: var(--dw-pressed-cover); }
+
+.app-cover-open:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+/* --- an album page's Properties, at its foot --- */
+
+.app-props {
+    max-width: calc(var(--pl-content-max) + var(--pl-edge-left) + var(--pl-edge-right));
+    margin: var(--app-props-top) 0 0;
+    padding: 0 var(--pl-edge-right) var(--app-props-bottom) var(--pl-edge-left);
+}
+
+.app-props-title {
+    margin: 0 0 var(--app-props-heading-gap);
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-heading);
+}
+
+.app-props-list {
+    display: grid;
+    grid-template-columns: minmax(0, var(--app-props-label)) minmax(0, 1fr);
+    gap: var(--app-props-row-gap) var(--app-props-col-gap);
+    margin: 0;
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-props-label { color: var(--dw-text-label-color); }
+
+/* a release id is one 36-character word: broken anywhere, never run off a phone */
+.app-props-value { min-width: 0; margin: 0; color: var(--dw-text); overflow-wrap: anywhere; }
+.app-props-value.is-mono { font-family: var(--dw-font-mono); }
+.app-props-value.is-quiet { color: var(--dw-text-3); }
+
+/* the release's page, opening beside the app - its target a finger's height, its line's height unmoved.
+   Positioned (review), so all of its reach is drawn over the rows either side of it, which take no taps:
+   unpositioned, the row under it - a grid item drawn after it - took the bottom of its reach. And never
+   under a finger's height: the line and the reach are laid out in 64ths of a pixel, rounded down, which
+   left the sum of them 0.03px short of it. */
+.app-props-link {
+    position: relative;
+    display: inline-block;
+    min-height: var(--pl-hit);
+    margin: calc(-1 * var(--app-props-link-reach)) 0;
+    padding: var(--app-props-link-reach) 0;
+    color: var(--dw-accent);
+    text-decoration: none;
+}
+
+.app-props-link:hover { color: var(--dw-accent-text); text-decoration: underline; }
+
+.app-props-link:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+/* --- the Edit panel's Tags list: a track's name opens its inspector (apart from its tick box) --- */
+
+.app-edit-track-open {
+    display: block;
+    width: 100%;
+    min-height: var(--pl-hit);
+    overflow: hidden;
+    color: inherit;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-edit-track-open:hover { color: var(--dw-accent-text); text-decoration: underline; }
+
+/* --- the track inspector: a column that fits 390px as well as 470 --- */
+
+.app-inspect { display: flex; flex-direction: column; gap: var(--app-inspect-gap); min-width: 0; }
+
+.app-inspect-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--app-inspect-lines); }
+.app-inspect-count { color: var(--dw-text-3); font-size: var(--dw-text-label); font-variant-numeric: tabular-nums; }
+
+/* STYLE.md's secondary button - inside the panel on a desktop, the panel's own (app-desktop.css) */
+.app-inspect-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-inspect-icon-gap);
+    min-height: var(--pl-hit);
+    padding: 0 var(--app-inspect-button-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+    white-space: nowrap;
+}
+
+/* the end of the album: still a stop for the keyboard (focus stays on it), seen to refuse */
+.app-inspect-button[aria-disabled='true'] { opacity: var(--app-inspect-off); cursor: default; }
+.app-inspect-icon { flex: none; width: var(--app-inspect-icon); height: var(--app-inspect-icon); }
+
+.app-inspect-head { display: flex; flex-direction: column; gap: var(--app-inspect-lines); min-width: 0; }
+
+.app-inspect-title {
+    margin: 0;
+    color: var(--dw-text);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-heading);
+    overflow-wrap: anywhere;
+}
+
+.app-inspect-place,
+.app-inspect-note,
+.app-inspect-warn {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-inspect-note { color: var(--dw-text-3); }
+.app-inspect-warn { color: var(--dw-amber-text); }
+
+.app-inspect-actions { display: flex; flex-wrap: wrap; gap: var(--app-inspect-lines); }
+
+.app-inspect-group { display: flex; flex-direction: column; gap: var(--app-inspect-lines); min-width: 0; }
+
+.app-inspect-heading {
+    display: flex;
+    align-items: center;
+    gap: var(--app-inspect-lines);
+    margin: 0;
+    padding-bottom: var(--app-inspect-row-gap);
+    border-bottom: var(--dw-hairline) solid var(--dw-border);
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* "synced", as the main page marks it */
+.app-inspect-mark {
+    padding: 0 var(--app-inspect-mark-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-green-border);
+    border-radius: var(--dw-radius-tag);
+    color: var(--dw-badge-green-text);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-regular);
+}
+
+/* a field a row: its label, then its value - an id, a path or a stranger's tag broken anywhere */
+.app-inspect-fields {
+    display: grid;
+    grid-template-columns: minmax(0, var(--app-inspect-label)) minmax(0, 1fr);
+    gap: var(--app-inspect-row-gap) var(--app-inspect-col-gap);
+    margin: 0;
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-inspect-label { min-width: 0; color: var(--dw-text-label-color); font-size: var(--dw-text-label); overflow-wrap: anywhere; }
+.app-inspect-value { min-width: 0; margin: 0; color: var(--dw-text); overflow-wrap: anywhere; }
+.app-inspect-label.is-mono,
+.app-inspect-value.is-mono { font-family: var(--dw-font-mono); }
+/* nothing in the file, and the disc 1 a file with no disc tag reads as: quieter than what is there */
+.app-inspect-value.is-empty,
+.app-inspect-value.is-inferred { color: var(--dw-text-3); }
+
+.app-inspect-raw { display: flex; flex-direction: column; gap: var(--app-inspect-lines); min-width: 0; }
+
+.app-inspect-summary {
+    display: flex;
+    align-items: center;
+    min-height: var(--pl-hit);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-footnote);
+    cursor: pointer;
+}
+
+.app-inspect-file {
+    margin: var(--app-inspect-lines) 0 0;
+    color: var(--dw-text-3);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-label);
+    overflow-wrap: anywhere;
+}
+
+.app-inspect-pictures { display: flex; flex-direction: column; gap: var(--app-inspect-lines); }
+
+.app-inspect-picture {
+    display: flex;
+    align-items: center;
+    gap: var(--app-inspect-col-gap);
+    width: 100%;
+    min-height: var(--pl-hit);
+    padding: var(--app-inspect-picture-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-card);
+    text-align: left;
+    cursor: zoom-in;
+}
+
+.app-inspect-picture:active { background: var(--dw-pressed); }
+
+.app-inspect-picture-img {
+    flex: none;
+    width: var(--app-inspect-picture);
+    height: var(--app-inspect-picture);
+    object-fit: cover;
+    border: var(--dw-hairline) solid var(--dw-border-cover);
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+}
+
+.app-inspect-picture-words { display: flex; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+.app-inspect-picture-label { color: var(--dw-text); font-size: var(--dw-text-footnote); overflow-wrap: anywhere; }
+.app-inspect-picture-facts { color: var(--dw-text-3); font-family: var(--dw-font-mono); font-size: var(--dw-text-label); overflow-wrap: anywhere; }
+
+.app-inspect-lyrics { display: flex; flex-direction: column; min-width: 0; }
+
+.app-inspect-line {
+    display: flex;
+    gap: var(--app-inspect-col-gap);
+    margin: 0;
+    color: var(--dw-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-inspect-line.is-gap { height: var(--app-inspect-verse); }
+
+.app-inspect-time {
+    flex: none;
+    width: var(--app-inspect-time);
+    color: var(--dw-text-3);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-label);
+    font-variant-numeric: tabular-nums;
+}
+
+.app-inspect-words { min-width: 0; overflow-wrap: anywhere; }
+
+/* the panel's body clips sideways, and these run to its edges: their rings drawn inside */
+.app-inspect-button:focus-visible,
+.app-inspect-picture:focus-visible,
+.app-inspect-summary:focus-visible,
+.app-edit-track-open:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+/* --- Artwork: the cover and each CD art picture, opening full size --- */
+
+.app-edit-cover-open { flex: none; border-radius: var(--dw-radius-cover); cursor: zoom-in; }
+.app-edit-cover-open:active .app-edit-cover { opacity: var(--dw-pressed-cover); }
+
+.app-edit-discs { display: flex; flex-wrap: wrap; gap: var(--app-edit-disc-gap); }
+
+.app-edit-disc {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--app-line-gap);
+    width: var(--app-edit-disc);
+    cursor: zoom-in;
+}
+
+.app-edit-disc-img {
+    width: var(--app-edit-disc);
+    height: var(--app-edit-disc);
+    object-fit: cover;
+    border: var(--dw-hairline) solid var(--dw-border-cover);
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+}
+
+.app-edit-disc:active .app-edit-disc-img { opacity: var(--dw-pressed-cover); }
+.app-edit-disc-name { max-width: 100%; color: var(--dw-text-3); font-family: var(--dw-font-mono); font-size: var(--dw-text-label); overflow-wrap: anywhere; }
+
+/* (review) the cover and the first CD art picture sit on the panel body's left edge, which clips
+   sideways: their rings drawn inside, as the inspector's are */
+.app-edit-cover-open:focus-visible,
+.app-edit-disc:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}

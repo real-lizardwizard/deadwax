@@ -108,6 +108,21 @@ And for pins and a finished Home (2.0.0-player.18):
 - The app's one notice for pins: fixed at the top, over Now Playing's menu and Info, taking no taps,
   clipped away (never removed) while it says nothing.
 
+And for inside a track, the cover viewer and an album's Properties (2.0.0-player.44), on both frames:
+
+- The cover viewer covers the whole window over everything but the pin notice, inside the screen's safe
+  areas, takes every touch (its own pinch and drag), has a scroll lock of its own, and tells a hand that
+  taps and pinches so; its ✕ and Close are tap targets, their rings drawn inside the frame.
+- An album page's cover is a button with the hero cover's own class, the picture filling it.
+- The track inspector fits a 390px panel: every field a row of a label column and a value that breaks
+  anywhere (ids, paths, strangers' tags), the value column never squeezed under 200px there; its buttons,
+  pictures and "All tags in this file" a tap target each, and - running to the panel body's clipping
+  edges - their rings drawn inside, as Artwork's cover's and CD art's are; a track's name in the Tags
+  list a button of its own.
+- Properties: the labels a column, a release id broken anywhere, its link a finger's height without
+  moving its line - worked out from the list's own type tokens, all of it hit (positioned over the rows
+  either side).
+
 And for the speed fader (2.0.0-player.39):
 
 - The fader takes every touch on it (touch-action: none), a tap target wide - a share of the plinth on
@@ -1156,3 +1171,107 @@ def test_every_token_a_rule_reads_is_defined():
     ui = Path(__file__).resolve().parent.parent / "ui" / "src"
     for name, component in SET_INLINE.items():
         assert f"'{name}':" in (ui / component).read_text(), name
+
+
+# ---------------------------------------------------------------- inside a track (2.0.0-player.44)
+
+UI = Path(__file__).resolve().parent.parent / "ui" / "src"
+
+
+def test_the_cover_viewer_covers_the_window_on_both_frames_over_everything_but_the_notice():
+    viewer = declarations(APP, ".app-viewer #art-viewer")
+    assert (viewer["position"], viewer["inset"], viewer["z-index"], viewer["touch-action"]) == ("fixed", "0", "var(--app-z-viewer)", "none")
+    #? over Now Playing (20), Sources (25), Info and the Edit panel (30) - under the pin notice (40)
+    z = int(ALL_TOKENS["--app-z-viewer"])
+    assert int(ALL_TOKENS["--app-z-over"]) < z < int(ALL_TOKENS["--app-z-notice"])
+    assert int(ALL_TOKENS["--app-z-sources"]) < z
+    for side in ("--pl-safe-top", "--pl-safe-right", "--pl-safe-bottom", "--pl-safe-left"):
+        assert f"var({side})" in viewer["padding"], side
+    #? the image is moved and zoomed by the viewer's own transform, clipped by its stage
+    assert declarations(APP, ".app-viewer .art-viewer-stage")["overflow"] == "hidden"
+    assert declarations(APP, ".app-viewer .art-viewer-stage > img")["touch-action"] == "none"
+    #? a phone's whole screen - and a desktop's the panel's viewer's size (app-desktop.css)
+    assert (ALL_TOKENS["--app-viewer-max"], ALL_TOKENS["--app-viewer-height"]) == ("100%", "100%")
+
+
+def test_the_cover_viewer_has_its_own_scroll_lock_and_tells_a_hand_it_can_pinch():
+    assert declarations(APP, "html.app-viewer-open")["overflow"] == "hidden"
+    viewer = (UI / "app" / "CoverViewer.tsx").read_text()
+    assert "export const VIEWER_LOCK = 'app-viewer-open'" in viewer
+    assert re.search(r"page\.classList\.add\(VIEWER_LOCK\)\s*return \(\) => page\.classList\.remove\(VIEWER_LOCK\)", viewer)
+    assert declarations(APP, ".app-viewer .hint-touch")["display"] == "none"
+    coarse = "@media (pointer: coarse)"
+    assert declarations(APP, ".app-viewer .hint-pointer", coarse)["display"] == "none"
+    assert declarations(APP, ".app-viewer .hint-touch", coarse)["display"] == "inline"
+
+
+def test_the_cover_viewers_buttons_are_tap_targets_with_their_rings_inside():
+    close = declarations(APP, ".app-viewer .window-close")
+    assert (close["width"], close["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
+    assert declarations(APP, ".app-viewer .win-button")["min-height"] == "var(--pl-hit)"
+    for selector in (".app-viewer .window-close:focus-visible", ".app-viewer .win-button:focus-visible"):
+        assert declarations(APP, selector)["outline-offset"] == "var(--app-ring-inset)", selector
+    #? a label typed by whoever made the file breaks rather than running off the frame
+    assert declarations(APP, ".app-viewer .art-viewer-label")["overflow-wrap"] == "anywhere"
+
+
+def test_an_album_pages_cover_is_a_button_with_the_hero_covers_class():
+    page = (UI / "player" / "AlbumPage.tsx").read_text()
+    assert 'class="pl-hero-cover app-cover-open"' in page and '<Cover id={shown.coverArt} size={800} class="app-cover-open-img" />' in page
+    picture = declarations(APP, ".app-cover-open-img")
+    assert (picture["width"], picture["height"], picture["object-fit"]) == ("100%", "100%", "cover")
+    assert declarations(APP, ".app-cover-open")["overflow"] == "hidden"
+    assert declarations(APP, ".app-cover-open:active .app-cover-open-img")["opacity"] == "var(--dw-pressed-cover)"
+
+
+def test_the_track_inspector_fits_a_390px_panel():
+    fields = declarations(APP, ".app-inspect-fields")
+    assert fields["grid-template-columns"] == "minmax(0, var(--app-inspect-label)) minmax(0, 1fr)"
+    for selector in (".app-inspect-value", ".app-inspect-label", ".app-inspect-title", ".app-inspect-words",
+                     ".app-inspect-picture-label", ".app-inspect-picture-facts", ".app-inspect-file"):
+        assert declarations(APP, selector)["overflow-wrap"] == "anywhere", selector
+    for selector in (".app-inspect-value", ".app-inspect-label", ".app-inspect", ".app-inspect-group", ".app-inspect-picture-words"):
+        assert declarations(APP, selector)["min-width"] == "0", selector
+    #? a 390px panel, its 20px padding either side (the desktop's --app-desk-panel-pad): the value column
+    #? keeps 200px - a MusicBrainz id in two lines, never one character a line
+    assert 390 - 2 * 20 - px("--app-inspect-label") - px("--app-inspect-col-gap") >= 200
+    assert declarations(APP, ".app-inspect-actions")["flex-wrap"] == "wrap"
+    assert declarations(APP, ".app-inspect-picture")["width"] == "100%"
+
+
+def test_the_inspectors_controls_are_tap_targets_with_their_rings_drawn_inside():
+    for selector in (".app-inspect-button", ".app-inspect-picture", ".app-inspect-summary", ".app-edit-track-open"):
+        assert declarations(APP, selector)["min-height"] == "var(--pl-hit)", selector
+    for selector in (".app-inspect-button:focus-visible", ".app-inspect-picture:focus-visible",
+                     ".app-inspect-summary:focus-visible", ".app-edit-track-open:focus-visible",
+                     #? (review) Artwork's cover and its first CD art picture sit on the panel body's left edge
+                     ".app-edit-cover-open:focus-visible", ".app-edit-disc:focus-visible"):
+        assert declarations(APP, selector)["outline-offset"] == "var(--app-ring-inset)", selector
+    #? the end of the album: still a stop for the keyboard, seen to refuse
+    assert declarations(APP, ".app-inspect-button[aria-disabled='true']")["opacity"] == "var(--app-inspect-off)"
+    #? what isn't in the file, and the inferred disc 1: quieter than what is
+    for selector in (".app-inspect-value.is-empty", ".app-inspect-value.is-inferred"):
+        assert declarations(APP, selector)["color"] == "var(--dw-text-3)", selector
+    name = declarations(APP, ".app-edit-track-open")
+    assert (name["text-overflow"], name["white-space"], name["width"]) == ("ellipsis", "nowrap", "100%")
+
+
+def test_an_album_pages_properties_break_a_release_id_and_reach_a_finger():
+    rows = declarations(APP, ".app-props-list")
+    assert rows["grid-template-columns"] == "minmax(0, var(--app-props-label)) minmax(0, 1fr)"
+    value = declarations(APP, ".app-props-value")
+    assert (value["overflow-wrap"], value["min-width"]) == ("anywhere", "0")
+    link = declarations(APP, ".app-props-link")
+    assert (link["padding"], link["margin"]) == ("var(--app-props-link-reach) 0", "calc(-1 * var(--app-props-link-reach)) 0")
+    #? (review) its line is the list's, worked out from the tokens the list is set in - no number typed here
+    assert (rows["font-size"], rows["line-height"]) == ("var(--dw-text-footnote)", "var(--dw-leading-note)")
+    assert ALL_TOKENS["--app-props-link-line"] == "calc(var(--dw-text-footnote) * var(--dw-leading-note))"
+    line = px("--dw-text-footnote") * float(ALL_TOKENS["--dw-leading-note"])
+    assert round(length("--app-props-link-line"), 6) == round(line, 6)
+    #? ...its line plus the reach above and below: a finger's height, the whole of it
+    assert round(2 * length("--app-props-link-reach") + line, 6) >= px("--pl-hit")
+    #? ...never under it, whatever the layout's rounding of a 18.2px line and a 12.9px reach (a hair short)
+    assert link["min-height"] == "var(--pl-hit)"
+    #? ...and all of it hit: positioned, so drawn over the rows either side, never under the next row (a
+    #? grid item drawn after it, which took the bottom of the reach)
+    assert link["position"] == "relative"

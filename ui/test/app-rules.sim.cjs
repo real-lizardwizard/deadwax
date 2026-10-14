@@ -179,6 +179,22 @@
  *    Managing pages. Needs a look warns when ignores can't be saved. The Edit panel has no link to the
  *    main page left ("Choose the folder"), and its Lyrics note names Managing's Settings; the sidebar's
  *    "Open the main page" names only artist images and re-filing.
+ *  - Inside a track (2.0.0-player.44): the Edit panel's track inspector (app/TrackInspector.tsx), the cover
+ *    viewer (app/CoverViewer.tsx) and an album page's Properties (app/AlbumProperties.tsx) call no playback
+ *    action - nothing on the list below gains a file. The inspector is drawn by the Edit panel alone, in
+ *    its Tags tab, over the list (the tag editor over it): a track's NAME opens it, its tick box still
+ *    ticks; it is a layer - the panel covered under it, an Escape inside the panel taking it back to the
+ *    list (one layer at a time; Escape out in the page the page's); focus goes to its Back as it opens,
+ *    back to the track's own name (the list scrolled where it was, by an effect once drawn, then that
+ *    name brought into view - review) as it closes, stays on Previous and Next (aria-disabled at the
+ *    ends, never disabled), and back to "Edit this track…" as the tag editor it opened closes - which is
+ *    the tag editor on that one file alone (review); it starts afresh for every Edit and folder, and
+ *    follows a rename. Its lyrics go through a latestOnly(). The cover viewer is the main page's
+ *    ArtViewer, reached only through CoverViewer - from an album page's cover (both frames), Artwork's
+ *    cover and CD art, and the inspector's pictures, each opener taken in the tap; the panel's drawn
+ *    inside the panel; closed by a move through the history (review). Properties come from the bridge
+ *    answer the album page asks already (no new request), and the unresized cover is asked for by the
+ *    viewer alone, first, the sized one its fallback (review).
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -471,8 +487,8 @@ console.log('\na link out of the app opens beside it')
   //? (2.0.0-player.36: and Info > Debug's link to the turntable's test bench, a page of its own)
   check('...and there are links to look at (You, the gate, the desktop sidebar, Needs a look, Library care and the log on a phone, the server settings, Info > Debug\'s test bench)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
-    //? phone note came)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/LibraryCare.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+    //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org)
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/LibraryCare.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -1418,10 +1434,12 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
       /const closeTagEditor = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*setEditingTags\(null\)/.test(panel),
       /const cancelDelete = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*setTab\('release'\)/.test(panel)],
     [true, true, true, [true, true, true], true, true, true])
+  //? (2.0.0-player.44: the track inspector is a layer over the Tags tab too - below, "inside a track")
   check('(review) an Escape in the tag editor or the delete confirmation closes that layer alone: the panel covered under it, the release editor\'s close passing it over',
-    [/const inner = drawn && \(\(tab === 'tags' && editingTags !== null && editingTags\.path === subject!\.path\) \|\| tab === 'delete'\)/.test(panel),
+    [/const tagEditorShown = drawn && editingTags !== null && editingTags\.path === subject!\.path\n/.test(panel),
+      /const inner = drawn && \(\(tab === 'tags' && \(tagEditorShown \|\| inspected !== null\)\) \|\| tab === 'delete'\)/.test(panel),
       /innerNow\.current = inner/.test(panel), /const escapeFrom = useEscapeFrom\(box, innerNow\)/.test(panel)],
-    [true, true, true])
+    [true, true, true, true])
   check('(review) the editors let go once the panel has closed - at once as a column, once a drawer has slid away - so no cover viewer outlives it',
     [/if \(open\) \{\s*setLetGo\(false\)\s*return\s*\}\s*const timer = setTimeout\(\(\) => setLetGo\(true\), panel === 'drawer' \? EDIT_SLIDE_MS : 0\)/.test(panel),
       /const drawn = !!subject && !!request && !deleted && !letGo/.test(panel), /\{drawn && subject && request && \(/.test(panel),
@@ -1429,7 +1447,8 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
     [true, true, true, 1])
   check('(review) a control that removes itself hands focus on inside the panel, never to the page',
     [/useLayoutEffect\(\(\) => \{\s*const pick = focusNext\.current\s*if \(!pick\) return\s*focusNext\.current = null\s*const active = document\.activeElement\s*if \(active && active !== document\.body\) return\s*pick\(\)\?\.focus\(\{ preventScroll: true \}\)/.test(panel),
-      /setEditingTags\(null\)\s*focusNext\.current = \(\) => tagsPane\.current\?\.querySelector<HTMLElement>\('\.app-edit-tags-open'\)/.test(panel),
+      //? (2.0.0-player.44: back to the track inspector's "Edit this track…" when it was opened from there)
+      /setEditingTags\(null\)\s*const opener = \(\) => tagsPane\.current\?\.querySelector<HTMLElement>\('\.app-inspect-edit'\)\s*\?\? tagsPane\.current\?\.querySelector<HTMLElement>\('\.app-edit-tags-open'\)\s*focusNext\.current = opener\n/.test(panel),
       /setTab\('release'\)\s*focusNext\.current = toTab\('release'\)/.test(panel),
       /setEditingTags\(\{ path, filenames \}\)\s*focusNext\.current = /.test(panel),
       /void library\.reload\(false\)\s*focusNext\.current = \(\) => scroller\.current/.test(panel),
@@ -1779,6 +1798,110 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
       /setChosen\(\{ key: request\.key, path \}\)\s*setPicking\(null\)\s*chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),
       /setChosen\(null\)\s*setPicking\(null\)\s*lookUp\(request\)/.test(panel)],
     [0, true, true, true, true])
+}
+
+console.log('\ninside a track (2.0.0-player.44): the track inspector, the cover viewer, an album\'s Properties')
+{
+  const panel = code(read('app/EditPanel.tsx'))
+  const inspector = code(read('app/TrackInspector.tsx'))
+  const viewer = code(read('app/CoverViewer.tsx'))
+  const page = code(read('player/AlbumPage.tsx'))
+  const drawnIn = (name) => files.filter((file) => APP_SIDE(file) && new RegExp(`<${name}\\b`).test(code(read(file))))
+  check('none of the three calls a playback action', ['app/TrackInspector.tsx', 'app/CoverViewer.tsx', 'app/AlbumProperties.tsx'].map((file) => actionsIn(code(read(file)))), [[], [], []])
+  check('the inspector is the Edit panel\'s alone, in the Tags pane - the tag editor over it, the list under it',
+    [drawnIn('TrackInspector'),
+      /\{editingTags && editingTags\.path === subject\.path \? \(\s*<TrackTagEditor[\s\S]*?\) : inspected \? \(\s*<TrackInspector[\s\S]*?\) : \(\s*<TagsList[\s\S]*?onInspect=\{inspect\}/.test(panel)],
+    [['app/EditPanel.tsx'], true])
+  check('...a track\'s NAME opens it - a button of its own, its tick box still ticking',
+    [/<button type="button" class="app-edit-track-open" data-file=\{track\.filename\} onClick=\{\(\) => onInspect\(track\.filename\)\}>/.test(panel),
+      /onClick=\{\(event\) => onTick\(track\.filename, event\.shiftKey\)\}/.test(panel)],
+    [true, true])
+  check('...only a track still in the folder shown, of this folder',
+    /const inspected = drawn && inspecting && inspecting\.path === subject!\.path && subject!\.tracks\.some\(\(track\) => track\.filename === inspecting\.filename\)\s*\? inspecting\.filename\s*: null/.test(panel), true)
+  check('...a layer: Escape inside the panel back to the list (the page\'s own Escape passed over, one taken by another listener left), only while it is the Tags tab\'s top',
+    [/const inspectorTop = open && !covered && tab === 'tags' && inspected !== null && !tagEditorShown/.test(panel),
+      /useEffect\(\(\) => \{\s*if \(!inspectorTop\) return\s*const onKeyDown = \(event: KeyboardEvent\) => \{\s*if \(event\.key !== 'Escape' \|\| event\.defaultPrevented\) return\s*if \(escapeFrom\(\) === 'page'\) return\s*event\.preventDefault\(\)\s*backToList\(\)\s*\}\s*document\.addEventListener\('keydown', onKeyDown\)\s*return \(\) => document\.removeEventListener\('keydown', onKeyDown\)\s*\}, \[inspectorTop\]\)/.test(panel)],
+    [true, true])
+  check('...focus to Back as it opens; back to the track\'s own name, the list where it was, as it closes; kept on Previous and Next',
+    [/setInspecting\(\{ path: subject\.path, filename, listTop: scroller\.current\?\.scrollTop \?\? 0 \}\)\s*scrollTop\(\)\s*focusNext\.current = \(\) => tagsPane\.current\?\.querySelector<HTMLElement>\('\.app-inspect-back'\)/.test(panel),
+      /const trackName = \(filename: string\) => \[\.\.\.\(tagsPane\.current\?\.querySelectorAll<HTMLElement>\('\.app-edit-track-open'\) \?\? \[\]\)\]\s*\.find\(\(button\) => button\.dataset\['file'\] === filename\)/.test(panel),
+      /setInspecting\(null\)\s*restoreView\.current = \{ top: was\.listTop, show: \(\) => trackName\(was\.filename\) \}\s*focusNext\.current = \(\) => trackName\(was\.filename\)/.test(panel),
+      /const stepTo = \(filename: string\) => \{\s*setInspecting\(\(was\) => \(was \? \{ \.\.\.was, filename \} : was\)\)\s*scrollTop\(\)\s*\}/.test(panel),
+      (inspector.match(/aria-disabled=\{steps\.(before|after) \? undefined : 'true'\}/g) ?? []).length, /\bdisabled=/.test(inspector.replace(/aria-disabled=/g, ''))],
+    [true, true, true, true, 2, false])
+  //? (review) the list put back where it was by an effect once it has drawn - and the track focus goes back
+  //? to then brought into view: Previous and Next may have moved on past the rows that were in view
+  check('(review) ...the list put back where it was once drawn, then the track focus goes back to brought into view',
+    [/useLayoutEffect\(\(\) => \{\s*const back = restoreView\.current\s*if \(!back\) return\s*restoreView\.current = null\s*const box = scroller\.current\s*if \(!box\) return\s*box\.scrollTop = back\.top\s*const shown = back\.show\(\)\s*if \(!shown\) return\s*const seen = box\.getBoundingClientRect\(\)\.top \+ box\.clientTop\s*box\.scrollTop \+= revealBy\(\{ top: seen, bottom: seen \+ box\.clientHeight \}, shown\.getBoundingClientRect\(\)\)\s*\}\)/.test(panel),
+      //? ...and after focus has gone to it: the focus hand-on's effect is the earlier one
+      panel.indexOf('const pick = focusNext.current') < panel.indexOf('const back = restoreView.current')],
+    [true, true])
+  //? (review) the tag editor's scroll stayed on the view under it as it closed - the inspector, taller, kept
+  //? the editor's offset and "Edit this track…" was focused above the panel's top, out of sight: the editor
+  //? opens from its top, keeping where the view under it was, and closes back to there, the button focus
+  //? goes back to brought into view by the same effect
+  check('(review) the tag editor from its top, the view under it kept - and as it closes put back, the button focus goes back to in view',
+    [/const openTagEditor = \(path: string, filenames: string\[\]\) => \{\s*editorOver\.current = scroller\.current\?\.scrollTop \?\? 0\s*scrollTop\(\)\s*setEditingTags\(\{ path, filenames \}\)/.test(panel),
+      /focusNext\.current = opener\s*restoreView\.current = \{ top: editorOver\.current, show: opener \}\s*\}, \[\]\)/.test(panel),
+      (panel.match(/editorOver\.current = /g) ?? []).length, (panel.match(/restoreView\.current = \{/g) ?? []).length],
+    [true, true, 1, 2])
+  //? (review) "Edit this track…" the tag editor on that one file - its one way to a writer - and the list's
+  //? Edit N tracks… on the ticked ones
+  check('(review) "Edit this track…" opens the tag editor on that one file alone',
+    [/<TrackInspector[\s\S]*?onEdit=\{\(filename\) => openTagEditor\(subject\.path, \[filename\]\)\}/.test(panel),
+      /<TagsList[\s\S]*?onEdit=\{\(filenames\) => openTagEditor\(subject\.path, filenames\)\}/.test(panel),
+      (panel.match(/openTagEditor\(subject\.path, /g) ?? []).length],
+    [true, true, 2])
+  check('...afresh for every Edit and every folder, following a rename',
+    [/setEditingTags\(null\)\s*setInspecting\(null\)\s*setDeleted\(null\)/.test(panel), /setTicked\(null\)\s*setEditingTags\(null\)\s*setInspecting\(null\)\s*scrollTop\(\)/.test(panel),
+      /setInspecting\(\(was\) => \(was && was\.path === oldPath \? \{ \.\.\.was, path: newPath \} : was\)\)/.test(panel)],
+    [true, true, true])
+  check('...its lyrics through a latestOnly(), only the newest answer drawn; read only - no writer reached',
+    [/const requests = useMemo\(latestOnly, \[\]\)/.test(inspector), /const ticket = requests\.begin\(\)/.test(inspector),
+      /trackLyrics\(album\.path, filename, ticket\.signal\)/.test(inspector), (inspector.match(/if \(ticket\.current\(\)/g) ?? []).length,
+      /\b(fetchLyrics|fetchCoverArt|fetchDiscArt|applyTagEdits|applyRetag|deleteAlbum|previewTagEdits)\b/.test(inspector)],
+    [true, true, true, 2, false])
+  check('the cover viewer: the main page\'s ArtViewer, reached in the app only through CoverViewer',
+    [files.filter((file) => APP_SIDE(file) && /from '\.\.\/components\/ArtViewer'/.test(code(read(file))) && !/import type/.test((code(read(file)).match(/import[^\n]*components\/ArtViewer'/) ?? [''])[0])),
+      drawnIn('ArtViewer'), drawnIn('CoverViewer')],
+    [['app/CoverViewer.tsx'], ['app/CoverViewer.tsx'], ['app/EditPanel.tsx', 'app/TrackInspector.tsx', 'player/AlbumPage.tsx']])
+  check('...opened from an album page\'s cover, Artwork\'s cover and CD art, and the inspector\'s pictures - each opener taken in the tap',
+    [(page.match(/viewOpener\.current = takeOpener\(event\)/g) ?? []).length, (panel.match(/opener\.current = takeOpener\(event\)/g) ?? []).length,
+      (inspector.match(/opener\.current = takeOpener\(event\)/g) ?? []).length,
+      (panel.match(/onClick=\{\(event\) => view\(event as unknown as MouseEvent, \[/g) ?? []).length],
+    [1, 1, 1, 2])
+  //? (review) what each of Artwork's two opens, pinned, not only that they open: the cover as the main page
+  //? opens it (its own file, then the Cover Art Archive's), each CD art picture the very file its thumbnail shows
+  const coverOpen = panel.match(/class="app-edit-cover-open"[\s\S]*?view\(event as unknown as MouseEvent, \[\{\s*label: album\.album,\s*sources: ([^\n]*),\n[\s\S]*?<img class="app-edit-cover" src=\{([^}]*)\}/)
+  const discOpen = panel.match(/class="app-edit-disc"[\s\S]*?view\(event as unknown as MouseEvent, \[\{ label: name, sources: \[([^\]]*)\] \}\]\)\}\s*>\s*<img class="app-edit-disc-img" src=\{([^}]*)\}/)
+  check('(review) ...Artwork\'s cover opening the cover as the main page does, each CD art picture the file its thumbnail shows',
+    [coverOpen?.slice(1), discOpen?.slice(1), (panel.match(/class="app-edit-disc"/g) ?? []).length],
+    [["coverSources(album, 'full')", 'albumArtUrl(album)'], ['discArtUrl(album.path, name, album.modified_at)', 'discArtUrl(album.path, name, album.modified_at)'], 1])
+  check('...its own lock, focus in to Close and back to the opener, Tab kept inside',
+    [/page\.classList\.add\(VIEWER_LOCK\)/.test(viewer), /box\.current\?\.querySelector<HTMLElement>\('\.window-close'\)\?\.focus\(\{ preventScroll: true \}\)/.test(viewer),
+      /opener\?\.current\?\.focus\(\{ preventScroll: true \}\)/.test(viewer), /if \(event\.key !== 'Tab' \|\| !box\.current\) return/.test(viewer)],
+    [true, true, true, true])
+  //? (review) a tab's page is kept mounted, hidden: a viewer left open in one after Back held its lock on the
+  //? page shown and took its next Escape (inspector.sim.cjs moves through the history)
+  check('(review) ...closed by a move through the history while it shows',
+    [/useEffect\(\(\) => \{\s*if \(!open\) return\s*const moved = \(\) => closeNow\.current\(\)\s*window\.addEventListener\('popstate', moved\)\s*window\.addEventListener\('hashchange', moved\)/.test(viewer),
+      /window\.removeEventListener\('popstate', moved\)\s*window\.removeEventListener\('hashchange', moved\)/.test(viewer)],
+    [true, true])
+  check('an album page\'s Properties: from the bridge answer it asks already - no new request - drawn under the songs',
+    [(page.match(/storeAlbum\(/g) ?? []).length, /<AlbumProperties rows=\{albumProperties\(store, storeFailed, releaseSaid\)\} \/>/.test(page),
+      page.indexOf('<AlbumProperties') > page.indexOf('class="pl-album-footer"')],
+    [1, true, true])
+  //? (review) "not tagged" only on Navidrome's own word for the album - the bridge's null is also its answer for
+  //? an id Navidrome doesn't have (an old address, "Navidrome has nothing by that id" above it), and a failed
+  //? ask: the album's own answer's id, '' when it came without one, a preview's until it comes, else nothing
+  check('(review) ...the release as the album\'s own answer said it, none when it came without one - never from the bridge\'s null',
+    /const releaseSaid = album \? album\.musicBrainzId \?\? '' : shown\?\.musicBrainzId\n/.test(page), true)
+  check('...the unresized cover asked for by the viewer alone - every screen still sharing the three sizes',
+    files.filter((file) => /\bcoverFullUrl\(/.test(code(read(file)))), ['player/AlbumPage.tsx', 'player/api.ts'])
+  //? (review) the viewer shows its sources in order, moving on only when one fails to load: the unresized
+  //? cover first, the page's own sized one its fallback
+  check('(review) ...shown first, the page\'s own sized cover its fallback',
+    /sources: \[coverFullUrl\(shown\.coverArt\), coverUrl\(shown\.coverArt, 800\)\]/.test(page), true)
 }
 
 console.log('\nthe checks themselves')

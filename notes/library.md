@@ -442,6 +442,9 @@ Asked for: the zoom "doesn't follow the cursor at all. and it doesn't move eithe
 - **`offsetWidth` over the rect matters more than usual here**: the image is the transformed
   element, so its rect is the ZOOMED box, and feeding that into the clamp multiplies the zoom
   back in on every frame.
+- Since 2.0.0-player.44 the app at `/player/` opens the same component (unchanged) through
+  `app/CoverViewer.tsx`, from an album page's cover on both frames, the Edit panel's Artwork and the
+  track inspector's pictures - notes/app-desktop.md "Inside a track".
 
 ### Arranging the track viewer's columns (v0.6.9)
 

@@ -261,9 +261,10 @@ export function fetchLyrics(
 }
 
 /** One track's lyrics as they are on disk now, for the track viewer. */
-export function trackLyrics(albumPath: string, filename: string): Promise<TrackLyrics> {
+export function trackLyrics(albumPath: string, filename: string, signal?: AbortSignal): Promise<TrackLyrics> {
   return get<TrackLyrics>(
     `/library/lyrics?album=${encodeURIComponent(albumPath)}&file=${encodeURIComponent(filename)}`,
+    signal,
   )
 }
 

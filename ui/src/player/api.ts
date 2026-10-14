@@ -310,6 +310,14 @@ export function coverUrl(id: string | null | undefined, size: number): string | 
 }
 
 /**
+ * A cover as Navidrome has it, not resized - the cover viewer's (2.0.0-player.44: an album page's cover
+ * opened full size, where its own pixels are the point). No `size`, so the route asks Navidrome for none.
+ */
+export function coverFullUrl(id: string | null | undefined): string | null {
+  return id ? url(`/navidrome/cover/${encodeURIComponent(id)}`) : null
+}
+
+/**
  * The turntable's record face (2.0.0-player.11): the CD art deadwax holds for a Navidrome album's
  * disc - a library route, which finds the album's folder itself, not a Navidrome one. A 404 when
  * there is none, and the turntable draws its plain record.

@@ -220,6 +220,12 @@ Click an album's cover to see it full size. Click (or tap) to zoom in on the poi
 use the wheel to zoom, or pinch on a phone; drag to move around; click again to fit. In the
 metadata editor it shows your cover and the release's side by side.
 
+The app at `/player/` has the same viewer since 2.0.0-player.44: tap an album page's cover, on a
+phone or a desktop, to see it as Navidrome has it, unresized; and in the **Edit album** panel,
+**Artwork**'s cover and CD art and the pictures inside a track ([below](#inside-a-track-in-the-app))
+open in it. Escape, **Close**, the ✕ or a click on the dimmed page round it closes it - and so does
+going back (the browser's Back, a mouse's back button, a phone's back gesture), which goes back too.
+
 ## Artist pages
 
 Select an artist (on a phone, tap it twice) for their page: a photograph, the facts MusicBrainz
@@ -304,10 +310,14 @@ them is true there too:
 - **Tags** lists the album's tracks with a tick box each. Tick some (Shift ticks a run), then **Edit
   N tracks…**, or **Edit all tracks…** with none ticked, for [the tag editor](#editing-tags-by-hand):
   only the fields you change are written. **Cancel**, **Close** or Escape goes back to the list.
+  Click a track's **name** (not its tick box) to look inside it (since 2.0.0-player.44 - see
+  [Inside a track](#inside-a-track-in-the-app), below).
 - **Artwork** shows the cover the album has and what CD art is beside its tracks, with **Get cover**
   and **Get CD art** where they can help ([as here](#covers-cd-art-and-lyrics)): each needs the
   album's release id, so an untagged album is matched in **Release** first. A cover you have is
-  replaced from **Release**, comparing the two.
+  replaced from **Release**, comparing the two. Since 2.0.0-player.44 the CD art is shown as pictures,
+  each with its file name, and the cover and each picture open in [the cover viewer](#the-cover-viewer)
+  when you click them.
 - **Lyrics** says how many tracks have a `.lrc`, with **Get lyrics** for the rest. The lyrics lead,
   and re-timing the lyrics already saved, are in the server settings - this page's Settings tab, or
   the app's **Managing → Settings**, under **Library** ([Configuration](configuration.md#in-the-app-on-a-desktop)).
@@ -343,10 +353,46 @@ is Navidrome's, so it changes once Navidrome has scanned.
 The panel is a side panel like Sources and Info - a third column from 1280 pixels wide, lying over
 the right of the page below that - and one shows at a time: **Edit** puts Sources and Info away, and
 either puts the Edit panel away. It closes when you go to another page, and when the window narrows
-to a phone's. The close button, or Escape while you're in the panel, closes it - in the tag editor or
-the delete confirmation, Escape closes that first, back to its tab; Escape out in the page (in the
-search field, say) is the page's. Between 1024 and 1279 pixels wide, while it lies over the page, the
+to a phone's. The close button, or Escape while you're in the panel, closes it - in the tag editor,
+inside a track or in the delete confirmation, Escape closes that first, back to the track or to its
+tab, one step at a time ([Inside a track](#inside-a-track-in-the-app) has the steps); Escape out in the
+page (in the search field, say) is the page's. Between 1024 and 1279 pixels wide, while it lies over the page, the
 album's **Play**, **Shuffle** and **Edit** move under its cover, so **Edit** stays in view to close it.
+
+### Inside a track, in the app
+
+Since 2.0.0-player.44, a track's name in the panel's **Tags** tab opens it in the panel - this page's
+track view, laid out for the panel (it fits a phone's width too, for when the panel comes to the phone):
+
+- **Tracks** at the top goes back to the list, where you left it - scrolled on just enough to show the
+  track you were on, if **Previous** and **Next** took you past the ones in view; **2 of 11** says
+  where the track is (a screen reader is told the track and where it is as it opens and at each step).
+  Its title (with "No title tag - this is the file's name" for a file that has none), then where it
+  sits - "Track 2", "disc 2 of 2 · <the disc's title>" for a set, "Unnumbered" for a file with no
+  track number - its length and its format.
+- **Previous** and **Next** step through the album's tracks in their order (by disc, then number),
+  greyed at the first and the last. **Edit this track…** opens [the tag editor](#editing-tags-by-hand)
+  on that one file (from its top); closing it comes back here, as you left it, with **Edit this
+  track…** in view.
+- **Every field this page's track table offers** - not only the ones its **Fields ▾** shows - under
+  **Tags**, **Audio**, **MusicBrainz** and **File**, each with what the file says, or a dash for a
+  field it doesn't carry. A field only the file carries shows `…` while the file is being read. A disc
+  number shown faded is a default, as in the track table: the file has no disc tag, so it counts as
+  disc 1 (point at it for why).
+- **Pictures in this file**: each picture embedded in it - its type (Front cover, Media (the disc
+  itself)…), its size in pixels, its bytes and format. Click one to see it full size in [the cover
+  viewer](#the-cover-viewer). This is where a song's odd sleeve comes from (see "Why a song can show
+  a different picture", above).
+- **Lyrics**: the track's `.lrc`, else lyrics embedded in the file - synced lines with their times
+  (and a gap between verses), marked **synced**, and where they came from. None, and it says so, with
+  **Get lyrics** in the panel's **Lyrics** tab when some of the album's tracks have none.
+- **All tags in this file (N)**: click it to see every tag in the file under its own name - including
+  ones no field knows - and the file's name.
+
+It reads the files as they are now and changes nothing. Escape while you're in the panel goes back to
+the list, one step at a time: from the tag editor to the track, from the track to the list, then it
+closes the panel; Escape in the cover viewer closes only the viewer. The track table's own columns -
+choosing, dragging and sizing them - stay this page's.
 
 ## Needs a look in the app
 

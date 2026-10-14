@@ -130,6 +130,15 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   once deadwax has said what you hold, in a place kept for it, so nothing in it moves as it fills.
   Beside an Also chip, in a row too narrow for all three whole (a phone held upright), it reads
   **Pressings**, and In your library keeps only its tick, to leave the Also chip room. The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
+  Since 2.0.0-player.44, tap the **cover** to see it full size - Navidrome's own picture, unresized - in
+  [the cover viewer](library.md#the-cover-viewer): tap to zoom in where you touch, pinch, drag to move,
+  ✕ or **Close** to put it away (going back puts it away too, as it goes back). And at the foot of the page, under the songs, **Properties**: the
+  album's **Year** - "1994 (this pressing 2014)" when this pressing's year isn't the album's own -
+  its **Size**, its **Release** on musicbrainz.org (a link that opens beside the app, so the music
+  keeps playing; "Not tagged with a MusicBrainz release" when Navidrome says its files carry none) and **First seen**, when
+  deadwax first found it, "filed by deadwax" when it was a download. They're what deadwax's own scan
+  of the folder says, so they show once deadwax has answered, and a line deadwax can't say is left
+  out.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
 - **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
@@ -418,14 +427,16 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **Edit** (since 2.0.0-player.21, for an admin - everyone, with logins off) opens the **Edit album**
   panel beside the page, and shows pressed while it's open: underline tabs for **Release** (the main
   page's metadata editor: pick the pressing, read the preview, **Apply**), **Tags** (the album's
-  tracks with tick boxes, and the tag editor for the ticked ones), **Artwork** (**Get cover**, **Get
-  CD art**), **Lyrics** (**Get lyrics**) and **Delete**. They're the main page's own editors, so they
+  tracks with tick boxes, and the tag editor for the ticked ones - a track's name opens what's inside
+  it: every field, the pictures in the file, its lyrics and all its tags, with **Previous**, **Next**
+  and **Edit this track…**, since 2.0.0-player.44), **Artwork** (**Get cover**, **Get CD art**, the
+  cover and CD art opening full size), **Lyrics** (**Get lyrics**) and **Delete**. They're the main page's own editors, so they
   work as [the library guide](library.md#editing-an-album-in-the-app) says - which also says how the
   panel finds the album's folder, and what happens after an edit: the page asks Navidrome again,
   and after you apply a different release it follows the album to the new id Navidrome gives it.
   The panel closes when you go to another page; the close button, Edit again, or Escape while
-  you're in the panel closes it too (in the tag editor or the delete confirmation, Escape closes that
-  first, back to its tab).
+  you're in the panel closes it too (in the tag editor, inside a track or the delete confirmation,
+  Escape closes that first, back to the track or to its tab).
 - **The album you don't have** has its cover beside its title, then **Get the album** with the
   **Pressing** button beside it, what you already have of that pressing under them, and the
   tracklist as a table - #, Title, Length - with an **Against the usual tracklist** column whenever

@@ -11,7 +11,10 @@ share). So this answers, for one release:
     track count; two or more for a set kept one folder per disc. Only folders still there: one that
     has gone becomes a `missing` tombstone, as Find's checks mark one. Tombstones are never listed,
     and a disc folder merged into its release's is not (its row is `merged`; the release's own row
-    is the one listed).
+    is the one listed). Since 2.0.0-player.44 each also says what the main page's details pane says
+    of the folder - an album page's Properties: `size` and `original_year` from the saved scan (None
+    and '' while the scan holds no copy of it), and `first_seen` and `imported` (deadwax filed it)
+    from its review row (None and False when it has none) - read without touching the disk.
   - `other_pressings`: the album's OTHER pressings the store holds (index_pressings, by the
     release group the present rows carry) - what the album page's "Also: <edition>" chip opens.
   - `navidrome_id`: Navidrome's album for the release, and for each other pressing - asked of
@@ -39,8 +42,12 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, client_for
 from src.config import Config
+from src.library import cached_album
 from src.logger import logger
 from src.organizer import is_within
+#? the library route's own loader of the saved scan, once per process - so the facts below are there
+#? after a restart, before anyone has opened the library
+from src.routes.library import _ensure_cache_loaded
 from src.routes.navidrome import ID_MAX
 from src.routes.search_musicbrainz import MBID_PATTERN
 
@@ -225,6 +232,31 @@ def _row(row: dict) -> dict:
     }
 
 
+async def _facts(request: Request, store, root: str, rows: list[dict]) -> dict[str, dict]:
+    """
+    What the main page's details pane says of each folder that the store's row doesn't hold (2.0.0-player.44):
+    its size and original year, as the saved scan read them, and when it was first seen and whether deadwax
+    filed it, from its review row. Keyed on the path; nothing read from the disk. A store that can't say
+    leaves those two out - the page draws only what it is told.
+    """
+    paths = [row["path"] for row in rows if row.get("path")]
+    if not paths:
+        return {}
+    await _ensure_cache_loaded(request)
+    seen = await store.album_seen(paths)
+    facts: dict[str, dict] = {}
+    for path in paths:
+        scan = cached_album(root, path) or {}
+        review = seen.get(path) or {}
+        facts[path] = {
+            "size": scan.get("total_size") if scan else None,
+            "original_year": scan.get("original_year") or "",
+            "first_seen": review.get("first_seen") or None,
+            "imported": review.get("source") == "import",
+        }
+    return facts
+
+
 @router.get("/album")
 async def store_album(
     request: Request,
@@ -250,6 +282,7 @@ async def store_album(
     root = Config.LIBRARY_PATH or ""
     present: list[dict] = []
     others: list[dict] = []
+    facts: dict[str, dict] = {}
     if _usable(store) and root:
         try:
             present = await _live(store, root, await store.index_present(root, release))
@@ -261,11 +294,17 @@ async def store_album(
             #? a check that fails says nothing: the album page draws no chip, Info no pressing
             logger.warning(f"could not read the store for {release}: {e}")
             present, others = [], []
+        try:
+            facts = await _facts(request, store, root, present)
+        except Exception as e:
+            #? the Properties' lines left out, the rows still answered
+            logger.warning(f"could not read what the scan says of {release}: {e}")
+            facts = {}
 
     title = next((row["album"] for row in present if row.get("album")), None)
     if navidrome_id is None:
         answer["navidrome_id"] = await navidrome_album(client, release, title)
-    answer["present"] = [_row(row) for row in present]
+    answer["present"] = [{**_row(row), **facts.get(row["path"], {})} for row in present]
 
     looked_up = others[:OTHER_PRESSINGS_LOOKED_UP]
     ids = await asyncio.gather(*(navidrome_album(client, row.get("release_mbid"), row.get("album") or title)

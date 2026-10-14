@@ -5,7 +5,8 @@ import * as libraryApi from '../api/library'
 import { storeAlbum } from '../api/store'
 import type { LibraryAlbum, StoreAlbumResponse } from '../api/types'
 import { DeleteAlbumDialog } from '../components/DeleteAlbumDialog'
-import { GetArtButton, GetDiscArtButton, GetLyricsButton } from '../components/LibraryParts'
+import type { ViewerImage } from '../components/ArtViewer'
+import { GetArtButton, GetDiscArtButton, GetLyricsButton, coverSources } from '../components/LibraryParts'
 import { MetadataEditor, type QueueContext } from '../components/MetadataEditor'
 import { TrackTagEditor } from '../components/TrackTagEditor'
 import { useLibrary } from '../hooks/useLibrary'
@@ -16,13 +17,16 @@ import {
   type EditAlbum, type EditTab,
 } from '../lib/albumEdit'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
-import { albumArtUrl, trackTime } from '../lib/format'
+import { albumArtUrl, discArtUrl, trackTime } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
 import type { FolderChange } from '../lib/needsLook'
 import { tickTracks } from '../lib/tagEdit'
+import { revealBy } from '../lib/trackInspector'
 import { CloseIcon } from '../player/icons'
+import { CoverViewer } from './CoverViewer'
 import { FolderPicker } from './FolderPicker'
-import { useSheet } from './useSheet'
+import { TrackInspector } from './TrackInspector'
+import { takeOpener, useSheet } from './useSheet'
 
 /** An Edit pressed on an album page: the album as the page had it, and a new number each time, so
  *  the panel starts afresh for every press. */
@@ -237,6 +241,13 @@ export function EditPanel({
   //? the tag editor's files, fixed as it opens (its preview is never recomputed against a selection
   //? that changed underneath it)
   const [editingTags, setEditingTags] = useState<{ path: string; filenames: string[] } | null>(null)
+  //? the track inspector (2.0.0-player.44): the track open in it, of which folder, and where the list
+  //? was scrolled to, put back on the way back to it
+  const [inspecting, setInspecting] = useState<{ path: string; filename: string; listTop: number } | null>(null)
+  //? where the view under the tag editor (the list, or the inspector) was scrolled to as it opened - and
+  //? the Tags tab's view to put back, and the control to bring into view, once it has drawn again (below)
+  const editorOver = useRef(0)
+  const restoreView = useRef<{ top: number; show: () => HTMLElement | null | undefined } | null>(null)
   const [deleted, setDeleted] = useState<string | null>(null)
   //? "Choose the folder" (2.0.0-player.42): the folder chosen from the scan for the Edit it was chosen
   //? in, and the list open to choose from (what has been typed to narrow it)
@@ -263,9 +274,16 @@ export function EditPanel({
   }, [open])
   const drawn = !!subject && !!request && !deleted && !letGo
 
-  //? an editor laid over its tab - the tag editor, the delete confirmation - takes Escape for itself:
-  //? the panel doesn't close under it (`covered`), nor does the release editor's close let it through
-  const inner = drawn && ((tab === 'tags' && editingTags !== null && editingTags.path === subject!.path) || tab === 'delete')
+  //? the track the Tags tab's inspector shows - of this folder, and still one of its tracks
+  const inspected = drawn && inspecting && inspecting.path === subject!.path && subject!.tracks.some((track) => track.filename === inspecting.filename)
+    ? inspecting.filename
+    : null
+  const tagEditorShown = drawn && editingTags !== null && editingTags.path === subject!.path
+
+  //? an editor laid over its tab - the tag editor, the delete confirmation, the track inspector - takes
+  //? Escape for itself: the panel doesn't close under it (`covered`), nor does the release editor's close
+  //? let it through
+  const inner = drawn && ((tab === 'tags' && (tagEditorShown || inspected !== null)) || tab === 'delete')
   const innerNow = useRef(inner)
   innerNow.current = inner
   useSheet({ open, covered: inner || covered, onClose, lockClass: 'app-edit-open', first: closeButton, opener, modal, area: box })
@@ -336,6 +354,7 @@ export function EditPanel({
     setTagsSeen(false)
     setTicked(null)
     setEditingTags(null)
+    setInspecting(null)
     setDeleted(null)
     setChosen(null)
     setPicking(null)
@@ -369,7 +388,13 @@ export function EditPanel({
   const closeTagEditor = useMemo(() => () => {
     if (escapeFrom() === 'page') return
     setEditingTags(null)
-    focusNext.current = () => tagsPane.current?.querySelector<HTMLElement>('.app-edit-tags-open')
+    //? back to the track inspector it was opened from (its "Edit this track…"), else the list's button
+    const opener = () => tagsPane.current?.querySelector<HTMLElement>('.app-inspect-edit')
+      ?? tagsPane.current?.querySelector<HTMLElement>('.app-edit-tags-open')
+    focusNext.current = opener
+    //? ...the view under it scrolled back to where it was, and that button in view (review: the editor's
+    //? scroll stayed on the taller inspector, "Edit this track…" focused out of sight above the panel's top)
+    restoreView.current = { top: editorOver.current, show: opener }
   }, [])
   const cancelDelete = useMemo(() => () => {
     if (escapeFrom() === 'page') return
@@ -413,6 +438,7 @@ export function EditPanel({
     setSession((n) => n + 1)
     setTicked(null)
     setEditingTags(null)
+    setInspecting(null)
     scrollTop()
   }
 
@@ -422,7 +448,10 @@ export function EditPanel({
     const updated = fresh.find((album) => album.path === newPath) ?? null
     if (updated) {
       setSubject((current) => (current && current.path === oldPath ? updated : current))
-      if (newPath !== oldPath) setChosen((was) => (was && was.path === oldPath ? { ...was, path: newPath } : was))
+      if (newPath !== oldPath) {
+        setChosen((was) => (was && was.path === oldPath ? { ...was, path: newPath } : was))
+        setInspecting((was) => (was && was.path === oldPath ? { ...was, path: newPath } : was))
+      }
     }
     return updated
   }
@@ -616,13 +645,83 @@ export function EditPanel({
 
   const checked = subject && ticked?.path === subject.path ? ticked.files : NO_FILES
 
-  //? the tag editor opened on these files: focus into it - its first field once the files are read,
+  //? the tag editor opened on these files, from its top (2.0.0-player.44 - where the view under it was
+  //? scrolled to kept, put back as it closes): focus into it - its first field once the files are read,
   //? its close button until then
   const openTagEditor = (path: string, filenames: string[]) => {
+    editorOver.current = scroller.current?.scrollTop ?? 0
+    scrollTop()
     setEditingTags({ path, filenames })
     focusNext.current = () => tagsPane.current?.querySelector<HTMLElement>('#tags-window input:not([type="checkbox"])')
       ?? tagsPane.current?.querySelector<HTMLElement>('#tags-window .window-close')
   }
+
+  /* ----- the track inspector (2.0.0-player.44): a view pushed over the Tags tab's list ----- */
+
+  //? a track's name in the list - its own button, by its file
+  const trackName = (filename: string) => [...(tagsPane.current?.querySelectorAll<HTMLElement>('.app-edit-track-open') ?? [])]
+    .find((button) => button.dataset['file'] === filename)
+
+  //? where the Tags tab's view was scrolled to, put back once it has drawn again - and then the least more
+  //? that shows the control focus goes back to: the track's name, back from its inspector (Previous and
+  //? Next having moved on past the rows that were in view), or "Edit this track…" or the list's "Edit N
+  //? tracks…", back from the tag editor (review, twice: each was focused out of sight, the next Tab or
+  //? Enter acting on a control nobody could see)
+  useLayoutEffect(() => {
+    const back = restoreView.current
+    if (!back) return
+    restoreView.current = null
+    const box = scroller.current
+    if (!box) return
+    box.scrollTop = back.top
+    const shown = back.show()
+    if (!shown) return
+    const seen = box.getBoundingClientRect().top + box.clientTop
+    box.scrollTop += revealBy({ top: seen, bottom: seen + box.clientHeight }, shown.getBoundingClientRect())
+  })
+
+  //? a track's name tapped: its inspector, from its top, focus on Back once it has drawn (the name tapped
+  //? went with the list)
+  const inspect = (filename: string) => {
+    if (!subject) return
+    setInspecting({ path: subject.path, filename, listTop: scroller.current?.scrollTop ?? 0 })
+    scrollTop()
+    focusNext.current = () => tagsPane.current?.querySelector<HTMLElement>('.app-inspect-back')
+  }
+
+  //? Back, or Escape in the panel: the list again, where it was scrolled to, focus on the track's own
+  //? name - the one it was showing when it went back, Previous and Next having moved it - in view
+  const backToList = () => {
+    const was = inspectingNow.current
+    if (!was) return
+    setInspecting(null)
+    restoreView.current = { top: was.listTop, show: () => trackName(was.filename) }
+    focusNext.current = () => trackName(was.filename)
+  }
+  const inspectingNow = useRef(inspecting)
+  inspectingNow.current = inspecting
+
+  //? Previous and Next: the same view, another track, from its top - focus stays on the button pressed
+  const stepTo = (filename: string) => {
+    setInspecting((was) => (was ? { ...was, filename } : was))
+    scrollTop()
+  }
+
+  //? Escape inside the panel while the inspector is the Tags tab's top layer: back to the list - one
+  //? layer at a time (the tag editor over it takes its own Escape; the cover viewer stops its own on the
+  //? window, before anything here hears it). Escape out in the page is the page's.
+  const inspectorTop = open && !covered && tab === 'tags' && inspected !== null && !tagEditorShown
+  useEffect(() => {
+    if (!inspectorTop) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (escapeFrom() === 'page') return
+      event.preventDefault()
+      backToList()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [inspectorTop])
 
   /* ----- what the body says ----- */
 
@@ -781,6 +880,15 @@ export function EditPanel({
                     onClose={closeTagEditor}
                     onApplied={written(request, subject)}
                   />
+                ) : inspected ? (
+                  <TrackInspector
+                    album={subject}
+                    filename={inspected}
+                    details={details}
+                    onBack={backToList}
+                    onStep={stepTo}
+                    onEdit={(filename) => openTagEditor(subject.path, [filename])}
+                  />
                 ) : (
                   <TagsList
                     album={subject}
@@ -788,6 +896,7 @@ export function EditPanel({
                     onTick={tick}
                     onTickAll={tickAll}
                     onEdit={(filenames) => openTagEditor(subject.path, filenames)}
+                    onInspect={inspect}
                   />
                 )}
               </div>
@@ -824,7 +933,8 @@ export function EditPanel({
  * one, Shift ticks the run from the last one clicked to this one's new state, the head's box ticks
  * or unticks them all. "Edit N tracks…" opens the tag editor on the ticked ones - or on all of them
  * with none ticked. Each box sits in a label filling its cell, the target a finger needs where the
- * pointer is coarse (a click on the label is the box's, Shift and all).
+ * pointer is coarse (a click on the label is the box's, Shift and all). A track's NAME (2.0.0-player.44)
+ * is a button of its own, apart from its tick box: it opens the track's inspector (app/TrackInspector.tsx).
  */
 function TagsList({
   album,
@@ -832,12 +942,15 @@ function TagsList({
   onTick,
   onTickAll,
   onEdit,
+  onInspect,
 }: {
   album: LibraryAlbum
   checked: ReadonlySet<string>
   onTick: (filename: string, range: boolean) => void
   onTickAll: (on: boolean) => void
   onEdit: (filenames: string[]) => void
+  /** a track's name tapped: inside it */
+  onInspect: (filename: string) => void
 }) {
   const tracks = album.tracks
   const count = tracks.filter((track) => checked.has(track.filename)).length
@@ -893,7 +1006,11 @@ function TagsList({
                   </label>
                 </td>
                 <td class="app-edit-number">{trackLabel(track, album.disc_count)}</td>
-                <td class="app-edit-title-cell" title={track.filename}>{track.title || track.filename}</td>
+                <td class="app-edit-title-cell" title={track.filename}>
+                  <button type="button" class="app-edit-track-open" data-file={track.filename} onClick={() => onInspect(track.filename)}>
+                    {track.title || track.filename}
+                  </button>
+                </td>
                 <td class="app-edit-length">{trackTime(track.length)}</td>
               </tr>
             )
@@ -904,16 +1021,38 @@ function TagsList({
   )
 }
 
-/** The cover and CD art: what the folder has, and the main page's Get buttons where they can help. */
+/**
+ * The cover and CD art: what the folder has, and the main page's Get buttons where they can help. The
+ * cover and each CD art picture (2.0.0-player.44, the main page's thumbnails in its Properties) open in
+ * the cover viewer - drawn here, inside the panel, so it goes with the panel's editors.
+ */
 function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void }) {
-  const ownDisc = (album.disc_art ?? []).filter((name) => name.toLowerCase().startsWith('disc'))
+  const discArt = album.disc_art ?? []
+  const ownDisc = discArt.filter((name) => name.toLowerCase().startsWith('disc'))
+  const [viewing, setViewing] = useState<ViewerImage[] | null>(null)
+  const opener = useRef<HTMLElement | null>(null)
+  const view = (event: MouseEvent, images: ViewerImage[]) => {
+    opener.current = takeOpener(event)
+    setViewing(images)
+  }
   return (
     <div class="app-edit-sections">
       <section class="app-edit-section" aria-labelledby="app-edit-cover">
         <h3 id="app-edit-cover" class="app-edit-heading">Cover</h3>
         <div class="app-edit-cover-row">
           {album.art ? (
-            <img class="app-edit-cover" src={albumArtUrl(album)} alt="" />
+            <button
+              type="button"
+              class="app-edit-cover-open"
+              aria-label="See the cover full size"
+              onClick={(event) => view(event as unknown as MouseEvent, [{
+                label: album.album,
+                sources: coverSources(album, 'full'),
+                missing: 'No cover on disk, and none on the Cover Art Archive for this release',
+              }])}
+            >
+              <img class="app-edit-cover" src={albumArtUrl(album)} alt="" />
+            </button>
           ) : (
             <span class="app-edit-cover is-empty" aria-hidden="true" />
           )}
@@ -935,9 +1074,27 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
 
       <section class="app-edit-section" aria-labelledby="app-edit-disc">
         <h3 id="app-edit-disc" class="app-edit-heading">CD art</h3>
-        <p class="app-edit-note">
-          {(album.disc_art ?? []).length ? `Beside the tracks: ${(album.disc_art ?? []).join(', ')}.` : 'No picture of the disc beside the tracks.'}
-        </p>
+        {discArt.length ? (
+          <>
+            <p class="app-edit-note">Beside the tracks - what players show for a song with a disc number:</p>
+            <div class="app-edit-discs">
+              {discArt.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  class="app-edit-disc"
+                  aria-label={`${name} - see it full size`}
+                  onClick={(event) => view(event as unknown as MouseEvent, [{ label: name, sources: [discArtUrl(album.path, name, album.modified_at)] }])}
+                >
+                  <img class="app-edit-disc-img" src={discArtUrl(album.path, name, album.modified_at)} alt="" loading="lazy" />
+                  <span class="app-edit-disc-name">{name}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p class="app-edit-note">No picture of the disc beside the tracks.</p>
+        )}
         <GetDiscArtButton album={album} onDone={onDone} class="app-edit-button" />
         {!album.release_mbid ? (
           <p class="app-edit-note">CD art is looked up by the album's release: match one in Release first.</p>
@@ -945,6 +1102,8 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
           <p class="app-edit-note">deadwax never replaces CD art it saved.</p>
         ) : null}
       </section>
+
+      <CoverViewer images={viewing} onClose={() => setViewing(null)} opener={opener} />
     </div>
   )
 }

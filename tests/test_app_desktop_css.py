@@ -59,6 +59,10 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   even while empty; "Choose the folder"'s field the Edit panel's well and its folders a finger's target,
   their focus rings drawn inside the panel's clipping body, no link to the main page left in the panel;
   Needs a look's warning amber; Re-time saved lyrics in Server settings, the tab's own classes styled here.
+- Inside a track (2.0.0-player.44): the album page's cover viewer the panel's viewer's size (app.css draws
+  it on both frames), a track's name in the Tags list the table's row height, and the rings of the
+  inspector's controls, the track names and Artwork's cover and CD art drawn inside the panel's clipping
+  body - a class more than the panel's own ring rule.
 """
 
 import re
@@ -821,3 +825,18 @@ def test_needs_a_looks_warning_is_amber_and_retime_is_styled_in_server_settings(
     assert declarations(DESKTOP, ".app-desk .app-settings .settings-retime-note", DESK)["overflow-wrap"] == "anywhere"
     assert declarations(DESKTOP, ".app-desk .app-settings .loading-blocks::before", DESK)["animation"] == \
         "pl-spin var(--app-desk-spin-time) linear infinite"
+
+
+def test_inside_a_track_on_a_desktop_the_viewer_is_the_panels_size_and_the_rings_are_inside():
+    tokens = media_tokens(DESKTOP, DESK)
+    assert (tokens["--app-viewer-pad"], tokens["--app-viewer-max"], tokens["--app-viewer-height"]) == (
+        "var(--app-desk-viewer-pad)", "var(--app-desk-viewer-max)", "var(--app-desk-viewer-height)")
+    assert declarations(DESKTOP, ".app-desk .app-edit-track-open", DESK)["min-height"] == "var(--app-desk-row)"
+    #? the panel's ring rule draws outside; these run to the body's clipping edges, so inside - and more particular
+    assert declarations(DESKTOP, ".app-desk .app-edit button:focus-visible", DESK)["outline-offset"] == "var(--app-ring)"
+    assert declarations(DESKTOP, ".app-desk .app-edit summary:focus-visible", DESK)["outline-offset"] == "var(--app-ring)"
+    #? (review) Artwork's cover and its first CD art picture sit on the body's left edge too
+    for selector in (".app-desk .app-edit .app-inspect-button:focus-visible", ".app-desk .app-edit .app-inspect-picture:focus-visible",
+                     ".app-desk .app-edit .app-inspect-summary:focus-visible", ".app-desk .app-edit .app-edit-track-open:focus-visible",
+                     ".app-desk .app-edit .app-edit-cover-open:focus-visible", ".app-desk .app-edit .app-edit-disc:focus-visible"):
+        assert declarations(DESKTOP, selector, DESK)["outline-offset"] == "var(--app-ring-inset)", selector

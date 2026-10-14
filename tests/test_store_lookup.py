@@ -562,3 +562,114 @@ def test_an_album_deleted_through_the_route_is_answered_as_nothing(root, store, 
     assert not (root / VINYL_PATH).exists()
     assert ask(store, release_mbid=VINYL).json()["present"] == []
     assert [row["path"] for row in ask(store, release_mbid=CD).json()["present"]] == [CD_PATH]
+
+
+# ---------------------------------------------------------------- what the rows say of their folders (2.0.0-player.44)
+
+from src import library as scan_cache  # noqa: E402
+from src.routes import library as library_routes  # noqa: E402
+
+
+@pytest.fixture
+def no_scan(monkeypatch):
+    """Nothing in the scan cache, and the saved scan not yet loaded for any root - before and after."""
+    scan_cache.clear_scan_cache()
+    monkeypatch.setattr(library_routes, "_cache_loaded_for", None)
+    yield
+    scan_cache.clear_scan_cache()
+
+
+def scanned(root, path, **album):
+    """A folder as a real scan leaves it in the cache: keyed on its absolute path, as os.walk spells it."""
+    scan_cache.seed_cache([(str(root / path), 1.0, {"path": path, **album})])
+
+
+def test_a_rows_folder_carries_its_size_original_year_and_when_deadwax_first_saw_it(root, store, navidrome_up, no_scan):
+    """An album page's Properties: what the main page's details pane says that the store's row doesn't -
+    the folder's size and original year from the saved scan, when it was first seen and whether deadwax
+    filed it from its review row. On the present rows; the other pressings' are left as they were."""
+    dummies(root, store)
+    scanned(root, CD_PATH, total_size=45_706_838, original_year="1993", year="1994")
+    run(store.record_albums_seen([{"path": CD_PATH, "artist": "Portishead", "album": "Dummy"}], source="import"))
+
+    answer = ask(store, release_mbid=CD).json()
+    [cd] = answer["present"]
+
+    assert (cd["size"], cd["original_year"], cd["imported"]) == (45_706_838, "1993", True)
+    assert cd["first_seen"] and cd["first_seen"].startswith("20"), cd["first_seen"]
+    [vinyl] = answer["other_pressings"]
+    assert not {"size", "original_year", "first_seen", "imported"} & set(vinyl), "the other pressings are as they were"
+
+
+def test_a_folder_the_scan_and_the_review_know_nothing_of_says_so(root, store, navidrome_up, no_scan):
+    dummies(root, store)
+
+    [cd] = ask(store, release_mbid=CD).json()["present"]
+
+    assert (cd["size"], cd["original_year"], cd["first_seen"], cd["imported"]) == (None, "", None, False)
+
+
+def test_a_folder_found_by_a_scan_is_not_one_deadwax_filed(root, store, navidrome_up, no_scan):
+    dummies(root, store)
+    scanned(root, CD_PATH, total_size=100, original_year="")
+    run(store.record_albums_seen([{"path": CD_PATH}]))
+
+    [cd] = ask(store, release_mbid=CD).json()["present"]
+
+    assert (cd["size"], cd["original_year"], cd["imported"]) == (100, "", False) and cd["first_seen"]
+
+
+def test_after_a_restart_the_saved_scan_answers_for_a_folder_before_the_library_is_opened(root, store, navidrome_up, no_scan):
+    """The in-memory cache starts empty after a restart: the bridge loads the saved scan once, as the
+    library's own routes do (routes/library.py _ensure_cache_loaded), and answers from it."""
+    dummies(root, store)
+    run(store.save_library_cache(str(root), [(str(root / CD_PATH), 1.0, {"path": CD_PATH, "total_size": 7, "original_year": "1991"})],
+                                 [], scan_cache.SCAN_FORMAT))
+
+    [cd] = ask(store, release_mbid=CD).json()["present"]
+
+    assert (cd["size"], cd["original_year"]) == (7, "1991")
+
+
+def test_a_set_kept_one_folder_per_disc_says_each_folder_of_its_own(root, store, navidrome_up, no_scan):
+    folder(root, "Portishead/Roseland (1998) (Disc 1)", store, CD, album="Roseland")
+    folder(root, "Portishead/Roseland (1998) (Disc 2)", store, CD, album="Roseland")
+    scanned(root, "Portishead/Roseland (1998) (Disc 1)", total_size=10)
+    scanned(root, "Portishead/Roseland (1998) (Disc 2)", total_size=20)
+
+    assert [row["size"] for row in ask(store, release_mbid=CD).json()["present"]] == [10, 20]
+
+
+def test_facts_that_cant_be_read_leave_the_rows_answered(root, store, navidrome_up, no_scan, monkeypatch):
+    dummies(root, store)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("the store went away")
+
+    monkeypatch.setattr(bridge, "_facts", broken)
+    [cd] = ask(store, release_mbid=CD).json()["present"]
+
+    assert cd["path"] == CD_PATH and "size" not in cd and "first_seen" not in cd
+
+
+def test_when_albums_were_first_seen_is_read_for_just_those_folders(store):
+    run(store.record_albums_seen([{"path": "a"}, {"path": "b"}]))
+    run(store.record_albums_seen([{"path": "c"}], source="import"))
+
+    seen = run(store.album_seen(["a", "c", "c", "gone", ""]))
+
+    assert set(seen) == {"a", "c"}
+    assert (seen["a"]["source"], seen["c"]["source"]) == ("scan", "import")
+    assert seen["a"]["first_seen"] and seen["c"]["first_seen"]
+    assert run(store.album_seen([])) == {}
+
+
+def test_the_scan_cache_hands_out_a_copy_of_one_folder_never_its_own(tmp_path, no_scan):
+    scanned(tmp_path, "A/B", total_size=5)
+
+    copy = scan_cache.cached_album(str(tmp_path) + "/", "A/B")
+    copy["total_size"] = 99
+
+    assert scan_cache.cached_album(str(tmp_path), "A/B")["total_size"] == 5
+    assert scan_cache.cached_album(str(tmp_path), "A/C") is None
+    assert scan_cache.cached_album("", "A/B") is None and scan_cache.cached_album(str(tmp_path), "") is None

@@ -3156,3 +3156,29 @@
     .app-desk .app-care-input { font-size: var(--dw-text-body); }
     .app-desk .app-care .app-text-button { min-height: var(--pl-hit); }
 }
+
+/* ===== inside a track, the cover viewer and Properties on a desktop (2.0.0-player.44) =====
+   The inspector, the album page's viewer and its Properties are drawn by app.css on both frames; here only
+   what the desktop changes: the viewer's frame the panel's viewer's size, a track's name in the Tags list
+   the table's row height, and the rings of what runs to the panel body's clipping edges drawn inside -
+   the inspector's controls, the track names, and Artwork's cover and CD art (review) - a class more
+   particular than the panel's own ring rule, which draws them outside. */
+@media (min-width: 1024px) {
+    :root {
+        --app-viewer-pad: var(--app-desk-viewer-pad);
+        --app-viewer-max: var(--app-desk-viewer-max);
+        --app-viewer-height: var(--app-desk-viewer-height);
+    }
+
+    .app-desk .app-edit-track-open { min-height: var(--app-desk-row); }
+
+    .app-desk .app-edit .app-inspect-button:focus-visible,
+    .app-desk .app-edit .app-inspect-picture:focus-visible,
+    .app-desk .app-edit .app-inspect-summary:focus-visible,
+    .app-desk .app-edit .app-edit-track-open:focus-visible,
+    .app-desk .app-edit .app-edit-cover-open:focus-visible,
+    .app-desk .app-edit .app-edit-disc:focus-visible { outline-offset: var(--app-ring-inset); }
+
+    /* Properties beside the cover's column: the songs' readable width */
+    .app-desk .app-props { max-width: calc(var(--app-desk-content-max) + var(--pl-edge-left) + var(--pl-edge-right)); }
+}

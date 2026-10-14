@@ -1044,3 +1044,209 @@ Managing pages' parts and STYLE.md. Built beside 2.0.0-player.41 (Get parity) an
   the picker's status regions), a library of thousands (the picker draws 50; the runs' counts work over
   the whole scan each render), a run left going while the app is backgrounded on a phone-sized iPad,
   the real :8081 setup, and the merge with 2.0.0-player.41.
+
+### Inside a track (2.0.0-player.44)
+
+James (2026-10-14), finishing the web app: the parity audit (`uplan/parity-audit.json`, its "library" area
+and the critic's gap list, section 4 - "Looking inside a track") found the main page's track viewer missing
+from the app: a track's fields, "All tags in this file", "Pictures in this file", its lyrics, Previous and
+Next, and the cover viewer. James chose **a per-track inspector in the Edit panel's Tags tab** over the main
+page's wide table: the column table and its drag and resize go with the main page. The spec is
+`uplan/slice-track-inspector.md`. Built beside 2.0.0-player.43 (the artist page), from .42.
+
+- **The inspector: `app/TrackInspector.tsx`**, its words `lib/trackInspector.ts` (pure). In the Tags tab a
+  track's NAME is a button of its own (`app-edit-track-open`, `data-file`), apart from its tick box (which
+  ticks as before); it opens the track's inspector, a view pushed over the list: **Tracks** back to it and
+  "2 of 11"; the title (the file's tag once read, else the scan's - "No title tag - this is the file's
+  name" for a file with none); where it sits as the main page's track view says it (`trackPlace`:
+  "Track 2", "Unnumbered", "disc 2 of 2 · <disc title>", its length and format); **Previous** / **Next** in
+  the album's order and **Edit this track…** (the tag editor on that one file). Then **every field the main
+  page offers** - `lib/trackFields.ts`'s whole registry, not only the Fields menu's choice (37 fields: 22
+  Tags, 7 Audio, 5 MusicBrainz, 3 File) - grouped as the main page groups them (`inspectorGroups`): the
+  file's own value where read (it wins), the scan's until then, a dash for a field the file lacks, `…` only
+  for a field the scan can't fill while the file is read, and the dimmed disc 1 of a file with no disc tag
+  with its reason as the tooltip (`inferred`, the main page's); the data face only for a value. Then
+  **Pictures in this file** (each picture's declared type, its pixel size measured as it loads, its bytes
+  and format - `pictureFacts`, the main page's `pictureBytes` - a tap opening that picture alone in the
+  cover viewer), the **lyrics** (the .lrc, else embedded: synced lines with their times, a blank synced
+  line a gap, "synced", where they came from - `lyricsSource` - and the main page's "none" pointing at the
+  Lyrics tab), and **All tags in this file (N)**, a disclosure of every raw tag and the file's name. Read
+  only: it reaches no writer, and nothing about the tag editor or its rules changed. The details are the
+  panel's own `useTrackDetails` (fetched once Tags has been opened, as before); the lyrics are asked as the
+  track shows and again when the folder's mtime or the scan's .lrc count moves (`lyricsKey`), through a
+  latestOnly() - a step on calls the last track's off, and a late answer draws nothing.
+  `api/library.ts` `trackLyrics` gained an optional signal (the main page's call is unchanged).
+- **The panel's layer rules** (app/EditPanel.tsx): `inspecting` (`path`, `filename`, `listTop`), shown only
+  for a track still in the folder shown (`inspected`), is a layer over the Tags tab as the tag editor is:
+  `inner` includes it (useSheet `covered`; the release editor's close passes an 'inner' Escape over), and an
+  Escape inside the panel while it is the Tags tab's top layer (`inspectorTop`: open, not covered, the Tags
+  tab, no tag editor over it) goes back to the list - Escape out in the page is the page's (`escapeFrom()`).
+  One press, one layer: the tag editor (opened from "Edit this track…") closes back to the inspector, the
+  inspector to the list, then the panel closes; the cover viewer stops its own Escape on the window first.
+  Focus: to **Tracks** as it opens (the name tapped went with the list - `focusNext`), back to the track's
+  own name as it closes (by `data-file`, the track it shows THEN - Previous and Next move it), the list
+  scrolled where it was (`listTop`, put back by a layout effect - `restoreView`) and then, when Previous
+  and Next moved past the rows that were in view, on by the least that shows that name (`revealBy`,
+  review); kept on Previous and Next, which are
+  `aria-disabled` at the ends, never `disabled` (a focused button made disabled drops focus to the page);
+  and to "Edit this track…" as the tag editor it opened closes (`closeTagEditor` tries it before the list's
+  button) - the editor opening from its top (`openTagEditor` keeps where the view under it was,
+  `editorOver`) and, as it closes, that view put back and the button brought into view by the same effect
+  (review, second round). It starts afresh for every Edit and every folder chosen, and follows a rename (`follow`). For a
+  screen reader (review) a visually hidden polite, atomic status line, always the inspector's first child,
+  says the track and where it is ("Sour Times, 2 of 11", `trackNow`): the inspector isn't redrawn per step,
+  so a step (focus staying on Previous or Next) changes its words and is spoken, and Back is described by
+  it (`aria-describedby`) as the inspector opens with focus there.
+- **The cover viewer: `app/CoverViewer.tsx`** round the main page's `components/ArtViewer.tsx` (unchanged:
+  zoom about the cursor, drag, pinch, notes/library.md "Looking at a cover close up"), the only way the app
+  reaches it (the release editor's own "Compare full size" aside, inside MetadataEditor). Its own scroll
+  lock (`VIEWER_LOCK`, `app-viewer-open`), focus into its ✕ before the paint and back to the opener (taken
+  in the tap by `takeOpener`) as it closes, Tab kept inside it. Opened from **an album page's cover, on both
+  frames** - the hero cover is now a button carrying `pl-hero-cover` itself, the picture filling it, so it
+  sits where the cover sat on a phone, a desktop and in a drawer's grid; the picture is Navidrome's own,
+  unresized (`coverFullUrl`, the cover route with no `size`; the page's own sized cover its fallback) - from the Edit
+  panel's **Artwork** (the cover, `coverSources(album, 'full')` as the main page opens it; and the CD art,
+  now shown as pictures with their names - the main page's Properties thumbnails - each opening alone),
+  and from the inspector's pictures. The panel's are drawn inside the panel, so they go with its editors.
+  A move through the history while it shows (popstate, hashchange) closes it (review): App keeps each
+  tab's top page mounted, only `hidden`, so a Back onto another tab's entry (a tab switch replaces the
+  entry under a page, so that history is ordinary) left an album page's viewer open in the hidden pane -
+  `app-viewer-open` still on `<html>`, so the page shown couldn't scroll, and ArtViewer's window-capture
+  Escape swallowing that page's next Escape (the Edit panel's, say), and the viewer back on returning.
+  The app's own moves push or replace the address and fire neither event; its in-app Back does, but the
+  viewer's scrim covers it. Chosen over a `shown` prop from App: it closes all three viewers the same way
+  and touches no shared file.
+- **Properties on the album page, both frames** (`app/AlbumProperties.tsx`, `lib/albumProperties.ts`), at
+  the foot under the songs: **Year** ("1994 (this pressing 2014)" when the original year isn't this
+  pressing's - the main page's "(this press …)"), **Size**, **Release** (the id, linked to
+  musicbrainz.org, opening beside the app; "Not tagged with a MusicBrainz release" only once Navidrome's
+  own answer for the album has SAID there is none - its `musicBrainzId` '', or that answer without the
+  field, `releaseSaid` in AlbumPage - never from the bridge's null alone, review) and **First seen** (", filed by deadwax" for a download). Placed on the
+  album page rather than the Edit panel's header because the spec asked for both frames and the phone has no
+  panel yet. They come from the id bridge's answer the page asks already - no new request: since this
+  change its `present` rows carry what the main page's details pane says of the folder
+  (`src/routes/store_album.py` `_facts`): `size` and `original_year` from the saved scan
+  (`library.cached_album`, one folder of the in-memory cache, a copy; `_ensure_cache_loaded` first, so a
+  restart answers before anyone opens the library) and `first_seen`/`imported` from its review row
+  (`JobStore.album_seen`, those paths only) - nothing read from the disk, other pressings' rows untouched,
+  and a failure leaving the rows answered without them. A set kept one folder per disc is one album: sizes
+  added (only when every folder said), the earliest first seen, filed by deadwax when any folder was.
+- **Style** (app.css, its own section at the end, every value a token; `--app-viewer-*`, `--app-props-*`,
+  `--app-inspect-*`, `--app-edit-disc*`, `--app-z-viewer` 35 - over Info and the Edit panel, under the pin
+  notice): frame-agnostic, so the inspector fits a 390px panel as well as 470 (the fields a label column of
+  112px and a value column that breaks ids, paths and strangers' tags anywhere; the actions wrapping) and the
+  viewer and Properties work on a phone (the viewer's frame the screen inside its safe areas, the touch hint
+  under a coarse pointer, 44px ✕ and Close; the release link a finger's height by a negative-margin reach -
+  since review worked out from the list's own type tokens, `--app-props-link-line` (13px × 1.4) and
+  `--app-props-link-reach` ((44 - that) / 2), with `min-height: var(--pl-hit)` because the layout's 64ths
+  of a pixel left the sum 0.03px short, and `position: relative` so the row under it - a grid item drawn
+  after it - no longer takes the bottom of the reach: at 12px fixed it was 42px, about 35 of it hit).
+  Inside the panel on a desktop app-desktop.css's panel rules win where they say more (buttons, words, the
+  panel viewer). app-desktop.css's own section: the album page viewer the panel viewer's size (tokens), a
+  track's name the table's row height, and the rings of the inspector's controls, the track names and
+  (review) Artwork's cover and CD art drawn inside the panel body's clipping edges - a class more than the
+  panel's ring rule (app.css draws those two inside as well).
+- **Not built, on purpose**: the track table's columns (choosing, dragging, sizing - the main page's, by
+  James's decision); the inspector on a phone (it is wherever the Edit panel is; the panel comes to the
+  phone in a later slice - the inspector is styled for it already); comparing two pictures side by side
+  (a tap opens one; the main page opened all of a file's together); "Find on MusicBrainz", the album's
+  issues and the edition pills on the album page (other gaps of the audit, not this slice's).
+- **Verified**: 2447 Python tests (2445 passed, 2 skipped; 16 new - 8 in `test_store_lookup.py`: the rows'
+  facts, a folder nobody knows, one found by a scan, the saved scan after a restart, a set's folders, a
+  failure leaving the rows, `album_seen`, `cached_album`'s copy; 7 in `test_app_css.py`: the viewer over
+  everything but the notice, its lock and touch hint, its targets and rings, the album cover's button, the
+  inspector at 390px, its targets and rings, Properties' breaking and reach; 1 in `test_app_desktop_css.py`),
+  pyflakes, tsc, the bundle, all 49 sims (`inspector` new, 81 checks; `app-rules` 339, extended - two of
+  its Edit panel checks moved to the new spelling, the inspector added as a layer, none weakened; the
+  links-out list gains `app/AlbumProperties.tsx`). 52 mutations, one or more per rule pinned, every file
+  restored byte for byte (checked by hash): 49 caught at once; one got past (the lyrics' `ticket.current()`
+  dropped - the sim answered the older track first, which the key check hides) and the sim now answers the
+  newer first and the older late, and catches it; one could not apply as written and was re-aimed; one was
+  equivalent (facts spread onto the other pressings - only present paths have facts) and was replaced by
+  the facts dropped from the present rows, caught. None was caught only by tsc. The engine guard is empty,
+  `player.sim.cjs` untouched, and `ui/src/components/` and `ui/src/hooks/` have no diff.
+- **Checked in a real page** (headless Chromium over plain http as `deadwax.test`, real mouse and touch
+  input, this change's own instance on :8115 with a scratch database and a hard-linked COPY of the builder36
+  library - Dummy's Sour Times given two embedded pictures and Strangers embedded lyrics on copies whose
+  links were broken first, Mysterons a synced .lrc and the folder a `disc.jpg` as new files - and the
+  stand-in Navidrome on 4533; 59 checks): at 1440x900 the album page's Properties (Year, Size, the release
+  linked beside the app, First seen), the reissue's "1994 (this pressing 2014)"; the cover opened full size
+  (600 × 600, the route with no size), focus on ✕, the page locked, a click zooming to 2x about the point
+  (down the picture; across it held at the clamp, as designed), a drag, the wheel, Escape closing it with
+  focus back on the cover; Tags' names as buttons beside their tick boxes; Sour Times' inspector (focus on
+  Tracks, "Track 2 · 4:14 · FLAC", "2 of 11", the four groups and 22/7/5/3 fields, the dimmed disc with its
+  reason, a dash for Genre), its two pictures with "600 × 600 · 6 KB · JPEG", one opened alone in the
+  viewer inside the panel, zoomed and dragged, Escape closing the viewer alone (focus back on the
+  picture); Next to Strangers (focus kept, embedded plain lyrics), Previous twice to Mysterons (the .lrc's
+  synced lines, the verse gap, "synced", "From 01 - Mysterons.lrc", Previous greyed, keeping focus and
+  refusing the click); All tags (10) with the file's name; Edit this track… on that file, Escape back to
+  the track with focus on Edit this track…; the inspector in a 390px panel (`--app-desk-panel` set to 390px)
+  with nothing past its edges; Escape back to the list (focus on the track's name), Escape again closing the
+  panel; Artwork's CD art as a picture and its cover, each into the viewer and back. At 1024x768 the same
+  Properties, the viewer inside the window, the inspector in the drawer with nothing past its edges, a
+  picture into the viewer. At 390x844 (touch) Properties on the phone's album page, no Edit there, the
+  release id broken inside its column with a 44px link; a tap on the cover opening the viewer with the
+  touch hint, its frame the screen, its ✕ 44px, a two-finger pinch zooming, the ✕ closing it. No sideways
+  scroll anywhere, no console error, exception or dialog.
+- **After review** (thirteen findings, eleven once merged, every one confirmed and fixed): the docs' panel
+  Escape rule naming the inspector as a layer (docs/library.md, and "back to the track or to its tab" in
+  both guides); the viewer closed by a history move (above - it had stayed open in a hidden tab, holding the
+  lock and taking the next Escape); Artwork's cover and CD art rings drawn inside; the track focus goes back
+  to brought into view (it could land out of sight below a list longer than the panel, the next Tab or Enter
+  on a row nobody could see); the screen reader's status line; three wirings app-rules claimed or the docs
+  promised but nothing pinned - "Edit this track…" on that one file (`[filename]`, not the album's
+  tracks), the list's scroll put back by its layout effect, the viewer's sources in order (the unresized
+  cover first); the README's two app paragraphs and notes/sims.md's app-rules line brought up to date; and
+  Properties' link reach from tokens, a whole 44px, all of it hit. Tests: `inspector` 81 → 97 checks (the
+  viewer through popstate and hashchange, through the close given last, nothing listening once shut or
+  gone; `trackNow`; `revealBy`; the status line, first and kept, its words per step, Back described by
+  it); `app-rules` 339 → 343 (the restore effect after the focus hand-on, "Edit this track…"'s one file,
+  the history listeners, the sources' order - and the focus check moved to `trackName`, none weakened);
+  `test_app_css.py` and `test_app_desktop_css.py` extended in place (the two rings; the reach from the
+  list's tokens, `min-height`, `position`) - 2447 Python tests still. 20 mutations, every one caught by a
+  check (none by tsc alone), each file restored and checked by hash: one, the status line drawn only past
+  the first track, was first written as a syntax error and re-aimed, and the check it then reached threw
+  rather than failed - it reads with `?.` now, and says FAIL. Real page (this fixer's own instance on :8116, the same library): Back onto
+  another tab's page with the viewer open at 390x844 touch and 1440x900 - no viewer left, no lock, a finger
+  scrolling the page shown, one Escape closing the Edit panel there, the viewer not back on returning;
+  the link 44px on one line and every row of it hit; both Artwork rings inside the clip; at 1440x560
+  Next ten times from Mysterons and back by Escape or Tracks with Glory Box's name in view, upwards from
+  the foot too, and a list whose row stayed in view put back exactly; the status line's words and its
+  description of Back; Escape in the panel's viewer closing it alone; Back with it open leaving no viewer,
+  panel or lock - 26 checks, and the builder's 59 again, all passing, no console error.
+- **After review, second round** (four findings, each confirmed by skeptics, all fixed): **closing the tag
+  editor opened from "Edit this track…"** put focus on that button out of sight - the editor's scroll stayed
+  on the taller inspector (1526px against the editor's 801), so at 1440x700 scrolled to the editor's foot
+  the button sat at -75 against the body's top of 116, its ring drawn where nobody could see and the next
+  Enter acting unseen. The restore effect is now one for both ways back (`restoreView`: a top to put back
+  and the control to bring into view - the track's name from the inspector, "Edit this track…" or "Edit N
+  tracks…" from the tag editor), and the editor opens from its top, keeping where the view under it was
+  (`editorOver`) - so the list's own way back, which had the same weakness on a long album, is fixed with
+  it. **Properties said "Not tagged with a MusicBrainz release" when Navidrome merely didn't answer**: the
+  bridge's `release_mbid: null` is also its answer when Navidrome couldn't be asked or has no album by that
+  id (`navidrome_release` swallows both - `album_release`'s docstring warns of it), so an old address after
+  a rescan showed the line under "Navidrome has nothing by that id". It now comes only from the album's own
+  answer (`releaseSaid`: its `musicBrainzId`, '' when the answer came without one - 0.64.2 always sends it,
+  the stub leaves it out - a list preview's until it comes); chosen over a flag in the bridge's answer as it
+  touches no shared route. And two checks the docs promised but nothing held: the `…` a field only the file
+  carries shows while it is read (rendered now, so dropping it or the inspector's `details.loading` fails),
+  and what Artwork's two buttons open (the cover `coverSources(album, 'full')`, each CD art picture the very
+  `discArtUrl` its thumbnail shows). Tests: `inspector` 97 → 100 checks, `app-rules` 343 → 346 (two
+  existing checks moved to `restoreView` and `releaseSaid`, none weakened) - 2447 Python tests still. 19
+  mutations, every one caught by a sim (two by tsc as well), each file restored and checked by hash. Real
+  page (this fixer's own instance on :8117, the step1 library, headless Chromium as deadwax.test): at
+  1440x700, 1366x660 and 1440x900, by Cancel clicked, Cancel by Enter and Escape in a field, the editor
+  opening at 0 with its first field in view, and closing back on "Edit this track…" in view with the
+  inspector where it was, the next Enter opening the editor again from its top; an inspector scrolled so
+  the button was half above the top put back and moved on just enough to show it; the list's "Edit all
+  tracks…" the same; Back after Next ten times still on Glory Box's name in view; Properties - nothing for
+  `0000aaaa1111gone` under its error, "Not tagged" for the stub's Windows, Dummy's release linked - 24
+  checks, no console error. With the two fixes undone and the bundle rebuilt, 12 of them failed (the button
+  out of view at 289 and 329, "Not tagged" under the error), and passed again once restored.
+- **NOT verified**: a real Navidrome's unresized cover (its original file; the stub's is 600px), an iPhone
+  (the pinch, the touch hint, the release link opening beside the app in a home-screen app, the back
+  gesture closing the viewer), VoiceOver (the inspector's headings and lists, its status line spoken on a
+  step, the viewer as a dialog), an iPad on its side (44px targets in the panel), a track with dozens of
+  pictures or a huge raw tag list, a real Navidrome's untagged album saying "Not tagged" (its
+  `musicBrainzId: ""`, read from 0.64.2's source, never seen from a running one), and the merge with
+  2.0.0-player.43.

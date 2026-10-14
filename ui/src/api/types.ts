@@ -531,13 +531,30 @@ export interface StoreRow {
   track_count: number
 }
 
+/**
+ * What the main page's details pane says of a folder that its store row doesn't hold (2.0.0-player.44) -
+ * an album page's Properties. On the bridge's `present` rows only, read without touching the disk, and
+ * left out altogether when the store couldn't say.
+ */
+export interface StoreFacts {
+  /** bytes, the folder's tracks as the saved scan read them; null while the scan holds no copy of it */
+  size?: number | null
+  /** the year of the folder's `originaldate` tag - '' for none, which is most libraries */
+  original_year?: string
+  /** when deadwax first saw the folder (ISO) - null for one it has no record of */
+  first_seen?: string | null
+  /** deadwax filed it (a download), rather than finding it there */
+  imported?: boolean
+}
+
 /** GET /store/album?release_mbid=|navidrome_id= (2.0.0-player.17): one album across its ids. */
 export interface StoreAlbumResponse {
   release_mbid: string | null
   release_group_mbid: string | null
   /** Navidrome's album for the release; null when Navidrome doesn't have it or can't be asked */
   navidrome_id: string | null
-  present: StoreRow[]
+  /** the store's live folders of the release - each with what the scan and its review row say of it */
+  present: (StoreRow & StoreFacts)[]
   other_pressings: (StoreRow & { navidrome_id: string | null })[]
 }
 

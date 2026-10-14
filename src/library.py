@@ -717,6 +717,21 @@ def seed_cache(entries: list[tuple[str, float, dict]]) -> int:
     return taken
 
 
+def cached_album(library_root: str, album_path: str) -> dict | None:
+    """
+    One album folder as the scan cache last read it - a shallow copy, never the cached dict - or None.
+
+    WITHOUT touching the disk, like snapshot_library, and for one folder: what the id bridge's rows
+    carry of the scan (2.0.0-player.44 - an album page's Properties: the folder's size, its original
+    year). `album_path` is relative to the root, as the scan reports it; the cache keys on the folder's
+    absolute path as os.walk spelled it, which joining onto the root reproduces.
+    """
+    if not library_root or not album_path:
+        return None
+    entry = _album_cache.get(str(Path(library_root) / album_path))
+    return dict(entry[1]) if entry else None
+
+
 def drain_cache_changes() -> tuple[list[tuple[str, float, dict]], list[str]]:
     """
     What has changed since the last call: entries to save, and cache keys to delete.

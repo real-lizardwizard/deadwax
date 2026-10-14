@@ -3,15 +3,20 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { storeAlbum } from '../api/store'
 import type { StoreAlbumResponse } from '../api/types'
+import type { ViewerImage } from '../components/ArtViewer'
+import { AlbumProperties } from '../app/AlbumProperties'
+import { CoverViewer } from '../app/CoverViewer'
 import { PINS_UNSAVED, PinToggle } from '../app/PinToggle'
+import { takeOpener } from '../app/useSheet'
 import { sayPins, setPinned, usePins } from '../app/usePins'
 import { discHeadings } from '../lib/discTitles'
 import { formatDuration, sharedFormat, trackTime } from '../lib/format'
 import { editAlbum, type EditAlbum } from '../lib/albumEdit'
+import { albumProperties } from '../lib/albumProperties'
 import { alsoChips, otherPressingsGroup } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
-import { album as fetchAlbum, prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
+import { album as fetchAlbum, coverFullUrl, coverUrl, prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
 import type { Player } from './usePlayer'
@@ -67,6 +72,12 @@ import type { Player } from './usePlayer'
  * and the bridge are asked afresh and what is drawn stays until they answer - a refresh that fails
  * keeps it, since the album may be under a new id Navidrome hasn't scanned yet (App moves the page to
  * it once found).
+ *
+ * Since 2.0.0-player.44, on both frames: the cover opens full size in the cover viewer (app/CoverViewer.tsx,
+ * the main page's ArtViewer - it only reads), Navidrome's own picture unresized; and at the foot, under the
+ * songs, the album's Properties (app/AlbumProperties.tsx, lib/albumProperties.ts) - its year against this
+ * pressing's, its size, its release on musicbrainz.org (opening beside the app) and when deadwax first saw
+ * it - from the bridge's answer the page asks already, drawn once it has answered.
  */
 export function AlbumPage({
   id,
@@ -108,6 +119,9 @@ export function AlbumPage({
   const [storeFailed, setStoreFailed] = useState(false)
   const storeRequests = useMemo(latestOnly, [])
   const { pins, known: pinsKnown, canSave } = usePins(true)
+  //? the cover, full size (2.0.0-player.44), and the control that opened it - focus goes back there
+  const [viewing, setViewing] = useState<ViewerImage[] | null>(null)
+  const viewOpener = useRef<HTMLElement | null>(null)
 
   //? the refresh last asked for: a new one is an edit's (2.0.0-player.21), asked afresh and drawn over
   //? what is on screen rather than blanking it
@@ -155,6 +169,11 @@ export function AlbumPage({
   }, [id, refresh, storeRequests])
 
   const shown: Album | null = album ?? (preview?.id === id ? preview : null)
+  //? what Navidrome has said of the album's release, for Properties' "not tagged" (review - never the
+  //? bridge's null alone, which is also its answer for an id Navidrome doesn't have): the album's own
+  //? answer's `musicBrainzId`, '' when that answer came without one (Navidrome 0.64.2 always sends it, ''
+  //? for none; a server leaving it out has still answered for the album), a list's preview's until then
+  const releaseSaid = album ? album.musicBrainzId ?? '' : shown?.musicBrainzId
   const songs = album?.song ?? []
   const tracks = useMemo(() => (album ? songs.map((song) => toQueueTrack(song, album)) : []), [album])
   const headings = discHeadings(songs, album?.discTitles)
@@ -200,7 +219,27 @@ export function AlbumPage({
       </header>
 
       <div class="pl-album-hero">
-        <Cover id={shown?.coverArt} size={800} class="pl-hero-cover" />
+        {shown?.coverArt ? (
+          //? the hero's cover is the button (its class, so it sits where the cover sits on both frames),
+          //? the picture filling it
+          <button
+            type="button"
+            class="pl-hero-cover app-cover-open"
+            aria-label="See the cover full size"
+            onClick={(event) => {
+              viewOpener.current = takeOpener(event)
+              setViewing([{
+                label: shown.name ?? '',
+                sources: [coverFullUrl(shown.coverArt), coverUrl(shown.coverArt, 800)].filter((source): source is string => !!source),
+                missing: 'Navidrome has no cover for this album',
+              }])
+            }}
+          >
+            <Cover id={shown.coverArt} size={800} class="app-cover-open-img" />
+          </button>
+        ) : (
+          <Cover id={shown?.coverArt} size={800} class="pl-hero-cover" />
+        )}
         <h1 class="pl-hero-title">{shown?.name ?? ''}</h1>
         {artistId && artistName && onArtist ? (
           <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist({ id: artistId, name: artistName })}>
@@ -315,6 +354,11 @@ export function AlbumPage({
           {total ? `, ${formatDuration(total)}` : ''}
         </p>
       )}
+
+      {/* what the main page's details pane says of the album (2.0.0-player.44), once the bridge has answered */}
+      <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid)} />
+
+      <CoverViewer images={viewing} onClose={() => setViewing(null)} opener={viewOpener} />
     </section>
   )
 }
