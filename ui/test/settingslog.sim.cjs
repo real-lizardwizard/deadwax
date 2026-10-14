@@ -20,7 +20,14 @@
  *    bar's live region its words alone, never its buttons; the drafts, the refusal and the tab outliving
  *    the page (left for a sibling, Back, Go to album - and mid-save), two copies drawn being one page,
  *    each told to draw again as it changes and a copy gone told nothing;
- *    the arrow keys moving through the tabs; on a phone a note, with nothing asked.
+ *    the arrow keys moving through the tabs; for anyone deadwax says isn't its admin a note, with nothing
+ *    asked (2.0.0-player.47: told `admin`, never the frame - a phone draws both pages as a desktop does,
+ *    where they were a note pointing at the main page until then); the page opened at a tab of its own
+ *    (showServerSettingsTab - the Navidrome gate's "Set up Navidrome" opens Connections), and each save
+ *    the server took told with the keys it carried (onServerSettingsSaved - App asks Navidrome again,
+ *    through lib/navidromeCheck.ts, driven here: only the newest answer draws, a failure and an AbortError
+ *    included, and an ask after a save is QUIET while the gates are open - the status kept, so nothing
+ *    under them unmounts - but a spinner while they are closed, as Try again's).
  *  - THE LOG: the history read, then the stream opened from its last number; history and stream joined
  *    by number - no gap, no line twice (the replay and a reconnect included); another run (deadwax
  *    restarted) starting again from its own numbers; a line holding markup drawn as its text, no element
@@ -30,7 +37,7 @@
  *    page is not what shows, and rejoined from the history on coming back; the lines, a Clear and a gap
  *    outliving the page (the page told to draw again by the history and by each line, and a page left told
  *    nothing); the history's and the stream's addresses as the REAL api/logs.ts makes them
- *    (deadwax faked at fetch, never the module); on a phone a note, with nothing asked.
+ *    (deadwax faked at fetch, never the module); for anyone but the admin a note, with nothing asked.
  *
  * Run it with:  node ui/test/settingslog.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -51,7 +58,7 @@ const settle = () => new Promise((resolve) => setImmediate(() => setImmediate(re
 
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-settingslog-'))
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/ServerSettings.tsx', 'src/app/EventLog.tsx', '--rootDir', 'src', '--outDir', OUT,
+  'src/app/ServerSettings.tsx', 'src/app/EventLog.tsx', 'src/app/navidromeSetUp.ts', 'src/lib/navidromeCheck.ts', '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -130,7 +137,10 @@ const L = require(path.join(OUT, 'lib/eventLog.js'))
 const S = require(path.join(OUT, 'lib/serverSettings.js'))
 const API = require(path.join(OUT, 'api/logs.js'))
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
-const { ServerSettings, forgetServerSettingsPage } = require(path.join(OUT, 'app/ServerSettings.js'))
+const { ServerSettings, forgetServerSettingsPage, showServerSettingsTab, onServerSettingsSaved } = require(path.join(OUT, 'app/ServerSettings.js'))
+const R = require(path.join(OUT, 'lib/appRoutes.js'))
+const NS = require(path.join(OUT, 'app/navidromeSetUp.js'))
+const NC = require(path.join(OUT, 'lib/navidromeCheck.js'))
 const { EventLog, forgetEventLogPage } = require(path.join(OUT, 'app/EventLog.js'))
 //? a fresh page: the asks forgotten, and what both pages keep beyond their own life (their modules)
 const reset = () => {
@@ -172,7 +182,7 @@ const button = (label) => find((node) => node.type === 'button' && words(node).t
 
 function mount(component, props) {
   const render = hooks.root(component)
-  const all = { desktop: true, live: true, backLabel: 'You', onBack() {}, ...props }
+  const all = { admin: true, live: true, backLabel: 'You', onBack() {}, ...props }
   const draw = (more = {}) => {
     Object.assign(all, more)
     tree = expand(render(all))
@@ -299,15 +309,129 @@ const tab = (id) => find((node) => node.props?.role === 'tab' && node.props['dat
 const savebar = () => words(classed('app-settings-savebar-text')[0])
 
 async function settingsPage() {
-  console.log('\nserver settings: on a phone, a note - and nothing asked')
+  console.log('\nserver settings: not the admin, a note - and nothing asked')
   {
     reset()
-    const phone = mount(ServerSettings, { desktop: false })
-    phone.draw()
-    const link = find((node) => node.type === 'a')[0]
-    check('the note, and the main page beside the app', [words(classed('app-settings-phone')[0]).replace(/\s+/g, ' '), link.props.target, link.props.rel],
-      ["Changing deadwax's settings needs a wider screen for now - or the main page.", '_blank', 'noopener'])
+    const refused = mount(ServerSettings, { admin: false })
+    refused.draw()
+    check('the note, and no link out (the phone\'s pointer at the main page went in 2.0.0-player.47)',
+      [words(classed('app-placeholder-text')[0]), find((node) => node.type === 'a').length], [R.MANAGING_ADMINS_ONLY, 0])
     check('...nothing read', W.reads.length, 0)
+    //? the page knows no frame: what was a desktop's is drawn for the admin, whatever App might hand it
+    refused.draw({ admin: true, desktop: false })
+    check('...the admin, told nothing of the frame: read', W.reads.length, 1)
+    refused.unmount()
+  }
+
+  console.log('\nthe Navidrome gate\'s "Set up Navidrome" (app/navidromeSetUp.ts): what App says it does')
+  {
+    const calls = []
+    NS.setUpNavidrome()
+    check('nothing said yet: the button does nothing (and throws nothing)', calls, [])
+    const offFirst = NS.setUpNavidromeBy(() => calls.push('first'))
+    NS.setUpNavidrome()
+    const offSecond = NS.setUpNavidromeBy(() => calls.push('second'))
+    NS.setUpNavidrome()
+    offFirst()
+    NS.setUpNavidrome()
+    check('...said: each press does it; the newest saying wins, and an older off switch leaves the newer', calls, ['first', 'second', 'second'])
+    offSecond()
+    NS.setUpNavidrome()
+    check('...its own off switch: nothing again', calls, ['first', 'second', 'second'])
+  }
+
+  console.log('\nNavidrome asked for every gate (lib/navidromeCheck.ts): only the newest answer, and quietly after a save')
+  {
+    //? App's useState, by hand: every value the gates were handed kept, in order
+    let status = null
+    const drawn = []
+    const show = (next) => { status = next(status); drawn.push(status) }
+    const asked = []
+    const ask = (signal) => new Promise((resolve, reject) => asked.push({ resolve, reject, signal }))
+    const asks = NC.navidromeChecks(ask, show)
+    const OK = (server) => ({ configured: true, ok: true, server, problem: null })
+    const DOWN = (problem) => ({ configured: true, ok: false, server: null, problem })
+
+    asks.check()
+    check('check (start-up, Try again): the status put away at once - every gate a spinner - and one ask out', [status, asked.length], [null, 1])
+    asked[0].resolve(OK('Navidrome 0.58.0'))
+    await settle()
+    check('...its answer drawn', status, OK('Navidrome 0.58.0'))
+
+    //? a working setup, a password retyped and saved: the gates must not let go of what they guard
+    const working = status
+    drawn.length = 0
+    asks.recheck()
+    check('recheck after a save, the gates open: the status drawn KEPT while it asks - the same one, never null', [status === working, drawn.every((value) => value === working), asked.length], [true, true, 2])
+    asked[1].resolve(OK('Navidrome 0.58.0'))
+    await settle()
+    check('...the answer drawn as it lands, still open', [status.ok, drawn.includes(null)], [true, false])
+
+    //? the race (review): an address that doesn't answer saved, then the fix saved inside its 10 s
+    asks.recheck()
+    const slow = asked[2]
+    asks.recheck()
+    check('a second save while the first\'s ask is out: the first called off', [slow.signal?.aborted, asked.length], [true, 4])
+    asked[3].resolve(OK('Navidrome 0.58.0'))
+    await settle()
+    slow.resolve(DOWN("Navidrome couldn't be reached at http://127.0.0.1:4533: ConnectTimeout"))
+    await settle()
+    check('...the newer answer stands: the older one, landing last, draws nothing - the gates stay open', [status.ok, drawn.filter((value) => value && !value.ok).length], [true, 0])
+
+    //? a failure is drawn only while its ask is the newest - an aborted fetch's AbortError never
+    asks.recheck()
+    const called = asked[4]
+    asks.recheck()
+    called.reject(Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }))
+    await settle()
+    check('an ask called off failing (its AbortError): nothing drawn of it', status.ok, true)
+    asked[5].reject(new Error('Failed to fetch'))
+    await settle()
+    check('...the newest failing: drawn as the gates\' reason, closing them', status, DOWN('Error: Failed to fetch'))
+
+    //? a gate not open: it shows its spinner while it asks, as Try again does
+    status = { configured: false, ok: false, server: null, problem: 'Navidrome isn\'t set up.' }
+    asks.recheck()
+    check('recheck with the gates closed (a first run set up from Connections): a spinner while it asks', status, null)
+    asked[6].resolve(OK('Navidrome 0.58.0'))
+    await settle()
+    check('...and they open by themselves as it answers', status.ok, true)
+
+    //? Try again during a quiet ask: the spinner, and only Try again's answer
+    asks.recheck()
+    asks.check()
+    check('check while a quiet ask is out: the spinner, the quiet one called off', [status, asked[7].signal?.aborted], [null, true])
+    asked[7].resolve(DOWN('stale'))
+    asked[8].resolve(OK('Navidrome 0.58.0'))
+    await settle()
+    check('...only the newest drawn', status.ok, true)
+
+    //? App going: the ask out called off and nothing drawn of it
+    drawn.length = 0
+    asks.check()
+    const before = drawn.length
+    asks.stop()
+    asked[9].resolve(DOWN('after the app went'))
+    await settle()
+    check('stop: the ask out called off, nothing drawn after', [asked[9].signal?.aborted, drawn.length === before], [true, true])
+  }
+
+  console.log('\nserver settings: opened at a tab (the Navidrome gate\'s "Set up Navidrome" opens Connections)')
+  {
+    reset()
+    showServerSettingsTab('connections')
+    const opened = mount(ServerSettings, {})
+    opened.draw()
+    W.reads[0].resolve(SETTINGS())
+    await settle()
+    opened.draw()
+    check('the page drawn at Connections, its groups', [find((node) => node.props?.role === 'tab' && node.props['aria-selected']).map((node) => node.props['data-tab']), classed('settings-section-title').map(words)],
+      [['connections'], ['Connections']])
+    type('ORGANIZE_MODE', 'copy')
+    showServerSettingsTab('library')
+    opened.draw()
+    check('...another tab asked for: shown, a draft left as it was', [tab('library').props['aria-selected'], savebar()], [true, '1 unsaved change'])
+    opened.unmount()
   }
 
   console.log('\nserver settings: read when it shows, its groups drawn from the main page\'s parts')
@@ -348,6 +472,12 @@ async function settingsPage() {
   check('the save bar there and saying nothing; no save button yet', [classed('app-settings-savebar').length, savebar(), !!button('Save changes')], [1, '', false])
 
   console.log('\nserver settings: drafts across the tabs, one save')
+  //? (2.0.0-player.47) each save the server takes is told, with the keys it carried
+  const told = []
+  const off = onServerSettingsSaved((keys) => told.push([...keys].sort()))
+  //? ...and one never let go, to count every save taken after the first is let go
+  const everySave = []
+  onServerSettingsSaved((keys) => everySave.push(keys))
   type('ORGANIZE_MODE', 'copy')
   page.draw()
   tab('connections').props.onClick()
@@ -393,6 +523,7 @@ async function settingsPage() {
   check('refused: said in the bar, every draft still there, nothing on the page changed',
     [savebar(), classed('is-edited').filter(byClass('settings-env')).length, input('NAVIDROME_URL').props.value, classed('app-settings-savebar')[0].props.class.includes('has-error')],
     ['Not saved: NAVIDROME_URL: has a user name or password in it - leave the login to NAVIDROME_USER', 2, 'http://elsewhere:4533', true])
+  check('...and nothing told of a save the server refused', told, [])
 
   console.log('\nserver settings: read again on coming back - only with no draft')
   page.draw({ live: false })
@@ -406,6 +537,7 @@ async function settingsPage() {
   await settle()
   page.draw()
   check('saved: the server\'s answer drawn, the drafts gone, "Saved."', [input('NAVIDROME_URL').props.value, savebar(), classed('is-edited').filter(byClass('settings-env')).length], ['http://elsewhere:4533', 'Saved.', 0])
+  check('...and told, with the keys it carried (App asks Navidrome again for one of these)', told, [['NAVIDROME_PASSWORD', 'NAVIDROME_URL', 'ORGANIZE_MODE']])
   page.draw({ live: false })
   page.draw({ live: true })
   check('back with no draft: read again (a volume just fixed shows as fixed)', W.reads.length, 2)
@@ -432,6 +564,8 @@ async function settingsPage() {
   await settle()
   page.draw()
   check('...the row as the save answered: the environment\'s, no revert offered', [input('LIBRARY_PATH').props.value, !!button('Revert to the environment (/data/music)')], ['/data/music', false])
+  check('...told too, its one key', told.at(-1), ['LIBRARY_PATH'])
+  off()
   page.unmount()
 
   {
@@ -717,6 +851,8 @@ async function settingsPage() {
     check('...nor does a revert of another setting', refused(), false)
     lead.unmount()
   }
+  //? the saves since the listener was let go (off(), above) told it nothing
+  check('a listener let go is told of no save after it (saves taken since: some)', [told.length, everySave.length > told.length], [2, true])
 }
 
 /* ===== the log page ===== */
@@ -725,15 +861,18 @@ const logLine = (seq, words, more = {}) => ({ event_type: 'INFO', event_content:
 const drawnLines = () => classed('app-log-words').map(words)
 
 async function logPage() {
-  console.log('\nthe log: on a phone, a note - and nothing asked')
+  console.log('\nthe log: not the admin, a note - and nothing asked')
   {
     reset()
-    const phone = mount(EventLog, { desktop: false })
-    phone.draw()
-    const link = find((node) => node.type === 'a')[0]
-    check('the note, and the main page beside the app', [words(classed('app-log-phone')[0]).replace(/\s+/g, ' '), link.props.target, link.props.rel],
-      ['The log needs a wider screen for now - or the main page.', '_blank', 'noopener'])
+    const refused = mount(EventLog, { admin: false })
+    refused.draw()
+    check('the note, and no link out (the phone\'s pointer at the main page went in 2.0.0-player.47)',
+      [words(classed('app-placeholder-text')[0]), find((node) => node.type === 'a').length], [R.MANAGING_ADMINS_ONLY, 0])
     check('...no history asked, no stream opened', [W.recents.length, W.sources.length], [0, 0])
+    //? the page knows no frame: what was a desktop's is drawn for the admin, whatever App might hand it
+    refused.draw({ admin: true, desktop: false })
+    check('...the admin, told nothing of the frame: the history asked', W.recents.length, 1)
+    refused.unmount()
   }
 
   console.log('\nthe log: the history, then the stream from its last number')

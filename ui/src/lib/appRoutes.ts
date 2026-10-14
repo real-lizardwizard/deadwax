@@ -81,6 +81,11 @@ export const LOG_PAGE: Page = { kind: 'log', id: LOG_ID, label: 'Log' }
 export const CARE_ID = 'library'
 export const CARE_PAGE: Page = { kind: 'care', id: CARE_ID, label: 'Library care' }
 
+/** What a Managing page says, in place of itself, to someone deadwax says isn't its admin (2.0.0-player.47:
+ *  the four pages are on both frames now - until then a phone's note stood here, pointing at the main
+ *  page). With logins off everyone is the admin, so nobody sees it yet. */
+export const MANAGING_ADMINS_ONLY = "Only deadwax's admin can open this page."
+
 /** The Managing pages that are one page each, by kind: an address's id is made this one. */
 const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID, care: CARE_ID }
 

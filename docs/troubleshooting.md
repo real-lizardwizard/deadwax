@@ -269,8 +269,8 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
 - **An empty library** when you know it isn't empty usually means the volume isn't mounted in
   the container. Settings → Library shows whether the path exists.
 - **A change made by another program doesn't show up**: tags edited elsewhere don't change a
-  folder's date, which is what the library watches. Press **Rescan** (in the app on a desktop:
-  **Managing → Library care**).
+  folder's date, which is what the library watches. Press **Rescan** (in the app: **Library care** -
+  the desktop sidebar's **Managing → Library care**, or **You → Library care** on a phone or a desktop).
 
 ## Lots of albums say "Folder off-convention"
 
@@ -505,7 +505,7 @@ Home's **Edit** says **Not saved: …** under the list instead. The reasons:
 
 ## The app's Edit panel can't find the album's folder
 
-On a desktop, an album page's **Edit** finds the album's folder by its MusicBrainz release, or - for
+An album page's **Edit** (on a phone as on a desktop) finds the album's folder by its MusicBrainz release, or - for
 an album Navidrome knows by no release - by its name among the library's untagged folders ([how it
 finds it](library.md#editing-an-album-in-the-app)). What it says when it can't:
 
@@ -532,8 +532,9 @@ finds it](library.md#editing-an-album-in-the-app)). What it says when it can't:
 - **LIBRARY_PATH is not set**: the panel needs the library, as the main page's Library tab does - see
   [the library tab is empty](#the-library-tab-is-empty-or-doesnt-show-a-change).
 
-**Edit** itself is missing on a phone (there's no editor there yet), in a window under 1024 pixels
-wide, and for someone deadwax says isn't an admin - with logins off, nobody.
+**Edit** itself is missing only for someone deadwax says isn't an admin - with logins off, nobody. On a
+phone (a window under 1024 pixels wide) it's at the top of the album's page, beside the pin, rather than
+after **Play** and **Shuffle**; until 2.0.0-player.47 a phone had none.
 
 ## The app's "Needs a look" count changes when you open it, or has none
 
@@ -557,8 +558,6 @@ album with an issue you haven't accepted, and every album deadwax filed that nob
   more than five minutes old, so after Navidrome scans the number can lag until the page has read the
   library again - a read asks Navidrome behind itself, so it's the read after it, or a **Rescan**
   (which waits for Navidrome's answer), that brings the new answer in.
-- **The page is missing on a phone**: it's a short note there, pointing at the main page, which has
-  the same queue (**Review N**). There's no editor on a phone yet.
 
 ## An album says "Not in Navidrome"
 
@@ -629,7 +628,7 @@ can be written as `PUID`/`PGID`, then restart deadwax.
 
 ## The app's Log is missing lines, says "The stream was lost", or starts empty
 
-The app's **Log** (on a desktop: the sidebar's **Managing → Log**, or **You → Log**) shows the same
+The app's **Log** (the desktop sidebar's **Managing → Log**, or **You → Log** on a phone or a desktop) shows the same
 lines as the main page's log, newest first. As it opens it reads what deadwax kept: **the last 500
 lines since deadwax started** - nothing from before a restart (a Komodo redeploy starts it empty), and
 nothing older than those 500. Then it follows deadwax live, joining the two so no line is missing or
@@ -645,13 +644,12 @@ shown twice.
   shows only what deadwax logs from then on. The next time it opens (leave the page and come back) it
   reads the history again and fills in the earlier lines it missed.
 - **It only follows while it is showing.** Leave the page, put the app in the background or open the
-  visualizer over it and it stops listening; it catches up as it shows again. That is on purpose: a
+  visualizer (or, on a phone, the now-playing screen) over it and it stops listening; it catches up as it shows again. That is on purpose: a
   connection held open is one of the few a browser allows to deadwax, and the player's music uses
   them too. So there is no count of unread lines anywhere.
 - **Clear** empties the page only, which then says **Cleared**. Nothing on the server is cleared, and
   the lines cleared don't come back when you return; deadwax's own container log is untouched either
   way.
-- **On a phone** the page is a short note pointing at the main page, which has the log too.
 
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
@@ -665,7 +663,9 @@ says "deadwax needs Navidrome for your library" and to set it up in deadwax's se
 
 - **Connect Navidrome**: the three Navidrome settings aren't all set. Fill in `NAVIDROME_URL`,
   `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections, which marks the one
-  that's missing. The container's log also names it at start-up.
+  that's missing. The container's log also names it at start-up. In the app, **Set up Navidrome**
+  under the reason opens the app's own **Server settings** at **Connections** (on a phone too, since
+  2.0.0-player.47); once the three are saved there the app asks Navidrome again by itself.
 - **"NAVIDROME_URL is unusable (…), so deadwax sends nothing to it"**: the address in your
   compose file or `.env` fails the check the settings tab makes on save - a user name or
   password in it, a `?` or `#`, a space, no `http://` - and the brackets say which. deadwax won't

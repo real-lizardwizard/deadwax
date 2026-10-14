@@ -111,8 +111,10 @@ type EscapeFrom = 'page' | 'inner' | 'panel' | null
  * release editor's close (listening whatever tab shows) passes it over too: one press, one layer. Taken
  * in the capture phase, ahead of their listeners and before any of them has changed anything, and
  * true only while that event is still on its way (its eventPhase is 0 once it has been dispatched).
+ * A SHEET (`modal`, a phone's - 2.0.0-player.47) has no page beside it: everything behind it is inert,
+ * so an Escape from outside its box (focus fallen to the body) is the sheet's, never the page's.
  */
-function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean }): () => EscapeFrom {
+function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean }, modal: { current: boolean }): () => EscapeFrom {
   const escape = useRef<{ event: Event; from: Exclude<EscapeFrom, null> } | null>(null)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -120,7 +122,7 @@ function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean })
         escape.current = null
         return
       }
-      const from = !box.current?.contains(event.target as Node | null) ? 'page' : inner.current ? 'inner' : 'panel'
+      const from = !modal.current && !box.current?.contains(event.target as Node | null) ? 'page' : inner.current ? 'inner' : 'panel'
       escape.current = { event, from }
     }
     document.addEventListener('keydown', onKeyDown, true)
@@ -179,14 +181,19 @@ function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean })
  * (or the panel going) - a write straight after an apply (CD art, a hand edit) must not leave the page
  * on an id Navidrome no longer has.
  *
- * A side panel like Sources and Info (useSheet.ts), and the desktop's alone: not modal, no scroll
- * lock, focus in to the close button and back to Edit, Escape closing it only from inside it - and
- * an editor's own Escape (they listen on the document) passed over when it came from the page. The
- * tag editor and the delete confirmation are a layer over their tab: Escape in them closes them alone
- * (useSheet's `covered`, and the release editor's close passing it over). A control that removes
- * itself hands focus on inside the panel, never to the page. It stays mounted while the desktop frame
- * shows; the editors in it are let go once it has closed (at once as a column, once a drawer has slid
- * away), so nothing of theirs - the cover viewer's Escape on the window - outlives it.
+ * On a desktop a side panel like Sources and Info (useSheet.ts): not modal, no scroll lock, focus in to
+ * the close button and back to Edit, Escape closing it only from inside it - and an editor's own Escape
+ * (they listen on the document) passed over when it came from the page. ON A PHONE (2.0.0-player.47) a
+ * sheet over the whole screen, as the artist page's panel is: modal - App makes everything behind it
+ * inert, the tab bar and the mini player included - with a scroll lock of its own (`app-edit-open`),
+ * focus in and back the same way, and every Escape its own; unlike the app's other sheets a tap on the
+ * backdrop beside it closes nothing, since what it holds is typed work. It stays open across 1024px, a panel one
+ * side and a sheet the other. The tag editor, the track inspector and the delete confirmation are a
+ * layer over their tab: Escape in them closes them alone (useSheet's `covered`, and the release editor's
+ * close passing it over). A control that removes itself hands focus on inside the panel, never to the
+ * page. It stays mounted on both frames; the editors in it are let go once it has closed (at once as a
+ * column, once a drawer or a sheet has slid away), so nothing of theirs - the cover viewer's Escape on
+ * the window - outlives it.
  */
 export function EditPanel({
   open,
@@ -202,12 +209,14 @@ export function EditPanel({
   opener?: { current: HTMLElement | null } | undefined
   onClose: () => void
   onChanged: (change: AlbumChange) => void
-  /** how it is drawn: a drawer over the page's edge, or a third column */
+  /** how it is drawn: a drawer over the page's edge, a third column - or, on a phone, a sheet */
   panel?: PanelStyle
   /** the desktop's visualizer is over everything (2.0.0-player.20): inert under it, an Escape the visualizer's */
   covered?: boolean
 }) {
   const modal = panelIsModal(panel)
+  const modalNow = useRef(modal)
+  modalNow.current = modal
   const box = useRef<HTMLDivElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -260,7 +269,7 @@ export function EditPanel({
   const writes = useRef(0)
 
   //? The editors let go once the panel has closed - at once as a column (gone in a frame), once a
-  //? drawer has slid away - so nothing in them outlives it: the cover viewer, left open, would go on
+  //? drawer or a phone's sheet has slid away - so nothing in them outlives it: the cover viewer, left open, would go on
   //? taking the next Escape anywhere in the app (it listens on the window). Every Edit is a new
   //? request, so nothing worth keeping goes with them.
   const [letGo, setLetGo] = useState(!open)
@@ -269,7 +278,7 @@ export function EditPanel({
       setLetGo(false)
       return
     }
-    const timer = setTimeout(() => setLetGo(true), panel === 'drawer' ? EDIT_SLIDE_MS : 0)
+    const timer = setTimeout(() => setLetGo(true), panel === 'column' ? 0 : EDIT_SLIDE_MS)
     return () => clearTimeout(timer)
   }, [open])
   const drawn = !!subject && !!request && !deleted && !letGo
@@ -287,7 +296,7 @@ export function EditPanel({
   const innerNow = useRef(inner)
   innerNow.current = inner
   useSheet({ open, covered: inner || covered, onClose, lockClass: 'app-edit-open', first: closeButton, opener, modal, area: box })
-  const escapeFrom = useEscapeFrom(box, innerNow)
+  const escapeFrom = useEscapeFrom(box, innerNow, modalNow)
 
   //? A control that removes itself (Edit N tracks…, the tag editor's Close, Delete's Cancel, Look
   //? again, a folder chosen) hands focus on inside the panel once the swap has drawn - never to the
@@ -746,11 +755,14 @@ export function EditPanel({
   const queue = isFolderRequest(request) ? request.queue : undefined
 
   return (
-    <div class={`app-layer app-edit-layer${open ? ' is-open' : ''} is-panel is-${panel}`} aria-hidden={!open || covered} inert={!open || covered}>
-      <div class="app-backdrop" onClick={onClose} />
-      {/* the box takes focus from a click on anything in it that can't, so Escape there is still
-          from inside it */}
-      <div ref={box} class="app-edit" role="dialog" aria-modal={modal ? 'true' : 'false'} aria-labelledby="app-edit-title" tabIndex={-1}>
+    <div class={`app-layer app-edit-layer${open ? ' is-open' : ''}${modal ? ' is-sheet' : ` is-panel is-${panel}`}`} aria-hidden={!open || covered} inert={!open || covered}>
+      {/* the backdrop takes a tap and closes nothing (2.0.0-player.47, review): a desktop's panel draws none,
+          and beside a phone's sheet - a phone on its side, an iPad upright, where thumbs rest - a stray tap
+          would throw away an edit half made. The sheet's ✕, Escape and the editors' own Cancel close it */}
+      <div class="app-backdrop" />
+      {/* a panel's box takes focus from a click on anything in it that can't, so Escape there is still
+          from inside it - a sheet's has no tabindex (2.0.0-player.47: every Escape is the sheet's) */}
+      <div ref={box} class="app-edit" role="dialog" aria-modal={modal ? 'true' : 'false'} aria-labelledby="app-edit-title" tabIndex={modal ? undefined : -1}>
         <header class="app-edit-head">
           <h2 id="app-edit-title" class="app-edit-title">Edit album</h2>
           <button ref={closeButton} type="button" class="app-edit-close" aria-label="Close the editor" onClick={onClose}>
@@ -892,6 +904,7 @@ export function EditPanel({
                 ) : (
                   <TagsList
                     album={subject}
+                    sheet={modal}
                     checked={checked}
                     onTick={tick}
                     onTickAll={tickAll}
@@ -938,6 +951,7 @@ export function EditPanel({
  */
 function TagsList({
   album,
+  sheet,
   checked,
   onTick,
   onTickAll,
@@ -945,6 +959,8 @@ function TagsList({
   onInspect,
 }: {
   album: LibraryAlbum
+  /** a phone's sheet: there is no Shift to tick a run with */
+  sheet: boolean
   checked: ReadonlySet<string>
   onTick: (filename: string, range: boolean) => void
   onTickAll: (on: boolean) => void
@@ -965,7 +981,7 @@ function TagsList({
           {count ? `Edit ${count} track${count === 1 ? '' : 's'}…` : 'Edit all tracks…'}
         </button>
         <span class="app-edit-note">
-          {count ? `${count} of ${tracks.length} ticked` : 'Tick tracks to edit only those; Shift ticks a run.'}
+          {count ? `${count} of ${tracks.length} ticked` : sheet ? 'Tick tracks to edit only those.' : 'Tick tracks to edit only those; Shift ticks a run.'}
         </span>
       </div>
 

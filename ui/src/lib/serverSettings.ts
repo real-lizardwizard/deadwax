@@ -38,6 +38,3 @@ export function draftsAfterSave(
   }
   return left
 }
-
-/** What the page says on a phone, before its link to the main page. */
-export const SETTINGS_PHONE = "Changing deadwax's settings needs a wider screen for now - or"

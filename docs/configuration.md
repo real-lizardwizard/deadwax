@@ -27,11 +27,13 @@ written.
 Two settings can't be changed from the settings tab, and the tab says why: `DB_PATH` is where
 the tab's own overrides are stored, and `PUID`/`PGID` are used before the app starts.
 
-### In the app, on a desktop
+### In the app
 
-The server settings can also be changed in [the app](player.md) at `/player/` on a desktop (a
-window at least 1024 pixels wide): **Managing → Settings** in the sidebar, or **You → Server
-settings**. It is the same server half of the settings tab - the same rows, the same three pages
+The server settings can also be changed in [the app](player.md) at `/player/`: on a desktop (a
+window at least 1024 pixels wide) **Managing → Settings** in the sidebar, or **You → Server
+settings** - which a phone has too since 2.0.0-player.47, laid out for it (the tabs a finger tall,
+each setting's name over its field, **Save changes** in a bar along the bottom above the tab bar and
+the player). It is the same server half of the settings tab - the same rows, the same three pages
 (Library, Downloads, Connections), the same rules - and what is saved there is the same override,
 in the same database. Changes stay drafts until **Save changes**, which saves every page's changes
 at once or, if deadwax refuses one, none of them, saying why. A change made while a save is still
@@ -48,8 +50,9 @@ not the old run's words. The same goes for a lead typed while a run is still goi
 it before the run ends: deadwax reads the lead as it does each album, so the albums done before the
 save moved to the old lead and the rest to the new one, and the line goes back to its prompt as the
 run ends. Pressing it again is safe - it moves what is still at the old lead and leaves the rest. The browser preferences (search, candidates, auto-grab, the interface) are
-still the main page's settings tab's; the page says so and links to it. On a phone the page only says
-it needs a wider screen.
+still the main page's settings tab's; the page says so and links to it. On a first run with Navidrome
+not set up, the app's **Set up Navidrome** (on Home, the Library and Search) opens this page at
+**Connections**; once the three Navidrome settings are saved, the app asks Navidrome again by itself.
 
 ## Server settings
 

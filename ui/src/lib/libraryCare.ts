@@ -121,6 +121,3 @@ export const CARE_LINE = 'Rescan, and the runs that fetch covers, CD art and lyr
 export const RESCAN_WORDS = "deadwax notices a changed album by its folder's date, and a tag edited in place by another "
   + "program doesn't change it - so after a retag elsewhere, Rescan reads every file again. Albums filed from a "
   + 'download appear without it.'
-
-/** On a phone, the page is a note. */
-export const CARE_PHONE = 'Looking after the library needs a wider screen for now - or'

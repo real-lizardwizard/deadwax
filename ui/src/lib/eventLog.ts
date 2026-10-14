@@ -111,6 +111,3 @@ export const STREAM_WORDS: Readonly<Record<StreamState, string>> = {
   live: 'Live',
   lost: 'The stream was lost - trying again',
 }
-
-/** What the page says on a phone, before its link to the main page. */
-export const LOG_PHONE = 'The log needs a wider screen for now - or'

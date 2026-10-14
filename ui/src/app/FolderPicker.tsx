@@ -29,7 +29,7 @@ export function FolderPicker({
           class="app-edit-pick-input"
           type="search"
           value={typed}
-          placeholder="Type part of its name, artist or path"
+          placeholder="Name, artist or path"
           spellcheck={false}
           autoComplete="off"
           aria-controls={shown.length ? 'app-edit-pick-list' : undefined}

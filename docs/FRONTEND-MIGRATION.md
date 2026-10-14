@@ -31,9 +31,11 @@ move. Cross-tree DOM writes go in the shell, synchronously.
 artist/album names hand off to the vanilla search rather than reimplementing it. It retires
 when the search view is ported.
 
-**What the one app still lacks before the main page can retire** (2.0.0-player.45): an editor on the
-phone, and the phone's Needs a look, settings and log. Rescan and the bulk runs (covers, CD art, lyrics)
-are the desktop's **Library care** since 2.0.0-player.42, over the target rules both pages take from
+**What the one app still lacks before the main page can retire** (2.0.0-player.47): nothing this list
+held is left - the phone has had the editor, Needs a look, Library care, the server settings and the log
+since 2.0.0-player.47, as a desktop has (below), so what stays the main page's alone is its own browser
+preferences (search, candidates, auto-grab, the interface), kept in that browser. Rescan and the bulk runs (covers, CD art, lyrics)
+are **Library care** since 2.0.0-player.42 (a desktop's until 2.0.0-player.47), over the target rules both pages take from
 `lib/bulkTargets.ts`, and **Re-time saved lyrics** is on its Server settings page
 (`components/RetimeLyrics.tsx`, the settings tab's own, moved where both draw it); the Edit panel's
 "can't tell which folder" case chooses the folder from the scan rather than sending you to the main
@@ -48,7 +50,9 @@ lyrics, deleting it - is in the app on a desktop since 2.0.0-player.21, the revi
 and un-ignoring, the New count, with a count in the sidebar and You), and the server settings and
 the event log since 2.0.0-player.33 (**Settings**, drawn from SettingsView.tsx's own exported parts -
 `ServerGroup`, `SettingRow`, `OrganizingVerdict`, `OrganizeModes`, `editedEnvDraft` - and **Log**,
-over the server's kept history and the stream). The main page's own queue (**Review N**,
+over the server's kept history and the stream) - and all of them, Library care with them, on a phone
+too since 2.0.0-player.47 (the Edit panel a sheet over the whole screen there, the four pages told
+`admin` rather than the frame). The main page's own queue (**Review N**,
 LibraryView.tsx), settings tab and log are unchanged beside them; the browser preferences stay the
 main page's, kept in that browser.
 

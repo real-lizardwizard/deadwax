@@ -1,5 +1,5 @@
 /**
- * Needs a look (2.0.0-player.25) - the review queue in the app, on a desktop: the pure rules in
+ * Needs a look (2.0.0-player.25) - the review queue in the app (a phone's too since 2.0.0-player.47): the pure rules in
  * lib/needsLook.ts, and the page itself (app/NeedsALook.tsx), compiled with the repo's TypeScript and
  * rendered by the small stand-in for Preact the other page sims use (group.sim, artist.sim).
  *
@@ -19,7 +19,9 @@
  *    quiet "Checking the library…" in a line that is always there, the selected row (Explorer's look
  *    and aria-current), what the panel is asked for (the folder, the queue's place, read again only
  *    for a session's first album), its own count standing in for the server's only while it shows
- *    with a real scan and no session - and on a phone a note, with nothing asked.
+ *    with a real scan and no session - and for anyone deadwax says isn't its admin a note, with nothing
+ *    asked (2.0.0-player.47: the page is told `admin`, never the frame - a phone draws it as a desktop
+ *    does; until then a phone drew a note pointing at the main page).
  *  - AFTER REVIEW: the ending's scan asked only once the album left has been noted reviewed (go()'s
  *    ending too); its rows held, aria-disabled and refusing a click, until no read is still out (a
  *    superseded read answering doesn't end it); the chips held for the session and its ending; a facet
@@ -261,6 +263,7 @@ function reset() {
 
 const hooks = require(path.join(PAGE, 'node_modules/preact/hooks.js'))
 const { NeedsALook } = require(path.join(PAGE, 'app/NeedsALook.js'))
+const R = require(path.join(PAGE, 'lib/appRoutes.js'))
 
 let tree = null
 function find(test, within = tree) {
@@ -293,7 +296,7 @@ function mount(props = {}) {
   const render = hooks.root(NeedsALook)
   const edits = [], facetsAsked = [], closes = []
   const all = {
-    desktop: true, shown: true, facet: null, editing: null, backLabel: 'You', onBack() {},
+    admin: true, shown: true, facet: null, editing: null, backLabel: 'You', onBack() {},
     onFacet: (facet) => facetsAsked.push(facet),
     onEdit: (request, opener) => { edits.push({ request, opener }); all.editing = request.folder },
     onCloseEdit: () => { closes.push(true); all.editing = null },
@@ -311,17 +314,19 @@ function mount(props = {}) {
 }
 
 async function page() {
-  console.log('\nthe page: on a phone, a note - and nothing asked')
+  console.log('\nthe page: not the admin, a note - and nothing asked')
   {
     reset()
     libraryOf(LIBRARY)
-    const phone = mount({ desktop: false })
-    phone.draw()
-    const link = find((node) => node.type === 'a')[0]
-    check('the note, and the main page beside the app', [words(classed('app-queue-phone')[0]).replace(/\s+/g, ' '), link.props.target, link.props.rel],
-      ['Fixing albums needs a wider screen for now - or the main page.', '_blank', 'noopener'])
+    const refused = mount({ admin: false })
+    refused.draw()
+    check('the note, and no link out (the phone\'s pointer at the main page went in 2.0.0-player.47)',
+      [words(classed('app-placeholder-text')[0]), find((node) => node.type === 'a').length], [R.MANAGING_ADMINS_ONLY, 0])
     check('...the library never read, no row, no count, nothing reviewed', [W.enabled.every((on) => on === false), rowButtons().length, W.counts.every((c) => c === null), W.reviewed, W.asked],
       [true, 0, true, [], 0])
+    //? the page knows no frame: what was a desktop's is drawn for the admin, whatever App might hand it
+    refused.draw({ admin: true, desktop: false })
+    check('...the admin, told nothing of the frame: the page, read, its rows drawn', [W.enabled.at(-1), rowButtons().length > 0, classed('app-placeholder-text').length], [true, true, 0])
   }
 
   console.log('\nthe page: its states')
@@ -331,7 +336,7 @@ async function page() {
     const one = mount()
     one.draw()
     check('until the first answer: the spinner, nothing else', [classed('pl-spinner').length, rowButtons().length, classed('app-queue-facets').length], [1, 0, 0])
-    check('...the library read once it shows on a desktop', W.enabled.at(-1), true)
+    check('...the library read once it shows', W.enabled.at(-1), true)
 
     libraryOf([], { problem: 'LIBRARY_PATH is not set' })
     one.draw()
@@ -696,8 +701,11 @@ async function page() {
     two.draw()
     check('no library to check: nothing said about Navidrome', note(), [])
     libraryOf(LIBRARY, { navidromeCheck: { state: 'unset', problem: null } })
+    two.draw({ desktop: true })
+    const onDesktop = note()
     two.draw({ desktop: false })
-    check('...nor on a phone', note(), [])
+    //? (2.0.0-player.47: a phone draws the page too, so it says what a desktop says)
+    check('...and the same on a phone, where the page is drawn too', [onDesktop.length, note()], [1, onDesktop])
     two.unmount()
   }
 
@@ -710,11 +718,12 @@ async function page() {
     }
     check('set up and reached: what it guards', gate({ ok: true, configured: true, problem: null }).props.children, 'THE LIBRARY')
     gate({ ok: false, configured: false, problem: 'Navidrome isn\'t set up - fill in NAVIDROME_URL' })
-    const link = find((node) => node.type === 'a')[0]
+    const setUp = find((node) => node.type === 'button')[0]
     check('not set up: Connect Navidrome, the reason, then why and how', [words(classed('app-needs-title')[0]), classed('app-needs-text').map(words).map((w) => w.replace(/\s+/g, ' '))],
       ['Connect Navidrome', ['Navidrome isn\'t set up - fill in NAVIDROME_URL', `${NAVIDROME_REQUIRED} Set it up in deadwax's settings (Connections), then come back.`]])
     check('...needed for the library, said so', /needs Navidrome for your library/.test(NAVIDROME_REQUIRED), true)
-    check('...its link beside the app, to the settings (the main page\'s for now)', [words(link), link.props.href, link.props.target, link.props.rel], ['settings', '/', '_blank', 'noopener'])
+    //? (2.0.0-player.47: the link to the main page's settings tab became "Set up Navidrome", opening the app's own)
+    check('...and "Set up Navidrome", the app\'s own settings, no link out', [words(setUp), setUp.props.class, find((node) => node.type === 'a').length], ['Set up Navidrome', 'app-button app-needs-setup', 0])
     gate({ ok: false, configured: true, problem: 'Navidrome couldn\'t be reached at http://navidrome:4533: refused' })
     check('set up, not reached: Can\'t reach Navidrome, the reason, that the library is Navidrome\'s, Try again',
       [words(classed('app-needs-title')[0]), classed('app-needs-text').map(words), find((node) => node.type === 'button').map(words)],
@@ -744,8 +753,8 @@ async function page() {
     W.tracking = false
     one.draw()
     check('the count\'s route saying so is enough - before the library has answered too', warning(), [N.IGNORES_UNSAVED])
-    one.draw({ desktop: false })
-    check('...never on a phone', warning(), [])
+    one.draw({ admin: false })
+    check('...never for anyone but the admin (the page is a note for them)', warning(), [])
     check('the rule: either one saying so, a library only once it has answered',
       [N.ignoresUnsaved({ loaded: true, reviewTracking: true }, null), N.ignoresUnsaved({ loaded: true, reviewTracking: false }, null),
         N.ignoresUnsaved({ loaded: false, reviewTracking: false }, true), N.ignoresUnsaved({ loaded: true, reviewTracking: true }, false), N.ignoresUnsaved({ loaded: false, reviewTracking: true }, true)],

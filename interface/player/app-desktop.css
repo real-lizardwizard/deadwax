@@ -2637,14 +2637,16 @@
     }
 
     /* the settings page fills the page area at least, so its save bar is at the foot of the window
-       even on a short tab - where sticky alone would leave it under the last group, mid-screen */
-    .app-desk .app-settings:not(.is-phone) {
+       even on a short tab - where sticky alone would leave it under the last group, mid-screen. Not
+       the note anyone deadwax says isn't the admin gets (.is-refused, ServerSettings.tsx): one card,
+       no bar (the note was .is-phone until 2.0.0-player.47, when it stopped being the phone's) */
+    .app-desk .app-settings:not(.is-refused) {
         display: flex;
         flex-direction: column;
         min-height: var(--app-desk-set-page);
     }
 
-    .app-desk .app-settings:not(.is-phone) .app-settings-body { flex: 1 0 auto; }
+    .app-desk .app-settings:not(.is-refused) .app-settings-body { flex: 1 0 auto; }
 
     .app-desk .app-settings-body,
     .app-desk .app-log-body {

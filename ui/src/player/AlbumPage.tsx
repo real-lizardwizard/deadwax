@@ -67,8 +67,10 @@ import type { Player } from './usePlayer'
  *
  * Since 2.0.0-player.21, on a desktop and for an admin, Edit after Play and Shuffle (DesktopManage.dc.html:
  * a toggle, pressed while the Edit panel shows this album) - App's `onEdit`, handed the album as
- * Navidrome sent it, which is what the panel finds its folder by; a phone has no editor, and is handed
- * none. Live once the album has answered. After an edit App asks the page again (`refresh`): the album
+ * Navidrome sent it, which is what the panel finds its folder by. Since 2.0.0-player.47 a phone has it too
+ * (the Edit panel a sheet over the whole screen there): in the bar, beside the pin (`editAt` 'bar') - above
+ * the title, so nothing under it moves whether or not it is drawn, and in reach from anywhere down the
+ * page, the bar being sticky. Live once the album has answered. After an edit App asks the page again (`refresh`): the album
  * and the bridge are asked afresh and what is drawn stays until they answer - a refresh that fails
  * keeps it, since the album may be under a new id Navidrome hasn't scanned yet (App moves the page to
  * it once found).
@@ -89,6 +91,7 @@ export function AlbumPage({
   onOpenAlbum,
   onOpenGroup,
   onEdit,
+  editAt = 'actions',
   editing = false,
   refresh = 0,
 }: {
@@ -103,8 +106,10 @@ export function AlbumPage({
   onOpenAlbum?: (album: Album) => void
   /** the album's MusicBrainz group, from "Other pressings" (2.0.0-player.41): every pressing, to get one */
   onOpenGroup?: (group: { id: string; title: string }) => void
-  /** Edit, on a desktop and for an admin (2.0.0-player.21): the Edit panel for this album, or closed */
+  /** Edit, for an admin (2.0.0-player.21; a phone's too since 2.0.0-player.47): the Edit panel for this album, or closed */
   onEdit?: ((event: MouseEvent, album: EditAlbum) => void) | undefined
+  /** where Edit is drawn: after Play and Shuffle (a desktop's), or in the bar beside the pin (a phone's) */
+  editAt?: 'actions' | 'bar'
   /** the Edit panel shows this album: Edit pressed */
   editing?: boolean
   /** asked again after an edit: a new number each time */
@@ -206,6 +211,20 @@ export function AlbumPage({
           <ChevronLeftIcon class="pl-back-icon" />
           <span class="pl-back-label">{backLabel}</span>
         </button>
+        {/* a phone's Edit (2.0.0-player.47): in the bar, so nothing under the title moves as it comes or goes */}
+        {onEdit && editAt === 'bar' && (
+          <button
+            type="button"
+            class="app-edit-toggle app-edit-chip"
+            aria-pressed={editing}
+            disabled={!album}
+            onClick={(event) => {
+              if (album) onEdit(event as unknown as MouseEvent, editAlbum(album))
+            }}
+          >
+            Edit
+          </button>
+        )}
         {!(storeDone && !release) && (
           <PinToggle
             look="icon"
@@ -300,7 +319,7 @@ export function AlbumPage({
             Shuffle
           </button>
           {/* a desktop's, for an admin (2.0.0-player.21): the Edit panel beside the page */}
-          {onEdit && (
+          {onEdit && editAt === 'actions' && (
             <button
               type="button"
               class="pl-pill app-edit-toggle"

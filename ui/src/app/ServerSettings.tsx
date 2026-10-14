@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { getServerSettings, saveServerSettings, type ServerSetting, type ServerSettings as Settings, type SettingUpdate } from '../api/settings'
 import { OrganizeModes, OrganizingVerdict, ServerGroup, editedEnvDraft, tabForGroup, tabMarks, type SettingsTab } from '../components/SettingsView'
 import { RetimeLyrics } from '../components/RetimeLyrics'
-import { SERVER_TABS, SETTINGS_PHONE, draftsAfterSave, serverTabAfter } from '../lib/serverSettings'
+import { SERVER_TABS, draftsAfterSave, serverTabAfter } from '../lib/serverSettings'
+import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { isAbort, latestOnly } from '../lib/latest'
 import { ChevronLeftIcon } from '../player/icons'
 
@@ -36,8 +37,26 @@ export function forgetServerSettingsPage(): void {
   kept = freshPage()
 }
 
+/** The page opened at one of its tabs (2.0.0-player.47): the Navidrome gate's "Set up Navidrome" opens it
+ *  at Connections - its drafts, kept across the tabs, are left as they are. */
+export function showServerSettingsTab(tab: SettingsTab): void {
+  keep({ tab })
+}
+
+//? told of each save the server took, with the keys it carried
+const saved = new Set<(keys: string[]) => void>()
+
+/** Told of each save the server took (2.0.0-player.47), with the keys it carried - App asks Navidrome
+ *  again after one that set it up, so the gate it was opened from opens by itself. Returns the off switch. */
+export function onServerSettingsSaved(listener: (keys: string[]) => void): () => void {
+  saved.add(listener)
+  return () => {
+    saved.delete(listener)
+  }
+}
+
 /**
- * The server's settings in the app, on a desktop (2.0.0-player.33) - the SERVER half of the main
+ * The server's settings in the app (2.0.0-player.33; a phone's too since 2.0.0-player.47) - the SERVER half of the main
  * page's settings tab (components/SettingsView.tsx), drawn from that tab's own parts: every group
  * GET /deadwax/settings returns, each row with its value and where it came from, its status, a
  * secret masked, choices as a dropdown, what can't be edited said, the organizing verdict, revert
@@ -74,15 +93,20 @@ export function forgetServerSettingsPage(): void {
  * settings they were made against, until Save or Discard - as the main page keeps its own for the
  * page's life. Coming back with a draft reads nothing over it; with none, it reads again.
  *
- * On a PHONE it is a short note, asking nothing.
+ * ON A PHONE TOO (2.0.0-player.47): the same page, laid out for 320-390px by app.css - the tabs fitting,
+ * rows wrapping, fields iOS won't zoom into, the save bar above the tab bar and the mini player, and
+ * keyboard focus kept clear of it. The Navidrome gate's "Set up Navidrome" opens it at Connections
+ * (showServerSettingsTab), and a save is told to App (onServerSettingsSaved), which asks Navidrome again.
+ * Someone deadwax says isn't its admin gets a short note instead, asking nothing.
  */
 export function ServerSettings({
-  desktop,
+  admin,
   live,
   onBack,
   backLabel,
 }: {
-  desktop: boolean
+  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
+  admin: boolean
   /** this page is what shows - its tab current, the app in front, nothing over it */
   live: boolean
   onBack: () => void
@@ -125,10 +149,10 @@ export function ServerSettings({
 
   useEffect(() => {
     //? a draft is never read over - one kept from before the page was last left included
-    if (!desktop || !live || Object.keys(kept.drafts).length) return
+    if (!admin || !live || Object.keys(kept.drafts).length) return
     read()
     return () => reads.supersede()
-  }, [desktop, live])
+  }, [admin, live])
 
   const settingsByKey = useMemo(() => {
     const map = new Map<string, ServerSetting>()
@@ -176,6 +200,7 @@ export function ServerSettings({
         const left = draftsAfterSave(state.drafts, sent)
         return { server: answer, drafts: left, justSaved: !Object.keys(left).length, saving: false }
       })
+      for (const listener of [...saved]) listener(Object.keys(sent))
     } catch (caught: unknown) {
       //? the server took none of the batch: every draft stays, and the bar says why
       keep({ saveError: caught instanceof Error ? caught.message : 'Could not save', saving: false })
@@ -196,18 +221,12 @@ export function ServerSettings({
     </>
   )
 
-  if (!desktop) {
+  if (!admin) {
     return (
-      <section class="app-settings is-phone app-needs">
+      <section class="app-settings is-refused app-needs">
         {header}
         <div class="app-card app-placeholder-body">
-          <p class="app-placeholder-text app-settings-phone">
-            {SETTINGS_PHONE}{' '}
-            <a class="app-queue-link" href="/" target="_blank" rel="noopener">
-              the main page
-            </a>
-            .
-          </p>
+          <p class="app-placeholder-text">{MANAGING_ADMINS_ONLY}</p>
         </div>
       </section>
     )

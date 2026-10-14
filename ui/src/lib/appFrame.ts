@@ -21,8 +21,9 @@
  * needs beside a drawer keeps to the part it leaves in view, `liesOver`). ONE panel at a time: opening
  * Info puts Sources away and the other way round (App; `sideOf` says which shows). Since
  * 2.0.0-player.21 the album page's Edit panel is a third kind (DesktopManage.dc.html: the editors
- * beside the album they edit) - the desktop's alone, with no sheet on a phone: crossing back under
- * 1024px closes it.
+ * beside the album they edit) - and since 2.0.0-player.47 a sheet over the whole screen on a phone,
+ * as the artist page's panel is (2.0.0-player.45): it stays open across 1024px, a panel one side and
+ * a sheet the other.
  *
  * The breakpoints are the stylesheets' too (interface/player/app-desktop.css, theme.css's desktop
  * tokens): tests/test_app_desktop_css.py reads these constants and holds every @media there to them.
@@ -74,7 +75,8 @@ export type Side = 'none' | 'sources' | 'info' | 'edit' | 'artist'
 
 /** What the side panel shows, from what is open: Info when it is (it is opened over the others -
  *  opening any puts the rest away), then the Edit panel, then the artist's, then Sources; on a phone
- *  none is a panel (the artist's is a sheet there, as Sources is). */
+ *  none is a panel (the artist's and, since 2.0.0-player.47, the Edit panel are sheets there, as
+ *  Sources is). */
 export function sideOf(frame: Frame, open: { sources: boolean; info: boolean; edit: boolean; artist?: boolean }): Side {
   if (frame === 'phone') return 'none'
   return open.info ? 'info' : open.edit ? 'edit' : open.artist ? 'artist' : open.sources ? 'sources' : 'none'
@@ -100,15 +102,15 @@ export function liesOver(panel: PanelStyle, side: Side): boolean {
  * What crossing into another frame closes. Into the desktop: Now Playing and whatever is over it
  * (its menu, Info as its sheet) - the desktop has no Now Playing sheet (its player bar is the
  * player, and the turntable is the phone's alone); the Sources sheet stays open, becoming the panel.
- * Back to the phone: the Info panel - Info is a sheet over Now Playing there, which isn't open - and
- * the Edit panel (2.0.0-player.21), which a phone has no board for, and so no sheet. The artist page's
- * panel (2.0.0-player.45) stays open either way, a panel on one side and a full-screen sheet on the
- * other, as Sources does.
+ * Back to the phone: the Info panel - Info is a sheet over Now Playing there, which isn't open. The
+ * artist page's panel (2.0.0-player.45) and the Edit panel (since 2.0.0-player.47 - until then a
+ * phone had no editor, and crossing back closed it) stay open either way, a panel on one side and a
+ * full-screen sheet on the other, as Sources does.
  */
-export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: boolean; editPanel: boolean } {
+export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: boolean } {
   return to === 'desktop'
-    ? { nowPlaying: true, infoPanel: false, editPanel: false }
-    : { nowPlaying: false, infoPanel: true, editPanel: true }
+    ? { nowPlaying: true, infoPanel: false }
+    : { nowPlaying: false, infoPanel: true }
 }
 
 /* ===== the sidebar ===== */

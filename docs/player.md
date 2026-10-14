@@ -133,6 +133,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   once deadwax has said what you hold, in a place kept for it, so nothing in it moves as it fills.
   Beside an Also chip, in a row too narrow for all three whole (a phone held upright), it reads
   **Pressings**, and In your library keeps only its tick, to leave the Also chip room. The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
+  Beside it, for an admin (everyone, with logins off), **Edit** opens the album's editors in a sheet over
+  the whole screen (since 2.0.0-player.47 - [below](#looking-after-deadwax-from-a-phone)).
   Since 2.0.0-player.44, tap the **cover** to see it full size - Navidrome's own picture, unresized - in
   [the cover viewer](library.md#the-cover-viewer): tap to zoom in where you touch, pinch, drag to move,
   ✕ or **Close** to put it away (going back puts it away too, as it goes back). And at the foot of the page, under the songs, **Properties**: the
@@ -154,11 +156,10 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
-  version, and that logins are off. Server settings, the albums that need a look and the log are on
-  the main page for now - and so is editing an album, on a phone (on a desktop an album's page has
-  **Edit**, and **Managing deadwax** has **Albums that need a look**, with how many, which opens
-  **Needs a look**, then **Library care**, **Server settings** and **Log**, [below](#on-a-desktop)) -
-  and **Open the main page** takes you there.
+  version, and that logins are off. For an admin, **Managing deadwax**: **Albums that need a look**,
+  with how many, which opens **Needs a look**, then **Library care**, **Server settings** and **Log** -
+  on a phone as on a desktop since 2.0.0-player.47 ([below](#looking-after-deadwax-from-a-phone)) - and
+  **Open the main page**, which opens it beside the app.
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
   from, and **✕** to cancel, which asks in the card first - **Keep it** or **Cancel download** -
   unless You's **Confirm before cancelling** is off),
@@ -445,6 +446,43 @@ today, there is one user, so every device sees the same pins; once logins exist,
 their own, and the first admin to sign in takes over the ones pinned before. They're in deadwax's
 database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pins` and
 `POST /deadwax/me/pins/toggle`. Home holds up to 50.
+## Looking after deadwax from a phone
+
+Since 2.0.0-player.47 a phone has every page a desktop has for looking after deadwax - in any window
+narrower than 1024 pixels, so an iPad held upright too. They're for an admin, which with logins off is
+everyone:
+
+- **Editing an album**: an album's page has **Edit** at the top, beside the pin. It opens **Edit album**
+  as a sheet over the whole screen - the same five tabs as a desktop's panel, **Release**, **Tags**,
+  **Artwork**, **Lyrics** and **Delete**, the main page's own editors laid out for a phone (fields big
+  enough that iOS doesn't zoom into them, **Apply** kept at the foot of the sheet, in reach above the
+  home indicator, as you scroll the preview). It finds the album's folder, follows the album to its new
+  id after you apply another release and goes back from a deleted album exactly as on a desktop -
+  [the library guide](library.md#editing-an-album-in-the-app) has all of it. Ticking a run of tracks
+  with Shift is a keyboard's; tick each one. The page behind waits while the sheet is open. The close
+  button closes it - a tap on the dimmed page beside it doesn't (it shows there on a phone on its side
+  or an iPad), so a stray one can't throw away an edit you've half made; inside the tag editor, a track or the delete confirmation, their own **Cancel**,
+  **Tracks** or **Close** goes back one step. Turn an iPad (or widen the window) past 1024 pixels with
+  the sheet open and it becomes the desktop's panel beside the page - and a sheet again the other way.
+- **You → Managing deadwax**: **Albums that need a look** (with how many) opens **Needs a look** - the
+  albums whose tags, folder or cover want attention and the ones deadwax filed that you haven't looked
+  at, with a chip per kind of issue. Tap one and the Edit sheet opens on it, saying where it is in the
+  list (*1 of 17*), with **◁**, **skip ▷** and, after **Apply**, **Next album ▷** to work through them
+  ([the library guide](library.md#needs-a-look-in-the-app)). **Library care** has **Rescan** and the runs
+  that fetch covers, CD art and lyrics, each with its **Stop** ([the library guide](library.md#library-care-in-the-app)).
+  **Server settings** is the server half of the main page's settings tab - three tabs, every change a
+  draft until **Save changes** in the bar along the bottom, above the tab bar and the player
+  ([configuration](configuration.md#in-the-app)). **Log** is deadwax's event log, newest first, each line's
+  time, level and where it came from over its words; it follows deadwax live while the page shows, and
+  lets go while the now-playing screen is over it or you're elsewhere
+  ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)).
+- **Setting Navidrome up from a phone**: on a first run, Home, the Library and Search say **Connect
+  Navidrome**, with **Set up Navidrome**: it opens **Server settings** at **Connections**. Fill in
+  `NAVIDROME_URL`, `NAVIDROME_USER` and `NAVIDROME_PASSWORD`, **Save changes**, and the app asks
+  Navidrome again by itself - your library shows without a reload. Changing them later, on a setup that
+  works, asks again too, leaving the pages you have open as they are while it does; if the new settings
+  don't reach Navidrome, those pages say so.
+
 ## On a desktop
 
 Open `/player/` in a window **1024 pixels wide or more** - a computer's browser, or an iPad on its
@@ -463,7 +501,7 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   Navidrome**; [the library guide](library.md#needs-a-look-in-the-app) has it),
   **Library care** - **Rescan** and the runs that fetch covers, CD art and lyrics for the albums
   missing them ([the library guide](library.md#library-care-in-the-app)) - **Settings**, the server's settings - the main page's settings tab's server half, its three pages
-  and its one save ([Configuration](configuration.md#in-the-app-on-a-desktop) has it) - and **Log**,
+  and its one save ([Configuration](configuration.md#in-the-app) has it) - and **Log**,
   deadwax's event log: the last 500 lines since it started, then new ones as they come, while the page
   shows ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)),
   and **Open the main page**, which opens the main page in a new tab (a desktop needs nothing that is
@@ -1547,16 +1585,16 @@ fixes that.
   between 1024 and 1279 pixels wide a panel lies over the right of the page, the end of a long
   tracklist under it. The Edit panel edits one album, from its page or from **Needs a look**; the bulk
   runs are **Library care**'s; an artist's pictures and **Move albums to …** are on the artist's page, on
-  a phone too; the browser preferences of its settings tab stay the main page's. On a phone **Needs a
-  look**, **Library care**, **Settings** and **Log** are short notes pointing at the main page. The [visualizer](#the-visualizer)
+  a phone too; the browser preferences of its settings tab stay the main page's. The [visualizer](#the-visualizer)
   sees FLAC songs only; its play/pause is its one control of the music (skip and seek from the player
   bar, after leaving it).
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
   memory and nothing is queued.
 - **Siri**, and a lower bit rate for mobile data.
-- **The rest of deadwax**: editing an album on a phone, the albums that need a look, looking after the
-  library, the server settings and the log (on a phone - a desktop has **Needs a look**, **Library
-  care**, **Settings** and **Log**) are on the main page, which also works on a phone.
+- **The rest of deadwax**: the main page's browser preferences (search, candidates, auto-grab, the
+  interface) and its track table's columns stay there (it works on a phone too); editing an album, the
+  albums that need a look, Library care, the server settings and the log are the app's, on a phone as
+  on a desktop, since 2.0.0-player.47.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you re-apply its release in the metadata

@@ -149,6 +149,19 @@ And for the speed fader (2.0.0-player.39):
 - The chip: a tap target tall, STYLE.md's toggled chip inside it, at the start of the icon row that is
   one fixed height - so it moves nothing coming and going - and on the turntable only on a phone on its
   side, where the plinth is too small to read the readout.
+
+And for looking after deadwax from a phone (2.0.0-player.47) - every rule of its section under the phone's
+frame (`.app-shell:not(.app-desk)`), so the desktop is drawn by app-desktop.css alone, as before:
+
+- The Edit panel a sheet over the whole screen, as the artist page's: from the very top, clear of the status
+  bar by padding and of a notch by where it is placed, a scroll lock of its own, no transform once open (the
+  cover viewers inside it are the screen's), its body the one part that scrolls; on a phone on its side its
+  title beside its tabs. The hosted editors' fields 17px and a finger tall, every target 44px, the preview's
+  changes a tag over old and new, long names broken anywhere, Apply sticky at the foot above the home
+  indicator; the album page's Edit a chip in the bar, the pin's size, its reach a finger's.
+- Needs a look's rows, Library care, the settings (a key over its field, the save bar above the tab bar and
+  the mini player, taking no taps until it says something, the scroll padding clear of it - on one line
+  where the window is wide enough) and the log (a line's time, level and source over its words, which wrap).
 """
 
 import re
@@ -1373,3 +1386,240 @@ def test_an_album_pages_properties_break_a_release_id_and_reach_a_finger():
     #? ...and all of it hit: positioned, so drawn over the rows either side, never under the next row (a
     #? grid item drawn after it, which took the bottom of the reach)
     assert link["position"] == "relative"
+
+
+# ---------------------------------------------------------------- looking after deadwax from a phone (2.0.0-player.47)
+
+PHONE = ".app-shell:not(.app-desk)"
+PHONE_HEADING = "/* ===== looking after deadwax from a phone (2.0.0-player.47)"
+
+
+def section(css: str, heading: str) -> str:
+    """A section of a stylesheet: from its heading to the next section's (`/* ===== `), or to the end of the
+    file while it is the last - so a section appended after it is never held to its rules."""
+    start = css.index(heading)
+    end = css.find("/* ===== ", start + len(heading))
+    return css[start:] if end == -1 else css[start:end]
+
+
+#? the section of app.css the change wrote
+PHONE_SECTION = section(APP, PHONE_HEADING)
+
+
+def phone(selector: str, context: str = "") -> dict[str, str]:
+    """A rule of the phone's frame alone - `.app-shell:not(.app-desk) <selector>`."""
+    return declarations(APP, f"{PHONE} {selector}", context)
+
+
+def test_the_phones_managing_rules_never_reach_the_desktop():
+    """Every rule the phone's managing added sits under the phone's frame (App puts `.app-desk` on the shell
+    from 1024px) - or is the sheet's scroll lock, or scroll padding a phone's page alone can set - so the
+    desktop's rules for the same parts (app-desktop.css) are all that draw them there, as before."""
+    found = rules(PHONE_SECTION)
+    assert len(found) > 150
+    for context, selector, _values in found:
+        for part in (piece.strip() for piece in selector.split(",")):
+            assert (part == ":root" or part.startswith(f"{PHONE} ") or part.startswith(".app-shell.has-mini:not(.app-desk) ")
+                    or part == "html.app-edit-open" or part.startswith(f"html:has({PHONE} ")
+                    or part.startswith("html:has(.app-shell.has-mini:not(.app-desk) ")), (context, part)
+    #? ...and the release editor's own cover viewer, styled as the album page's (the rules it shares), the same way
+    viewer = [part.strip() for _context, selector, _values in rules(APP) for part in selector.split(",") if "#app-edit-panel-release" in part]
+    assert viewer and all(part.startswith(f"{PHONE} #app-edit-panel-release ") for part in viewer), viewer
+    assert phone("#app-edit-panel-release #art-viewer")["position"] == "fixed"
+    assert phone("#app-edit-panel-release .window-close")["width"] == "var(--pl-hit)"
+
+
+def test_every_id_and_class_the_phones_section_styles_is_still_in_the_markup():
+    """(review) The sheet styles the main page's editors by their own ids and classes - MetadataEditor's
+    #metadata-footer, TrackTagEditor's .tags-footer (the sticky Apply bars), DeleteAlbumDialog's, the settings'
+    rows - so renaming one in its component, and checking the main page and the desktop's panel, would leave
+    the phone's rule matching nothing with every other test green: each name is held to the source here."""
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    source = "\n".join(path.read_text() for path in sorted(ui.rglob("*.ts*")))
+    names = {match.group(1) for _context, selector, _values in rules(PHONE_SECTION)
+             for match in re.finditer(r"[#.]([A-Za-z][\w-]*)", selector)}
+    #? the log's stream state, built `is-${stream}` from StreamState's words
+    built = {"is-live", "is-lost"}
+    assert "app-log-stream is-${stream}" in (ui / "app" / "EventLog.tsx").read_text()
+    assert "'live' | 'lost'" in (ui / "lib" / "eventLog.ts").read_text()
+    gone = sorted(name for name in names - built if not re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", source))
+    assert gone == []
+    #? ...the load-bearing ones by name, where they are drawn
+    components = ui / "components"
+    for name, file in (("metadata-footer", "MetadataEditor.tsx"), ("metadata-apply-button", "MetadataEditor.tsx"), ("tags-footer", "TrackTagEditor.tsx"),
+                       ("tags-apply-button", "TrackTagEditor.tsx"), ("delete-confirm-button", "DeleteAlbumDialog.tsx"), ("settings-env-input", "SettingsView.tsx")):
+        assert name in names and name in (components / file).read_text(), name
+
+
+def test_the_phones_section_ends_where_the_next_begins():
+    """(review) The section is held to the phone's frame up to the next section's heading, not to the end of the
+    file: a later change appending an ordinary rule to app.css is never told it must sit under the phone's frame."""
+    later = APP + "\n/* ===== a later change (2.0.0-player.99) ===== */\n.app-later { color: var(--dw-text); }\n"
+    held = section(later, PHONE_HEADING)
+    assert ".app-later" not in held and held.rstrip() == PHONE_SECTION.rstrip()
+    #? ...and nothing of the section is lost: its last rule is still in it, and nothing follows it today
+    assert PHONE_SECTION.rstrip().endswith("}") and APP.rstrip().endswith(PHONE_SECTION.rstrip())
+
+
+def test_the_edit_panel_is_a_sheet_over_the_whole_screen_on_a_phone():
+    """As the artist page's panel: from the very top, its words clear of the status bar by padding, placed clear
+    of a notch by left and right; its own scroll lock; no transform once open (the cover viewers inside it are
+    fixed to the screen, not to it); the body the one part that scrolls, saying its touches pan."""
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    assert "lockClass: 'app-edit-open'" in (ui / "app" / "EditPanel.tsx").read_text()
+    assert declarations(APP, "html.app-edit-open") == {"overflow": "hidden"}
+    box = phone(".app-edit")
+    assert (box["position"], box["top"], box["bottom"], box["right"], box["left"]) == ("absolute", "0", "0", "var(--pl-safe-right)", "var(--pl-safe-left)")
+    assert box["padding"].startswith("calc(var(--pl-safe-top) + var(--app-ph-pad))")
+    assert (box["transform"], phone(".app-layer.is-open .app-edit")["transform"]) == ("translateY(100%)", "none")
+    body = phone(".app-edit-body")
+    assert (body["flex"], body["min-height"], body["overflow-y"], body["overflow-x"], body["touch-action"]) == ("1", "0", "auto", "hidden", "pan-y")
+    #? a tab's end clear of the home indicator - but one whose Apply bar clears it itself
+    assert phone(".app-edit-pane")["padding-bottom"] == "calc(var(--pl-safe-bottom) + var(--app-ph-pad))"
+    assert phone(".app-edit-pane:has(#metadata-footer)")["padding-bottom"] == phone(".app-edit-pane:has(.tags-footer)")["padding-bottom"] == "0"
+    assert phone(".app-edit-layer:not(.is-open) .app-sweep::before") == {"animation-play-state": "paused"}
+
+
+def test_the_edit_sheets_targets_are_a_fingers_and_ios_never_zooms_into_its_fields():
+    """Every field 17px and a finger tall (iOS zooms into one under 16); the close button, the tabs, a tick box's
+    label, a folder to choose, a pressing, every button of the hosted editors - and Apply - 44px."""
+    assert px("--dw-text-body") >= 16 and px("--pl-hit") == 44
+    for selector in (".app-edit .releases-filter-input", ".app-edit-select", ".app-edit-pick-input"):
+        field = phone(selector)
+        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-hit)"), selector
+    close = phone(".app-edit-close")
+    assert (close["width"], close["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
+    for selector in (".app-edit-tab", ".app-edit-choice", ".app-edit .app-edit-button", ".app-edit .columns-toggle-button", ".app-edit .win-button",
+                     ".app-edit #metadata-apply-button", ".app-edit #tags-apply-button", ".app-edit #delete-confirm-button", ".app-edit .metadata-release",
+                     ".app-edit .metadata-issue-undo", ".app-edit .tags-revert", ".app-edit .tags-tracks > summary", ".app-edit .metadata-checkbox"):
+        assert phone(selector)["min-height"] == "var(--pl-hit)", selector
+    hit = phone(".app-edit-hit")
+    assert (hit["min-width"], hit["min-height"]) == ("var(--pl-hit)", "var(--pl-hit)")
+    assert phone(".app-edit-tracks .app-edit-tick")["width"] == "var(--pl-hit)"
+    assert phone(".app-edit #tags-window .window-close")["width"] == "var(--pl-hit)"
+    #? the tabs: spread across where they fit, scrolling sideways (by themselves) where they don't - saying
+    #? they pan sideways inside the sheet alone, whose layer takes every touch (review: Server settings' row,
+    #? the same class in the page's own scroll, stopped a swipe up that began on it from scrolling the page)
+    tabs = phone(".app-edit-tabs")
+    assert (tabs["overflow-x"], phone(".app-edit-tab")["flex"]) == ("auto", "1 0 auto")
+    assert phone(".app-edit .app-edit-tabs") == {"touch-action": "pan-x"}
+    assert not [selector for _context, selector, values in rules(APP) if "touch-action" in values
+                and any(part in selector for part in (".app-edit-tabs", ".app-settings-tabs", ".app-settings-tab")) and ".app-edit .app-edit-tabs" not in selector]
+    #? the sheet's own ✕ stands for the release editor's
+    assert phone(".app-edit #metadata-close-button") == {"display": "none"}
+
+
+def test_the_edit_sheets_apply_stays_in_reach_above_the_home_indicator():
+    """The release editor's and the tag editor's Apply bars stick to the foot of the sheet's scroll, their own
+    foot padded clear of the home indicator, Cancel and Apply whole buttons across it; the solid purple is
+    Apply's, the red the delete's."""
+    for selector in (".app-edit #metadata-footer", ".app-edit .tags-footer"):
+        foot = phone(selector)
+        assert (foot["position"], foot["bottom"], foot["background"]) == ("sticky", "0", "var(--dw-bg-sheet)"), selector
+        assert foot["padding"] == "var(--app-ph-block) 0 calc(var(--pl-safe-bottom) + var(--app-ph-block))", selector
+    assert phone(".app-edit #metadata-footer > button")["flex"] == "1 1 auto"
+    assert phone(".app-edit #metadata-apply-button")["background"] == "var(--dw-primary-bg)"
+    #? the viewer's own choice: the primary, outweighing the viewer's secondary button by the release tab's id
+    assert phone("#app-edit-panel-release .win-button.is-default")["background"] == "var(--dw-primary-bg)"
+    assert phone(".app-edit #delete-confirm-button")["background"] == "var(--dw-danger-bg)"
+    #? the pressings in the sheet's own scroll: no list scrolling inside another on a phone
+    assert "max-height" not in phone(".app-edit .metadata-releases") and "overflow-y" not in phone(".app-edit .metadata-releases")
+
+
+def test_the_release_editors_preview_is_readable_at_320px():
+    """A change: the tag's name on a line of its own, the old value (struck) and the new side by side under it -
+    three columns at 288px would leave each a word or two wide. Long names and paths broken, never clipped."""
+    change = phone(".app-edit .metadata-change")
+    assert change["grid-template-columns"] == "minmax(0, 1fr) minmax(0, 1fr)"
+    assert phone(".app-edit .metadata-tag")["grid-column"] == "1 / -1"
+    assert phone(".app-edit .metadata-from")["text-decoration"] == "line-through"
+    for selector in (".app-edit .metadata-from", ".app-edit .metadata-to", ".app-edit .metadata-tag", ".app-edit .metadata-path", ".app-edit .metadata-file-name",
+                     ".app-edit .metadata-move", ".app-edit-note", ".app-edit-choice", ".app-edit .delete-others", ".app-edit .metadata-release-title"):
+        assert phone(selector)["overflow-wrap"] == "anywhere", selector
+
+
+def test_on_a_phone_on_its_side_the_edit_sheets_title_sits_beside_its_tabs():
+    """At 844x390 a second row of head over the tabs left the body - and the Apply bar at its foot - too little:
+    under 500px tall the head and its close button sit beside the tabs, the body the rest."""
+    short = "@media (max-height: 500px)"
+    box = phone(".app-edit", short)
+    assert (box["display"], box["grid-template-columns"], box["grid-template-rows"]) == ("grid", "minmax(0, 1fr) auto", "auto auto minmax(0, 1fr)")
+    assert (phone(".app-edit-head", short)["grid-area"], phone(".app-edit-tabs", short)["grid-area"], phone(".app-edit-body", short)["grid-area"]) == (
+        "1 / 2 / 2 / 3", "1 / 1 / 2 / 2", "3 / 1 / 4 / 3")
+
+
+def test_an_album_pages_edit_on_a_phone_is_in_its_bar_and_reaches_44px():
+    """In the bar beside the pin, the pin's size, its reach a finger's every way; pushed to the bar's right by
+    its margin, the back link giving way; toggled while the sheet shows the album, faded until it answers."""
+    chip = phone(".app-edit-chip")
+    assert (chip["height"], chip["margin-left"], chip["position"]) == ("var(--app-pin-toggle)", "auto", "relative")
+    assert phone(".app-edit-chip::before")["inset"] == "calc(-1 * var(--app-pin-toggle-reach))"
+    assert length("--app-pin-toggle") + 2 * length("--app-pin-toggle-reach") >= px("--pl-hit")
+    assert phone('.app-edit-chip[aria-pressed="true"]')["background"] == "var(--dw-toggled-bg)"
+    assert phone(".app-edit-chip:disabled")["opacity"] == "var(--app-pin-off)"
+    assert declarations(APP, ".app-album-bar .pl-back")["min-width"] == "0"
+
+
+def test_the_managing_pages_on_a_phone_are_a_fingers_and_never_zoom():
+    """Needs a look's rows, Library care's field and buttons, the settings' fields, revert and save bar - a
+    finger's, 17px fields; the facets the Library's chips (a finger's reach) within the page's edges."""
+    for selector in (".app-settings .settings-env-input", ".app-care-input"):
+        field = phone(selector)
+        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-hit)"), selector
+    for selector in (".app-queue-row", ".app-queue-checking", ".app-settings .settings-env-revert", ".app-settings-discard", ".app-settings-save",
+                     ".app-settings .settings-retime .win-button", ".app-care .app-text-button"):
+        assert phone(selector)["min-height"] == "var(--pl-hit)", selector
+    #? Library care's buttons and Try again are the app's secondary button, a finger tall on both frames
+    assert declarations(APP, ".app-button")["min-height"] == "var(--dw-row)" and px("--dw-row") >= px("--pl-hit")
+    #? each page's body within the page's edges
+    for selector in (".app-queue-body", ".app-settings-body", ".app-log-body", ".app-care-body"):
+        assert phone(selector)["padding"] == "0 var(--pl-edge-right) var(--pl-gap) var(--pl-edge-left)", selector
+    #? a row of Needs a look: its cover beside its name and artist, its chips under them wrapping, whole
+    row = phone(".app-queue-row")
+    assert (row["display"], row["grid-template-columns"]) == ("grid", "var(--app-ph-queue-cover) minmax(0, 1fr)")
+    assert phone(".app-queue-cover")["grid-row"] == "1 / span 2"
+    assert (phone(".app-queue-chips")["flex-wrap"], phone(".app-queue-chip")["text-overflow"]) == ("wrap", "ellipsis")
+    assert phone(".app-queue-row.is-done .app-queue-text")["opacity"] == "var(--app-ph-queue-done)"
+    assert phone(".app-queue-row.is-current")["background"] == "var(--dw-selection-bg)"
+    #? the settings' rows wrap: a key broken anywhere over its field
+    assert phone(".app-settings .settings-env")["flex-direction"] == "column"
+    assert phone(".app-settings .settings-env-key")["overflow-wrap"] == "anywhere"
+
+
+def test_the_settings_save_bar_on_a_phone_sits_above_the_tab_bar_and_the_mini_player():
+    """Sticky above the tab bar - and the mini player while it shows - taking no taps until it says something;
+    keyboard focus (and a field the keyboard comes up for) kept clear of it while it does, only from the pane
+    that shows. Its words over Discard and Save, each half the width."""
+    bar = phone(".app-settings-savebar")
+    assert (bar["position"], bar["bottom"], bar["z-index"]) == ("sticky", "var(--app-tabbar-height)", "var(--app-ph-z-bar)")
+    assert declarations(APP, ".app-shell.has-mini:not(.app-desk) .app-settings-savebar")["bottom"] == "var(--app-ph-bar-mini)"
+    assert ALL_TOKENS["--app-ph-bar-mini"] == "calc(var(--app-tabbar-height) + var(--pl-mini-height) + var(--pl-mini-inset))"
+    assert phone(".app-settings-savebar:not(.is-said)") == {"pointer-events": "none"}
+    assert phone(".app-settings-savebar.is-said")["background"] == "var(--dw-bg)"
+    padded = declarations(APP, f"html:has({PHONE} .app-pane:not([hidden]) .app-settings-savebar.is-said)")
+    assert padded["scroll-padding-bottom"] == "calc(var(--app-chrome-bottom) + var(--app-ph-bar) + var(--dw-hairline))"
+    mini = declarations(APP, "html:has(.app-shell.has-mini:not(.app-desk) .app-pane:not([hidden]) .app-settings-savebar.is-said)")
+    assert mini["scroll-padding-bottom"] == "calc(var(--app-chrome-bottom-mini) + var(--app-ph-bar) + var(--dw-hairline))"
+    #? the bar's height the padding reads: its words' line over a finger's buttons
+    assert ALL_TOKENS["--app-ph-bar"] == "calc(2 * var(--app-ph-bar-pad) + var(--app-ph-bar-line) + var(--app-ph-lines) + var(--pl-hit))"
+    assert phone(".app-settings-savebar-text")["flex"] == "1 1 100%"
+    assert (phone(".app-settings-discard")["flex"], phone(".app-settings-save")["background"]) == ("1 1 0", "var(--dw-primary-bg)")
+    #? a window wide enough (a phone on its side, an iPad upright): one line - and the padding the shorter bar's
+    wide = "@media (min-width: 600px)"
+    assert declarations(APP, ":root", wide)["--app-ph-bar"] == "calc(2 * var(--app-ph-bar-pad) + var(--pl-hit))"
+    assert phone(".app-settings-savebar-text", wide)["flex"] == "1 1 0"
+    assert phone(".app-settings-discard", wide)["flex"] == phone(".app-settings-save", wide)["flex"] == "0 0 var(--app-ph-bar-button)"
+
+
+def test_the_log_on_a_phone_wraps_its_lines_and_the_care_runs_words_are_drawn_while_empty():
+    """A line's time, level and source over its words, which take the row's width and break anywhere; errors
+    red and warnings amber. Library care's run result drawn while empty (a live region VoiceOver reads only
+    once it is there), giving its gap back."""
+    line = phone(".app-log-row")
+    assert (line["display"], line["grid-template-columns"]) == ("grid", "auto auto minmax(0, 1fr)")
+    words = phone(".app-log-words")
+    assert (words["grid-column"], words["overflow-wrap"]) == ("1 / -1", "anywhere")
+    assert phone(".app-log-row.is-error .app-log-words")["color"] == "var(--dw-danger-text)"
+    assert phone(".app-log-row.is-warning .app-log-words")["color"] == "var(--dw-amber-text)"
+    assert phone(".app-care-result:empty")["margin-top"] == "calc(-1 * var(--app-ph-lines))"
+    assert "display" not in phone(".app-care-result")

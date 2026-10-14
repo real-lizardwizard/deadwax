@@ -24,8 +24,9 @@
  *  - THE STORE: a run kept in the module (it outlives the page), one of a kind at a time, the library
  *    told once at its end and only when something was written - its kind then `behind` the disk -
  *    Stop's state, the narrowing kept.
- *  - THE PAGE: on a phone a note, nothing asked; the library read only once it shows on a desktop and
- *    read again as it shows again; its states; Rescan the scan that ignores the cache, refused while one
+ *  - THE PAGE: for anyone deadwax says isn't its admin a note, nothing asked (2.0.0-player.47: told
+ *    `admin`, never the frame - a phone draws the page as a desktop does, where it drew a note pointing at
+ *    the main page until then); the library read only once it shows and read again as it shows again; its states; Rescan the scan that ignores the cache, refused while one
  *    is out, the library told once it has answered; the runs offered only from a REAL scan, each saying
  *    what it acts on (in album folders), started over the targets in view, its Stop and its result kept
  *    until the next; a run that wrote holding its button back until a read of the library begun after
@@ -125,6 +126,7 @@ const T = require(path.join(OUT, 'lib/typedMatch.js'))
 const { ApiError } = require(path.join(OUT, 'api/http.js'))
 const S = require(path.join(OUT, 'app/useLibraryCare.js'))
 const { LibraryCare } = require(path.join(OUT, 'app/LibraryCare.js'))
+const R = require(path.join(OUT, 'lib/appRoutes.js'))
 const RT = require(path.join(OUT, 'components/RetimeLyrics.js'))
 const { FolderPicker } = require(path.join(OUT, 'app/FolderPicker.js'))
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
@@ -421,28 +423,30 @@ function libraryOf(albums, more = {}) {
 }
 
 async function page() {
-  console.log('\nthe page: on a phone, a note - and nothing asked')
+  console.log('\nthe page: not the admin, a note - and nothing asked')
   {
     reset()
     S.forgetLibraryCare()
     libraryOf([album('A/B (2000)')])
-    const phone = mount(LibraryCare, { desktop: false, live: true, backLabel: 'You', onBack() {} })
-    phone.draw()
-    const link = find((node) => node.type === 'a')[0]
-    check('the note, and the main page beside the app', [words(classed('app-care-phone')[0]).replace(/\s+/g, ' '), link.props.href, link.props.target, link.props.rel],
-      ['Looking after the library needs a wider screen for now - or the main page.', '/', '_blank', 'noopener'])
+    const refused = mount(LibraryCare, { admin: false, live: true, backLabel: 'You', onBack() {} })
+    refused.draw()
+    check('the note, and no link out (the phone\'s pointer at the main page went in 2.0.0-player.47)',
+      [words(classed('app-placeholder-text')[0]), find((node) => node.type === 'a').length], [R.MANAGING_ADMINS_ONLY, 0])
     check('...the library never read, no Rescan, no run', [C.enabled.every((on) => on === false), !!button('Rescan'), classed('app-care-run').length], [true, false, 0])
+    //? the page knows no frame: what was a desktop's is drawn for the admin, whatever App might hand it
+    refused.draw({ admin: true, desktop: false })
+    check('...the admin, told nothing of the frame: the library read, Rescan drawn', [C.enabled.at(-1), !!button('Rescan')], [true, true])
   }
 
   console.log('\nthe page: its states')
   {
     reset()
     libraryOf([], { loaded: false })
-    const one = mount(LibraryCare, { desktop: true, live: false, backLabel: 'You', onBack() {} })
+    const one = mount(LibraryCare, { admin: true, live: false, backLabel: 'You', onBack() {} })
     one.draw()
     check('not showing: the library not read', C.enabled.at(-1), false)
     one.draw({ live: true })
-    check('showing on a desktop: read; the spinner until the first answer', [C.enabled.at(-1), classed('pl-spinner').length, !!button('Rescan')], [true, 1, false])
+    check('showing: read; the spinner until the first answer', [C.enabled.at(-1), classed('pl-spinner').length, !!button('Rescan')], [true, 1, false])
     libraryOf([], { problem: 'LIBRARY_PATH is not set' })
     one.draw()
     check('LIBRARY_PATH not set: said plainly, nothing to press', [words(classed('app-care-state')[0]), !!button('Rescan'), classed('app-care-run').length], ['LIBRARY_PATH is not set', false, 0])
@@ -466,7 +470,7 @@ async function page() {
     S.forgetLibraryCare()
     const LIB = [album('Portishead/Dummy (1994)', { art: '', release_mbid: 'r1' }), album('Portishead/Third (2008)', { lyrics_count: 0 })]
     libraryOf(LIB)
-    const one = mount(LibraryCare, { desktop: true, live: true, backLabel: 'You', onBack() {} })
+    const one = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     one.draw()
     check('what the scan holds and how old it is, as the main page says them - a status the screen reader hears',
       [words(classed('app-care-facts')[0]), classed('app-care-facts')[0].props.role], ['2 albums · 20 tracks · 200 MB · Scanned 2 min ago in 3s', 'status'])
@@ -519,7 +523,7 @@ async function page() {
     const TAKK = album('Sigur Rós/Takk (2005)', { art: '', release_mbid: 'r3', disc_art: ['disc.jpg'], lyrics_count: 0 })
     const LIB = [DUMMY, THIRD, TAKK]
     libraryOf(LIB, { stale: true })
-    const one = mount(LibraryCare, { desktop: true, live: true, backLabel: 'You', onBack() {} })
+    const one = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     one.draw()
     check('the saved scan in hand: no run offered yet - it can be behind what is on disk', [classed('app-care-run').length, buttons(classed('app-care-run')[0]).length, words(classed('app-care-note', classed('app-care-run')[0])[0])],
       [3, 0, 'Checking the library…'])
@@ -531,6 +535,10 @@ async function page() {
       [['Covers', 'Get covers · 2'], ['CD art', 'Get CD art · 2'], ['Lyrics', 'Get lyrics · 2']])
     check('...each saying what it will act on before it starts, in album folders', words(classed('app-care-note', runRow('disc'))[0]).startsWith("2 album folders with a release and no CD art of deadwax's own in the whole library."), true)
     check('...and the whole library said under the field', words(classed('app-care-note')[1]), 'The runs act on the whole library: 3 album folders.')
+    //? (2.0.0-player.47, review: at 17px on a phone "- empty for the whole library" was cut off mid-sentence -
+    //? the line under the field says what an empty one means)
+    check('...the field\'s placeholder short enough for a phone at 17px: what to type, nothing more',
+      find((node) => node.type === 'input' && byClass('app-care-input')(node))[0].props.placeholder, 'Artist, album or folder')
     let told = one.redraws()
     find((node) => node.type === 'input' && byClass('app-care-input')(node))[0].props.onInput({ currentTarget: { value: 'portishead' } })
     check('words typed: the page told to draw again (the narrowing is the store\'s - nothing else would draw it)', one.redraws() > told, true)
@@ -589,7 +597,7 @@ async function page() {
     //? the page gone (the sidebar's Log, Back) and drawn again: the result still there
     one.unmount()
     const gone = one.redraws()
-    const again = mount(LibraryCare, { desktop: true, live: true, backLabel: 'You', onBack() {} })
+    const again = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     again.draw()
     check('the page left and come back to: the run\'s words still there, the words typed too',
       [words(classed('app-care-result', runRow('disc'))[0]), find((node) => node.type === 'input' && byClass('app-care-input')(node))[0].props.value], ['fetched CD art for 1 album, 1 had none to find', 'portishead'])
@@ -597,7 +605,7 @@ async function page() {
     await settle()
     check('a page gone is told nothing more (its listener let go)', one.redraws(), gone)
     again.unmount()
-    const third = mount(LibraryCare, { desktop: true, live: true, backLabel: 'You', onBack() {} })
+    const third = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     third.draw()
     check('a run going on while the page was away: drawn running again, its Stop live', [words(buttons(runRow('lyrics'))[0]), (buttons(runRow('lyrics'))[0].props.onClick(), S.libraryCareNow().stopping.lyrics)],
       ['Stop · 0 of 1', true])
@@ -613,7 +621,7 @@ async function page() {
     check('a run that wrote, ended while the page was away: behind', S.libraryCareNow().behind.covers, true)
     C.reloads.length = 0
     libraryOf([{ ...DUMMY, art: 'file', disc_art: ['disc.jpg'], lyrics_count: 9 }, THIRD, TAKK])
-    const fourth = mount(LibraryCare, { desktop: true, live: true, backLabel: 'You', onBack() {} })
+    const fourth = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     fourth.draw()
     check('...a page drawn after it: nothing held (its reads all come after the run), no read asked for it - drawn from the scan it reads',
       [S.libraryCareNow().behind, C.reloads.length, words(classed('app-care-note', runRow('covers'))[0]).startsWith('No album with a release is missing its cover')],
@@ -624,7 +632,7 @@ async function page() {
     S.forgetLibraryCare()
     reset()
     libraryOf([DUMMY])
-    const focus = mount(LibraryCare, { desktop: true, live: true, backLabel: 'You', onBack() {} })
+    const focus = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     focus.draw()
     const wordsElement = { focused: false, focus() { this.focused = true } }
     const buttonElement = { isConnected: true }
@@ -865,6 +873,10 @@ function picker() {
     [['Björk/Homogenic (1997)', 'No artist or album tags'], ['Old Rips/Third rip', 'Portishead - Third · no release'], ['Portishead/Dummy (1994)', 'Portishead - Dummy']])
   check('...and how many, over them, as a status', [words(find((node) => node.props?.role === 'status')[0]), find((node) => node.type === 'input')[0].props['aria-controls']],
     ['3 folders - pick the one this album is.', 'app-edit-pick-list'])
+  //? (2.0.0-player.47, review: the field is a phone's too now, in the Edit sheet - 262px for words at 17px at
+  //? 320 wide, where "Type part of its name, artist or path" lost "path"; the status under it says the rest)
+  check('...the field\'s placeholder short enough for a phone at 17px: what to type, nothing more',
+    find((node) => node.type === 'input')[0].props.placeholder, 'Name, artist or path')
   find((node) => node.type === 'input')[0].props.onInput({ currentTarget: { value: 'portishead third' } })
   check('typing told to the panel', typed, ['portishead third'])
   at('portishead third')

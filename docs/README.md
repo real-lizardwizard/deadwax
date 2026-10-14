@@ -18,7 +18,7 @@ Everything deadwax does, explained for someone opening it for the first time. Th
 | [Downloading](downloading.md) | the Soulseek candidates panel, what the scores mean, quality filters, the downloads panel, cancelling, and retrying a failed download |
 | [Organizing](organizing.md) | what happens when a download finishes: dry run, copy or move, folder names and templates, editions, tags, covers, lyrics, and clean-up |
 | [The library](library.md) | the library tab, the review queue, the metadata editor, editing tags by hand, covers, CD art, lyrics, artist pages, deleting |
-| [The phone player](player.md) | playing your library on an iPhone from Navidrome, through deadwax: setting it up, adding it to the home screen, how plays are counted, the same app on a desktop, and what it can't do yet |
+| [The phone player](player.md) | playing your library on an iPhone from Navidrome, through deadwax: setting it up, adding it to the home screen, how plays are counted, looking after deadwax from a phone, the same app on a desktop, and what it can't do yet |
 | [How matching works](matching.md) | the six signals a candidate is scored on, and why edition is never a filter |
 | [Troubleshooting](troubleshooting.md) | what to do when something doesn't work, by symptom |
 

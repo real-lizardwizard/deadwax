@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 import { logStreamUrl, recentLog, type LogLine } from '../api/logs'
 import {
   EMPTY_WORDS,
-  LOG_PHONE,
   STREAM_RETRY_MS,
   STREAM_WORDS,
   clearLog,
@@ -15,6 +14,7 @@ import {
   type LogState,
   type StreamState,
 } from '../lib/eventLog'
+import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { isAbort, latestOnly } from '../lib/latest'
 import { ChevronLeftIcon } from '../player/icons'
 
@@ -34,7 +34,7 @@ export function forgetEventLogPage(): void {
 }
 
 /**
- * The event log in the app, on a desktop (2.0.0-player.33) - the main page's log (interface/scripts/
+ * The event log in the app (2.0.0-player.33; a phone's too since 2.0.0-player.47) - the main page's log (interface/scripts/
  * init.js, which is left as it is) as a page of the app, pushed on You (`#/you/log/all`). There is no
  * board for it; the desktop sidebar's Managing names it.
  *
@@ -53,9 +53,10 @@ export function forgetEventLogPage(): void {
  * the stream (a reverse proxy's 502 while deadwax restarts) ends it for good - then the page asks
  * again itself, the history first, every STREAM_RETRY_MS.
  *
- * THE STREAM IS HELD ONLY WHILE THIS PAGE IS WHAT SHOWS (`live`: a desktop, an admin, the page in front,
- * the visualizer not over it - App's word) and closed otherwise: the player fetches its audio from the
- * same host over plain http/1.1, where a held connection is one of the six a browser allows. Coming back,
+ * THE STREAM IS HELD ONLY WHILE THIS PAGE IS WHAT SHOWS (`live`: its tab current, the page in front, the
+ * desktop's visualizer or a phone's Now Playing not over it - App's word; and an admin) and closed
+ * otherwise: the player fetches its audio from the same host over plain http/1.1, where a held
+ * connection is one of the six a browser allows. Coming back,
  * the history is read again and the stream rejoined by number. So there is no unread badge anywhere - it
  * would need the stream held open.
  *
@@ -65,15 +66,18 @@ export function forgetEventLogPage(): void {
  * coming back is coming back into view: the history joined by number, nothing twice, and nothing
  * cleared back again. Kept until a reload.
  *
- * On a PHONE it is a short note, asking nothing.
+ * ON A PHONE TOO (2.0.0-player.47): the same page, laid out for a phone by app.css - a line's time, level
+ * and source over its words, which wrap - and its stream held by the same rule. Someone deadwax says isn't
+ * its admin gets a short note instead, asking nothing.
  */
 export function EventLog({
-  desktop,
+  admin,
   live,
   onBack,
   backLabel,
 }: {
-  desktop: boolean
+  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
+  admin: boolean
   /** this page is what shows - its tab current, the app in front, nothing over it */
   live: boolean
   onBack: () => void
@@ -97,7 +101,7 @@ export function EventLog({
   const join = keep
 
   useEffect(() => {
-    if (!desktop || !live) return
+    if (!admin || !live) return
     let source: EventSource | null = null
     let closed = false
     let retry: ReturnType<typeof setTimeout> | null = null
@@ -165,7 +169,7 @@ export function EventLog({
       source = null
       if (retry) clearTimeout(retry)
     }
-  }, [desktop, live])
+  }, [admin, live])
 
   const header = (
     <>
@@ -181,18 +185,12 @@ export function EventLog({
     </>
   )
 
-  if (!desktop) {
+  if (!admin) {
     return (
-      <section class="app-log is-phone app-needs">
+      <section class="app-log is-refused app-needs">
         {header}
         <div class="app-card app-placeholder-body">
-          <p class="app-placeholder-text app-log-phone">
-            {LOG_PHONE}{' '}
-            <a class="app-queue-link" href="/" target="_blank" rel="noopener">
-              the main page
-            </a>
-            .
-          </p>
+          <p class="app-placeholder-text">{MANAGING_ADMINS_ONLY}</p>
         </div>
       </section>
     )

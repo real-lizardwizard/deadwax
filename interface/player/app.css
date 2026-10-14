@@ -3755,7 +3755,8 @@ html.app-artist-panel-open { overflow: hidden; }
 
 html.app-viewer-open { overflow: hidden; }
 
-.app-viewer #art-viewer {
+.app-viewer #art-viewer,
+.app-shell:not(.app-desk) #app-edit-panel-release #art-viewer {
     position: fixed;
     inset: 0;
     z-index: var(--app-z-viewer);
@@ -3768,7 +3769,8 @@ html.app-viewer-open { overflow: hidden; }
     touch-action: none;
 }
 
-.app-viewer .art-viewer-frame {
+.app-viewer .art-viewer-frame,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-frame {
     display: flex;
     flex-direction: column;
     gap: var(--app-viewer-gap);
@@ -3782,7 +3784,8 @@ html.app-viewer-open { overflow: hidden; }
     box-shadow: var(--dw-highlight), var(--dw-shadow);
 }
 
-.app-viewer .window-titlebar {
+.app-viewer .window-titlebar,
+.app-shell:not(.app-desk) #app-edit-panel-release .window-titlebar {
     display: flex;
     flex: none;
     align-items: center;
@@ -3790,14 +3793,16 @@ html.app-viewer-open { overflow: hidden; }
     gap: var(--app-viewer-gap);
 }
 
-.app-viewer .window-title {
+.app-viewer .window-title,
+.app-shell:not(.app-desk) #app-edit-panel-release .window-title {
     color: var(--dw-text-heading-color);
     font-size: var(--dw-text-heading);
     font-weight: var(--dw-weight-semibold);
 }
 
 /* the ✕: a tap target, its glyph the heading's size */
-.app-viewer .window-close {
+.app-viewer .window-close,
+.app-shell:not(.app-desk) #app-edit-panel-release .window-close {
     display: grid;
     flex: none;
     place-items: center;
@@ -3808,7 +3813,8 @@ html.app-viewer-open { overflow: hidden; }
     font-size: var(--dw-text-heading);
 }
 
-.app-viewer .art-viewer-panes {
+.app-viewer .art-viewer-panes,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-panes {
     display: grid;
     flex: 1;
     grid-template-columns: minmax(0, 1fr);
@@ -3817,7 +3823,8 @@ html.app-viewer-open { overflow: hidden; }
     background: var(--dw-border);
 }
 
-.app-viewer .art-viewer-pane {
+.app-viewer .art-viewer-pane,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-pane {
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -3826,7 +3833,8 @@ html.app-viewer-open { overflow: hidden; }
     background: var(--dw-field);
 }
 
-.app-viewer .art-viewer-caption {
+.app-viewer .art-viewer-caption,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-caption {
     display: flex;
     flex: none;
     flex-wrap: wrap;
@@ -3839,17 +3847,21 @@ html.app-viewer-open { overflow: hidden; }
 }
 
 /* a label typed by whoever made the file: broken, never run off the frame */
-.app-viewer .art-viewer-label { min-width: 0; color: var(--dw-text); font-weight: var(--dw-weight-medium); overflow-wrap: anywhere; }
-.app-viewer .art-viewer-dims { color: var(--dw-text-3); font-family: var(--dw-font-mono); }
+.app-viewer .art-viewer-label,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-label { min-width: 0; color: var(--dw-text); font-weight: var(--dw-weight-medium); overflow-wrap: anywhere; }
+.app-viewer .art-viewer-dims,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-dims { color: var(--dw-text-3); font-family: var(--dw-font-mono); }
 
-.app-viewer .art-viewer-largest {
+.app-viewer .art-viewer-largest,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-largest {
     padding: 0 var(--app-inspect-mark-pad);
     border: var(--dw-hairline) solid var(--dw-badge-green-border);
     border-radius: var(--dw-radius-tag);
     color: var(--dw-badge-green-text);
 }
 
-.app-viewer .art-viewer-stage {
+.app-viewer .art-viewer-stage,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-stage {
     position: relative;
     display: flex;
     flex: 1;
@@ -3861,7 +3873,8 @@ html.app-viewer-open { overflow: hidden; }
 }
 
 /* moved and zoomed by a transform the viewer sets, clipped by the stage */
-.app-viewer .art-viewer-stage > img {
+.app-viewer .art-viewer-stage > img,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-stage > img {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
@@ -3872,10 +3885,13 @@ html.app-viewer-open { overflow: hidden; }
     user-select: none;
 }
 
-.app-viewer .art-viewer-stage.is-zoomed > img { cursor: grab; }
-.app-viewer .art-viewer-stage.is-panning > img { cursor: grabbing; }
+.app-viewer .art-viewer-stage.is-zoomed > img,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-stage.is-zoomed > img { cursor: grab; }
+.app-viewer .art-viewer-stage.is-panning > img,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-stage.is-panning > img { cursor: grabbing; }
 
-.app-viewer .art-viewer-status {
+.app-viewer .art-viewer-status,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-status {
     position: absolute;
     inset: 0;
     display: flex;
@@ -3887,12 +3903,16 @@ html.app-viewer-open { overflow: hidden; }
     text-align: center;
 }
 
-.app-viewer .art-viewer-footer { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: var(--app-viewer-gap); }
-.app-viewer .art-viewer-hint { margin-right: auto; color: var(--dw-text-3); font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
-.app-viewer .hint-touch { display: none; }
+.app-viewer .art-viewer-footer,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-footer { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: var(--app-viewer-gap); }
+.app-viewer .art-viewer-hint,
+.app-shell:not(.app-desk) #app-edit-panel-release .art-viewer-hint { margin-right: auto; color: var(--dw-text-3); font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+.app-viewer .hint-touch,
+.app-shell:not(.app-desk) #app-edit-panel-release .hint-touch { display: none; }
 
 /* STYLE.md's secondary button: Close */
-.app-viewer .win-button {
+.app-viewer .win-button,
+.app-shell:not(.app-desk) #app-edit-panel-release .win-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3907,18 +3927,23 @@ html.app-viewer-open { overflow: hidden; }
     font-weight: var(--dw-weight-medium);
 }
 
-.app-viewer .win-button:active { background: var(--dw-secondary-bg-active); }
+.app-viewer .win-button:active,
+.app-shell:not(.app-desk) #app-edit-panel-release .win-button:active { background: var(--dw-secondary-bg-active); }
 
 .app-viewer .window-close:focus-visible,
-.app-viewer .win-button:focus-visible {
+.app-viewer .win-button:focus-visible,
+.app-shell:not(.app-desk) #app-edit-panel-release .window-close:focus-visible,
+.app-shell:not(.app-desk) #app-edit-panel-release .win-button:focus-visible {
     outline: var(--app-ring) solid var(--dw-accent);
     outline-offset: var(--app-ring-inset);
 }
 
 /* a hand that taps and pinches is told so */
 @media (pointer: coarse) {
-    .app-viewer .hint-pointer { display: none; }
-    .app-viewer .hint-touch { display: inline; }
+    .app-viewer .hint-pointer,
+    .app-shell:not(.app-desk) #app-edit-panel-release .hint-pointer { display: none; }
+    .app-viewer .hint-touch,
+    .app-shell:not(.app-desk) #app-edit-panel-release .hint-touch { display: inline; }
 }
 
 /* --- an album page's cover, a button that opens it full size (its class is the hero cover's) --- */
@@ -4220,3 +4245,1492 @@ html.app-viewer-open { overflow: hidden; }
     outline-offset: var(--app-ring-inset);
     border-radius: var(--dw-radius-control);
 }
+
+/* ===== looking after deadwax from a phone (2.0.0-player.47) =====
+   The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen
+   (app/EditPanel.tsx - the main page's editors hosted in it as they are, styled here by their own ids
+   and classes, as app-desktop.css styles them in the desktop's panel), Needs a look, Library care, Server
+   settings and the log laid out for 320-390px, You's Managing rows, the album page's Edit in its bar,
+   and the Navidrome gate's "Set up Navidrome". EVERY RULE IS UNDER `.app-shell:not(.app-desk)` - the
+   phone's frame alone (App puts `.app-desk` on the shell from 1024px) - or a scroll lock or scroll padding
+   on <html> that only a phone's sheet or page can set: the desktop's own rules for the same parts
+   (app-desktop.css) are left exactly as they were (tests/test_app_css.py holds the section to that).
+   A finger's targets (44px), fields iOS won't zoom into (17px), nothing wider than 320px, and the sheet's
+   Apply in reach above the home indicator. */
+
+:root {
+    --app-ph-pad: 16px;              /* the sheet's top under the status bar, and its foot over the home indicator */
+    --app-ph-gap: 12px;              /* between the sheet's head, tabs and body; a page's parts */
+    --app-ph-block: 14px;            /* between an editor's blocks */
+    --app-ph-lines: 6px;             /* between a block's lines */
+    --app-ph-pad-y: 10px;            /* a well, a pressing, a choice */
+    --app-ph-pad-x: 12px;
+    --app-ph-tab-x: 10px;            /* an underline tab's sides */
+    --app-ph-rule: 2px;              /* the chosen tab's underline */
+    --app-ph-chip-pad: 6px;          /* a small badge's sides */
+    --app-ph-chip: 22px;             /* a chip in a queue row */
+    --app-ph-cover: 112px;           /* Artwork's cover */
+    --app-ph-thumb: 88px;            /* the two covers the release editor compares */
+    --app-ph-number: 30px;           /* the Tags tab's # */
+    --app-ph-length: 46px;           /* ...and its length */
+    --app-ph-spin: 14px;             /* busy beside a label: the player's own ring */
+    --app-ph-spin-panel: 24px;       /* ...on its own, in an empty list */
+    --app-ph-spin-ring: 2px;
+    --app-ph-spin-time: 0.8s;
+    --app-ph-queue-cover: 48px;      /* a Needs a look row's cover */
+    --app-ph-queue-done: 0.55;       /* a row dealt with: its cover and words, never its word */
+    --app-ph-badge: 22px;            /* You's count of albums that need a look */
+    --app-ph-badge-pad: 6px;
+    --app-ph-set-edge: 3px;          /* an edited setting's amber edge */
+    --app-ph-mark: 7px;              /* a settings tab's mark */
+    --app-ph-bar-pad: 10px;          /* the save bar's padding, above and below */
+    --app-ph-bar-line: calc(var(--dw-text-footnote) * var(--dw-leading-note));
+    /* the save bar while it says something with its buttons: its words over Discard and Save */
+    --app-ph-bar: calc(2 * var(--app-ph-bar-pad) + var(--app-ph-bar-line) + var(--app-ph-lines) + var(--pl-hit));
+    --app-ph-bar-mini: calc(var(--app-tabbar-height) + var(--pl-mini-height) + var(--pl-mini-inset));
+    --app-ph-bar-button: 180px;      /* Discard and Save beside the words, where the window is wide enough */
+    --app-ph-z-bar: 1;               /* the save bar, over the rows scrolling under it */
+    --app-ph-log-dot: 8px;
+    --app-ph-tight: 6px;             /* a phone on its side: the sheet's top */
+}
+
+/* --- the Edit sheet: from the very top, clear of the status bar and the home indicator by padding, of a
+   notch by where it is placed; no transform once open, so the cover viewers' fixed frames are the screen's.
+   The dimmed backdrop beside it (a phone on its side, an iPad upright) closes nothing on a tap, unlike the
+   other sheets': the sheet holds typed work (EditPanel.tsx) --- */
+
+html.app-edit-open { overflow: hidden; }
+
+.app-shell:not(.app-desk) .app-edit {
+    position: absolute;
+    top: 0;
+    right: var(--pl-safe-right);
+    bottom: 0;
+    left: var(--pl-safe-left);
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-ph-gap);
+    max-width: var(--pl-content-max);
+    margin: 0 auto;
+    padding: calc(var(--pl-safe-top) + var(--app-ph-pad)) var(--dw-gutter-grouped) 0;
+    background: var(--dw-bg-sheet);
+    box-shadow: var(--dw-highlight);
+    transform: translateY(100%);
+    transition: transform var(--pl-sheet-duration) var(--pl-sheet-ease);
+}
+
+.app-shell:not(.app-desk) .app-layer.is-open .app-edit { transform: none; }
+
+/* closed mid-ask: its asking bar stops moving as it slides away */
+.app-shell:not(.app-desk) .app-edit-layer:not(.is-open) .app-sweep::before { animation-play-state: paused; }
+
+.app-shell:not(.app-desk) .app-edit-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-ph-gap);
+}
+
+.app-shell:not(.app-desk) .app-edit-title {
+    margin: 0;
+    font-size: var(--dw-text-title);
+    font-weight: var(--dw-weight-bold);
+    line-height: var(--dw-leading-tight);
+}
+
+.app-shell:not(.app-desk) .app-edit-close {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    border-radius: var(--dw-radius-control);
+    color: var(--dw-text-2);
+}
+
+.app-shell:not(.app-desk) .app-edit-close-icon { width: var(--app-artist-close-icon); height: var(--app-artist-close-icon); }
+
+/* underline tabs, a finger tall - the Edit sheet's five, and Server settings' three: spread across the
+   width where they fit, scrolling sideways (by themselves) where they don't. The rule under them is an
+   inset shadow, so the chosen tab's underline sits on it without being clipped */
+.app-shell:not(.app-desk) .app-edit-tabs {
+    display: flex;
+    flex: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    box-shadow: inset 0 calc(-1 * var(--dw-hairline)) 0 var(--dw-border);
+}
+
+/* the sheet's layer takes every touch, so its tabs say they pan sideways themselves - the sheet's alone
+   (review): Server settings' row sits in the page's own scroll, where pan-x would stop a swipe up that
+   starts on it from scrolling the page */
+.app-shell:not(.app-desk) .app-edit .app-edit-tabs { touch-action: pan-x; }
+
+.app-shell:not(.app-desk) .app-edit-tabs::-webkit-scrollbar { display: none; }
+
+.app-shell:not(.app-desk) .app-edit-tab {
+    flex: 1 0 auto;
+    min-height: var(--pl-hit);
+    padding: 0 var(--app-ph-tab-x);
+    border-bottom: var(--app-ph-rule) solid transparent;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+    white-space: nowrap;
+}
+
+.app-shell:not(.app-desk) .app-edit-tab.is-on {
+    border-bottom-color: var(--dw-accent);
+    color: var(--dw-text);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* which folder, for an album kept in several */
+.app-shell:not(.app-desk) .app-edit-folder { display: flex; flex: none; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+.app-shell:not(.app-desk) .app-edit-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+/* the one part that scrolls, saying so itself (the layer takes every touch); each tab's end clear of the
+   home indicator - but for one whose Apply bar, sticky at its foot, clears it itself */
+.app-shell:not(.app-desk) .app-edit-body {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    font-size: var(--dw-text-footnote);
+}
+
+.app-shell:not(.app-desk) .app-edit-body:focus { outline: none; }
+.app-shell:not(.app-desk) .app-edit-pane { padding-bottom: calc(var(--pl-safe-bottom) + var(--app-ph-pad)); }
+.app-shell:not(.app-desk) .app-edit-pane:has(#metadata-footer),
+.app-shell:not(.app-desk) .app-edit-pane:has(.tags-footer) { padding-bottom: 0; }
+
+.app-shell:not(.app-desk) .app-edit-state {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--app-ph-block);
+    padding: var(--app-ph-lines) 0 calc(var(--pl-safe-bottom) + var(--app-ph-pad));
+}
+
+.app-shell:not(.app-desk) .app-edit-sweep { align-self: stretch; }
+
+/* a path or a name typed by whoever made the folder can be one long word: broken, never clipped */
+.app-shell:not(.app-desk) .app-edit-note {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-edit-choices {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    gap: var(--app-ph-lines);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* a folder to choose - "Which one is it?", and Choose the folder's list: a path, typed by whoever named it */
+.app-shell:not(.app-desk) .app-edit-choice {
+    width: 100%;
+    min-height: var(--pl-hit);
+    padding: var(--app-ph-pad-y) var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-card);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-data);
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-edit-choice:active { background: var(--dw-pressed); }
+.app-shell:not(.app-desk) .app-edit-pick { align-self: stretch; }
+.app-shell:not(.app-desk) .app-edit-pick-field { display: flex; flex-direction: column; gap: var(--app-line-gap); align-self: stretch; min-width: 0; }
+.app-shell:not(.app-desk) .app-edit-pick-choice { display: flex; flex-direction: column; gap: var(--app-line-gap); }
+.app-shell:not(.app-desk) .app-edit-pick-path { color: var(--dw-text); }
+.app-shell:not(.app-desk) .app-edit-pick-sub { color: var(--dw-text-2); font-family: var(--pl-font); font-size: var(--dw-text-footnote); }
+
+/* Artwork and Lyrics: a heading, what is there, and the main page's Get buttons */
+.app-shell:not(.app-desk) .app-edit-sections { display: flex; flex-direction: column; gap: var(--app-section-gap); padding-top: var(--app-ph-lines); }
+.app-shell:not(.app-desk) .app-edit-section { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-ph-block); }
+
+.app-shell:not(.app-desk) .app-edit-heading {
+    margin: 0;
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-shell:not(.app-desk) .app-edit-cover-row { display: flex; align-items: flex-start; gap: var(--app-ph-block); }
+
+.app-shell:not(.app-desk) .app-edit-cover {
+    display: block;
+    flex: none;
+    width: var(--app-ph-cover);
+    height: var(--app-ph-cover);
+    object-fit: cover;
+    border: var(--dw-hairline) solid var(--dw-border-cover);
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+}
+
+.app-shell:not(.app-desk) .app-edit-lines { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-ph-lines); min-width: 0; }
+
+/* Tags: the album's tracks, a tick box each in a label a finger's size, the name its own button */
+.app-shell:not(.app-desk) .app-edit-tags { display: flex; flex-direction: column; gap: var(--app-ph-block); padding-top: var(--app-ph-lines); }
+.app-shell:not(.app-desk) .app-edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-ph-lines) var(--app-ph-block); }
+
+.app-shell:not(.app-desk) .app-edit-tracks {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: var(--dw-text-footnote);
+}
+
+.app-shell:not(.app-desk) .app-edit-tracks th,
+.app-shell:not(.app-desk) .app-edit-tracks td {
+    padding: 0 var(--app-ph-lines);
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-shell:not(.app-desk) .app-edit-tracks thead th {
+    border-bottom: var(--dw-hairline) solid var(--dw-border);
+    color: var(--dw-text-label-color);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-regular);
+}
+
+.app-shell:not(.app-desk) .app-edit-tracks td { border-bottom: var(--dw-hairline) solid var(--dw-row-border); }
+.app-shell:not(.app-desk) .app-edit-tracks tr.is-ticked td { background: var(--dw-selected-row); }
+.app-shell:not(.app-desk) .app-edit-tracks .app-edit-tick { width: var(--pl-hit); padding: 0; }
+
+.app-shell:not(.app-desk) .app-edit-hit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--pl-hit);
+    min-height: var(--pl-hit);
+    cursor: pointer;
+    user-select: none;
+}
+
+.app-shell:not(.app-desk) .app-edit-tracks .app-edit-number {
+    width: calc(var(--app-ph-number) + 2 * var(--app-ph-lines));
+    color: var(--dw-text-3);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-label);
+    text-align: right;
+}
+
+.app-shell:not(.app-desk) .app-edit-tracks .app-edit-length {
+    width: calc(var(--app-ph-length) + 2 * var(--app-ph-lines));
+    color: var(--dw-text-2);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-label);
+    text-align: right;
+}
+
+/* --- the main page's editors, in the sheet: their words, fields and buttons --- */
+
+.app-shell:not(.app-desk) .app-edit h4,
+.app-shell:not(.app-desk) .app-edit h5,
+.app-shell:not(.app-desk) .app-edit p { margin: 0; }
+
+.app-shell:not(.app-desk) .app-edit h4 { font-size: var(--dw-text-footnote); font-weight: var(--dw-weight-semibold); line-height: var(--dw-leading-note); }
+.app-shell:not(.app-desk) .app-edit h5 { font-size: var(--dw-text-footnote); font-weight: var(--dw-weight-regular); line-height: var(--dw-leading-note); }
+
+/* the main page's colour classes, in this page's palette */
+.app-shell:not(.app-desk) .app-edit .white { color: var(--dw-text); }
+.app-shell:not(.app-desk) .app-edit .default { color: var(--dw-text-heading-color); }
+.app-shell:not(.app-desk) .app-edit .default-secondary { color: var(--dw-text-2); }
+
+.app-shell:not(.app-desk) .app-edit .white-tertiary,
+.app-shell:not(.app-desk) .app-edit .default-muted { color: var(--dw-text-3); }
+
+.app-shell:not(.app-desk) .app-edit .yellow { color: var(--dw-amber-text); }
+.app-shell:not(.app-desk) .app-edit .red { color: var(--dw-danger-text); }
+.app-shell:not(.app-desk) .app-edit .green { color: var(--dw-badge-green-text); }
+
+/* a text field: STYLE.md's well, a finger tall, its text the body's 17px - iOS zooms into one under 16 */
+.app-shell:not(.app-desk) .app-edit .releases-filter-input,
+.app-shell:not(.app-desk) .app-edit-select,
+.app-shell:not(.app-desk) .app-edit-pick-input {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--pl-hit);
+    padding: 0 var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--dw-text-body);
+    outline: none;
+}
+
+.app-shell:not(.app-desk) .app-edit .releases-filter-input:focus,
+.app-shell:not(.app-desk) .app-edit-select:focus,
+.app-shell:not(.app-desk) .app-edit-pick-input:focus { border-color: var(--dw-best); }
+
+.app-shell:not(.app-desk) .app-edit .releases-filter-input::placeholder,
+.app-shell:not(.app-desk) .app-edit-pick-input::placeholder { color: var(--dw-text-3); }
+
+.app-shell:not(.app-desk) .app-edit input[type="checkbox"] {
+    flex: none;
+    width: var(--dw-checkbox);
+    height: var(--dw-checkbox);
+    margin: 0;
+    accent-color: var(--dw-accent);
+}
+
+/* STYLE.md's secondary button, a finger tall: the editors' own, the Get buttons, the viewer's */
+.app-shell:not(.app-desk) .app-edit .app-edit-button,
+.app-shell:not(.app-desk) .app-edit .columns-toggle-button,
+.app-shell:not(.app-desk) .app-edit .win-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-ph-lines);
+    min-height: var(--pl-hit);
+    padding: 0 var(--dw-gutter-grouped);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+    text-align: center;
+}
+
+.app-shell:not(.app-desk) .app-edit .app-edit-button:active:not(:disabled),
+.app-shell:not(.app-desk) .app-edit .columns-toggle-button:active:not(:disabled),
+.app-shell:not(.app-desk) .app-edit .win-button:active:not(:disabled) { background: var(--dw-secondary-bg-active); }
+
+.app-shell:not(.app-desk) .app-edit button:disabled { opacity: var(--app-pin-off); }
+
+/* a Get that failed: still a button to press again, its words amber */
+.app-shell:not(.app-desk) .app-edit .app-edit-button.failed { color: var(--dw-amber-text); }
+
+/* opened from Needs a look: the editor's place in the queue, and its Previous and skip a pair */
+.app-shell:not(.app-desk) .app-edit .metadata-queue-nav { display: inline-flex; gap: var(--app-ph-lines); }
+.app-shell:not(.app-desk) .app-edit .metadata-queue-position { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+
+/* the solid purple: Apply, in the release editor and the tag editor - and the viewer's choice (named
+   by the release tab's id too, so it outweighs the viewer's own secondary button, above) */
+.app-shell:not(.app-desk) .app-edit #metadata-apply-button,
+.app-shell:not(.app-desk) .app-edit #tags-apply-button,
+.app-shell:not(.app-desk) .app-edit .win-button.is-default,
+.app-shell:not(.app-desk) #app-edit-panel-release .win-button.is-default {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-ph-lines);
+    min-height: var(--pl-hit);
+    padding: 0 var(--dw-gutter-grouped);
+    border: var(--dw-hairline) solid var(--dw-primary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-shell:not(.app-desk) .app-edit #metadata-footer .columns-toggle-button,
+.app-shell:not(.app-desk) .app-edit .tags-footer .columns-toggle-button,
+.app-shell:not(.app-desk) .app-edit #delete-actions .columns-toggle-button { font-size: var(--dw-text-heading); }
+
+/* busy inside a solid button ("Applying, renaming in 20s", "Saving", "Deleting"): the button's own white */
+.app-shell:not(.app-desk) .app-edit #metadata-apply-button .loading-blocks,
+.app-shell:not(.app-desk) .app-edit #tags-apply-button .loading-blocks,
+.app-shell:not(.app-desk) .app-edit #delete-confirm-button .loading-blocks,
+.app-shell:not(.app-desk) .app-edit .win-button.is-default .loading-blocks { color: inherit; }
+
+.app-shell:not(.app-desk) .app-edit button:focus-visible,
+.app-shell:not(.app-desk) .app-edit summary:focus-visible,
+.app-shell:not(.app-desk) .app-edit .app-edit-hit:focus-within {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+/* busy: the player's own ring, beside a label or alone in an empty list */
+.app-shell:not(.app-desk) .app-edit .loading-blocks,
+.app-shell:not(.app-desk) .app-settings .loading-blocks { display: inline-flex; align-items: center; gap: var(--app-ph-lines); }
+
+.app-shell:not(.app-desk) .app-edit .loading-blocks::before,
+.app-shell:not(.app-desk) .app-edit .loading-panel::before,
+.app-shell:not(.app-desk) .app-settings .loading-blocks::before,
+.app-shell:not(.app-desk) .app-care-spin {
+    content: '';
+    flex: none;
+    width: var(--app-ph-spin);
+    height: var(--app-ph-spin);
+    border: var(--app-ph-spin-ring) solid var(--dw-border-cover);
+    border-top-color: var(--dw-text-2);
+    border-radius: var(--dw-radius-round);
+    animation: pl-spin var(--app-ph-spin-time) linear infinite;
+}
+
+.app-shell:not(.app-desk) .app-edit .loading-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--app-ph-lines);
+    padding: var(--app-ph-gap) 0;
+    color: var(--dw-text-2);
+}
+
+.app-shell:not(.app-desk) .app-edit .loading-panel::before { width: var(--app-ph-spin-panel); height: var(--app-ph-spin-panel); }
+
+/* --- the release editor (components/MetadataEditor.tsx), one column --- */
+
+.app-shell:not(.app-desk) .app-edit #metadata-window,
+.app-shell:not(.app-desk) .app-edit #metadata-panel,
+.app-shell:not(.app-desk) .app-edit #metadata-body,
+.app-shell:not(.app-desk) .app-edit .metadata-plan { display: flex; flex-direction: column; gap: var(--app-ph-block); }
+
+.app-shell:not(.app-desk) .app-edit #metadata-window,
+.app-shell:not(.app-desk) .app-edit #tags-window,
+.app-shell:not(.app-desk) .app-edit #delete-window { padding-top: var(--app-ph-lines); }
+
+.app-shell:not(.app-desk) .app-edit #metadata-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--app-ph-lines) var(--app-ph-block);
+}
+
+.app-shell:not(.app-desk) .app-edit #metadata-header > h4 { min-width: 0; font-size: var(--dw-text-heading); overflow-wrap: anywhere; }
+
+/* the folder: the one string here people copy */
+.app-shell:not(.app-desk) .app-edit .metadata-path,
+.app-shell:not(.app-desk) .app-edit .tags-path,
+.app-shell:not(.app-desk) .app-edit .delete-path {
+    flex-basis: 100%;
+    min-width: 0;
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-label);
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+/* the sheet's own close button stands for the editor's */
+.app-shell:not(.app-desk) .app-edit #metadata-close-button { display: none; }
+
+.app-shell:not(.app-desk) .app-edit #metadata-issues { display: flex; flex-direction: column; gap: var(--app-ph-lines); }
+
+.app-shell:not(.app-desk) .app-edit .metadata-issue {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--app-line-gap) var(--app-ph-lines);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+}
+
+/* an issue: STYLE.md's amber badge */
+.app-shell:not(.app-desk) .app-edit .library-issue-chip {
+    flex: none;
+    padding: 0 var(--app-ph-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-tag);
+    background: var(--dw-badge-amber-bg);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-label);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-issue-undo,
+.app-shell:not(.app-desk) .app-edit .tags-revert { min-height: var(--pl-hit); color: var(--dw-accent); font-size: var(--dw-text-footnote); }
+
+.app-shell:not(.app-desk) .app-edit #metadata-current {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-line-gap) var(--app-ph-block);
+    font-size: var(--dw-text-label);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-mbid { color: var(--dw-text-2); font-family: var(--dw-font-mono); overflow-wrap: anywhere; }
+
+.app-shell:not(.app-desk) .app-edit #metadata-search { display: flex; gap: var(--app-ph-lines); }
+.app-shell:not(.app-desk) .app-edit #metadata-search > input { flex: 1; }
+
+/* the pressings: one long list in the sheet's own scroll - no list scrolling inside another on a phone */
+.app-shell:not(.app-desk) .app-edit .metadata-releases { display: flex; flex-direction: column; gap: var(--app-ph-lines); }
+
+.app-shell:not(.app-desk) .app-edit .metadata-release {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--app-line-gap) var(--app-ph-lines);
+    width: 100%;
+    min-height: var(--pl-hit);
+    padding: var(--app-ph-pad-y) var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-card);
+    text-align: left;
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-release:active { background: var(--dw-pressed); }
+
+.app-shell:not(.app-desk) .app-edit .metadata-release.active {
+    border-color: var(--dw-selection-border);
+    background: var(--dw-selection-bg);
+    color: var(--dw-selected-text);
+}
+
+/* a pressing: its title and track count on the first line, what it is under them */
+.app-shell:not(.app-desk) .app-edit .metadata-release-title { flex: 1 1 auto; min-width: 0; font-weight: var(--dw-weight-semibold); overflow-wrap: anywhere; }
+.app-shell:not(.app-desk) .app-edit .metadata-release-detail { flex-basis: 100%; order: 2; font-size: var(--dw-text-label); overflow-wrap: anywhere; }
+
+.app-shell:not(.app-desk) .app-edit .metadata-release-tracks {
+    flex: none;
+    order: 1;
+    margin-left: auto;
+    color: var(--dw-text-2);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-label);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-release-tracks.mismatch { color: var(--dw-amber-text); }
+
+/* the release the album is tagged with: STYLE.md's green badge */
+.app-shell:not(.app-desk) .app-edit .metadata-current-badge {
+    flex: none;
+    padding: 0 var(--app-ph-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-green-border);
+    border-radius: var(--dw-radius-tag);
+    background: var(--dw-badge-green-bg);
+    color: var(--dw-badge-green-text);
+    font-size: var(--dw-text-label);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-status { padding: var(--app-ph-lines) 0; }
+
+/* the fields: artist, album and edition across, the two years side by side */
+.app-shell:not(.app-desk) .app-edit .metadata-fields { display: flex; flex-wrap: wrap; gap: var(--app-ph-lines) var(--app-ph-block); }
+.app-shell:not(.app-desk) .app-edit .metadata-field { display: flex; flex: 1 1 100%; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+.app-shell:not(.app-desk) .app-edit .metadata-field-short { flex: 1 1 0; }
+.app-shell:not(.app-desk) .app-edit .metadata-field > span:first-child { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+.app-shell:not(.app-desk) .app-edit .metadata-hint,
+.app-shell:not(.app-desk) .app-edit .tags-hint { color: var(--dw-text-3); font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+
+/* the cover you have beside the release's */
+.app-shell:not(.app-desk) .app-edit .metadata-art { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-ph-lines) var(--app-ph-block); }
+.app-shell:not(.app-desk) .app-edit .metadata-art-slot { display: flex; flex-direction: column; gap: var(--app-line-gap); font-size: var(--dw-text-label); }
+
+.app-shell:not(.app-desk) .app-edit .metadata-art-slot img,
+.app-shell:not(.app-desk) .app-edit .metadata-art-empty {
+    display: block;
+    width: var(--app-ph-thumb);
+    height: var(--app-ph-thumb);
+    object-fit: cover;
+    border: var(--dw-hairline) solid var(--dw-border-cover);
+    border-radius: var(--dw-radius-cover);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-art-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dw-empty-cover);
+    color: var(--dw-text-3);
+    text-align: center;
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-art-open { display: block; cursor: zoom-in; }
+.app-shell:not(.app-desk) .app-edit .metadata-art-size { font-family: var(--dw-font-mono); }
+.app-shell:not(.app-desk) .app-edit .metadata-art-arrow { color: var(--dw-text-2); }
+.app-shell:not(.app-desk) .app-edit .metadata-art-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-ph-lines); }
+
+/* "Download the cover too": the whole label is the box's target, a finger tall */
+.app-shell:not(.app-desk) .app-edit .metadata-checkbox {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--app-line-gap) var(--app-ph-pad-x);
+    min-height: var(--pl-hit);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-checkbox > .metadata-hint { grid-column: 2; }
+
+/* what applying it changes: a well */
+.app-shell:not(.app-desk) .app-edit .metadata-move {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-line-gap);
+    padding: var(--app-ph-pad-y) var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-file {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-line-gap);
+    padding-top: var(--app-ph-lines);
+    border-top: var(--dw-hairline) solid var(--dw-row-border);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-file-name { font-family: var(--dw-font-mono); font-size: var(--dw-text-label); overflow-wrap: anywhere; }
+
+/* a change, readable at 320px: the tag's name on a line of its own, the old value (struck) and the new
+   side by side under it - three columns would leave each a word or two wide */
+.app-shell:not(.app-desk) .app-edit .metadata-change {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 var(--app-ph-block);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-shell:not(.app-desk) .app-edit .metadata-tag { grid-column: 1 / -1; min-width: 0; font-size: var(--dw-text-label); overflow-wrap: anywhere; }
+
+.app-shell:not(.app-desk) .app-edit .metadata-from,
+.app-shell:not(.app-desk) .app-edit .metadata-to { min-width: 0; overflow-wrap: anywhere; }
+
+.app-shell:not(.app-desk) .app-edit .metadata-from { text-decoration: line-through; }
+
+/* Apply and Cancel stay in reach at the foot of the sheet, the summary over them, the bar's own foot
+   clear of the home indicator */
+.app-shell:not(.app-desk) .app-edit #metadata-footer,
+.app-shell:not(.app-desk) .app-edit .tags-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-ph-lines);
+    padding: var(--app-ph-block) 0 calc(var(--pl-safe-bottom) + var(--app-ph-block));
+    border-top: var(--dw-hairline) solid var(--dw-border);
+    background: var(--dw-bg-sheet);
+}
+
+/* a row of whole buttons across the sheet: Cancel and Apply, It's fine as it is */
+.app-shell:not(.app-desk) .app-edit #metadata-footer > button,
+.app-shell:not(.app-desk) .app-edit .tags-footer > button { flex: 1 1 auto; }
+
+.app-shell:not(.app-desk) .app-edit .metadata-summary,
+.app-shell:not(.app-desk) .app-edit .metadata-result,
+.app-shell:not(.app-desk) .app-edit .tags-result { flex-basis: 100%; font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+
+.app-shell:not(.app-desk) .app-edit .tags-spacer { display: none; }
+
+/* --- the tag editor (components/TrackTagEditor.tsx) --- */
+
+.app-shell:not(.app-desk) .app-edit #tags-window,
+.app-shell:not(.app-desk) .app-edit .tags-body,
+.app-shell:not(.app-desk) .app-edit .tags-form,
+.app-shell:not(.app-desk) .app-edit .tags-preview { display: flex; flex-direction: column; gap: var(--app-ph-block); }
+
+.app-shell:not(.app-desk) .app-edit #tags-window .window-titlebar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-ph-lines);
+}
+
+.app-shell:not(.app-desk) .app-edit #tags-window .window-title {
+    min-width: 0;
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    overflow-wrap: anywhere;
+}
+
+/* the tag editor's own ✕ closes it alone, back to the list or the track: a finger's target */
+.app-shell:not(.app-desk) .app-edit #tags-window .window-close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    border-radius: var(--dw-radius-control);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-heading);
+}
+
+.app-shell:not(.app-desk) .app-edit .tags-subject,
+.app-shell:not(.app-desk) .app-edit .delete-subject {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--app-line-gap) var(--app-ph-lines);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-edit .tags-preview-title { color: var(--dw-text-heading-color); font-size: var(--dw-text-heading); }
+
+.app-shell:not(.app-desk) .app-edit .tags-tracks > summary {
+    display: flex;
+    align-items: center;
+    min-height: var(--pl-hit);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-footnote);
+    cursor: pointer;
+}
+
+.app-shell:not(.app-desk) .app-edit .tags-track-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-line-gap);
+    margin: var(--app-ph-lines) 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--dw-text-label);
+}
+
+.app-shell:not(.app-desk) .app-edit .tags-track-list > li { display: flex; gap: var(--app-ph-lines); min-width: 0; }
+.app-shell:not(.app-desk) .app-edit .tags-track-list > li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.app-shell:not(.app-desk) .app-edit .tags-track-list .is-mono { flex: none; color: var(--dw-text-3); font-family: var(--dw-font-mono); }
+
+/* the fields: two to a row for the short ones (track, disc, the years), the rest across */
+.app-shell:not(.app-desk) .app-edit .tags-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--app-ph-pad-x) var(--app-ph-block);
+}
+
+.app-shell:not(.app-desk) .app-edit .tags-field { display: flex; flex-direction: column; grid-column: 1 / -1; gap: var(--app-line-gap); min-width: 0; }
+.app-shell:not(.app-desk) .app-edit .tags-field.is-short { grid-column: span 1; }
+.app-shell:not(.app-desk) .app-edit .tags-field-head { display: flex; align-items: center; justify-content: space-between; gap: var(--app-ph-lines); }
+.app-shell:not(.app-desk) .app-edit .tags-field-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+.app-shell:not(.app-desk) .app-edit .tags-field.is-edited .tags-field-label { color: var(--dw-accent-text); }
+.app-shell:not(.app-desk) .app-edit .tags-field.has-problem .releases-filter-input { border-color: var(--dw-amber-icon); }
+.app-shell:not(.app-desk) .app-edit .tags-field-note { font-size: var(--dw-text-label); line-height: var(--dw-leading-note); }
+
+/* --- the delete confirmation (components/DeleteAlbumDialog.tsx) --- */
+
+.app-shell:not(.app-desk) .app-edit #delete-window,
+.app-shell:not(.app-desk) .app-edit #delete-panel { display: flex; flex-direction: column; gap: var(--app-ph-block); }
+
+.app-shell:not(.app-desk) .app-edit #delete-panel > h4 { font-size: var(--dw-text-heading); }
+
+.app-shell:not(.app-desk) .app-edit .library-edition {
+    padding: 0 var(--app-ph-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-purple-border);
+    border-radius: var(--dw-radius-tag);
+    background: var(--dw-badge-purple-bg);
+    color: var(--dw-accent-text);
+    font-size: var(--dw-text-label);
+}
+
+/* the files a delete takes beside the tracks - a rip log may be the only copy - named in full */
+.app-shell:not(.app-desk) .app-edit .delete-others {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-line-gap);
+    font-size: var(--dw-text-label);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-edit .delete-warning { line-height: var(--dw-leading-note); }
+.app-shell:not(.app-desk) .app-edit #delete-actions { display: flex; flex-wrap: wrap; gap: var(--app-ph-lines); }
+.app-shell:not(.app-desk) .app-edit #delete-actions > button { flex: 1 1 auto; }
+
+/* the one destructive button: the primary's shape, in red */
+.app-shell:not(.app-desk) .app-edit #delete-confirm-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-ph-lines);
+    min-height: var(--pl-hit);
+    padding: 0 var(--dw-gutter-grouped);
+    border: var(--dw-hairline) solid var(--dw-danger-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-danger-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* A phone on its side (390px tall): the title and its close button beside the tabs rather than above them,
+   so the body - and the Apply bar at its foot - keep the height of the screen a second row would take */
+@media (max-height: 500px) {
+    .app-shell:not(.app-desk) .app-edit {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 0 var(--app-ph-gap);
+        padding-top: calc(var(--pl-safe-top) + var(--app-ph-tight));
+    }
+
+    .app-shell:not(.app-desk) .app-edit-head { grid-area: 1 / 2 / 2 / 3; }
+    .app-shell:not(.app-desk) .app-edit-tabs { grid-area: 1 / 1 / 2 / 2; align-self: end; }
+    .app-shell:not(.app-desk) .app-edit-folder { grid-area: 2 / 1 / 3 / 3; margin-top: var(--app-ph-lines); }
+    .app-shell:not(.app-desk) .app-edit-body { grid-area: 3 / 1 / 4 / 3; margin-top: var(--app-ph-lines); }
+    .app-shell:not(.app-desk) .app-edit-title { font-size: var(--dw-text-heading); }
+}
+
+/* --- the album page's Edit, a phone's: a chip in the bar beside the pin, the pin's size, reaching 44px --- */
+
+.app-shell:not(.app-desk) .app-edit-chip {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    height: var(--app-pin-toggle);
+    margin-left: auto;
+    padding: 0 var(--app-pin-toggle-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-shell:not(.app-desk) .app-edit-chip::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--app-pin-toggle-reach));
+}
+
+.app-shell:not(.app-desk) .app-edit-chip:active:not(:disabled) { background: var(--dw-secondary-bg-active); }
+.app-shell:not(.app-desk) .app-edit-chip:disabled { opacity: var(--app-pin-off); }
+
+.app-shell:not(.app-desk) .app-edit-chip[aria-pressed="true"] {
+    border-color: var(--dw-toggled-border);
+    background: var(--dw-toggled-bg);
+    box-shadow: none;
+    color: var(--dw-accent-text);
+}
+
+.app-shell:not(.app-desk) .app-edit-chip:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+/* --- the Managing pages on a phone: each body inside the page's edges, its lines footnotes --- */
+
+.app-shell:not(.app-desk) .app-queue-body,
+.app-shell:not(.app-desk) .app-settings-body,
+.app-shell:not(.app-desk) .app-log-body,
+.app-shell:not(.app-desk) .app-care-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-ph-gap);
+    padding: 0 var(--pl-edge-right) var(--pl-gap) var(--pl-edge-left);
+}
+
+.app-shell:not(.app-desk) .app-queue-body:focus { outline: none; }
+
+.app-shell:not(.app-desk) .app-queue-line,
+.app-shell:not(.app-desk) .app-queue-state,
+.app-shell:not(.app-desk) .app-settings-line,
+.app-shell:not(.app-desk) .app-settings-state,
+.app-shell:not(.app-desk) .app-settings-problem,
+.app-shell:not(.app-desk) .app-log-line,
+.app-shell:not(.app-desk) .app-log-problem,
+.app-shell:not(.app-desk) .app-log-empty,
+.app-shell:not(.app-desk) .app-care-line,
+.app-shell:not(.app-desk) .app-care-state,
+.app-shell:not(.app-desk) .app-care-note,
+.app-shell:not(.app-desk) .app-care-facts,
+.app-shell:not(.app-desk) .app-care-problem,
+.app-shell:not(.app-desk) .app-care-result {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-queue-state,
+.app-shell:not(.app-desk) .app-settings-state,
+.app-shell:not(.app-desk) .app-care-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-ph-gap); }
+
+.app-shell:not(.app-desk) .app-settings-problem,
+.app-shell:not(.app-desk) .app-log-problem,
+.app-shell:not(.app-desk) .app-care-problem { color: var(--dw-danger-text); }
+
+.app-shell:not(.app-desk) .app-settings-line a { color: var(--dw-accent); }
+.app-shell:not(.app-desk) .app-settings-line code { color: var(--dw-text); font-family: var(--dw-font-mono); }
+
+/* --- Needs a look: the Library's chips as facets, and a row per album - its cover beside its name and
+   artist, its chips under them, wrapping; the row the sheet has open in Explorer's selection, a row dealt
+   with faded but never its word, held rows seen to refuse a tap --- */
+
+.app-shell:not(.app-desk) .app-queue-warning {
+    margin: 0;
+    padding: var(--app-ph-pad-y) var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-tint-amber);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-shell:not(.app-desk) .app-queue-facets { padding-right: 0; padding-left: 0; }
+.app-shell:not(.app-desk) .app-queue-facet { max-width: 100%; }
+.app-shell:not(.app-desk) .app-queue-count { color: var(--dw-text-2); }
+
+/* always there and a finger tall, empty or saying "Checking the library…": its going moves no row */
+.app-shell:not(.app-desk) .app-queue-checking {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-ph-lines);
+    min-height: var(--pl-hit);
+    margin: 0;
+    color: var(--dw-text-3);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-shell:not(.app-desk) .app-queue-list {
+    margin: 0;
+    padding: 0;
+    border-top: var(--dw-hairline) solid var(--dw-row-border);
+    list-style: none;
+}
+
+.app-shell:not(.app-desk) .app-queue-list > li { border-bottom: var(--dw-hairline) solid var(--dw-row-border); }
+
+.app-shell:not(.app-desk) .app-queue-row {
+    display: grid;
+    grid-template-columns: var(--app-ph-queue-cover) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--app-ph-lines) var(--app-ph-pad-x);
+    width: 100%;
+    min-height: var(--pl-hit);
+    padding: var(--app-ph-pad-y) var(--pl-gap-sm);
+    border: var(--dw-hairline) solid transparent;
+    border-radius: var(--dw-radius-control);
+    color: var(--dw-text);
+    text-align: left;
+}
+
+.app-shell:not(.app-desk) .app-queue-row:active { background: var(--dw-pressed); }
+
+.app-shell:not(.app-desk) .app-queue-row.is-current {
+    border-color: var(--dw-selection-border);
+    background: var(--dw-selection-bg);
+    color: var(--dw-selected-text);
+}
+
+.app-shell:not(.app-desk) .app-queue-row:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+}
+
+.app-shell:not(.app-desk) .app-queue-cover {
+    grid-row: 1 / span 2;
+    width: var(--app-ph-queue-cover);
+    height: var(--app-ph-queue-cover);
+    border-radius: var(--dw-radius-cover);
+    object-fit: cover;
+}
+
+.app-shell:not(.app-desk) .app-queue-cover.is-empty {
+    border: var(--dw-hairline) solid var(--dw-border);
+    background: var(--dw-empty-cover);
+}
+
+.app-shell:not(.app-desk) .app-queue-text { display: flex; flex-direction: column; min-width: 0; }
+
+.app-shell:not(.app-desk) .app-queue-album,
+.app-shell:not(.app-desk) .app-queue-artist {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-shell:not(.app-desk) .app-queue-album { font-size: var(--dw-text-heading); font-weight: var(--dw-weight-semibold); }
+.app-shell:not(.app-desk) .app-queue-artist { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+
+/* its chips under its name: whole, wrapping - one alone wider than the row ellipsizes */
+.app-shell:not(.app-desk) .app-queue-chips { display: flex; flex-wrap: wrap; gap: var(--app-ph-lines); min-width: 0; }
+.app-shell:not(.app-desk) .app-queue-chips:empty { display: none; }
+
+.app-shell:not(.app-desk) .app-queue-chip,
+.app-shell:not(.app-desk) .app-queue-mark {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    min-height: var(--app-ph-chip);
+    padding: 0 var(--app-ph-chip-pad);
+    overflow: hidden;
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-badge-amber-bg);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-label);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-shell:not(.app-desk) .app-queue-chip.is-new {
+    border-color: var(--dw-badge-purple-border);
+    background: var(--dw-badge-purple-bg);
+    color: var(--dw-accent-text);
+}
+
+.app-shell:not(.app-desk) .app-queue-mark {
+    border-color: var(--dw-badge-green-border);
+    background: var(--dw-badge-green-bg);
+    color: var(--dw-badge-green-text);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-shell:not(.app-desk) .app-queue-row.is-done .app-queue-cover,
+.app-shell:not(.app-desk) .app-queue-row.is-done .app-queue-text { opacity: var(--app-ph-queue-done); }
+
+.app-shell:not(.app-desk) .app-queue-row[aria-disabled='true'] { opacity: var(--app-job-busy); }
+.app-shell:not(.app-desk) .app-queue-row[aria-disabled='true']:active { background: transparent; }
+
+/* You's Managing rows: the count beside "Albums that need a look", Requests' badge */
+.app-shell:not(.app-desk) .app-queue-link-row { width: 100%; text-align: left; }
+.app-shell:not(.app-desk) .app-queue-link-row .app-row-label { flex: 1 1 auto; }
+
+.app-shell:not(.app-desk) .app-queue-badge {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--app-ph-badge);
+    height: var(--app-ph-badge);
+    padding: 0 var(--app-ph-badge-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-purple-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-badge-purple-bg);
+    color: var(--dw-accent-text);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* --- Server settings: the three tabs (the Edit sheet's underline tabs, above), the settings tab's own
+   rows - a key over its field, wrapping - and the save bar above the tab bar and the mini player --- */
+
+.app-shell:not(.app-desk) .app-settings-tab { display: inline-flex; align-items: center; justify-content: center; gap: var(--app-ph-lines); }
+
+.app-shell:not(.app-desk) .app-settings-mark {
+    flex: none;
+    width: var(--app-ph-mark);
+    height: var(--app-ph-mark);
+    border-radius: var(--dw-radius-round);
+    background: var(--dw-accent);
+}
+
+.app-shell:not(.app-desk) .app-settings-mark.is-attention { background: var(--dw-amber-icon); }
+.app-shell:not(.app-desk) .app-settings-panel { display: flex; flex-direction: column; gap: var(--app-section-gap); }
+
+.app-shell:not(.app-desk) .app-settings .settings-section { display: flex; flex-direction: column; gap: var(--app-ph-lines); min-width: 0; }
+
+.app-shell:not(.app-desk) .app-settings .settings-section-title {
+    margin: 0;
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-section-note,
+.app-shell:not(.app-desk) .app-settings .settings-env-effect,
+.app-shell:not(.app-desk) .app-settings .settings-mode-note,
+.app-shell:not(.app-desk) .app-settings .settings-retime-note {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-section-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight);
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env-list { display: flex; flex-direction: column; }
+
+.app-shell:not(.app-desk) .app-settings .settings-env,
+.app-shell:not(.app-desk) .app-settings .settings-mode,
+.app-shell:not(.app-desk) .app-settings .settings-retime {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-ph-lines);
+    min-width: 0;
+    padding: var(--app-ph-pad-y) var(--app-ph-pad-x);
+    border-left: var(--app-ph-set-edge) solid transparent;
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env + .settings-env,
+.app-shell:not(.app-desk) .app-settings .settings-mode + .settings-mode,
+.app-shell:not(.app-desk) .app-settings .settings-retime { border-top: var(--dw-hairline) solid var(--dw-row-border); }
+
+/* an edit still only a draft: marked at its edge until it is saved */
+.app-shell:not(.app-desk) .app-settings .settings-env.is-edited { border-left-color: var(--dw-amber-icon); background: var(--dw-tint-amber); }
+
+.app-shell:not(.app-desk) .app-settings .settings-env-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-ph-lines);
+    min-width: 0;
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env-key,
+.app-shell:not(.app-desk) .app-settings .settings-mode-name {
+    min-width: 0;
+    color: var(--dw-text);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-mode-name { color: var(--dw-accent-text); }
+
+/* where the value came from, the row's badge, a setting that can't be changed here */
+.app-shell:not(.app-desk) .app-settings .settings-env-source,
+.app-shell:not(.app-desk) .app-settings .settings-env-badge,
+.app-shell:not(.app-desk) .app-settings .settings-env-locked {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--app-ph-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-tag);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env-source.is-override {
+    border-color: var(--dw-badge-purple-border);
+    background: var(--dw-badge-purple-bg);
+    color: var(--dw-accent-text);
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env-badge { border-color: var(--dw-danger-border); color: var(--dw-danger-text); }
+
+.app-shell:not(.app-desk) .app-settings .settings-env-badge.is-edited {
+    border-color: var(--dw-badge-amber-border);
+    background: var(--dw-badge-amber-bg);
+    color: var(--dw-amber-text);
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env-control { display: flex; align-items: center; min-width: 0; }
+
+/* a field or a dropdown: STYLE.md's well, a finger tall, never small enough for iOS to zoom into */
+.app-shell:not(.app-desk) .app-settings .settings-env-input {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--pl-hit);
+    padding: 0 var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font-family: var(--dw-font-mono);
+    font-size: var(--dw-text-body);
+    outline: none;
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env-input:focus { border-color: var(--dw-best); }
+.app-shell:not(.app-desk) .app-settings .settings-env-input::placeholder { color: var(--dw-text-3); }
+
+.app-shell:not(.app-desk) .app-settings .settings-env-revert {
+    align-self: flex-start;
+    min-height: var(--pl-hit);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-footnote);
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-env-detail {
+    color: var(--dw-danger-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+/* whether organizing can happen: amber while it can't, green while it can */
+.app-shell:not(.app-desk) .app-settings .settings-verdict {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-ph-lines);
+    padding: var(--app-ph-pad-y) var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-tint-amber);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-verdict.ok { border-color: var(--dw-badge-green-border); background: var(--dw-tint-green); }
+.app-shell:not(.app-desk) .app-settings .settings-verdict-title { color: var(--dw-amber-text); font-size: var(--dw-text-footnote); font-weight: var(--dw-weight-semibold); }
+.app-shell:not(.app-desk) .app-settings .settings-verdict.ok .settings-verdict-title { color: var(--dw-badge-green-text); }
+
+.app-shell:not(.app-desk) .app-settings .settings-verdict-list {
+    margin: 0;
+    padding-left: var(--dw-gutter-grouped);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+/* Re-time saved lyrics: the tab's own button, a finger tall */
+.app-shell:not(.app-desk) .app-settings .settings-retime { align-items: flex-start; }
+
+.app-shell:not(.app-desk) .app-settings .settings-retime .win-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-ph-lines);
+    min-height: var(--pl-hit);
+    padding: 0 var(--dw-gutter-grouped);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+}
+
+.app-shell:not(.app-desk) .app-settings .settings-retime .win-button:disabled { opacity: var(--app-job-busy); }
+
+.app-shell:not(.app-desk) .app-settings .settings-env-revert:focus-visible,
+.app-shell:not(.app-desk) .app-settings .settings-retime .win-button:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+/* the save bar: sticky above the tab bar (and the mini player, while it shows) - saying nothing, and
+   taking no taps, until there is something to save; its words over Discard and Save, each half the width */
+.app-shell:not(.app-desk) .app-settings-savebar {
+    position: sticky;
+    bottom: var(--app-tabbar-height);
+    z-index: var(--app-ph-z-bar);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-ph-lines);
+    padding: var(--app-ph-bar-pad) var(--pl-edge-right) var(--app-ph-bar-pad) var(--pl-edge-left);
+    border-top: var(--dw-hairline) solid transparent;
+}
+
+.app-shell.has-mini:not(.app-desk) .app-settings-savebar { bottom: var(--app-ph-bar-mini); }
+.app-shell:not(.app-desk) .app-settings-savebar:not(.is-said) { pointer-events: none; }
+.app-shell:not(.app-desk) .app-settings-savebar.is-said { border-top-color: var(--dw-border); background: var(--dw-bg); }
+
+/* while the bar says something it covers what scrolls under it: keyboard focus - and a field the keyboard
+   comes up for - stops above it too (only from the pane that shows: :has() matches a hidden pane) */
+html:has(.app-shell:not(.app-desk) .app-pane:not([hidden]) .app-settings-savebar.is-said) {
+    scroll-padding-bottom: calc(var(--app-chrome-bottom) + var(--app-ph-bar) + var(--dw-hairline));
+}
+
+html:has(.app-shell.has-mini:not(.app-desk) .app-pane:not([hidden]) .app-settings-savebar.is-said) {
+    scroll-padding-bottom: calc(var(--app-chrome-bottom-mini) + var(--app-ph-bar) + var(--dw-hairline));
+}
+
+.app-shell:not(.app-desk) .app-settings-savebar-text {
+    flex: 1 1 100%;
+    min-width: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-shell:not(.app-desk) .app-settings-savebar-text:focus { outline: none; }
+.app-shell:not(.app-desk) .app-settings-savebar.has-error .app-settings-savebar-text { color: var(--dw-danger-text); }
+
+.app-shell:not(.app-desk) .app-settings-discard,
+.app-shell:not(.app-desk) .app-settings-save { flex: 1 1 0; min-height: var(--pl-hit); }
+
+/* the page's one solid purple button */
+.app-shell:not(.app-desk) .app-settings-save {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-shell:not(.app-desk) .app-settings-save:active:not([aria-disabled='true']) { filter: var(--dw-primary-pressed); }
+.app-shell:not(.app-desk) .app-settings-savebar [aria-disabled='true'] { opacity: var(--app-job-busy); }
+
+/* a window wide enough (a phone on its side, an iPad upright): the words, Discard and Save on one line, so
+   the bar takes a row less of a short screen - and the scroll padding reads the shorter bar */
+@media (min-width: 600px) {
+    :root { --app-ph-bar: calc(2 * var(--app-ph-bar-pad) + var(--pl-hit)); }
+    .app-shell:not(.app-desk) .app-settings-savebar-text { flex: 1 1 0; }
+
+    .app-shell:not(.app-desk) .app-settings-discard,
+    .app-shell:not(.app-desk) .app-settings-save { flex: 0 0 var(--app-ph-bar-button); }
+}
+
+/* --- the log: where the stream stands and Clear, then each line - its time, level and source over its
+   words, which wrap, broken anywhere --- */
+
+.app-shell:not(.app-desk) .app-log-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--app-ph-lines); }
+
+.app-shell:not(.app-desk) .app-log-stream {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-ph-lines);
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+}
+
+.app-shell:not(.app-desk) .app-log-dot {
+    flex: none;
+    width: var(--app-ph-log-dot);
+    height: var(--app-ph-log-dot);
+    border-radius: var(--dw-radius-round);
+    background: var(--dw-text-3);
+}
+
+.app-shell:not(.app-desk) .app-log-stream.is-live .app-log-dot { background: var(--dw-green-icon); }
+.app-shell:not(.app-desk) .app-log-stream.is-lost { color: var(--dw-amber-text); }
+.app-shell:not(.app-desk) .app-log-stream.is-lost .app-log-dot { background: var(--dw-amber-icon); }
+.app-shell:not(.app-desk) .app-log-clear { flex: none; padding-right: 0; }
+.app-shell:not(.app-desk) .app-log-clear[aria-disabled='true'] { color: var(--dw-text-3); }
+
+.app-shell:not(.app-desk) .app-log-list {
+    margin: 0;
+    padding: 0;
+    border-top: var(--dw-hairline) solid var(--dw-row-border);
+    list-style: none;
+}
+
+.app-shell:not(.app-desk) .app-log-row {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--app-line-gap) var(--app-ph-lines);
+    padding: var(--app-ph-lines) 0;
+    border-bottom: var(--dw-hairline) solid var(--dw-row-border);
+    color: var(--dw-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-shell:not(.app-desk) .app-log-time { color: var(--dw-text-3); font-size: var(--dw-text-label); }
+.app-shell:not(.app-desk) .app-log-level { color: var(--dw-text-2); font-size: var(--dw-text-label); font-weight: var(--dw-weight-semibold); }
+
+.app-shell:not(.app-desk) .app-log-src {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-shell:not(.app-desk) .app-log-words { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
+
+.app-shell:not(.app-desk) .app-log-row.is-error .app-log-level,
+.app-shell:not(.app-desk) .app-log-row.is-error .app-log-words { color: var(--dw-danger-text); }
+
+.app-shell:not(.app-desk) .app-log-row.is-warning .app-log-level,
+.app-shell:not(.app-desk) .app-log-row.is-warning .app-log-words { color: var(--dw-amber-text); }
+
+/* --- Library care: Rescan and the runs as cards, each run a row - its heading and button wrapping, what it
+   will do and what it did under them; the field narrowing them a finger tall at 17px --- */
+
+.app-shell:not(.app-desk) .app-care-facts,
+.app-shell:not(.app-desk) .app-care-result { color: var(--dw-text); }
+
+/* what the last run did: drawn while empty (a live region VoiceOver reads only once it is there), taking
+   back its gap; where focus goes as the run's button goes - words, no ring */
+.app-shell:not(.app-desk) .app-care-result:empty { margin-top: calc(-1 * var(--app-ph-lines)); }
+.app-shell:not(.app-desk) .app-care-result:focus { outline: none; }
+
+.app-shell:not(.app-desk) .app-care-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-ph-lines);
+    min-width: 0;
+    padding: var(--app-ph-block) var(--dw-gutter-grouped);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight);
+}
+
+.app-shell:not(.app-desk) .app-care-run {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-ph-lines);
+    min-width: 0;
+    padding-top: var(--app-ph-block);
+    border-top: var(--dw-hairline) solid var(--dw-row-border);
+}
+
+.app-shell:not(.app-desk) .app-care-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-ph-lines) var(--app-ph-block);
+    min-width: 0;
+}
+
+.app-shell:not(.app-desk) .app-care-title,
+.app-shell:not(.app-desk) .app-care-heading {
+    margin: 0;
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-shell:not(.app-desk) .app-care-heading { color: var(--dw-text); }
+.app-shell:not(.app-desk) .app-care-button { gap: var(--app-ph-lines); font-size: var(--dw-text-footnote); }
+.app-shell:not(.app-desk) .app-care [aria-disabled='true'] { opacity: var(--app-job-busy); }
+
+.app-shell:not(.app-desk) .app-care-narrow { display: flex; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
+.app-shell:not(.app-desk) .app-care-label { color: var(--dw-text-label-color); font-size: var(--dw-text-label); }
+
+.app-shell:not(.app-desk) .app-care-input {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--pl-hit);
+    padding: 0 var(--app-ph-pad-x);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--dw-text-body);
+    outline: none;
+}
+
+.app-shell:not(.app-desk) .app-care-input:focus { border-color: var(--dw-best); }
+.app-shell:not(.app-desk) .app-care-input::placeholder { color: var(--dw-text-3); }
+.app-shell:not(.app-desk) .app-care .app-text-button { min-height: var(--pl-hit); padding: 0; }

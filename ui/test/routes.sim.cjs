@@ -805,7 +805,7 @@ console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
       F.sideOf('phone', { sources: true, info: false, edit: false }), F.sideOf('desktop', { sources: true, info: true, edit: false })], ['sources', 'info', 'none', 'none', 'info'])
   //? 2.0.0-player.21: the album page's Edit panel, a third kind - App opens one at a time, and this
   //? says which shows if two ever were
-  check('the Edit panel is a side panel too: shown alone, under Info, over Sources - and never on a phone',
+  check('the Edit panel is a side panel too: shown alone, under Info, over Sources - and no side on a phone (a sheet there since 2.0.0-player.47)',
     [F.sideOf('desktop', { sources: false, info: false, edit: true }), F.sideOf('desktop', { sources: false, info: true, edit: true }),
       F.sideOf('desktop', { sources: true, info: false, edit: true }), F.sideOf('phone', { sources: false, info: false, edit: true })], ['edit', 'info', 'edit', 'none'])
   check('...making room as a column, lying over the page as a drawer',
@@ -821,9 +821,12 @@ console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
   check('the main area makes room only for a third column - a drawer lies over it',
     [F.makesRoom('column', 'sources'), F.makesRoom('column', 'info'), F.makesRoom('column', 'none'), F.makesRoom('drawer', 'sources'), F.makesRoom('sheet', 'sources')],
     [true, true, false, false, false])
-  check('crossing into the desktop closes Now Playing; back to the phone, the Info panel - and the Edit panel, which a phone has none of',
+  check('crossing into the desktop closes Now Playing; back to the phone, the Info panel',
     [F.closesOnCrossing('desktop'), F.closesOnCrossing('phone')],
-    [{ nowPlaying: true, infoPanel: false, editPanel: false }, { nowPlaying: false, infoPanel: true, editPanel: true }])
+    [{ nowPlaying: true, infoPanel: false }, { nowPlaying: false, infoPanel: true }])
+  //? 2.0.0-player.47: the Edit panel is a phone's sheet too, so it stays open across, as the artist page's does
+  check('...and the Edit panel is left open as the window crosses 1024px, either way - a panel one side, a sheet the other',
+    ['editPanel' in F.closesOnCrossing('phone'), 'editPanel' in F.closesOnCrossing('desktop')], [false, false])
   check('a drawer, showing, lies over the page - a column makes room instead, and a sheet is no panel',
     [F.liesOver('drawer', 'sources'), F.liesOver('drawer', 'info'), F.liesOver('drawer', 'none'), F.liesOver('column', 'info'), F.liesOver('sheet', 'sources')],
     [true, true, false, false, false])

@@ -11,6 +11,7 @@ import { handleDownloadRequests } from '../lib/downloadRequests'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { latestOnly } from '../lib/latest'
+import { navidromeChecks } from '../lib/navidromeCheck'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
@@ -38,10 +39,11 @@ import { LibraryCare } from './LibraryCare'
 import { chooseLibrary, libraryPick, librarySongs, useLibraryPick } from './libraryPick'
 import { NeedsALook } from './NeedsALook'
 import { NeedsNavidrome } from './NeedsNavidrome'
+import { setUpNavidromeBy } from './navidromeSetUp'
 import { ReleaseGroupPage } from './ReleaseGroupPage'
 import { Requests } from './Requests'
 import { Search } from './Search'
-import { ServerSettings } from './ServerSettings'
+import { ServerSettings, onServerSettingsSaved, showServerSettingsTab } from './ServerSettings'
 import { Sidebar } from './Sidebar'
 import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
@@ -192,8 +194,8 @@ function usePageShown(): boolean {
  * EDITING AN ALBUM (2.0.0-player.21, DesktopManage.dc.html): on a desktop, for an admin (`/deadwax/me`
  * again), the album page has Edit, which opens the Edit panel (EditPanel.tsx) - a third kind of side
  * panel, by the same rule: one at a time (Edit puts Sources and Info away, and either puts Edit away),
- * not modal, a column or a drawer, and the desktop's alone (drawn only in its frame; crossing to the
- * phone closes it). It is the album page's: it closes as that page stops being the one showing. What
+ * not modal, a column or a drawer - the desktop's alone until 2.0.0-player.47, a phone's sheet since
+ * (below). It is the album page's: it closes as that page stops being the one showing. What
  * it writes comes back as `albumChanged`: the album page asked again (`refreshes`, now and once
  * Navidrome has scanned) and the library's listeners told (announceAlbumsFiled - the owned marks, an
  * album-you-don't-have page's store line); an album an apply gave a new id in Navidrome becomes that
@@ -211,7 +213,8 @@ function usePageShown(): boolean {
  * asked again; an album PAGE of the same album elsewhere in the stacks is not followed - nothing keys
  * it on a folder. How many albums need a look is useQueueSummary.ts's store, asked here as the desktop
  * frame shows for an admin and as the app comes back to the front, and after every change the panel
- * reports - never on a timer; the sidebar and You draw it. A phone draws the page as a short note.
+ * reports - never on a timer; the sidebar and You draw it. (A phone drew the page as a short note until
+ * 2.0.0-player.47.)
  *
  * THE ARTIST PAGE, AS THE MAIN PAGE HAD IT (2.0.0-player.45, ArtistPanel.tsx): for an admin (/deadwax/me
  * - asked on a phone too as an artist page shows), the artist page's Artist images…, Move albums to …
@@ -226,6 +229,19 @@ function usePageShown(): boolean {
  * coming back on top - any other page (their name now, a name an album stayed under) stays where it
  * is; and the page they were moved from is asked again under the id it has now (`artistRefreshes`)
  * when the panel's wait of EDIT_SETTLE_MS says so.
+ *
+ * LOOKING AFTER DEADWAX FROM A PHONE (2.0.0-player.47): the Edit panel is drawn on both frames - on a phone a
+ * sheet over the whole screen, as the artist page's is (modal: `covered` gains it, so everything behind is
+ * inert), opened from the album page's Edit in its bar, for an admin, by the same request and rules (the
+ * page following the album to a new id, a delete going back), and staying open across 1024px. The four
+ * Managing pages - Needs a look, Library care, Server settings and the log - are drawn on a phone too,
+ * handed `admin` rather than the frame, and You's Managing rows lead to them there as siblings
+ * (openManagingPage). /deadwax/me is asked on a phone as something an admin's comes on top (an album or
+ * artist page, a Managing page, You), and the count of albums that need a look as You shows there. The
+ * log's stream is held only while its page shows - Now Playing over it on a phone counts as not showing,
+ * as the desktop's visualizer does. The Navidrome gate's "Set up Navidrome" opens Server settings at
+ * Connections (navidromeSetUp.ts), and a save that touched Navidrome's settings asks Navidrome again, so
+ * a first run from a phone can set it up and play.
  */
 export function App() {
   const player = usePlayer()
@@ -359,16 +375,16 @@ export function App() {
     if (problem) console.warn(`turntable recording: ${problem}`)
   }, [])
 
-  const checkNavidrome = useCallback(() => {
-    setStatus(null)
-    navidromeStatus()
-      .then(setStatus)
-      .catch((reason: unknown) =>
-        setStatus({ configured: true, ok: false, server: null, problem: String(reason) }),
-      )
-  }, [])
+  //? Navidrome asked once for every gate (lib/navidromeCheck.ts): as the app starts and from a gate's
+  //? Try again with the status put away first - and, after a save that touched Navidrome's settings
+  //? (below), quietly while the gates are open. Only the newest answer draws
+  const navidromeAsks = useMemo(() => navidromeChecks(navidromeStatus, setStatus), [])
+  const checkNavidrome = navidromeAsks.check
 
-  useEffect(checkNavidrome, [checkNavidrome])
+  useEffect(() => {
+    navidromeAsks.check()
+    return navidromeAsks.stop
+  }, [])
 
   useLayoutEffect(() => {
     history.scrollRestoration = 'manual'
@@ -441,11 +457,14 @@ export function App() {
   //? How many albums need a look (2.0.0-player.25, useQueueSummary.ts): the desktop sidebar's count
   //? and You's - an admin's. Asked as the desktop frame first shows for one, and as the page comes back
   //? from hidden; after that, the Edit panel's changes and the queue page's reviews ask again (and a
-  //? filed album, by itself). Never at start-up on a phone, and no timer
+  //? filed album, by itself). On a phone (2.0.0-player.47) as You's tab shows, where its row draws it -
+  //? never at start-up there, and no timer. One flag, so a desktop moving to and from You (its sidebar,
+  //? a Managing page) asks nothing more: it is true there all along
   const needsLook = useQueueSummary()
+  const asksQueueSummary = desktop || nav.tab === 'you'
   useEffect(() => {
-    if (desktop && admin && pageShown) askQueueSummary()
-  }, [desktop, admin, pageShown])
+    if (asksQueueSummary && admin && pageShown) askQueueSummary()
+  }, [asksQueueSummary, admin, pageShown])
 
   const openAlbum = useCallback((album: Album) => {
     previews.current.delete(album.id)
@@ -750,7 +769,8 @@ export function App() {
 
   //? Crossing into the other frame (lib/appFrame.ts closesOnCrossing): into the desktop, Now Playing
   //? and what is over it close - the desktop's player is its bar; back to the phone, the Info panel.
-  //? The Sources sheet stays open across, a panel on one side and a sheet on the other.
+  //? The Sources sheet stays open across, a panel on one side and a sheet on the other - as the artist
+  //? page's panel and (2.0.0-player.47) the Edit panel do.
   const lastFrame = useRef(frame)
   useEffect(() => {
     if (lastFrame.current === frame) return
@@ -767,10 +787,6 @@ export function App() {
       setInfoPanel(false)
       //? the visualizer is a desktop's: a phone's width closes it, and it doesn't come back by itself
       setVisualizing(false)
-    }
-    if (closes.editPanel) {
-      editOpener.current = null
-      setEditOpen(false)
     }
   }, [frame])
 
@@ -812,10 +828,11 @@ export function App() {
   })
 
   //? An artist page on a phone (2.0.0-player.45): its managing is an admin's, so /deadwax/me is asked as
-  //? one comes on top there too - the desktop frame asks as it shows (above)
-  const artistOnTop = topNow?.kind === 'artist'
+  //? one comes on top there too - the desktop frame asks as it shows (above). And (2.0.0-player.47) as
+  //? anything else an admin's comes on top there: an album page (its Edit), a Managing page, You's tab
+  const adminsOnTop = nav.tab === 'you' || topNow?.kind === 'artist' || topNow?.kind === 'album' || (!!topNow && MANAGING_KINDS.includes(topNow.kind))
   useEffect(() => {
-    if (desktop || !artistOnTop) return
+    if (desktop || !adminsOnTop) return
     const request = meRequests.begin()
     me(request.signal).then(
       (who) => {
@@ -823,7 +840,19 @@ export function App() {
       },
       () => {},
     )
-  }, [desktop, artistOnTop])
+  }, [desktop, adminsOnTop])
+
+  //? The Navidrome gate's "Set up Navidrome" (2.0.0-player.47): Server settings, at Connections - and a
+  //? save there that touched Navidrome's settings asks Navidrome again, so the gate opens by itself. Quietly
+  //? (review): a working setup's gates stay open while it asks, so nothing under them is thrown away for a
+  //? password retyped - an answer that isn't ok still closes them
+  useEffect(() => setUpNavidromeBy(() => {
+    showServerSettingsTab('connections')
+    openManaging('settings')
+  }), [])
+  useEffect(() => onServerSettingsSaved((keys) => {
+    if (keys.some((key) => key.startsWith('NAVIDROME_'))) navidromeAsks.recheck()
+  }), [])
 
   /**
    * What the Edit panel wrote (2.0.0-player.21), for the album it names. A write: the library's
@@ -1041,13 +1070,12 @@ export function App() {
         onOpensAs={chooseOpensAs}
         windDown={windDown}
         onWindDown={chooseWindDown}
-        desktop={desktop}
         needsLook={needsLook}
         onNeedsLook={openQueue}
         onManaging={openManaging}
       />
     ),
-    [youSeen, youCurrent, opensAs, windDown, desktop, needsLook],
+    [youSeen, youCurrent, opensAs, windDown, needsLook],
   )
   const roots: Record<Tab, JSX.Element> = { library, search, you, home, requests }
 
@@ -1082,12 +1110,12 @@ export function App() {
     )
   }
 
-  //? Needs a look (2.0.0-player.25): the review queue, a desktop's - on a phone a short note, asking
-  //? nothing. Its rows open the Edit panel on their folder; it is told which folder the panel has open
-  //? for it (`editing`), and whether it is what shows
+  //? Needs a look (2.0.0-player.25): the review queue, an admin's - on both frames since 2.0.0-player.47
+  //? (a phone's note until then). Its rows open the Edit panel on their folder; it is told which folder
+  //? the panel has open for it (`editing`), and whether it is what shows
   const queueView = (tab: Tab, page: Page) => (
     <NeedsALook
-      desktop={desktop}
+      admin={admin}
       shown={pageShown && nav.tab === tab}
       facet={page.facet ?? null}
       onFacet={pickFacet}
@@ -1099,19 +1127,19 @@ export function App() {
     />
   )
 
-  //? The server's settings and the log (2.0.0-player.33): a desktop's, an admin's - on a phone a short
-  //? note, asking nothing. `live`: the page is what shows - its tab current, the app in front, the
-  //? visualizer not over it (the log holds its stream open only then)
-  const managingLive = (tab: Tab) => pageShown && nav.tab === tab && !visualizerShown
+  //? The server's settings and the log (2.0.0-player.33): an admin's - on both frames since 2.0.0-player.47
+  //? (a phone's note until then). `live`: the page is what shows - its tab current, the app in front, the
+  //? desktop's visualizer not over it, nor a phone's Now Playing (the log holds its stream open only then)
+  const managingLive = (tab: Tab) => pageShown && nav.tab === tab && !visualizerShown && !sheetOpen
   const settingsView = (tab: Tab) => (
-    <ServerSettings desktop={desktop && admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+    <ServerSettings admin={admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
   const logView = (tab: Tab) => (
-    <EventLog desktop={desktop && admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+    <EventLog admin={admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
-  //? Library care (2.0.0-player.42): Rescan and the bulk runs, a desktop's and an admin's, by the same rule
+  //? Library care (2.0.0-player.42): Rescan and the bulk runs, an admin's, by the same rule
   const careView = (tab: Tab) => (
-    <LibraryCare desktop={desktop && admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+    <LibraryCare admin={admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
 
   const pageView = (tab: Tab, page: Page, player: Player) =>
@@ -1142,7 +1170,8 @@ export function App() {
           onArtist={openAlbumArtist}
           onOpenAlbum={openAlbum}
           onOpenGroup={openHeldGroup}
-          onEdit={desktop && admin ? toggleEdit : undefined}
+          onEdit={admin ? toggleEdit : undefined}
+          editAt={desktop ? 'actions' : 'bar'}
           editing={editOpen && edit?.album?.id === page.id}
           refresh={refreshes.get(page.id) ?? 0}
         />
@@ -1165,7 +1194,7 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes],
   )
 
   const playing = player.track
@@ -1177,8 +1206,9 @@ export function App() {
   const infoDetails = useInfoDetails(infoOpen, playing, playedFrom)
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows; a desktop's
   //? side panel leaves the page beside it as it is
-  //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
-  const covered = (!desktop && (sheetOpen || sourcesOpen || artistOpen)) || visualizerShown
+  //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen; 2.0.0-player.47:
+  //? and behind a phone's Edit sheet)
+  const covered = (!desktop && (sheetOpen || sourcesOpen || artistOpen || editOpen)) || visualizerShown
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)
   const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen })
@@ -1280,8 +1310,8 @@ export function App() {
             panel={panel}
             covered={visualizerShown}
           />
-          {/* the album page's Edit panel (2.0.0-player.21) - the desktop's alone, in its frame only */}
-          {desktop && <EditPanel open={editOpen} request={edit} opener={editOpener} onClose={closeEdit} onChanged={albumChanged} panel={panel} covered={visualizerShown} />}
+          {/* the album page's Edit panel (2.0.0-player.21) - a side panel on a desktop, a sheet on a phone (2.0.0-player.47) */}
+          <EditPanel open={editOpen} request={edit} opener={editOpener} onClose={closeEdit} onChanged={albumChanged} panel={panel} covered={visualizerShown} />
           {/* the artist page's panel (2.0.0-player.45) - a side panel on a desktop, a sheet on a phone */}
           <ArtistPanel open={artistOpen} request={artistManage} opener={artistOpener} onClose={closeArtistManage} onSettled={artistSettled} panel={panel} covered={visualizerShown} />
           {/* what became of a pin, said over everything (2.0.0-player.18) */}

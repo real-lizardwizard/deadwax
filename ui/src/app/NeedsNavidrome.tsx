@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact'
 
 import type { NavidromeStatus } from '../player/api'
+import { setUpNavidrome } from './navidromeSetUp'
 
 /** Why the gate is there, said when Navidrome isn't set up - followed by how to set it up. */
 export const NAVIDROME_REQUIRED = "deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome "
@@ -23,8 +24,9 @@ export const NAVIDROME_UNREACHED = 'Your library comes from Navidrome, so it sho
  * main page's settings tab the link opens today and of wherever the settings live next. A folder on
  * disk that Navidrome doesn't list is never out of reach: Needs a look raises it ("Not in Navidrome").
  *
- * A leaf: the status and the retry come from App, which asks Navidrome once for every gate. Its
- * link to the settings tab opens beside the app, like every link out of it (app-rules.sim.cjs).
+ * A leaf: the status and the retry come from App, which asks Navidrome once for every gate. Not set
+ * up, its "Set up Navidrome" opens the app's own Server settings at Connections, on every frame
+ * (2.0.0-player.47, navidromeSetUp.ts - it pointed at the main page's settings tab until then).
  */
 export function NeedsNavidrome({
   status,
@@ -61,10 +63,14 @@ export function NeedsNavidrome({
               </button>
             </>
           ) : (
-            <p class="app-needs-text">
-              {NAVIDROME_REQUIRED} Set it up in deadwax's <a href="/" target="_blank" rel="noopener">settings</a> (Connections),
-              then come back.
-            </p>
+            <>
+              <p class="app-needs-text">
+                {NAVIDROME_REQUIRED} Set it up in deadwax's settings (Connections), then come back.
+              </p>
+              <button type="button" class="app-button app-needs-setup" onClick={setUpNavidrome}>
+                Set up Navidrome
+              </button>
+            </>
           )}
         </div>
       )}

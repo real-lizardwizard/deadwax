@@ -6,10 +6,11 @@ import { useLibrary } from '../hooks/useLibrary'
 import { albumArtUrl } from '../lib/format'
 import { isNewImport, issueLabel, outstandingIssues } from '../lib/metadataQueue'
 import {
-  IGNORES_UNSAVED, MARK_WORDS, NEEDS_LOOK_LINE, NEEDS_LOOK_PHONE, facetAlbums, facetShown, facets, ignoresUnsaved, leavingAtEnd,
+  IGNORES_UNSAVED, MARK_WORDS, NEEDS_LOOK_LINE, facetAlbums, facetShown, facets, ignoresUnsaved, leavingAtEnd,
   navidromeNote, rowChanged, startSession, stepTarget, summaryTotal,
   type Facet, type FolderChange, type LookSession, type RowMark,
 } from '../lib/needsLook'
+import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { ChevronLeftIcon } from '../player/icons'
 import type { FolderRequest } from './EditPanel'
 import { askQueueSummary, setPageQueueCount, useQueueTracking } from './useQueueSummary'
@@ -43,7 +44,7 @@ const focusLost = (): boolean => {
 }
 
 /**
- * Needs a look (2.0.0-player.25): the review queue in the app, on a desktop - the main page's queue
+ * Needs a look (2.0.0-player.25): the review queue in the app - the main page's queue
  * (components/LibraryView.tsx's review, which is left as it is) with the app's Edit panel for its
  * editor. There is no board for this screen; it is built from STYLE.md and the desktop frame's parts.
  *
@@ -76,10 +77,12 @@ const focusLost = (): boolean => {
  * yet - in the status line, when it has nothing else to say, one line (the whole of it in its title),
  * so its coming and going moves no row.
  *
- * On a PHONE it is a short note, asking nothing: no editor has a board there yet.
+ * ON A PHONE TOO (2.0.0-player.47): the same page, laid out for a phone by app.css, its rows opening the
+ * Edit panel as a sheet over the whole screen - the queue's stepping and every rule above as they are.
+ * Someone deadwax says isn't its admin gets a short note instead, asking nothing (nobody, with logins off).
  */
 export function NeedsALook({
-  desktop,
+  admin,
   shown,
   facet,
   onFacet,
@@ -89,7 +92,8 @@ export function NeedsALook({
   onEdit,
   onCloseEdit,
 }: {
-  desktop: boolean
+  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
+  admin: boolean
   /** its tab is the one showing, and the app is in front */
   shown: boolean
   /** the facet the address names (null: All) */
@@ -103,8 +107,8 @@ export function NeedsALook({
   onEdit: (request: Omit<FolderRequest, 'key'>, opener: HTMLElement | null | undefined) => void
   onCloseEdit: () => void
 }) {
-  //? read only once it shows on a desktop - a phone asks nothing at all
-  const library = useLibrary(desktop && shown)
+  //? read only once it shows - for anyone but the admin, nothing is asked at all
+  const library = useLibrary(admin && shown)
   const real = library.loaded && !library.stale && !library.error
   //? whether deadwax can keep ignores, as the count's route last said (null: not yet)
   const tracking = useQueueTracking()
@@ -287,21 +291,21 @@ export function NeedsALook({
   //? shown again after the first time, with nothing under way: the library read again underneath
   const wasShown = useRef(shown)
   useEffect(() => {
-    if (desktop && shown && !wasShown.current && library.loaded && !sessionNow.current && !ending) void library.reload(false)
+    if (admin && shown && !wasShown.current && library.loaded && !sessionNow.current && !ending) void library.reload(false)
     wasShown.current = shown
   }, [shown])
 
   //? while it shows with a real scan and no session, its count is the badge's
   useEffect(() => {
-    setPageQueueCount(desktop && shown && real && !session && !ending ? summaryTotal(library.albums) : null)
-  }, [desktop, shown, real, session, ending, library.albums])
+    setPageQueueCount(admin && shown && real && !session && !ending ? summaryTotal(library.albums) : null)
+  }, [admin, shown, real, session, ending, library.albums])
 
   //? a facet the address names that has emptied: the address says All again - only while this page
   //? is the one showing, since the router rewrites the top of the tab that shows (a read landing
   //? while another tab shows would rewrite nothing, and the address would keep the old facet)
   useEffect(() => {
-    if (desktop && shown && real && !session && !ending && facet !== null && showing === null) onFacet(null)
-  }, [desktop, shown, real, session, ending, facet, showing])
+    if (admin && shown && real && !session && !ending && facet !== null && showing === null) onFacet(null)
+  }, [admin, shown, real, session, ending, facet, showing])
 
   const header = (
     <>
@@ -317,19 +321,13 @@ export function NeedsALook({
     </>
   )
 
-  if (!desktop) {
+  if (!admin) {
     return (
-      <section class="app-queue is-phone app-needs">
+      <section class="app-queue is-refused app-needs">
         {header}
-        {/* the app's own card for a page with nothing to show - no style of this page's own on a phone */}
+        {/* the app's own card for a page with nothing to show */}
         <div class="app-card app-placeholder-body">
-          <p class="app-placeholder-text app-queue-phone">
-            {NEEDS_LOOK_PHONE}{' '}
-            <a class="app-queue-link" href="/" target="_blank" rel="noopener">
-              the main page
-            </a>
-            .
-          </p>
+          <p class="app-placeholder-text">{MANAGING_ADMINS_ONLY}</p>
         </div>
       </section>
     )

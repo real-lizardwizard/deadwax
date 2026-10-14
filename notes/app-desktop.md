@@ -1,4 +1,4 @@
-# The app on a desktop: the frame, editing, Needs a look, settings and the log
+# The app on a desktop: the frame, editing, Needs a look, settings and the log - and on a phone since 2.0.0-player.47
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 
@@ -436,7 +436,9 @@ on a step counter"); LibraryView.tsx, `ui/src/components/` and `ui/src/hooks/` h
   built). `tests/test_queue_summary.py` (10) through `TestClient(start())`.
 - **The app's one store of it: `app/useQueueSummary.ts`** (a module, as useOwned and usePins): one
   request in flight and one "ask again"; asked by App's `useEffect([desktop, admin, pageShown])` - as the
-  desktop frame first shows for an admin and as the app comes back from hidden; by `albumChanged` on
+  desktop frame first shows for an admin and as the app comes back from hidden (since 2.0.0-player.47
+  `[asksQueueSummary, admin, pageShown]`, the flag `desktop || nav.tab === 'you'`: true on a desktop all
+  along, so the same asks there, and a phone's as You shows); by `albumChanged` on
   EVERY change the Edit panel reports; by the queue page after each album it marks reviewed; and by
   `onAlbumsFiled` once anything has asked. No timer. While the queue page shows with a REAL scan and no
   session its own All count stands in (`setPageQueueCount`, cleared as it hides, starts a session or
@@ -1514,3 +1516,226 @@ words are notes/app.md's "Navidrome required (2.0.0-player.46)"; this is the que
   `elapsedTime` in nanoseconds as its source says (`int64(status.ElapsedTime)`, a Go duration - read
   from source, never from a running one), and how long paging takes on a large library; the real :8081
   setup; VoiceOver.
+
+### Looking after deadwax from a phone (2.0.0-player.47)
+
+James (2026-10-14), finishing the web app: the phone gets all four managing pages a desktop has -
+editing an album, Needs a look, server settings and the log ("phone" being any window under 1024px, an
+iPad held upright included) - and Library care with them, the same kind of page. The main page, which
+the phone's notes pointed at, will retire. There is no board; the artist page's panel (2.0.0-player.45,
+"The artist page, as the main page had it") is the pattern. The spec is `uplan/slice-phone-managing.md`.
+Built from .45 beside "Navidrome required" (.46, which lands first and also touches NeedsNavidrome and
+Needs a look - the edits to the shared files here are kept small for that merge).
+
+- **The Edit panel, a phone's sheet** (app/EditPanel.tsx): App draws `<EditPanel>` on both frames (it
+  was `{desktop && …}`). On a phone App's `panel` is 'sheet', so `panelIsModal` makes it modal, as the
+  artist page's panel: useSheet's scroll lock (`app-edit-open`), App's `covered` gains `editOpen` (the
+  page, the tab bar and the mini player inert behind it), focus in to its close button and back to the
+  Edit that opened it, and every Escape its own - `useEscapeFrom` takes `modal`, so an Escape from
+  outside the box (focus fallen to the body - nothing behind can hold it) is the sheet's, never 'page',
+  and the box takes no tabindex (a sheet's box never does). The layer is `is-sheet` there, `is-panel
+  is-<column|drawer>` on a desktop. One layer at a time as before: the tag editor, the track inspector
+  and the delete confirmation are layers over their tab, the cover viewers stop their own Escape first.
+  **Its backdrop closes nothing** (after review): the sheet is capped at the content's width, so a phone
+  on its side (102px of dimmed backdrop each side at 844px) and an iPad upright (64-190px) show it
+  beside the sheet, where thumbs rest, and a stray tap there closed the sheet and - the editors let go
+  as it slid away - threw away a tag draft, a pressing chosen with its preview or an open delete
+  confirmation without a word. The app's other sheets keep theirs (they hold searches and cheap choices,
+  not typed work); this one closes by its ✕, Escape and the editors' own Cancel, as iOS's own sheets
+  with an edit in them refuse to be swiped away. A desktop's panel draws no backdrop, so nothing changes
+  there. **It stays open across 1024px** (`closesOnCrossing` lost `editPanel`), a panel one side and a sheet
+  the other, as Sources and the artist page's panel do; its editors are let go `EDIT_SLIDE_MS` after a
+  sheet closes, as after a drawer (`panel === 'column' ? 0 : EDIT_SLIDE_MS`). In a sheet the Tags tab's
+  note leaves out "Shift ticks a run" (`TagsList`'s `sheet` - a phone has no Shift). Everything else is
+  the desktop panel's, unchanged: the same request, which folder, the page following the album to a new
+  id after an apply, a delete going back, the queue's stepping.
+- **Edit on the phone's album page**: App hands `onEdit` to an admin on both frames, and `editAt` -
+  'actions' on a desktop (after Play and Shuffle, as before), 'bar' on a phone: a chip in the album
+  page's sticky bar between the back link and the pin (`app-edit-toggle app-edit-chip`, `aria-pressed`
+  while the sheet shows the album, disabled until the album has answered, drawn from the first frame).
+  Above the title, so nothing under it moves whether it is drawn or not, and in reach from anywhere
+  down the page. Chosen over the action row (a third pill beside Play and Shuffle crowds 320px) and a
+  ••• menu (the album page has none - Now Playing's is the song's). It carries `app-edit-toggle`, so
+  App's focus re-point after a move (`.app-edit-toggle[aria-pressed="true"]`) finds it.
+- **The four Managing pages on a phone**: NeedsALook, LibraryCare, ServerSettings and EventLog are told
+  `admin`, never the frame (their prop was `desktop`, App handing `desktop && admin`), so a phone draws
+  each exactly as a desktop does; for anyone deadwax says isn't an admin - nobody, with logins off -
+  each draws `MANAGING_ADMINS_ONLY` (lib/appRoutes.ts) and asks nothing, as `is-refused` - the four notes'
+  class, which was `is-phone`; app-desktop.css's full-height settings page skipped the note by it, and
+  that exclusion follows it, `.app-desk .app-settings:not(.is-refused)` (after the second review: left
+  as `:not(.is-phone)` it excluded nothing, and the note took the page's column). The phone notes, their words
+  (`NEEDS_LOOK_PHONE`, `CARE_PHONE`, `SETTINGS_PHONE`, `LOG_PHONE`) and their links to the main page are
+  gone. The routes were always both frames'; You's Managing rows - Albums that need a look with its
+  count, Library care, Server settings, Log - are drawn on both (You takes no `desktop` any more), and
+  open the pages as siblings through `openManagingPage`; the footnote is the desktop's ("Everything here
+  is in the app now; the main page stays until it retires.") on both.
+- **What App asks on a phone**: `/deadwax/me` as an album page, an artist page, a Managing page or You's
+  tab comes on top (`adminsOnTop`, which was `artistOnTop`); the review count as You's tab shows
+  (`asksQueueSummary && admin && pageShown`, the one flag `desktop || nav.tab === 'you'`), where its row
+  draws it - never at start-up, no timer. One flag (after review): with `desktop` and "You showing" as two
+  dependencies a desktop - true either way - asked again each time it moved to or from You (its sidebar,
+  any Managing page), two requests a visit; the flag stays true there, so the desktop asks as before.
+- **The log's stream on a phone** is held by the same rule, and `managingLive` is also false while Now
+  Playing shows (`!sheetOpen` - Now Playing over the page is to the log what the visualizer is on a
+  desktop); the pages memo is keyed on `sheetOpen` too.
+- **Set up Navidrome, on every frame**: the gate's not-set-up branch (app/NeedsNavidrome.tsx) lost its
+  link to the main page's settings tab. It says "Set it up in deadwax's settings, under Connections" and
+  has **Set up Navidrome** (`app-button app-needs-setup`), which calls `setUpNavidrome()` from
+  `app/navidromeSetUp.ts` - a module, as searchBox.ts is: the gate is drawn by Home, Search, the Library
+  and the album and artist pages, and App is what opens pages. App says what it does
+  (`setUpNavidromeBy`): `showServerSettingsTab('connections')` (the settings page's kept tab; its drafts
+  left as they are) and `openManaging('settings')`. ServerSettings tells its listeners of each save the
+  server TOOK, with the keys it carried (`onServerSettingsSaved`, after the answer, never for a refusal),
+  and App asks Navidrome again after one carrying a `NAVIDROME_` key - the server applies the three
+  without a restart - so the gate a first run was opened from opens by itself. **Asked through
+  `lib/navidromeCheck.ts`** (after review - the first re-ask was App's old `checkNavidrome`, with two
+  faults the new caller made reachable): `navidromeChecks(navidromeStatus, setStatus)`, made once, whose
+  `check()` (start-up, a gate's Try again) puts the status away first as before, and whose `recheck()`
+  (after a save) is QUIET while the gates are open - the status drawn stays until the answer lands. The
+  old one blanked it on every save, and NeedsNavidrome draws a spinner in place of what it guards while
+  there is no status, so retyping the password on a working setup unmounted every gate's subtree on every
+  tab - the Library (its loaded pages, scroll and artist sort lost), Home's shelf, the album or artist page
+  on top of each stack - and fetched them all again. An answer that isn't ok still closes the gates; a
+  gate not open yet shows its spinner while it asks, as Try again's. And each ask is a `latestOnly()`
+  ticket, drawing (its answer or its failure) only while it is the newest: a save is the first caller that
+  can overlap another ask (Try again hides as its ask starts), and an address that doesn't answer waits out
+  the server's 10 s connect timeout (closing the old httpx client doesn't cut a connect short), so a fix
+  saved inside it answered ok and the first ask's late "can't reach" - naming the new, working address -
+  closed every gate again. A working-to-working change of NAVIDROME_URL leaves the pages drawn as they
+  were, as before this change (nothing re-asked then). `settingslog.sim.cjs` drives the module; app-rules
+  pins App to it. The
+  "Can't reach Navidrome" branch keeps its Try again alone (the spec asked only for "set it up").
+- **Style** (app.css, a section of its own at the end, tokens `--app-ph-*`): EVERY rule under
+  `.app-shell:not(.app-desk)` - the phone's frame alone, App putting `.app-desk` on the shell from
+  1024px - or `html.app-edit-open` / `html:has(.app-shell:not(.app-desk) …)`, which only a phone's
+  sheet or page can set; app-desktop.css changes only by the settings page's exclusion following the
+  note's class (above), so its rules for the same parts are still all that draw them on a desktop (`test_the_phones_managing_rules_never_reach_the_desktop`). The sheet is
+  the artist page's: from the very top, its words clear of the status bar by padding, placed clear of
+  a notch by left and right, at most the content's width, no transform once open (so the cover viewers'
+  fixed frames are the screen's - the release editor's own "Compare full size…" viewer styled as the
+  album page's viewer through `#app-edit-panel-release`, scoped to the phone), its body the one part
+  that scrolls (pan-y), each tab's end clear of the home indicator unless its Apply bar clears it. The
+  five underline tabs a finger tall, spread across where they fit and scrolling sideways by themselves
+  where they don't (at 320px Delete runs off the edge) - `touch-action: pan-x` on the sheet's alone
+  (`.app-edit .app-edit-tabs`: its layer takes every touch), never on Server settings' row of the same
+  class, which sits in the page's own scroll, where it stopped a swipe up begun on the row from scrolling
+  the page (after review); on a phone on its side (`max-height: 500px`)
+  the title and its close button beside the tabs, a row of height given back to the body. The hosted
+  editors are styled by their own ids and classes, as app-desktop.css styles them in the panel: fields
+  17px and a finger tall, every button and tick box's label 44px, the release editor one column (the
+  pressings in the sheet's own scroll - no list scrolling inside another), a change the tag over its old
+  value (struck) and new side by side, long names, paths and ids broken anywhere, Apply and Cancel
+  sticky at the foot under the summary and padded over the home indicator, delete the one red button.
+  The Managing pages: each body inside the page's edges; Needs a look's rows a 48px cover beside name
+  and artist, its chips under them wrapping (one alone too wide ellipsized); the settings' rows a key
+  over its field, the save bar sticky above the tab bar and the mini player (`--app-ph-bar-mini`),
+  taking no taps while it says nothing, the scroll padding keeping keyboard focus (and the field the
+  keyboard comes up for) clear of it from the pane that shows only, as the desktop's - its words over
+  Discard and Save, and on one line from 600px wide (a phone on its side, an iPad upright: found in the
+  real page, where at 844x390 the two-row bar, the mini player and the tab bar left 140px of page;
+  `--app-ph-bar` is the shorter bar there); the log's line its time, level and source over its words,
+  which wrap; Library care's two cards, its field 17px (its placeholder "Artist, album or folder" - "- empty
+  for the whole library" was cut off at 17px on a phone, and the line under the field says it: after
+  review); in the sheet, Choose the folder's field the same, its placeholder "Name, artist or path"
+  (app/FolderPicker.tsx, both frames: "Type part of its name, artist or path" took 282px of the 262px a
+  320px phone gives its words, losing "path", and the status under the field says the rest - after the
+  second review). The album page's chip is the pin's size, its reach 44px by a `::before`.
+- **Not built, on purpose**: a history entry for the sheet (none of the app's sheets has one - a
+  browser Back with it open goes back from the album page and the sheet closes with it, as the artist
+  page's does); Try again's sibling for "Can't reach Navidrome" (above); a layout of its own for an
+  iPad upright beyond the phone's (600-1023px gets the phone's, with the one-line save bar).
+- **After review** (eleven findings, merged to seven fixes, each described in its bullet above): the
+  Navidrome re-ask after a save through `lib/navidromeCheck.ts` - quiet while the gates are open, each ask
+  a `latestOnly()` ticket (four findings); the review count by one flag, so a desktop moving to and from
+  You asks nothing more; the Edit sheet's backdrop closing nothing; the tabs' `pan-x` the sheet's alone;
+  Library care's placeholder shortened; docs/FRONTEND-MIGRATION.md's lead sentence rewritten for .47
+  rather than contradicted at the paragraph's end; CLAUDE.md's rule on the hosted editors naming the
+  phone's sheet and app.css's section beside the desktop's panel and app-desktop.css. And two guards in
+  `test_app_css.py`: the phone's section is held to its rules only up to the next `/* ===== ` heading (it
+  ran to the end of the file, so the next change appending an ordinary rule to app.css would have failed
+  it), and every id and class the section styles is held to the source
+  (`test_every_id_and_class_the_phones_section_styles_is_still_in_the_markup` - renaming `.tags-footer` in
+  TrackTagEditor and checking the main page and the desktop's panel left the phone's sticky Apply bar
+  matching nothing with every test green). 18 mutations, one per fix undone (six on the module, four on
+  App, one on the panel's backdrop, three on the CSS, the section's end, two renames in the editors'
+  markup, the placeholder), each caught, every file restored byte for byte (sha256). In a real page
+  (this change's deadwax on :8110 against a stand-in Navidrome on :8111 over a copy of builder36's
+  library, headless Chromium with touch over plain http as `deadwax.test`): at 844x390 and 768x1024 a
+  tap on the backdrop beside the sheet (what `elementFromPoint` found there) left it open with a tag
+  editor's typed draft, Escape closing the tag editor alone and the ✕ the sheet, focus back on Edit; at
+  390x844, 375x667 and 320x568 a swipe up begun on Server settings' tab row scrolled the page, the
+  sheet's own tabs still `pan-x` over a `none` layer; at 1440x900 and 390x844 NAVIDROME_PASSWORD retyped
+  and saved asked Navidrome once with no gate letting go (no spinner, the Library and the album page on it
+  the very same elements, the album not fetched again), a wrong password closing the gates with "Can't
+  reach Navidrome" and the right one opening them by themselves; with the HTTP cache off, an address that
+  doesn't answer (10.255.255.1) saved and the fix saved 1.5 s later, the gates open from the fix to 15 s -
+  quiet while open, a spinner while closed - and never closed by the first ask; a desktop asking the count
+  once as it showed and not at all over five moves to and from You, a phone not at start-up and once each
+  time You showed; Library care's placeholder 177px in a 220px field at 320px; the builder's four-size run
+  (20 checks each) passing again; the desktop's Edit panel at 1440x900 and 1100x800 drawing no backdrop.
+  No console error.
+- **After the second review** (two findings, both nits): Choose the folder's placeholder shortened, as
+  Library care's was (above), pinned in `care.sim.cjs`; and app-desktop.css's `:not(.is-phone)` on the
+  settings page, which the notes' rename to `is-refused` left excluding nothing - reachable by nobody
+  while logins are off (`/deadwax/me` says everyone is the admin), the note anyone else gets on a desktop
+  would have stretched to the page area's height - renamed with it, `test_app_desktop_css.py`'s settings
+  test asserting the new selector and the note's class in ServerSettings.tsx, and a guard,
+  `test_every_class_a_not_exclusion_names_is_still_drawn`: every class a `:not(.x)` in app.css or
+  app-desktop.css names is still in ui/src. 7 mutations, each caught, every file restored byte for byte
+  (sha256): the exclusion back to `.is-phone` (caught by the settings test, the guard and the real page
+  alone), the body rule alone left behind, the note renamed with the exclusion left, a new exclusion naming
+  a class nothing draws, the long placeholder back. In a real page (this change's deadwax on :8110 over
+  a library holding Portishead and Ye's BULLY only, against a stand-in Navidrome on :8111 over builder36's
+  whole library, so Tame Impala's album is Navidrome's with no folder here; headless Chromium with touch
+  over plain http as `deadwax.test`): at 320x568, 375x667, 390x844 and 844x390 the Edit sheet on that
+  album offered Choose the folder, the field took focus, its placeholder 161px of the 262/317/332/582px
+  its words have (17px Noto Sans; the old one 282px), the scan's four folders each a finger tall, no
+  sideways scroll, no field under 16px, "bully" typed narrowing it to one, Escape closing the sheet with
+  focus back on Edit; the same in the desktop's panel at 1440x900 (10 checks a size); and at 1440x900,
+  `/deadwax/me` answered `admin: false` by the browser (CDP Fetch), Server settings' note a block 198px
+  tall where the admin's page is the 828px flex column - with the exclusion put back to `.is-phone`, the
+  note was the 828px column too. No console error.
+- **Verified**: 2477 Python tests (2475 passed, 2 skipped; 12 new in `test_app_css.py`, one of them
+  extended for the one-line save bar, and one in `test_app_desktop_css.py`), pyflakes, tsc, the bundle, all 49 sims (`app-rules` 363 → 374,
+  `routes` 273 → 274, `settingslog` 146 → 170, `care` 129 → 132, `needslook` 121 → 122, `you` 88 - its
+  desktop-and-phone checks rewritten to "no frame in it", none weakened; app-rules' links-out list
+  loses the four pages and the gate). 50 mutations, one or more per rule pinned (twelve on App, one on
+  the frame's crossing, six on the panel, two on the album page's chip, thirteen on the four pages, the gate
+  and its module, one on You, fifteen on the CSS), each caught, every file restored byte for byte
+  (sha256 checked). The engine guard is empty, `player.sim.cjs` untouched, and `ui/src/components/` and
+  `ui/src/hooks/` have no diff.
+- **Checked in a real page** (headless Chromium with touch over plain http as `deadwax.test`, this
+  change's own deadwax on :8110 against its own stand-in Navidrome on :8111 over a COPY of the builder36
+  library with Portishead's Third staged at the root as a stranger's rip, a first run on :8112 with no
+  Navidrome set, and the base commit's build on :8113 over the same library for comparison; 25 + 14 +
+  4 × 22 + 4 × 20 + 9 + 7 checks, all passing, no console error): at 390x844 the rip's album page has
+  Edit in its bar, a finger's reach every way; Edit opens the sheet (focus on its close, the page inert
+  and locked), the rip found by name, the pressings listed, a pressing's preview (a change per line,
+  Apply sticky at the foot and still in view scrolled), **Apply** re-filing it under Portishead and the
+  page following the album to its new id with the sheet still open; two tracks ticked and a genre written
+  to them, Escape closing the tag editor alone; a track inspected (focus on Tracks, Escape back to its
+  name); Get CD art; the cover full size over the sheet (the screen's, ✕ 44px), Escape closing the viewer
+  alone; Delete (the folder gone from disk, the sheet closed, the page gone back from, nothing locked).
+  At 390x844, 375x667, 320x568 and 844x390: the sheet over the whole screen, its tabs a finger tall, a
+  preview with Apply in view, Tags, the inspector, Artwork, Lyrics and Delete with no sideways scroll or
+  field under 16px, Escape one layer at a time and focus back on Edit; Needs a look's rows and the sheet
+  on a folder saying "1 of 2", skip ▷ and ◁ stepping with focus kept inside, its close giving focus back
+  to the row; Server settings from You (three tabs, a draft marking its row, the bar above the mini
+  player and the tab bar, the scroll padding reaching over it, Save storing the lead, Connections), the
+  log from You (Live, one stream, the save's line from the history, a line logged while it shows
+  arriving, every line's words inside the width; Now Playing over it letting the stream go and taking it
+  again as it closes; leaving for You letting it go), Library care (Rescan, a run narrowed to
+  "portishead" to its end, its words said); the release editor's own "Compare full size…" viewer the
+  whole screen; widened to 1280 with the sheet open it became the side panel (not modal, the page live,
+  no lock) and narrowed back a sheet again with focus inside. A first run: Home's gate with **Set up
+  Navidrome** and no link, opening Server settings on You at Connections; the three typed and saved,
+  deadwax reaching the stand-in, and the Library's and Home's gates opened by themselves. Compared with
+  the base build pixel by pixel: at 1440x900 Home, the Library, the album page, the artist page, Needs a
+  look, Settings (but for the scratch download folder's own path), Library care, You and the Edit
+  panel's five tabs drawn the same; at 390x844 Home, the Library, the artist page, Search, Requests and
+  You's top drawn the same, the album page differing only by the chip in its bar and You's foot only by
+  Managing's rows and footnote.
+- **NOT verified**: an iPhone (the sheet's safe areas, the keyboard over a field with the scroll padding,
+  VoiceOver through the sheet and the four pages, the chip's reach under a real finger, the back gesture
+  with the sheet open), an iPad upright, a real Navidrome giving an album a new id after an apply from a
+  phone, Safari's EventSource on a phone, and the merge with 2.0.0-player.46.

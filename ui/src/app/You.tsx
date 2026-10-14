@@ -51,12 +51,12 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
 
 /**
  * You: how Get works for you, what this device plays like, whether deadwax can reach what it needs,
- * and what version it is - and, on a DESKTOP, the way to the app's own Managing pages: the albums that
- * need a look, the server's settings and the log (below). What is left of looking after deadwax is on
- * the main page for now, and this says so and links there: on a desktop nothing (an artist's pictures and
- * re-filing are the artist page's since 2.0.0-player.45, the bulk runs Library care's since .42); on a
- * PHONE all of it - server settings, the albums that need a look, the
- * log and editing an album, none of which the app draws there yet.
+ * and what version it is - and the way to the app's own Managing pages: the albums that need a look,
+ * Library care, the server's settings and the log (below) - on a phone as on a desktop since
+ * 2.0.0-player.47 (until then a phone's Managing said all of it was the main page's). Nothing of
+ * looking after deadwax is left on the main page (an artist's pictures and re-filing are the artist
+ * page's since 2.0.0-player.45, the bulk runs Library care's since .42), and the footnote says so; the
+ * link to it stays until it retires.
  *
  * - Getting albums (2.0.0-player.15, GettingChoices.tsx): "When I tap Get" (Show me the sources, the
  *   default, or Pick the best source for me), the quality floor and Format (2.0.0-player.41) - kept per USER on the server
@@ -82,12 +82,11 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   "unknown" there until the app is killed.
  * - The link to the main page opens it BESIDE the app (a new tab in a browser), so the music playing
  *   here carries on: in the same page it would unload the player, its queue and all.
- * - On a DESKTOP (2.0.0-player.25), "Albums that need a look" above it, with how many - the review
- *   queue's page, Needs a look (`onNeedsLook`: App opens it on this tab). A phone has no such row, and
- *   its Managing reads as it always has: no editor has a board there yet. Under it (2.0.0-player.33)
- *   "Server settings" and "Log", the app's own pages of them (`onManaging`: App opens them on this
- *   tab) - a desktop's only, as the queue's row. And (2.0.0-player.42) "Library care" under the queue's
- *   row: Rescan and the bulk runs, the same way.
+ * - "Albums that need a look" above it (2.0.0-player.25), with how many - the review queue's page,
+ *   Needs a look (`onNeedsLook`: App opens it on this tab). Under it (2.0.0-player.33) "Server
+ *   settings" and "Log", the app's own pages of them (`onManaging`: App opens them on this tab), and
+ *   (2.0.0-player.42) "Library care" under the queue's row: Rescan and the bulk runs, the same way. A
+ *   desktop's only until 2.0.0-player.47; a phone's too since.
  *
  * It works with Navidrome unset or down: nothing here waits on it. A page, so it reads the player
  * from context; `shown` is App's word that the tab has been opened at least once, `current` that it
@@ -100,7 +99,6 @@ export function You({
   onOpensAs,
   windDown,
   onWindDown,
-  desktop = false,
   needsLook = null,
   onNeedsLook,
   onManaging,
@@ -114,8 +112,6 @@ export function You({
   /** "Pause winds the record down", and the way to change it - App's */
   windDown: boolean
   onWindDown: (on: boolean) => void
-  /** the desktop's frame: Managing has the review queue's row */
-  desktop?: boolean
   /** how many albums need a look (null: not known yet) */
   needsLook?: number | null
   onNeedsLook?: () => void
@@ -281,55 +277,40 @@ export function You({
             Managing deadwax
           </h2>
           <div class="app-group">
-            {desktop && (
-              <button
-                type="button"
-                class="app-row app-link-row app-queue-link-row"
-                {...(needsLook ? { 'aria-label': needsLookLabel('Albums that need a look', needsLook) } : {})}
-                onClick={() => onNeedsLook?.()}
-              >
-                <span class="app-row-label">Albums that need a look</span>
-                {badgeText(needsLook ?? 0) && (
-                  <span class="app-queue-badge app-mono" aria-hidden="true">
-                    {badgeText(needsLook ?? 0)}
-                  </span>
-                )}
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-            {desktop && (
-              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('care')}>
-                <span class="app-row-label">Library care</span>
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-            {desktop && (
-              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('settings')}>
-                <span class="app-row-label">Server settings</span>
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-            {desktop && (
-              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
-                <span class="app-row-label">Log</span>
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
+            <button
+              type="button"
+              class="app-row app-link-row app-queue-link-row"
+              {...(needsLook ? { 'aria-label': needsLookLabel('Albums that need a look', needsLook) } : {})}
+              onClick={() => onNeedsLook?.()}
+            >
+              <span class="app-row-label">Albums that need a look</span>
+              {badgeText(needsLook ?? 0) && (
+                <span class="app-queue-badge app-mono" aria-hidden="true">
+                  {badgeText(needsLook ?? 0)}
+                </span>
+              )}
+              <ChevronRightIcon class="app-chevron" />
+            </button>
+            <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('care')}>
+              <span class="app-row-label">Library care</span>
+              <ChevronRightIcon class="app-chevron" />
+            </button>
+            <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('settings')}>
+              <span class="app-row-label">Server settings</span>
+              <ChevronRightIcon class="app-chevron" />
+            </button>
+            <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
+              <span class="app-row-label">Log</span>
+              <ChevronRightIcon class="app-chevron" />
+            </button>
             <a class="app-row app-link-row" href="/" target="_blank" rel="noopener">
               <span class="app-row-label">Open the main page</span>
               <ChevronRightIcon class="app-chevron" />
             </a>
           </div>
-          {desktop ? (
-            <p class="app-footnote">
-              Everything here is in the app now; the main page stays until it retires.
-            </p>
-          ) : (
-            <p class="app-footnote">
-              Server settings, albums that need a look, the log and editing an album are on the main
-              page for now.
-            </p>
-          )}
+          <p class="app-footnote">
+            Everything here is in the app now; the main page stays until it retires.
+          </p>
         </section>
       )}
 

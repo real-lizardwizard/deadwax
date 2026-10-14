@@ -21,8 +21,8 @@ again.
 
 Albums filed from a download appear by themselves. **Rescan** re-reads everything, and is what
 to press after changing files with another program: a tag edited elsewhere doesn't change a
-folder's date, so it isn't noticed otherwise. In the app on a desktop it's on **Library care**
-([below](#library-care-in-the-app)).
+folder's date, so it isn't noticed otherwise. In the app it's on **Library care**
+([below](#library-care-in-the-app)), on a phone as on a desktop.
 
 The status bar at the bottom counts albums, artists, tracks and size, and says when the library
 was last scanned.
@@ -128,7 +128,8 @@ bootleg that will never be on MusicBrainz, say), **It's fine as it is** stops it
 for the issues it has now. It's still flagged if something new goes wrong, such as the cover
 going missing.
 
-The app has the same queue on a desktop, as **Needs a look** ([below](#needs-a-look-in-the-app)).
+The app has the same queue, as **Needs a look** ([below](#needs-a-look-in-the-app)) - on a phone too since
+2.0.0-player.47.
 
 ### Not in Navidrome
 
@@ -244,7 +245,7 @@ disc's tracks and type it once.
   the details in its tooltip). **Get lyrics · N** does every album in view that has no lyrics at
   all.
 
-The three **· N** runs are also the app's, on a desktop: **Library care**
+The three **· N** runs are also the app's, on a phone and a desktop: **Library care**
 ([below](#library-care-in-the-app)) runs them over the same albums by the same rules.
 
 ![A track's synced lyrics, with the time beside each line](../assets/images/lyrics.png)
@@ -341,15 +342,18 @@ Library:
   [below](#library-care-in-the-app)). An artist's pictures and **Move albums to …** are on the artist's
   page (since 2.0.0-player.45; [Managing an artist](player.md#managing-an-artist)), so a desktop needs
   nothing that is only this page's. The server settings and the log are **Managing**'s
-  **Settings** and **Log** (since 2.0.0-player.33; see [Configuration](configuration.md#in-the-app-on-a-desktop)
+  **Settings** and **Log** (since 2.0.0-player.33; see [Configuration](configuration.md#in-the-app)
   and [Troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)).
 
 ## Editing an album in the app
 
 In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), an album's page has
 **Edit** after **Play** and **Shuffle** (since 2.0.0-player.21). It opens the **Edit album** panel
-beside the page, and shows pressed while the panel is open; click it again to close the panel. It's
-there for an admin, which with logins off is everyone. There's no editor on a phone.
+beside the page, and shows pressed while the panel is open; click it again to close the panel. On a
+phone - any window narrower, an iPad held upright included - **Edit** is at the top of the page,
+beside the pin (since 2.0.0-player.47), and opens the same panel as a sheet over the whole screen,
+laid out for a phone: its fields big enough that iOS doesn't zoom into them, **Apply** kept at the
+sheet's foot as you scroll. It's there for an admin, which with logins off is everyone.
 
 The panel holds this page's own editors, not copies of them - so everything this page says about
 them is true there too:
@@ -359,7 +363,7 @@ them is true there too:
   a rename (*Applying, waiting for Navidrome*, or *Applying, renaming in 20s*) and **Compare full
   size…** for the cover. **Cancel** closes the panel; nothing is written until **Apply**. **It's
   fine as it is** is there for an album with issues, as here.
-- **Tags** lists the album's tracks with a tick box each. Tick some (Shift ticks a run), then **Edit
+- **Tags** lists the album's tracks with a tick box each. Tick some (on a desktop Shift ticks a run), then **Edit
   N tracks…**, or **Edit all tracks…** with none ticked, for [the tag editor](#editing-tags-by-hand):
   only the fields you change are written. **Cancel**, **Close** or Escape goes back to the list.
   Click a track's **name** (not its tick box) to look inside it (since 2.0.0-player.44 - see
@@ -372,7 +376,7 @@ them is true there too:
   when you click them.
 - **Lyrics** says how many tracks have a `.lrc`, with **Get lyrics** for the rest. The lyrics lead,
   and re-timing the lyrics already saved, are in the server settings - this page's Settings tab, or
-  the app's **Managing → Settings**, under **Library** ([Configuration](configuration.md#in-the-app-on-a-desktop)).
+  the app's **Managing → Settings**, under **Library** ([Configuration](configuration.md#in-the-app)).
 - **Delete** is [the delete confirmation](#deleting-an-album): what the folder holds, read as you
   open the tab, and **delete permanently**. **Cancel** (or Escape) goes back to **Release**.
 
@@ -402,19 +406,23 @@ new id too. Deleting the album closes the panel and goes back from its page - un
 of several, when the page stays and is asked again, at once and ten seconds later. The Library's grid
 is Navidrome's, so it changes once Navidrome has scanned.
 
-The panel is a side panel like Sources and Info - a third column from 1280 pixels wide, lying over
-the right of the page below that - and one shows at a time: **Edit** puts Sources and Info away, and
-either puts the Edit panel away. It closes when you go to another page, and when the window narrows
-to a phone's. The close button, or Escape while you're in the panel, closes it - in the tag editor,
-inside a track or in the delete confirmation, Escape closes that first, back to the track or to its
-tab, one step at a time ([Inside a track](#inside-a-track-in-the-app) has the steps); Escape out in the
-page (in the search field, say) is the page's. Between 1024 and 1279 pixels wide, while it lies over the page, the
+On a desktop the panel is a side panel like Sources and Info - a third column from 1280 pixels wide,
+lying over the right of the page below that - and one shows at a time: **Edit** puts Sources and Info
+away, and either puts the Edit panel away. On a phone it's a sheet over the whole screen, as Sources
+is there, and the page waits behind it. It closes when you go to another page; widening or narrowing
+the window across 1024 pixels with it open turns the one into the other. The close button, or Escape
+while you're in the panel (on a phone, any Escape), closes it - a tap on the dimmed page beside the
+phone's sheet (a phone on its side, an iPad held upright) doesn't, so a stray one can't throw away an
+edit you've half made - in the tag editor, inside a track or in
+the delete confirmation, Escape closes that first, back to the track or to its tab, one step at a time
+([Inside a track](#inside-a-track-in-the-app) has the steps); on a desktop, Escape out in the page (in
+the search field, say) is the page's. Between 1024 and 1279 pixels wide, while it lies over the page, the
 album's **Play**, **Shuffle** and **Edit** move under its cover, so **Edit** stays in view to close it.
 
 ### Inside a track, in the app
 
 Since 2.0.0-player.44, a track's name in the panel's **Tags** tab opens it in the panel - this page's
-track view, laid out for the panel (it fits a phone's width too, for when the panel comes to the phone):
+track view, laid out for the panel (and for a phone's sheet, since 2.0.0-player.47):
 
 - **Tracks** at the top goes back to the list, where you left it - scrolled on just enough to show the
   track you were on, if **Previous** and **Next** took you past the ones in view; **2 of 11** says
@@ -450,8 +458,8 @@ choosing, dragging and sizing them - stay this page's.
 
 In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), the sidebar's **Managing**
 starts with **Needs a look** (since 2.0.0-player.25), with how many albums need one beside it - and
-You's **Managing deadwax** has **Albums that need a look**, with the same count. It's there for an
-admin, which with logins off is everyone. It's this page's review queue (**Review N**), not a copy:
+You's **Managing deadwax** has **Albums that need a look**, with the same count, on a phone too since
+2.0.0-player.47. It's there for an admin, which with logins off is everyone. It's this page's review queue (**Review N**), not a copy:
 
 - **The same albums, in the same order**: every album with an issue you haven't accepted, and every
   album deadwax filed that nobody has looked at yet - those first, then the worst first, then by
@@ -477,7 +485,8 @@ library). It's kept to one line, so it never moves the rows; hover it for the wh
 (`DB_PATH`), the page says so above the list (since 2.0.0-player.42), as this page's queue does: an
 album you accept with **It's fine as it is** comes back. See [Troubleshooting](troubleshooting.md#ignored-albums-come-back-to-the-review-queue).
 
-**Click a row** and the **Edit album** panel opens on that album's folder, beside the list - the same
+**Click a row** and the **Edit album** panel opens on that album's folder, beside the list (on a phone,
+as a sheet over it) - the same
 panel as an album page's **Edit**, all five tabs ([above](#editing-an-album-in-the-app)), the row
 highlighted. **Release** says where the album is in the queue (*3 of 17*), with **◁** and **skip ▷**,
 and after **Apply** its button becomes **Next album ▷**, so you can work through the queue without going
@@ -490,15 +499,15 @@ The chips hold still for the whole run too, counts and all. Until that read has 
 as they were, faded, and a click on one does nothing - click again once they are back to full
 strength.
 
-On a phone the page says fixing albums needs a wider screen for now, with a link to this page; there's
-no editor on a phone yet. An album page showing the same album elsewhere in the app isn't asked again
-after an edit made from **Needs a look** - go back to it, or reload, to see the change.
+An album page showing the same album elsewhere in the app isn't asked again after an edit made from
+**Needs a look** - go back to it, or reload, to see the change. Until 2.0.0-player.47 a phone had only a
+note here, pointing at this page.
 
 ## Library care in the app
 
 In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), the sidebar's **Managing**
 has **Library care** after **Needs a look** (since 2.0.0-player.42), and You's **Managing deadwax** has
-the same row. It's there for an admin, which with logins off is everyone. It holds what this page's
+the same row - on a phone too since 2.0.0-player.47, where the page is laid out for it. It's there for an admin, which with logins off is everyone. It holds what this page's
 toolbar does beyond the review queue:
 
 - **Rescan** - the same as here: every file read again, ignoring the saved scan. Under it, what the
@@ -525,8 +534,7 @@ toolbar does beyond the review queue:
   album in the scan's count and two folders here.
 
 The runs are offered once the library has been read from the disk - with the saved copy on screen
-the page says *Checking the library…* first, since the saved copy can be behind. On a phone the page
-says it needs a wider screen, with a link to this page.
+the page says *Checking the library…* first, since the saved copy can be behind.
 
 ## Deleting an album
 

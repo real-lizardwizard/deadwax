@@ -3,8 +3,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { useLibrary } from '../hooks/useLibrary'
 import { BULK_KINDS, bulkSummary, bulkTargets, type BulkKind } from '../lib/bulkTargets'
 import {
-  BULK_LABELS, BULK_TITLES, CARE_LINE, CARE_PHONE, RESCAN_WORDS, narrowAlbums, planWords, scanAge, scanTotals, scopeLine,
+  BULK_LABELS, BULK_TITLES, CARE_LINE, RESCAN_WORDS, narrowAlbums, planWords, scanAge, scanTotals, scopeLine,
 } from '../lib/libraryCare'
+import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { ChevronLeftIcon } from '../player/icons'
 import { caughtUp, libraryCareNow, setCareNarrow, startBulk, stopBulk, useLibraryCare } from './useLibraryCare'
@@ -17,7 +18,7 @@ const focusLost = (): boolean => {
 }
 
 /**
- * Library care (2.0.0-player.42): looking after the library in the app, on a desktop - what the main
+ * Library care (2.0.0-player.42): looking after the library in the app (a phone's too since 2.0.0-player.47) - what the main
  * page's Library tab toolbar does beyond the review queue (which is Needs a look). There is no board
  * for it; it is built from STYLE.md and the Managing pages' parts. Pushed on You (`#/you/care/library`),
  * a sibling of Needs a look, Settings and Log (App's openManagingPage).
@@ -39,26 +40,28 @@ const focusLost = (): boolean => {
  *    button waits for that read - never drawn again over the albums the run just did.
  *
  * The library through the main page's own hook (hooks/useLibrary.ts: the saved scan drawn at once, a
- * real scan underneath), read only once the page first shows on a desktop - and again, quietly, as it
- * shows again later with nothing under way. A control that goes as a run ends hands focus to what
+ * real scan underneath), read only once the page first shows - and again, quietly, as it shows again
+ * later with nothing under way. A control that goes as a run ends hands focus to what
  * the run says, never to the page.
  *
- * On a PHONE it is a short note, asking nothing.
+ * ON A PHONE TOO (2.0.0-player.47): the same page and the same runs, laid out for a phone by app.css.
+ * Someone deadwax says isn't its admin gets a short note instead, asking nothing.
  */
 export function LibraryCare({
-  desktop,
+  admin,
   live,
   onBack,
   backLabel,
 }: {
-  desktop: boolean
+  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
+  admin: boolean
   /** this page is what shows - its tab current, the app in front, nothing over it */
   live: boolean
   onBack: () => void
   backLabel: string
 }) {
-  //? read only once it shows on a desktop - a phone asks nothing at all
-  const library = useLibrary(desktop && live)
+  //? read only once it shows - for anyone but the admin, nothing is asked at all
+  const library = useLibrary(admin && live)
   const care = useLibraryCare()
   const [rescanning, setRescanning] = useState(false)
   //? the run whose button has focus: should the button go (the run ended with nothing left to fetch),
@@ -70,7 +73,7 @@ export function LibraryCare({
   //? shown again after the first time, with nothing under way: the library read again underneath
   const wasLive = useRef(live)
   useEffect(() => {
-    if (desktop && live && !wasLive.current && library.loaded && !library.loading) void library.reload(false)
+    if (admin && live && !wasLive.current && library.loaded && !library.loading) void library.reload(false)
     wasLive.current = live
   }, [live])
 
@@ -86,7 +89,7 @@ export function LibraryCare({
   const catchUp = useRef<{ kinds: BulkKind[]; answered: boolean } | null>(null)
   const [, caughtUpDrawn] = useState(0)
   useEffect(() => {
-    if (!desktop || !live || !library.loaded || library.problem) return
+    if (!admin || !live || !library.loaded || library.problem) return
     const pending = catchUp.current
     if (pending) {
       //? answered, and no newer read still out (useLibrary draws only the newest): what is in hand was
@@ -138,18 +141,12 @@ export function LibraryCare({
     </>
   )
 
-  if (!desktop) {
+  if (!admin) {
     return (
-      <section class="app-care is-phone app-needs">
+      <section class="app-care is-refused app-needs">
         {header}
         <div class="app-card app-placeholder-body">
-          <p class="app-placeholder-text app-care-phone">
-            {CARE_PHONE}{' '}
-            <a class="app-queue-link" href="/" target="_blank" rel="noopener">
-              the main page
-            </a>
-            .
-          </p>
+          <p class="app-placeholder-text">{MANAGING_ADMINS_ONLY}</p>
         </div>
       </section>
     )
@@ -229,7 +226,7 @@ export function LibraryCare({
                   class="app-care-input"
                   type="search"
                   value={care.narrow}
-                  placeholder="Artist, album or folder - empty for the whole library"
+                  placeholder="Artist, album or folder"
                   spellcheck={false}
                   autoComplete="off"
                   onInput={(event) => setCareNarrow((event.currentTarget as HTMLInputElement).value)}

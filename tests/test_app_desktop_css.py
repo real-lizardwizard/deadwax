@@ -67,6 +67,10 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   it on both frames), a track's name in the Tags list the table's row height, and the rings of the
   inspector's controls, the track names and Artwork's cover and CD art drawn inside the panel's clipping
   body - a class more than the panel's own ring rule.
+- Looking after deadwax from a phone (2.0.0-player.47) draws nothing differently here: the settings page's
+  full-height column still skips the note anyone but the admin gets, by the class the note carries now
+  (`.is-refused`, which was `.is-phone`), and every `:not(.x)` in the app's two stylesheets names a class
+  ui/src still draws.
 """
 
 import re
@@ -678,10 +682,16 @@ def test_the_settings_page_reaches_the_foot_and_its_idle_bar_takes_no_clicks_nor
     the last group, mid-screen. So the page fills the page area at least, the body taking the room. And the
     bar, always there, is a box over what a long tab scrolls under it: idle (transparent) it takes no
     clicks, and saying something (opaque) it covers what is there, so keyboard focus stops above it too."""
-    page = declarations(DESKTOP, ".app-desk .app-settings:not(.is-phone)", DESK)
+    page = declarations(DESKTOP, ".app-desk .app-settings:not(.is-refused)", DESK)
     assert (page["display"], page["flex-direction"], page["min-height"]) == ("flex", "column", "var(--app-desk-set-page)")
     assert media_tokens(DESKTOP, DESK)["--app-desk-set-page"] == "calc(100dvh - var(--app-desk-bar))"
-    assert declarations(DESKTOP, ".app-desk .app-settings:not(.is-phone) .app-settings-body", DESK)["flex"] == "1 0 auto"
+    assert declarations(DESKTOP, ".app-desk .app-settings:not(.is-refused) .app-settings-body", DESK)["flex"] == "1 0 auto"
+    #? the page, not the note anyone deadwax says isn't the admin gets - one card, no save bar. (2.0.0-player.47,
+    #? review: the note's class was .is-phone, the exclusion's too; .47 renamed the note's alone, and the
+    #? exclusion excluded nothing - the note given the page-filling column - with this test still green)
+    settings = (SRC / "app" / "ServerSettings.tsx").read_text()
+    assert '<section class="app-settings is-refused app-needs">' in settings
+    assert '<section class="app-settings">' in settings
     assert declarations(DESKTOP, ".app-desk .app-settings-savebar:not(.is-said)", DESK)["pointer-events"] == "none"
     assert "pointer-events" not in declarations(DESKTOP, ".app-desk .app-settings-savebar.is-said", DESK)
     assert declarations(DESKTOP, "html:has(.app-desk .app-pane:not([hidden]) .app-settings-savebar.is-said)", DESK)["scroll-padding-bottom"] == \
@@ -878,3 +888,14 @@ def test_inside_a_track_on_a_desktop_the_viewer_is_the_panels_size_and_the_rings
                      ".app-desk .app-edit .app-inspect-summary:focus-visible", ".app-desk .app-edit .app-edit-track-open:focus-visible",
                      ".app-desk .app-edit .app-edit-cover-open:focus-visible", ".app-desk .app-edit .app-edit-disc:focus-visible"):
         assert declarations(DESKTOP, selector, DESK)["outline-offset"] == "var(--app-ring-inset)", selector
+
+
+def test_every_class_a_not_exclusion_names_is_still_drawn():
+    """A `:not(.x)` naming a class nothing draws excludes nothing, and reads as if it did: app-desktop.css's
+    settings page kept `:not(.is-phone)` after 2.0.0-player.47 renamed the note it skipped to
+    `.is-refused` (review). So every class the app's two stylesheets exclude is still in ui/src."""
+    sources = "\n".join(path.read_text() for path in SRC.rglob("*") if path.suffix in (".ts", ".tsx"))
+    named = {name for css in (APP, DESKTOP) for name in re.findall(r":not\(\.([\w-]+)", css)}
+    assert "is-refused" in named
+    for name in sorted(named):
+        assert re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", sources), f":not(.{name}) names a class ui/src never draws"

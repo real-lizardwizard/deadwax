@@ -202,10 +202,6 @@ export const NEEDS_LOOK_LINE =
   "Albums whose tags, folder or cover want attention or that Navidrome doesn't list, and albums deadwax filed that "
   + "you haven't looked at yet."
 
-/** The phone's note in place of the page (no editor has a board on a phone yet) - followed by a link
- *  to "the main page", opening beside the app. */
-export const NEEDS_LOOK_PHONE = 'Fixing albums needs a wider screen for now - or'
-
 /** Said when ignores can't be saved (2.0.0-player.42) - the main page's warning, in the app's words. */
 export const IGNORES_UNSAVED = "Ignores can't be saved: deadwax couldn't open its job store (DB_PATH), so an album you "
   + "accept with \u201cIt's fine as it is\u201d will come back."

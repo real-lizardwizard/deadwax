@@ -462,7 +462,8 @@ console.log('\nan album page is memoised on what it reads of the player')
     //? 2.0.0-player.21: and the Edit toggle's state - admin, the panel, its album - and an edit's refresh)
     //? 2.0.0-player.33: and the visualizer, which the server settings' and the log's `live` read)
     //? 2.0.0-player.45: and the artist page's panel - open, its request - and an artist page's refresh)
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? 2.0.0-player.47: and Now Playing, which a phone's Managing pages' `live` reads as the visualizer)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -497,10 +498,13 @@ console.log('\na link out of the app opens beside it')
   //? and (2.0.0-player.33) the server settings' line and its phone note, and the log's phone note
   //? (2.0.0-player.36: and Info > Debug's link to the turntable's test bench, a page of its own)
   //? (2.0.0-player.45: and an artist page's links - their site, their socials - in its About)
-  check('...and there are links to look at (You, the gate, the desktop sidebar, Needs a look, Library care and the log on a phone, the server settings, Info > Debug\'s test bench, an artist\'s About)',
+  //? (2.0.0-player.47: the four phone notes went - Needs a look, Library care, the settings and the log are
+  //? drawn on a phone - and so did the gate's link to the main page's settings tab: "Set up Navidrome" opens
+  //? the app's own Settings at Connections)
+  check('...and there are links to look at (You, the desktop sidebar, the server settings\' line, Info > Debug\'s test bench, an artist\'s About, an album\'s Properties)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
     //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/EventLog.tsx', 'app/InfoSheet.tsx', 'app/LibraryCare.tsx', 'app/NeedsALook.tsx', 'app/NeedsNavidrome.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -512,10 +516,11 @@ console.log('\nNow Playing covers everything behind it')
     [!!behind, /TABS\.map/.test(behind?.[1] ?? ''), /<MiniPlayer\b/.test(behind?.[1] ?? ''), /<TabBar\b/.test(behind?.[1] ?? '')], [true, true, true, true])
   //? 2.0.0-player.19: on a phone - a desktop's side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen)
-  check('...inert while Now Playing, the Sources sheet or the artist page\'s sheet shows, on a phone - or the visualizer, on a desktop',
+  check('...inert while Now Playing, the Sources sheet, the artist page\'s or the Edit sheet shows, on a phone - or the visualizer, on a desktop',
     //? (2.0.0-player.33: visualizerShown is worked out earlier now - the pages memo reads it)
     //? (2.0.0-player.45: the artist page's panel is a sheet over the whole screen on a phone)
-    [/const visualizerShown = desktop && visualizing\n/.test(app), /const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen \|\| artistOpen\)\) \|\| visualizerShown/.test(app),
+    //? (2.0.0-player.47: and so is the Edit panel)
+    [/const visualizerShown = desktop && visualizing\n/.test(app), /const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen \|\| artistOpen \|\| editOpen\)\) \|\| visualizerShown/.test(app),
       (app.match(/const visualizerShown =/g) ?? []).length], [true, true, 1])
   //? (2.0.0-player.20) ...and a desktop's Sources or Info panel left open goes inert under the visualizer
   //? too - outside that wrapper, each takes it as `covered`, as Now Playing takes what is over it
@@ -560,8 +565,14 @@ console.log('\nevery sheet is a sheet by the one hook')
   check('...and they are the only ones', files.filter((file) => /\buseSheet\(/.test(code(read(file))) && file !== 'app/useSheet.ts').sort(), Object.keys(SHEETS).sort())
   check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true, true, true, true])
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
-  check('the menu, Info, the sources, the Edit panel and the artist page\'s close on their backdrop (a panel\'s is not drawn)',
-    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/EditPanel.tsx', 'app/ArtistPanel.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true, true])
+  check('the menu, Info, the sources and the artist page\'s close on their backdrop (a panel\'s is not drawn)',
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/ArtistPanel.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true])
+  //? (2.0.0-player.47, review: beside a phone's Edit sheet - a phone on its side, an iPad upright - a stray
+  //? tap on the backdrop threw away an edit half made)
+  check('...the Edit sheet\'s takes a tap and closes nothing - it holds typed work; its close button and Escape close it',
+    [/<div class="app-backdrop" \/>/.test(texts['app/EditPanel.tsx']), /class="app-backdrop"[^>]*onClick/.test(texts['app/EditPanel.tsx']),
+      /class="app-edit-close"[^>]*onClick=\{onClose\}/.test(texts['app/EditPanel.tsx']), /useSheet\(\{ open, covered: inner \|\| covered, onClose,/.test(texts['app/EditPanel.tsx'])],
+    [true, false, true, true])
   //? (2.0.0-player.19: a desktop's side panel is no sheet over the page - no lock - and Escape closes
   //? it only from inside it; a sheet is modal unless it says otherwise)
   check('the hook: the lock on <html> (a sheet\'s, never a panel\'s), focus in, focus back, Escape for the one on top',
@@ -1418,33 +1429,50 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
   const app = code(read('app/App.tsx'))
   const panel = code(read('app/EditPanel.tsx'))
   const page = code(read('player/AlbumPage.tsx'))
-  check('drawn only in the desktop\'s frame, after Info - never on a phone, which has no board for it',
-    [/\{desktop && <EditPanel open=\{editOpen\} request=\{edit\} opener=\{editOpener\} onClose=\{closeEdit\} onChanged=\{albumChanged\} panel=\{panel\} covered=\{visualizerShown\} \/>\}/.test(app),
-      app.indexOf('<EditPanel') > app.indexOf('<InfoSheet'), files.filter((file) => file !== 'app/App.tsx' && /<EditPanel\b/.test(code(read(file))))],
-    [true, true, []])
-  check('Edit is on the album page only for a desktop and an admin, and drawn only when handed',
-    [/onEdit=\{desktop && admin \? toggleEdit : undefined\}/.test(app), /\{onEdit && \(\s*<button\b[^>]*class="pl-pill app-edit-toggle"\s*aria-pressed=\{editing\}/.test(page),
+  //? (2.0.0-player.47: drawn on both frames - a phone's sheet, as the artist page's panel is)
+  check('drawn after Info, on both frames - a side panel on a desktop, a sheet over the whole screen on a phone',
+    [/\n\s*<EditPanel open=\{editOpen\} request=\{edit\} opener=\{editOpener\} onClose=\{closeEdit\} onChanged=\{albumChanged\} panel=\{panel\} covered=\{visualizerShown\} \/>\n/.test(app),
+      /desktop && <EditPanel\b/.test(app), app.indexOf('<EditPanel') > app.indexOf('<InfoSheet'), files.filter((file) => file !== 'app/App.tsx' && /<EditPanel\b/.test(code(read(file))))],
+    [true, false, true, []])
+  //? (2.0.0-player.47: an admin's on both frames - after Play and Shuffle on a desktop, in the bar beside the pin on a phone)
+  check('Edit is on the album page for an admin, on both frames, and drawn only when handed - where the frame says',
+    [/onEdit=\{admin \? toggleEdit : undefined\}/.test(app), /editAt=\{desktop \? 'actions' : 'bar'\}/.test(app),
+      /\{onEdit && editAt === 'actions' && \(\s*<button\b[^>]*class="pl-pill app-edit-toggle"\s*aria-pressed=\{editing\}/.test(page),
       /editing=\{editOpen && edit\?\.album\?\.id === page\.id\}/.test(app)],
-    [true, true, true])
+    [true, true, true, true])
+  //? a phone's Edit: in the bar, after the back link and before the pin - above the title, so nothing under
+  //? it moves as it comes or goes (the spec) - with the toggle's class and state, so App's focus re-point
+  //? after a move (`.app-edit-toggle[aria-pressed="true"]`) finds it there too
+  const bar = /<header class="pl-nav-bar app-album-bar">([\s\S]*?)<\/header>/.exec(page)?.[1] ?? ''
+  check('...a phone\'s in the album page\'s bar: after the back link, before the pin, the toggle\'s class and pressed state, live once the album answers',
+    [/\{onEdit && editAt === 'bar' && \(\s*<button\b[^>]*class="app-edit-toggle app-edit-chip"\s*aria-pressed=\{editing\}\s*disabled=\{!album\}/.test(bar),
+      bar.indexOf('pl-back') < bar.indexOf('app-edit-chip') && bar.indexOf('app-edit-chip') < bar.indexOf('<PinToggle'),
+      /if \(album\) onEdit\(event as unknown as MouseEvent, editAlbum\(album\)\)/.test(bar), (page.match(/class="[^"]*app-edit-toggle/g) ?? []).length],
+    [true, true, true, 2])
   const toggle = /const toggleEdit = useCallback\(\(event: MouseEvent, album: EditAlbum\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
   check('Edit opens it - a new request each press - putting Sources and Info away; pressed again on its album, closes it',
     [/if \(editOpenNow\.current && editNow\.current\?\.album\?\.id === album\.id\) \{\s*setEditOpen\(false\)\s*return\s*\}/.test(toggle),
       /editOpener\.current = takeOpener\(event\)\s*editKeys\.current \+= 1\s*setEdit\(\{ album, key: editKeys\.current \}\)\s*setEditOpen\(true\)/.test(toggle),
       /sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)/.test(toggle)],
     [true, true, true])
-  check('crossing to the phone closes it, and so does its page stopping being the one showing',
-    [/if \(closes\.editPanel\) \{\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(app),
+  //? (2.0.0-player.47: crossing leaves it open - a panel one side, a sheet the other, as the artist page's)
+  check('crossing 1024px leaves it open, either way; its page stopping being the one showing closes it',
+    [!/closes\.editPanel/.test(app),
       /const editShown = edit !== null && \(isFolderRequest\(edit\) \? topNow\?\.kind === 'queue' : topNow\?\.kind === 'album' && topNow\.id === edit\.album\.id\)/.test(app),
       /if \(!editOpen \|\| editShown\) return\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(app)],
     [true, true, true])
-  check('a side panel by the one hook: modal only as a sheet (it never is), Escape from inside it, focus in to its close and back to Edit',
+  //? (2.0.0-player.47: modal as a phone's sheet - its scroll lock, every Escape its own, a box with no tabindex)
+  check('one hook: a side panel on a desktop (Escape from inside it), a modal sheet on a phone; focus in to its close and back to Edit',
     [/const modal = panelIsModal\(panel\)/.test(panel), /useSheet\(\{ open, covered: inner \|\| covered, onClose, lockClass: 'app-edit-open', first: closeButton, opener, modal, area: box \}\)/.test(panel),
-      /<button ref=\{closeButton\} type="button" class="app-edit-close"/.test(panel), /tabIndex=\{-1\}/.test(panel)],
-    [true, true, true, true])
+      /<button ref=\{closeButton\} type="button" class="app-edit-close"/.test(panel),
+      /<div ref=\{box\} class="app-edit" role="dialog" aria-modal=\{modal \? 'true' : 'false'\} aria-labelledby="app-edit-title" tabIndex=\{modal \? undefined : -1\}>/.test(panel),
+      /class=\{`app-layer app-edit-layer\$\{open \? ' is-open' : ''\}\$\{modal \? ' is-sheet' : ` is-panel is-\$\{panel\}`\}`\}/.test(panel)],
+    [true, true, true, true, true])
   //? (review) the direction pinned, and each handler's guard - not only that they exist
   check('an editor\'s own Escape (they listen on the document) passed over when it came from the page beside',
     [/document\.addEventListener\('keydown', onKeyDown, true\)/.test(panel), /at !== null && at\.event\.eventPhase !== 0 \? at\.from : null/.test(panel),
-      /const from = !box\.current\?\.contains\(event\.target as Node \| null\) \? 'page' : inner\.current \? 'inner' : 'panel'/.test(panel),
+      //? (2.0.0-player.47: a sheet has no page beside it - an Escape from outside its box is its own)
+      /const from = !modal\.current && !box\.current\?\.contains\(event\.target as Node \| null\) \? 'page' : inner\.current \? 'inner' : 'panel'/.test(panel),
       ['onClose={closeFromEditor}', 'onClose={closeTagEditor}', 'onCancel={cancelDelete}'].map((prop) => panel.includes(prop)),
       /const closeFromEditor = useMemo\(\(\) => \(\) => \{\s*const from = escapeFrom\(\)\s*if \(from !== 'page' && from !== 'inner'\) close\.current\(\)/.test(panel),
       /const closeTagEditor = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*setEditingTags\(null\)/.test(panel),
@@ -1454,10 +1482,10 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
   check('(review) an Escape in the tag editor or the delete confirmation closes that layer alone: the panel covered under it, the release editor\'s close passing it over',
     [/const tagEditorShown = drawn && editingTags !== null && editingTags\.path === subject!\.path\n/.test(panel),
       /const inner = drawn && \(\(tab === 'tags' && \(tagEditorShown \|\| inspected !== null\)\) \|\| tab === 'delete'\)/.test(panel),
-      /innerNow\.current = inner/.test(panel), /const escapeFrom = useEscapeFrom\(box, innerNow\)/.test(panel)],
+      /innerNow\.current = inner/.test(panel), /const escapeFrom = useEscapeFrom\(box, innerNow, modalNow\)/.test(panel) && /modalNow\.current = modal\n/.test(panel)],
     [true, true, true, true])
-  check('(review) the editors let go once the panel has closed - at once as a column, once a drawer has slid away - so no cover viewer outlives it',
-    [/if \(open\) \{\s*setLetGo\(false\)\s*return\s*\}\s*const timer = setTimeout\(\(\) => setLetGo\(true\), panel === 'drawer' \? EDIT_SLIDE_MS : 0\)/.test(panel),
+  check('(review) the editors let go once the panel has closed - at once as a column, once a drawer or a phone\'s sheet has slid away - so no cover viewer outlives it',
+    [/if \(open\) \{\s*setLetGo\(false\)\s*return\s*\}\s*const timer = setTimeout\(\(\) => setLetGo\(true\), panel === 'column' \? 0 : EDIT_SLIDE_MS\)/.test(panel),
       /const drawn = !!subject && !!request && !deleted && !letGo/.test(panel), /\{drawn && subject && request && \(/.test(panel),
       (panel.match(/<MetadataEditor\b/g) ?? []).length],
     [true, true, true, 1])
@@ -1553,11 +1581,12 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
   check('no playback action from any of its files, nor a context',
     ['app/NeedsALook.tsx', 'app/useQueueSummary.ts', 'lib/needsLook.ts'].map((file) => [actionsIn(code(read(file))), /useContext|PlayerContext|ActionsContext/.test(code(read(file)))]),
     [[[], false], [[], false], [[], false]])
-  check('the page reads the library through the main page\'s hook, only once it shows on a desktop - and nothing else of it',
-    [/const library = useLibrary\(desktop && shown\)/.test(page), (page.match(/useLibrary\(/g) ?? []).length, /listAlbums|loadScan|queueSummary\(/.test(page)],
-    [true, 1, false])
-  check('...on a phone a note and nothing more: its return comes before any row is drawn',
-    [/if \(!desktop\) \{\s*return \(/.test(page), page.indexOf('if (!desktop)') < page.indexOf('app-queue-list')], [true, true])
+  //? (2.0.0-player.47: told `admin`, never the frame - a phone draws the page as a desktop does)
+  check('the page reads the library through the main page\'s hook, only once it shows, for the admin - and nothing else of it',
+    [/const library = useLibrary\(admin && shown\)/.test(page), (page.match(/useLibrary\(/g) ?? []).length, /listAlbums|loadScan|queueSummary\(/.test(page), /\bdesktop\b/.test(page.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
+    [true, 1, false, false])
+  check('...anyone else a note and nothing more: its return comes before any row is drawn',
+    [/if \(!admin\) \{\s*return \(/.test(page), page.indexOf('if (!admin)') < page.indexOf('app-queue-list')], [true, true])
   check('the list is queueAlbums, through lib/needsLook.ts, and its session the pure rules\'',
     [/from '\.\.\/lib\/needsLook'/.test(page), /export function facetAlbums[\s\S]*?queueAlbums\(albums, facet\)/.test(code(read('lib/needsLook.ts'))),
       /const begun = startSession\(albums, path, showing\)/.test(page), /const target = stepTarget\(was, index,/.test(page)],
@@ -1572,23 +1601,26 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       /useEffect\(\(\) => \(\) => \{\s*const was = sessionNow\.current\s*if \(was\) \{\s*const path = leavingAtEnd\(was\)\s*if \(path\) review\(path\)/.test(page)],
     [true, true])
   check('the count: one store - asked as the desktop frame shows for an admin and the page comes back, after every change the panel reports, by the page\'s reviews and on a filed album; no timer',
-    [/useEffect\(\(\) => \{\s*if \(desktop && admin && pageShown\) askQueueSummary\(\)\s*\}, \[desktop, admin, pageShown\]\)/.test(app),
+    //? (2.0.0-player.47: and on a phone as You's tab shows, where its row draws it - by ONE flag, true on a
+    //? desktop all along, so a desktop moving to and from You asks nothing more: review)
+    [/const asksQueueSummary = desktop \|\| nav\.tab === 'you'\s*useEffect\(\(\) => \{\s*if \(asksQueueSummary && admin && pageShown\) askQueueSummary\(\)\s*\}, \[asksQueueSummary, admin, pageShown\]\)/.test(app),
       /const albumChanged = useCallback\(\(change: AlbumChange\) => \{\s*\/\/[^\n]*\n\s*askQueueSummary\(\)/.test(read('app/App.tsx')),
       /onAlbumsFiled\(\(\) => askQueueSummary\(\)\)/.test(store), /if \(asking\) again = true\s*else ask\(\)/.test(store),
       files.filter((file) => APP_SIDE(file) && /askQueueSummary\(|\(askQueueSummary\)/.test(code(read(file)))).sort(),
       /setTimeout|setInterval/.test(store), (app.match(/useQueueSummary\(\)/g) ?? []).length],
     [true, true, true, true, ['app/App.tsx', 'app/NeedsALook.tsx', 'app/useQueueSummary.ts'], false, 1])
   check('...the page\'s own count standing in only while it shows with a real scan and no session',
-    [/setPageQueueCount\(desktop && shown && real && !session && !ending \? summaryTotal\(library\.albums\) : null\)/.test(page), /return page \?\? server/.test(store)],
+    [/setPageQueueCount\(admin && shown && real && !session && !ending \? summaryTotal\(library\.albums\) : null\)/.test(page), /return page \?\? server/.test(store)],
     [true, true])
   check('the sidebar\'s item: Managing\'s first, an admin\'s, with the count',
     [/\{admin && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul class="app-side-list">\s*\{item\(SIDEBAR_QUEUE\)\}/.test(side),
       /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow\)/.test(app)],
     [true, true, true])
-  check('You\'s row: a desktop\'s, in Managing (an admin\'s), above the link to the main page - the phone\'s Managing as it was',
-    [/\{desktop && \(\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), you.indexOf('app-queue-link-row') < you.indexOf('Open the main page'),
-      /\{admin && \([\s\S]*?app-queue-link-row/.test(you), /desktop=\{desktop\}\s*needsLook=\{needsLook\}\s*onNeedsLook=\{openQueue\}/.test(app)],
-    [true, true, true, true])
+  //? (2.0.0-player.47: on both frames - You is told no frame at all now)
+  check('You\'s row: in Managing (an admin\'s), above the link to the main page - on a phone as on a desktop',
+    [/<div class="app-group">\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), you.indexOf('app-queue-link-row') < you.indexOf('Open the main page'),
+      /\{admin && \([\s\S]*?app-queue-link-row/.test(you), /onWindDown=\{chooseWindDown\}\s*needsLook=\{needsLook\}\s*onNeedsLook=\{openQueue\}/.test(app), /\bdesktop\b/.test(you.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
+    [true, true, true, true, false])
   //? (2.0.0-player.33: through openManagingPage, which also replaces another Managing page on top)
   check('its page opened on You - the tab as left, the page pushed only when it isn\'t on top there',
     [/const openQueue = useCallback\(\(\) => openManagingPage\(QUEUE_PAGE\), \[\]\)/.test(app)
@@ -1633,8 +1665,8 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       /\{deleted && queue && queue\.position < queue\.total && \(\s*<button type="button" class="app-edit-button" onClick=\{queue\.onNext\}>\s*Next album ▷/.test(panel),
       (panel.match(/onApplied=\{written\(request, subject\)\}|onDone=\{written\(request, subject\)\}/g) ?? []).length],
     [2, true, true, true, true, 3])
-  check('the pages memo is keyed on what the queue page reads (the frame, the page shown, the panel and its request)',
-    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes\]/.test(app),
+  check('the pages memo is keyed on what the queue page reads (admin, the page shown, the panel and its request)',
+    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes\]/.test(app),
       /page\.kind === 'queue' \? queueView\(tab, page\)/.test(app)],
     [true, true])
 }
@@ -1667,15 +1699,17 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
   const opening = files.filter((file) => /\bnew EventSource\b/.test(code(read(file))))
   check('the log is the one file in the app that opens a stream', opening, ['app/EventLog.tsx'])
   check('...in an effect that opens nothing unless the page is what shows, keyed on exactly that, and closes it as that stops',
-    [/useEffect\(\(\) => \{\s*if \(!desktop \|\| !live\) return\b[\s\S]*?new EventSource\([\s\S]*?return \(\) => \{\s*closed = true\s*reads\.supersede\(\)\s*source\?\.close\(\)[\s\S]*?\}, \[desktop, live\]\)/.test(log),
+    //? (2.0.0-player.47: an admin's, on either frame)
+    [/useEffect\(\(\) => \{\s*if \(!admin \|\| !live\) return\b[\s\S]*?new EventSource\([\s\S]*?return \(\) => \{\s*closed = true\s*reads\.supersede\(\)\s*source\?\.close\(\)[\s\S]*?\}, \[admin, live\]\)/.test(log),
       (log.match(/new EventSource\(/g) ?? []).length],
     [true, 1])
   check('...a history answering after it stopped showing opens nothing (`closed` asked first)',
     [/recentLog\(ticket\.signal\)\.then\(\s*\(recent\) => \{\s*if \(!ticket\.current\(\) \|\| closed\) return/.test(log)], [true])
-  check('App\'s `live`: the page\'s tab current, the app in front, the visualizer not over it; both a desktop\'s and an admin\'s',
-    [/const managingLive = \(tab: Tab\) => pageShown && nav\.tab === tab && !visualizerShown/.test(app),
-      /<ServerSettings desktop=\{desktop && admin\} live=\{managingLive\(tab\)\}/.test(app),
-      /<EventLog desktop=\{desktop && admin\} live=\{managingLive\(tab\)\}/.test(app)],
+  //? (2.0.0-player.47: an admin's on both frames - and a phone's Now Playing over the page is as the visualizer)
+  check('App\'s `live`: the page\'s tab current, the app in front, neither the visualizer nor a phone\'s Now Playing over it; both an admin\'s, on either frame',
+    [/const managingLive = \(tab: Tab\) => pageShown && nav\.tab === tab && !visualizerShown && !sheetOpen\n/.test(app),
+      /<ServerSettings admin=\{admin\} live=\{managingLive\(tab\)\}/.test(app),
+      /<EventLog admin=\{admin\} live=\{managingLive\(tab\)\}/.test(app)],
     [true, true, true])
   check('the log\'s lines and the settings\' rows are text: nothing set as HTML in either',
     [/dangerouslySetInnerHTML|innerHTML|insertAdjacentHTML/.test(log), /dangerouslySetInnerHTML|innerHTML|insertAdjacentHTML/.test(settings),
@@ -1683,7 +1717,7 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
     [false, false, true])
   check('the settings read through latestOnly, never over a draft, and a save calls a read still out off',
     [/const ticket = reads\.begin\(\)\s*setLoading\(true\)\s*getServerSettings\(ticket\.signal\)/.test(settings),
-      /if \(!desktop \|\| !live \|\| Object\.keys\(kept\.drafts\)\.length\) return\s*read\(\)/.test(settings),
+      /if \(!admin \|\| !live \|\| Object\.keys\(kept\.drafts\)\.length\) return\s*read\(\)/.test(settings),
       /const save = async \(\) => \{[\s\S]*?reads\.supersede\(\)[\s\S]*?saveServerSettings\(/.test(settings)],
     [true, true, true])
   //? App draws only a tab's top page: a page left for a sibling, Back or Go to album goes - and with it any
@@ -1699,9 +1733,9 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
   //? (2.0.0-player.42: Library care between Needs a look and them)
   check('the sidebar\'s Settings and Log: an admin\'s, after Needs a look and Library care, before the main page',
     [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_CARE\)\}\s*\{item\(SIDEBAR_SETTINGS\)\}\s*\{item\(SIDEBAR_LOG\)\}\s*<li>\s*<a/.test(sidebar)], [true])
-  check('You\'s rows: a desktop\'s, opening the pages through App',
+  check('You\'s rows: opening the pages through App - on a phone as on a desktop (2.0.0-player.47)',
     //? (2.0.0-player.42: and Library care's)
-    [(you.match(/\{desktop && \(\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('(care|settings|log)'\)\}>/g) ?? []).length,
+    [(you.match(/\n\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('(care|settings|log)'\)\}>/g) ?? []).length,
       /onManaging=\{openManaging\}/.test(app), /move\.how === 'managing'\) \{\s*openManaging\(move\.kind\)/.test(app)],
     [3, true, true])
   check('the Managing pages are siblings: each opened through one helper, one over another REPLACING it (never piled up)',
@@ -1711,8 +1745,8 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
       /if \(top\?\.kind === page\.kind\) return[\s\S]{0,120}if \(top && MANAGING_KINDS\.includes\(top\.kind\)\) router\.become\(top, page\)\s*else router\.open\(page\)/.test(app),
       /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'care', 'settings', 'log'\]/.test(app)],
     [true, true, true, true])
-  check('the pages memo is keyed on what they read - the visualizer too',
-    [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown, artistOpen, artistManage, artistRefreshes\]/.test(app)], [true, true])
+  check('the pages memo is keyed on what they read - the visualizer, and Now Playing, too',
+    [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes\]/.test(app)], [true, true])
 }
 
 console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
@@ -1743,8 +1777,9 @@ console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
   check('...the page on the tab it was opened on: the request keeps its tab, the panel closes on another, and only that tab\'s copy shows it pressed',
     [/setArtistManage\(\{ \.\.\.request, key: artistKeys\.current, tab: router\.nav\.tab \}\)/.test(toggle),
       /managing=\{artistOpen && artistManage\?\.tab === tab && artistManage\.page === page\.id \? artistManage\.mode : null\}/.test(app)], [true, true])
-  check('...and it stays open across 1024px - a panel one side, a sheet the other (crossing closes only Now Playing, Info and Edit)',
-    [/if \(closes\.editPanel\) \{\s*editOpener\.current = null\s*setEditOpen\(false\)\s*\}/.test(app), /closes\.\w+\) \{[^}]*setArtistOpen/.test(app)], [true, false])
+  //? (2.0.0-player.47: and so does the Edit panel - crossing closes only Now Playing and Info now)
+  check('...and it stays open across 1024px - a panel one side, a sheet the other (crossing closes only Now Playing and Info)',
+    [/if \(closes\.infoPanel\) \{\s*infoOpener\.current = null\s*setInfoPanel\(false\)/.test(app), /closes\.\w+\) \{[^}]*setArtistOpen/.test(app), /closes\.\w+\) \{[^}]*setEditOpen/.test(app)], [true, false, false])
   //? review: the conditions were unpinned - the guard could go and the page never follow, or follow from any page
   const moved = /const artistMoved = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''
   check('albums moved: the library told; the page follows by the artist\'s MusicBrainz id only when it said to (its name has no album left) and that id is another',
@@ -1783,8 +1818,10 @@ console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
     [/admin=\{admin\}\s*onManage=\{toggleArtistManage\}/.test(app), /const manages = admin && !!onManage/.test(page),
       (page.match(/\{manages && (?:\(shownLibrary \|\| summariesFailed\) && )?\(/g) ?? []).length, (page.match(/manage\('(?:who|images|refile)', event\)/g) ?? []).length],
     [true, true, 4, 4])
-  check('...and a phone asks /deadwax/me as an artist page comes on top there (the desktop frame asks as it shows)',
-    /const artistOnTop = topNow\?\.kind === 'artist'\s*useEffect\(\(\) => \{\s*if \(desktop \|\| !artistOnTop\) return\s*const request = meRequests\.begin\(\)/.test(app), true)
+  //? (2.0.0-player.47: and as anything else an admin's comes on top there - an album page, a Managing page, You)
+  check('...and a phone asks /deadwax/me as an artist page - or an album page, a Managing page, You - comes on top there (the desktop frame asks as it shows)',
+    [/const adminsOnTop = nav\.tab === 'you' \|\| topNow\?\.kind === 'artist' \|\| topNow\?\.kind === 'album' \|\| \(!!topNow && MANAGING_KINDS\.includes\(topNow\.kind\)\)\s*useEffect\(\(\) => \{\s*if \(desktop \|\| !adminsOnTop\) return\s*const request = meRequests\.begin\(\)\s*me\(request\.signal\)\.then\(\s*\(who\) => \{\s*if \(request\.current\(\)\) setAdmin\(who\.admin\)/.test(app),
+      /\}, \[desktop, adminsOnTop\]\)/.test(app)], [true, true])
   check('the page\'s summaries are asked through their own latestOnly()',
     [/const summaryRequests = useMemo\(latestOnly, \[\]\)/.test(page), /fetchArtist\(name, request\.signal\)/.test(page), /if \(!request\.current\(\)\) return\s*setSummaryAsking\(false\)[\s\S]{0,400}?const answered: Summaries/.test(page)],
     [true, true, true])
@@ -1803,11 +1840,13 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   const queue = code(read('app/NeedsALook.tsx'))
   const app = code(read('app/App.tsx'))
   check('no playback action from Library care, its store, the targets or Re-time', [actionsIn(care), actionsIn(store), actionsIn(targets), actionsIn(retime)], [[], [], [], []])
-  check('the library read through the main page\'s hook, only once the page shows on a desktop; a phone\'s note drawn before anything',
-    [/const library = useLibrary\(desktop && live\)/.test(care), care.indexOf('if (!desktop) {') < care.indexOf('const real = library.loaded'), /app-care-phone/.test(care)],
-    [true, true, true])
-  check('App draws it a desktop\'s and an admin\'s, `live` as the other Managing pages\' - from the pages memo\'s one view',
-    [/<LibraryCare desktop=\{desktop && admin\} live=\{managingLive\(tab\)\}/.test(app), /page\.kind === 'care' \? careView\(tab\)/.test(app)],
+  //? (2.0.0-player.47: told `admin`, never the frame - a phone draws the page; its note went)
+  check('the library read through the main page\'s hook, only once the page shows, for the admin; anyone else\'s note drawn before anything',
+    [/const library = useLibrary\(admin && live\)/.test(care), care.indexOf('if (!admin) {') < care.indexOf('const real = library.loaded'), /app-care-phone/.test(care),
+      /\bdesktop\b/.test(care.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
+    [true, true, false, false])
+  check('App draws it an admin\'s, on either frame, `live` as the other Managing pages\' - from the pages memo\'s one view',
+    [/<LibraryCare admin=\{admin\} live=\{managingLive\(tab\)\}/.test(app), /page\.kind === 'care' \? careView\(tab\)/.test(app)],
     [true, true])
   check('Rescan is the scan that ignores the cache - refused while one is out; the library\'s listeners told once it has answered',
     [/void library\.reload\(true\)\.then\(/.test(care), /if \(scanBusy \|\| library\.problem\) return/.test(care), /if \(albums\.length\) announceAlbumsFiled\(\)/.test(care)],
@@ -1867,9 +1906,10 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
       (retime.match(/keep\(ended\(\{/g) ?? []).length, (retime.match(/keep\(\{[^}]*running: false/g) ?? []).length,
       /if \(run\?\.running\) return\s*stop = false\s*leadMoved = false/.test(retime)],
     [true, 2, 0, true])
-  check('the sidebar\'s Library care: an admin\'s, straight after Needs a look; You\'s row a desktop\'s',
+  //? (2.0.0-player.47: You's row on a phone too - straight after "Albums that need a look")
+  check('the sidebar\'s Library care: an admin\'s, straight after Needs a look; You\'s row too, on both frames',
     [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_CARE\)\}/.test(code(read('app/Sidebar.tsx'))),
-      /\{desktop && \(\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('care'\)\}>/.test(code(read('app/You.tsx')))],
+      /<\/button>\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('care'\)\}>/.test(code(read('app/You.tsx')))],
     [true, true])
   check('Needs a look warns when ignores can\'t be saved: the library\'s answer or the count\'s',
     [/\{ignoresUnsaved\(library, tracking\) && <p class="app-queue-warning">\{IGNORES_UNSAVED\}<\/p>\}/.test(queue), /const tracking = useQueueTracking\(\)/.test(queue)],
@@ -2094,6 +2134,64 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
     [96, 112, 120, 260, 300, 400, 512, 800, 1000, 4000].map(step), [128, 128, 128, 400, 400, 400, 1024, 1024, 1024, 1024])
   check('...and coverUrl asks through it, nothing else building a cover\'s address',
     [/size=\$\{coverSize\(size\)\}/.test(api), /COVER_SIZES\.find\(\(step\) => step >= size\) \?\? COVER_SIZES\[COVER_SIZES\.length - 1\]/.test(api)], [true, true])
+}
+
+//? LOOKING AFTER DEADWAX FROM A PHONE (2.0.0-player.47): the Edit panel a phone's sheet, the four Managing pages
+//? drawn on a phone (handed `admin`, never the frame), You's rows on both frames, and the Navidrome gate's
+//? "Set up Navidrome" opening the app's own Settings at Connections - a save there asking Navidrome again
+console.log('\nlooking after deadwax from a phone (2.0.0-player.47)')
+{
+  const app = code(read('app/App.tsx'))
+  const gate = code(read('app/NeedsNavidrome.tsx'))
+  const setUp = code(read('app/navidromeSetUp.ts'))
+  const pages = ['app/NeedsALook.tsx', 'app/LibraryCare.tsx', 'app/ServerSettings.tsx', 'app/EventLog.tsx']
+  check('no playback action from the gate\'s new module, nor a player read',
+    [actionsIn(setUp), /useContext|usePlayer|PlayerContext/.test(setUp)], [[], false])
+  check('the four Managing pages know no frame - each told `admin`, and anyone else\'s note says so, with no link out',
+    pages.map((file) => {
+      const text = code(read(file))
+      return [/\bdesktop\b/.test(text.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '')), /if \(!admin\) \{\s*return \(/.test(text), /\{MANAGING_ADMINS_ONLY\}/.test(text), /is-phone|_PHONE\b/.test(text)]
+    }),
+    pages.map(() => [false, true, true, false]))
+  check('...App hands each `admin` alone: Needs a look, Library care, the settings and the log',
+    [/<NeedsALook\s+admin=\{admin\}/.test(app), /<LibraryCare admin=\{admin\}/.test(app), /<ServerSettings admin=\{admin\}/.test(app), /<EventLog admin=\{admin\}/.test(app),
+      /desktop=\{desktop && admin\}/.test(app)],
+    [true, true, true, true, false])
+  //? a phone's sheet has no Shift: the Tags tab's note offers none
+  const panel = code(read('app/EditPanel.tsx'))
+  check('the Edit sheet\'s Tags note says nothing of Shift - a phone has none to tick a run with',
+    [/<TagsList\s+album=\{subject\}\s+sheet=\{modal\}/.test(panel),
+      /\{count \? `\$\{count\} of \$\{tracks\.length\} ticked` : sheet \? 'Tick tracks to edit only those\.' : 'Tick tracks to edit only those; Shift ticks a run\.'\}/.test(panel)],
+    [true, true])
+  check('the gate: no link out - "Set up Navidrome", the app\'s secondary button, calls the module\'s setUpNavidrome',
+    [linksOut(gate).length, /import \{ setUpNavidrome \} from '\.\/navidromeSetUp'/.test(gate),
+      /<button type="button" class="app-button app-needs-setup" onClick=\{setUpNavidrome\}>\s*Set up Navidrome\s*<\/button>/.test(gate)],
+    [0, true, true])
+  check('...which App says opens Server settings at Connections - the Managing page, on You, as You\'s row opens it',
+    [/useEffect\(\(\) => setUpNavidromeBy\(\(\) => \{\s*showServerSettingsTab\('connections'\)\s*openManaging\('settings'\)\s*\}\), \[\]\)/.test(app),
+      files.filter((file) => APP_SIDE(file) && /setUpNavidromeBy\(/.test(code(read(file)))), files.filter((file) => APP_SIDE(file) && /showServerSettingsTab\(/.test(code(read(file)))).sort()],
+    [true, ['app/App.tsx', 'app/navidromeSetUp.ts'], ['app/App.tsx', 'app/ServerSettings.tsx']])
+  check('...and a save the server took that touched Navidrome\'s settings asks Navidrome again - so the gate opens by itself - quietly (review)',
+    [/useEffect\(\(\) => onServerSettingsSaved\(\(keys\) => \{\s*if \(keys\.some\(\(key\) => key\.startsWith\('NAVIDROME_'\)\)\) navidromeAsks\.recheck\(\)\s*\}\), \[\]\)/.test(app),
+      /for \(const listener of \[\.\.\.saved\]\) listener\(Object\.keys\(sent\)\)/.test(code(read('app/ServerSettings.tsx'))),
+      code(read('app/ServerSettings.tsx')).indexOf('listener(Object.keys(sent))') > code(read('app/ServerSettings.tsx')).indexOf('const answer = await saveServerSettings(updates)')
+        && code(read('app/ServerSettings.tsx')).indexOf('listener(Object.keys(sent))') < code(read('app/ServerSettings.tsx')).indexOf('} catch (caught: unknown)')],
+    [true, true, true])
+  //? (review: the re-ask after a save was the first that could overlap another - a save made while the last
+  //? ask still waited out an address that didn't answer - and it put the status away first, so every gate
+  //? on every tab unmounted what it guarded for a password retyped. lib/navidromeCheck.ts holds both rules;
+  //? settingslog.sim.cjs drives it)
+  const checks = code(read('lib/navidromeCheck.ts'))
+  check('...App asks Navidrome only through lib/navidromeCheck.ts, made once: as it starts and from Try again with the status put away, after a save quietly',
+    [/const navidromeAsks = useMemo\(\(\) => navidromeChecks\(navidromeStatus, setStatus\), \[\]\)/.test(app), /const checkNavidrome = navidromeAsks\.check\b/.test(app),
+      /useEffect\(\(\) => \{\s*navidromeAsks\.check\(\)\s*return navidromeAsks\.stop\s*\}, \[\]\)/.test(app),
+      (app.match(/navidromeStatus\(/g) ?? []).length, (app.match(/\bsetStatus\(/g) ?? []).length,
+      files.filter((file) => APP_SIDE(file) && /navidromeChecks\(/.test(code(read(file)))).sort()],
+    [true, true, true, 0, 0, ['app/App.tsx']])
+  check('...where each ask is a latestOnly ticket, drawing only while it is the newest - its answer and its failure alike',
+    [/const asks = latestOnly\(\)/.test(checks), /const ticket = asks\.begin\(\)/.test(checks), /ask\(ticket\.signal\)/.test(checks),
+      (checks.match(/if \(ticket\.current\(\)\) show\(/g) ?? []).length, /show\(\(now\) => \(quiet && now\?\.ok \? now : null\)\)/.test(checks)],
+    [true, true, true, 2, true])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
