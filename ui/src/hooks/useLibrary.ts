@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import * as api from '../api/library'
 import { onAlbumsFiled } from '../lib/libraryEvents'
 import type {
-  LibraryAlbum, LibraryArtist, LibraryResponse, MetadataIssueType, MetadataQueueSummary,
+  LibraryAlbum, LibraryArtist, LibraryResponse, MetadataIssueType, MetadataQueueSummary, NavidromeCheck,
 } from '../api/types'
 
 /** Nothing needing attention, for before the first load finishes. */
@@ -20,6 +20,9 @@ export interface LibraryState {
   issueTypes: Record<string, MetadataIssueType>
   /** False when ignores can't be saved because the SQLite store couldn't be opened. */
   reviewTracking: boolean
+  /** How the albums' check against Navidrome stands ("Not in Navidrome", 2.0.0-player.46) - null
+   *  until an answer has said, and from a server that doesn't. */
+  navidromeCheck: NavidromeCheck | null
   /** Set when the library can't be read at all — unset/missing LIBRARY_PATH. Not an error. */
   problem: string | null
   /** Set when the request itself failed. */
@@ -72,6 +75,7 @@ export function useLibrary(enabled: boolean): LibraryState {
   const [queue, setQueue] = useState<MetadataQueueSummary>(EMPTY_QUEUE)
   const [issueTypes, setIssueTypes] = useState<Record<string, MetadataIssueType>>({})
   const [reviewTracking, setReviewTracking] = useState(true)
+  const [navidromeCheck, setNavidromeCheck] = useState<NavidromeCheck | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -118,6 +122,7 @@ export function useLibrary(enabled: boolean): LibraryState {
         setQueue(result.queue ?? EMPTY_QUEUE)
         setIssueTypes(result.issue_types ?? {})
         setReviewTracking(result.review_tracking_enabled !== false)
+        setNavidromeCheck(result.navidrome_check ?? null)
         setProblem(result.problem)
         setLibraryPath(result.library_path)
         setScanSeconds(result.scan_seconds)
@@ -186,7 +191,7 @@ export function useLibrary(enabled: boolean): LibraryState {
   )
 
   return {
-    albums, artists, queue, issueTypes, reviewTracking,
+    albums, artists, queue, issueTypes, reviewTracking, navidromeCheck,
     problem, error, loading, loaded, stale, scannedAt, scanSeconds, libraryPath, reload,
   }
 }

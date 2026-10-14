@@ -65,12 +65,18 @@ it needs a wider screen.
 | `FANARTTV_KEY` | | optional. A [fanart.tv](https://fanart.tv) **project** key: artist thumbnails, banners, backgrounds, logos, and CD art, voted on by the people who use them. It has to be your own, because fanart.tv issues keys per application. |
 | `FANARTTV_PERSONAL_KEY` | | optional, with the project key: shows you images added in the last week, which the project key alone doesn't. |
 
-### The phone player (Settings → Connections)
+### Navidrome (Settings → Connections)
 
-Optional, and all three or none: [the phone player](player.md) at `/player/` is off until every
-one is set, and the settings tab marks whichever is missing. With them set, and an address that
-passes the check below, applying a release also asks Navidrome when it has scanned before
-renaming a folder (see `RETAG_RENAME_WAIT` below).
+All three, for the library (since 2.0.0-player.46 deadwax needs Navidrome for it, no longer an
+option): the app at `/player/` - [the phone player](player.md), and on a computer the same app laid
+out for a desktop - shows and plays your library from Navidrome, so its Home shelves, Library,
+albums and artists you have, and Search's look in your library say **Connect Navidrome** until every
+one is set; the settings tab marks whichever is missing. Searching MusicBrainz, getting albums,
+**Requests** and **You** work without them. With them set, and an address that passes the check
+below, deadwax also checks every album folder against the albums Navidrome lists, raising one it
+doesn't as [Not in Navidrome](library.md#not-in-navidrome), and applying a release asks Navidrome
+when it has scanned before renaming a folder (see `RETAG_RENAME_WAIT` below). Point Navidrome at the
+same music `LIBRARY_PATH` reads.
 
 | setting | default | what it does |
 | --- | --- | --- |
@@ -118,7 +124,7 @@ can land seconds off.
 | `ORGANIZE_MODE` | `dry_run` | what happens when a download finishes. `off`: nothing. `dry_run`: the log says where each file would go, and nothing is written. `copy`: files are tagged and copied into the library, and slskd's copies stay. `move`: files are tagged and moved, and slskd's emptied folder is removed. See [Organizing](organizing.md). |
 | `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | how an album's folder is named. The artist folder above it is always the artist. See [folder names](organizing.md#folder-names). |
 | `COUNTRY_IN_FOLDER` | `off` | `on` lets a release's country name its folder when nothing else tells the pressing apart, as in `Dummy (1994) [GB]`. Two different releases never share a folder either way. |
-| `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, the metadata editor writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (the phone player's three settings), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the editor says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
+| `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, the metadata editor writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (its three settings, [above](#navidrome-settings--connections)), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the editor says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
 
 ### Soulseek searches (Settings → Downloads)
 

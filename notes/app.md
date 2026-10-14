@@ -408,3 +408,38 @@ be a switch in the global settings".
   after this change) and everything on the iPhone - Info's scroll and the page not moving under a
   finger, a tap above Info closing it, focus coming back with VoiceOver, the Gapless checkbox
   unlocking the second element from its tap, and what the Navidrome sent row says against 0.64.2.
+
+### Navidrome required (2.0.0-player.46)
+
+James (2026-10-14, finishing the web app): the one app's library is Navidrome's, so **Navidrome is required
+for the library** - no longer "optional, for the phone player" - and a folder Navidrome doesn't list is raised
+in Needs a look as "Not in Navidrome" rather than given a second library view (that half, and how deadwax
+knows what Navidrome lists, is notes/app-desktop.md's "Navidrome required (2.0.0-player.46)").
+
+- **The gate's words** (`app/NeedsNavidrome.tsx`): the titles stay - **Connect Navidrome** / **Can't reach
+  Navidrome**, which troubleshooting.md quotes - with the server's reason under them. Unset:
+  `NAVIDROME_REQUIRED` ("deadwax needs Navidrome for your library: the app shows and plays the albums
+  Navidrome lists, through deadwax - so the phone never needs Navidrome's password.") then "Set it up in
+  deadwax's [settings] (Connections), then come back." - a sentence true of the main page's settings tab the
+  link opens today (`/`, beside the app, as app-rules holds every link out) and of the phone's settings
+  when they come; the link's file stays on app-rules' list. Set up but unreachable: `NAVIDROME_UNREACHED`
+  ("Your library comes from Navidrome, so it shows here once deadwax can reach it.") above Try again.
+  Where the gate is drawn didn't change: Home's shelves, the Library tab, album pages, Navidrome artists'
+  pages and Search's library half; Search's MusicBrainz half, the album you don't have and its Get,
+  Requests, Home's Arriving, You and Needs a look work without Navidrome (checked in the real page:
+  Requests and You drawn, Needs a look listing the rest of its queue).
+- **The start-up log** (`Config.report_navidrome`): unset says "deadwax needs it for the app's library - until
+  it is, the app at /player/ says Connect Navidrome where the library would be and plays nothing
+  (searching, Get, Requests and You work without it)" - still INFO. Not "the player at /player/ is off",
+  as it said before: the page isn't off, only its library half waits (review). With only some of the
+  three set, the ERROR says the same ("...so the app at /player/ says Connect Navidrome where the library
+  would be"). The compose and `.env` templates' Navidrome blocks say "needed for the app's library" too (review).
+- **The docs**: README's prerequisites (Navidrome, reading the same music folder, item 4 no longer
+  "optionally") and the OMV list (five things, the fifth no longer "optional, for the phone player"), the
+  app paragraphs (what works without it; Not in Navidrome), a probable issue; getting-started's "What you
+  need", a seventh first-run step (set up Navidrome) and "What the app shows without Navidrome";
+  configuration.md's section renamed **Navidrome (Settings → Connections)** (anchor
+  `#navidrome-settings--connections`, player.md's link moved with it); library.md's issue table row, a
+  "Not in Navidrome" section and Needs a look's line; player.md's "What you need", its gate words and the
+  sidebar's Needs a look; troubleshooting.md's "An album says "Not in Navidrome"", the count's lag and the
+  gate's new words.

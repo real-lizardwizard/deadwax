@@ -7,7 +7,7 @@ import { albumArtUrl } from '../lib/format'
 import { isNewImport, issueLabel, outstandingIssues } from '../lib/metadataQueue'
 import {
   IGNORES_UNSAVED, MARK_WORDS, NEEDS_LOOK_LINE, NEEDS_LOOK_PHONE, facetAlbums, facetShown, facets, ignoresUnsaved, leavingAtEnd,
-  rowChanged, startSession, stepTarget, summaryTotal,
+  navidromeNote, rowChanged, startSession, stepTarget, summaryTotal,
   type Facet, type FolderChange, type LookSession, type RowMark,
 } from '../lib/needsLook'
 import { ChevronLeftIcon } from '../player/icons'
@@ -69,6 +69,12 @@ const focusLost = (): boolean => {
  *
  * IGNORES THAT CAN'T BE SAVED are warned of (2.0.0-player.42), as the main page's queue warns: when the
  * library's answer or the count's says deadwax has no job store, an "It's fine as it is" comes back.
+ *
+ * NOT IN NAVIDROME (2.0.0-player.46) is an issue like any other - its chip, its facet and the Edit panel
+ * come with the rest, from the server's words. What is this page's own is saying why there may be none
+ * (lib/needsLook.ts's navidromeNote): Navidrome not set up, not answering, scanning, or not answered
+ * yet - in the status line, when it has nothing else to say, one line (the whole of it in its title),
+ * so its coming and going moves no row.
  *
  * On a PHONE it is a short note, asking nothing: no editor has a board there yet.
  */
@@ -337,6 +343,8 @@ export function NeedsALook({
     void library.reload(false)
   }
   const checking = library.loaded && (library.stale || library.loading)
+  //? said once, in the status line, by the answer on screen (there only over albums there are to check)
+  const navidrome = navidromeNote(library.navidromeCheck ?? null)
   const pressed = session ? session.facet : ending ? ending.facet : showing
 
   return (
@@ -374,7 +382,8 @@ export function NeedsALook({
               ))}
             </div>
 
-            {/* always there, one line tall: its coming and going moves no row */}
+            {/* always there, one line tall: its coming and going moves no row - Navidrome's note too, kept
+                to one line (its whole in its title) */}
             <p class="app-queue-checking" role="status">
               {library.error ? (
                 <>
@@ -385,6 +394,8 @@ export function NeedsALook({
                 </>
               ) : checking ? (
                 'Checking the library…'
+              ) : navidrome ? (
+                <span class="app-queue-navidrome" title={navidrome}>{navidrome}</span>
               ) : null}
             </p>
 

@@ -25,6 +25,7 @@ from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, compact_for_wire, delet
                          snapshot_library, summarize_for_deletion)
 from src.logger import logger
 from src.metadata_health import ISSUE_TYPES, attach_issues
+from src.navidrome_listing import LISTING_FRESH_SECONDS, LISTING_STALE_SECONDS, navidrome_listing
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import is_within
 from src.api.coverart_endpoint import CoverArtClient
@@ -130,6 +131,15 @@ async def _persist_cache(request: Request, scan: dict | None = None) -> None:
         await reconcile_scan(store, root, scan["albums"], since=began if began > 0 else None)
 
 
+def _follow_verdict(source: str, target: str) -> None:
+    """A folder deadwax moved, by absolute paths: its "Not in Navidrome" verdict goes with it."""
+    root = Path(Config.LIBRARY_PATH or "")
+    try:
+        navidrome_listing.follow(str(Path(source).relative_to(root)), str(Path(target).relative_to(root)))
+    except ValueError:
+        pass
+
+
 async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False) -> dict:
     """
     Scan the library, then say what still needs attention and why.
@@ -146,6 +156,12 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
     `snapshot` answers from the cache without touching the disk, when there is a cache to
     answer from - see library.snapshot_library. It falls through to a real scan when there
     isn't, so asking for one never returns an empty library that is merely unscanned.
+
+    Which folders Navidrome lists (2.0.0-player.46 - "Not in Navidrome", src/navidrome_listing.py):
+    judged by the answer in hand. A real scan asks Navidrome again, behind it, when that answer is
+    older than LISTING_FRESH_SECONDS - waiting only for Navidrome's very first answer, or a Rescan's
+    (which always asks), beside the disk's walk; a snapshot asks nothing. `navidrome_check` says how
+    the check stands, taken with the verdicts, for the queue to say once.
     """
     root = Config.LIBRARY_PATH or ""
     store = _store(request)
@@ -158,14 +174,25 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
         #? when the disk was last actually looked at, so the interface can say how old this is
         info = await store.library_scan_info(root) if store else None
         result["scanned_at"] = info["scanned_at"] if info else None
+        await navidrome_listing.ask(None)
     else:
-        result = await asyncio.to_thread(scan_library, root, force)
+        result, _ = await asyncio.gather(
+            asyncio.to_thread(scan_library, root, force),
+            navidrome_listing.ask(0 if force else LISTING_FRESH_SECONDS, rescan=force),
+        )
         await _persist_cache(request, result)
 
     reviews = await store.album_reviews() if store else {}
 
-    result["queue"] = attach_issues(result["albums"], reviews)
+    #? a real scan prunes the verdicts of folders it didn't find (unlisted() keeps them when it found
+    #? none); a snapshot never does - it lacks a folder a writer has just forgotten
+    unlisted = navidrome_listing.unlisted(result["albums"], prune=not result["stale"] and not result["problem"])
+    result["queue"] = attach_issues(result["albums"], reviews, unlisted)
     result["issue_types"] = ISSUE_TYPES
+    #? whether the albums could be checked against Navidrome, read in the same moment as the verdicts
+    #? (a refresh can land while the walk or the reviews are awaited) - no time in it, so an
+    #? unchanged library is still an unchanged body (the ETag's 304)
+    result["navidrome_check"] = navidrome_listing.check()
     #? so the interface can say "your ignores aren't being saved" rather than silently
     #? forgetting them, exactly as the downloads panel does for job tracking
     result["review_tracking_enabled"] = bool(store and store.available)
@@ -616,6 +643,9 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
         forget_cached_album(plan["source"])
         if results.get("moved_to"):
             forget_cached_album(results["moved_to"])
+            #? a folder flagged "Not in Navidrome" stays flagged at its new path until Navidrome has
+            #? looked (2.0.0-player.46) - a merge's folder keeps its own verdict
+            _follow_verdict(plan["source"], results["moved_to"])
         await _persist_cache(request)
 
         #? The store index follows the album (step 2), keeping its row - and so its id - through
@@ -1376,6 +1406,11 @@ async def queue_summary(request: Request):
      - no saved scan at all (`known` false): the new imports alone, store.new_import_summary's
        count. It does not fall through to a real scan, as _scan_with_queue does.
 
+    "Not in Navidrome" (2.0.0-player.46) is counted from the listing in hand, as the page's /albums is
+    judged by it - Navidrome is asked only when there is no listing yet (its first answer waited for a
+    bounded while, so the count shown as the app starts is right too) or it is older than
+    LISTING_STALE_SECONDS (then behind the answer, for the next count).
+
     No LIBRARY_PATH, or no store: zeros, `known` false - still a 200.
     """
     root = Config.LIBRARY_PATH or ""
@@ -1397,7 +1432,11 @@ async def queue_summary(request: Request):
 
     reviews = await store.album_reviews()
     albums = snapshot["albums"]
-    queue = attach_issues(albums, reviews)
+    #? Navidrome's listing as the page's /albums judged by it: the one in hand - asked for only when
+    #? there is none yet (the first answer waited for, a bounded while) or it is past
+    #? LISTING_STALE_SECONDS (behind this count, for the next)
+    await navidrome_listing.ask(LISTING_STALE_SECONDS)
+    queue = attach_issues(albums, reviews, navidrome_listing.unlisted(albums))
     listed = sum(1 for album in albums if album["needs_attention"] or (album["imported"] and not album["reviewed"]))
     held = {album["path"] for album in albums}
     #? the same rule attach_issues reads an import by: filed by deadwax, not looked at
@@ -1938,6 +1977,8 @@ async def artist_refile_apply(request: Request, body: ArtistRefileRequest):
     for moved in results["moved"]:
         forget_cached_album(str(Path(root) / moved["from"]))
         forget_cached_album(str(Path(root) / moved["to"]))
+        #? its "Not in Navidrome" verdict too, until Navidrome has looked (2.0.0-player.46)
+        navidrome_listing.follow(moved["from"], moved["to"])
         if store is not None:
             await store.mark_album_reviewed(moved["from"], moved["to"])
     await _persist_cache(request)

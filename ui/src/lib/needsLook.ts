@@ -23,7 +23,7 @@
  *    list is worked out again from a fresh scan.
  */
 
-import type { LibraryAlbum, MetadataIssueType } from '../api/types'
+import type { LibraryAlbum, MetadataIssueType, NavidromeCheck } from '../api/types'
 import { isNewImport, issueLabel, outstandingIssues, queueAlbums } from './metadataQueue'
 
 /** The facet for new imports - not an issue code (the scan's codes are snake_case words, never this). */
@@ -197,9 +197,10 @@ export function leavingAtEnd(session: LookSession): string | null {
   return here && here.mark !== 'deleted' ? here.path : null
 }
 
-/** The words above the list: what the page is. */
+/** The words above the list: what the page is - Navidrome not listing an album among them (2.0.0-player.46). */
 export const NEEDS_LOOK_LINE =
-  "Albums whose tags, folder or cover want attention, and albums deadwax filed that you haven't looked at yet."
+  "Albums whose tags, folder or cover want attention or that Navidrome doesn't list, and albums deadwax filed that "
+  + "you haven't looked at yet."
 
 /** The phone's note in place of the page (no editor has a board on a phone yet) - followed by a link
  *  to "the main page", opening beside the app. */
@@ -218,6 +219,38 @@ export const IGNORES_UNSAVED = "Ignores can't be saved: deadwax couldn't open it
  */
 export function ignoresUnsaved(library: { loaded: boolean; reviewTracking: boolean }, summaryTracking: boolean | null): boolean {
   return (library.loaded && !library.reviewTracking) || summaryTracking === false
+}
+
+/** Said when Navidrome isn't set up (2.0.0-player.46): nothing is checked against it. */
+export const NAVIDROME_UNSET = "Navidrome isn't set up, so no album is checked against what it lists - set it up in "
+  + "deadwax's settings (Connections)."
+
+/** Said when Navidrome was scanning as it was last asked - past tense, as it stays true once the scan
+ *  has ended: until a read asks again, only the albums found missing before are marked. */
+export const NAVIDROME_SCANNING = 'Navidrome was scanning when last asked, so only albums found missing before are '
+  + 'marked \u201cNot in Navidrome\u201d.'
+
+/** Said when a read of the disk landed before Navidrome's first answer. */
+export const NAVIDROME_WAITING = "Navidrome hasn't answered yet, so no album is checked against it until the library "
+  + 'is read again.'
+
+/** Said when Navidrome couldn't be asked: why, as deadwax said it. */
+export const navidromeFailed = (problem: string | null): string =>
+  `Couldn't ask Navidrome which albums it has: ${problem || 'no reason given'}`
+
+/**
+ * What the page says ONCE about the albums' check against Navidrome (2.0.0-player.46) - "Not in
+ * Navidrome" is raised only once Navidrome has answered, and Navidrome unset or failing raises
+ * nothing, so the page says why there may be none. Null when there is nothing to say (checked, or no
+ * answer at all). Said in the page's status line - always there, a row tall, one line of words - so
+ * its coming and going moves no row, not even mid-session (2.0.0-player.46 review).
+ */
+export function navidromeNote(check: NavidromeCheck | null): string | null {
+  if (check?.state === 'unset') return NAVIDROME_UNSET
+  if (check?.state === 'failed') return navidromeFailed(check.problem)
+  if (check?.state === 'scanning') return NAVIDROME_SCANNING
+  if (check?.state === 'checking') return NAVIDROME_WAITING
+  return null
 }
 
 /** What VoiceOver hears for "Needs a look" with its count: "Needs a look, 3 albums". */

@@ -752,6 +752,23 @@ export interface LibraryResponse {
    * remembering what you ignored, the same way downloads still work untracked.
    */
   review_tracking_enabled: boolean
+  /**
+   * Whether the albums could be checked against what Navidrome lists - "Not in Navidrome"
+   * (2.0.0-player.46, src/navidrome_listing.py). Absent from a server before it.
+   */
+  navidrome_check?: NavidromeCheck
+}
+
+/**
+ * How the albums' check against Navidrome stands (2.0.0-player.46). `listed`: checked, so an album
+ * Navidrome doesn't list carries `not_in_navidrome`; `scanning`: Navidrome was scanning as it was
+ * asked, so only albums already found missing are marked; `checking`: Navidrome hasn't answered yet;
+ * `unset`: Navidrome isn't set up; `failed`: it couldn't be asked (`problem` says why). Nothing is
+ * raised but under `listed` and `scanning`.
+ */
+export interface NavidromeCheck {
+  state: 'listed' | 'scanning' | 'checking' | 'unset' | 'failed'
+  problem: string | null
 }
 
 /**

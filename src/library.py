@@ -45,7 +45,9 @@ from src.tagkeys import easy_file
 #?   6  albums carry `discs`, the disc numbers their files are tagged with
 #?   7  albums carry `albumartist_mbids` - WHO the album is by, as MusicBrainz ids
 #?   8  tracks carry `disc_title`, albums `disc_titles` - each disc's own title
-SCAN_FORMAT = 8
+#?   9  albums carry `changed_at` - the folder's mtime or its ctime, the later - and, once deadwax
+#?      has written the folder, `written_at` (2.0.0-player.46, "Not in Navidrome")
+SCAN_FORMAT = 9
 
 #? path -> (mtime, album dict). Reading tags costs milliseconds per file and a real library
 #? is thousands of files, so a rescan re-reads only the folders that actually changed. The
@@ -71,10 +73,25 @@ _removed: set[str] = set()
 _behind = True
 
 
+#? When deadwax last wrote each folder (2.0.0-player.46), by cache key - every writer goes through
+#? forget_cached_album() once its files are written. What tells "Not in Navidrome" that Navidrome may
+#? not have scanned a folder since deadwax changed it: a retag leaves the folder's own mtime and ctime
+#? where they were, so `changed_at` can't say so (src/navidrome_listing.py). The next scan to read the
+#? folder stamps it onto the album as `written_at` (_walk), so it is SAVED with the scan cache and
+#? comes back with it after a restart (seed_cache) - whether a folder is flagged must not hang on
+#? whether deadwax restarted in between.
+_written_at: dict[str, float] = {}
+
+
 def note_library_changed() -> None:
     """Say the library changed behind the cache's back - the poller calls this as it files."""
     global _behind
     _behind = True
+
+
+def written_at(directory: str) -> float | None:
+    """When deadwax last wrote this folder (its cache key - an absolute path), None if it hasn't."""
+    return _written_at.get(directory)
 
 
 def library_is_behind() -> bool:
@@ -659,10 +676,24 @@ def read_album_dir(directory: Path, library_root: Path) -> dict | None:
         "untitled_tracks": sum(1 for t in tracks if not t["has_title_tag"]),
         "tracks": tracks,
         "modified_at": directory.stat().st_mtime if directory.exists() else 0,
+        #? when the folder ITSELF last changed, for "Not in Navidrome" (2.0.0-player.46): its mtime,
+        #? or its ctime when that is later - a folder moved or copied in (mv, cp -a, rsync -a, an
+        #? unzip) keeps the mtime it had, but its ctime is when it arrived, and nothing outside the
+        #? kernel can set a ctime back
+        "changed_at": _changed_at(directory),
         #? surfaced rather than hidden: a folder whose files disagree about the album name is
         #? usually a real tagging problem the user wants to know about
         "mixed_tags": len({t["album"] for t in tracks if t["album"]}) > 1,
     }
+
+
+def _changed_at(directory: Path) -> float:
+    """The later of a folder's mtime and ctime, epoch seconds - 0 when it can't be read."""
+    try:
+        info = directory.stat()
+    except OSError:
+        return 0
+    return max(info.st_mtime, info.st_ctime)
 
 
 def clear_scan_cache() -> None:
@@ -679,6 +710,7 @@ def clear_scan_cache() -> None:
     _album_cache.clear()
     _dirty.clear()
     _removed.clear()
+    _written_at.clear()
 
 
 def forget_cached_album(directory: str) -> None:
@@ -698,6 +730,7 @@ def forget_cached_album(directory: str) -> None:
     _album_cache.pop(directory, None)
     _dirty.discard(directory)
     _removed.add(directory)
+    _written_at[directory] = time.time()
     note_library_changed()
 
 
@@ -714,6 +747,11 @@ def seed_cache(entries: list[tuple[str, float, dict]]) -> int:
         if path not in _album_cache:
             _album_cache[path] = (mtime, album)
             taken += 1
+            #? when deadwax last wrote it, saved with it - kept for the next read of the folder to stamp
+            #? again (a Rescan reads every folder afresh)
+            wrote = album.get("written_at")
+            if isinstance(wrote, (int, float)) and wrote > _written_at.get(path, 0):
+                _written_at[path] = float(wrote)
     return taken
 
 
@@ -872,6 +910,10 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
         album = read_album_dir(Path(current), root)
         if album is None:
             continue
+        #? when deadwax last wrote it (forget_cached_album), carried by the album - so it is saved with
+        #? the cache, and judged by wherever the album is read from (navidrome_listing.py)
+        if current in _written_at:
+            album["written_at"] = _written_at[current]
 
         _album_cache[current] = (mtime, album)
         _dirty.add(current)
@@ -1321,6 +1363,10 @@ TRACK_DEFAULT_FIELDS = ("artist", "album", "albumartist", "date", "originaldate"
 #? Per-track fields the interface never reads (the album carries its own), dropped on the wire.
 TRACK_SERVER_ONLY_FIELDS = ("release_group_mbid", "albumartist_mbids", "disc_title")
 
+#? Album fields only the server reads - when the folder changed and when deadwax wrote it, for "Not in
+#? Navidrome" (2.0.0-player.46) - dropped on the wire too.
+ALBUM_SERVER_ONLY_FIELDS = ("changed_at", "written_at")
+
 
 def compact_for_wire(albums: list[dict]) -> list[dict]:
     """
@@ -1351,5 +1397,6 @@ def compact_for_wire(albums: list[dict]) -> list[dict]:
             if not track.get("has_title_tag", True):
                 entry["has_title_tag"] = False
             compact.append(entry)
-        wire.append({**album, "tracks": compact, "track_defaults": defaults})
+        kept = {k: v for k, v in album.items() if k not in ALBUM_SERVER_ONLY_FIELDS}
+        wire.append({**kept, "tracks": compact, "track_defaults": defaults})
     return wire

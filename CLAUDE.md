@@ -96,6 +96,9 @@ src/
                    library can hold the deluxe and the standard press at the same time.
   metadata_health.py  PURE. What's WRONG with an album on disk, as issue codes. Backs the
                    metadata queue. Derived on every request, never stored — see below.
+  navidrome_listing.py  which album folders Navidrome lists - "Not in Navidrome" in the queue: a pure
+                   match and a cache asking getScanStatus and getAlbumList2 internally - see
+                   "Navidrome required (2.0.0-player.46)".
   library.py       scans LIBRARY_PATH with mutagen, cached per folder on mtime - and that
                    cache is SAVED to SQLite (library_cache), so a restart starts warm and
                    the tab can draw a snapshot before touching the disk. Also finds cover
@@ -205,7 +208,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             2464 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2548 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -243,7 +246,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the one app: routes, the gesture rule, the restyle, Now Playing, Info | `notes/app.md` |
 | Requests, Search, the album you don't have, Sources and Get | `notes/app-requests-search-get.md` |
 | artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
-| the desktop frame, the Edit panel, Needs a look, server settings and the log, Library care | `notes/app-desktop.md` |
+| the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care | `notes/app-desktop.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
 | the turntable's sound following the hand (.24) | `notes/turntable-sound.md` |
 | the turntable's sound since: warble, echo, kernel, first turn, clock, recorder, limiter (.27-.35), less delay (.40) | `notes/turntable-fixes.md` |
@@ -445,7 +448,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2464 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2548 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -483,7 +486,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2464 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2548 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -2445,6 +2445,10 @@
         font-size: var(--app-desk-text-sm);
     }
 
+    /* why no album may be marked "Not in Navidrome" (2.0.0-player.46), said in that line: one line of
+       it, its whole in the title, so it never grows the line and moves no row */
+    .app-desk .app-queue-navidrome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     .app-desk .app-queue-list {
         margin: 0;
         padding: 0;

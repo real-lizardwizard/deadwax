@@ -1056,18 +1056,24 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
 
     if "navidrome" in invalidate:
         from src.api.navidrome_endpoint import navidrome
+        from src.navidrome_listing import navidrome_listing
         from src.routes.store_album import forget_navidrome_ids
 
         await navidrome.close_client()
         #? another Navidrome (or another account on it) has other album ids (2.0.0-player.17)
         forget_navidrome_ids()
+        #? ...and lists other albums: "Not in Navidrome" is asked afresh (2.0.0-player.46)
+        navidrome_listing.forget()
         logger.info("Navidrome client dropped, it will rebuild with the new address")
 
     if "library" in invalidate:
         #? The scan cache keys on folder mtime under the OLD root, so it is meaningless now.
         from src.library import clear_scan_cache
+        from src.navidrome_listing import navidrome_listing
 
         clear_scan_cache()
+        #? the "Not in Navidrome" verdicts are by path under the old root too (2.0.0-player.46)
+        navidrome_listing.forget_folders()
         logger.info("library scan cache cleared, the new path will be read fresh")
 
     logger.info(

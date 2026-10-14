@@ -14,8 +14,10 @@ spent getting three folder paths to agree.
   limit the ones that don't send it.
 - **A folder for your music library.** An empty one is fine, and so is an existing library:
   the library tab reads whatever is there.
-- **Optionally, [Navidrome](https://www.navidrome.org)** and an account on it of your own (not
-  an admin one), for [the phone player](player.md). Nothing else needs it.
+- **[Navidrome](https://www.navidrome.org)**, reading the same music folder, and an account on it
+  of your own (not an admin one). The app at `/player/` - [the phone player](player.md), and on a
+  computer the same app laid out for a desktop - shows and plays your library from Navidrome, so it
+  needs one for the library. Searching, getting albums and following downloads work without it.
 
 ## The three folders
 
@@ -115,6 +117,20 @@ Every setting is described in [Configuration](configuration.md).
    (files are copied into the library and slskd's copies stay) or `move` (they're moved, and
    slskd's emptied folder is cleaned up). A setting saved in the settings tab takes effect
    straight away, with no restart.
+7. **Set up Navidrome.** Point Navidrome at the same music folder you mounted at `/music`, then fill
+   in `NAVIDROME_URL` (Navidrome's address as this container sees it, such as
+   `http://navidrome:4533`), `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections (or
+   uncomment the three lines waiting for them in `docker-compose.example.yml` or `.env.example`) -
+   [the phone player's setup](player.md#setting-it-up) has the details. Then open
+   `http://your-server:8080/player/`: Home and the Library show your albums from Navidrome.
+
+**What the app shows without Navidrome.** Home's shelves, the Library tab, the albums and artists
+you have and Search's look in your library each say **Connect Navidrome** (or **Can't reach
+Navidrome**, with the reason and **Try again**) and how to set it up, in place of your albums. The
+rest works without it: Search's MusicBrainz half, an album you don't have and its **Get**,
+**Requests**, Home's arriving downloads and **You**. An album folder Navidrome doesn't list - not
+scanned yet, unreadable, or outside Navidrome's music folder - is never out of reach: on a desktop,
+**Needs a look** raises it as **Not in Navidrome** (see [the library](library.md#not-in-navidrome)).
 
 ## Running it day to day
 
@@ -128,8 +144,8 @@ Every setting is described in [Configuration](configuration.md).
   deadwax unhealthy, because restarting deadwax wouldn't fix them.
 - **There is no login.** Anyone who can reach the port can use it, so keep it on your own
   network or put it behind something that asks for a password.
-- **On your phone**, the main page works as it is, and `/player/` is a separate player for
-  your library, played from Navidrome, that you can add to an iPhone's home screen. To use either
+- **On your phone**, the main page works as it is, and `/player/` is the app for your library,
+  played from Navidrome, that you can add to an iPhone's home screen. To use either
   away from home, reach deadwax over a VPN such as WireGuard or Tailscale rather than an open
   port. See [the phone player](player.md).
 

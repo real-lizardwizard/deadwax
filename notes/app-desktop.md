@@ -1250,3 +1250,267 @@ page's wide table: the column table and its drag and resize go with the main pag
   pictures or a huge raw tag list, a real Navidrome's untagged album saying "Not tagged" (its
   `musicBrainzId: ""`, read from 0.64.2's source, never seen from a running one), and the merge with
   2.0.0-player.45.
+
+### Navidrome required (2.0.0-player.46)
+
+Finishing the web app (James, 2026-10-14; the spec is `uplan/slice-navidrome-required.md`, from the parity
+audit's critic, "missed" point 1 and gap section 6). The one app's library is Navidrome's - the Library tab,
+album pages, artist pages but `mb:` ones, Home's shelves and Search's library half all sit behind
+`NeedsNavidrome` - while the README and getting-started called Navidrome optional, and the main page's
+library is deadwax's own scan. James decided: **Navidrome is required for the library**, said so in the
+docs and the gate, and **a folder Navidrome doesn't list gets a "Not in Navidrome" chip in Needs a look**,
+so no folder on disk becomes unreachable once the main page goes - not a second library view. The gate's
+words are notes/app.md's "Navidrome required (2.0.0-player.46)"; this is the queue's half.
+
+- **The issue** (`metadata_health.py`): `not_in_navidrome` in `ISSUE_TYPES` - label "Not in Navidrome", a
+  hint saying what it means (the app can't show or play it) and each thing to do (Navidrome hasn't scanned
+  it: start a scan; can't read its files: the user Navidrome runs as; outside Navidrome's music folder:
+  point it at `LIBRARY_PATH`'s folder), severity WRONG (the album may be perfectly identified). Still pure:
+  `inspect_album(album, unlisted=False)` and `attach_issues(albums, reviews, unlisted=None)` take the paths
+  Navidrome doesn't list from the route - a fact about Navidrome, never read off the album. So everything
+  downstream is the existing machinery: the chip and its hint, the facet (`facets` lists any code with
+  albums), `queueAlbums`' order by severity, the Edit panel on a queue folder, per-issue ignores, the main
+  page's queue too (it renders `issue_types` as sent; LibraryView.tsx has no diff). Derived on every
+  response, never stored - "the metadata queue stores only what you ignored" holds.
+- **How deadwax knows: `src/navidrome_listing.py`** (new; pure match + the cache, the client passed in so
+  its tests need no network - lyrics.py's shape). Internal client calls only, no route added, the fixed
+  list and `test_there_is_no_general_proxy` untouched: **getScanStatus first**, then **getAlbumList2
+  `alphabeticalByName`, 500 a page** (Subsonic's cap) until a short page (a repeated page ends it too,
+  `LISTING_PAGES_MAX` 200 bounds it), then **getScanStatus again**. Asked as deadwax's own account (the
+  shared `navidrome`, not `client_for`): what Navidrome lists is a fact about the server every viewer of
+  the queue shares, cached once, as the scan wait's getScanStatus is.
+  - **The match** (`judge`, pure): a folder is listed when Navidrome has an album with its release id
+    (OpenSubsonic `musicBrainzId`, lowercased). Else by name - `artists._fold` (pins.py's precedent) of the
+    folder's album title and any of its artists (the scan's, each file's album artist and artist) against
+    each album's title and every name it's credited to (`artist`, `displayArtist`, OpenSubsonic `artists`);
+    a folder no file of which names an artist is also tried as "[Unknown Artist]" (Navidrome's
+    `consts.UnknownArtist` - the scan's own artist is then the parent folder's name). Title alone
+    against an album credited to Various Artists or `isCompilation` - but only for a folder with no album
+    artist tagged other than Various Artists (`may_be_compilation`): Navidrome credits the tagged album
+    artist whenever there is one, so Queen's "Greatest Hits" is found by (title, Queen) or not at all,
+    never "listed" by somebody's compilation of that name. **A folder with a
+    release id matches by name only albums Navidrome knows by NO id**: an album carrying another release's
+    id is another pressing (the deluxe beside the standard - a folder of the deluxe Navidrome doesn't
+    list is flagged though the standard of the same title is listed). **A folder with no album tag on any
+    file is never judged** (the scan names it after the folder; Navidrome files it under "[Unknown Album]").
+  - **A negative needs evidence from a scan that saw the folder as it is now.** A folder changed after
+    Navidrome's last scan BEGAN - `lastScan` (from the first getScanStatus) less its `elapsedTime` (a Go
+    duration, nanoseconds: 0.64.2 writes `last_scan_at` as a scan ENDS, and works elapsedTime out as
+    lastScan less the start it keeps to the second, so the difference is at or before the real start);
+    with no elapsedTime above zero (an older server, a scan that began and never finished, a scan
+    running) `LISTING_SETTLE_SECONDS` (120) before lastScan stands in - by the folder's own change
+    (`changed_at`, new in the scan, SCAN_FORMAT 9: the later of its mtime and its CTIME - a folder
+    added, a file renamed or added, a lyrics or cover fetch, and a folder moved or copied in by hand,
+    which `mv`, `cp -a`, `rsync -a` and an unzip leave with its OLD mtime but whose ctime nothing outside
+    the kernel can set back) or by deadwax writing it (`written_at`: every writer calls
+    `forget_cached_album()` once its files are written, which notes the time - a retag moves neither
+    mtime nor ctime - and the scan's next read of the folder stamps it on the album, so it is SAVED with
+    the scan cache and `seed_cache` brings it back after a restart; `ALBUM_SERVER_ONLY_FIELDS` keeps
+    both off the wire) - keeps the verdict it last had, and has none until judged once. So a
+    just-filed album, a just-applied release (Navidrome still has the old id for the seconds before its
+    watcher scans), a just-fetched cover and a folder just moved in are never NEWLY flagged - and one
+    already flagged stays flagged until Navidrome has looked again, so an apply on a Not-in-Navidrome
+    folder doesn't read "Fixed" in the session's row. **But for `LISTING_GRACE_SECONDS` (900) at most**,
+    counted from the change to when the listing in hand was asked (`Listing.asked_at`, moved on every
+    refresh that finds no scan since): a folder outside Navidrome's music folder never wakes its
+    watcher, and with scheduled scans off by default lastScan never moves - waiting for a scan would
+    leave exactly the folders the issue is for unflagged for good. The watcher scans about 5 s after a
+    change, so a quarter of an hour is long past any scan that was coming. The last verdicts are kept in memory per path (`_verdicts`), never written down:
+    MERGED from every read (a snapshot - the count's route, a page's first draw, the artist routes -
+    lacks a folder a writer has just forgotten, and its verdict must outlive that read), pruned only by a
+    real scan with no problem that found albums, carried along when deadwax moves a folder (`follow()`:
+    the apply's rename, beside its `moved_to`; the artist re-file, per album - a merge's folder keeps its
+    own), and dropped when `LIBRARY_PATH` changes (`forget_folders()`). **An UNSETTLED listing** - a scan running at either
+    getScanStatus, or `lastScan` moving between them (an album can slip between two pages while
+    Navidrome adds and removes them) - can say an album IS there, never that it isn't (the last
+    verdict stands) and is never reused. No usable lastScan (a server that won't say): measured from
+    the listing's own time less `LISTING_SETTLE_SECONDS` (120). Go's zero time (never scanned) judges
+    nothing.
+  - **The cost**: a refresh whose first getScanStatus matches the last listing's (settled, nothing
+    running) reuses it - one call, Navidrome's albums can't have changed without a scan.
+  - **When** (`ask(due_after, wait, rescan)`): a real scan (`/albums`, not a snapshot) asks when the last
+    answer is older than `LISTING_FRESH_SECONDS` (10), **alongside the disk's walk** (`asyncio.gather`);
+    `/rescan` always asks; the count's route asks only with no answer yet or one older than
+    `LISTING_STALE_SECONDS` (300); a snapshot never asks. **A read is judged by the answer in hand and
+    never held for a refresh** ("never blocking the queue") - the refresh runs behind it, for the next
+    read. Two waits, each at most `LISTING_WAIT_SECONDS` (3): Navidrome's very FIRST answer (since start,
+    or since a setting changed) - the one that can put a chip on the page first opened, as nothing reads
+    again on its own - counted from when that refresh began, so the reads that come while it is out
+    share one wait; and a Rescan's, counted from the Rescan, beside its re-read of every file - the way
+    to see the check afresh. One refresh at a time, on the running loop (TestClient runs a request per
+    loop, so a task of another loop is never joined - the route tests that need a refresh to land serve
+    the app on one loop, `served`). **Until Navidrome has answered, nothing is raised; Navidrome unset or
+    failing raises nothing** (a failure drops the listing). Each call bounded
+    (`LISTING_CALL_TIMEOUT_SECONDS` 10), and the first getScanStatus NOT REACHING Navidrome (refused,
+    timed out) ends the refresh there - the album pages would only wait out the same timeout again; an
+    answer it can't use goes on, as a server that won't say when it scanned. A Navidrome setting changing
+    forgets it all (`forget()`: the settings route beside `forget_navidrome_ids`, and on its own when URL
+    or user differ from the answers').
+- **The routes** (`routes/library.py`): `_scan_with_queue` passes `navidrome_listing.unlisted(albums,
+  prune=<a real scan without a problem>)` to `attach_issues` and answers `navidrome_check: {state,
+  problem}` - `listed | scanning | checking | unset | failed`, read by `check()` straight after the
+  verdicts (never `ask()`'s return: a refresh can land while the walk or the reviews are awaited), no
+  time in it, so an unchanged library is still a 304 (pinned). `/queue/summary` judges its saved scan by
+  the same listing: the badge and the page count the same albums, from what is cached. The apply route
+  (`_follow_verdict`) and the artist re-file carry a moved folder's verdict; the settings route's
+  `library` invalidation drops them all.
+- **The page** (`NeedsALook.tsx`, `lib/needsLook.ts`'s `navidromeNote`): why there may be no chip, said
+  in the STATUS LINE (`.app-queue-checking`, always there and a row tall) when it has nothing else to say
+  - not over a read's "Checking the library…" nor a failed read's Try again - as
+  `<span class="app-queue-navidrome" title=…>`, one line with an ellipsis and its whole in the title (one
+  rule in app-desktop.css, inside the desktop query: `min-width: 0`, `overflow: hidden`, `text-overflow:
+  ellipsis`, `white-space: nowrap`), so its coming and going moves no row, over the saved scan, as the
+  disk's read lands, mid-session, or as a session ends: `NAVIDROME_UNSET` (with where to set it up - "in
+  deadwax's settings (Connections)", true of either page), `navidromeFailed(problem)`,
+  `NAVIDROME_SCANNING` (past tense, "was scanning when last asked": nothing reads again on its own, so
+  it must stay true once the scan has ended), `NAVIDROME_WAITING` (a disk read landed before
+  Navidrome's first answer - asked again on the next read; no timer). Not over `problem` (no library),
+  not on a phone (the page is still the phone's note). `NEEDS_LOOK_LINE` names the new kind of row ("...
+  or that Navidrome doesn't list"). `useLibrary` exposes `navidromeCheck` (`api/types.ts` `NavidromeCheck`).
+- **Not built, on purpose**: an "On disk" library view (James: not a second library view); a timer to
+  re-read while Navidrome hasn't answered; matching a folder by path (Navidrome's song `path` is a fake one
+  unless "report real path" is on for the player); following a folder renamed OUTSIDE deadwax (its new
+  path counts as changed when it was renamed - its ctime - and its old verdict stays behind); per-user
+  listings (step 6 - the queue is the admin's); persisting the verdicts (the metadata queue stores only
+  what you ignored - the write time is a fact about the folder, saved with the scan's other facts).
+- **Known limits**: a second copy of a release Navidrome lists, outside its folder, is "listed" (same id);
+  getScanStatus can't say which folders a scan read (scan_wait.py's caveat: an admin's targeted scan or a
+  second library moves lastScan too); with Navidrome's watcher off (or blind, on a network mount), a
+  changed folder is judged 15 minutes after the change with no scan since - so a release applied IN
+  PLACE is flagged then, Navidrome still listing the album under its old id (the hint's "start a scan"
+  is the fix, and the app shows the album as it was, not "can't show" it); the verdicts are memory
+  only, so a folder flagged and then written by deadwax shortly before a restart is unflagged until
+  Navidrome scans or its 15 minutes are up (the safe direction); a ctime moved without the mtime
+  (chmod, chown) on a folder the scan cache already holds isn't seen until the folder is read again;
+  the SCAN_FORMAT bump means the first read after upgrading re-reads every folder's tags, as every
+  bump does; a folder with NO album artist tag still matches a Various Artists
+  album of its title (the scan doesn't read the compilation flag, so a single-artist rip with no album
+  artist and that flag can't be told from one without - wrongly flagging those would be worse); a
+  server sending no elapsedTime, with a scan longer than `LISTING_SETTLE_SECONDS`, could still flag a
+  folder written while it ran; since a read never waits, what Navidrome changes shows one read late (or
+  at a Rescan) - the badge's count up to five minutes late.
+- **After review** (17 findings, every one confirmed by its skeptics; fixed, each with a test that fails
+  without the fix):
+  - *Reads waited up to 3 s on Navidrome* (two findings - the badge, the main page's Library tab, every
+    Edit panel reload after a write, and a black-holed host costing 3 s a read for 20 s in every 30):
+    `ask()` now holds a read only for Navidrome's FIRST answer (counted from when that refresh began, so
+    reads while it is out share one wait) and for a Rescan; every other read is judged by the answer in
+    hand. An unreachable first getScanStatus ends the refresh (one 10 s timeout, not two). Measured on
+    the fixer's instance against a black hole: the first real read 3.01 s, the next 0.006 s, the count
+    0.003 s; failed after 10 s, reads 0.006 s.
+  - *A flagged folder lost its chip* (two findings, one major - a snapshot or the count read between a
+    writer's forget and the next scan rebuilt `_verdicts` without the folder; a rename left the verdict
+    at the old path; an unreadable scan wiped them all): verdicts merged, pruned only by a real scan
+    with no problem that found albums, carried through the apply's rename and the artist re-file.
+  - *lastScan is a scan's END* (0.64.2: `ScanEnd` writes `last_scan_at`): measured from lastScan less
+    `elapsedTime`, so a folder filed while Navidrome scanned isn't flagged by that scan.
+  - *[Unknown Artist]*: an artist-less folder is tried under Navidrome's placeholder.
+  - *Any Various Artists title hid every folder of that title*: the title-only match only for a folder
+    with no album artist but Various Artists.
+  - *`navidrome_check` from before the chips*: read by `check()` with the verdicts.
+  - *The Navidrome line moved every row* (two findings - arriving after the saved scan, coming and going
+    mid-session): it lives in the always-there status line, one line, its whole in its title; the
+    scanning words in the past tense.
+  - *The start-up log said /player/ is off*: it says the app shows Connect Navidrome where the library
+    would be, and what works without it; the partial-settings ERROR the same.
+  - *Needs a look's line didn't cover the new row*: `NEEDS_LOOK_LINE` names albums Navidrome doesn't list.
+  - *The compose and .env templates still said "Optional"*: their Navidrome blocks say needed for the
+    app's library, reading the same music folder, and what it brings; getting-started's step 7 points
+    at them.
+  - *Unpinned* (four findings): a real scan asking again past ten seconds and the 304's re-ask; the
+    badge's five minutes (scan, 60 s on: nothing asked; 300 s on: asked); the tagged-folder rule for
+    compilations and `displayArtist`; the per-call bound, the catch-all, pruning and the page size - and
+    the numbers the docs give pinned in one test.
+- **After the second review** (9 findings, two of them twice - 7 fixes, each with a test that fails
+  without it, but the docs line):
+  - *A folder moved in by hand was flagged at once* (`mv`, `cp -a`, `rsync -a` and an unzip keep its
+    old mtime, so it looked unchanged since Navidrome's last scan): the scan now reads `changed_at`, the
+    later of the folder's mtime and ctime - a rename, a copy's arrival, an unzip all move the ctime, and
+    nothing outside the kernel sets one back. (The first-seen time from the review store was the
+    review's proposal; its skeptics showed it would leave every folder unjudged on a fresh database.)
+  - *A folder filed after Navidrome's last scan was never flagged while no scan came* - the issue's own
+    case, a folder outside Navidrome's music folder, never wakes its watcher: `LISTING_GRACE_SECONDS`
+    (900) bounds the wait, counted from the change to `Listing.asked_at`, which a refresh finding no
+    scan since moves on (`replace`). Bounded for every kind of change, a write by deadwax included, so
+    the outcome is the same whether or not deadwax restarted in between; the cost, with the watcher
+    off, is an in-place apply flagged after 15 minutes (Known limits).
+  - *A restart flagged an album deadwax had just written* (the write time was memory only): the scan
+    stamps it on the album (`written_at`), the scan cache saves it, `seed_cache` restores it. So
+    `unlisted()` reads it off the album and lost its `root` argument - which also settles *the count
+    route's `root` was unpinned*: there is no `root` to drop, and a route test pins the badge = the page
+    for a folder written in place.
+  - *docs/library.md put the Navidrome line "under its title"* (two findings): "in the line above its
+    list where *Checking the library…* shows", as the rest of the page says.
+  - *`useLibrary` passing `navidrome_check` on was unpinned*: needslook.sim runs the real hook.
+  - *The count's "never held" check ran when the count had no reason to ask*: it runs past five minutes.
+  - *The failure paths' generation fences were unpinned*: a forget, the new server's answer, then the
+    old refresh FAILING (a NavidromeError, and anything else) - the new answer stands.
+- **Verified**: 2531 Python tests (2529 passed, 2 skipped; 84 new in this change - `test_navidrome_listing.py`
+  55, the match and the cache against a fake client; `test_not_in_navidrome.py` 25, through `start()`
+  against a MockTransport Navidrome - those needing a refresh a read leaves running to land served on ONE
+  event loop (`served`, anyio's blocking portal and httpx's ASGITransport), as uvicorn serves: the chip and
+  its words, the badge = the page, the badge's first ask and its five minutes, a snapshot asking nothing,
+  unset, down, the untagged and nameless rips, a folder filed since lastScan and one filed while
+  Navidrome scanned, one moved in by hand, one no scan comes for past its grace, an apply a moment ago
+  and across a restart, the badge = the page for a folder written in place, freshness, Rescan waiting,
+  a read never held once answered,
+  the check read with the verdicts, the 304, the ignore, a verdict through a count read and through a
+  move, the apply and the re-file carrying it; two in `test_metadata_health.py`, two in
+  `test_navidrome_settings.py` - a new LIBRARY_PATH forgetting the verdicts, and the start-up words),
+  pyflakes, tsc, the bundle, all 49 sims (`needslook` 121 → 161: the note's rules, the page's chip, facet,
+  address and Edit panel for a not-listed folder, the note in the status line in each state - the body's
+  parts and the rows unchanged, mid-session too - and where it isn't, the page's line, and the gate's
+  words, NeedsNavidrome.tsx compiled into the page's sim, and the real useLibrary.ts passing
+  `navidrome_check` and `review_tracking_enabled` on). 50 mutations at first (judge's every rule, the
+  cache's reuse, settling, ordering, paging, fencing, waiting and failure, the write log, each route's ask
+  and judge, the settings forget, the start-up words, the note's rules, the page and the gate) - three
+  first got past (an unsettled listing reused when the status matched again, a second refresh started
+  while one was out, `unlisted()` with Navidrome unset) and gained their pins; after review 43 more over
+  the fixes, on a copy of the worktree, each restored and checked by hash, all caught (one, the route not
+  saying Rescan, first got past and gained `test_a_rescan_waits_for_navidromes_answer`); after the second
+  review 16 more (ctime, the grace, `asked_at` moved on, the stamp, the restore, the wire, the hook
+  three ways - tsc passing each - the count's wait, the count without the write time, both failure
+  fences), all caught, the route tests alone catching the five that reach a route - both fences first
+  got past, the test letting the old refresh start only after the forget, and now holds it out first.
+  The engine guard is empty.
+- **Checked in a real page** (headless Chromium over plain http as `deadwax.test`; this change's own
+  deadwax on :8115 - a scratch database, a hard-linked copy of builder36's library plus a real copy of
+  BULLY retagged as Portishead's "Roseland NYC Live" - against its own copy of the stand-in Navidrome on
+  :8116 serving the library without that folder, and a Navidrome-unset instance on :8117; 29 checks): at
+  1440x900 the sidebar's badge 2 = the page's All = the summary's; the chips All 2, ... Not in Navidrome 1
+  titled with the hint; the Roseland row's one chip, no other row's; no line; the facet in the address,
+  pressed, the list narrowed; the row opening the Edit album panel "1 of 1", the row current; the stub
+  stopped - one line "Couldn't ask Navidrome which albums it has… couldn't be reached at
+  http://127.0.0.1:8116…", no chip, the badge 1 = All 1 = the summary; the Library's gate "Can't reach
+  Navidrome" with the reason, "Your library comes from Navidrome…" and Try again; the stub back and a
+  Rescan raising it again; on :8117 the gate "Connect Navidrome" with "deadwax needs Navidrome for your
+  library…" and its link to `/` beside the app, Needs a look's unset line with the rest of the queue,
+  Requests and You drawn ungated; at 390x844 the gate's words, Needs a look still the phone's note, the
+  Library ungated with Navidrome up, no sideways scroll; no console errors. **After review** (the fixer's
+  own deadwax on :8115 against its own stand-in on :8116, and on :8117 against a black hole on :8118 -
+  a port that accepts and never answers; 17 checks): badge = All = the summary; the page's line naming
+  albums Navidrome doesn't list; the status line a row tall (36 px) and empty when checked; the stub
+  stopped, the failure said IN the status line with its reason, its whole in its title, one line
+  (18 px, clipped with an ellipsis), no chip, badge = All = summary = 1, and the first row and the status
+  line exactly where and as tall as they were (285 px, 36 px); Roseland copied into the stub's library and
+  scanned, a Rescan's answer the new one (no chip, one row, the first row unmoved, badge 1), and taken out
+  again, a Rescan raising it again; at 1024 against the black hole, "didn't answer within 10s" in the
+  status line, one line with the Edit panel open; 390 still the phone's note; no sideways scroll; no
+  console errors. By hand against the black hole: the first real read 3.01 s, the next 0.006 s, the count
+  0.003 s; failed after 10 s (one call), every read after 0.006 s. **After the second review** (the
+  fixer's own deadwax on :8115 against its own stand-in on :8116 - whose watcher sees only its own
+  folder, so nothing deadwax's library gains ever brings a scan, the case the grace is for; 32 checks
+  in three passes): a copy of Roseland given an hour-old mtime and `mv`ed into the library, and Windows'
+  album tag edited in place through `/tags/apply` (its folder's mtime and ctime unmoved, the stand-in
+  still listing it as "Windows") - a moment after: neither flagged, Roseland (there before the stand-in's
+  scan) flagged, one row chipped, "Not in Navidrome 1", badge 3 = All 3 = the summary, the status line
+  empty; deadwax restarted (the saved scan carrying Windows' `written_at`): the same; 16 minutes on,
+  no scan since: both flagged - three rows chipped, "Not in Navidrome 3", badge 3 = All 3 = the summary
+  (the sidebar's count had asked the fifteen-minute-old answer again before the page's read, so the
+  page's first read showed it). In every pass no album on the wire carried `changed_at` or
+  `written_at`, 390 was still the phone's note with no sideways scroll, and no console errors.
+- **NOT verified**: a real Navidrome 0.64.2 - that getAlbumList2 sends every album's `musicBrainzId`,
+  `displayArtist`, `artists` and `isCompilation` as OpenSubsonic says, that getScanStatus sends
+  `elapsedTime` in nanoseconds as its source says (`int64(status.ElapsedTime)`, a Go duration - read
+  from source, never from a running one), and how long paging takes on a large library; the real :8081
+  setup; VoiceOver.

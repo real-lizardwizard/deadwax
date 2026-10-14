@@ -396,9 +396,11 @@ class Config:
     FANARTTV_KEY = _env("FANARTTV_KEY")
     FANARTTV_PERSONAL_KEY = _env("FANARTTV_PERSONAL_KEY")
 
-    #? Optional, and the player at /player/ is off without them. Navidrome is what plays the
-    #? library; deadwax holds its login and passes on a short, fixed list of read-only requests,
-    #? so the password never reaches a phone's browser. See src/api/navidrome_endpoint.py. With
+    #? Needed for the app's library (2.0.0-player.46 - no longer optional): without them the app at
+    #? /player/ says "Connect Navidrome" where the library would be, and plays nothing, while its
+    #? searching, Get, Requests and You work. Navidrome is what lists and plays the library; deadwax
+    #? holds its login and passes on a short, fixed list of read-only requests, so the password never
+    #? reaches a phone's browser. See src/api/navidrome_endpoint.py. With
     #? them, applying a release also asks Navidrome when it has scanned before renaming a folder.
     #? None of it needs an admin account, and a non-admin one of your own is the one to give it.
     NAVIDROME_URL = _env("NAVIDROME_URL")
@@ -634,18 +636,21 @@ class Config:
         given = [name for name in cls.NAVIDROME_SETTINGS if getattr(cls, name, None)]
 
         if not given:
+            #? still INFO, not a warning: searching, getting albums and filing them work without it
             logger.info(
-                "Navidrome isn't set up (NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD), so the "
-                "player at /player/ is off, and applying a release waits a fixed RETAG_RENAME_WAIT "
-                "before renaming"
+                "Navidrome isn't set up (NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD): deadwax needs "
+                "it for the app's library - until it is, the app at /player/ says Connect Navidrome where "
+                "the library would be and plays nothing (searching, Get, Requests and You work without "
+                "it), and applying a release waits a fixed RETAG_RENAME_WAIT before renaming"
             )
             return
 
         missing = [name for name in cls.NAVIDROME_SETTINGS if name not in given]
         if missing:
             logger.error(
-                f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so the player "
-                f"at /player/ is off - it needs all three NAVIDROME_ settings, and only "
+                f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so the app at "
+                f"/player/ says Connect Navidrome where the library would be - it needs all three "
+                f"NAVIDROME_ settings, and only "
                 f"{' and '.join(given)} {'is' if len(given) == 1 else 'are'} there. Set the rest in the "
                 f"settings tab (Connections), or in your compose file.",
                 extra={"frontend": True},

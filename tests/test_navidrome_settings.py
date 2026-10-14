@@ -111,6 +111,33 @@ def test_a_new_address_forgets_the_album_ids_the_old_one_gave(app, store, cached
     assert store_album._kept("11111111-1111-4111-8111-111111111111") is None
 
 
+def test_a_new_address_forgets_which_albums_the_old_one_listed(app, store, cached_client):
+    """Another Navidrome lists other albums: "Not in Navidrome" is asked afresh (2.0.0-player.46)."""
+    from src.navidrome_listing import build_listing, navidrome_listing
+
+    navidrome_listing.listing = build_listing([{"id": "x", "name": "Dummy", "artist": "Portishead"}], 0.0)
+    navidrome_listing._verdicts = {"Portishead/Dummy (1994)": True}
+    try:
+        save(app, NAVIDROME_URL="http://music-box:4533", NAVIDROME_PASSWORD=NEW_PASSWORD)
+        assert (navidrome_listing.listing, navidrome_listing._verdicts) == (None, {})
+    finally:
+        navidrome_listing.forget()
+
+
+def test_a_new_library_path_forgets_every_folders_verdict(app, store, tmp_path, monkeypatch):
+    """"Not in Navidrome" verdicts are by path under LIBRARY_PATH: another root, other folders."""
+    from src.navidrome_listing import navidrome_listing
+
+    monkeypatch.setattr(Config, "LIBRARY_PATH", Config.LIBRARY_PATH)  #? the save sets it: put back after
+    navidrome_listing._verdicts = {"Portishead/Dummy (1994)": False}
+    (tmp_path / "elsewhere").mkdir()
+    try:
+        assert save(app, LIBRARY_PATH=str(tmp_path / "elsewhere")).status_code == 200
+        assert navidrome_listing._verdicts == {}
+    finally:
+        navidrome_listing.forget()
+
+
 def test_a_new_address_without_the_password_is_refused(app, store, cached_client):
     """What anyone who can reach deadwax could otherwise do: collect the saved password's token."""
     response = save(app, NAVIDROME_URL="http://collector.example:9999")
@@ -294,7 +321,8 @@ def test_the_start_up_report_says_where_the_address_came_from(env, monkeypatch, 
     assert "http://navidrome:4533 (from the settings tab)" in caplog.records[-1].getMessage()
 
 
-def test_nothing_set_is_quietly_optional(env, monkeypatch, caplog):
+def test_nothing_set_is_said_plainly_with_what_needs_it(env, monkeypatch, caplog):
+    """INFO, not an error - deadwax searches, gets and files without it - but the library needs it (2.0.0-player.46)."""
     for key in Config.NAVIDROME_SETTINGS:
         monkeypatch.setattr(Config, key, None)
 
@@ -302,7 +330,12 @@ def test_nothing_set_is_quietly_optional(env, monkeypatch, caplog):
         Config.report_navidrome()
 
     assert caplog.records[-1].levelno == logging.INFO
-    assert "player at /player/ is off" in caplog.records[-1].getMessage()
+    said = caplog.records[-1].getMessage()
+    assert "deadwax needs it for the app's library" in said
+    #? the app isn't off - only its library half waits for Navidrome
+    assert "the app at /player/ says Connect Navidrome where the library would be" in said
+    assert "searching, Get, Requests and You work without it" in said
+    assert "is off" not in said
 
 
 def test_check_leaves_navidrome_to_the_report(env, monkeypatch, caplog):

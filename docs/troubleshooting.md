@@ -552,8 +552,54 @@ album with an issue you haven't accepted, and every album deadwax filed that nob
   last read found no albums there at all (an unmounted share, say).
 - **An album filed a moment ago** counts at once, before any scan has seen its folder; it appears on
   the page once the page has read the library.
+- **Not in Navidrome** is counted from Navidrome's last answer, the one the page's list was checked
+  by. The count asks Navidrome only when it hasn't been asked yet (as the app starts) or its answer is
+  more than five minutes old, so after Navidrome scans the number can lag until the page has read the
+  library again - a read asks Navidrome behind itself, so it's the read after it, or a **Rescan**
+  (which waits for Navidrome's answer), that brings the new answer in.
 - **The page is missing on a phone**: it's a short note there, pointing at the main page, which has
   the same queue (**Review N**). There's no editor on a phone yet.
+
+## An album says "Not in Navidrome"
+
+The app's library is Navidrome's (since 2.0.0-player.46), so deadwax checks each album folder against
+the albums Navidrome lists and raises one it doesn't, in the main page's review queue and the app's
+**Needs a look** ([how it's checked](library.md#not-in-navidrome)). The app can't show or play such an
+album until Navidrome lists it. In turn:
+
+- **Navidrome hasn't scanned it yet.** deadwax waits for Navidrome's next scan before flagging a
+  folder that changed since its last one began - a folder filed, moved in, retagged or given a cover -
+  but for 15 minutes at most, since a folder Navidrome can't see never brings a scan. So a folder
+  marked within 15 minutes of a change is one Navidrome has scanned since; one marked later may just
+  not have been scanned, if Navidrome's file watcher is off or it only scans on a schedule - a release
+  applied in place is marked then too, as Navidrome still has the album as it was. Start a scan in
+  Navidrome, then press **Rescan** (in the app, **Library care**) once it has finished: a Rescan asks
+  Navidrome and waits for its answer, where an ordinary read asks behind itself and shows the new
+  answer only on the read after.
+- **Navidrome can't read its files.** Navidrome skips what the user it runs as can't read. Make the
+  folder and its files readable by that user - the same `PUID`/`PGID` as deadwax and slskd is
+  simplest - and scan again.
+- **The folder is outside Navidrome's music folder.** Navidrome has to read the same music deadwax
+  files into: point its music folder at what you mount at `LIBRARY_PATH`. A second library in
+  Navidrome that the account deadwax uses (`NAVIDROME_USER`) can't see counts as not listed too.
+- **deadwax's scan is behind the files.** A folder is matched to Navidrome's albums by its release
+  id, or - with none - by its album title and artist, as deadwax last read them. A tag edited by
+  another program isn't noticed until **Rescan** (it doesn't change the folder's date), so when
+  Navidrome has read the new tags and deadwax still has the old ones, press **Rescan** (in the app,
+  **Library care**).
+
+A folder whose files carry no album tag at all is never checked (Navidrome files those under "[Unknown
+Album]"). If an album really is fine as it is, **It's fine as it is** accepts it like any issue.
+
+**No album is marked even though some should be**: the app's **Needs a look** says why in the line
+above its list - Navidrome isn't set up, couldn't be asked (with the reason; the
+[Navidrome messages below](#the-player-says-connect-navidrome-or-cant-reach-navidrome) are the same), was
+scanning when last asked (only the albums already found missing are marked until a read after it), or
+hadn't answered when the library was read (it's asked again the next time). A read is checked against
+Navidrome's last answer and asks again behind it, so after Navidrome changes it takes one more read -
+or a **Rescan**, which waits for Navidrome's answer - for the marks to follow. And a folder that
+changed in the last 15 minutes is marked only once Navidrome has scanned since, or the 15 minutes are
+up ([above](#an-album-says-not-in-navidrome)) - that one the line doesn't say.
 
 ## Ignored albums come back to the review queue
 
@@ -610,7 +656,10 @@ shown twice.
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
 The [phone player](player.md) shows one of these on Home and in the Library tab, in place of your
-albums, and in Search in place of what's in your library, with the reason under it. The other tabs
+albums, and in Search in place of what's in your library, with the reason under it - and, since
+deadwax needs Navidrome for the app's library (2.0.0-player.46), that it does: **Connect Navidrome**
+says "deadwax needs Navidrome for your library" and to set it up in deadwax's settings
+(Connections), and **Can't reach Navidrome** that your library shows once deadwax can reach it. The other tabs
 (and Search's MusicBrainz half, and an album you don't have) work without Navidrome, and You's
 **Connections** shows Navidrome as **Not set up** or **Can't reach it**, with the same reason under it.
 

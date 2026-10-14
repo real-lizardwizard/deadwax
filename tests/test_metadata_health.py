@@ -91,7 +91,8 @@ def test_every_issue_code_is_described():
                  "has_title_tag": False, "artist": "", "albumartist": ""}],
     )
 
-    issues = inspect_album(album)
+    #? Navidrome not listing it is handed in (2.0.0-player.46), not read off the album
+    issues = inspect_album(album, unlisted=True)
 
     assert set(issues) == set(ISSUE_TYPES), "the worst-case album should trip every rule"
     for code in issues:
@@ -272,6 +273,27 @@ def test_attach_issues_counts_unreviewed_imports_only():
     assert summary["new_imports"] == 1
     assert fresh["imported"] is True
     assert found["imported"] is False
+
+
+def test_not_in_navidrome_is_handed_in_never_read_off_the_album():
+    """2.0.0-player.46: what Navidrome lists is navidrome_listing.py's to say; this module stays pure."""
+    assert "not_in_navidrome" not in inspect_album(make_album())
+    assert inspect_album(make_album(), unlisted=True) == ["not_in_navidrome"]
+    assert ISSUE_TYPES["not_in_navidrome"]["severity"] == 2, "WRONG: it may be perfectly identified"
+    assert inspect_album(make_album(release_mbid="", art=""), unlisted=True) == ["no_release", "not_in_navidrome", "no_art"]
+
+
+def test_attach_issues_raises_it_only_for_the_paths_handed_in():
+    listed = make_album()
+    unlisted = make_album(key="rel-2", release_mbid="rel-2", artist="Tame Impala", album="Currents", year="2015",
+                          original_year="2015", edition="", path="Tame Impala/Currents (2015)")
+
+    summary = attach_issues([listed, unlisted], None, {"Tame Impala/Currents (2015)"})
+
+    assert (listed["issues"], unlisted["issues"]) == ([], ["not_in_navidrome"])
+    assert unlisted["needs_attention"] is True and unlisted["severity"] == 2
+    assert summary["by_issue"] == {"not_in_navidrome": 1} and summary["total"] == 1
+    assert attach_issues([unlisted], None)["total"] == 0, "nothing handed in, nothing raised"
 
 
 def test_attach_issues_works_with_no_store_at_all():

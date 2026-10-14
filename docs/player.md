@@ -25,14 +25,16 @@ seen working on a real iPhone; other things haven't been confirmed yet.
 ## What you need
 
 - **Navidrome**, reading your music library. The player plays whatever Navidrome has, so point
-  Navidrome at the same folder deadwax files albums into.
+  Navidrome at the same folder deadwax files albums into. deadwax needs it for the app's library
+  (since 2.0.0-player.46): an album folder Navidrome doesn't list is raised on a desktop's **Needs a
+  look** as [Not in Navidrome](library.md#not-in-navidrome), so nothing on disk is out of reach.
 - **An account on Navidrome for the player to use.** Use one of your own, and not an admin
   account: nothing the player asks Navidrome for needs one. Plays are counted on this account.
 
 ## Setting it up
 
 Three settings, all blank by default, in **Settings → Connections** (or in your compose file or
-`.env`, like any other setting; see [Configuration](configuration.md#the-phone-player-settings--connections)):
+`.env`, like any other setting; see [Configuration](configuration.md#navidrome-settings--connections)):
 
 | setting | what to put there |
 | --- | --- |
@@ -64,8 +66,9 @@ itself.
   never sent it, or anything made from it.
 
 Then open `http://your-server:8080/player/`. If something's wrong, Home and the Library tab say
-what, in place of the albums: **Connect Navidrome** when the settings aren't all there, or **Can't
-reach Navidrome** with the reason and a **Try again** button. The tab bar and You work without
+what, in place of the albums: **Connect Navidrome** when the settings aren't all there - deadwax
+needs Navidrome for your library, set up in deadwax's settings (Connections) - or **Can't reach
+Navidrome** with the reason and a **Try again** button. The tab bar and You work without
 Navidrome, so You's **Connections** can say what deadwax can and can't reach. [Troubleshooting](troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome)
 goes through each one.
 
@@ -456,7 +459,8 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   and **Requests** (with the count of what's arriving, as the tab has), the Library's views -
   **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
   songs, as on a phone) - then **Managing**: **Needs a look**, with how many albums need one, the
-  library's review queue in the app ([the library guide](library.md#needs-a-look-in-the-app) has it),
+  library's review queue in the app, an album folder Navidrome doesn't list among them (**Not in
+  Navidrome**; [the library guide](library.md#needs-a-look-in-the-app) has it),
   **Library care** - **Rescan** and the runs that fetch covers, CD art and lyrics for the albums
   missing them ([the library guide](library.md#library-care-in-the-app)) - **Settings**, the server's settings - the main page's settings tab's server half, its three pages
   and its one save ([Configuration](configuration.md#in-the-app-on-a-desktop) has it) - and **Log**,

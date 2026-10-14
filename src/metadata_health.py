@@ -8,7 +8,8 @@ album in turn and reading its current-state line. That is the same "open it and 
 busywork that made Lidarr's release picker useless, reproduced inside deadwax.
 
 Everything here is a pure function over the album dicts library.py already produces. No
-filesystem, no MusicBrainz, so the whole rule set is testable from fixtures - the same reason
+filesystem, no MusicBrainz, no Navidrome (which folders it lists is handed in - see
+navidrome_listing.py), so the whole rule set is testable from fixtures - the same reason
 matching.py and editions.py are pure.
 
 Three rules keep this honest:
@@ -61,6 +62,17 @@ ISSUE_TYPES: dict[str, dict] = {
         "hint": "the files in this folder disagree about which album they belong to, which "
                 "usually means two albums are sharing a folder.",
         "severity": BLOCKING,
+    },
+    #? 2.0.0-player.46: the app's library is Navidrome's, so a folder Navidrome doesn't list is out of
+    #? the app's reach - raised from what navidrome_listing.py says (the route passes it in as
+    #? `unlisted`), never stored. WRONG rather than BLOCKING: the album may be perfectly identified.
+    "not_in_navidrome": {
+        "label": "Not in Navidrome",
+        "hint": "Navidrome doesn't list this album, so the app can't show or play it. Navidrome may not "
+                "have scanned it yet (start a scan in Navidrome), may not be able to read its files "
+                "(check they can be read by the user Navidrome runs as), or the folder is outside "
+                "Navidrome's music folder (point Navidrome at the same folder as LIBRARY_PATH).",
+        "severity": WRONG,
     },
     "split_discs": {
         "label": "Split across folders",
@@ -167,13 +179,16 @@ def _has_no_artist_tag(album: dict) -> bool:
     )
 
 
-def inspect_album(album: dict) -> list[str]:
+def inspect_album(album: dict, unlisted: bool = False) -> list[str]:
     """
     Every issue this album has, worst first.
 
     Takes one album dict as `library.scan_library` reports it, including its tracks. Order is
     by severity so the interface can show the most useful two or three without deciding for
     itself which those are.
+
+    `unlisted` is Navidrome not listing the folder - a fact about Navidrome, not the files, so
+    it is handed in (navidrome_listing.py works it out) rather than read off the album.
     """
     tracks = album.get("tracks") or []
     found: list[str] = []
@@ -186,6 +201,9 @@ def inspect_album(album: dict) -> list[str]:
 
     if album.get("mixed_tags"):
         found.append("mixed_tags")
+
+    if unlisted:
+        found.append("not_in_navidrome")
 
     #? set by library._mark_multi_edition, which is the one place that sees the other folders
     if album.get("split_discs"):
@@ -237,7 +255,8 @@ def outstanding(issues: list[str], ignored: list[str]) -> list[str]:
     return [code for code in issues if code not in muted]
 
 
-def attach_issues(albums: list[dict], reviews: dict[str, dict] | None = None) -> dict:
+def attach_issues(albums: list[dict], reviews: dict[str, dict] | None = None,
+                  unlisted: set[str] | frozenset[str] | None = None) -> dict:
     """
     Give every album its issue list and review state, and summarise what the queue holds.
 
@@ -250,8 +269,12 @@ def attach_issues(albums: list[dict], reviews: dict[str, dict] | None = None) ->
     is optional and an absent entry means "never seen, nothing ignored", so this works
     unchanged when the SQLite store could not be opened - the queue simply stops remembering
     what you ignored, exactly like downloads stop being tracked.
+
+    `unlisted` is the paths of the albums Navidrome doesn't list (2.0.0-player.46 - navidrome_listing
+    .NavidromeListing.unlisted), empty or None when Navidrome hasn't said: nothing is raised then.
     """
     reviews = reviews or {}
+    unlisted = unlisted or set()
 
     by_issue: dict[str, int] = {}
     needing = 0
@@ -261,7 +284,7 @@ def attach_issues(albums: list[dict], reviews: dict[str, dict] | None = None) ->
         review = reviews.get(album["path"]) or {}
         ignored = review.get("ignored_issues") or []
 
-        issues = inspect_album(album)
+        issues = inspect_album(album, album["path"] in unlisted)
         remaining = outstanding(issues, ignored)
 
         album["issues"] = issues

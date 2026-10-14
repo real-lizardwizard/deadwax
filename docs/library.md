@@ -5,7 +5,8 @@ ones deadwax never downloaded. It flags what's wrong with them and lets you fix 
 
 This page is about the main page's Library tab, the one for looking after the library. The phone
 app at `/player/` has a Library tab of its own, for listening - **Albums**, **Artists** and
-**Songs** from Navidrome, and an [artist page](player.md#artist-pages) with their albums from
+**Songs** from Navidrome (since 2.0.0-player.46 deadwax needs Navidrome for the app's library, and an
+album folder Navidrome doesn't list is raised as [Not in Navidrome](#not-in-navidrome)), and an [artist page](player.md#artist-pages) with their albums from
 MusicBrainz and Play and Shuffle over the ones you have - which the [phone player
 guide](player.md#what-it-does) covers. [The app on a desktop](#the-app-on-a-desktop), below, says
 how that Library is laid out in a window 1024 pixels wide or more, and [Editing an album in the
@@ -119,6 +120,7 @@ Each album is checked for these, fresh on every scan:
 | Untitled tracks | some files have no title tag, so filenames are shown | apply a release |
 | Unnumbered tracks | some files have no track number, so the order is alphabetical | apply a release |
 | No cover art | no cover beside the tracks or inside them | **Get cover** |
+| Not in Navidrome | Navidrome doesn't list the album, so the app can't show or play it (since 2.0.0-player.46; [below](#not-in-navidrome)) | let Navidrome scan it, make its files readable to Navidrome, or point Navidrome at this music folder |
 
 **Review N**, in the toolbar, walks through every album that needs attention (and every album
 newly filed), one at a time, in the metadata editor. For an album that's right as it is (a
@@ -127,6 +129,44 @@ for the issues it has now. It's still flagged if something new goes wrong, such 
 going missing.
 
 The app has the same queue on a desktop, as **Needs a look** ([below](#needs-a-look-in-the-app)).
+
+### Not in Navidrome
+
+The app's library is Navidrome's, so since 2.0.0-player.46 deadwax checks each album folder against
+the albums Navidrome lists, and raises one it doesn't as **Not in Navidrome** - here and in the app's
+**Needs a look** alike. That way no folder on disk is out of reach: the app can't show or play it, but
+the queue lists it and its editors open on it like any other.
+
+- **How it's checked.** A folder is in Navidrome when Navidrome has an album with its release id. A
+  folder with no release id (or whose album Navidrome knows by none) is matched by its album title and
+  artist instead, as both are spelled in the tags (case, accents and curly quotes aside) - a folder
+  whose files name no artist at all as Navidrome's "[Unknown Artist]". A folder with no album artist
+  tagged (or Various Artists) also matches an album Navidrome credits to Various Artists by its title
+  alone; one with an album artist of its own never does, so Queen's *Greatest Hits* isn't taken for a
+  compilation of that name. A folder whose files carry no album tag at all isn't checked: Navidrome
+  files those under "[Unknown Album]", with no name to match.
+- **When.** Each read of the library is checked against Navidrome's last answer, and never waits for
+  Navidrome: when that answer is more than ten seconds old, a read from the disk asks Navidrome again
+  behind it, for the next read. Only Navidrome's very first answer (after deadwax starts, or its
+  Navidrome settings change) is waited for, at most three seconds, and **Rescan** always asks and waits
+  as long, so Rescan is the way to see the check afresh. The saved scan drawn first asks nothing. Usually it's one quick question: Navidrome's
+  albums are listed again only once it has finished a scan since the last time.
+- **Never too soon.** A folder that changed after Navidrome's last scan began - filed a moment ago,
+  filed while Navidrome was scanning, moved or copied in by hand (deadwax goes by when it arrived, not
+  the old date `mv` or `rsync -a` keep on it), a release just applied, a cover just fetched - isn't
+  newly flagged until a scan that began after it has finished (usually seconds later: Navidrome's file
+  watcher scans a change about five seconds after it), and one already flagged stays flagged until
+  then, also when deadwax renames or re-files it, and across a restart of deadwax. But not for ever:
+  a folder outside Navidrome's music folder never wakes its watcher, so when no scan has come 15
+  minutes after the change, the folder is checked anyway. While Navidrome is scanning, only the albums
+  already found missing are marked.
+- **Nothing raised without an answer.** Until Navidrome has answered, with Navidrome not set up, or
+  when it can't be asked, no album is marked, and the app's **Needs a look** says why once, in the line
+  above its list where *Checking the library…* shows (see [Needs a look in the app](#needs-a-look-in-the-app)).
+  The main page's queue doesn't say.
+- **Fixing it** - see [troubleshooting](troubleshooting.md#an-album-says-not-in-navidrome): start a scan in
+  Navidrome, make the files readable by the user Navidrome runs as, or point Navidrome at the folder
+  `LIBRARY_PATH` reads. **It's fine as it is** accepts it, as for any issue.
 
 ## The metadata editor
 
@@ -424,6 +464,14 @@ admin, which with logins off is everyone. It's this page's review queue (**Revie
 - **A row** shows the album's cover, name, artist and edition, **New** for an album just filed, and
   its outstanding issues (hover one for what it means). The list is read the first time you open the
   page - the saved scan at once, then the disk, with *Checking the library…* meanwhile.
+
+**Not in Navidrome** is one of its chips ([above](#not-in-navidrome)): an album folder Navidrome doesn't
+list, which the rest of the app can't reach - its row opens the **Edit album** panel like any other.
+When no album can be checked against Navidrome, the line above the list (where *Checking the library…*
+shows) says why once the disk has been read: *Navidrome isn't set up…* (with where to set it up),
+*Couldn't ask Navidrome which albums it has…* (with the reason), *Navidrome was scanning when last
+asked…*, or *Navidrome hasn't answered yet…* (it's asked again the next time the page reads the
+library). It's kept to one line, so it never moves the rows; hover it for the whole of it.
 
 **Ignores can't be saved without the job store.** When deadwax couldn't open its database
 (`DB_PATH`), the page says so above the list (since 2.0.0-player.42), as this page's queue does: an

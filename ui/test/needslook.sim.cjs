@@ -29,10 +29,23 @@
  *  - IGNORES THAT CAN'T BE SAVED (2.0.0-player.42): warned of, in the page, as the main page's queue
  *    warns, when the library's answer (review_tracking_enabled) or the count's (tracking_enabled) says
  *    deadwax has no job store - never on a phone, never before either has said so.
+ *  - NOT IN NAVIDROME (2.0.0-player.46): what the page says about the albums' check against Navidrome
+ *    (lib/needsLook.ts's navidromeNote - not set up, failed, was scanning, not answered yet), said in the
+ *    status line that is always there once the disk's read is in - one line, its whole in the title - so
+ *    nothing above the list comes or goes in any state, mid-session included; never over no library nor
+ *    on a phone; the page's own line naming such albums; a folder Navidrome doesn't list as a row like
+ *    any other - its chip and facet in the server's words, the facet to the address, the Edit panel on
+ *    its folder; and the gate's words (app/NeedsNavidrome.tsx, compiled with the page): deadwax needs
+ *    Navidrome for the library, set up in deadwax's settings.
  *  - THE COUNT'S STORE: the real app/useQueueSummary.ts against a faked deadwax - one request out and
  *    exactly one more, a failure keeping the last number (null with none), the page's count first;
  *    whether ignores can be kept, and useQueueTracking's caller told to draw again as an answer lands
  *    (a caller gone told nothing more).
+ *  - THE LIBRARY'S HOOK: the real hooks/useLibrary.ts against a faked loadScan, under a stand-in for
+ *    Preact's hooks that keeps their state - the answer's navidrome_check reaching navidromeCheck (the
+ *    saved scan's, then the disk's; null from an answer that says nothing of it), and
+ *    review_tracking_enabled reaching reviewTracking: the page above is handed a library object, so
+ *    only this says the hook passes them on (review: setting it to null passed every other check).
  *
  * Run it with:  node ui/test/needslook.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -65,6 +78,7 @@ const TYPES = {
   no_release: { label: 'no release', hint: 'Not matched to a MusicBrainz release.', severity: 3 },
   no_art: { label: 'no cover', hint: 'No cover art saved with the album.', severity: 1 },
   misfiled: { label: 'folder off-convention', hint: 'The folder is not named as deadwax would.', severity: 2 },
+  not_in_navidrome: { label: 'Not in Navidrome', hint: "Navidrome doesn't list this album, so the app can't show or play it.", severity: 2 },
 }
 const album = (path, more = {}) => ({
   path, artist: path.split('/')[0], album: path.split('/')[1], edition: '', art: 'file', art_mtime: 1,
@@ -103,6 +117,25 @@ console.log('\nthe list and its facets')
     ['no_art', null, null, null])
   check('a count for VoiceOver', [N.needsLookLabel('Needs a look', 3), N.needsLookLabel('Needs a look', 1), N.needsLookLabel('Needs a look', 0), N.needsLookLabel('Needs a look', null)],
     ['Needs a look, 3 albums', 'Needs a look, 1 album', 'Needs a look', 'Needs a look'])
+}
+
+console.log('\nNot in Navidrome (2.0.0-player.46): what the page says about the check, once')
+{
+  const unset = { state: 'unset', problem: null }
+  const failed = { state: 'failed', problem: "Navidrome couldn't be reached at http://navidrome:4533: refused" }
+  const scanning = { state: 'scanning', problem: null }
+  const waiting = { state: 'checking', problem: null }
+  const listed = { state: 'listed', problem: null }
+  check('checked, or nothing said at all: nothing to say', [N.navidromeNote(listed), N.navidromeNote(null)], [null, null])
+  check('not set up: said, with where to set it up', [N.navidromeNote(unset), /no album is checked/.test(N.NAVIDROME_UNSET), /deadwax's settings \(Connections\)/.test(N.NAVIDROME_UNSET)],
+    [N.NAVIDROME_UNSET, true, true])
+  check('failed: why, as deadwax said it', [N.navidromeNote(failed), /^Couldn't ask Navidrome which albums it has: Navidrome couldn't be reached/.test(N.navidromeFailed(failed.problem))],
+    [N.navidromeFailed(failed.problem), true])
+  check('...a failure with no words still says something', /: no reason given$/.test(N.navidromeFailed(null)), true)
+  check('scanning, or not answered yet: said', [N.navidromeNote(scanning), N.navidromeNote(waiting)], [N.NAVIDROME_SCANNING, N.NAVIDROME_WAITING])
+  check('...the scan in the past tense - still true once it has ended, with nothing reading again on its own',
+    [/^Navidrome was scanning when last asked/.test(N.NAVIDROME_SCANNING), /is scanning/.test(N.NAVIDROME_SCANNING)], [true, false])
+  check('the page\'s own line names the albums Navidrome doesn\'t list', /or that Navidrome doesn't list/.test(N.NEEDS_LOOK_LINE), true)
 }
 
 console.log('\nthe session')
@@ -161,7 +194,7 @@ console.log('\nthe session')
 
 const PAGE = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-needslook-page-'))
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/NeedsALook.tsx', '--rootDir', 'src', '--outDir', PAGE,
+  'src/app/NeedsALook.tsx', 'src/app/NeedsNavidrome.tsx', '--rootDir', 'src', '--outDir', PAGE,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -594,6 +627,101 @@ async function page() {
     check('...ready again: it reads the library', W.reloads.length - reads, 1)
   }
 
+  console.log('\nthe page: Not in Navidrome (2.0.0-player.46)')
+  {
+    const note = () => classed('app-queue-navidrome').map(words)
+    //? the body's parts in order, by their first class - what moves the rows when it comes or goes
+    const parts = () => {
+      const body = classed('app-queue-body')[0]
+      const kids = [].concat(body.props.children).flat(Infinity).filter((kid) => kid && typeof kid === 'object')
+      return kids.flatMap((kid) => (kid.type === 'fragment' ? [].concat(kid.props.children).flat(Infinity).filter((k) => k && typeof k === 'object') : [kid]))
+        .map((kid) => (kid.props.class || kid.type).split(' ')[0])
+    }
+    const UNLISTED = album('Old Rips/Roseland', issues(['not_in_navidrome']))
+    reset()
+    libraryOf([CLEAN, UNLISTED, COVERLESS], { navidromeCheck: { state: 'listed', problem: null } })
+    const one = mount()
+    one.draw()
+    check('a folder Navidrome doesn\'t list is a row like any other, its chip in the server\'s words, titled with its hint',
+      [rowAlbums(), classed('app-queue-chip').map((chip) => [words(chip), chip.props.title ?? null])],
+      [['Roseland', 'Dummy (1994)'], [['Not in Navidrome', TYPES.not_in_navidrome.hint], ['no cover', TYPES.no_art.hint]]])
+    check('...with its facet, counted (ties by label)', facetChips(), [['All 2', true], ['no cover 1', false], ['Not in Navidrome 1', false]])
+    check('...checked: nothing said about the check', note(), [])
+    click(find((node) => node.type === 'button' && words(node) === 'Not in Navidrome 1')[0])
+    check('...its facet chosen goes to the address', one.facetsAsked, ['not_in_navidrome'])
+    one.draw({ facet: 'not_in_navidrome' })
+    check('...and lists it alone', rowAlbums(), ['Roseland'])
+    click(rowButtons()[0])
+    check('a row opens the Edit panel on its folder, as any queue folder', [one.edits.at(-1).request.folder, one.edits.at(-1).request.queue.total], ['Old Rips/Roseland', 1])
+    one.unmount()
+
+    reset()
+    libraryOf(LIBRARY, { navidromeCheck: { state: 'unset', problem: null }, stale: true })
+    const two = mount()
+    two.draw()
+    const settled = parts()
+    check('over the saved scan the status line says it is checking the library', [note(), words(classed('app-queue-checking')[0])], [[], 'Checking the library…'])
+    libraryOf(LIBRARY, { navidromeCheck: { state: 'unset', problem: null } })
+    two.draw()
+    const line = classed('app-queue-navidrome')[0]
+    check('Navidrome not set up: said once the disk\'s read is in, IN the status line, its whole in its title',
+      [note(), find(byClass('app-queue-navidrome'), classed('app-queue-checking')[0]).length, line.props.title], [[N.NAVIDROME_UNSET], 1, N.NAVIDROME_UNSET])
+    check('...nothing above the list came or went: no row moved', parts(), settled)
+    libraryOf(LIBRARY, { navidromeCheck: { state: 'failed', problem: 'Navidrome answered 502' }, loading: true })
+    two.draw()
+    check('a read out: the line says that instead, in the same place', [note(), words(classed('app-queue-checking')[0]), parts()], [[], 'Checking the library…', settled])
+    libraryOf(LIBRARY, { navidromeCheck: { state: 'failed', problem: 'Navidrome answered 502' } })
+    two.draw()
+    check('...a failure said when it lands, why as deadwax said it', [note(), parts()], [[N.navidromeFailed('Navidrome answered 502')], settled])
+    for (const state of ['scanning', 'checking', 'listed']) {
+      libraryOf(LIBRARY, { navidromeCheck: { state, problem: null } })
+      two.draw()
+      check(`...${state}: ${state === 'listed' ? 'nothing said' : 'said'}, and still no row moved`, [note().length, parts()], [state === 'listed' ? 0 : 1, settled])
+    }
+
+    console.log('\nthe page: mid-session, Navidrome\'s state changing moves nothing')
+    libraryOf(LIBRARY, { navidromeCheck: { state: 'listed', problem: null } })
+    two.draw()
+    click(rowButtons()[1])
+    two.draw()
+    const during = [parts(), rowAlbums(), rowButtons().map((row) => row.props['aria-current'] ?? null)]
+    for (const [state, problem] of [['scanning', null], ['failed', 'Navidrome answered 502'], ['listed', null], ['unset', null]]) {
+      libraryOf(LIBRARY, { navidromeCheck: { state, problem } })
+      two.draw()
+      check(`a read mid-session answering ${state}: the body's parts, the rows and the current one as they were`,
+        [parts(), rowAlbums(), rowButtons().map((row) => row.props['aria-current'] ?? null)], during)
+    }
+    two.draw({ editing: null })
+    libraryOf([], { problem: 'LIBRARY_PATH is not set', navidromeCheck: { state: 'unset', problem: null } })
+    two.draw()
+    check('no library to check: nothing said about Navidrome', note(), [])
+    libraryOf(LIBRARY, { navidromeCheck: { state: 'unset', problem: null } })
+    two.draw({ desktop: false })
+    check('...nor on a phone', note(), [])
+    two.unmount()
+  }
+
+  console.log('\nthe gate: Navidrome is needed for the library (2.0.0-player.46)')
+  {
+    const { NeedsNavidrome, NAVIDROME_REQUIRED, NAVIDROME_UNREACHED } = require(path.join(PAGE, 'app/NeedsNavidrome.js'))
+    const gate = (status) => {
+      tree = NeedsNavidrome({ status, onRetry() {}, children: 'THE LIBRARY' })
+      return tree
+    }
+    check('set up and reached: what it guards', gate({ ok: true, configured: true, problem: null }).props.children, 'THE LIBRARY')
+    gate({ ok: false, configured: false, problem: 'Navidrome isn\'t set up - fill in NAVIDROME_URL' })
+    const link = find((node) => node.type === 'a')[0]
+    check('not set up: Connect Navidrome, the reason, then why and how', [words(classed('app-needs-title')[0]), classed('app-needs-text').map(words).map((w) => w.replace(/\s+/g, ' '))],
+      ['Connect Navidrome', ['Navidrome isn\'t set up - fill in NAVIDROME_URL', `${NAVIDROME_REQUIRED} Set it up in deadwax's settings (Connections), then come back.`]])
+    check('...needed for the library, said so', /needs Navidrome for your library/.test(NAVIDROME_REQUIRED), true)
+    check('...its link beside the app, to the settings (the main page\'s for now)', [words(link), link.props.href, link.props.target, link.props.rel], ['settings', '/', '_blank', 'noopener'])
+    gate({ ok: false, configured: true, problem: 'Navidrome couldn\'t be reached at http://navidrome:4533: refused' })
+    check('set up, not reached: Can\'t reach Navidrome, the reason, that the library is Navidrome\'s, Try again',
+      [words(classed('app-needs-title')[0]), classed('app-needs-text').map(words), find((node) => node.type === 'button').map(words)],
+      ['Can\'t reach Navidrome', ['Navidrome couldn\'t be reached at http://navidrome:4533: refused', NAVIDROME_UNREACHED], ['Try again']])
+    check('...which says the library comes from it', /library comes from Navidrome/.test(NAVIDROME_UNREACHED), true)
+  }
+
   console.log('\nthe page: ignores that can\'t be saved are warned of (2.0.0-player.42)')
   {
     const warning = () => classed('app-queue-warning').map(words)
@@ -719,7 +847,64 @@ async function storeFailingFirst(DIR) {
   check('...and whether ignores can be kept unknown too: null, no warning over it', Q.queueTrackingNow(), null)
 }
 
-page().then(store).then(storeFailingFirst).then(() => {
+/* ===== the library's hook: hooks/useLibrary.ts itself, against a faked loadScan ===== */
+
+async function libraryHook() {
+  console.log('\nthe library\'s hook (the real useLibrary.ts)')
+  const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-needslook-hook-'))
+  execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
+    'src/hooks/useLibrary.ts', '--rootDir', 'src', '--outDir', DIR,
+    '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
+    '--lib', 'es2022,dom', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
+  ], { cwd: UI, stdio: 'inherit' })
+  fs.mkdirSync(path.join(DIR, 'node_modules/preact'), { recursive: true })
+  //? one component's hooks, in call order, kept between renders; effects run after a render when
+  //? their dependencies moved - enough of Preact to read what the hook hands its page
+  fs.writeFileSync(path.join(DIR, 'node_modules/preact/hooks.js'), `
+const H = () => globalThis.__hook
+const slot = (make) => { const h = H(), k = h.i++; if (!(k in h.slots)) h.slots[k] = make(); return [h, k] }
+exports.useState = (initial) => {
+  const [h, k] = slot(() => initial)
+  return [h.slots[k], (v) => { h.slots[k] = typeof v === 'function' ? v(h.slots[k]) : v }]
+}
+exports.useRef = (initial) => { const [h, k] = slot(() => ({ current: initial })); return h.slots[k] }
+exports.useCallback = (f) => { const [h, k] = slot(() => f); return h.slots[k] }
+exports.useEffect = (f, deps) => {
+  const h = H(), k = h.i++, before = h.slots[k]
+  if (!before || deps.some((d, n) => d !== before[n])) { h.slots[k] = deps; h.effects.push(f) }
+}
+`)
+  //? deadwax answering when the test says
+  fs.writeFileSync(path.join(DIR, 'api/library.js'), `
+exports.loadScan = (mode, etag) => new Promise((resolve, reject) => globalThis.__hook.asks.push({ mode, etag, resolve, reject }))
+`)
+  fs.writeFileSync(path.join(DIR, 'lib/libraryEvents.js'), `exports.onAlbumsFiled = () => () => {}\n`)
+  const H = globalThis.__hook = { slots: {}, i: 0, effects: [], asks: [] }
+  const { useLibrary } = require(path.join(DIR, 'hooks/useLibrary.js'))
+  const render = () => { H.i = 0; const state = useLibrary(true); for (const f of H.effects.splice(0)) f(); return state }
+  const body = (more) => ({
+    albums: [], artists: [], queue: { total: 0, by_issue: {}, new_imports: 0, ignored_albums: 0 }, issue_types: {},
+    problem: null, library_path: '/music', scan_seconds: 0, scanned_at: null, stale: false, etag: null, ...more,
+  })
+  const answer = async (more) => { H.asks.shift().resolve(body(more)); await settle() }
+
+  check('before an answer: null', render().navidromeCheck, null)
+  check('the first look asks for the saved scan', H.asks.map((ask) => ask.mode), ['snapshot'])
+  await answer({ stale: true, navidrome_check: { state: 'unset', problem: null } })
+  check('the saved scan\'s navidrome_check reaches navidromeCheck', render().navidromeCheck, { state: 'unset', problem: null })
+  check('...and the disk\'s read is asked under it', H.asks.map((ask) => ask.mode), ['scan'])
+  await answer({ navidrome_check: { state: 'failed', problem: 'Navidrome couldn\'t be reached' }, review_tracking_enabled: false })
+  const read = render()
+  check('the disk\'s replaces it', read.navidromeCheck, { state: 'failed', problem: 'Navidrome couldn\'t be reached' })
+  check('review_tracking_enabled reaches reviewTracking', read.reviewTracking, false)
+  const reloaded = read.reload()
+  await answer({})
+  await reloaded
+  const older = render()
+  check('an answer that says nothing of either: null, and ignores taken as kept', [older.navidromeCheck, older.reviewTracking], [null, true])
+}
+
+page().then(store).then(storeFailingFirst).then(libraryHook).then(() => {
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')
   process.exit(failures ? 1 : 0)
 })
