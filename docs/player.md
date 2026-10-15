@@ -195,7 +195,17 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   opens [their page](#artist-pages), an album opens it, and a song plays
   from there through its album once that album has been fetched (a ▶ at its right says so - the
   first five albums of the songs found are fetched as the answer arrives), and otherwise opens its
-  album. **Not in your library yet** is MusicBrainz's albums, less the ones you have, asked when
+  album. **Songs on MusicBrainz** (since 2.0.0-player.53) comes next: a few of the songs MusicBrainz has
+  for the box, every take of one song one row ("Roads · Portishead · 4:56 · Dummy · in your library"),
+  with **More songs** for the rest; tap one to open the albums it's on - albums and EPs, then singles,
+  then the compilations, live albums, soundtracks and broadcasts behind one line that opens - and an album
+  to open it on a pressing that has the song, the song marked and scrolled to (one you have the song on
+  opens the album you have; one you have a pressing of that nothing yet says has the song says "a pressing
+  in your library", and a tap looks through the album's pressings before it opens the album you have or
+  the one you don't). No song matching, there's no section - unless that answer arrives after the albums
+  are on the screen, when the line that was asking says *No songs on MusicBrainz for "…"* instead; songs
+  arriving after the albums wait behind **Show songs**, so the albums don't move under your finger.
+  **Not in your library yet** is MusicBrainz's albums, less the ones you have, asked when
   you press Search on the keyboard or a moment after you stop typing (one your library turns out
   to hold after the list is drawn says "in your library", and opens the album you have) - 12 at a
   time, with **More from MusicBrainz** under them for the next 12 (since 2.0.0-player.50). Tap one
@@ -1739,7 +1749,9 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   says so - Navidrome has unstarred it, and Remove again finishes it.
 - **Search** looks in the store first - titled **In the store**, each album row saying **in your
   library** or **in the store** - then MusicBrainz, **Not in the store yet**, for what deadwax doesn't
-  have.
+  have. Its **Songs on MusicBrainz** (since 2.0.0-player.53) say **in your library** or **in the store** of
+  a song, and of each album it's on, the same way - and **a pressing in your library** (or **a pressing in
+  the store**) of an album held as a pressing nothing yet says has the song or hasn't.
 - **Home**: Recently added and Not played in a while are asked as you (so "not played" is what *you*
   haven't played); **New in your library** is as before.
 - **A Navidrome that gives users libraries of their own** (its multi-library setting): deadwax only ever

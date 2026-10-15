@@ -12,7 +12,9 @@
  * More from MusicBrainz: a page appended below by the first page's held rule, a group got twice drawn
  * once, and whether another page is there - by MusicBrainz's count, a full page without one, never past
  * the route's bound; what a page brought said in words, a page of repeats or none never "in your library"
- * (review).
+ * (review). And (2.0.0-player.53) the song search's reading of the same box: a title beside an artist you
+ * have as that song by them (credited then or called now), falling back to the words typed as one title
+ * (review), the words typed otherwise - never a type filter - and nothing at all for an artist's name alone.
  *
  * Run it with:  node ui/test/searchQuery.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -187,6 +189,25 @@ console.log('\nMore from MusicBrainz (2.0.0-player.50): the next page appended, 
   check('...a page that brought nothing ends it, whatever the count says', R.morePages(12, 500, 0, 12), 'end')
   check('...past the route\'s bound, "far": narrow the search', [R.morePages(R.MUSICBRAINZ_OFFSET_MAX, 5000, 12, 12), R.morePages(R.MUSICBRAINZ_OFFSET_MAX + 8, 5000, 12, 12)], ['more', 'far'])
   check('...the bound the route\'s own (FULLY_SEARCH_OFFSET_MAX)', R.MUSICBRAINZ_OFFSET_MAX, 1000)
+}
+
+console.log('\nthe song search (2.0.0-player.53): the box read as the album half reads it')
+{
+  const artists = ['Portishead', 'Pink Floyd', 'Ye']
+  const song = (text) => Q.songSearchQuery(text, Q.searchQuery(text, artists))
+  check('a title beside an artist you have: that song by them, credited then or called now',
+    [song('roads portishead'), song('Portishead - Roads')], ['recording:"roads" AND (artist:"Portishead" OR artistname:"Portishead")', 'recording:"Roads" AND (artist:"Portishead" OR artistname:"Portishead")'])
+  check('...the longest name, as the albums read it', song('pink floyd money'), 'recording:"money" AND (artist:"Pink Floyd" OR artistname:"Pink Floyd")')
+  check('...its quotes and backslashes escaped', Q.fieldedSongQuery('Say "Hi" \\o/', 'Ye'), 'recording:"Say \\"Hi\\" \\\\o/" AND (artist:"Ye" OR artistname:"Ye")')
+  check('anything else: the words typed, spaces closed up', song('  hey   jude '), 'hey jude')
+  check('...never with a type filter - that is about albums', Q.songSearchQuery('hey jude', Q.searchQuery('hey jude', artists, Q.typeFilter({ primary: ['Album'] }))), 'hey jude')
+  check('an artist\'s name alone: nothing asked', [song('portishead'), song('PINK FLOYD')], [null, null])
+  check('...nor for nothing typed', [Q.songSearchQuery('', null), Q.songSearchQuery('   ', Q.searchQuery('   ', artists))], [null, null])
+  //? (review) what a title beside an artist falls back to, finding no song by them: the words typed as ONE title -
+  //? never loose, which matched strangers' songs titled after the artist ("Tame Impala") above an album's words
+  check('the fallback: the words typed as one title, spaces closed up, quotes escaped; nothing for nothing',
+    [Q.songTitleQuery('  the slow rush   tame impala '), Q.songTitleQuery('prince charming'), Q.songTitleQuery('Say "Hi"'), Q.songTitleQuery('   ')],
+    ['recording:"the slow rush tame impala"', 'recording:"prince charming"', 'recording:"Say \\"Hi\\""', null])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

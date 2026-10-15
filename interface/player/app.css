@@ -2852,6 +2852,100 @@ button.app-result:active { background: var(--dw-pressed); }
     outline-offset: var(--app-ring);
 }
 
+/* ===== song search (2.0.0-player.53): Songs on MusicBrainz, and the song on the album opened from it =====
+   A song's row opens in place (a disclosure) onto the albums it is on - indented under it, so its covers
+   line up with the song's title - Albums, EPs and Singles listed and the rest behind one fold; on the
+   album you don't have, the song is tinted and barred in the accent, and brought into view. */
+:root {
+    --app-song-indent: calc(var(--app-result-cover) + var(--app-result-gap));   /* an album row under its song */
+    --app-song-cover: 40px;          /* ...its cover, a little smaller than the song's */
+    --app-song-album: 56px;          /* ...its row */
+    --app-song-chevron: 20px;
+    --app-song-turn: 180deg;         /* the chevron of an open song */
+    --app-song-gap: 4px;             /* the song to its albums, the albums to the fold */
+    --app-song-bar: 3px;             /* the song's mark in a tracklist */
+    /* the songs' place while they're asked, and all that's folded into it once the albums are under it: a
+       button a finger tall with a little room above and below - taller than the asking line it holds first */
+    --app-song-slot: calc(var(--dw-row) + 2 * var(--pl-gap-sm));
+}
+
+/* The songs' slot (review): the asking line, and - the songs landing after the albums were drawn under it -
+   what folds into it: Show songs, why there are none, MusicBrainz away with Try again. One height whatever it
+   holds, so nothing drawn below moves; a line too long for it ends in an ellipsis rather than wrapping. No
+   overflow of its own, so a focused button's ring isn't clipped. */
+.app-song-slot {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: var(--app-song-slot);
+}
+
+.app-song-slot.is-row { flex-direction: row; align-items: center; gap: var(--app-song-gap); }
+.app-song-slot .app-asking,
+.app-song-slot .app-search-empty { padding: 0; }
+.app-song-slot .app-search-empty { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.app-song-slot.is-row .app-search-empty { flex: 1; }
+.app-song-slot .app-text-button { flex: none; padding: 0; }
+.app-song-show { width: 100%; }
+.app-song-show.is-busy { opacity: var(--app-job-busy); }
+
+.app-song-chevron {
+    flex: none;
+    width: var(--app-song-chevron);
+    height: var(--app-song-chevron);
+    color: var(--dw-text-2);
+    transition: transform var(--dw-duration) var(--dw-ease);
+}
+
+.app-song-row[aria-expanded="true"] .app-song-chevron { transform: rotate(var(--app-song-turn)); }
+
+.app-song-albums { padding: 0 0 var(--app-song-gap) var(--app-song-indent); }
+.app-song-list { margin: 0; padding: 0; list-style: none; }
+.app-song-list > li + li { border-top: var(--dw-hairline) solid var(--dw-border); }
+.app-song-album { min-height: var(--app-song-album); padding: var(--app-song-gap) 0; }
+.app-song-album .app-result-cover { width: var(--app-song-cover); height: var(--app-song-cover); }
+/* ...its line wraps rather than cutting off where it's held - "another pressing in your library" is long
+   (review), and the row a disclosure opened is free to grow, a little room above and below it then (the
+   padding inside the row's own height, so a row of one line is as tall as ever) */
+.app-song-album .app-result-line { white-space: normal; overflow-wrap: anywhere; }
+
+/* the fold: a text button in the accent, a tap target tall, its words the albums it holds */
+.app-song-fold {
+    display: block;
+    width: 100%;
+    padding: 0;
+    font-size: var(--dw-text-footnote);
+    text-align: left;
+}
+
+/* nothing above the fold: its words as the list's caption, quieter */
+.app-song-caption {
+    margin: 0;
+    padding: var(--app-song-gap) 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-song-chevron { transition: none; }
+}
+
+/* the song an album was opened from, in its tracklist: tinted as a chosen row is (a Bonus track keeps its
+   green), barred in the accent at its start, its title in the accent - and said to a screen reader */
+.app-rg-track.is-song {
+    margin: 0 calc(-1 * var(--app-rg-mark-bleed));
+    padding: 0 var(--app-rg-mark-bleed);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-selected-row);
+    box-shadow: inset var(--app-song-bar) 0 0 var(--dw-accent);
+}
+
+.app-rg-track.is-song.is-marked { padding: var(--app-rg-mark-pad) var(--app-rg-mark-bleed); }
+.app-rg-track.is-song.is-bonus { background: var(--dw-tint-green); }
+.app-rg-track.is-song.is-version,
+.app-rg-track.is-song.is-renamed { background: var(--dw-tint-amber); }
+.app-rg-track.is-song .app-rg-title { color: var(--dw-accent); font-weight: var(--dw-weight-semibold); }
+
 /* ===== Artists, and the two libraries joined (2.0.0-player.17) ===== */
 
 /* the artist page's hero: the picture under it, its own colour in place of one; the back link at

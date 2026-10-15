@@ -10,6 +10,10 @@
  *   #/<tab>/group/<rgid>?release=<mbid>                an album you don't have (2.0.0-player.13):
  *                                                      a MusicBrainz release group, and the pressing
  *                                                      shown when it isn't the default
+ *   #/<tab>/group/<rgid>?song=<mbid>,<mbid>            ...opened from a song Search found (2.0.0-player.53):
+ *                                                      its recordings, so the page opens on a pressing
+ *                                                      with the song and marks it - `release` too once
+ *                                                      one is chosen
  *   #/<tab>/artist/<id>                                an artist (2.0.0-player.17): Navidrome's
  *                                                      artist id, or `mb:<mbid>` for one known only
  *                                                      by MusicBrainz (lib/artistPage.ts reads it)
@@ -101,6 +105,9 @@ export interface Page {
   release?: string
   /** the queue page's facet (2.0.0-player.25): in the address (`?facet=`), never its identity */
   facet?: string
+  /** a group page opened from a song Search found (2.0.0-player.53): the song's recordings, comma-separated
+   *  (lib/songs.ts songIds) - in the address (`?song=`), never its identity, and kept as a pressing is chosen */
+  song?: string
 }
 
 export interface Route {
@@ -124,14 +131,21 @@ export function formatRoute(route: Route): string {
   if (!route.page) return root
   const path = `${root}/${route.page.kind}/${encodeURIComponent(route.page.id)}`
   if (route.page.kind === 'queue' && route.page.facet) return `${path}?facet=${encodeURIComponent(route.page.facet)}`
-  return route.page.kind === 'group' && route.page.release ? `${path}?release=${encodeURIComponent(route.page.release)}` : path
+  if (route.page.kind !== 'group') return path
+  const query = [
+    ...(route.page.release ? [`release=${encodeURIComponent(route.page.release)}`] : []),
+    //? its commas left as they are: `song=<id>,<id>` reads as what it is
+    ...(route.page.song ? [`song=${encodeURIComponent(route.page.song).replace(/%2C/gi, ',')}`] : []),
+  ]
+  return query.length ? `${path}?${query.join('&')}` : path
 }
 
 /** What a page's scroll is kept under: its address without the pressing - choosing another
- *  pressing is the same page, and must not jump it back to the top - nor the queue's facet. */
+ *  pressing is the same page, and must not jump it back to the top - nor the queue's facet, nor the song
+ *  a group page was opened from. */
 export function scrollKey(route: Route): string {
   if (!route.page) return formatRoute(route)
-  const { release: _release, facet: _facet, ...page } = route.page
+  const { release: _release, facet: _facet, song: _song, ...page } = route.page
   return formatRoute({ tab: route.tab, page })
 }
 
@@ -149,8 +163,11 @@ function pageFrom(parts: readonly string[], query: string): Page | null {
     return facet ? { kind, id: QUEUE_ID, facet } : { kind, id: QUEUE_ID }
   }
   if (kind !== 'group') return { kind, id }
-  const release = new URLSearchParams(query).get('release')?.trim()
-  return release ? { kind, id, release } : { kind, id }
+  const params = new URLSearchParams(query)
+  const release = params.get('release')?.trim()
+  //? the song's recordings as lib/songs.ts reads them - kept as written here, read (and checked) by the page
+  const song = params.get('song')?.trim()
+  return { kind, id, ...(release ? { release } : {}), ...(song ? { song } : {}) }
 }
 
 /**
@@ -228,12 +245,16 @@ export function replaceTop(nav: Nav, page: Page): Nav {
   const stack = nav.stacks[nav.tab]
   const top = stack[stack.length - 1]
   if (!samePage(top, page)) return nav
-  if ((top!.release ?? null) === (page.release ?? null) && (top!.facet ?? null) === (page.facet ?? null)) return nav
-  const { release: _release, facet: _facet, ...kept } = top!
+  //? the song a group page was opened from stays as a pressing is chosen (a pick names none); an address
+  //? that names one says which
+  const song = page.song ?? top!.song ?? null
+  if ((top!.release ?? null) === (page.release ?? null) && (top!.facet ?? null) === (page.facet ?? null) && (top!.song ?? null) === song) return nav
+  const { release: _release, facet: _facet, song: _song, ...kept } = top!
   return withStack(nav, nav.tab, [...stack.slice(0, -1), {
     ...kept,
     ...(page.release ? { release: page.release } : {}),
     ...(page.facet ? { facet: page.facet } : {}),
+    ...(song ? { song } : {}),
   }])
 }
 

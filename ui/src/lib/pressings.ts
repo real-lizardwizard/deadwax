@@ -373,6 +373,8 @@ export interface TrackRow {
   /** m:ss, or '' when MusicBrainz has no length */
   length: string
   mark: TrackMark | null
+  /** the song the album was opened from (2.0.0-player.53, Search's songs): marked, and scrolled to */
+  song: boolean
 }
 
 /** "Disc 2 · Unreleased Tracks", or "Disc 2" for a disc without a title. */
@@ -383,9 +385,10 @@ export function discHeading(position: number, title: string | null | undefined):
 
 /**
  * The chosen pressing's tracklist, row by row, with its differences from the usual one marked
- * (`diff` null: nothing to mark). Running positions match the diff's.
+ * (`diff` null: nothing to mark). Running positions match the diff's. `isSong` (2.0.0-player.53): which
+ * tracks are the song the album was opened from (lib/songs.ts songMatcher) - none without one.
  */
-export function trackRows(release: PageRelease | null, diff: TracklistDiff | null): TrackRow[] {
+export function trackRows(release: PageRelease | null, diff: TracklistDiff | null, isSong: ((track: MbTrack) => boolean) | null = null): TrackRow[] {
   if (!release) return []
   const media = (release.media ?? []).filter((medium) => (medium.tracks ?? []).length)
   const headings = media.length > 1 || media.some((medium) => (medium.title ?? '').trim())
@@ -414,6 +417,7 @@ export function trackRows(release: PageRelease | null, diff: TracklistDiff | nul
         title: track.title || track.recording?.title || '',
         length: formatSeconds(seconds),
         mark,
+        song: !!isSong && isSong(track),
       })
     })
   })

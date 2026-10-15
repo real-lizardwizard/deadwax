@@ -121,7 +121,8 @@ already in your library, or already downloading in full, the panel says so and d
 ## On the phone: the app's Search tab
 
 The [phone app](player.md) at `/player/` has its own **Search** tab (since 2.0.0-player.13): one
-box, **your library first, then MusicBrainz**. Since 2.0.0-player.15 it gets albums too: **Get** on
+box, **your library first, then MusicBrainz** - its songs (since 2.0.0-player.53: find a song, see the
+albums it's on, open one on a pressing that has it) and its albums. Since 2.0.0-player.15 it gets albums too: **Get** on
 a row of albums you don't have, or **Get the album** on an album's page, opens the sources found on
 Soulseek to choose from - see [Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source) -
 and the app's Requests tab follows the download from there.
@@ -139,11 +140,11 @@ characters. Each half is asked by itself:
 
 - **Your library** is asked a fifth of a second after you stop typing.
 - **MusicBrainz** is asked when you press **Search** on the keyboard, or 0.7 seconds after you stop
-  typing once there are 3 characters or more. Fewer than 3, and it waits for Search: it says *Type
-  a little more, or press Search, to ask MusicBrainz.* - and cutting the box back below 3 clears
-  what MusicBrainz found for the longer text (and calls off a search still on its way), so its
-  albums never sit under words they don't answer. MusicBrainz allows about one request a second,
-  so it isn't asked on every key.
+  typing once there are 3 characters or more - for its songs and its albums at the same moment. Fewer
+  than 3, and it waits for Search: it says *Type a little more, or press Search, to ask MusicBrainz.* -
+  and cutting the box back below 3 clears what MusicBrainz found for the longer text, songs and albums
+  (and calls off a search still on its way), so nothing sits under words it doesn't answer.
+  MusicBrainz allows about one request a second, so it isn't asked on every key.
 
 Only the newest search is ever shown: an answer that arrives after you've typed something else,
 and searched again, is dropped.
@@ -172,6 +173,78 @@ deadwax holds - so it is titled **In the store**, each album row ends **· in yo
 store** (yours: starred by you, or in your library), an artist's count is the store's ("Artist · 2 albums in
 the store"), and the half below is **Not in the store yet**. With logins off, everything here is as
 written - [the player as you](player.md#the-player-as-you-with-logins-on).
+
+### Songs on MusicBrainz
+
+Since 2.0.0-player.53, between your library and MusicBrainz's albums: the **songs** MusicBrainz has for
+the box - for people who know a song but not the album it's on. They come first because a phone shows
+them first, but only **three** of them, so when what you typed is an album's name the albums are still on
+the screen under them. When no song matches at all, there's no songs section - the albums answer for what
+you typed.
+
+- **One row per song.** MusicBrainz keeps every performance of a song as a recording of its own - the
+  studio take, each live tape, each re-recording - and finds them all equally well, in no useful order
+  ("Roads" by Portishead is 45 recordings, Queen's "Bohemian Rhapsody" over 200). So every recording of
+  one title by one artist is **one row**, its albums put together; a remix ("Roads (Monk & Canatella
+  mix)"), or the same title by someone else, is a row of its own. A take titled "(live)" or "(Remastered
+  2015)" counts as the song itself. Each row is the song's title, then who it's by, its length on the album
+  it names and that album: "Roads · Portishead · 4:56 · Dummy". When you have the song - a pressing of one
+  of its albums that it's on - the row names that album and ends **· in your library** (with logins on,
+  **· in the store** when only the store has it). deadwax knows you have it when the pressing you hold is
+  one MusicBrainz's answer lists the song on, when your library's own search - the half above - finds the
+  song by that artist on that album, or when it already has the album's pressings from earlier (its page
+  opened, say) and yours has the song in its tracklist. A pressing of the album without the song isn't
+  having it: with The Slow Rush's usual CD in your library, Tame Impala's "Patience" (a bonus track on its
+  Japanese CD alone) says nothing of the sort. A song MusicBrainz lists on no release at all isn't shown -
+  there'd be nothing to get; when every song it found is like that, it says *MusicBrainz has songs for
+  "…", but on no release yet - nothing to get.*
+- **Tap a song** and it opens in place onto **the albums it's on**: albums and EPs first, then singles,
+  each official release before a promotional one before a bootleg, the earliest first. Compilations,
+  live albums, soundtracks, broadcasts and the rest wait behind one line saying what and how many there
+  are - "On 24 compilations, live albums, broadcasts and other records" - which opens them, in the same
+  order (a live radio or TV broadcast counts as a broadcast, not a live album). A song that's only on
+  those (Elliott Smith's "Miss Misery") lists them at once, under those words. Each album says what it is
+  and when ("Live album · Bootleg · 1997"), who it's by when that isn't the song's artist ("Compilation ·
+  Various Artists · 2015"), the song's length there when it's another performance's ("· 5:36"), and **·
+  in your library** when you have it with the song on it - **· a pressing in your library** when you have
+  a pressing of it that nothing yet says has the song or hasn't (**· a pressing in the store** with logins
+  on, when it's only the store's). That happens because MusicBrainz often keeps one song as several
+  recordings across an album's pressings, and its answer names only some of them: Dummy's 1994 CD has Roads
+  as a recording the first answer for "roads portishead" doesn't bring, while The Slow Rush's usual CD
+  hasn't "Patience" at all. Tap the song again to close it.
+- **Tap an album** you don't have and it opens as [the album you don't have](#the-album-you-dont-have),
+  on a pressing that **has the song**, with the song marked - [below](#opened-from-a-song). Tap one you
+  have the song on and it opens **the album you have**, as the Library would (while Navidrome hasn't found
+  it, or can't be asked, the album you don't have, which says "in your library"). Tap one that says **a
+  pressing in your library** and deadwax first fetches the album's pressings - the row looks busy meanwhile;
+  the album's page would fetch them anyway, and keeps them - then opens the album you have when the
+  pressing you hold has the song (the row then says **in your library** while the app keeps that album's
+  pressings), and otherwise the album you don't have, on a pressing with the song, where Get is. If
+  MusicBrainz can't list the pressings, it opens the album you don't have.
+- **More songs**, under the rows, shows the rest of the songs MusicBrainz sent (25 recordings a request),
+  then asks for the next 25 of the same search: a later take of a song already listed adds its albums to
+  that row, and new songs come after the others (a song whose earlier takes were on no release among
+  them), so nothing you were looking at moves. It reads **Asking
+  MusicBrainz…** while it asks, and says when a page brought only albums ("No new songs - 7 more albums
+  for the songs above.") or nothing (*MusicBrainz sent nothing new.*). No page starts more than 1,000
+  answers in.
+
+The box is read as it is for albums ([below](#not-in-your-library-yet)): a title beside an artist you
+have is that song by them ("roads portishead" is Roads by Portishead), and if that finds nothing it's
+asked again as the words you typed taken as **one title** - so a song whose title starts with the name of
+an artist you have is still found - not the words loose, which would bring strangers' songs named after
+the artist above an album's words. An **artist's name alone** asks for no songs - every
+recording they ever made, in no useful order, is no answer to it; their albums are below. **Words with no
+artist you have are matched against song titles only**, so a famous title alone mostly finds covers:
+"hey jude" alone finds tribute bands and string quartets, and no Beatles in its first pages. Type the
+artist too - an artist in your library is read as the artist. While it asks it says **Asking
+MusicBrainz…**; if MusicBrainz isn't answering it says so, with its own **Try again**.
+
+The albums below don't wait for the songs: they're drawn the moment MusicBrainz has answered for them,
+as they always were. Songs that arrive after the albums are on the screen never push them down - they
+stay folded in the line that was saying *Asking MusicBrainz…*, the same height, as a **Show songs**
+button that opens them (or *No songs on MusicBrainz for "…"* when none matched, or *MusicBrainz isn't
+answering.* with **Try again**, which opens the songs once they come).
 
 ### Not in your library yet
 
@@ -219,6 +292,9 @@ How the box is read, since there's only one:
 - **It is an artist you have**: their albums.
 - **va**, or "various artists", is Various Artists, as the main page's artist box reads it.
 - **Anything else** goes to MusicBrainz as you typed it.
+
+[Songs on MusicBrainz](#songs-on-musicbrainz) read the box the same way - for a song by that title
+instead of an album - except that an artist's name alone asks for no songs.
 
 If reading it as an artist and an album finds nothing (an artist's name that happens to begin a
 title), it's asked again as the words you typed. While it asks, it says **Asking MusicBrainz…**
@@ -336,6 +412,17 @@ At the foot of the page (since 2.0.0-player.50), after the words **On MusicBrain
 **This pressing ↗** open the album's page and the chosen pressing's on musicbrainz.org, beside the app -
 in a new tab, so the music keeps playing.
 
+
+#### Opened from a song
+
+An album opened from [a song](#songs-on-musicbrainz) (since 2.0.0-player.53) opens on a pressing that
+has it: the usual one when that has the song, and otherwise the most usual of the pressings that do -
+Tame Impala's "Patience" is a bonus track on The Slow Rush's Japanese CD alone, so The Slow Rush opens on
+that CD (Get the album then gets it). The song is **marked** in the tracklist - tinted, barred and in the
+accent, and a screen reader says "the song you searched for" - and the page scrolls to it as it opens. A
+song MusicBrainz keeps as another recording on the usual pressing (Borderline's single mix) is found by
+its title there. Choose another pressing and that's the one shown from then on, the song marked wherever
+it is on it. The address keeps the song (`?song=`), so a reload or a link opens it the same way.
 ### Another pressing of an album you have
 
 Since 2.0.0-player.41 an album you have - its own page in the app, played from your library - ends

@@ -37,6 +37,11 @@ And for the Requests tab and Home's Arriving (2.0.0-player.12):
 - A row being cancelled fades its cover, title and bar, never the words saying "cancelling…".
 - An Arriving card's state word gives way before the album's name.
 
+And for song search (2.0.0-player.53): a song's albums open under it, indented to its title, `hidden` hiding
+them; its chevron turns (still for reduced motion); its fold a finger-tall text button; the songs' slot one
+height whatever folds into it (review); and the song an album was opened from tinted, barred and in the accent
+in its tracklist, a Bonus track keeping its green.
+
 And for the Search tab and the album you don't have (2.0.0-player.13):
 
 - The search field's text is never under 16px, or iOS zooms the page as it is tapped.
@@ -1490,6 +1495,75 @@ def test_the_sample_rate_chip_rings_as_the_sort_does():
 PHONE = ".app-shell:not(.app-desk)"
 PHONE_HEADING = "/* ===== looking after deadwax from a phone (2.0.0-player.47)"
 
+
+
+# ---------------------------------------------------------------- song search (2.0.0-player.53)
+
+def test_a_songs_albums_open_under_it_and_hidden_hides_them():
+    """A song's row opens in place onto the albums it is on: indented by the song's cover and its gap, so
+    their covers line up with the song's title - and `hidden` hides them, nothing setting their display."""
+    assert declarations(APP, ".app-song-albums")["padding"] == "0 0 var(--app-song-gap) var(--app-song-indent)"
+    assert ALL_TOKENS["--app-song-indent"] == "calc(var(--app-result-cover) + var(--app-result-gap))"
+    for selector in (".app-song-albums", ".app-song-list"):
+        assert "display" not in declarations(APP, selector), selector
+    #? an album row under its song: a smaller cover, still a finger's row
+    assert declarations(APP, ".app-song-album")["min-height"] == "var(--app-song-album)" and px("--app-song-album") >= px("--pl-hit")
+    cover = declarations(APP, ".app-song-album .app-result-cover")
+    assert (cover["width"], cover["height"]) == ("var(--app-song-cover)", "var(--app-song-cover)") and px("--app-song-cover") < px("--app-result-cover")
+    #? (review) its line wraps: "another pressing in your library" was cut to "another pressing in yo…" at 390 wide
+    assert declarations(APP, ".app-song-album .app-result-line")["white-space"] == "normal"
+    assert declarations(APP, ".app-song-album")["padding"] == "var(--app-song-gap) 0"
+
+
+def test_a_songs_chevron_turns_as_it_opens_and_stands_still_for_reduced_motion():
+    assert declarations(APP, '.app-song-row[aria-expanded="true"] .app-song-chevron')["transform"] == "rotate(var(--app-song-turn))"
+    assert ALL_TOKENS["--app-song-turn"] == "180deg"
+    assert declarations(APP, ".app-song-chevron")["transition"] == "transform var(--dw-duration) var(--dw-ease)"
+    assert declarations(APP, ".app-song-chevron", "@media (prefers-reduced-motion: reduce)")["transition"] == "none"
+
+
+def test_a_songs_fold_is_a_text_button_a_finger_tall_and_its_caption_quieter():
+    source = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Search.tsx").read_text()
+    assert 'class="app-text-button app-song-fold"' in source
+    assert declarations(APP, ".app-text-button")["min-height"] == "var(--dw-row)" and px("--dw-row") >= px("--pl-hit")
+    fold = declarations(APP, ".app-song-fold")
+    assert (fold["width"], fold["text-align"], fold["font-size"]) == ("100%", "left", "var(--dw-text-footnote)")
+    assert declarations(APP, ".app-song-caption")["color"] == "var(--dw-text-2)"
+
+
+def test_the_songs_slot_holds_one_height_whatever_folds_into_it():
+    """(review) The albums never wait for the songs, so songs landing after the albums are drawn come folded into
+    the slot that was asking - Show songs, why there are none, MusicBrainz away with Try again. The slot is one
+    fixed height, room for a button a finger tall, every line in it one line (ending in an ellipsis), so nothing
+    drawn below it moves; and it clips nothing, so a focused button keeps its ring."""
+    slot = declarations(APP, ".app-song-slot")
+    assert slot["height"] == "var(--app-song-slot)" and "min-height" not in slot and "overflow" not in slot
+    assert length("--app-song-slot") >= length("--dw-row") >= px("--pl-hit")
+    assert declarations(APP, ".app-song-slot .app-asking")["padding"] == "0"
+    line = declarations(APP, ".app-song-slot .app-search-empty")
+    assert (line["white-space"], line["overflow"], line["text-overflow"], line["padding"]) == ("nowrap", "hidden", "ellipsis", "0")
+    assert declarations(APP, ".app-song-show")["width"] == "100%" and declarations(APP, ".app-button")["min-height"] == "var(--dw-row)"
+    source = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Search.tsx").read_text()
+    #? the asking line drawn in the slot, and every late state in one
+    assert re.search(r'<div class="app-song-slot">\s*<div class="app-asking" role="status">', source)
+    assert source.count('class="app-song-slot') == 3
+
+
+def test_the_song_an_album_was_opened_from_is_marked_in_its_tracklist():
+    """Tinted as a chosen row is, barred in the accent at its start, its title in the accent - the tint past
+    the column as a marked row's is, so its number and length stay in line; a Bonus track keeps its green,
+    another version or a rename its amber."""
+    song = declarations(APP, ".app-rg-track.is-song")
+    assert (song["background"], song["box-shadow"]) == ("var(--dw-selected-row)", "inset var(--app-song-bar) 0 0 var(--dw-accent)")
+    marked = declarations(APP, ".app-rg-track.is-marked")
+    assert song["margin"] == marked["margin"] and song["border-radius"] == marked["border-radius"]
+    assert song["padding"] == "0 var(--app-rg-mark-bleed)"
+    assert declarations(APP, ".app-rg-track.is-song.is-marked")["padding"] == marked["padding"]
+    assert declarations(APP, ".app-rg-track.is-song.is-bonus")["background"] == "var(--dw-tint-green)"
+    for kind in ("is-version", "is-renamed"):
+        assert declarations(APP, f".app-rg-track.is-song.{kind}")["background"] == "var(--dw-tint-amber)", kind
+    title = declarations(APP, ".app-rg-track.is-song .app-rg-title")
+    assert (title["color"], title["font-weight"]) == ("var(--dw-accent)", "var(--dw-weight-semibold)")
 
 def section(css: str, heading: str) -> str:
     """A section of a stylesheet: from its heading to the next section's (`/* ===== `), or to the end of the

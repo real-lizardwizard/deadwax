@@ -278,6 +278,31 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   Tap **Try again** in a minute; the album page never shows part of a pressing list as if it were
   all of it. You's **Connections** says whether deadwax can reach MusicBrainz at all, and [The
   MusicBrainz pill is red](#the-musicbrainz-pill-is-red) goes through why it might not.
+- **The same words under Songs on MusicBrainz** (since 2.0.0-player.53): the song search couldn't get an
+  answer. Its own **Try again** asks for the songs alone; the albums' asks for the albums (and the songs
+  too, only if they failed as well). When the albums were already on the screen it's shorter - *MusicBrainz
+  isn't answering.* with **Try again** beside it, in the line that was asking, so nothing under it moves.
+- **A song I know isn't under Songs on MusicBrainz, or only covers of it are**: words with no artist you
+  have are matched against song **titles** only, so a famous title alone finds tribute bands and string
+  quartets ("hey jude" alone has no Beatles in its first pages). Type the artist with the title - an artist in your
+  library is read as the artist ("roads portishead"). Even then a famous song can have hundreds of takes
+  in no useful order (Hey Jude by The Beatles is 219): its row gathers them, and **More songs** adds the
+  albums of the next 25 to it - the studio album can take a page or two to arrive.
+- **An album opened from a song shows a pressing that isn't its usual one**: on purpose - the usual one
+  hasn't got the song (a bonus track, say), so it opens on one that has. Choose another in **Pressing**.
+- **Songs on MusicBrainz shows only "Show songs"**: the songs arrived after the albums were already on
+  the screen, so they wait behind that button rather than pushing the albums down under your finger. Tap
+  it.
+- **An album under a song says "a pressing in your library"**: you have a pressing of that album, and
+  nothing deadwax has yet says whether the song is on it. MusicBrainz often keeps one song as several
+  recordings across an album's pressings and names only some of them in its answer, so the pressing you
+  hold can have the song under one the search didn't bring (Dummy's 1994 CD, for "roads portishead") - or
+  not have it at all (The Slow Rush's usual CD, for the Japanese CD's bonus track "Patience"). Tap it:
+  deadwax fetches the album's pressings first (the row looks busy) and opens **the album you have** when
+  yours has the song, otherwise the album you don't have, on a pressing that has it, where **Get** gets
+  it. When your library's own search (the half above) finds the song by that artist on that album, it
+  says **in your library** straight away. If it opened the album you don't have because MusicBrainz
+  couldn't list the pressings, the page tries again itself.
 - **"Asking MusicBrainz…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
   request. An album page fetches every pressing's tracklist, which for an album with hundreds of
   pressings is several requests one after another. Once it has them it keeps them while the app is

@@ -1,6 +1,6 @@
 import { ApiError, MusicBrainzUnavailable, get } from './http'
 import type {
-  ArtistFacts, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse,
+  ArtistFacts, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse, SongSearchResponse,
 } from './types'
 
 /**
@@ -40,6 +40,24 @@ export async function fullySearch(
 
   try {
     return await get<FullySearchResponse>(`/search_musicbrainz/fully_search?${params}`, signal)
+  } catch (error) {
+    throw asUnavailable(error)
+  }
+}
+
+/**
+ * Songs on MusicBrainz (2.0.0-player.53): the recordings matching `query` - the box read as the album
+ * search reads it (lib/searchQuery.ts songSearchQuery) - each with every release it is on, so the albums
+ * a song is on come in the same answer. `limit` recordings a page (lib/songs.ts SONG_SEARCH_LIMIT, the
+ * route's); `offset` sent only past the first page, as fullySearch sends it. Resolves to an empty list for
+ * nothing found; throws MusicBrainzUnavailable when MusicBrainz is away - never the one for the other.
+ */
+export async function searchSongs(query: string, limit: number, signal?: AbortSignal, offset = 0): Promise<SongSearchResponse> {
+  const params = new URLSearchParams({ query, limit: String(limit) })
+  if (offset > 0) params.set('offset', String(offset))
+
+  try {
+    return await get<SongSearchResponse>(`/search_musicbrainz/songs?${params}`, signal)
   } catch (error) {
     throw asUnavailable(error)
   }

@@ -79,6 +79,10 @@ check('...with logins off (or break-glass) everything the store has is in your l
   [W.heldPhrase(false, false), W.heldPhrase(false, true), W.heldLabel(false, false)], ['in your library', 'in your library', 'In your library'])
 check('...and a `yours` the server left out (it couldn\'t read your library) never reads "not yours"',
   [W.heldPhrase(true, undefined), W.isYours({}), W.anyYours([{ yours: false }, {}]), W.anyYours([{ yours: false }])], ['in your library', true, true, false])
+//? (2.0.0-player.53, review) a song's album held only as a pressing nothing says has the song or hasn't: "a pressing", in the same words
+check('a pressing held that nothing says has a song\'s song or hasn\'t: "a pressing in your library", the store\'s with a library of your own - never "another" (second review)',
+  [W.pressingHeldPhrase(true, false), W.pressingHeldPhrase(true, true), W.pressingHeldPhrase(false, false), W.pressingHeldPhrase(true, undefined)],
+  ['a pressing in the store', 'a pressing in your library', 'a pressing in your library', 'a pressing in your library'])
 
 console.log('\nwhose an album as Navidrome answers it is: starred by you, or held by your library')
 check('starred by you is yours, whatever the library says - Amperfy\'s star before deadwax reads it back',
@@ -214,7 +218,8 @@ console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the s
   const page = read('app/ReleaseGroupPage.tsx')
   check('...the page lays the store line\'s answer for the pressing on screen over its folders, the marks and the place from them',
     [/const said = store && store\.id === shownId \? store\.state : null\s+const holding = ownership \? withStoreLine\(ownership\.held, said\) : null/.test(page),
-      /const shownId = useMemo\(\(\) => chosenPressingId\(releases, release\), \[answer, release\]\)/.test(page), /const known = said\n/.test(page),
+      //? (2.0.0-player.53) the pressing on screen: the address's, else - opened from a song - one with the song
+      /const shownId = useMemo\(\(\) => chosenPressingId\(releases, asked\), \[answer, asked\]\)/.test(page), /const known = said\n/.test(page),
       /const yoursKey = personal \? releaseIds\(\(holding \?\? \[\]\)\.filter\(isYours\)\) : null/.test(page)],
     [true, true, true, true])
   check('...and asks the library again every time it shows, as the store line is asked',

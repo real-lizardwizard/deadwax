@@ -12,8 +12,12 @@ real app, start(), with a real MusicBrainzClient whose network is a fake that co
   page asked exactly as before (no offset sent - the same cache entry), each page cached apiece,
   MusicBrainz's `count` passed on, and an offset outside 0-FULLY_SEARCH_OFFSET_MAX a 422 with nothing
   asked - the app keeps the same bound.
+- `/songs` (2.0.0-player.53, the app's "Songs on MusicBrainz") is one recording search a page - its answer
+  already holds the albums each song is on - paged and cached as /fully_search is, a failure a 503 that
+  says so and never kept, and its query, limit and offset bounded, a 422 outside with nothing asked.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -384,3 +388,153 @@ def test_artist_refuses_anything_but_an_mbid(app_client, musicbrainz, bad):
 
     assert app_client.get("/deadwax/search_musicbrainz/artist", params={"mbid": bad}).status_code == 422
     assert fake.calls == []
+
+
+# ---------------------------------------------------------------- /songs (2.0.0-player.53)
+
+SONGS = Path(__file__).resolve().parent / "fixtures" / "songs"
+
+
+def recorded(name):
+    """A recording search as MusicBrainz answered it on 2026-10-15 (tests/fixtures/songs/, trimmed)."""
+    return json.loads((SONGS / f"{name}.json").read_text())
+
+
+class Recordings:
+    """MusicBrainz's recording search: `recordings` paged by offset and limit, with its `count` - or a
+    refusal (a 403 gives up at once)."""
+
+    def __init__(self, recordings, count=None, status_code=200):
+        self.recordings = recordings
+        self.count = len(recordings) if count is None else count
+        self.status_code = status_code
+        self.calls = []
+
+    async def get(self, endpoint, params=None):
+        self.calls.append((endpoint, dict(params or {})))
+        if self.status_code != 200:
+            return Answer(status_code=self.status_code)
+        offset = int((params or {}).get("offset", 0))
+        limit = int((params or {}).get("limit", 25))
+        return Answer({"created": "2026-10-15T00:00:00Z", "count": self.count, "offset": offset,
+                       "recordings": self.recordings[offset:offset + limit]})
+
+
+ROADS_QUERY = 'recording:"Roads" AND (artist:"Portishead" OR artistname:"Portishead")'
+
+
+def test_songs_is_one_recording_search_and_carries_the_albums(app_client, musicbrainz):
+    """One request a page - MusicBrainz's recording search, nothing asked per album: its answer already
+    holds each recording's releases with their release group, status, date and country, passed on as sent."""
+    roads = recorded("roads-portishead")
+    fake = Recordings(roads["recordings"], count=roads["count"])
+    musicbrainz[1]["fake"] = fake
+
+    body = app_client.get("/deadwax/search_musicbrainz/songs", params={"query": ROADS_QUERY}).json()
+
+    [(endpoint, params)] = fake.calls
+    assert endpoint == "recording/"
+    assert params == {"query": ROADS_QUERY, "fmt": "json", "limit": 25}, "no offset on the first page, and no inc: the answer has the releases already"
+    assert [recording["id"] for recording in body["recordings"]] == [recording["id"] for recording in roads["recordings"]]
+    assert body["count"] == 45
+    studio = next(recording for recording in body["recordings"] if recording["id"] == "ef37de8d-8fab-42ed-82da-fbfe25715989")
+    assert {release["release-group"]["title"] for release in studio["releases"]} == {"Dummy", "Dummy / Portishead"}
+    assert all({"status", "release-group", "media"} <= set(release) for release in studio["releases"])
+
+
+def test_songs_pages_on_by_offset_each_cached_apiece(app_client, musicbrainz):
+    many = [{"id": f"r{n}", "title": "Roads", "releases": []} for n in range(60)]
+    fake = Recordings(many)
+    musicbrainz[1]["fake"] = fake
+
+    for offset in (0, 25, 0, 25):
+        body = app_client.get("/deadwax/search_musicbrainz/songs", params={"query": "roads", "offset": offset}).json()
+        assert [recording["id"] for recording in body["recordings"]] == [f"r{n}" for n in range(offset, offset + 25)]
+
+    assert [params.get("offset", 0) for _, params in fake.calls] == [0, 25], "each page asked once, the repeats from the cache"
+
+
+def test_songs_nothing_found_is_an_empty_list_not_a_failure(app_client, musicbrainz):
+    musicbrainz[1]["fake"] = Recordings([])
+
+    answer = app_client.get("/deadwax/search_musicbrainz/songs", params={"query": "zzzz qqqq"})
+
+    assert answer.status_code == 200 and answer.json() == {"recordings": [], "count": 0}
+
+
+def test_songs_without_a_count_says_none(app_client, musicbrainz):
+    class Uncounted(Recordings):
+        async def get(self, endpoint, params=None):
+            answer = await super().get(endpoint, params)
+            answer.payload["count"] = "lots"
+            return answer
+
+    musicbrainz[1]["fake"] = Uncounted([{"id": "r1", "title": "Roads", "releases": []}])
+
+    body = app_client.get("/deadwax/search_musicbrainz/songs", params={"query": "roads"}).json()
+
+    assert body == {"recordings": [{"id": "r1", "title": "Roads", "releases": []}]}
+
+
+def test_songs_failure_is_a_503_that_says_so_and_never_cached(app_client, musicbrainz):
+    musicbrainz[1]["fake"] = Recordings([], status_code=403)
+
+    failed = app_client.get("/deadwax/search_musicbrainz/songs", params={"query": ROADS_QUERY})
+
+    assert failed.status_code == 503
+    assert "MusicBrainz is unreachable right now" in failed.json()["detail"]
+    assert "isn't a problem with your search terms" in failed.json()["detail"]
+
+    roads = recorded("roads-portishead")
+    recovered = Recordings(roads["recordings"])
+    musicbrainz[1]["fake"] = recovered
+    for _ in range(2):
+        assert len(app_client.get("/deadwax/search_musicbrainz/songs", params={"query": ROADS_QUERY}).json()["recordings"]) == 12
+    assert len(recovered.calls) == 1, "Try again asks (the failure wasn't kept), and the success was kept"
+
+
+def test_songs_answer_that_is_not_a_recording_list_is_a_failure(app_client, musicbrainz):
+    """An answer without its `recordings` list is MusicBrainz misbehaving, never "no songs" (fully_search's trap)."""
+    class Odd(Recordings):
+        async def get(self, endpoint, params=None):
+            self.calls.append((endpoint, dict(params or {})))
+            return Answer({"error": "something else"})
+
+    musicbrainz[1]["fake"] = Odd([])
+
+    assert app_client.get("/deadwax/search_musicbrainz/songs", params={"query": "roads"}).status_code == 503
+
+
+@pytest.mark.parametrize("bad", [
+    {"query": "roads", "offset": "-1"}, {"query": "roads", "offset": "1001"}, {"query": "roads", "offset": "twelve"},
+    {"query": "roads", "offset": "1.5"}, {"query": "roads", "limit": "0"}, {"query": "roads", "limit": "101"},
+    {"query": "roads", "limit": "many"}, {"query": ""}, {"query": "   "}, {"query": "r" * 1001}, {},
+])
+def test_songs_refuses_anything_out_of_bounds_asking_nothing(app_client, musicbrainz, bad):
+    from src.routes.search_musicbrainz import SONG_SEARCH_LIMIT_MAX, SONG_SEARCH_OFFSET_MAX, SONG_SEARCH_QUERY_MAX
+
+    fake = Recordings([{"id": "r1", "title": "Roads", "releases": []}])
+    musicbrainz[1]["fake"] = fake
+
+    assert (SONG_SEARCH_LIMIT_MAX, SONG_SEARCH_OFFSET_MAX, SONG_SEARCH_QUERY_MAX) == (100, 1000, 1000)
+    assert app_client.get("/deadwax/search_musicbrainz/songs", params=bad).status_code == 422
+    assert fake.calls == [], "nothing asked of MusicBrainz for a search it would never be asked"
+
+
+def test_songs_takes_the_bounds_themselves(app_client, musicbrainz):
+    fake = Recordings([{"id": "r1", "title": "Roads", "releases": []}], count=5000)
+    musicbrainz[1]["fake"] = fake
+
+    for params in ({"query": "r", "limit": "1"}, {"query": "roads", "limit": "100"}, {"query": "roads", "offset": "0"},
+                   {"query": "roads", "offset": "1000"}, {"query": "r" * 1000}):
+        assert app_client.get("/deadwax/search_musicbrainz/songs", params=params).status_code == 200
+    assert [params["limit"] for _, params in fake.calls] == [1, 100, 25, 25, 25]
+
+
+def test_songs_and_albums_page_no_further_than_one_bound_and_the_app_asks_the_routes_page():
+    """lib/songs.ts asks the route's own page size, and pages no further than the album half - one bound."""
+    from src.routes.search_musicbrainz import FULLY_SEARCH_OFFSET_MAX, SONG_SEARCH_LIMIT, SONG_SEARCH_OFFSET_MAX
+
+    source = (Path(__file__).resolve().parent.parent / "ui" / "src" / "lib" / "songs.ts").read_text()
+    assert SONG_SEARCH_OFFSET_MAX == FULLY_SEARCH_OFFSET_MAX
+    assert f"export const SONG_SEARCH_LIMIT = {SONG_SEARCH_LIMIT}" in source

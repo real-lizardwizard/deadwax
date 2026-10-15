@@ -32,6 +32,10 @@
  *
  * The box holds at most SEARCH_MAX_CHARS - the bound deadwax's /navidrome/search declares, so a
  * paste can't become a 422 that reads as a URL with a Try again that can never work (review).
+ *
+ * SONGS (2.0.0-player.53): the song search reads the box the same way (songSearchQuery) - a title beside an
+ * artist you have is `recording:"title" AND (artist:"A" OR artistname:"A")`, falling back to the words typed
+ * as one title (songTitleQuery); anything else the words typed; and an artist alone asks no songs at all.
  */
 
 import { fieldedAlbumQuery } from './release'
@@ -143,6 +147,43 @@ export function searchQuery(
   }
 
   return plan(words.join(' '), 'free', null, null)
+}
+
+/**
+ * A song by its title and artist (2.0.0-player.53): fieldedAlbumQuery's shape for a recording -
+ * `recording:"title" AND (artist:"A" OR artistname:"A")`, the artist as credited then or as called now (a
+ * recording's `artist` is its credit, `artistname` any of its artists' names), so a renamed artist's songs
+ * are found as their albums are.
+ */
+export function fieldedSongQuery(title: string, artist: string): string {
+  return `recording:${quoteTerm(title)} AND (artist:${quoteTerm(artist)} OR artistname:${quoteTerm(artist)})`
+}
+
+/**
+ * What the song search (2.0.0-player.53) asks for the box, read as the album half reads it (`plan`): a title
+ * beside an artist you have is that song by them (fieldedSongQuery); anything else the words typed, as the
+ * album half sends them - no type filter, which is about albums; an artist's name ALONE asks nothing - every
+ * recording they ever made, in MusicBrainz's relevance order (live tapes and all), is no answer to it, and
+ * their albums are the half below. Null for nothing to ask.
+ */
+export function songSearchQuery(text: string, plan: SearchPlan | null): string | null {
+  if (!plan || plan.kind === 'artist') return null
+  if (plan.kind === 'album-by-artist' && plan.title && plan.artist) return fieldedSongQuery(plan.title, plan.artist)
+  const words = text.trim().split(/\s+/).filter(Boolean).join(' ')
+  return words || null
+}
+
+/**
+ * What the song search falls back to when a title beside an artist found no song by them (2.0.0-player.53,
+ * review): the words typed as ONE title - `recording:"the words"` - so a title that starts with the name of an
+ * artist you have (read as that artist) still finds that title. Not the words loose, as the album half
+ * falls back: a recording search matches loose words against song titles alone, so an album's words beside its
+ * artist ("the slow rush tame impala") brought strangers' songs titled "Tame Impala" above the album. Null
+ * for nothing to ask.
+ */
+export function songTitleQuery(text: string): string | null {
+  const words = text.trim().split(/\s+/).filter(Boolean).join(' ')
+  return words ? `recording:${quoteTerm(words)}` : null
 }
 
 /** Whether the box has waited long enough, and holds enough, to ask MusicBrainz without an Enter. */

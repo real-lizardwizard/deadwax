@@ -49,6 +49,13 @@
  * album's name from the page that opened it - standing in as the title on a cold page until
  * MusicBrainz's own group arrives, never over it.
  *
+ * And for a song Search found (2.0.0-player.53): the page opens on a pressing that has the song - the usual
+ * one when it has it (Borderline's single mix: the usual pressing has Borderline, as another recording), else
+ * the one that does (Patience, only on The Slow Rush's Japanese CD) - never over a pressing the address
+ * names; the song marked in the tracklist (a Bonus track still one) and said to a screen reader, on a phone and
+ * in a desktop's table; brought into view once, as it is first drawn, only while the page shows and is at its
+ * top; and a pick on it written into the address even for the usual pressing.
+ *
  * And for the search extras (2.0.0-player.50): the chosen pressing's facts in one line under the picker
  * (under Get and it on a desktop), its whole in the tooltip, every option's facts between its label and
  * its note; "maybe in your library", dashed, for a folder of the album's name and artist with no ids -
@@ -907,6 +914,83 @@ async function main() {
     check('logins off: "in your library" over "Already in your library", nothing marked the store\'s - as ever',
       [meta(), storeLine(), mark()], ['1994 · in your library', 'Already in your library', [true, true, false]])
     globalThis.__group.owned = null
+  }
+
+  console.log('\nopened from a song Search found (2.0.0-player.53): a pressing with the song, the song marked and brought into view')
+  {
+    const rush = JSON.parse(fs.readFileSync(path.join(FIXTURES, '../songs/slow-rush-pressings.json'), 'utf8'))
+    const recording = (prefix) => rush.releases.flatMap((r) => r.media.flatMap((m) => m.tracks)).find((t) => t.recording.id.startsWith(prefix)).recording.id
+    const PATIENCE = recording('bba0e134'), SINGLE_MIX = recording('ebbf5e17')
+    const JP = rush.releases.find((r) => r.id.startsWith('452ccdb4')).id
+    const AU = rush.releases.find((r) => r.id.startsWith('1cf564b9')).id
+    //? under an id of its own: The Slow Rush's pressings without recording ids are kept for the session above
+    rush.group = '00000000-0000-4000-8000-0000000000a1'
+    const answeringRush = () => Promise.resolve({ id: rush.group, releases: rush.releases, problem: null })
+    //? a page's scroll and its tracklist's song row, as the browser would have them
+    const scrolled = []
+    globalThis.window = { scrollY: 0 }
+    const mount = (props) => {
+      const made = page({ id: rush.group, title: 'The Slow Rush', ...props })
+      made.draw()
+      const section = find((node) => node.type === 'section' && node.props.class === 'pl-album-page app-rg')[0]
+      section.props.ref.current = { querySelector: (selector) => (selector === '.is-song' ? { scrollIntoView: (how) => scrolled.push(how) } : null) }
+      return made
+    }
+    const songRows = () => classed('is-song').map((row) => text(row))
+
+    answers.length = 0
+    answers.push(answeringRush)
+    const { draw, picks } = mount({ song: PATIENCE })
+    await settle()
+    draw()
+    const view = find((node) => node.type === PressingPicker)[0]?.props.view
+    check('Patience, a bonus track: the page opens on the Japanese CD that has it, not the usual pressing', [view?.chosenId === JP, view?.defaultId === AU], [true, true])
+    check('...its Patience the one row marked - still a Bonus track - and said to a screen reader', [songRows(), classed('is-song')[0]?.props.class],
+      [['13Patience, the song you searched forOnly on this pressingBonus4:53'], 'app-rg-track is-marked is-bonus is-song'])
+    check('...brought into view once, as it is first drawn', scrolled, [{ block: 'nearest' }])
+    draw()
+    draw()
+    check('...and never again on that page', scrolled.length, 1)
+    find((node) => node.type === PressingPicker)[0].props.onPick(AU)
+    check('a pick on it is written into the address even when it is the usual pressing - so the song never overrules it', picks, [[rush.group, AU]])
+    draw({ release: AU })
+    check('...which then shows, the song not on it marked nowhere', [find((node) => node.type === PressingPicker)[0].props.view.chosenId === AU, songRows()], [true, []])
+
+    scrolled.length = 0
+    globalThis.window.scrollY = 640
+    const back = mount({ song: PATIENCE })
+    back.draw()
+    check('come back to with its scroll put back (or scrolled meanwhile): left where it is', [songRows().length, scrolled], [1, []])
+
+    globalThis.window.scrollY = 0
+    const away = mount({ song: PATIENCE, shown: false })
+    away.draw()
+    check('not showing (another tab, a sheet over it): nothing scrolled', scrolled, [])
+    away.draw({ shown: true })
+    check('...brought into view once it shows', scrolled, [{ block: 'nearest' }])
+
+    scrolled.length = 0
+    const single = mount({ song: SINGLE_MIX })
+    single.draw()
+    check('Borderline\'s single mix, another recording: the usual pressing has Borderline - it opens on that, Borderline marked',
+      [find((node) => node.type === PressingPicker)[0].props.view.chosenId === AU, songRows().map((row) => row.replace(/[0-9:]/g, ''))], [true, ['Borderline, the song you searched for']])
+    const named = mount({ song: PATIENCE, release: AU })
+    named.draw()
+    check('a pressing the address names wins over the song\'s', find((node) => node.type === PressingPicker)[0].props.view.chosenId === AU, true)
+    const plain = page({ id: rush.group })
+    plain.draw()
+    check('a page from no song marks nothing, scrolls nothing - and a pick of the usual pressing takes it out of the address, as ever', [classed('is-song').length, scrolled.length], [0, 1])
+    find((node) => node.type === PressingPicker)[0].props.onPick(AU)
+    check('...', plain.picks, [[rush.group, null]])
+
+    const desk = mount({ song: PATIENCE, desktop: true })
+    desk.draw()
+    //? the desktop's tracklist, a component of its own, drawn from the page's element as above
+    const deskTable = find((node) => node.type?.name === 'DeskTracklist')[0]
+    const marked = find((node) => node.type === 'tr' && typeof node.props.class === 'string' && node.props.class.includes('is-song'), deskTable.type(deskTable.props))
+    check('on a desktop: the table\'s row of the song marked and said', [marked.length, marked[0] && text(find(byClass('app-rg-title'), marked[0])[0])],
+      [1, 'Patience, the song you searched for'])
+    delete globalThis.window
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

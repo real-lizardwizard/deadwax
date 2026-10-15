@@ -83,6 +83,7 @@ ROUTES = {
     ("GET", "/deadwax/interface_logs/recent"): "admin",
     ("GET", "/deadwax/interface_logs/interface_logs"): "admin",
     ("GET", "/deadwax/search_musicbrainz/fully_search"): "user",
+    ("GET", "/deadwax/search_musicbrainz/songs"): "user",
     ("GET", "/deadwax/search_musicbrainz/discography"): "user",
     ("GET", "/deadwax/search_musicbrainz/releases"): "user",
     ("GET", "/deadwax/search_musicbrainz/release_group"): "user",

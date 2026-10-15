@@ -560,6 +560,50 @@ export interface FullySearchResponse {
   count?: number
 }
 
+/** The song on one release, as MusicBrainz's recording search carries it (2.0.0-player.53). */
+export interface RecordingTrack {
+  id?: string
+  /** where it sits on its medium, as printed: "6", "B5" */
+  number?: string
+  title?: string
+  length?: number | null
+}
+
+/** One release a recording is on, as the recording search carries it (2.0.0-player.53): its group (title,
+ *  types), status, date and country, and the medium the song is on with its track. */
+export interface RecordingRelease {
+  id: string
+  title?: string
+  status?: string | null
+  date?: string
+  country?: string | null
+  'artist-credit'?: ArtistCredit[]
+  'release-group'?: { id?: string; title?: string; 'primary-type'?: string | null; 'secondary-types'?: string[] } | null
+  media?: { position?: number; format?: string; 'track-offset'?: number; 'track-count'?: number; track?: RecordingTrack[] }[]
+}
+
+/** A recording - one performance of a song - from MusicBrainz's recording search (2.0.0-player.53). */
+export interface Recording {
+  id: string
+  title?: string
+  length?: number | null
+  /** "live, 2008-04-07: Heineken Music Hall, Amsterdam, Netherlands" for most live tapes */
+  disambiguation?: string
+  'artist-credit'?: ArtistCredit[]
+  releases?: RecordingRelease[]
+}
+
+/**
+ * GET /search_musicbrainz/songs (2.0.0-player.53): the recordings matching a query, each with every
+ * release it is on. An empty list is a search that matched nothing; MusicBrainz away is a 503, arriving as
+ * a MusicBrainzUnavailable error - kept apart, as FullySearchResponse's note says.
+ */
+export interface SongSearchResponse {
+  recordings?: Recording[]
+  /** how many recordings match in all, as MusicBrainz counts them - absent when it didn't say */
+  count?: number
+}
+
 export interface ReleasesResponse {
   id: string
   releases: Release[]

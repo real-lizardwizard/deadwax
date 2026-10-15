@@ -3299,3 +3299,16 @@
     /* Properties beside the cover's column: the songs' readable width */
     .app-desk .app-props { max-width: calc(var(--app-desk-content-max) + var(--pl-edge-left) + var(--pl-edge-right)); }
 }
+
+/* ===== song search on a desktop (2.0.0-player.53) =====
+   The song an album was opened from, in the desktop's tracklist table: its row tinted as a chosen row is (a
+   Bonus track keeps its green, another version its amber), barred in the accent at the number's edge, its
+   title in the accent - as on a phone. */
+@media (min-width: 1024px) {
+    .app-desk .app-rg-row.is-song td { background: var(--dw-selected-row); }
+    .app-desk .app-rg-row.is-song.is-bonus td { background: var(--dw-tint-green); }
+    .app-desk .app-rg-row.is-song.is-version td,
+    .app-desk .app-rg-row.is-song.is-renamed td { background: var(--dw-tint-amber); }
+    .app-desk .app-rg-row.is-song td:first-child { box-shadow: inset var(--app-song-bar) 0 0 var(--dw-accent); }
+    .app-desk .app-rg-row.is-song .app-rg-title { color: var(--dw-accent); font-weight: var(--dw-weight-semibold); }
+}

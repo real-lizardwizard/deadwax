@@ -51,6 +51,16 @@ export function heldLabel(personal: boolean, yours: boolean | null | undefined):
  *  read as a contradiction. */
 export const ANOTHER_PRESSING_YOURS = 'another pressing in your library'
 
+/** A pressing of an album is held, and nothing says whether it is one the line is about (2.0.0-player.53: a
+ *  song's album under the song in Search, when what the store holds of it is a pressing neither the recording
+ *  search, the library's own search nor the album's pressings say has the song - the bonus-track case, or the
+ *  song kept as another recording there): "a pressing in your library", or with a library of your own and none
+ *  of them yours, "a pressing in the store" - never "another", which read as a pressing WITHOUT the song
+ *  (second review). */
+export function pressingHeldPhrase(personal: boolean, yours: boolean | null | undefined): string {
+  return `a pressing ${heldPhrase(personal, yours)}`
+}
+
 const releaseOf = (album: { release_mbid?: string | null }) => (album.release_mbid ?? '').trim().toLowerCase()
 
 /**

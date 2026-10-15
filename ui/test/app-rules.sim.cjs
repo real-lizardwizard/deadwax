@@ -197,6 +197,17 @@
  *    listbox, only for a long list, emptied as it closes, its field's own keys left to it. After review:
  *    More's last page handing focus on when it had it; the Pressing button's close emptying the filter
  *    too; a pressing the list reveals kept clear of the filter by its scroll-padding.
+ *  - Song search (2.0.0-player.53): Search's songs through a latestOnly of their own, asked beside the albums
+ *    from the same reading (and once a text) - after the album half's own request, the albums never waiting
+ *    for them (review) - the library waited for as the albums wait; a title beside an artist that finds no
+ *    song asked again as the words typed as one title, free text never twice; songs landing after the albums
+ *    were drawn folded, by an answer drawn (an effect), never by its own Try again; More songs through it
+ *    too, merged with the drawn songs kept in place, only for its search; called off and emptied with the box;
+ *    drawn in a section of their own before the albums', a few at first; a song's album you have opening the
+ *    album you have through the held rows' latestOnly - else, the bridge answering nothing or failing, its page
+ *    with the song's recordings - App passing them in the address with the album's name, no preview and a
+ *    fresh scroll; the page choosing a pressing with the song, marking it on both frames, writing every pick,
+ *    and bringing it into view once, only while it shows and from its top; lib/songs.ts pure.
  *  - Inside a track (2.0.0-player.44): the Edit panel's track inspector (app/TrackInspector.tsx), the cover
  *    viewer (app/CoverViewer.tsx) and an album page's Properties (app/AlbumProperties.tsx) call no playback
  *    action - nothing on the list below gains a file. The inspector is drawn by the Edit panel alone, in
@@ -979,7 +990,8 @@ console.log('\nSearch: a song plays from the tap, with its album in hand; the ne
   //? (2.0.0-player.52, second review) the album page asks EVERY time it shows, as its store line is asked
   check('...whenever the album page shows, and beside each MusicBrainz search, which waits a moment for its answer',
     [/const owned = useOwned\(false\)\s*useEffect\(\(\) => \{\s*if \(shown\) void refreshOwned\(\)\s*\}, \[shown\]\)/.test(page), /const ownedAnswered = refreshOwned\(\)/.test(askMusicBrainz),
-      /await Promise\.race\(\[ownedAnswered, wait\(OWNED_WAIT_MS\)\]\)/.test(askMusicBrainz)],
+      //? (2.0.0-player.53, review) ...for the library alone - never the songs drawn above, so the albums draw when they always did
+      /await Promise\.race\(\[ownedAnswered, wait\(OWNED_WAIT_MS\)\]\)/.test(askMusicBrainz) && !/songsAnswered|Promise\.all/.test(askMusicBrainz)],
     [true, true, true])
   check('...and what MusicBrainz found is left out once, as drawn - never filtered again as the library\'s answer changes',
     [/shown: notInLibrary\(groups, ownedNow\(\)\?\.index \?\? null\)/.test(askMusicBrainz), /const found = musicbrainz\.state === 'done' \? musicbrainz\.shown : \[\]/.test(search)],
@@ -1034,6 +1046,88 @@ console.log('\nsearch extras (2.0.0-player.50): More from MusicBrainz, the press
     [true, true, true, true])
   check('...a pressing revealed by the list itself kept clear of the filter, by the list\'s own scroll-padding the arrows\' focus scrolling honours (review)',
     /const clear = typeof getComputedStyle === 'function' \? parseFloat\(getComputedStyle\(box\)\.scrollPaddingTop\) \|\| 0 : 0[\s\S]*?if \(top - clear < box\.scrollTop\) box\.scrollTop = top - clear/.test(picker), true)
+}
+
+console.log('\nsong search (2.0.0-player.53): Songs on MusicBrainz, and the album opened from a song')
+{
+  const search = code(read('app/Search.tsx'))
+  const askSongs = /function askSongs\(term: string, plan: SearchPlan, ownedAnswered: Promise<unknown>, beside: boolean\): void \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  const askMoreSongs = /async function askMoreSongs\(\) \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  const askMusicBrainz = /async function askMusicBrainz\(term: string\) \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  check('the songs through a latestOnly of their own, the fetch called off when superseded, drawn only while newest, never rejecting',
+    [/const songRequests = useMemo\(latestOnly, \[\]\)/.test(search), /const request = songRequests\.begin\(\)/.test(askSongs),
+      /searchSongs\(query, SONG_SEARCH_LIMIT, request\.signal\)/.test(askSongs), /if \(!request\.current\(\)\) return\s*const recordings = found\.recordings \?\? \[\]/.test(askSongs),
+      /catch \(reason\) \{\s*if \(!request\.current\(\) \|\| isAbort\(reason\)\) return/.test(askSongs)],
+    [true, true, true, true, true])
+  check('...asked beside the albums from the same reading - after the album half\'s request - the library\'s answer waited for as theirs is, and asked once for a text',
+    [/const request = musicRequests\.begin\(\)\s*setMusicbrainz\(\{ state: 'searching', text: term \}\)\s*const first = fullySearch\(plan\.query, MUSICBRAINZ_LIMIT, false, request\.signal\)\s*askSongs\(term, plan, ownedAnswered, true\)\s*try \{\s*let query = plan\.query\s*let found = await first/.test(askMusicBrainz),
+      /if \(request\.current\(\)\) await Promise\.race\(\[ownedAnswered, wait\(OWNED_WAIT_MS\)\]\)/.test(askSongs), /const key = `\$\{term\}\\n\$\{query \?\? ''\}`\s*if \(songsFor\.current === key\) return\n/.test(askSongs),
+      /const query = songSearchQuery\(term, plan\)/.test(askSongs)],
+    [true, true, true, true])
+  //? (review) the fallback: the words typed as one title, for a title beside an artist alone
+  check('...a title beside an artist finding no song asked again as the words typed, as ONE title - free text never asked twice',
+    [/const again = plan\.kind === 'album-by-artist' \? songTitleQuery\(term\) : null\s*if \(!found\.recordings\?\.length && again && request\.current\(\)\) \{\s*asked = again\s*found = await searchSongs\(again, SONG_SEARCH_LIMIT, request\.signal\)/.test(askSongs),
+      /export function songTitleQuery\(text: string\): string \| null \{\s*const words = text\.trim\(\)\.split\(\/\\s\+\/\)\.filter\(Boolean\)\.join\(' '\)\s*return words \? `recording:\$\{quoteTerm\(words\)\}` : null/.test(code(read('lib/searchQuery.ts')))],
+    [true, true])
+  //? (review) songs landing after the albums were drawn come folded - "drawn" meaning an answer the screen has had (an effect)
+  check('...songs landing after the album answer was drawn come folded: by an effect, so only once it has been drawn; never when asked by their own Try again',
+    [/const late = beside && albumsShown\.current === term/.test(askSongs), /visible: late \? 0 : SONG_ROWS_SHOWN,/.test(askSongs),
+      /useEffect\(\(\) => \{\s*albumsShown\.current = musicbrainz\.state === 'done' \|\| musicbrainz\.state === 'failed' \? musicbrainz\.text : null\s*\}, \[musicbrainz\]\)/.test(search),
+      /songsFor\.current = null\s*askSongs\(term, plan, refreshOwned\(\), false\)/.test(search)],
+    [true, true, true, true])
+  check('...More songs through the same latestOnly, by offset, merged in, drawing only for the search it was asked for',
+    [/const request = songRequests\.begin\(\)/.test(askMoreSongs), /searchSongs\(was\.query, SONG_SEARCH_LIMIT, request\.signal, was\.nextOffset\)/.test(askMoreSongs),
+      /const found = await searchSongs\([^)]*\)\s*if \(!request\.current\(\)\) return/.test(askMoreSongs), /appendSongs\(now\.recordings, page, now\.songs\)/.test(askMoreSongs),
+      /now\.state === 'done' && now\.text === term/.test(askMoreSongs)],
+    [true, true, true, true, true])
+  check('...called off and emptied as the box empties or is cut back, and as the tab goes',
+    [/setMusicbrainz\(\{ state: 'idle' \}\)\s*dropSongs\(\)\s*return/.test(search), /setMusicbrainz\(\(was\) => \(was\.state === 'idle' \? was : \{ state: 'idle' \}\)\)\s*dropSongs\(\)/.test(search),
+      /function dropSongs\(\) \{\s*songRequests\.supersede\(\)/.test(search), /musicRequests\.supersede\(\)\s*songRequests\.supersede\(\)\s*getRequests\.supersede\(\)/.test(search)],
+    [true, true, true, true])
+  check('...drawn in a section of their own BEFORE the albums\' (which is as it was), a few of them, its More a secondary button',
+    [/aria-labelledby="app-search-songs"[\s\S]*?<section ref=\{musicSection\}/.test(search), /const songsShown = songs\.state === 'done' \? songs\.songs\.slice\(0, songs\.visible\) : \[\]/.test(search),
+      /visible: late \? 0 : SONG_ROWS_SHOWN,/.test(askSongs), /<ul class="app-results">\{songsShown\.map\(songRow\)\}<\/ul>/.test(search)],
+    [true, true, true, true])
+  const openSongAlbum = /function openSongAlbum\(song: FoundSong, album: SongAlbum\) \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  check('a song\'s album you have opens the album you have, through the held rows\' latestOnly (called off as the box changes); else its page, with the song\'s recordings',
+    [/const releases = songAlbumHeldReleases\(index, album, song, evidence\)/.test(openSongAlbum),
+      /const yours = \(releases: readonly string\[\], request = heldRequests\.begin\(\)\) => \{\s*setOpening\(key\)/.test(openSongAlbum),
+      /navidromeAlbumFor\(releases, request\.signal\)/.test(openSongAlbum), /const open = \(\) => onOpenSongAlbum\(\{ id: album\.id, title: album\.title \}, album\.recordings\)/.test(openSongAlbum),
+      //? (review) the bridge answering nothing, or failing: its page all the same
+      /if \(found\) onOpenAlbum\([^\n]*\)\s*else open\(\)/.test(openSongAlbum), /if \(!request\.current\(\) \|\| isAbort\(reason\)\) return\s*setOpening\(null\)\s*open\(\)/.test(openSongAlbum)],
+    [true, true, true, true, true, true])
+  //? (second review) what you hold of a song's album told by more than the releases the song was found on: the library half's
+  //? songs and the session's kept pressings, in every line; a pressing the library half vouches for opens its album at once;
+  //? one nothing vouches for has the album's pressings asked first, through the same latestOnly, and kept
+  check('...what you hold told by the library half\'s songs and the kept pressings too, in every line; one it vouches for opened at once; one nothing vouches for: the pressings asked first, through the same latestOnly, kept, then the bridge or its page',
+    [/const evidence: SongEvidence = \{ heard: library\?\.results\.songs \?\? null, pressings: \(id\) => kept\(id\)\?\.releases \?\? null \}/.test(search),
+      /songAlbumLine\(album, song, index_, personal, evidence\)/.test(search), /songLine\(song, index_, personal, evidence\)/.test(search), /namedAlbum\(song, index_, evidence\)/.test(search),
+      /const holding = songAlbumHolding\(index, album, song, evidence\)\s*if \(holding\.albums\.length\) \{\s*heldRequests\.supersede\(\)\s*setOpening\(null\)\s*onOpenAlbum\(\{ id: holding\.albums\[0\]!/.test(openSongAlbum),
+      /if \(!holding\.other\.length \|\| kept\(album\.id\)\) \{\s*open\(\)\s*return\s*\}/.test(openSongAlbum),
+      /const request = heldRequests\.begin\(\)\s*setOpening\(key\)\s*getReleaseGroup\(album\.id, request\.signal\)\.then\(/.test(openSongAlbum),
+      /\(found\) => \{\s*if \(!request\.current\(\)\) return\s*if \(!found\.problem\) keep\(album\.id, found\)/.test(openSongAlbum),
+      /const held = songAlbumHeldReleases\(ownedNow\(\)\?\.index \?\? index, album, song, \{ \.\.\.evidence, pressings: \(\) => found\.releases \}\)\s*if \(held\.length\) \{\s*yours\(held, request\)\s*return\s*\}\s*setOpening\(null\)\s*open\(\)/.test(openSongAlbum)],
+    [true, true, true, true, true, true, true, true, true])
+  const app = code(read('app/App.tsx'))
+  check('App: the song\'s album opened with its recordings in the address, no preview (a Get builds from MusicBrainz\'s own group), and handed to the page',
+    [/const openSongAlbum = useCallback\(\(album: \{ id: string; title: string \}, song: readonly string\[\]\) => \{\s*const ids = songIds\(song\)/.test(app),
+      /\.\.\.\(ids\.length \? \{ song: ids\.join\(','\) \} : \{\}\)/.test(app), /<Search\b[^>]*onOpenSongAlbum=\{openSongAlbum\}/.test(app),
+      /<ReleaseGroupPage\b[\s\S]*?song=\{page\.song \?\? null\}/.test(app),
+      //? (review) the album's name standing in as the title, and a fresh scroll - unless it is the page on screen
+      /const page: Page = \{ kind: 'group', id: album\.id, \.\.\.\(album\.title \? \{ label: album\.title \} : \{\}\), \.\.\.\(ids\.length/.test(app),
+      /const address = scrollKey\(\{ tab: router\.nav\.tab, page \}\)\s*if \(address !== scrollKey\(currentRoute\(router\.nav\)\)\) scrolls\.current\.delete\(address\)\s*router\.open\(page\)/.test((/const openSongAlbum = useCallback\([\s\S]*?\n  \}, \[\]\)/.exec(app) ?? [''])[0]),
+      /const openSongAlbum = useCallback\([\s\S]*?groupPreviews\.current\.set/.test((/const openSongAlbum = useCallback\([\s\S]*?\n  \}, \[\]\)/.exec(app) ?? [''])[0])],
+    [true, true, true, true, true, true, false])
+  const page = code(read('app/ReleaseGroupPage.tsx'))
+  check('the page: the pressing asked for the address\'s, else one with the song; marked rows on both frames; a pick written whatever it is',
+    [/const asked = useMemo\(\(\) => release \?\? \(songKey \? songPressing\(releases, songKey\.split\(','\)\) : null\), \[answer, release, songKey\]\)/.test(page),
+      /const rows = trackRows\(chosen, diff, isSong\)/.test(page), (page.match(/\$\{row\.song \? ' is-song' : ''\}/g) ?? []).length,
+      (page.match(/\{row\.song && <span class="app-visually-hidden">\{SONG_WORDS\}<\/span>\}/g) ?? []).length,
+      /onPick=\{\(picked\) => onPick\(id, songKey \|\| picked !== view\.defaultId \? picked : null\)\}/.test(page)],
+    [true, true, 2, 2, true])
+  check('...brought into view once, only while it shows, only from the page\'s top, a row already in view left still',
+    /if \(songShown\.current \|\| !shown \|\| !rows\.some\(\(row\) => row\.song\)\) return\s*const row = page\.current\?\.querySelector<HTMLElement>\('\.is-song'\)\s*if \(!row\) return\s*songShown\.current = true\s*if \(typeof window === 'undefined' \|\| window\.scrollY > 0\) return\s*row\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(page), true)
+  check('lib/songs.ts is pure: no fetch, no playback, no DOM', /fetch\(|playTracks|document\.|window\./.test(code(read('lib/songs.ts'))), false)
 }
 
 console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
@@ -2151,7 +2245,8 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
   check('the pressing list marks what the library holds, from the page\'s one /library/owned answer (whose each is, as the store line last said - second review)',
     [/const ownership = owned \? ownedForGroup\(owned\.index, \{\s*groupId: mbid,\s*releaseIds: releases\.map\(\(release\) => release\.id\),[\s\S]*?\}\) : null\s*(?:const [^\n]*\n\s*){3}const holding = ownership \? withStoreLine\(ownership\.held, said\) : null/.test(page),
       //? (2.0.0-player.52) and which of those are yours: "In the store" for one that isn't, with a library of your own
-      /pressingsView\(releases, release, heldIds, yoursIds\)/.test(page),
+      //? (2.0.0-player.53) the pressing asked for: the address's, else - opened from a song - one with the song
+      /pressingsView\(releases, asked, heldIds, yoursIds\)/.test(page),
       /\{row\.held && <span class=\{`app-picker-held\$\{row\.inStore \? ' is-store' : ''\}`\}>\{row\.inStore \? 'In the store' : 'In your library'\}<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
     [true, true, true])
   //? James's decision kept (pin both): Search's MusicBrainz half leaves held groups out, and the artist

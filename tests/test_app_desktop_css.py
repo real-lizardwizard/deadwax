@@ -918,3 +918,15 @@ def test_every_class_a_not_exclusion_names_is_still_drawn():
     assert "is-refused" in named
     for name in sorted(named):
         assert re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", sources), f":not(.{name}) names a class ui/src never draws"
+
+
+def test_the_song_an_album_was_opened_from_is_marked_in_the_desktops_table():
+    """(2.0.0-player.53) As on a phone: its row tinted as a chosen row is (a Bonus track's green, another
+    version's amber kept), barred in the accent at the number's edge, its title in the accent."""
+    assert declarations(DESKTOP, ".app-desk .app-rg-row.is-song td", DESK)["background"] == "var(--dw-selected-row)"
+    assert declarations(DESKTOP, ".app-desk .app-rg-row.is-song.is-bonus td", DESK)["background"] == "var(--dw-tint-green)"
+    for kind in ("is-version", "is-renamed"):
+        assert declarations(DESKTOP, f".app-desk .app-rg-row.is-song.{kind} td", DESK)["background"] == "var(--dw-tint-amber)", kind
+    assert declarations(DESKTOP, ".app-desk .app-rg-row.is-song td:first-child", DESK)["box-shadow"] == "inset var(--app-song-bar) 0 0 var(--dw-accent)"
+    title = declarations(DESKTOP, ".app-desk .app-rg-row.is-song .app-rg-title", DESK)
+    assert (title["color"], title["font-weight"]) == ("var(--dw-accent)", "var(--dw-weight-semibold)")

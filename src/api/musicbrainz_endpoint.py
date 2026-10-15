@@ -643,6 +643,41 @@ class MusicBrainzClient:
             **counted,
         }
     
+    async def search_recordings(self, query: str, limit: int = 25, offset: int = 0) -> dict:
+        """
+        Recordings - songs - matching the query (2.0.0-player.53): the app's "Songs on MusicBrainz".
+
+        One request, and nothing more asked per song: MusicBrainz's recording search answers each
+        recording with its `releases`, every one carrying its `release-group` (id, title, primary and
+        secondary types), its status, date and country, and the track itself (`media[].track`: its
+        number, title and length) - which is all the app needs to say which albums a song is on and
+        open one on a pressing that has it. Measured on 2026-10-15: Queen's studio "Bohemian
+        Rhapsody" came with all 353 of its releases, in 133 release groups, in one answer.
+
+        `offset` is sent only past the first page, as fully_search does. The answer is `recordings`
+        (an empty list when nothing matched - never a failure) and MusicBrainz's `count` when it said
+        one; a failed request raises MusicBrainzUnavailable, so an outage never reads as no songs.
+        """
+        logger.info("searching musicbrainz for songs...")
+        params = {"query": query, "fmt": "json", "limit": limit}
+        if offset:
+            params["offset"] = offset
+        found = await self.request_with_retries("recording/", params)
+
+        #? request_with_retries answers a failure with an error dict rather than raising - the trap
+        #? fully_search documents: read as an answer, an outage would be "no songs found"
+        if found.get("status") == "failed" or not isinstance(found.get("recordings"), list):
+            reason = found.get("error", "unknown error")
+            logger.error(
+                f"MusicBrainz is unreachable, this is not a problem with your search ({reason})",
+                extra={"frontend": True, "src": "musicbrainz"},
+            )
+            raise MusicBrainzUnavailable(reason)
+
+        count = found.get("count")
+        counted = {"count": count} if isinstance(count, int) and not isinstance(count, bool) else {}
+        return {"recordings": found["recordings"], **counted}
+
     async def ping(self) -> dict:
         logger.info("pinging MusicBrainz to check connectivity")
         try: 

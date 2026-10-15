@@ -46,6 +46,57 @@ async def fully_search(
         raise HTTPException(status_code=500, detail=f"Error searching MusicBrainz: {e}")
 
 
+#? A song search's bounds (2.0.0-player.53). The app asks SONG_SEARCH_LIMIT recordings a page
+#? (ui/src/lib/songs.ts keeps the number); MusicBrainz serves at most 100 to one search page, so a
+#? limit past that is refused here rather than quietly cut short there. Its paging goes no further
+#? than the album search's - one bound for both halves of the app's MusicBrainz search - and the query
+#? no longer than the app's box (200 characters) read as a title and an artist, quoted, can make it.
+SONG_SEARCH_LIMIT = 25
+SONG_SEARCH_LIMIT_MAX = 100
+SONG_SEARCH_OFFSET_MAX = FULLY_SEARCH_OFFSET_MAX
+SONG_SEARCH_QUERY_MAX = 1000
+
+
+@router.get("/songs")
+async def songs(
+    request: Request,
+    query: str = Query(..., min_length=1, max_length=SONG_SEARCH_QUERY_MAX),
+    limit: int = Query(SONG_SEARCH_LIMIT, ge=1, le=SONG_SEARCH_LIMIT_MAX),
+    offset: int = Query(0, ge=0, le=SONG_SEARCH_OFFSET_MAX),
+):
+    """
+    A SONG search (2.0.0-player.53, step 7 of the multi-user plan): MusicBrainz's recordings matching
+    the query - the app's box read as the album search reads it (`recording:"..." AND (artist:"..." OR
+    artistname:"...")` for a title beside an artist you have, else the words typed) - for "Songs on
+    MusicBrainz" in its Search tab, where a song found shows the albums it is on.
+
+    ONE request a page, and the least that answers: a recording search's answer already carries each
+    recording's releases with their release group (title, primary and secondary types), status, date,
+    country and the track - so the albums a song is on come in the same answer, with nothing asked per
+    album. Cached in the ResponseCache like every MusicBrainz success (a failure never is); paged by
+    `offset` as /fully_search is, the first page asked with no offset. MusicBrainz away is a 503 that
+    says so - never an empty answer that reads as a song nobody recorded.
+    """
+    if not query.strip():
+        raise HTTPException(status_code=422, detail="A song search needs some words to search for.")
+
+    try:
+        mb_client = request.app.state.musicbrainz_client
+        return await mb_client.search_recordings(query, limit, offset=offset)
+
+    except MusicBrainzUnavailable as e:
+        #? 503 not 500, as /fully_search: nothing is wrong with the request, the upstream is down
+        raise HTTPException(
+            status_code=503,
+            detail=f"MusicBrainz is unreachable right now, so this search couldn't run. "
+                   f"This isn't a problem with your search terms - try again shortly. ({e})",
+        )
+
+    except Exception as e:
+        logger.error(f"Exception in /songs endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Error searching MusicBrainz for songs: {e}")
+
+
 #? The primary types MusicBrainz browse accepts. Validated here rather than passed straight
 #? through: an unrecognised value makes the whole browse return nothing, which would look
 #? exactly like an artist with no records.

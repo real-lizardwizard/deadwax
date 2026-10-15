@@ -16,6 +16,7 @@ import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type Requ
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import { newShelf } from '../lib/myLibrary'
+import { songIds } from '../lib/songs'
 import type { Look } from '../lib/turntable'
 import { AlbumPage } from '../player/AlbumPage'
 import { navidromeStatus, playedAlbum, sentFormat, type Album, type Artist, type NavidromeStatus } from '../player/api'
@@ -497,6 +498,22 @@ export function App() {
       if (oldest !== undefined) groupPreviews.current.delete(oldest)
     }
     const page: Page = { kind: 'group', id: group.id, ...(group.title ? { label: group.title } : {}) }
+    const address = scrollKey({ tab: router.nav.tab, page })
+    if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
+    router.open(page)
+  }, [])
+
+  /**
+   * An album a song is on (2.0.0-player.53), from Search's songs: its group's page, on the tab showing, with
+   * the song's recordings in the address (`?song=`) - the page opens on a pressing that has the song, and
+   * marks it. No preview: a song's albums come from a recording search, whose release groups carry no year
+   * or credit of their own, and a preview is what a Get builds its download from - so the header and the
+   * download come from MusicBrainz's own group with the pressings, the title standing in meanwhile (as
+   * "Other pressings" opens one). A group Search's album half showed is still drawn from what it showed.
+   */
+  const openSongAlbum = useCallback((album: { id: string; title: string }, song: readonly string[]) => {
+    const ids = songIds(song)
+    const page: Page = { kind: 'group', id: album.id, ...(album.title ? { label: album.title } : {}), ...(ids.length ? { song: ids.join(',') } : {}) }
     const address = scrollKey({ tab: router.nav.tab, page })
     if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
     router.open(page)
@@ -1086,7 +1103,7 @@ export function App() {
     [status, librarySeen],
   )
   const search = useMemo(
-    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenArtist={openLibraryArtist} onGet={openSources} />,
+    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenSongAlbum={openSongAlbum} onOpenArtist={openLibraryArtist} onGet={openSources} />,
     [status, searchSeen, searchActive],
   )
   const you = useMemo(
@@ -1176,6 +1193,7 @@ export function App() {
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
+        song={page.song ?? null}
         preview={groupPreviews.current.get(page.id) ?? null}
         title={page.label ?? ''}
         shown={pageShown && nav.tab === tab && !sourcesOver}

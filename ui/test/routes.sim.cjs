@@ -20,6 +20,8 @@
  *    to the page, forward by putting the pages passed back on top, never by searching the stack,
  *    since Go to album can put one album in a stack twice; onto another tab's entry it shows that
  *    tab AS IT WAS LEFT, pages kept, and rewrites the entry.
+ *  - (2.0.0-player.53) the album opened from a song: `?song=<id>,<id>` beside the pressing, not the page's
+ *    identity nor its scroll's, kept as a pressing is chosen, read back from a cold link.
  *  - The album you don't have (2.0.0-player.13): `#/<tab>/group/<rgid>?release=<mbid>` read and
  *    written; the pressing is in the address but not part of the page's identity, so choosing
  *    another REPLACES the entry (never a page pushed over it), keeps the page's scroll, and back
@@ -149,6 +151,28 @@ check('...and not where its scroll is kept', [R.scrollKey({ tab: 'search', page:
   nav = R.openPage(picked, album('al-1', 'Dummy'))
   const back = R.followRoute(nav, R.parseHash('#/search/group/rg-1?release=r-4').route)
   check('back onto it shows the pressing its entry names, label kept', back.stacks.search, [group('rg-1', 'r-4', 'Third')])
+}
+
+console.log('\nthe album opened from a song (2.0.0-player.53): its recordings in the address')
+{
+  const sung = (id, song, release, label) => ({ ...group(id, release, label), ...(song ? { song } : {}) })
+  check('a group opened from a song carries its recordings, commas as they are', R.formatRoute({ tab: 'search', page: sung('rg-1', 's-1,s-2') }), '#/search/group/rg-1?song=s-1,s-2')
+  check('...after the pressing, once one is chosen - and read back as itself', [R.formatRoute({ tab: 'search', page: sung('rg-1', 's-1', 'r-2') }),
+    R.parseHash('#/search/group/rg-1?release=r-2&song=s-1,s-2').route.page, R.parseHash('#/search/group/rg-1?song=s%2C1&release=r-2').canonical],
+    ['#/search/group/rg-1?release=r-2&song=s-1', sung('rg-1', 's-1,s-2', 'r-2'), '#/search/group/rg-1?release=r-2&song=s,1'])
+  check('...an empty song is none, and only a group takes one', [R.parseHash('#/search/group/rg-1?song=').canonical, R.parseHash('#/library/album/x?song=s-1').route.page,
+    R.formatRoute({ tab: 'library', page: { ...album('x'), song: 's-1' } })], ['#/search/group/rg-1', album('x'), '#/library/album/x'])
+  check('the song is not who the page is, nor where its scroll is kept', [R.samePage(sung('rg-1', 's-1'), group('rg-1')), R.scrollKey({ tab: 'search', page: sung('rg-1', 's-1', 'r-2', 'Third') })],
+    [true, '#/search/group/rg-1'])
+  const nav = R.openPage(R.startNav({ tab: 'search', page: null }), sung('rg-1', 's-1', null, 'Roads'))
+  const picked = R.replaceTop(nav, group('rg-1', 'r-2'))
+  check('a pressing chosen keeps the song (a pick names none) - and its label', [picked.stacks.search, R.formatRoute(R.currentRoute(picked))],
+    [[sung('rg-1', 's-1', 'r-2', 'Roads')], '#/search/group/rg-1?release=r-2&song=s-1'])
+  check('...the same pressing again changes nothing', R.replaceTop(picked, group('rg-1', 'r-2')) === picked, true)
+  check('...an address naming another song says which', R.replaceTop(picked, sung('rg-1', 's-9', 'r-2')).stacks.search, [sung('rg-1', 's-9', 'r-2', 'Roads')])
+  const deeper = R.openPage(picked, album('al-1', 'Dummy'))
+  check('back onto it: the pressing its entry names, the song kept', R.followRoute(deeper, R.parseHash('#/search/group/rg-1?release=r-3&song=s-1').route).stacks.search,
+    [sung('rg-1', 's-1', 'r-3', 'Roads')])
 }
 
 console.log('\nan artist (2.0.0-player.17)')
@@ -627,6 +651,16 @@ console.log('\nend to end: choosing a pressing on the album you don\'t have')
   d.router.update({ kind: 'album', id: 'rg-1', release: 'r-2' })
   d.router.update({ kind: 'group', id: 'rg-other', release: 'r-2' })
   check('an update for another page does nothing', d.hashes(), ['#/search', '#/search/group/rg-1'])
+
+  //? (2.0.0-player.53) opened from a song: a pick replaces the entry with the pressing AND the song
+  const e = makeBrowser('#/search')
+  e.load()
+  e.router.open({ kind: 'group', id: 'rg-1', label: 'Dummy', song: 's-1' })
+  e.router.update({ kind: 'group', id: 'rg-1', release: 'r-2' })
+  check('a song\'s album: pushed with the song, a pressing chosen replacing the entry with both', [e.hashes(), e.index], [['#/search', '#/search/group/rg-1?release=r-2&song=s-1'], 1])
+  const f = makeBrowser('#/search/group/rg-7?release=r-9&song=s-3')
+  f.load()
+  check('...a cold link opens on the pressing and the song it names', f.router.nav.stacks.search, [{ kind: 'group', id: 'rg-7', release: 'r-9', song: 's-3' }])
 }
 
 console.log('\nan album an edit gave a new id: the page becomes it, in place (2.0.0-player.21)')

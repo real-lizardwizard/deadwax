@@ -18,6 +18,7 @@ import {
   releaseGroupUrl, summaryLine, trackRows, type PageRelease, type TrackRow,
 } from '../lib/pressings'
 import { storeStatusFor } from '../lib/perPerson'
+import { songIds, songMatcher, songPressing } from '../lib/songs'
 import { creditName, currentName } from '../lib/release'
 import { buildDownloadRelease } from '../lib/releasePayload'
 import { soleCredit } from '../lib/artistPage'
@@ -39,6 +40,9 @@ type Trouble = { message: string; unavailable: boolean; final?: boolean }
 
 /** What a link that isn't a MusicBrainz album says, with nothing to try again. */
 export const NOT_AN_ALBUM_LINK = "That isn't a link to an album on MusicBrainz."
+
+/** What a screen reader hears on the song an album was opened from (2.0.0-player.53) - its row marked. */
+export const SONG_WORDS = ', the song you searched for'
 
 //? each page's tracklist heading its own id (a page stays mounted on each tab it was opened on)
 let deskTables = 0
@@ -95,10 +99,11 @@ function DeskTracklist({
                   </th>
                 </tr>
               )}
-              <tr class={`app-rg-row${row.mark ? ` is-marked is-${row.mark.kind}` : ''}`}>
+              <tr class={`app-rg-row${row.mark ? ` is-marked is-${row.mark.kind}` : ''}${row.song ? ' is-song' : ''}`}>
                 <td class="app-rg-number">{row.number}</td>
                 <td class="app-rg-title" title={row.title}>
                   {row.title}
+                  {row.song && <span class="app-visually-hidden">{SONG_WORDS}</span>}
                 </td>
                 {against && (
                   <td class="app-rg-against" title={row.mark ? `${row.mark.chip} · ${row.mark.note}` : undefined}>
@@ -201,6 +206,13 @@ function DeskTracklist({
  * has no group from Search to draw its header from, so `title` - the album's name as the page that
  * opened it knew it - stands in as the title until MusicBrainz's own group arrives with the pressings.
  *
+ * OPENED FROM A SONG (2.0.0-player.53, Search's songs): `song` is the song's recordings, from the address.
+ * The page opens on a pressing that HAS the song - the usual one when it has it, else the most usual of
+ * those that do (lib/songs.ts songPressing: the bonus-track case) - and marks it in the tracklist (tinted,
+ * an accent bar, and SONG_WORDS for a screen reader), brought into view once as it is first drawn, unless
+ * the page was scrolled meanwhile or came back with its scroll put back. A pressing chosen from then on is
+ * written into the address whatever it is - the usual one too - so the song never overrules a choice.
+ *
  * SEARCH EXTRAS (2.0.0-player.50), as the main page had them: the chosen pressing's FACTS under the
  * picker - status, full date, labels, catalogue number, barcode, as MusicBrainz gives them, one line of
  * fixed height (two on a phone) so choosing another pressing moves nothing under it - with every
@@ -213,6 +225,7 @@ function DeskTracklist({
 export function ReleaseGroupPage({
   id,
   release,
+  song = null,
   preview,
   title = '',
   shown,
@@ -227,6 +240,8 @@ export function ReleaseGroupPage({
 }: {
   id: string
   release: string | null
+  /** opened from a song Search found (2.0.0-player.53): its recordings, as the address carries them */
+  song?: string | null
   /** the group as Search showed it, for the header before (or without) the pressings */
   preview: ReleaseGroup | null
   /** the album's name as the page that opened it knew it (2.0.0-player.41): the title until the
@@ -307,6 +322,11 @@ export function ReleaseGroupPage({
   //? the album as credited - Search's group, else the one the pressings carry - for its title and the
   //? names it could be filed under
   const credited = preview ?? releases.find((each) => each['release-group'])?.['release-group'] ?? null
+  //? (2.0.0-player.53) opened from a song: the pressing asked for is the address's, else one with the song -
+  //? null when the usual pressing has it, as the page would open anyway
+  const songKey = songIds(song).join(',')
+  const asked = useMemo(() => release ?? (songKey ? songPressing(releases, songKey.split(',')) : null), [answer, release, songKey])
+  const isSong = useMemo(() => (songKey ? songMatcher(releases, songKey.split(',')) : null), [answer, songKey])
   //? what the library holds of this album: its folders by the group's id or any pressing's - null
   //? until the library has answered, and the meta line then says neither. And, held by no id, a folder
   //? with no MusicBrainz ids that has the album's name and an artist's it could be filed under - the
@@ -321,7 +341,7 @@ export function ReleaseGroupPage({
   //? (second review) ...and whose each folder is as the line under Get last said it of the pressing on screen -
   //? that line is asked as the page shows, and the two lines on screen must never disagree (lib/whose.ts)
   const [store, setStore] = useState<{ id: string; state: StoreStateResponse } | null>(null)
-  const shownId = useMemo(() => chosenPressingId(releases, release), [answer, release])
+  const shownId = useMemo(() => chosenPressingId(releases, asked), [answer, asked])
   const said = store && store.id === shownId ? store.state : null
   const holding = ownership ? withStoreLine(ownership.held, said) : null
   const held = holding ? holding.length > 0 : null
@@ -337,14 +357,14 @@ export function ReleaseGroupPage({
   const yoursKey = personal ? releaseIds((holding ?? []).filter(isYours)) : null
   const heldIds = useMemo(() => new Set(heldKey ? heldKey.split(' ') : []), [heldKey])
   const yoursIds = useMemo(() => (yoursKey === null ? null : new Set(yoursKey ? yoursKey.split(' ') : [])), [yoursKey])
-  const view = useMemo(() => (releases.length ? pressingsView(releases, release, heldIds, yoursIds) : null), [answer, release, heldIds, yoursIds])
+  const view = useMemo(() => (releases.length ? pressingsView(releases, asked, heldIds, yoursIds) : null), [answer, asked, heldIds, yoursIds])
   const chosen = releases.find((candidate) => candidate.id === view?.chosenId) ?? null
   //? ...and with a pressing of it yours but the one on screen the store's, "another pressing in your library":
   //? never "in your library" over a store line saying "In the store, not in your library" (review)
   const place = groupPagePlace(personal, holding ?? [], view?.chosenId)
   const header = pageHeader(releases, chosen, preview)
   const diff = view && chosen ? view.diffs.get(chosen.id) ?? null : null
-  const rows = trackRows(chosen, diff)
+  const rows = trackRows(chosen, diff, isSong)
   const missing = leftOut(diff)
   const summary = view ? summaryLine(view, releases.length) : null
   //? the artist, a link to their page when the album is credited to ONE artist MusicBrainz knows
@@ -423,7 +443,23 @@ export function ReleaseGroupPage({
     )
   }, [shown, sourcesPressing, chosen?.id])
 
-  const picker = view && <PressingPicker view={view} onPick={(picked) => onPick(id, picked === view.defaultId ? null : picked)} />
+  //? a pick on a page opened from a song is written into the address even when it is the usual pressing, so the
+  //? song's own choice never comes back over it (2.0.0-player.53)
+  const picker = view && <PressingPicker view={view} onPick={(picked) => onPick(id, songKey || picked !== view.defaultId ? picked : null)} />
+
+  //? (2.0.0-player.53) the song brought into view as it is first drawn - once for the page, only while it shows
+  //? (a page on another tab mustn't scroll this one), and only from the top: a page scrolled meanwhile, or come
+  //? back to with its scroll put back, is left where it is. `nearest` leaves a row already in view still
+  const page = useRef<HTMLElement>(null)
+  const songShown = useRef(false)
+  useEffect(() => {
+    if (songShown.current || !shown || !rows.some((row) => row.song)) return
+    const row = page.current?.querySelector<HTMLElement>('.is-song')
+    if (!row) return
+    songShown.current = true
+    if (typeof window === 'undefined' || window.scrollY > 0) return
+    row.scrollIntoView({ block: 'nearest' })
+  }, [rows, shown])
   //? the chosen pressing's facts (2.0.0-player.50): status, full date, labels, catalogue number,
   //? barcode, as MusicBrainz gives them - drawn with the picker, one fixed height (app.css), so another
   //? pressing chosen moves nothing under it; the whole of it in its tooltip, and in the list's rows
@@ -435,7 +471,7 @@ export function ReleaseGroupPage({
   )
 
   return (
-    <section class="pl-album-page app-rg">
+    <section ref={page} class="pl-album-page app-rg">
       <header class="pl-nav-bar">
         <button type="button" class="pl-back" onClick={onBack}>
           <ChevronLeftIcon class="pl-back-icon" />
@@ -525,10 +561,13 @@ export function ReleaseGroupPage({
             {rows.map((row) => (
               <Fragment key={row.key}>
                 {row.heading && <li class="app-rg-disc">{row.heading}</li>}
-                <li class={`app-rg-track${row.mark ? ` is-marked is-${row.mark.kind}` : ''}`}>
+                <li class={`app-rg-track${row.mark ? ` is-marked is-${row.mark.kind}` : ''}${row.song ? ' is-song' : ''}`}>
                   <span class="app-rg-number">{row.number}</span>
                   <span class="app-rg-text">
-                    <span class="app-rg-title">{row.title}</span>
+                    <span class="app-rg-title">
+                      {row.title}
+                      {row.song && <span class="app-visually-hidden">{SONG_WORDS}</span>}
+                    </span>
                     {row.mark && <span class="app-rg-note">{row.mark.note}</span>}
                   </span>
                   {row.mark && <span class="app-rg-chip">{row.mark.chip}</span>}

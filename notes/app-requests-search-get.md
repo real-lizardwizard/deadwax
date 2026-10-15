@@ -1196,3 +1196,310 @@ floor on a desktop; the size range dropped and README.md:123 corrected; Min scor
   from the home-screen app (outside it, in Safari); a real slskd's sample rates (the fake's say 44.1 or 96);
   MusicBrainz's `count` for a search with no answers past the first page, and its paging of a very long tail
   (relevance ties shifting between pages - `appendPage` drops a repeat, nothing finds one skipped).
+
+### Song search (2.0.0-player.53)
+
+Step 7 of the multi-user plan (the plan doc's build order: "Song search: a MusicBrainz recording, then its
+releases, then the request flow"; useful before multi-user). People often know a SONG, not the album it is
+on. The Search tab's MusicBrainz half had albums only; it now has **Songs on MusicBrainz** too - find a song,
+see the albums it is on, open one and Get it - on a phone and a desktop alike (`uplan/slice-song-search.md`).
+The main page is untouched.
+
+- **What a real recording answer holds** (asked 2026-10-15, gently - nine recording searches by hand, 2 s
+  apart, with the app's own user agent, and the real page's own through a record-and-replay stand-in, each
+  question once, 1.1 s apart; trimmed copies in `tests/fixtures/songs/`): `/ws/2/recording?query=` answers `count`,
+  `offset` and `recordings`, each with its `id`, `title`, `length`, `disambiguation` (most live tapes: "live,
+  2008-04-07: Heineken Music Hall, Amsterdam, Netherlands"), `first-release-date`, `artist-credit` (with
+  aliases), and **`releases` - every release it is on**, each with its `id`, `title`, `status`, `date`,
+  `country`, `release-events`, `artist-credit`, `track-count`, its **`release-group`** (`id`, `title`,
+  `primary-type`, `secondary-types` - but no first-release-date and no credit of its own) and `media` holding
+  only the medium the song is on, with its `track` (`id`, `number`, `title`, `length`) and `track-offset`. No
+  `inc` is sent (a search takes none): the albums a song is on come in the one answer - Queen's
+  studio "Bohemian Rhapsody" with all 353 of its releases in 133 groups (436 KB for 12 recordings). A recording
+  on no release at all comes with an empty list.
+- **What real answers look like** - and why the rows read as they do. A recording is ONE PERFORMANCE: every
+  take is a recording of its own, and they tie at score 100 in no useful order. Fielded: "Roads" by Portishead
+  is 45 recordings, the studio take (Dummy) fourth, ten live tapes around it; "Bohemian Rhapsody" by Queen 227,
+  the studio take third; "Hey Jude" by The Beatles 219, the studio take not in the first dozen (bootlegs,
+  medleys, compilation takes); "Miss Misery" by Elliott Smith 33, on no album or EP - a soundtrack, bootleg
+  and promotional compilations, live tapes. A boost for Official releases (`+(...) status:official`), tried
+  once, moved official takes up but still not Hey Jude's studio one (scores tie), so it isn't used. Words with
+  no artist the library knows are matched against TITLES only: "hey jude" (114,731 recordings) is covers -
+  tribute bands, string quartets, no Beatles on its first page (nor in any of the 300 answers a reviewer looked
+  at: the first 200, and 400-499); "roads portishead" covers and mash-ups named after Portishead,
+  never Portishead's Roads. Page 2 of Roads brought "Roads (live)", "Roads (Live UK 1998)", five remixes and
+  two duets.
+- **The rows are songs, not recordings** (`lib/songs.ts`, pure): one row per title by one credit (`songKey`:
+  the credit's artist ids - two bands of one name stay two - else its words; `titleKey`: case, accents and
+  punctuation folded, an aside naming another take or a mastering dropped - "(live)", "(Live UK 1998)",
+  "(Remastered 2015)", "(2011 remaster)", "(mono)", "(stereo)" - but no other bracket, so "Roads (Max Cooper
+  remix)" and "Sour Times (Airbus Reconstruction)" are songs of their own). Their albums are unioned, one per
+  release group (`groupSongs`): its best status, its earliest date, its releases and recordings that have the
+  song, the song's length there. One row per recording would be a dozen "Roads · Portishead" told apart by a
+  length, the one on Dummy wherever it landed. The row's title is a take's plain title when any has one; a song
+  on no release is left out (nothing to show or get). The albums are ordered (`sortAlbums`): Albums and EPs
+  (no secondary type), then Singles, then everything else - any secondary type, a broadcast, nothing said -
+  folded under one `foldLabel` ("On 1 compilation", "On 24 compilations, live albums, broadcasts and other
+  records" - Roads' real first page - "On 11 compilations, live albums and soundtracks", "…and other
+  records"), each folded album named as its own row names it (review: a live broadcast was counted a "live
+  album" under a row saying "Live broadcast"): a live record is a live album only when it is an album or of
+  no type, a broadcast is a broadcast, live or not, a live EP or single another record; within each Official,
+  Promotion, Bootleg, anything else; the earliest first (a full date before its bare year, undated last); then
+  by title. A song row: its title, then `songLine` - the credit, the song's length on the album it names, that
+  album - naming the first album you have THE SONG on (yours before one only the store has), with "in your
+  library" / "in the store" (`heldWords`, lib/whose.ts's words). An album row's line (`songAlbumLine`): its
+  kind, its status unless Official, its credit when not the song's ("Various Artists"), its year, the song's
+  length there when it is another version's against the row's (tracklistDiff's `isOtherVersion`), and where it
+  is held (`songAlbumHolding`, review and second review). A folder of the group holds THE SONG (`song`) when
+  its release is one the search found the song on (an .m4a deadwax filed has only a release id), when it has
+  no release id at all (by the group's id, as every screen holds it), or when the album's pressings are
+  already kept for the session (`SongEvidence.pressings` - app/pressingLists.ts's `kept`: its page opened, a
+  Get chip, or the tap below) and its pressing's tracklist has the song (`songMatcher`: one of the song's
+  recordings, or a track of its title). It holds it as **heard** when the library half's own songs (Navidrome's
+  search3, as last answered - `SongEvidence.heard`) have one of the song's title (titleKey) by its credit
+  (foldName) on an album named as the folder's own album tag (foldName; both names come from the same files'
+  tags) - a song with no artist or no album id vouching for nothing - with that Navidrome album (`albums`) to
+  open. Anything else of the group is **other**: "a pressing in your library" / "a pressing in the store"
+  (`pressingHeldPhrase`, lib/whose.ts) on the album row, nothing on the song row. Holding The Slow Rush's
+  usual CD had read as holding Patience (a bonus track on its Japanese CD alone), and its tap opened the
+  12-track album you have; the dev library holds exactly that CD. The first fix called every such folder
+  "another pressing" - which the docs said meant a pressing WITHOUT the song - and opened the album you don't
+  have; **second review** found that backwards for the most common case: MusicBrainz keeps one song as several
+  recordings across one album's pressings, and at the app's 25 a page "roads portishead"'s first page brings
+  Dummy only through recordings ef37de8d (five pressings) and ab6cc25d (the 20th anniversary reissue,
+  f5804905), while Dummy's 1994 XE CD (76df3287 - the dev library's "Dummy (1994)") has Roads as recording
+  8a49dba0, on the second page alone with 13 other Dummy pressings. Holding only that CD read "another
+  pressing in your library" right under the library half playing Roads from it, the song row claimed nothing,
+  and the tap opened the album you don't have - on the usual pressing, which may be that very CD, marked "in
+  your library" (the earlier code, by the group's id, had read it right). So the words for `other` are neutral
+  now - "a pressing", never "another" - the two kinds of evidence above make it the song when they can, and
+  the tap finds out (below).
+- **The route**: `GET /deadwax/search_musicbrainz/songs?query=&limit=&offset=` (a user's route - in
+  test_logins' table), declared bounds - `query` 1-1000 characters and not blank, `limit` 1-100 (MusicBrainz's
+  own ceiling; default `SONG_SEARCH_LIMIT` 25), `offset` 0-`SONG_SEARCH_OFFSET_MAX` (= `FULLY_SEARCH_OFFSET_MAX`,
+  1000, one bound for both halves) - each a 422 with nothing asked. `MusicBrainzClient.search_recordings`: one
+  `recording/` request, offset sent only past the first page, cached in the ResponseCache (successes only), the
+  answer `{recordings, count}` (count only when MusicBrainz said a number); a failed or shapeless answer raises
+  MusicBrainzUnavailable, a 503 with the album search's words. No server twin of the box's reading exists: the
+  app builds the query, as it does for albums.
+- **The reading** (`lib/searchQuery.ts`): `songSearchQuery(text, plan)` - an artist you have at either end is
+  `fieldedSongQuery` (`recording:"title" AND (artist:"A" OR artistname:"A")`, fieldedAlbumQuery's shape, so a
+  renamed artist's songs are found as their albums are); anything else the words typed, never the albums' type
+  filter; an artist's name ALONE asks nothing (every recording they made, in relevance order, live tapes and
+  all, answers nothing - their albums are below). A fielded read that finds nothing is asked again as the
+  words typed taken as ONE title (`songTitleQuery`: `recording:"the words"`, review) - not the words loose, as
+  the albums fall back: a recording search matches loose words against titles alone, so "the slow rush tame
+  impala" (Tame Impala known, no song titled "The Slow Rush") brought 11,924,330 recordings, the first three
+  strangers' songs titled "Tame Impala", above The Slow Rush - 274 px at 390x844, the album's line under the
+  tab bar at 375x667 and the album off the first screen at 320x568. As one title it still finds a title that
+  starts with the name of an artist you have, which the box read as that artist (reasoned, not measured: the
+  one fallback asked of MusicBrainz was "the slow rush tame impala"'s - count 0); free text is never asked
+  twice.
+- **In the Search tab** (`app/Search.tsx`): asked with the albums, from `askMusicBrainz` (the same pause, the
+  same Enter, the same reading) through `askSongs` and a latestOnly of its own (`songRequests`); asked once
+  for a text and how it read (`songsFor`: the albums' Try again, or Enter after the pause, asks no songs again,
+  but Enter after the library named an artist it didn't know does). **Where**: a section of its own,
+  **before** the albums' (`aria-labelledby="app-search-songs"`) - a phone shows it first - showing
+  `SONG_ROWS_SHOWN` (3) songs, so an album's words still show the albums: at 390x844 the first album row of
+  "portishead roseland" sat at 431-495 under two songs (the builder's run). A search that finds no song at
+  all draws **no section** (review) - the albums answer for the words; "No songs on MusicBrainz for “…”." is
+  said only in the slot below. **The album half is as it was** (review: the builder had the albums wait for
+  the songs too - `Promise.all([ownedAnswered, songsAnswered])` raced against OWNED_WAIT_MS - which changed
+  when they drew, and songs slower than that still pushed drawn albums down, ~274 px on a phone, a finger's
+  tap landing on a song): its request goes first (`const first = fullySearch(...)`, then `askSongs`), the
+  gate is HEAD's `Promise.race([ownedAnswered, wait(OWNED_WAIT_MS)])`, its requests and cache entries
+  unchanged. **The slot**: while the songs are asked, the asking line sits in `.app-song-slot`, one fixed
+  height (`--app-song-slot`, a 44px button with `--pl-gap-sm` above and below); songs landing AFTER the
+  album answer was drawn (`late` - `albumsShown`, set by an effect, so only once the screen has had that
+  answer; never for songs asked by their own Try again, which were asked for) are folded into it - **Show
+  songs** (it opens SONG_ROWS_SHOWN, focus to the first song when it had focus), or one line: "No songs on
+  MusicBrainz for “…”.", the no-release words, More songs for a bare page with more to come, or "MusicBrainz
+  isn't answering." with a text-button Try again - each one line, ellipsised, so nothing drawn below moves;
+  VoiceOver hears "N songs on MusicBrainz - Show songs to see them". Songs landing first draw at once. **A
+  song's tap expands it in place** (a disclosure, `aria-expanded`/`aria-controls`, its container always there
+  with `hidden` and filled only while open) - the PressingPicker fold's and More's way of growing in place; the
+  Search root stays mounted, so Back from an album finds the song still open: its Albums, EPs and Singles,
+  then the fold (an `app-text-button`, its own `aria-expanded`), or - nothing above it - the fold's words as a
+  caption (`app-song-caption`) with its albums listed at once. **An album you don't have** opens through App's
+  `openSongAlbum` with the song's recordings on that album (`album.recordings`); **one you have** the song on
+  opens the album you have (Search's `openSongAlbum`, through the held rows' latestOnly - `heldRequests`, so
+  the box changing or the tab no longer showing calls it off): a `song` folder's release through the id
+  bridge (`songAlbumHeldReleases` - by release or kept tracklist only); a `heard` one's Navidrome album at
+  once, nothing asked; and **only `other`** (second review) - the album's pressings asked first
+  (`getReleaseGroup`, the row `is-busy`/`aria-busy`; a complete answer kept, so the album page then asks
+  nothing - it is the page's own request, made before it opens rather than after), then the bridge for a held
+  pressing whose tracklist has the song, else the album you don't have; the pressings already kept and none
+  held having the song, the album you don't have at once. Navidrome not having it, the bridge failing or
+  MusicBrainz failing: the album you don't have (whose page asks for the pressings again itself). **More songs** shows the songs in
+  hand first (no request - "8 more songs" said), then asks the next page by offset (`appendSongs(recordings,
+  page, drawn)`: every page's recordings regrouped, the songs DRAWN kept in their order - a later take adds its
+  albums to its row in place - and every other song after them; review: a song whose takes on the drawn pages
+  were on no release kept its first take's place in the regrouping and came back ABOVE rows drawn, focus
+  landing on an old row - DJ Tripp's two takes of "Breathe Roads" in the real "roads portishead" answer, one on
+  a release and one on none, are such a pair), busy and
+  aria-disabled, a failure said with Try again on the same page, its words (`moreSongsWords`) - new songs said
+  only to VoiceOver, "No new songs - 7 more albums for the songs above.", "MusicBrainz sent nothing new." - and
+  `morePages` with the route's limit; its last page hands focus on as More from MusicBrainz's does. States:
+  the sweep and "Asking MusicBrainz…"; recordings found but none on a release - "MusicBrainz has songs for
+  “…”, but on no release yet - nothing to get." (review: it read "No songs", untrue - "Roads (Max Cooper
+  remix)" by Portishead is one such recording), More and the bound's note drawn whether or not any row is
+  (as the albums' More is); MusicBrainz away with a Try again of its own (`askSongsAgain`, the songs alone).
+  A new search calls the old one off; the box emptied or cut back
+  below three characters calls the songs off and empties them (`dropSongs`), as the albums' rules do.
+- **The album opened from a song** (`app/ReleaseGroupPage.tsx`): App opens the group page with the recordings
+  in the address (`#/<tab>/group/<rgid>?song=<id>,<id>`, `Page.song` - not the page's identity nor its scroll
+  key, kept by `replaceTop` as a pressing is chosen, read back on a cold link; `songIds` keeps up to 8 MBIDs)
+  and **no preview**: a recording search's release groups carry no year or credit, and a preview is what Get
+  builds its download (and its folder's year) from - so the header and the download come from MusicBrainz's own
+  group with the pressings, the title standing in meanwhile, as "Other pressings" opens one. The pressing
+  shown (`asked`) is the address's, else `songPressing`: null (the usual pressing) when the usual one has the
+  song, else representativeRelease over the pressings with one of its recordings, else over those with a
+  track of its title; `songMatcher` marks a track of one of its recordings or one titled as those tracks are
+  (track title or recording title, titleKey) - MusicBrainz often has the same song as another recording on
+  another pressing (The Slow Rush's Borderline single mix: the usual pressing has Borderline, so it opens on
+  that, Borderline marked). Patience, only on The Slow Rush's Japanese CD, opens that CD. A pick on a page from
+  a song is written into the address even for the usual pressing (`songKey || picked !== view.defaultId`), so
+  the song's choice never comes back over it. `trackRows(chosen, diff, isSong)` sets `TrackRow.song`; the
+  phone's row and the desktop's table row take `is-song` and a visually hidden `SONG_WORDS` (", the song you
+  searched for") in the title. Brought into view once (`songShown`), when its row is first found, only while
+  the page shows (a page on another tab must not scroll this one) and only from the top (`scrollY` 0: a page
+  scrolled meanwhile, or come back to with its scroll put back, is left alone), `block: 'nearest'` so a row in
+  view stays still.
+- **Style** (tokens only): app.css's "song search" section - `--app-song-indent` (the song's cover and gap, so
+  its albums' covers line up with its title), `--app-song-cover` 40px, `--app-song-album` 56px, the chevron
+  turning 180deg (still for reduced motion), the fold, the caption; the slot (review: `.app-song-slot`,
+  `height: var(--app-song-slot)`, its lines one each with an ellipsis, `.is-row` for the failure and its
+  Try again, `.app-song-show` the screen's width, no overflow of its own so a focused button keeps its ring);
+  an album row's line under a song wrapping (review: "another pressing in your library" was cut to "another
+  pressing in yo…" at 390), with `--app-song-gap` above and below inside the row's own height; the tracklist's `.app-rg-track.is-song`
+  tinted `--dw-selected-row` (a Bonus track keeps its green, another version its amber), an inset accent bar,
+  the title in the accent, semibold; app-desktop.css the table row's tint, the bar on its first cell and the
+  title, inside the desktop query.
+- **Tests**: 25 new Python tests (2894 in all: 2892 passed, 2 skipped) - `test_musicbrainz_routes.py` 19 for
+  `/songs` (one request carrying the albums, paged and cached apiece, nothing found an empty list, no count,
+  a 503 that says so and is never cached, a shapeless answer a failure, eleven refused bounds asking nothing,
+  the bounds themselves, the app's page size and the shared offset bound read out of lib/songs.ts),
+  `test_app_css.py` 5 (the slot's one height among them) and `test_app_desktop_css.py` 1. Sims: `songs.sim.cjs`
+  new (82 checks), `search` (190), `searchQuery` (67), `group` (153), `routes` (284), `app-rules` (400),
+  `whose` (98) extended - the counts after the second review; app-rules' pressingsView pin and whose's
+  "pressing on screen" pin updated on purpose (the page's pressing asked is `asked`); app-rules' gate pin is
+  HEAD's again, with the songs kept out of it; app-rules' held-open pin, whose's phrase check and songs/search's
+  held-pressing checks updated on purpose by the second review ("a pressing", the evidence, the tap's look).
+  The builder's **67 mutations** (`work/song53-builder/mutate.py`: the route's bounds, words and page size, the
+  client's offset, failure and count; grouping, ordering, fold, held and line rules; the reading; the gate, the
+  fallback, the few rows, More's reveal and merge and focus, the drop, the once-only, the held open, the songs'
+  own Try again, the fold, the section's place; the page's pressing, its picks, its three scroll guards, both
+  marks; the address's song four ways; App's no-preview and prop; the app client's offset; six CSS rules) were
+  all caught, one only by failing to compile until made type-valid. **Review** found that list didn't reach
+  every rule it named - the title tie-break (songs.sim's check of it had ids equal to titles), the first album
+  only the store has, the length from a later release, "&" and "and", a duet's artists in either order, a
+  track known by its recording's title, the songs' bound note, free text never asked twice, App's label and
+  fresh scroll - and that the bridge answering nothing or failing, the drop's key, the albums' Try again after
+  both failed, a second tap closing, and a new answer closing were unpinned. Each has a check now, and
+  `work/song53-fixer/mutate.py` breaks every one of them and every review fix one at a time - **47
+  mutations, all caught on a check** (a sim's FAIL line, or for the four CSS rules a pytest assertion - none
+  by a compile failure), the tree byte-identical afterwards (`mutate.log`). The engine guard is empty.
+- **After a second review** (six findings, each confirmed by skeptics, every one fixed; no Python changed):
+  - **A held pressing with the song as a recording the page didn't bring** (major): the first fix's
+    "another pressing" was backwards for Dummy's 1994 CD (above, under the rows) - it now reads "a pressing in
+    your library" unvouched (`pressingHeldPhrase`), is made the song by the library half's songs or the kept
+    pressings (`SongEvidence`, `heard`/`albums`), and its tap asks the album's pressings first (above, under
+    the Search tab). Not done instead: a bare rewording (the tap would still have opened the album you don't
+    have of a song you hold), nor asking every held album's pressings as the rows draw (a MusicBrainz request
+    per album); the kept-pressings check is memoised per kept list and song (`pressedFor`, a WeakMap - each
+    album row's line asks namedAlbum, so a big album's tracklists would otherwise be folded once per row per
+    render; a speed-up, so no check pins it).
+  - **The notes named the wrong Dummy pressing** (nit): "The cost, chosen" said the 20th anniversary
+    reissue's Roads is on page 2 - at 25 a page the reissue (f5804905, recording ab6cc25d) is on the first,
+    and the 1994 CD (76df3287, recording 8a49dba0) the one past it; songs.sim's comment said "on page 2" of a
+    pressing the 12-recording fixture merely doesn't list. Both now say what the recorded answers show.
+  - **search.sim's header** (nit) still said the albums wait for the songs and the fallback asks "the
+    words": rewritten - the albums never wait, late songs fold into the slot, the fallback is one title.
+  - **The best status and the recordings union were unpinned** (minor): songs.sim builds an album listed
+    first by a bootleg, then a promo, then an official pressing (Official, placed by its earliest date among
+    the Official albums) and one carrying two of the song's recordings (both kept). The notes' "its best
+    status" is now pinned.
+  - **Accent folding was unpinned** (nit): the check named accents but fed none; "Señor" / "Senor" and
+    "Mañana" / "Manana" now - an accent MID-word, since one at a word's end folds even without dropping the
+    mark (the mark is trimmed as punctuation).
+  - **docs/player.md said a search finding no song draws no section** (nit) - a late empty answer stays as
+    the slot's line; it says so now, as finding-music.md did.
+  `work/song53-fixer2/mutate.py` breaks every fix one at a time - **32 mutations, all caught on a sim's FAIL
+  line** (31 by songs or search behaviour; one - the tap's look taken out of the latestOnly - by app-rules'
+  pin, search crashing on it), the tree byte-identical afterwards (`mutate.log`). New search.sim checks pin a
+  broken-off pressings list (not kept, the next tap asking again, what it shows still counting) and an answer
+  landing after the box changed (it opens nothing, asks the bridge nothing). The engine guard is empty.
+- **Real page** (the builder's own deadwax on 8113, logins off; its own fake slskd on 5041; the stand-in
+  Navidrome; MusicBrainz through a record-and-replay stand-in on 4541 - each question asked of
+  musicbrainz.org once, 1.1 s apart, then replayed; a hard-linked copy of the stub library less The Slow Rush,
+  plus a "Tame Impala/Currents" with no MusicBrainz ids, so Tame Impala is an artist the library knows;
+  `work/song53-builder/drive.cjs`, 34 checks, all passing, no console errors; headless Chromium as
+  `deadwax.test` over plain http): at 390x844 "roads portishead" - one row, "Roads · Portishead · 4:56 · Dummy
+  · in your library", above the albums; opened, Dummy and "On 24 compilations and live albums" (a finger tall),
+  the fold opening 24 more, official first; Dummy opening the album page you'd get from the Library; Back
+  finding it all still open; More songs asking offset 25 - Roads in place with more albums (the "(live)" takes
+  merged in), six remixes and duets after it, "6 more songs" said; "patience tame impala" - Patience and its
+  remix, The Slow Rush then the single, The Slow Rush opening on the Japanese CD with Patience marked (Bonus,
+  barred, said) and in view, Get's sheet for "The Slow Rush · CD · 2020 · JP · Caroline International" with
+  six sources, the usual pressing chosen and written with the song, kept across a reload; "the slow rush tame
+  impala" three songs at most in 274 px straight above the albums, "portishead roseland" the first album row
+  whole on the first screen; MusicBrainz away - both halves saying so, the songs' Try again asking the songs
+  alone; at 320x568 the lines' ellipses, nothing wider than the screen, a cold link to the song's album on the
+  Japanese CD with Patience in view; at 1440x900 the songs above the albums from the sidebar's field, a click
+  opening a song, the table's Patience row marked and in view, Get's panel for the Japanese CD. That run was
+  before review: its "the slow rush tame impala" (three strangers' songs, 274 px) and its fold's words are
+  what review changed.
+- **Real page after review** (the fixer's own deadwax on 8116, logins off; its own stand-in Navidrome on 4553
+  over a hard-linked copy of the WHOLE stub library - The Slow Rush's usual Australian CD among it - its own
+  fake slskd on 5052; MusicBrainz replayed from the recorded answers on 4552, a `slow-songs` file delaying
+  the recording answers, `away` answering 503; one new question asked of musicbrainz.org, `recording:"the slow
+  rush tame impala"`: count 0; `work/song53-fixer/page/drive.cjs`, 25 checks, all passing, no console errors):
+  "patience tame impala" - the row "Tame Impala · 4:53 · The Slow Rush", no claim, The Slow Rush "Album ·
+  2020 · another pressing in your library" (whole - two lines at 320; "a pressing in your library" since the
+  second review), "On 4 compilations, broadcasts and other
+  records", the tap opening the album you don't have on the Japanese CD, Patience marked and in view, the
+  store line "You also have another pressing"; "roads portishead" - Dummy held by its 20th anniversary
+  reissue (a pressing page 1 has Roads on), "in your library", "On 24 compilations, live albums, broadcasts and
+  other records", Dummy opening the album you have; "the slow rush tame impala" at 390, 375 and 320 - no songs
+  section, no strangers; songs four seconds slower than the albums at 390 and 320 - the albums drawn first
+  under the asking slot (60 px), the songs folding into it as Show songs, the first album row not a pixel
+  lower, Show songs opening them; no song landing late at 320 - the slot's one line, ellipsised, the albums
+  where they were; MusicBrainz away - both halves saying so; at 1440x900 the same Patience lines and the
+  table's row marked.
+- **Real page after the second review** (the second fixer's own deadwax on 8117, logins off; its own stand-in
+  Navidrome on 4556 over a hard-linked copy of the stub library LESS Dummy's 20th anniversary reissue - Dummy
+  held only as its 1994 CD, 76df3287 - with The Slow Rush's usual CD; its own fake slskd on 5055; MusicBrainz
+  replayed from the recorded answers on 4557, `away` answering 503, plus one new question asked of
+  musicbrainz.org: Dummy's pressings, `release/?release-group=48140466…` - one request, 20 pressings, the
+  1994 CD's Roads recording 8a49dba0 as recorded; `work/song53-fixer2/page/drive.cjs`, 21 checks, all passing,
+  no console errors): at 390x844 "roads portishead" - the library half "Song · Portishead · Dummy", the row
+  "Portishead · 4:56 · Dummy · in your library", Dummy "Album · 1994 · in your library", its tap opening your
+  Dummy (with Roads) at once, no pressings or bridge asked; with the library half's search blocked - the row
+  claiming nothing, Dummy "Album · 1994 · a pressing in your library" (whole), its tap asking Dummy's pressings
+  once and the bridge about 76df3287, the album you have opening, Back finding the row and Dummy "in your
+  library", a second tap asking no pressings; "patience tame impala" - The Slow Rush "a pressing in your
+  library", its tap with MusicBrainz away opening the album you don't have, with MusicBrainz back the album
+  you don't have on the Japanese CD, Patience marked and in view, no bridge asked; at 320x568 Dummy's line
+  whole on two lines, nothing wider than the screen; at 1440x900 the same row, Dummy's line, the click opening
+  the album you have.
+- **Not built**: a ranking of MusicBrainz's ties (a famous song's studio take can be a page or two in - Hey
+  Jude's; More songs brings it into the one row); reading words with no known artist across title AND artist
+  (`recording:(…) OR artist:(…)` would likely put Portishead's Roads first for "roads portishead" with no
+  Portishead in the library - measured only for the title-only default, so not sent: the box's reading is the
+  album half's); songs on the main page; a "get a better copy" (James, 2026-10-15: not now); the Search tab's
+  songs in the address; saying of a held pressing nothing vouches for whether it has the song BEFORE a tap
+  (the library's index has no track titles to look in, and asking each held album's pressings as the songs
+  draw would be a MusicBrainz request per album - so it reads "a pressing in your library" until the library
+  half, a kept list or the tap says); keeping
+  the songs' empty answer from the slot when it lands just after the albums - an album's words beside an
+  artist you have ask a second song request (the one-title fallback) and so often land after the albums, the
+  slot then saying "No songs on MusicBrainz for “…”." where no section would have been.
+- **NOT verified here**: logins on in a real page (the route is a user's - test_logins walks it; the words
+  "in the store" and "a pressing in the store" are songs.sim's); the library half's evidence against a real
+  Navidrome 0.64.2's search3 (its songs' `artist` and `album` as the stand-in gives them - track artist and
+  album tag - assumed, read from the files as /library/owned reads them); the iPhone - the disclosure and the fold
+  under a finger, VoiceOver reading "the song you searched for", More's region and "Show songs to see them",
+  the slot under a finger as the songs fold into it, the album page's scroll to the song under the mini
+  player on a real screen; how often real MusicBrainz answers the songs after the albums (so folded) - the
+  recording search answers more (47-436 KB against 1-12 KB), and a fielded miss asks twice; a real Navidrome 0.64.2's id bridge for a song's held album; MusicBrainz answers for queries
+  not recorded here, and its recording search on a bad day (a 436 KB answer for a big song).
