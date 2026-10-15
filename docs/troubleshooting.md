@@ -265,6 +265,42 @@ may throttle or refuse requests, and the log says so.
 A search MusicBrainz rejects as invalid (odd punctuation in a fielded search) says so at once,
 rather than retrying.
 
+## MusicBrainz is down, but searches still answer
+
+That's deadwax's [saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections)
+(since 2.0.0-player.54): anything asked before - a search, an artist, an album's pressings - is
+answered from the file deadwax keeps, however old the answer, while MusicBrainz is away. Something
+never asked before still needs MusicBrainz, and fails as above. The MusicBrainz pill (and You's
+**Connections** in the app) still says whether MusicBrainz itself can be reached: it never answers from
+the saved answers. Nothing needs doing; when MusicBrainz is back, old answers are refreshed behind
+themselves as they're used.
+
+## A MusicBrainz answer looks out of date
+
+A new release missing from a search, or a correction made on MusicBrainz not showing: deadwax shows
+its [saved answer](configuration.md#musicbrainzs-saved-answers-settings--connections) for the same
+question, and asks MusicBrainz again only once the answer is old - a search after 7 days, an artist, an
+album's pressings or a discography after 30. Then the saved answer is still shown once, and the new one
+fetched behind it for the next time.
+
+- **Wait for the refresh**: once the answer is old, asking shows the old one and fetches the new one
+  behind it; ask once more and the new one is shown. If MusicBrainz didn't answer the refresh, it's
+  tried again the next time the answer is read from the file - after the hour it is kept in memory, or
+  after deadwax restarts.
+- **Or clear them now**: **Clear MusicBrainz's saved answers**, under Settings → Connections (or the
+  app's You → Server settings → Connections), empties the file and the memory, and the next answers
+  are asked of MusicBrainz again. Only speed is lost.
+- To stop saving answers altogether, set `MUSICBRAINZ_CACHE_MB` to `0`.
+- If the line beside Clear says **Nothing is being saved**, or the `MUSICBRAINZ_CACHE_PATH` row is
+  marked, it names what's wrong: a `musicbrainz-cache.db` in that folder that is some other database
+  (it's left alone - point `MUSICBRAINZ_CACHE_PATH` at a folder of its own), deadwax's own database, a
+  file where the folder should be (`MUSICBRAINZ_CACHE_PATH` is always a folder), a folder deadwax
+  can't write to (check `PUID`/`PGID`), or one that isn't there and can't be made - usually a volume
+  that isn't mounted, such as `MUSICBRAINZ_CACHE_PATH=/cache` with the `/cache` line under `volumes:`
+  left commented out. The row says so from the start, and for as long as it lasts. A `musicbrainz-cache.db` that can't be read at all is set aside
+  as `musicbrainz-cache.db.unreadable-<date>` the next time deadwax uses it, and a new one started;
+  the old one can be deleted.
+
 ## The app's Search says MusicBrainz isn't answering, or keeps asking
 
 The phone app's [Search tab](finding-music.md#on-the-phone-the-apps-search-tab) and its album pages
@@ -306,7 +342,9 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
 - **"Asking MusicBrainz…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
   request. An album page fetches every pressing's tracklist, which for an album with hundreds of
   pressings is several requests one after another. Once it has them it keeps them while the app is
-  open (the last 20 albums), so going back to the album is instant.
+  open (the last 20 albums), so going back to the album is instant - and since 2.0.0-player.54
+  deadwax saves them too, so the album opens at once next time, after a reload or a restart as well
+  ([saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections)).
 - **The library half shows nothing, or "Can't reach Navidrome"**: that half is Navidrome's search,
   and needs Navidrome as Home does ([below](#the-player-says-connect-navidrome-or-cant-reach-navidrome));
   MusicBrainz is still searched under it.

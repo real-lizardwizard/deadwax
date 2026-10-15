@@ -57,6 +57,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import __version__, auth  # noqa: E402
 from src.api.app import LOGINS_MARK, start  # noqa: E402
+from src.api.musicbrainz_endpoint import ResponseCache  # noqa: E402
 from src.config import Config, describe_auth_mode, parse_admins  # noqa: E402
 from src.store import JobStore  # noqa: E402
 from src.users import ADMIN_ONLY, LOCAL_USER, current_user, is_admin, require_admin  # noqa: E402
@@ -135,6 +136,9 @@ ROUTES = {
     ("GET", "/deadwax/settings/"): "admin",
     ("PUT", "/deadwax/settings"): "admin",
     ("PUT", "/deadwax/settings/"): "admin",
+    #? MusicBrainz's saved answers: their size, and Clear (2.0.0-player.54 - tests/test_musicbrainz_disk_cache.py)
+    ("GET", "/deadwax/settings/musicbrainz_cache"): "admin",
+    ("POST", "/deadwax/settings/musicbrainz_cache/clear"): "admin",
     ("GET", "/deadwax/navidrome/status"): "user",
     ("GET", "/deadwax/navidrome/albums"): "user",
     ("GET", "/deadwax/navidrome/albums/{album_id}"): "user",
@@ -872,7 +876,14 @@ def test_deadwax_starts_the_recheck_only_with_logins_on(monkeypatch, tmp_path, c
         return None
 
     class Client:
+        #? (2.0.0-player.54) the lifespan attaches MusicBrainz's saved answers to the client's cache, and
+        #? stops its refreshes as it ends
+        cache = ResponseCache()
+
         async def close_client(self):
+            return None
+
+        async def stop_refreshing(self):
             return None
 
     monkeypatch.setattr(app_module, "MusicBrainzClient", Client)

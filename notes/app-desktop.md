@@ -901,6 +901,16 @@ Managing pages' parts and STYLE.md. Built beside 2.0.0-player.41 (Get parity) an
   was on that button and fell to the page. Focus moving on is asked a microtask after the blur: Chromium
   blurs a focused button AS it removes it, while it is still connected, and that is the button going
   (handed on by the layout effect in the same commit), not focus moving on.
+- **Clear MusicBrainz's saved answers in the app** (2.0.0-player.54): `components/MusicBrainzAnswers.tsx`,
+  drawn as `ServerGroup`'s child for the `musicbrainz-cache` group on both pages (Connections), keyed on
+  the group's saved values so a save draws it afresh, refused while `MUSICBRAINZ_CACHE_PATH` is a draft.
+  Told `live` by the app's page and read again each time it comes back into view (the review: the page
+  stays drawn while another tab shows, so the line went on saying "Nothing saved yet." after a search),
+  but never over a Clear on its way. Refused with `aria-disabled`, never `disabled` - it refuses itself
+  on its own press, and a focused button made disabled dropped the focus to the page, against this
+  page's own rule for Save and Discard. Its row is styled by the Re-time row's rules, extended to
+  `.settings-answers`, the refused look on `[aria-disabled='true']`. The whole change: "MusicBrainz
+  answers kept on disk (2.0.0-player.54)" in notes/backend-gotchas.md.
 - **Re-time saved lyrics in the app**: `components/RetimeLyrics.tsx` is the settings tab's own
   component moved out of SettingsView.tsx so both draw it (`ServerGroup`'s children for the `lyrics`
   group on both pages), refused (`disabled`, "Save the new lead first.") while `LYRICS_LEAD_MS` has a

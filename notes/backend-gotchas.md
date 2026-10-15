@@ -144,7 +144,8 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   'release-groups'"* — which reads like a bad query, so an outage looked like user error.
   `MusicBrainzUnavailable` now distinguishes them. **This is also why the response cache stores
   only the success path** — caching that error dict would pin a transient outage in place for
-  the whole TTL, turning a bad minute into a bad hour with no remedy but a restart.
+  the whole TTL, turning a bad minute into a bad hour with no remedy but a restart (and on disk,
+  since 2.0.0-player.54, a bad month - the same one place stores both; see below).
 - **MusicBrainz's own result order cannot pick the album for you.** Searching
   `releasegroup:"Metallica" AND artist:"Metallica"` returns 25 groups of which the **first five
   all score exactly 100** — two live albums, an interview disc, a compilation, and only then the
@@ -213,3 +214,237 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   guard on the FILE**: a file found in a contained folder's listing can itself be a symlink
   out, which is how `/disc_art` served one until v1.1.8. A route serving a file's own bytes
   checks the file resolves inside its folder too.
+
+### MusicBrainz answers kept on disk (2.0.0-player.54)
+
+Asked for by James (2026-10-15): "the first time I search an artist it asks musicbrainz, and when it
+gets results it caches them so the next time I search that artist, it's instant. how much space would
+that take?" Until then every answer lived in `ResponseCache` alone - in memory, an hour, 64 entries -
+so a search repeated after an hour, after a restart (every image update) or after a few album pages
+asked MusicBrainz again. The decision it reopens, with the measurements, is in notes/decisions.md
+("MusicBrainz responses are cached, successes only").
+
+- **One layer under the memory one, in the one place.** `request_with_retries` (still the only way any
+  MusicBrainz request is made - `test_no_musicbrainz_request_goes_round_request_with_retries` reads the
+  source: only `_ask` touches a connection, only `request_with_retries` calls `_ask`, no other module in
+  src names MusicBrainz's web service) looks in memory, then on disk, then asks. A disk hit is put back
+  in memory. A success is stored in memory and queued for the disk in the same line it always was
+  stored in. So every caller - Search, the album pages, the artist page, the metadata editor, the
+  download flow's tracklists, and the song search slice (2.0.0-player.53) with no change of its own -
+  gets it.
+- **The file** (`src/musicbrainz_cache.py`, `SavedAnswers`): SQLite of its own, `musicbrainz-cache.db`
+  in the FOLDER `MUSICBRAINZ_CACHE_PATH` names, or in the database's folder (`config.musicbrainz_cache_path`:
+  DB_PATH or `default_db_path()`'s choice, so the legacy `jimbrainz.db` folder too). **Always a folder**,
+  like `PLAYER_CACHE_PATH` - James's addendum (2026-10-15, "a cache path variable in the compose file so
+  I can put the cache on my ssd"): one `/cache` mount holds both caches, and the compose example and
+  `.env.example` name it beside `PLAYER_CACHE_PATH` (a test reads both). The build first read the value
+  as a FILE unless the folder existed or it ended in `/`, so a folder not made yet became a SQLite file
+  of its name (which then shut the player's cache out of it), the same setting named another file once
+  the folder appeared, and a typo naming somebody's file got that file set aside; the review caught
+  it. A folder not there yet is made with the first answer saved; a file where the folder should be is
+  refused by the settings tab (`that is a file`), and one set in the environment is never touched - an
+  OSError at `makedirs`, the row saying `is a file, not a directory`. A `meta` table says what it is
+  (`kind`) and its shape (`format`); `answers` holds the key (`json.dumps(ResponseCache.key(...))`),
+  the answer's JSON zlib-compressed, its size, `fetched_at` and `used_at` (wall clock, since it
+  outlives the process). Created on the first answer saved, with
+  `auto_vacuum = INCREMENTAL`, **the tables and the meta rows in ONE transaction** (`_make_tables`, also
+  the format reset): the build made them a statement at a time on the autocommit connection, so a file
+  killed (SIGKILL, a power cut) or a disk filling between the CREATEs and the meta rows was left with
+  tables and no `kind` - refused ever after as "a database, but not deadwax's saved answers", nothing
+  saved until it was deleted by hand, with a message telling you to leave it alone (the second review's
+  catch, reproduced by killing the process at the meta rows). Now a cut-short making rolls back - the
+  journal played back on the next open - to an empty file, made afresh. **Never the job database**: a path that resolves to DB_PATH (the folder
+  value itself, or the file in it) is refused by the settings tab and by the layer itself (the row says
+  why), since Clear empties the file. A `musicbrainz-cache.db` that isn't a SQLite database at all (no
+  header) is set aside - renamed `<name>.unreadable-<time>`, its `-journal`/`-wal`/`-shm` with it,
+  BEFORE SQLite opens it, since SQLite would otherwise decide what to do with a journal lying beside
+  it; and a new one is started, with one log line. One that breaks while in use (a `DatabaseError`
+  that isn't an `OperationalError`) the same. Only by real use (a read, a write, Clear): **the settings'
+  look (`stats`, the GET the Clear line reads as it draws) never sets anything aside nor makes a file**
+  (`repair=False`), and **a file of any other name is never set aside** (`NotOurs`) - only one named
+  `musicbrainz-cache.db` is deadwax's to rename and call deletable. A file that IS a database but not
+  this one is left alone, nothing is saved, and the row says so. An `OperationalError` (locked, a full
+  disk, read-only) only costs that answer: **a transaction it interrupts is rolled back** (the trim's
+  own `BEGIN..COMMIT`, and `_with_file` for anything else - closing the connection if even that
+  fails). SQLite doesn't roll back on SQLITE_BUSY, so before the review a trim whose DELETE or COMMIT
+  another process's lock refused left its BEGIN open: every answer after it went into that
+  transaction, never committed, the file's lock held, until a restart. A file that couldn't be opened
+  is tried again after a minute, or at once after a settings save. **What a save found wrong (`problem`)
+  stands until a file opens or the settings are saved** (`reset`): the build cleared it whenever a read
+  found no file, so a folder that can't be made (`MUSICBRAINZ_CACHE_PATH=/cache` uncommented in the
+  compose example with the `/cache` volume left out - deadwax runs as PUID and can't make `/cache`) was
+  said for the minute after a failed save, then the Clear line's own look cleared it, the row read fine
+  and the warning was logged again every minute of use (the second review's catch).
+- **Never in the way.** One worker thread of its own (a one-thread `ThreadPoolExecutor`) holds the
+  connection and does every read, write, trim and Clear in the order asked - never the event loop. A
+  read not answered within `READ_TIMEOUT_SECONDS` (1 s - about what MusicBrainz's quickest answer
+  costs at its request a second) is given up and MusicBrainz asked instead; writes and the "used now"
+  touch are queued and never waited for. A disk hit is about 9 ms end to end through the route.
+- **How big**: `MUSICBRAINZ_CACHE_MB`, 200 by default, 0 to 1048576, 0 off (nothing read or written;
+  the file left as it is). Measured as the file's pages in use, `(page_count - freelist_count) *
+  page_size`; past it, the answers used longest ago go until it is back under 90% (`TRIM_TO`, so a full
+  cache isn't trimmed on every answer), and `incremental_vacuum` gives the pages back. An answer bigger
+  than 90% of the budget isn't kept. "Used" is a disk read: an answer served from memory for its hour
+  is touched on disk only when it is next read from there, so the order is right to within the hour.
+- **Fresh enough**: a search (anything asked with a `query`) is old after 7 days, everything else after
+  30. An old answer is answered AT ONCE (from disk) and one refresh is queued behind it, however often
+  it is used (keyed like the cache, at most 100 waiting). The refresher (`_refresh_saved`, a task of
+  the client's) waits until **nobody's question is on its way** (`asking`, counted from the memory miss
+  on - the disk read included - until the answer) and **nothing at all has been asked of MusicBrainz
+  for a whole window of the rate limiter** - 5 s, and never less than `REFRESH_QUIET_SECONDS` (2 s: a
+  question chained on another follows it within milliseconds, so the quiet keeps a refresh from
+  slipping between them) - checked by `RateLimit.quiet`, synchronous, so nothing slips in between the
+  check and the refresh taking its turn. So **at most one refresh is ever in the limiter's window**:
+  up to three questions asked together right after one go at once, and only a fourth waits for the
+  refresh's turn to pass (at most 5 s); a hundred waiting take about nine minutes. The build paced them
+  at the 2 s quiet alone, which let two or three refreshes sit in the window (4 turns per 5 s) and
+  held a page's second and third requests after one for up to about 4.5 s - the review measured it.
+  It asks ONCE (no retries), on **a connection of its own** (`get_refresh_client`: a slow refresh never
+  holds the one connection a question is waiting for, and a network error closes only the connection
+  it came on, either way), says nothing in the event log (its `HTTP <status>` line is info, not
+  error), and replaces the stored answer - and the one in memory - only on success. A failure keeps
+  the saved answer. **One for that question alone** - MusicBrainz answered 400 or 404
+  (`REFRESH_ONE_QUESTION_FAILURES`; a refresh's failure carries `http_status` for this, seen by
+  `_refresh_saved` alone) - drops only it, and the rest go on: before the review a 404 (something since
+  deleted from MusicBrainz) dropped every refresh behind it as if MusicBrainz were away. The saved
+  answer of a deleted thing stands (the spec: replaced only on success, any age keeps working). **Any
+  other** (no connection, 503, 429, 403, another 5xx) means MusicBrainz is away, and drops every
+  refresh waiting; each is queued again the next time its answer is read from disk - after its hour in
+  memory, or a restart. A queue emptied while the refresher waits (Clear) ends it quietly. The screen
+  showing the old answer is never redrawn.
+- **Keys that mean the same question** (`same_question`): only a `query`'s runs of ASCII whitespace
+  (space, tab, CR, LF - what Lucene's query parser splits terms on) become one space, and its ends are
+  trimmed - never a whitespace character right after a backslash (an escaped space is part of a term),
+  never a no-break space (Lucene reads it as part of a word), never the case (`AND`, `OR`, `NOT` are
+  operators only in capitals), never another param. The memory layer keys the same way, so
+  `Massive  Attack ` and `Massive Attack` are one question there too. Only the KEY is normalised: what
+  is sent is what the caller wrote.
+- **A paged browse is ONE answer** (`Browse`, `MusicBrainzClient._browse`): an artist's discography and a
+  release group's pressings come a hundred at a time, each page its own question and key. The build
+  saved and refreshed each page on its own, so a browse could be put together from pages of different
+  ages - a refresh replacing the first page and failing (503) on the second, the size trim dropping one
+  page and keeping the other, a look between two refreshes - and an edit on MusicBrainz that moved the
+  page boundary meanwhile showed an album twice or not at all; the second review reproduced 150 release
+  groups with 149 different, for up to a month. Now: every page of a browse is stored with the FIRST
+  page's `fetched_at`, its stamp (`_ask(fetched_at=)`, `SavedAnswers.put(fetched_at=)`; memory entries
+  carry it too, a disk hit put back with its own). A read takes pages from the caches only while their
+  stamp is the first page's; a page of another stamp, or one in neither cache after pages that were, and
+  the read is thrown away and made again from MusicBrainz, every page (`live`) - as it is when the first
+  page itself comes from MusicBrainz. A stale page read from disk queues ONE refresh of the whole browse
+  (`BrowseRefresh`, one place in the queue, never a page's own): `_browse(refreshing=True)` asks every
+  page once, each after a quiet turn of its own (so still one refresh in the limiter's window), keeps them
+  back (`keep=False`), and saves them together under one new stamp only when every page came - a
+  failure saves nothing, the old pages stand together. The two loops are one pager now
+  (`get_releases`, `get_artist_release_groups`), and their items are listed each id once
+  (`_distinct`): pages asked seconds apart can still straddle an edit on MusicBrainz. A read thrown
+  away costs what a browse cost before anything was saved. The app's own paging (Search's More, by
+  offset) is the client's, and its `appendPage` already drops ids it has.
+- **The connection check never reads or writes the file** (`ping` passes `disk=False`): it asks whether
+  MusicBrainz can be reached, which an answer saved last week can't say. It keeps its hour in memory,
+  as before.
+- **Shared by everyone**, logins on or off: the key holds no user - MusicBrainz's data isn't anybody's.
+- **Settings and Clear**: the two settings are their own group, "MusicBrainz's saved answers", on the
+  Connections tab of both the main page's settings and the app's Server settings (`tabForGroup`),
+  straight after the Connections group - whose last rows are Navidrome's three, after MusicBrainz's own
+  (a group of its own can't sit among another group's rows; the build's notes said "right after
+  MusicBrainz's own settings", which the second review caught). The path's row checks the folder the
+  way the file will need it: a folder and writable when it is there, and **when it isn't, its nearest
+  folder that is** (`_unmakeable_folder`), so a folder that can't be made is red from the start - after a
+  restart, before any search - and for as long as it lasts. Both editable; a save of either closes the file
+  (`SavedAnswers.reset`), so the next answer opens the file the settings now name, trimmed to the size
+  they now allow. Under the rows, `components/MusicBrainzAnswers.tsx`: the count and size (`GET
+  /deadwax/settings/musicbrainz_cache`) and **Clear MusicBrainz's saved answers** (`POST
+  .../musicbrainz_cache/clear` - DELETE then VACUUM on the worker, the memory layer cleared and the
+  waiting refreshes dropped, logged to the event log). Both admin routes (the settings router's
+  `require_admin`), in test_logins.py's table; Clear is a write the same-origin guard refuses from
+  another site. No confirmation: only speed is lost. Refused while the path is a draft (it clears the
+  SAVED file), with nothing held, and while it goes - with **`aria-disabled` and the press refused,
+  never `disabled`** (it refuses itself on its own press, and a focused button made disabled dropped the
+  focus to the page - the review saw `document.activeElement` become BODY). Drawn afresh (keyed on the
+  group's saved values) after a save, and **read again each time the app's page comes back into view**
+  (`live`: the app keeps a hidden tab's page drawn, so the line said "Nothing saved yet." after a
+  search until Back or a reload - the review's catch); not over a Clear on its way, whose answer still
+  lands, since going out of view calls nothing off. The main page's tab is drawn afresh each time it
+  opens, so it passes no `live`. Its row styles are the Re-time row's (`.settings-retime` selectors
+  extended to `.settings-answers` in main.css, app-desktop.css and app.css), the refused look on
+  `[aria-disabled='true']` (main.css's on a new theme token, `--disabled-opacity`, the 0.45 its
+  `:where(button:disabled)` rule now reads too), tokens only.
+- **Only the running app touches the real file**: `ResponseCache(disk=None)` is every test's unless it
+  says otherwise, and the lifespan attaches `musicbrainz_cache.saved_answers` (reading the settings at
+  every use) after the overrides and, as it ends, stops the refreshes, drops MusicBrainz's connections,
+  closes the file (`close` writes what is queued first) and only then detaches it - a test holds the
+  order. Two tests that enter the lifespan with a stand-in client (test_logins, test_personal_libraries)
+  gave it a `cache` and `stop_refreshing`.
+- **The HEALTHCHECK** is unchanged: /health reads the poller alone; the file and MusicBrainz count for
+  nothing there.
+
+Pinned by `tests/test_musicbrainz_disk_cache.py` (a fake transport; MusicBrainz never asked): a miss
+asks once and saves; a restart (a new client and memory over the same file) answers with nothing
+asked; byte-for-byte JSON; no failure saved (403, 400, 503, 500, 404, not-JSON, a network error); the
+age rule (7 and 30 days, an old answer at once with one refresh, replaced only on success, a failed
+refresh keeping it and dropping the rest - a 400 or 404 dropping only itself - and a refresh never
+ahead of a waiting question: the limiter full, a question slower than the quiet, a question still
+reading the disk - and `asking` back down after a question called off, while MusicBrainz is slow and
+while the disk is); one refresh in the window, three questions after it at once; a refresh's failure
+silent in the event log and closing only its own connection (and a question's only its own); a
+refresher emptied while it waits ending quietly; a paged browse as one answer (refreshed halfway and
+kept whole, refreshed whole under one stamp a turn a page, a page trimmed away - either one - and the
+browse asked again whole, pages of different stamps never joined, an item on two pages listed once -
+each for the discography and the pressings); the size bound and LRU order, the trim back under 90%
+(not on every answer); too big not kept, between 90% and 100% of the budget too; 0 off; a file whose
+making was cut short (a full disk at the meta rows, and a real SIGKILL there) made afresh; a corrupt
+file set aside with its journal - by real
+use, never by the settings' look, never a file of another name; one broken in use; a foreign database
+left alone; a file of another shape made afresh; a trim refused by another process's lock, and any
+failure mid-transaction, rolled back; the job database never the file; the path always a folder, made
+when missing, shareable with the player's cache, a file refused and never touched, one that can't be
+made said on its row from the start and still after the retry minute (and its warning logged once);
+closing writes what is queued; the lifespan's attach and its order at the end; the default path
+and the legacy folder; the compose example and .env.example naming both settings; a slow disk given up
+within the timeout; the disk only on its thread; ping never from the file; the key rules; Clear (disk,
+memory, refreshes) and its same-origin refusal, its refused look on `aria-disabled` in all three
+stylesheets; the rows, the group's place, the refusals, a save applying from the next answer; the
+bypass rule. `ui/test/mbanswers.sim.cjs` pins the component (aria-disabled only, the re-read as the
+page comes back); `settingslog.sim.cjs` where both pages draw it, its key and `live`.
+
+**Seen on a real page** (its own deadwax on 127.0.0.1:8120, a scratch database, real MusicBrainz -
+six requests in all, seconds apart): a search of "Portishead" (releases off) took 0.51 s and saved one
+answer (32 KB file); deadwax restarted, the same search took 0.009 s, the log saying "from the saved
+answers on disk, nothing asked" and no request made, the answer identical as JSON. The saved search
+aged by 8 days in the file and deadwax restarted: answered in 0.009 s, the log saying it was old, and
+the refresh went behind it - the first time MusicBrainz answered 503 (another session shares this
+address), and the refresh was dropped quietly, the saved answer kept, nothing in the event log; after a
+restart the next one succeeded and `fetched_at` was now. Both settings pages at a non-local name
+(`deadwax.test`, not a secure context): the group on Connections with its two rows, "1 answer in 32
+KB saved, of 200 MB.", Clear emptying it ("Cleared. ..."), and at 390 px wide the button 44 px tall
+with no sideways scroll. After the second review's fixes (its own deadwax on 8122, a scratch database,
+five real requests, the launcher holding the limiter to one per 1.2 s): `MUSICBRAINZ_CACHE_PATH` a
+missing folder under a mode-555 parent - the row red before any search ("nothing exists at ... and it
+can't be made there: ... is readable but NOT writable"), a search saving nothing and the problem in
+the Clear line's stats, both still there 62 s later, the warning logged once; and Massive Attack's
+discography (107 release groups, two pages) saved under one stamp, a restart answering it from the file
+in 0.02 s with nothing asked, and with its first page deleted from the file both pages asked again (the
+kept second page never read) and saved under a new stamp, 107 different. NOT verified live: a file at
+its size limit, a disk slow enough to time out, a corrupt file, a cut-short making, a browse refreshed
+behind itself - those are the tests' alone.
+
+**Verified**: 2969 Python tests (2967 passed, 2 skipped; 100 in the new file), pyflakes, tsc, all 53
+sims (one new, mbanswers), the build; the engine files have no diff. Mutation checks: the build broke
+41 rules one at a time, with one equivalent mutant (dropping `_queue_refresh`'s "already queued"
+check changes nothing, the queue being a dict keyed the same way) - but the review found seven more
+whose break no test noticed (`asking` three ways, a refresh's event-log silence, the 90% trim, a
+refresh's connection closing alone, the emptied-queue re-check, the format reset, and the Clear line's
+key and main-page drawing). After the fixes, 32 mutants in a copy (broken, the test file or sim run,
+restored byte for byte): 31 failed their test; the one that survives is the trim's own ROLLBACK,
+equivalent while `_with_file` rolls back too (both removed, both rollback tests fail). A second review
+found six more (a folder that can't be made read as fine after a minute, a browse put together from pages
+of different ages, a cut-short making refused for ever, `asking` after a question called off, the 90%
+limit and the lifespan's order unpinned, the group's place misdescribed); after those fixes 19 mutants
+in a copy - the problem cleared on a missing file, the row's parent check gone, the tables made outside a
+transaction (twice: the full-disk test and the SIGKILL test each alone), a cached page's stamp
+unchecked, page 0 from MusicBrainz not making the rest live, a later missing page asked alone, a
+browse refresh saving page by page, browse pages queueing their own refreshes, no `_distinct`, a
+browse refresh's pages taking no turn, its pages stamped one by one, live pages not given page 0's
+stamp, a disk hit put back without its stamp, a cancel leaving `asking` up, `> budget` for `> 90%`,
+the lifespan not stopping the refreshes, not closing the file, detaching before closing - every one
+failed its test.

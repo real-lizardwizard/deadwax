@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { getServerSettings, saveServerSettings, type ServerSetting, type ServerSettings as Settings, type SettingUpdate } from '../api/settings'
 import { OrganizeModes, OrganizingVerdict, ServerGroup, editedEnvDraft, tabForGroup, tabMarks, type SettingsTab } from '../components/SettingsView'
 import { RetimeLyrics } from '../components/RetimeLyrics'
+import { MusicBrainzAnswers } from '../components/MusicBrainzAnswers'
+import { SAVED_ANSWERS_GROUP, SAVED_ANSWERS_PATH, savedAnswersKey } from '../lib/musicbrainzAnswers'
 import { SERVER_TABS, draftsAfterSave, serverTabAfter } from '../lib/serverSettings'
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { isAbort, latestOnly } from '../lib/latest'
@@ -75,7 +77,10 @@ export function onServerSettingsSaved(listener: (keys: string[]) => void): () =>
  * the app. RE-TIME SAVED LYRICS is here since 2.0.0-player.42, beside LYRICS_LEAD_MS as on the main
  * page (components/RetimeLyrics.tsx, the tab's own, moved where both can draw it): refused while the
  * lead has a draft - it re-times to the SAVED lead - reading a real scan, its run kept in its module so
- * it goes on (and can be stopped) when this page goes.
+ * it goes on (and can be stopped) when this page goes. CLEAR MUSICBRAINZ'S SAVED ANSWERS is here since
+ * 2.0.0-player.54, under their two settings on Connections, as on the main page
+ * (components/MusicBrainzAnswers.tsx): the file's size and count beside it - read again each time the page
+ * comes back into view, drafts or not - refused while the path is a draft.
  *
  * Read the first time the page shows, and again each time it comes back into view WITH NO UNSAVED
  * DRAFT - a volume just fixed shows as fixed, and a draft is never read over; never at start-up. Each
@@ -299,6 +304,12 @@ export function ServerSettings({
                 <ServerGroup key={group.id} group={group} server={server} draftEnv={draftEnv} onEdit={edit} onRevert={revert}>
                   {/* beside the lead, as on the main page's tab - refused while the lead is a draft */}
                   {group.id === 'lyrics' && <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />}
+                  {/* (2.0.0-player.54) Clear MusicBrainz's saved answers, under their two settings - read again
+                      as a save changes either, and as the page comes back into view (it stays drawn while
+                      hidden, and the file fills meanwhile); refused while the path is a draft */}
+                  {group.id === SAVED_ANSWERS_GROUP && (
+                    <MusicBrainzAnswers key={savedAnswersKey(group)} live={live} unsaved={draftEnv[SAVED_ANSWERS_PATH] !== undefined} />
+                  )}
                 </ServerGroup>
               ))}
               {tab === 'library' && <OrganizeModes modes={server.organize_modes} />}

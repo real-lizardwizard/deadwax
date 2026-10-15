@@ -5712,7 +5712,8 @@ html.app-edit-open { overflow: hidden; }
 .app-shell:not(.app-desk) .app-settings .settings-section-note,
 .app-shell:not(.app-desk) .app-settings .settings-env-effect,
 .app-shell:not(.app-desk) .app-settings .settings-mode-note,
-.app-shell:not(.app-desk) .app-settings .settings-retime-note {
+.app-shell:not(.app-desk) .app-settings .settings-retime-note,
+.app-shell:not(.app-desk) .app-settings .settings-answers-note {
     margin: 0;
     color: var(--dw-text-2);
     font-size: var(--dw-text-footnote);
@@ -5734,7 +5735,8 @@ html.app-edit-open { overflow: hidden; }
 
 .app-shell:not(.app-desk) .app-settings .settings-env,
 .app-shell:not(.app-desk) .app-settings .settings-mode,
-.app-shell:not(.app-desk) .app-settings .settings-retime {
+.app-shell:not(.app-desk) .app-settings .settings-retime,
+.app-shell:not(.app-desk) .app-settings .settings-answers {
     display: flex;
     flex-direction: column;
     gap: var(--app-ph-lines);
@@ -5745,7 +5747,8 @@ html.app-edit-open { overflow: hidden; }
 
 .app-shell:not(.app-desk) .app-settings .settings-env + .settings-env,
 .app-shell:not(.app-desk) .app-settings .settings-mode + .settings-mode,
-.app-shell:not(.app-desk) .app-settings .settings-retime { border-top: var(--dw-hairline) solid var(--dw-row-border); }
+.app-shell:not(.app-desk) .app-settings .settings-retime,
+.app-shell:not(.app-desk) .app-settings .settings-answers { border-top: var(--dw-hairline) solid var(--dw-row-border); }
 
 /* an edit still only a draft: marked at its edge until it is saved */
 .app-shell:not(.app-desk) .app-settings .settings-env.is-edited { border-left-color: var(--dw-amber-icon); background: var(--dw-tint-amber); }
@@ -5859,10 +5862,13 @@ html.app-edit-open { overflow: hidden; }
     line-height: var(--dw-leading-note);
 }
 
-/* Re-time saved lyrics: the tab's own button, a finger tall */
-.app-shell:not(.app-desk) .app-settings .settings-retime { align-items: flex-start; }
+/* Re-time saved lyrics: the tab's own button, a finger tall - and Clear MusicBrainz's saved answers
+   (2.0.0-player.54), the same */
+.app-shell:not(.app-desk) .app-settings .settings-retime,
+.app-shell:not(.app-desk) .app-settings .settings-answers { align-items: flex-start; }
 
-.app-shell:not(.app-desk) .app-settings .settings-retime .win-button {
+.app-shell:not(.app-desk) .app-settings .settings-retime .win-button,
+.app-shell:not(.app-desk) .app-settings .settings-answers .win-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -5878,10 +5884,13 @@ html.app-edit-open { overflow: hidden; }
     font-weight: var(--dw-weight-medium);
 }
 
-.app-shell:not(.app-desk) .app-settings .settings-retime .win-button:disabled { opacity: var(--app-job-busy); }
+/* Clear refuses with aria-disabled (the focus on it stays), Re-time with disabled */
+.app-shell:not(.app-desk) .app-settings .settings-retime .win-button:disabled,
+.app-shell:not(.app-desk) .app-settings .settings-answers .win-button[aria-disabled='true'] { opacity: var(--app-job-busy); }
 
 .app-shell:not(.app-desk) .app-settings .settings-env-revert:focus-visible,
-.app-shell:not(.app-desk) .app-settings .settings-retime .win-button:focus-visible {
+.app-shell:not(.app-desk) .app-settings .settings-retime .win-button:focus-visible,
+.app-shell:not(.app-desk) .app-settings .settings-answers .win-button:focus-visible {
     outline: var(--app-ring) solid var(--dw-accent);
     outline-offset: var(--app-ring);
     border-radius: var(--dw-radius-control);

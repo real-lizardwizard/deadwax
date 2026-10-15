@@ -53,6 +53,18 @@ services:
       # played longest ago going first. A disk short of space just means Safari gets the FLAC.
       #- PLAYER_CACHE_PATH=/cache
       #- PLAYER_CACHE_MB=1024
+      #
+      # Optional. Every answer MusicBrainz gives is saved on disk, so a search, an artist or an album
+      # asked again is answered at once - after a restart too, and while MusicBrainz is away. This is
+      # the FOLDER that file (musicbrainz-cache.db) is kept in. Left out, it sits beside the database
+      # in /config. It can share the player cache's fast disk: point both at the same /cache mount
+      # below. The folder must be writable by PUID/PGID (deadwax makes it if it isn't there, and
+      # touches nothing else in it). It is only a cache: leave it out of your backups, and deleting
+      # it is always safe - it costs nothing but speed. MUSICBRAINZ_CACHE_MB is the most it holds (0
+      # to 1048576; 200 is about 4,000 artists looked up with an album each), the answers used
+      # longest ago going first; 0 turns saving off.
+      #- MUSICBRAINZ_CACHE_PATH=/cache
+      #- MUSICBRAINZ_CACHE_MB=200
 
       # ----- uncomment to configure deadwax here instead of in .env -----
       #
@@ -159,10 +171,12 @@ services:
       #- /path/to/slskd/incomplete:/incomplete
       # where organized albums get filed
       - /path/to/music:/music
-      # holds the database that remembers which download belongs to which release
+      # holds the database that remembers which download belongs to which release - and MusicBrainz's
+      # saved answers beside it (musicbrainz-cache.db) unless MUSICBRAINZ_CACHE_PATH points elsewhere
       - /path/to/deadwax/config:/config
-      # only needed if you set PLAYER_CACHE_PATH above - put it on a fast disk (an SSD), writable
-      # by PUID/PGID. It is only a cache: leave it out of your backups, and delete it when you like
+      # only needed if you set PLAYER_CACHE_PATH or MUSICBRAINZ_CACHE_PATH above (one mount holds
+      # both caches) - put it on a fast disk (an SSD), writable by PUID/PGID. It is only a cache:
+      # leave it out of your backups, and delete it when you like
       #- /path/to/fast/disk/deadwax-cache:/cache
 
     ports:

@@ -3181,9 +3181,11 @@
         line-height: var(--dw-leading-note);
     }
 
-    /* --- Server settings: Re-time saved lyrics, under the lyrics group's rows (the tab's own parts) --- */
+    /* --- Server settings: Re-time saved lyrics, under the lyrics group's rows (the tab's own parts) - and
+       Clear MusicBrainz's saved answers under theirs (2.0.0-player.54), the same shape --- */
 
-    .app-desk .app-settings .settings-retime {
+    .app-desk .app-settings .settings-retime,
+    .app-desk .app-settings .settings-answers {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -3193,7 +3195,8 @@
         border-left: var(--app-desk-set-edge) solid transparent;   /* in line with the rows above it */
     }
 
-    .app-desk .app-settings .settings-retime .win-button {
+    .app-desk .app-settings .settings-retime .win-button,
+    .app-desk .app-settings .settings-answers .win-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -3210,15 +3213,20 @@
         white-space: nowrap;
     }
 
-    .app-desk .app-settings .settings-retime .win-button:hover:not(:disabled) { background: var(--dw-secondary-bg-active); }
-    .app-desk .app-settings .settings-retime .win-button:disabled { opacity: var(--app-job-busy); cursor: not-allowed; }
+    .app-desk .app-settings .settings-retime .win-button:hover:not(:disabled),
+    .app-desk .app-settings .settings-answers .win-button:hover:not([aria-disabled='true']) { background: var(--dw-secondary-bg-active); }
+    /* Clear refuses with aria-disabled (the focus on it stays), Re-time with disabled */
+    .app-desk .app-settings .settings-retime .win-button:disabled,
+    .app-desk .app-settings .settings-answers .win-button[aria-disabled='true'] { opacity: var(--app-job-busy); cursor: not-allowed; }
 
-    .app-desk .app-settings .settings-retime .win-button:focus-visible {
+    .app-desk .app-settings .settings-retime .win-button:focus-visible,
+    .app-desk .app-settings .settings-answers .win-button:focus-visible {
         outline: var(--app-ring) solid var(--dw-accent);
         outline-offset: var(--app-ring);
     }
 
-    .app-desk .app-settings .settings-retime-note {
+    .app-desk .app-settings .settings-retime-note,
+    .app-desk .app-settings .settings-answers-note {
         flex: 1 1 auto;
         min-width: 0;
         color: var(--dw-text-2);

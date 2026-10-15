@@ -11,7 +11,10 @@
  *  - SERVER SETTINGS: the server's groups only - no browser preference of the main page's (one line
  *    says they are the main page's, its link beside the app) - and, since 2.0.0-player.42, Re-time saved
  *    lyrics under the Lyrics group alone, refused while the lead is a draft; every rule of a row (a
- *    secret masked, choices a dropdown, a locked one saying why, revert, the retype note); drafts kept
+ *    secret masked, choices a dropdown, a locked one saying why, revert, the retype note); since
+ *    2.0.0-player.54 Clear MusicBrainz's saved answers under their group's two rows on Connections alone,
+ *    refused while the path (not the size) is a draft, keyed on the group's saved values and told `live` -
+ *    and on the main page's settings tab (components/SettingsView.tsx, drawn here too) the same; drafts kept
  *    across the tabs (a tab holding one marked) and ONE save sending them all in one batch; a refusal
  *    said in the bar with every draft still there, until the next save or Discard; Save the one solid
  *    purple button; read when it first shows and again on coming back only with no draft; a save calling
@@ -115,8 +118,10 @@ write('components/Loading.js', `exports.Loading = () => null; exports.LoadingPan
 //? Re-time saved lyrics (2.0.0-player.42), the tab's own, drawn where the page draws it - itself pinned
 //? in care.sim.cjs: here a stand-in that says where it went and what it was told
 write('components/RetimeLyrics.js', `exports.RetimeLyrics = ({ unsaved }) => ({ type: 'div', props: { class: 'retime-stub', 'data-unsaved': unsaved, children: 'Re-time saved lyrics' } })\n`)
+//? Clear MusicBrainz's saved answers (2.0.0-player.54), the same way - itself pinned in mbanswers.sim.cjs
+write('components/MusicBrainzAnswers.js', `exports.MusicBrainzAnswers = ({ unsaved }) => ({ type: 'div', props: { class: 'answers-stub', 'data-unsaved': unsaved, children: "Clear MusicBrainz's saved answers" } })\n`)
 write('state/persisted.js', `
-exports.readSettingsTab = () => null; exports.writeSettingsTab = () => {}
+exports.readSettingsTab = () => globalThis.__settingsTab ?? null; exports.writeSettingsTab = () => {}
 exports.useDownloadDefaults = () => [{}, () => {}]; exports.usePreferences = () => [{}, () => {}, () => {}]
 `)
 
@@ -138,6 +143,9 @@ const S = require(path.join(OUT, 'lib/serverSettings.js'))
 const API = require(path.join(OUT, 'api/logs.js'))
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { ServerSettings, forgetServerSettingsPage, showServerSettingsTab, onServerSettingsSaved } = require(path.join(OUT, 'app/ServerSettings.js'))
+const SV = require(path.join(OUT, 'components/SettingsView.js'))
+const MBA = require(path.join(OUT, 'components/MusicBrainzAnswers.js'))
+const MBL = require(path.join(OUT, 'lib/musicbrainzAnswers.js'))
 const R = require(path.join(OUT, 'lib/appRoutes.js'))
 const NS = require(path.join(OUT, 'app/navidromeSetUp.js'))
 const NC = require(path.join(OUT, 'lib/navidromeCheck.js'))
@@ -194,7 +202,9 @@ function mount(component, props) {
   //? how many times the page has been told to draw again - its first hook, the `redraw` counter each
   //? page keeps (their state is their module's: nothing else would draw them again in a real page)
   const redraws = () => render.slots[0]?.v ?? 0
-  return { draw, all, redraws, unmount: () => render.unmount() }
+  //? the page as drawn, function components NOT drawn through - where an element's key can be seen
+  const raw = () => render(all)
+  return { draw, all, redraws, raw, unmount: () => render.unmount() }
 }
 
 /* ===== the pure rules ===== */
@@ -851,6 +861,79 @@ async function settingsPage() {
     check('...nor does a revert of another setting', refused(), false)
     lead.unmount()
   }
+  console.log("\nserver settings: Clear MusicBrainz's saved answers, under their two settings on Connections (2.0.0-player.54)")
+  {
+    reset()
+    check('their group sits on Connections, on both pages (tabForGroup, the main page\'s own)', SV.tabForGroup('musicbrainz-cache'), 'connections')
+    const withAnswers = () => {
+      const settings = SETTINGS()
+      settings.groups.splice(1, 0, { id: 'musicbrainz-cache', label: "MusicBrainz's saved answers", note: 'Saved on disk.', settings: [
+        setting('MUSICBRAINZ_CACHE_PATH', { status: 'unset' }), setting('MUSICBRAINZ_CACHE_MB', { value: '200' })] })
+      return settings
+    }
+    const answers = mount(ServerSettings)
+    answers.draw()
+    W.reads[0].resolve(withAnswers())
+    await settle()
+    answers.draw()
+    check('not on Library', classed('answers-stub').length, 0)
+    tab('connections').props.onClick()
+    answers.draw()
+    const group = find((node) => byClass('settings-section')(node) && words(classed('settings-section-title', node)[0]) === "MusicBrainz's saved answers")[0]
+    check('on Connections, after its own group: the two rows, then Clear once, inside the group - the path saved, so not refused',
+      [classed('settings-section-title').map(words), !!row('MUSICBRAINZ_CACHE_PATH') && !!row('MUSICBRAINZ_CACHE_MB'), classed('answers-stub').length,
+        classed('answers-stub', group).length, classed('answers-stub')[0]?.props['data-unsaved']],
+      [['Connections', "MusicBrainz's saved answers"], true, 1, 1, false])
+    const refused = () => classed('answers-stub')[0]?.props['data-unsaved']
+    type('MUSICBRAINZ_CACHE_MB', '400')
+    answers.draw()
+    check('...a draft of the size refuses nothing (the file is the same one)', refused(), false)
+    type('MUSICBRAINZ_CACHE_PATH', '/ssd/')
+    answers.draw()
+    check('...a draft of the path refuses Clear - it clears the file that is SAVED', refused(), true)
+    type('MUSICBRAINZ_CACHE_PATH', '')
+    answers.draw()
+    check('...typed back to what is saved: no draft, offered again', refused(), false)
+    //? review: dropping the key, or `live`, left every check above passing - the stand-in ignores both
+    const element = () => find((node) => node.type === MBA.MusicBrainzAnswers, answers.raw())[0]
+    const savedGroup = withAnswers().groups[1]
+    check('keyed on the group\'s settings as saved - a save of either draws it afresh, reading the file they name',
+      [element()?.key, element()?.key === MBL.savedAnswersKey(savedGroup)], ['MUSICBRAINZ_CACHE_PATH=|MUSICBRAINZ_CACHE_MB=200', true])
+    check('...told whether the page is in view, so it reads the file again as the page comes back', element()?.props.live, true)
+    answers.draw({ live: false })
+    check('...and when it isn\'t (another tab in front: drawn, hidden)', element()?.props.live, false)
+    answers.unmount()
+  }
+
+  console.log("\nthe main page's settings tab: Clear MusicBrainz's saved answers under the same group (2.0.0-player.54)")
+  {
+    reset()
+    globalThis.__settingsTab = 'connections'
+    const withAnswers = () => {
+      const settings = SETTINGS()
+      settings.groups.splice(1, 0, { id: 'musicbrainz-cache', label: "MusicBrainz's saved answers", note: 'Saved on disk.', settings: [
+        setting('MUSICBRAINZ_CACHE_PATH', { status: 'unset' }), setting('MUSICBRAINZ_CACHE_MB', { value: '200' })] })
+      return settings
+    }
+    const main = mount(SV.SettingsView, { active: true })
+    main.draw()
+    W.reads[0].resolve(withAnswers())
+    await settle()
+    main.draw()
+    const group = find((node) => byClass('settings-section')(node) && words(classed('settings-section-title', node)[0]) === "MusicBrainz's saved answers")[0]
+    check('on its Connections tab: Clear drawn once, inside the group, under its two rows - the path saved, so not refused',
+      [!!group, classed('answers-stub').length, classed('answers-stub', group).length, !!row('MUSICBRAINZ_CACHE_PATH') && !!row('MUSICBRAINZ_CACHE_MB'),
+        classed('answers-stub')[0]?.props['data-unsaved']], [true, 1, 1, true, false])
+    const element = find((node) => node.type === MBA.MusicBrainzAnswers, main.raw())[0]
+    check('...keyed on the settings as saved; no `live` (the tab is drawn afresh each time it opens)',
+      [element?.key, element?.props.live], ['MUSICBRAINZ_CACHE_PATH=|MUSICBRAINZ_CACHE_MB=200', undefined])
+    type('MUSICBRAINZ_CACHE_PATH', '/ssd')
+    main.draw()
+    check('...a draft of the path refuses it', classed('answers-stub')[0]?.props['data-unsaved'], true)
+    main.unmount()
+    globalThis.__settingsTab = undefined
+  }
+
   //? the saves since the listener was let go (off(), above) told it nothing
   check('a listener let go is told of no save after it (saves taken since: some)', [told.length, everySave.length > told.length], [2, true])
 }

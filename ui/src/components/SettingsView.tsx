@@ -8,7 +8,9 @@ import {
 import type { FormatPreference } from '../api/types'
 import { SORT_LABELS } from '../lib/candidates'
 import { LoadingPanel } from './Loading'
+import { MusicBrainzAnswers } from './MusicBrainzAnswers'
 import { RetimeLyrics } from './RetimeLyrics'
+import { SAVED_ANSWERS_GROUP, SAVED_ANSWERS_PATH, savedAnswersKey } from '../lib/musicbrainzAnswers'
 import {
   readSettingsTab, useDownloadDefaults, usePreferences, writeSettingsTab,
   type DownloadDefaults, type Preferences,
@@ -31,8 +33,9 @@ const SETTINGS_TABS: readonly { id: SettingsTab; label: string; hint: string }[]
  * yet goes under Library rather than nowhere, so a setting added later is never unreachable.
  */
 export function tabForGroup(groupId: string): SettingsTab {
-  //? (2.0.0-player.48) logins - read-only, the environment's - sit with Navidrome, whose accounts they are
-  if (groupId === 'connections' || groupId === 'logins') return 'connections'
+  //? (2.0.0-player.48) logins - read-only, the environment's - sit with Navidrome, whose accounts they are;
+  //? (2.0.0-player.54) MusicBrainz's saved answers, a group the server sends straight after Connections
+  if (groupId === 'connections' || groupId === 'logins' || groupId === SAVED_ANSWERS_GROUP) return 'connections'
   if (groupId === 'downloads' || groupId === 'soulseek') return 'downloads'
   return 'library'
 }
@@ -240,7 +243,8 @@ export function editedEnvDraft(
  * A server group's rows (exported for the app's Server settings page, 2.0.0-player.33): every
  * setting, its draft, and the note another row's edit asks of it. `children` follow the rows inside
  * the group - Re-time saved lyrics, under the lyrics group, on the settings tab and (since
- * 2.0.0-player.42) the app's page alike (components/RetimeLyrics.tsx).
+ * 2.0.0-player.42) the app's page alike (components/RetimeLyrics.tsx); and since 2.0.0-player.54
+ * Clear MusicBrainz's saved answers under theirs (components/MusicBrainzAnswers.tsx), on both too.
  */
 export function ServerGroup({
   group,
@@ -583,6 +587,9 @@ export function SettingsView({ active }: { active: boolean }) {
     <ServerGroup key={group.id} group={group} server={server} draftEnv={draftEnv} onEdit={editEnv} onRevert={revertEnv}>
       {group.id === 'lyrics' && (
         <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />
+      )}
+      {group.id === SAVED_ANSWERS_GROUP && (
+        <MusicBrainzAnswers key={savedAnswersKey(group)} unsaved={draftEnv[SAVED_ANSWERS_PATH] !== undefined} />
       )}
     </ServerGroup>
   )

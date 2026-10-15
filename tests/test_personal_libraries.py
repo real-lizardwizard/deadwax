@@ -45,6 +45,7 @@ from fastapi.testclient import TestClient
 
 from src import auth, library, library_ledger, organizer, poller, stars
 from src.api.app import start
+from src.api.musicbrainz_endpoint import ResponseCache
 from src.config import Config
 from src.library_ledger import ADDED, FLAGGED, INCOMPLETE, grant_for
 from src.poller import poll_downloads_once
@@ -1120,7 +1121,14 @@ def test_deadwax_starts_the_starring_worker_only_with_logins_on(monkeypatch, tmp
         return None
 
     class Client:
+        #? (2.0.0-player.54) the lifespan attaches MusicBrainz's saved answers to the client's cache, and
+        #? stops its refreshes as it ends
+        cache = ResponseCache()
+
         async def close_client(self):
+            return None
+
+        async def stop_refreshing(self):
             return None
 
     monkeypatch.setattr(app_module, "MusicBrainzClient", Client)

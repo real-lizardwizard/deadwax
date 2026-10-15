@@ -226,6 +226,52 @@ def parse_player_cache_mb(value: str | None) -> int | None:
     return megabytes if low <= megabytes <= high else None
 
 
+#? (2.0.0-player.54) MusicBrainz's answers kept on disk - src/musicbrainz_cache.py. The file's name, and
+#? MUSICBRAINZ_CACHE_MB's default and bounds: 200 MB holds about 4,000 artists looked up with an album
+#? each (about 45 KB compressed apiece, measured against real answers on 2026-10-15); 0 turns the disk
+#? layer off, leaving the hour in memory there always was; a terabyte is past any sensible disk.
+MUSICBRAINZ_CACHE_FILE = "musicbrainz-cache.db"
+DEFAULT_MUSICBRAINZ_CACHE_MB = 200
+MUSICBRAINZ_CACHE_MB_RANGE = (0, 1 << 20)
+
+
+def parse_musicbrainz_cache_mb(value: str | None) -> int | None:
+    """MUSICBRAINZ_CACHE_MB as a whole number of MB within range (0 is off), or None when it isn't one."""
+    text = (value or "").strip().removesuffix("MB").removesuffix("mb").strip()
+    #? ASCII digits only, as PLAYER_CACHE_MB: int() also takes '٣' and '1_024', which nobody means as a size
+    if not re.fullmatch(r"[0-9]+", text):
+        return None
+    low, high = MUSICBRAINZ_CACHE_MB_RANGE
+    megabytes = int(text)
+    return megabytes if low <= megabytes <= high else None
+
+
+def musicbrainz_cache_path(configured: str | None, db_path: str) -> str:
+    """
+    The file MusicBrainz's answers are kept in: musicbrainz-cache.db inside the FOLDER
+    MUSICBRAINZ_CACHE_PATH names when it is set, and otherwise in the database's own folder,
+    whichever database that is (DB_PATH, or default_db_path()'s choice, the legacy jimbrainz.db
+    included). Its own file, never the database: deleting it only ever costs speed.
+
+    ALWAYS A FOLDER, like PLAYER_CACHE_PATH, so one fast-disk mount can hold both caches (James,
+    2026-10-15: "a cache path variable in the compose file so I can put the cache on my ssd") - never
+    read as the file itself, whether the folder is there yet or not. A folder not there yet is made
+    with the first answer saved, so the same setting never names one file before the folder exists
+    and another after it, nor a file of somebody else's that a typo happens to name.
+    """
+    if configured:
+        return os.path.join(configured, MUSICBRAINZ_CACHE_FILE)
+    return os.path.join(os.path.dirname(db_path) or ".", MUSICBRAINZ_CACHE_FILE)
+
+
+def is_the_database(path: str, db_path: str) -> bool:
+    """Whether `path` is the job database itself - the one file the saved answers may never be kept in."""
+    try:
+        return os.path.realpath(path) == os.path.realpath(db_path)
+    except (OSError, ValueError):
+        return False
+
+
 def parse_lyrics_lead(value: str | None) -> int | None:
     """A lyrics lead in milliseconds, or None if `value` isn't one - a whole number within the limit."""
     text = (value or "").strip().removesuffix("ms").strip()
@@ -460,6 +506,17 @@ class Config:
     #? 1024 is the gigabyte it always had, several albums of CD-quality FLAC. 64 to 1048576.
     PLAYER_CACHE_MB = _env("PLAYER_CACHE_MB", str(DEFAULT_PLAYER_CACHE_MB))
 
+    #? (2.0.0-player.54) Where MusicBrainz's answers are kept on disk, so a question asked again - after
+    #? a restart too - is answered at once, even while MusicBrainz is away (src/musicbrainz_cache.py).
+    #? A FOLDER, which holds musicbrainz-cache.db (musicbrainz_cache_path) - the player cache's /cache
+    #? mount can be it; empty is the database's own folder. Only ever a cache: deleting the file costs
+    #? nothing but speed.
+    MUSICBRAINZ_CACHE_PATH = _env("MUSICBRAINZ_CACHE_PATH")
+
+    #? How much those answers may take, in MB (MiB): the ones used longest ago go first past it. 0 is
+    #? off - memory only, for an hour, as before 2.0.0-player.54. 0 to 1048576.
+    MUSICBRAINZ_CACHE_MB = _env("MUSICBRAINZ_CACHE_MB", str(DEFAULT_MUSICBRAINZ_CACHE_MB))
+
     #? ===== logins (2.0.0-player.48, step 3 of the multi-user plan) ===============
     #?
     #? ENVIRONMENT ONLY, all four, and never editable in the settings tab (NOT_EDITABLE below): a
@@ -535,6 +592,10 @@ class Config:
         #? read by the player's cache at every request it answers, so nothing to rebuild
         "PLAYER_CACHE_PATH": None,
         "PLAYER_CACHE_MB": None,
+        #? (2.0.0-player.54) the saved answers' file is held open, so a change closes it: the next
+        #? answer opens the file the settings now name, trimmed to the size they now allow
+        "MUSICBRAINZ_CACHE_PATH": "musicbrainz_cache",
+        "MUSICBRAINZ_CACHE_MB": "musicbrainz_cache",
     }
 
     #? Why each of these cannot be edited here, in words the settings tab renders verbatim.
@@ -985,3 +1046,14 @@ def search_timeout_seconds() -> int:
 def player_cache_bytes() -> int:
     """The player cache's cap in bytes - the setting when it is valid, else the gigabyte it always was."""
     return (parse_player_cache_mb(Config.PLAYER_CACHE_MB) or DEFAULT_PLAYER_CACHE_MB) << 20
+
+
+def musicbrainz_cache_megabytes() -> int:
+    """MUSICBRAINZ_CACHE_MB as a number - the setting when it is valid (0 is off), else the default 200."""
+    megabytes = parse_musicbrainz_cache_mb(Config.MUSICBRAINZ_CACHE_MB)
+    return DEFAULT_MUSICBRAINZ_CACHE_MB if megabytes is None else megabytes
+
+
+def musicbrainz_cache_file() -> str:
+    """The saved answers' file as the settings name it now (musicbrainz_cache_path)."""
+    return musicbrainz_cache_path(Config.MUSICBRAINZ_CACHE_PATH, Config.DB_PATH)

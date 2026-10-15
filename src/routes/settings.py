@@ -50,10 +50,14 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from src import __version__, player_cache
-from src.config import (COVER_ART_SIZES, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS, PLAYER_CACHE_MB_RANGE,
+from src import __version__, musicbrainz_cache, player_cache
+from src.api.musicbrainz_endpoint import MusicBrainzClient
+from src.config import (COVER_ART_SIZES, DEFAULT_MUSICBRAINZ_CACHE_MB, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS,
+                        MUSICBRAINZ_CACHE_FILE, MUSICBRAINZ_CACHE_MB_RANGE, PLAYER_CACHE_MB_RANGE,
                         RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config, describe_auth_mode, describe_secret_key,
-                        build_user_agent, parse_player_cache_mb, parse_rename_wait, parse_search_timeout,
+                        build_user_agent, is_the_database, musicbrainz_cache_file, musicbrainz_cache_megabytes,
+                        musicbrainz_cache_path, parse_musicbrainz_cache_mb, parse_player_cache_mb,
+                        parse_rename_wait, parse_search_timeout,
                         describe_contact, describe_navidrome_url, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env, without_login)
 from src.scan_wait import SCAN_WAIT_CAP_SECONDS
@@ -404,6 +408,118 @@ def _player_cache_rows() -> list[dict]:
         _setting(
             "PLAYER_CACHE_MB",
             Config.PLAYER_CACHE_MB,
+            effect=size_effect,
+            status="ok" if megabytes is not None else "error",
+            detail=None if megabytes is not None else f"expected a whole number of MB, {low} to {high}",
+        ),
+    ]
+
+
+#? What the saved answers are, for both of their rows (2.0.0-player.54).
+MUSICBRAINZ_CACHE_IS = (
+    "Only a cache: safe to delete at any time, which costs nothing but speed - the next answers are "
+    "asked of MusicBrainz again"
+)
+
+
+def _saved_answers() -> "musicbrainz_cache.SavedAnswers":
+    """The saved answers MusicBrainz's client uses - or, outside a running app, the ones it would."""
+    return MusicBrainzClient.cache.disk or musicbrainz_cache.saved_answers
+
+
+def _unmakeable_folder(folder: str) -> tuple[str | None, str | None]:
+    """
+    A MUSICBRAINZ_CACHE_PATH folder that isn't there yet is made with the first answer saved - when it
+    can be. Its nearest folder that IS there is checked the way the making will need it, so a folder
+    that can't be made is said at once and for as long as it lasts - after a restart, before any search
+    - rather than only after a save has failed (review: the compose example's MUSICBRAINZ_CACHE_PATH=/cache
+    uncommented with its /cache volume left out, deadwax running as PUID, read as fine). (None, None)
+    when it can be made.
+    """
+    parent = os.path.dirname(os.path.abspath(folder))
+    while parent and not os.path.exists(parent) and os.path.dirname(parent) != parent:
+        parent = os.path.dirname(parent)
+    parent_status, parent_detail = _describe_path(
+        parent, needs_write=True, unwritable=f"{folder} can't be made inside it",
+    )
+    if parent_status != "error":
+        return None, None
+    return "error", (
+        f"nothing exists at {folder} as seen from inside this container, and it can't be made there: "
+        f"{parent_detail} If it is meant to be a volume, its mapping is "
+        f"missing - the path has to be the CONTAINER's path. Until then MusicBrainz's answers are kept "
+        f"in memory only, for an hour"
+    )
+
+
+def _musicbrainz_cache_rows() -> list[dict]:
+    """
+    Where MusicBrainz's answers are kept on disk, and how much (2.0.0-player.54). MUSICBRAINZ_CACHE_PATH
+    is a FOLDER, always (config.musicbrainz_cache_path): it is checked the way the file will need it - a
+    folder and writable, when it is there (it is made when it isn't) - and what the saved answers last
+    found wrong is said, without opening anything.
+    """
+    configured = Config.MUSICBRAINZ_CACHE_PATH
+    path = musicbrainz_cache_file()
+    status, detail = None, None
+    if is_the_database(path, Config.DB_PATH):
+        status, detail = "error", (
+            f"{path} is deadwax's own database - the saved answers need a file of their own, so point "
+            f"MUSICBRAINZ_CACHE_PATH at another folder. Until then "
+            f"MusicBrainz's answers are kept in memory only, for an hour"
+        )
+    else:
+        folder = os.path.dirname(path) or "."
+        if os.path.exists(folder):
+            folder_status, folder_detail = _describe_path(
+                folder, needs_write=True,
+                unwritable="MusicBrainz's answers can't be saved there, and are kept in memory only, for an hour",
+            )
+            if folder_status == "error":
+                status, detail = "error", folder_detail
+        else:
+            status, detail = _unmakeable_folder(folder)
+        problem = _saved_answers().problem
+        if status is None and problem:
+            status, detail = "error", f"{problem}. Until then MusicBrainz's answers are kept in memory only, for an hour"
+    if configured:
+        path_effect = (
+            f"The folder deadwax keeps MusicBrainz's answers in, as {MUSICBRAINZ_CACHE_FILE}, so a search or "
+            f"page asked again - after a restart too - is answered at once, even while MusicBrainz is away: "
+            f"{path}. Made when it isn't there yet; it can be the folder PLAYER_CACHE_PATH uses, on a fast "
+            f"disk. {MUSICBRAINZ_CACHE_IS}"
+        )
+    else:
+        path_effect = (
+            f"Unset: MusicBrainz's answers are kept on disk in {path}, beside the database, so a search or "
+            f"page asked again - after a restart too - is answered at once, even while MusicBrainz is away. "
+            f"Set it to a folder to keep them there instead - one on a fast disk (an SSD), which can be the "
+            f"folder PLAYER_CACHE_PATH uses: deadwax keeps {MUSICBRAINZ_CACHE_FILE} inside it. "
+            f"{MUSICBRAINZ_CACHE_IS}"
+        )
+
+    megabytes = parse_musicbrainz_cache_mb(Config.MUSICBRAINZ_CACHE_MB)
+    low, high = MUSICBRAINZ_CACHE_MB_RANGE
+    used = musicbrainz_cache_megabytes()
+    if used:
+        size_effect = (
+            f"The saved answers take at most {used} MB, the ones used longest ago dropped first past it. An "
+            f"artist searched, their page and one album opened take about 45 KB, so that holds about "
+            f"{used * 20:,} artists looked up with an album each. 0 turns saving off"
+        )
+    else:
+        size_effect = (
+            "0: off. MusicBrainz's answers are kept in memory only, for an hour, and asked again after a "
+            "restart. A file already there is left as it is - Clear empties it"
+        )
+    if megabytes is None:
+        size_effect = f"unrecognised, so {DEFAULT_MUSICBRAINZ_CACHE_MB} is used. {size_effect}"
+
+    return [
+        _setting("MUSICBRAINZ_CACHE_PATH", configured, effect=path_effect, status=status, detail=detail),
+        _setting(
+            "MUSICBRAINZ_CACHE_MB",
+            Config.MUSICBRAINZ_CACHE_MB,
             effect=size_effect,
             status="ok" if megabytes is not None else "error",
             detail=None if megabytes is not None else f"expected a whole number of MB, {low} to {high}",
@@ -777,6 +893,20 @@ async def settings():
                 ],
             },
             {
+                #? (2.0.0-player.54) on the Connections tab, straight after the Connections group (whose
+                #? last rows are Navidrome's, after MusicBrainz's) - a group of its own, so it can't sit among
+                #? that group's rows - with Clear drawn under its rows (components/MusicBrainzAnswers.tsx)
+                "id": "musicbrainz-cache",
+                "label": "MusicBrainz's saved answers",
+                "note": (
+                    "Every answer MusicBrainz gives is saved on disk, for everyone, so asking again - after a "
+                    "restart too - is answered at once, even while MusicBrainz is away. Searches are refreshed "
+                    "after 7 days and everything else after 30: the saved answer is shown straight away and a "
+                    "new one asked for quietly behind it, for next time. A failure is never saved."
+                ),
+                "settings": _musicbrainz_cache_rows(),
+            },
+            {
                 "id": "paths",
                 "label": "Paths",
                 "note": (
@@ -989,6 +1119,23 @@ def _validate(key: str, value: str) -> str | None:
         return (f"expected a whole number of MB, {low} to {high} - {DEFAULT_PLAYER_CACHE_MB} is the "
                 f"default")
 
+    if key == "MUSICBRAINZ_CACHE_MB" and parse_musicbrainz_cache_mb(value) is None:
+        low, high = MUSICBRAINZ_CACHE_MB_RANGE
+        return (f"expected a whole number of MB, {low} to {high} - {DEFAULT_MUSICBRAINZ_CACHE_MB} is the "
+                f"default, 0 turns saving off")
+
+    if key == "MUSICBRAINZ_CACHE_PATH" and value.strip():
+        folder = value.strip()
+        #? a FOLDER, always (config.musicbrainz_cache_path) - so neither the job database, which Clear
+        #? would empty, nor a folder it is musicbrainz-cache.db in, nor any other file somebody typed
+        if is_the_database(folder, Config.DB_PATH) or is_the_database(
+                musicbrainz_cache_path(folder, Config.DB_PATH), Config.DB_PATH):
+            return ("that is deadwax's own database - MUSICBRAINZ_CACHE_PATH names a folder, which "
+                    f"{MUSICBRAINZ_CACHE_FILE} is kept in, of its own")
+        if os.path.exists(folder) and not os.path.isdir(folder):
+            return (f"that is a file - MUSICBRAINZ_CACHE_PATH names a folder, which {MUSICBRAINZ_CACHE_FILE} "
+                    f"is kept in (made when it isn't there yet)")
+
     if key == "LYRICS_LEAD_MS" and parse_lyrics_lead(value) is None:
         return (f"expected a whole number of milliseconds, at most {LYRICS_LEAD_LIMIT_MS} "
                 f"either way - 300, say, or -200 to move them later")
@@ -1176,6 +1323,12 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
         navidrome_listing.forget()
         logger.info("Navidrome client dropped, it will rebuild with the new address")
 
+    if "musicbrainz_cache" in invalidate:
+        #? (2.0.0-player.54) the file held open is closed: the next answer opens the one the settings
+        #? name now, trimmed to the size they now allow
+        await _saved_answers().reset()
+        logger.info("MusicBrainz's saved answers will use the new settings from the next answer on")
+
     if "library" in invalidate:
         #? The scan cache keys on folder mtime under the OLD root, so it is meaningless now.
         from src.library import clear_scan_cache
@@ -1192,3 +1345,36 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
     )
 
     return await settings()
+
+
+# ==============================================================================
+# MusicBrainz's saved answers (2.0.0-player.54)
+# ==============================================================================
+
+
+@router.get("/musicbrainz_cache")
+async def musicbrainz_cache_stats():
+    """
+    What the settings show beside Clear: the saved answers' file, its size in bytes, how many answers
+    it holds, whether saving is on, and what is wrong, if anything. Reads the file on the saved
+    answers' own thread; never makes it.
+    """
+    return await _saved_answers().stats()
+
+
+@router.post("/musicbrainz_cache/clear")
+async def clear_musicbrainz_cache(request: Request):
+    """
+    "Clear MusicBrainz's saved answers": every one gone, on disk (the file shrunk) and in memory, and
+    any refresh waiting dropped - then the file's size and count as they are now. Only speed is lost:
+    the next answers are asked of MusicBrainz again. An admin's, as the whole settings router is, and a
+    write the same-origin guard stands in front of, as every one is.
+    """
+    MusicBrainzClient.cache.clear()
+    client = getattr(request.app.state, "musicbrainz_client", None)
+    if client is not None:
+        client.refreshes.clear()
+    answer = await _saved_answers().clear()
+    logger.info("MusicBrainz's saved answers cleared, on disk and in memory - the next answers are asked "
+                "of MusicBrainz again", extra={"frontend": True})
+    return answer

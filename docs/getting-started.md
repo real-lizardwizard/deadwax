@@ -28,7 +28,7 @@ mounted into it:
 | --- | --- | --- |
 | `/downloads` | **slskd's finished-downloads folder** | the *same* folder slskd writes finished downloads into |
 | `/music` | your library, where organized albums are filed | wherever your music lives |
-| `/config` | deadwax's database: which download is which release, your settings, the saved library scan | any folder of its own |
+| `/config` | deadwax's database: which download is which release, your settings, the saved library scan - and, beside it, MusicBrainz's [saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections) (`musicbrainz-cache.db`, only a cache, unless `MUSICBRAINZ_CACHE_PATH` names another folder) | any folder of its own |
 
 The first one is where almost every first-run problem comes from. A finished download is
 written into slskd's own downloads folder, and deadwax has to find those files to file them. So the

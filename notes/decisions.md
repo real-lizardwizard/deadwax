@@ -108,13 +108,39 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   file the track viewer shows. Every apply endpoint **recomputes the plan** rather than
   accepting the previewed one back — a plan is a list of file operations, and taking one over
   the wire would let a caller name arbitrary paths to write to.
-- **MusicBrainz responses are cached in memory, successes only.** One bounded TTL cache for the
-  process (`ResponseCache`), shared like the rate limiter and for the same reason: both are
-  about what this application asks of MusicBrainz as a whole. It is what makes the review queue
-  usable — stepping back to an album you already looked at costs nothing — and it turns a
-  guaranteed duplicate into a hit, since `fully_search` fetches the first group's releases as
-  `best-match-releases` and the editor then asks for that same group again. Bounded because a
-  release list with recordings is a large payload. **Never cache the failure path** — see below.
+- **MusicBrainz responses are cached, successes only - in memory, and on disk since
+  2.0.0-player.54.** One bounded TTL cache for the process (`ResponseCache`, an hour, 64 entries),
+  shared like the rate limiter and for the same reason: both are about what this application asks
+  of MusicBrainz as a whole. It is what makes the review queue usable — stepping back to an album
+  you already looked at costs nothing — and it turns a guaranteed duplicate into a hit, since
+  `fully_search` fetches the first group's releases as `best-match-releases` and the editor then
+  asks for that same group again. Bounded because a release list with recordings is a large
+  payload. **Never cache the failure path** — see below.
+  **Reopened on 2026-10-15, at James's request** ("the first time I search an artist it asks
+  musicbrainz, and when it gets results it caches them so the next time I search that artist, it's
+  instant. how much space would that take?"): the hour in memory meant a search repeated after an
+  hour, after a restart (every image update) or after a few album pages asked MusicBrainz again, at
+  a request a second, when it is often slow or away. So every answer the memory layer keeps is
+  now kept on disk as well (`src/musicbrainz_cache.py`): its own SQLite file,
+  `musicbrainz-cache.db` (in the folder `MUSICBRAINZ_CACHE_PATH` names - always a folder, so the
+  player cache's SSD mount can hold it too, as James asked that day - by default beside the database,
+  never the database itself; deleting it costs only speed), zlib-compressed JSON under the very key
+  `ResponseCache` keys it with, LRU past `MUSICBRAINZ_CACHE_MB` (200 by default; 0 is the old
+  memory-only behaviour). **Still successes only, on disk too** - a failure stored there would be a
+  bad month, not a bad hour. What changed is how long a success lives: a search is old after 7
+  days, a lookup (an artist, a release, a group's pressings, a discography) after 30, and an old
+  answer is still answered AT ONCE and refreshed quietly behind it, at the lowest priority; when
+  MusicBrainz is away, answers of any age keep working. A paged browse (a discography, a group's
+  pressings) is one answer made of pages: saved under one stamp, read only whole from the caches,
+  refreshed whole, so it is never put together from pages of different ages. Measured on real answers that day (raw
+  JSON / zlib): a release-group search of 12, 50 KB / 7 KB; a recording search of 12, 26 KB / 5 KB;
+  an artist search of 5, 3 KB / 1 KB; an artist's facts, 18 KB / 4 KB; their discography of 100
+  groups, 50 KB / 7 KB; an album's pressings with tracks, 7 KB / 1.5 KB to 205 KB / 20 KB (Dummy) -
+  and the Black Album below, 1.4 MB over five pages, about 140 KB compressed. So an artist searched,
+  their page and one album opened is about 350 KB raw and **about 45 KB compressed**: a thousand of
+  those is about 45 MB, and the default 200 MB about 4,000. Everything else in this decision and
+  the next stands as it was. The write-up: "MusicBrainz answers kept on disk (2.0.0-player.54)" in
+  notes/backend-gotchas.md.
 - **Ask MusicBrainz for the least that answers the question.** Two flags, both defaulting to
   the expensive-but-correct behaviour so that a caller who does nothing cannot lose data:
   `fully_search(include_releases=False)` skips the eager best-match-releases walk, and

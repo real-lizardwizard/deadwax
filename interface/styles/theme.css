@@ -295,6 +295,9 @@
     --white-secondary-text: #8b8798;  /* secondary / body default */
     --white-tertiary-text:  #6b6878;  /* de-emphasised metadata */
     --muted-text:           #4e4b5c;  /* disabled, placeholder, dividers */
+    /* a control that can't be used just now: a button :disabled, or aria-disabled where the focus on it
+       must stay (2.0.0-player.54, Clear MusicBrainz's saved answers) - one value for both */
+    --disabled-opacity:     0.45;
 
     /*
       The "main" family was the purple text colour used for labels, headings and

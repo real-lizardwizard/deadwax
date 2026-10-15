@@ -149,6 +149,10 @@ characters. Each half is asked by itself:
 Only the newest search is ever shown: an answer that arrives after you've typed something else,
 and searched again, is dropped.
 
+A search MusicBrainz was asked before is answered at once from deadwax's
+[saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections) (since
+2.0.0-player.54), after a restart too - refreshed behind itself once it is a week old.
+
 ### In your library
 
 Navidrome's own search of your library, in three parts:

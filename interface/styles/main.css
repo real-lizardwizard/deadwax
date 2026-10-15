@@ -60,7 +60,7 @@
 
 :where(button:disabled) {
     cursor: not-allowed;
-    opacity: 0.45;
+    opacity: var(--disabled-opacity);
 }
 
 :where(input, textarea, select) {
@@ -4124,15 +4124,27 @@ span.red { color: var(--red-text); }
 .lyrics-source { margin-top: var(--space-2); font-size: var(--text-2xs); font-family: var(--font-mono); overflow-wrap: anywhere; }
 .lyrics-none { font-size: var(--text-sm); }
 
-/* The settings tab's "Re-time saved lyrics": a button and a sentence saying what it did. */
-.settings-retime {
+/* The settings tab's "Re-time saved lyrics": a button and a sentence saying what it did - and
+   "Clear MusicBrainz's saved answers" (2.0.0-player.54), the same shape. */
+.settings-retime,
+.settings-answers {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-3);
     margin-top: var(--space-3);
 }
-.settings-retime-note { font-size: var(--text-xs); color: var(--white-secondary-text); min-width: 0; }
+.settings-retime-note,
+.settings-answers-note { font-size: var(--text-xs); color: var(--white-secondary-text); min-width: 0; }
+/* Clear refuses with aria-disabled, never disabled - it refuses itself on its own press, and a focused
+   button made disabled drops the focus to the page: faded as a disabled button is, no hover, no press */
+.settings-answers .win-button[aria-disabled='true'] { cursor: not-allowed; opacity: var(--disabled-opacity); }
+.settings-answers .win-button[aria-disabled='true']:hover,
+.settings-answers .win-button[aria-disabled='true']:active {
+    background: var(--gloss-button);
+    border-color: var(--border-strong);
+    box-shadow: var(--bevel);
+}
 
 /*
  * Pictures shown as small tiles in the details pane: an album's CD art, and the pictures a

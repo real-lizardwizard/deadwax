@@ -10,6 +10,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
 from src.routes import auth as auth_routes, held, my_library
 from src import auth, stars
+from src.musicbrainz_cache import saved_answers
 from src.users import current_user, require_admin
 from src.logger import logger, cleanup_logging
 from src.poller import run_download_poller
@@ -71,6 +72,16 @@ async def lifespan(app: FastAPI):
     #? after the overrides too: whether a sign-in can reach Navidrome depends on NAVIDROME_URL, which can be one
     Config.report_logins()
 
+    #? (2.0.0-player.54) MusicBrainz's answers kept on disk, under the hour in memory - after the
+    #? overrides, since MUSICBRAINZ_CACHE_PATH and MUSICBRAINZ_CACHE_MB can be ones. Nothing is opened
+    #? until the first answer is looked for. Only here, so nothing outside a running app touches the file.
+    MusicBrainzClient.cache.disk = saved_answers
+    if saved_answers.enabled():
+        logger.info(f"MusicBrainz's answers are kept on disk in {saved_answers.path()}, at most "
+                    f"{saved_answers.max_bytes() >> 20} MB")
+    else:
+        logger.info("MUSICBRAINZ_CACHE_MB is 0, so MusicBrainz's answers are kept in memory only, for an hour")
+
     #? An empty store index - the first start of a version with one - is filled from the saved
     #? scan, so Find knows what the library holds before anyone opens its tab (step 2). After the
     #? overrides, since LIBRARY_PATH can be one; from the database alone, never the disk.
@@ -104,7 +115,11 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
 
+    await app.state.musicbrainz_client.stop_refreshing()
     await app.state.musicbrainz_client.close_client()
+    #? what is queued for the file is written first; then it is closed
+    await saved_answers.close()
+    MusicBrainzClient.cache.disk = None
     await app.state.slskd_client.close_client()
     await library.coverart_client.close_client()
     await library.artist_images_client.close_client()

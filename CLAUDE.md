@@ -115,6 +115,9 @@ src/
   store_index.py   keeps the store index in step with every scan and writer, and the "already
                    have it" checks Find, /enqueue and the retries make - see "Already in the
                    store".
+  musicbrainz_cache.py  MusicBrainz's answers kept on disk (2.0.0-player.54), under ResponseCache's
+                   hour in memory: a SQLite file of its own, successes only, an old answer answered
+                   at once and refreshed behind it - see "MusicBrainz answers kept on disk".
   poller.py        background task: slskd transfers -> job status transitions.
   organizer.py     writes downloads into the library. Plan/execute split, dry_run default.
   retag.py         the metadata manager's write half - applies a chosen release to an album
@@ -232,7 +235,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             2894 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2994 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -340,8 +343,9 @@ One line each; the reasoning, and what went wrong before each was made, is in `n
 - **Getting a cover never requires applying a release** and chooses nothing; replacing art lives in
   the editor; bulk runs are driven from the client, one album at a time.
 - **Eight writers to the filesystem**, plan/execute, previews and writes sharing one tag computation.
-- **MusicBrainz answers are cached in memory, successes only**; ask for the least that answers, with
-  every saving flag defaulting to the expensive-but-correct way (never make trackless the default).
+- **MusicBrainz answers are cached, successes only - in memory and on disk since 2.0.0-player.54**; ask
+  for the least that answers, with every saving flag defaulting to the expensive-but-correct way (never
+  make trackless the default).
 - **The metadata queue stores only what you ignored**; what's wrong is derived per request; ignores
   are per issue; rows are keyed on the album's path.
 - **The tab badge and the queue never count different things.**
@@ -477,7 +481,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2894 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2994 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -515,7 +519,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2894 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2994 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

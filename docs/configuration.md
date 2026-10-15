@@ -50,7 +50,9 @@ it go too: what it said was at the old lead, so once the new one is saved the li
 not the old run's words. The same goes for a lead typed while a run is still going, even if you save
 it before the run ends: deadwax reads the lead as it does each album, so the albums done before the
 save moved to the old lead and the rest to the new one, and the line goes back to its prompt as the
-run ends. Pressing it again is safe - it moves what is still at the old lead and leaves the rest. The browser preferences (search, candidates, auto-grab, the interface) are
+run ends. Pressing it again is safe - it moves what is still at the old lead and leaves the rest.
+**Clear MusicBrainz's saved answers** is there too (since 2.0.0-player.54), under **Connections**
+beside its two settings, as on the settings tab ([below](#musicbrainzs-saved-answers-settings--connections)). The browser preferences (search, candidates, auto-grab, the interface) are
 still the main page's settings tab's; the page says so and links to it. On a first run with Navidrome
 not set up, the app's **Set up Navidrome** (on Home, the Library and Search) opens this page at
 **Connections**; once the three Navidrome settings are saved, the app asks Navidrome again by itself.
@@ -88,6 +90,47 @@ same music `LIBRARY_PATH` reads.
 | `NAVIDROME_USER` | | the Navidrome account the player plays as. Its play counts are recorded there, and passed on to Last.fm or ListenBrainz if that account has them. It doesn't need to be an admin, and a non-admin account of your own is the one to use. With logins on (since 2.0.0-player.52) each person's player plays as their own account instead, and this one is still needed: deadwax asks as it for what answers for nobody in particular (fetching a song once into the player's cache, whether Navidrome has finished a scan, which albums it lists), and the break-glass `admin` plays as it - [the player as you](player.md#the-player-as-you-with-logins-on). With Navidrome's per-user libraries, give it **every** library: a song in one it can't see won't play on an iPhone, through Gapless or on the turntable, and its folder counts as not in Navidrome. |
 | `NAVIDROME_PASSWORD` | | that account's password. It stays in deadwax: the page only shows whether it's set, and the phone is never sent it or anything made from it. |
 
+### MusicBrainz's saved answers (Settings → Connections)
+
+Since 2.0.0-player.54 every answer MusicBrainz gives deadwax is saved on disk, so asking the same thing
+again - a search, an artist, an album's pressings, the metadata editor's lookups, a download's
+tracklist - is answered at once instead of waiting on MusicBrainz, even after deadwax restarts and even
+while MusicBrainz is away. The answers are shared by everyone using deadwax. Only answers are saved,
+never a failure: a minute when MusicBrainz is down is never remembered as an answer. (Before, they were
+kept in memory for an hour; that hour is still there, in front of the file.)
+
+| setting | default | what it does |
+| --- | --- | --- |
+| `MUSICBRAINZ_CACHE_PATH` | *(the database's folder)* | the **folder** MusicBrainz's answers are saved in, as `musicbrainz-cache.db`, **as seen from inside this container**. Always a folder, never the file itself: deadwax makes it when it isn't there yet, and touches nothing else in it. Left empty, it is the folder `DB_PATH` is in - `/config/musicbrainz-cache.db` for most - so it is on the volume you already have. It can be the same folder as `PLAYER_CACHE_PATH`, on a fast disk ([below](#paths)). The folder has to be writable by `PUID`/`PGID`; a file of that name, or a folder holding deadwax's own database as `musicbrainz-cache.db`, is refused. **It's only a cache**: nothing in it needs backing up, deleting it is always safe (stop deadwax first, or use **Clear** below), and all it costs is speed - the next answers are asked of MusicBrainz again. The file is made when the first answer is saved. A change applies from the next answer, with no restart (the old file is left where it is). |
+| `MUSICBRAINZ_CACHE_MB` | `200` | the most the saved answers take, in MB, from 0 to 1048576. An artist searched, their page and one album opened take about 45 KB, so 200 MB holds about 4,000 of those. Past it, the answers used longest ago are dropped first, until the file is back under 90% of this. **`0` turns saving off**: answers are kept in memory only, for an hour, as before 2.0.0-player.54 - a file already there is left as it is, and **Clear** still empties it. |
+
+**How old an answer can be.** MusicBrainz changes - new releases, corrections - so a saved answer has
+an age: a **search** is refreshed after **7 days**, and everything else - an artist, a release, an
+album's pressings, an artist's discography - after **30 days**. An older answer is still shown straight
+away; deadwax then asks MusicBrainz for a new one quietly behind it, for next time. That refresh waits
+until nobody is waiting on MusicBrainz and nothing has been asked of it for five seconds, and goes one
+at a time - so a refresh hardly ever holds up anything you ask: up to three requests asked together
+still go straight away, and only a fourth asked within five seconds of a refresh waits for its turn
+under MusicBrainz's rate limit, at most five seconds. If MusicBrainz doesn't answer, the saved answer
+is kept and the refresh tried again the next time the answer is read from the file; if it says the
+thing asked for is gone (or can't be asked that way), that answer is kept as it is and the other
+refreshes go on. The screen you're looking at isn't redrawn by it. An artist's discography and an
+album's pressings come from MusicBrainz a hundred at a time, and those pages are saved and refreshed
+**together**: a refresh asks for every page, one turn each, and replaces the saved ones only when all
+of them have come, so a long list is never put together from pages of different ages (an album shown
+twice, or one missing). When one page of such a list has gone from the file, the whole list is asked
+of MusicBrainz again.
+
+**Clear MusicBrainz's saved answers**, under the two settings (on the settings tab and in the app's
+Server settings, both under **Connections**), shows how many answers the file holds and how big it
+is, and empties it - on disk and in memory. Only speed is lost. It's refused while
+`MUSICBRAINZ_CACHE_PATH` has an unsaved change (it clears the file that is saved) and when nothing is
+saved.
+
+The connection check (the MusicBrainz pill, and You's **Connections** in the app) never answers from
+the saved answers: one saved last week can't say whether MusicBrainz can be reached now. (It keeps its
+answer in memory for an hour, as it always did.)
+
 ### Paths
 
 | setting | default | what it does |
@@ -99,18 +142,25 @@ same music `LIBRARY_PATH` reads.
 | `PLAYER_CACHE_PATH` | *(the container's temporary space)* | where [the phone player](player.md#seeking-and-where-safari-lands) keeps the FLAC songs it repackages: as MP4s for Safari and iPhones, whose seeks only land where you asked in an MP4, and as the fragmented MP4s [Gapless](player.md#one-stream-for-flac) joins into one stream, in any browser, including hi-res songs resampled to 48 kHz for [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz) (a resampled copy is kept apart from the song's original, and is about a quarter of its size). deadwax makes a folder of its own inside it, `deadwax-player`, private to the user it runs as, and touches nothing else there, so it can be a folder other things use too. **It's only a cache**: nothing in it needs backing up, deleting it is always safe, and a song that isn't in it is made again from Navidrome the next time it's played, which only makes that first play start a moment later. Left empty, it's the container's temporary space, which starts empty whenever the container is recreated. Best on a fast disk (an SSD); see below. A change applies to the next song, with no restart. |
 | `PLAYER_CACHE_MB` | `1024` | the most that cache holds, in MB, from 64 to 1048576. A CD-quality song is 20 to 60 MB, so the default is a few albums. The songs played longest ago are cleared first. While a song is being made its download sits beside it until it's done, so the folder can briefly hold one song more than this. A song another song is waiting behind is never cleared while it's being played (it was served in the last two minutes), so a song that doesn't fit beside the ones playing waits: Safari is sent it as FLAC, and the gapless stream plays it the ordinary way. A single song bigger than the whole setting is made only while nothing else in the cache is being played, and is then kept on its own. The MP4 and the fragmented MP4 of one song are two files, and both count. deadwax also leaves the disk 128 MB spare and needs room for two copies of the song being made: when there isn't, older songs are cleared to make room, and if there still isn't enough, Safari is sent the FLAC and the gapless stream plays that song the ordinary way. Nothing is cleared for a song clearing couldn't make room for. The desktop's [visualizer](player.md#the-visualizer) (and the phone's turntable) cut their stretches from a song's MP4 here when there is one, and otherwise - in a browser that plays the FLAC as it is, Chrome, Firefox or Edge with Gapless off, the default - straight from the FLAC on Navidrome (since 2.0.0-player.23), adding nothing to the cache; only where that can't be done (the log says so once a song) is an MP4 made and kept for them, as Safari's would be. |
 
-**Putting the player's cache on a fast disk.** Mount a folder into the container and point
-`PLAYER_CACHE_PATH` at it, as `docker-compose.example.yml` shows:
+**Putting the caches on a fast disk.** deadwax keeps two caches: the player's songs
+(`PLAYER_CACHE_PATH`) and [MusicBrainz's saved answers](#musicbrainzs-saved-answers-settings--connections)
+(`MUSICBRAINZ_CACHE_PATH`). One folder on a fast disk (an SSD) can hold both: mount it into the
+container and point both settings at it, as `docker-compose.example.yml` shows:
 
 ```yaml
     environment:
       - PLAYER_CACHE_PATH=/cache
+      - MUSICBRAINZ_CACHE_PATH=/cache
     volumes:
       - /path/to/fast/disk/deadwax-cache:/cache
 ```
 
-The folder has to be writable by `PUID`/`PGID`: unlike `/config`, deadwax doesn't change its
-owner. Leave it out of your backups. Settings → Library shows whether deadwax can write there,
+Inside it the player keeps its songs in a folder of its own, `deadwax-player`, and the saved answers
+are one file beside it, `musicbrainz-cache.db`; neither touches anything else there. Either setting
+can be left out: the player's songs then go in the container's temporary space, and the saved answers
+beside the database in `/config`. The folder has to be writable by `PUID`/`PGID`: unlike `/config`,
+deadwax doesn't change its owner. Leave it out of your backups. Settings → Connections shows whether
+deadwax can write there for the saved answers, and Settings → Library whether it can for the player,
 and what's wrong with its own `deadwax-player` folder inside it, if anything. It uses that folder
 only while it's a real folder (not a link), owned by the user deadwax runs as, and open to nobody
 else (mode 700), which is how deadwax makes it. The setgid bit an OpenMediaVault shared folder
