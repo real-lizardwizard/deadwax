@@ -24,7 +24,8 @@ second time. See store_album in the schema and src/store_index.py.
 
 **Per user** (the one app, 2.0.0-player.15 on): what each user chose for themselves (user_prefs) and
 pinned to the app's Home (pins, keyed on that same stable store_album id - never Navidrome's stars).
-Both are `local`'s while logins are off; adopt_local hands them to the first admin in step 3.
+Both are `local`'s while logins are off; adopt_local hands them to the first admin to sign in once
+logins are on (2.0.0-player.48), and `sessions` keeps who is signed in.
 
 Every table lives in one file and one connection. A failure to open it degrades rather than
 raises: downloads still work untracked, and the queue still works without remembering what
@@ -252,6 +253,26 @@ CREATE TABLE IF NOT EXISTS pins (
     created_at    TEXT NOT NULL,
     PRIMARY KEY (user, kind, ref)
 );
+
+CREATE TABLE IF NOT EXISTS sessions (
+    -- Who is signed in (2.0.0-player.48, logins - src/auth.py), so a restart signs nobody out. Only
+    -- with AUTH_MODE on; off, nothing ever writes here.
+    --
+    -- `id_hash` is the SHA-256 of the cookie's session id, never the id itself: a copy of this file
+    -- doesn't hand anybody a live cookie. `credential` is the Navidrome token and salt the user signed
+    -- in with, ENCRYPTED with DEADWAX_SECRET_KEY (Fernet): on Navidrome's API a token and its salt are
+    -- as good as the password, so this file never holds one in the clear. `expires_at` slides forward
+    -- as the session is used (SESSION_IDLE_SECONDS); `checked_at` is when Navidrome last said the
+    -- login still stands (getUser, every few minutes - RECHECK_SECONDS).
+    id_hash     TEXT PRIMARY KEY,
+    user        TEXT NOT NULL,
+    credential  TEXT NOT NULL,
+    created_at  REAL NOT NULL,
+    last_seen   REAL NOT NULL,
+    expires_at  REAL NOT NULL,
+    checked_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user);
 """
 
 #? The columns a pin row has, in the order they are written.
@@ -899,9 +920,9 @@ class JobStore:
 
     async def adopt_local(self, user: str) -> tuple[int, int] | None:
         """
-        Step 3's take-over, written and tested now: what `local` saved while logins were off - its
-        pins and its preferences - becomes `user`'s, the first admin to sign in, and `local` is left
-        with nothing. What `user` has already set wins: a preference they chose is kept over local's,
+        Step 3's take-over (src/auth.py sign_in calls it on an admin's sign-in, 2.0.0-player.48): what
+        `local` saved while logins were off - its pins and its preferences - becomes `user`'s, the first
+        admin to sign in, and `local` is left with nothing. What `user` has already set wins: a preference they chose is kept over local's,
         and a pin they already have keeps its place; local's other pins come after theirs, in local's
         order, while Home holds them (pins.PINS_MAX). One transaction: all of it moves or none.
         Returns (pins taken, preferences taken) - None when it couldn't be done - and adopting into
@@ -942,6 +963,56 @@ class JobStore:
         except Exception as e:
             logger.error(f"could not hand what {LOCAL_USER} saved to {user} ({e})", extra={"frontend": True})
             return None
+
+    # ===== who is signed in (2.0.0-player.48) ===================================
+    #
+    # SYNCHRONOUS, all of them, like stored_settings: src/users.py's current_user is a sync FastAPI
+    # dependency, which FastAPI runs in its thread pool, and it reads a session from there; the
+    # async callers (the sign-in route, the re-check) hop to a thread to call them. Each RAISES on
+    # a database error rather than degrading: a session that can't be read must answer 503, never
+    # "signed out" and never "signed in" (fail closed - src/auth.py says which).
+
+    def create_session(self, id_hash: str, user: str, credential: str, now: float, expires_at: float) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO sessions (id_hash, user, credential, created_at, last_seen, expires_at, checked_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (id_hash, user, credential, now, now, expires_at, now))
+
+    def session(self, id_hash: str) -> dict | None:
+        """The session with this id hash as stored, or None when there is none."""
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM sessions WHERE id_hash = ?", (id_hash,)).fetchone()
+        return dict(row) if row is not None else None
+
+    def touch_session(self, id_hash: str, now: float, expires_at: float) -> None:
+        with self._connect() as connection:
+            connection.execute("UPDATE sessions SET last_seen = ?, expires_at = ? WHERE id_hash = ?",
+                               (now, expires_at, id_hash))
+
+    def session_checked(self, id_hash: str, now: float) -> None:
+        with self._connect() as connection:
+            connection.execute("UPDATE sessions SET checked_at = ? WHERE id_hash = ?", (now, id_hash))
+
+    def delete_session(self, id_hash: str) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM sessions WHERE id_hash = ?", (id_hash,))
+
+    def sessions_due(self, checked_before: float, now: float) -> list[dict]:
+        """Every live session Navidrome hasn't vouched for since `checked_before`, oldest check first."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM sessions WHERE checked_at < ? AND expires_at > ? ORDER BY checked_at",
+                (checked_before, now)).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_expired_sessions(self, now: float) -> list[str]:
+        """Forget every session past its expiry; the id hashes forgotten."""
+        with self._connect() as connection:
+            gone = [row["id_hash"] for row in connection.execute(
+                "SELECT id_hash FROM sessions WHERE expires_at <= ?", (now,)).fetchall()]
+            connection.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
+        return gone
 
     async def record_albums_seen(self, albums: list[dict], source: str = "scan") -> int:
         """

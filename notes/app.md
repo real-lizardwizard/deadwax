@@ -162,7 +162,8 @@ the `/deadwax/me` seam, and disc titles on the album page.
 - **`/deadwax/me` and `current_user`** (`src/users.py`, `src/routes/me.py`): a FastAPI DEPENDENCY
   returning `local` - never `@app.middleware("http")`, which hides disconnects. The answer is
   `{user, admin: true, auth: 'off', version}`. Step 3 changes `current_user`'s body and nothing
-  else; `test_me.py` overrides the dependency to prove the route reads it.
+  else; `test_me.py` overrides the dependency to prove the route reads it. (**Done in
+  2.0.0-player.48** - every router checked by it, and the app's sign-in: see "Logins and roles".)
 - **The token section, theme.css section 10 (`--dw-*`)**: STYLE.md's "just a touch of Windows 7"
   as tokens, aliasing what exists - `--font-family` (the self-hosted Noto), `--font-mono`,
   `--accent-hover`, section 7's durations (so reduced motion still collapses them). Nothing in

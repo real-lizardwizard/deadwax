@@ -142,12 +142,49 @@ scanned yet, unreadable, or outside Navidrome's music folder - is never out of r
 - **The image has a health check.** `/deadwax/health` answers 200 while the background download
   poller is running and 503 if it has stopped. Neither slskd nor MusicBrainz being down makes
   deadwax unhealthy, because restarting deadwax wouldn't fix them.
-- **There is no login.** Anyone who can reach the port can use it, so keep it on your own
-  network or put it behind something that asks for a password.
+- **There is no login unless you turn logins on** ([below](#turning-logins-on)). With them off - the
+  default - anyone who can reach the port can use it, so keep it on your own network or put it
+  behind something that asks for a password.
 - **On your phone**, the main page works as it is, and `/player/` is the app for your library,
   played from Navidrome, that you can add to an iPhone's home screen. To use either
   away from home, reach deadwax over a VPN such as WireGuard or Tailscale rather than an open
   port. See [the phone player](player.md).
+
+## Turning logins on
+
+Off by default. Turned on (since 2.0.0-player.48), everyone signs in with their **Navidrome**
+account - the same user name and password - and only the people you name are deadwax's admins: they edit the
+library, see the albums that need a look and the log, and change the server settings, while everyone
+else searches, gets albums and plays. Three settings, in the container's environment (compose's
+`environment:` block or `.env` - not the settings tab, which only shows them):
+
+```yaml
+      - AUTH_MODE=on
+      - DEADWAX_ADMINS=james                # your Navidrome user name; comma-separate several
+      - DEADWAX_SECRET_KEY=...              # openssl rand -hex 32
+      # optional - signs in `admin` with no Navidrome, for when Navidrome is down:
+      #- DEADWAX_ADMIN_PASSWORD=...
+```
+
+`NAVIDROME_URL` has to be set too, since signing in asks Navidrome. Recreate the container, open
+deadwax, and sign in.
+
+- **The first admin to sign in takes over** what was saved while logins were off - the pins on Home
+  and the Getting albums settings in You - in one step. Anyone signing in after starts with their own.
+- **The app** (`/player/`, the home-screen app included) shows a sign-in screen; **You → About** has
+  **Sign out**. **The main page** says you're signed out and links to the app's sign-in, which brings
+  you back to it.
+- **The app left open while you switch logins on** - the home-screen app your phone kept in the
+  background, a tab - reloads itself into the sign-in screen as soon as deadwax turns down something
+  it asks for (it asks after your downloads as it comes back to the front, so by then at the latest).
+  That needs it to be running 2.0.0-player.48 or later already: if you upgrade and switch logins on in
+  the same go, close the home-screen app (swipe it away) and open it again, and reload any open tab -
+  until then everything in it fails with "Sign in to use deadwax."
+- **Don't reach deadwax from outside your network over plain http** once logins are on: put HTTPS in
+  front of it first. On your own network and over WireGuard, plain http is fine.
+
+Every setting, what it does and what it keeps: [Configuration → Logins](configuration.md#logins-environment-only).
+If you're locked out, see [Troubleshooting](troubleshooting.md#signing-in).
 
 ## Coming from jimbrainz
 

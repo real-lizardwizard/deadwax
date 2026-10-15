@@ -129,6 +129,17 @@ services:
       # tab's own save.
       #- TRUSTED_ORIGINS=https://music.example.com
       #
+      # Optional - logins (off unless AUTH_MODE=on). Everyone then signs in with their own
+      # Navidrome account (NAVIDROME_URL above is needed), and only the Navidrome users named in
+      # DEADWAX_ADMINS can edit the library, see the review queue and the log, or change settings.
+      # DEADWAX_SECRET_KEY encrypts the logins deadwax keeps - at least 32 characters, from
+      # `openssl rand -hex 32` - and is better kept in .env. DEADWAX_ADMIN_PASSWORD, optional,
+      # signs in `admin` with no Navidrome, for when it is down. Environment only, all four.
+      #- AUTH_MODE=on
+      #- DEADWAX_ADMINS=your-navidrome-user
+      #- DEADWAX_SECRET_KEY=
+      #- DEADWAX_ADMIN_PASSWORD=
+      #
       # off | dry_run | copy | move. Starts at dry_run on purpose - organizing is the only
       # thing here that writes to your filesystem, so check the event log looks right before
       # switching to copy or move.

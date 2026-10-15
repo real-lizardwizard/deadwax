@@ -1,8 +1,9 @@
 """
 Refuse writes that another website asks for (v1.0.1).
 
-deadwax has no login, so anything that can reach it can use it - which is the documented
-trade-off. What that trade-off never meant was "any web page the owner happens to have open".
+With logins off - the default - deadwax has no login, so anything that can reach it can use it,
+which is the documented trade-off. (With AUTH_MODE on, since 2.0.0-player.48, a session is needed
+too, and this guard still stands in front of every write, the sign-in included.) What that trade-off never meant was "any web page the owner happens to have open".
 A page elsewhere can make the browser send a POST to deadwax's address, and before this nothing
 stood in the way: FastAPI reads a JSON body even when no Content-Type says it is JSON, and the
 routes that take no body at all (cancel, retry, clear, rescan) accept a plain form post. So a

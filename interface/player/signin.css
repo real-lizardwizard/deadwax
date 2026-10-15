@@ -1,0 +1,158 @@
+/*
+ * The sign-in screen (2.0.0-player.48, ui/src/app/SignIn.tsx) and You's Sign out (app/SignOutRow.tsx).
+ *
+ * A stylesheet of its own beside app.css, and held to app.css's rule: TOKENS ONLY. Every value lives in
+ * :root here, drawn from theme.css section 10 (--dw-*) and player.css (--pl-*), and the rules read only
+ * var()s - tests/test_logins_css.py reads them, as tests/test_app_css.py reads app.css.
+ *
+ * Linked by the app's page only with logins on (src/api/app.py SIGNIN_SHEET): off, the page is exactly what
+ * it was.
+ *
+ * The screen covers everything (the desktop's visualizer in its window, at 50, included - in full
+ * screen the browser's top layer is over any z-index, so the gate leaves full screen first:
+ * signInGate.tsx leaveFullScreen), scrolls inside itself with the page behind it held still, keeps
+ * clear of the notch and the home bar in the home-screen app, and centres a card no wider than a
+ * phone - at 320px the card is the width less the gutters. The fields' text is 17px: under 16 and iOS
+ * zooms the page into the field as it is tapped.
+ */
+
+:root {
+    --app-z-signin: 60;                             /* over everything: the visualizer (50), the pin notice (40) */
+    --app-signin-width: 380px;                      /* the card, at most */
+    --app-signin-edge: 16px;                        /* the screen's edge to the card */
+    --app-signin-pad: 24px;                         /* inside the card */
+    --app-signin-gap: 16px;                         /* between the card's parts */
+    --app-signin-label-gap: 6px;                    /* a label to its field */
+    --app-signin-head-gap: 14px;                    /* the d to deadwax */
+    --app-signin-field: var(--pl-hit);              /* a field: a tap target */
+    --app-signin-field-pad: 12px;
+    --app-signin-field-text: var(--dw-text-body);   /* 17px: never under 16 */
+    --app-signin-button: var(--pl-hit);
+    --app-signin-busy: 0.75;                        /* the button while it signs in: faded, still legible */
+    --app-signin-reason-pad: 10px 12px;
+    --app-signin-ring: 2px;
+    --app-signout-gap: 12px;                        /* About's list to Sign out */
+}
+
+/* the page behind holds still while the screen is up */
+html.has-signin { overflow: hidden; }
+
+.app-signin {
+    position: fixed;
+    inset: 0;
+    z-index: var(--app-z-signin);
+    display: flex;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding:
+        max(var(--app-signin-edge), var(--pl-safe-top))
+        max(var(--app-signin-edge), var(--pl-safe-right))
+        max(var(--app-signin-edge), var(--pl-safe-bottom))
+        max(var(--app-signin-edge), var(--pl-safe-left));
+    background: var(--dw-bg);
+    color: var(--dw-text);
+    font-family: var(--dw-font);
+}
+
+/* centred by its margins, not the flex box: a card taller than the screen then scrolls from its top,
+   where centring would push its top out of reach */
+.app-signin-card {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--app-signin-width);
+    margin: auto;
+    padding: var(--app-signin-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card);
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight);
+}
+
+.app-signin-head { display: flex; align-items: center; gap: var(--app-signin-head-gap); }
+
+.app-signin-title {
+    margin: 0;
+    font-size: var(--dw-text-title-2);
+    font-weight: var(--dw-weight-bold);
+    letter-spacing: var(--dw-tracking-title);
+    line-height: var(--dw-leading-title);
+}
+
+.app-signin-lede {
+    margin: var(--app-signin-gap) 0 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+/* why the screen came back - the session ended, and how - in a warning's amber */
+.app-signin-reason {
+    margin: var(--app-signin-gap) 0 0;
+    padding: var(--app-signin-reason-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-amber-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-badge-amber-bg);
+    color: var(--dw-amber-text);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-signin-label {
+    display: block;
+    margin: var(--app-signin-gap) 0 var(--app-signin-label-gap);
+    color: var(--dw-text-label-color);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-label);
+}
+
+.app-signin-field {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    height: var(--app-signin-field);
+    padding: 0 var(--app-signin-field-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-field);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--app-signin-field-text);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.app-signin-field:focus { outline: var(--app-signin-ring) solid var(--dw-accent); outline-offset: var(--app-signin-ring); }
+
+/* always there (a live region), and room for one line of failure when there is one */
+.app-signin-problem p {
+    margin: var(--app-signin-gap) 0 0;
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-signin-submit {
+    display: block;
+    width: 100%;
+    height: var(--app-signin-button);
+    margin: var(--app-signin-gap) 0 0;
+    border: var(--dw-hairline) solid var(--dw-primary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-signin-submit:active:not(:disabled) { filter: var(--dw-primary-pressed); }
+.app-signin-submit:disabled { opacity: var(--app-signin-busy); }
+.app-signin-submit:focus-visible { outline: var(--app-signin-ring) solid var(--dw-accent); outline-offset: var(--app-signin-ring); }
+
+/* You > About's Sign out, under the version and Logins */
+.app-signout { margin-top: var(--app-signout-gap); }
+/* the whole row is the button, its name to the right as About's values are */
+.app-signout-row { box-sizing: border-box; width: 100%; text-align: left; }
+.app-signout-row .app-row-label { flex: 1 1 auto; color: var(--dw-danger-text); }
+.app-signout-row:disabled { opacity: var(--app-signin-busy); }

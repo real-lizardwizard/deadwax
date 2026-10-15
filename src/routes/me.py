@@ -5,7 +5,8 @@ Who the page is talking to: `GET /deadwax/me`, and what they chose for themselve
 The app at /player/ decides what to show from this, not from assumptions - admin-only rows (server
 settings, the review queue, the log, editing) show when `admin` is true, and Sign out only when
 logins are on. With logins off it is always the implicit admin, `local` (src/users.py), and the
-page says "logins are off". Step 3 fills in real values; the page already reads them.
+page says "logins are off"; with them on (2.0.0-player.48) the signed-in user - and with no session a
+401, as every route but the public ones answers (src/auth.py), which is how the app knows to sign in.
 
 The preferences are You > Getting albums in the app: "When I tap Get" (show me the sources, or
 pick the best source for me), the quality floor and - since 2.0.0-player.41 - Format (any, prefer

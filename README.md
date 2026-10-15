@@ -390,12 +390,12 @@ Files are sent as they are whenever the phone can play them (FLAC to Safari in i
 <br><br>
 <strong>What it can't do</strong>, because it's a web page and not an App Store app: no CarPlay, no offline downloads, and no Siri, and the queue is gone if iOS closes the app. Playing with the phone locked, and moving to the next song there, which is what iOS has historically been fussy about for web apps, have been seen working on a real iPhone.
 <br><br>
-To use it away from home, reach deadwax over a VPN such as WireGuard or Tailscale rather than an open port, since deadwax has no login (see below). Everything else — setting it up, what counts as a play, what's still unverified — is in <a href="docs/player.md">the phone player guide</a>.
+To use it away from home, reach deadwax over a VPN such as WireGuard or Tailscale rather than an open port: logins are off unless you turn them on, and even then it wants HTTPS in front of it before it faces the internet (see below). Everything else — setting it up, what counts as a play, what's still unverified — is in <a href="docs/player.md">the phone player guide</a>.
 </details>
 
 ## (more importantly) Non-features (and how they dont work)
 
-Being lightweight and fast (and working _just enough_) was and is the only focus, so authentication (as in a login page), recommendations, and batch adding artist discographies are not present.
+Being lightweight and fast (and working _just enough_) was and is the only focus, so recommendations and batch adding artist discographies are not present, and logins are off unless you turn them on.
 
 ### Adding whole artist discographies at a time
 <details>
@@ -415,10 +415,10 @@ Everything deadwax writes into a file's tags comes from MusicBrainz, so if a rel
 Theres no tracking of what you download or listen to, so theres nothing to base cool recommendations on.
 </details>
 
-### Any kind of login
+### Logins, unless you turn them on
 <details>
-<summary style="font-style:italic">Anyone who can reach it can use it</summary>
-There is no authentication of any kind. It can delete files and rewrite tags, so put it behind whatever you already use for the rest of your homelab, and dont expose it to the internet. It does refuse changes that another website sends through your browser: a page you happen to have open can't make it delete an album. Nor can a saved key or password be sent somewhere new: changing slskd's or Navidrome's address takes that service's key or password again, in the same save. Behind a reverse proxy that rewrites the <code>Host</code> header, set <code>TRUSTED_ORIGINS</code> (see <a href="docs/configuration.md">configuration</a>).
+<summary style="font-style:italic">Off by default: anyone who can reach it can use it</summary>
+Out of the box there is no login. It can delete files and rewrite tags, so put it behind whatever you already use for the rest of your homelab, and dont expose it to the internet. Since 2.0.0-player.48 you can turn logins on - <code>AUTH_MODE=on</code>, with <code>DEADWAX_ADMINS</code> and <code>DEADWAX_SECRET_KEY</code> in compose: everyone then signs in with their own <strong>Navidrome</strong> account, and only the admins you name can edit the library, see the review queue and the log, or change the settings (everyone else searches, gets albums and plays; until requests become each person's own, everyone still sees the whole download queue). The first admin to sign in takes over the pins and settings saved before. A break-glass password (<code>DEADWAX_ADMIN_PASSWORD</code>) signs in an admin even when Navidrome is down. Plain http is fine on your own network and over WireGuard; put HTTPS in front of it before anything else. See <a href="docs/getting-started.md#turning-logins-on">turning logins on</a> and <a href="docs/configuration.md#logins-environment-only">the settings</a>. It does refuse changes that another website sends through your browser: a page you happen to have open can't make it delete an album. Nor can a saved key or password be sent somewhere new: changing slskd's or Navidrome's address takes that service's key or password again, in the same save. Behind a reverse proxy that rewrites the <code>Host</code> header, set <code>TRUSTED_ORIGINS</code> (see <a href="docs/configuration.md">configuration</a>).
 </details>
 
 ### Undo

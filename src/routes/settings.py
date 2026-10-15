@@ -52,7 +52,7 @@ from pydantic import BaseModel
 
 from src import __version__, player_cache
 from src.config import (COVER_ART_SIZES, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS, PLAYER_CACHE_MB_RANGE,
-                        RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config,
+                        RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config, describe_auth_mode, describe_secret_key,
                         build_user_agent, parse_player_cache_mb, parse_rename_wait, parse_search_timeout,
                         describe_contact, describe_navidrome_url, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env, without_login)
@@ -276,6 +276,63 @@ def _navidrome_rows() -> list[dict]:
             ),
             status="error" if partial and not Config.NAVIDROME_PASSWORD else None,
             detail=missing if partial and not Config.NAVIDROME_PASSWORD else None,
+        ),
+    ]
+
+
+def _logins_rows() -> list[dict]:
+    """
+    Logins (2.0.0-player.48), READ-ONLY: all four are the environment's alone (Config.NOT_EDITABLE says
+    why on each row), so the rows say what is in force and what, if anything, stops it working. The
+    two secrets are reported as set or not, like every secret here - never their values.
+    """
+    on, mode_problem = describe_auth_mode(Config.AUTH_MODE)
+    key_problem = describe_secret_key(Config.DEADWAX_SECRET_KEY)
+    admins = sorted(Config.admins())
+
+    return [
+        _setting(
+            "AUTH_MODE",
+            Config.AUTH_MODE,
+            effect=(
+                "Logins are on: everyone signs in with their Navidrome account, and only deadwax's admins "
+                "can edit the library, see the review queue and the log, or change these settings"
+                if on else
+                "Logins are off: anyone who can reach deadwax can use it, as its one admin"
+            ),
+            status="error" if mode_problem else "ok",
+            detail=f"AUTH_MODE {mode_problem}" if mode_problem else None,
+        ),
+        _setting(
+            "DEADWAX_ADMINS",
+            Config.DEADWAX_ADMINS,
+            effect=(
+                f"deadwax's admins, by Navidrome user name: {', '.join(admins)}" if admins else
+                "deadwax's admins, by Navidrome user name - nobody listed"
+            ) + ". Navidrome's own admin flag is never used",
+            status="error" if on and not admins else None,
+            detail="nobody signed in through Navidrome is an admin until this lists them" if on and not admins else None,
+        ),
+        _setting(
+            "DEADWAX_SECRET_KEY",
+            Config.DEADWAX_SECRET_KEY,
+            secret=True,
+            required=on,
+            effect=(
+                "Encrypts the Navidrome login each signed-in person's session keeps in deadwax's database, "
+                "and seals the break-glass sign-in. Logins don't work without it"
+            ),
+            status="error" if on and key_problem else None,
+            detail=f"DEADWAX_SECRET_KEY {key_problem}" if on and key_problem else None,
+        ),
+        _setting(
+            "DEADWAX_ADMIN_PASSWORD",
+            Config.DEADWAX_ADMIN_PASSWORD,
+            secret=True,
+            effect=(
+                "The break-glass sign-in: as admin, with this password, for when Navidrome is down. It needs "
+                "neither Navidrome nor the database, and lasts 12 hours"
+            ),
         ),
     ]
 
@@ -827,6 +884,15 @@ async def settings():
                     "ones already saved below."
                 ),
                 "settings": [_lyrics_row(), _lyrics_lead_row()],
+            },
+            {
+                "id": "logins",
+                "label": "Logins",
+                "note": (
+                    "Set in the container's environment only, and shown here read-only: a value saved "
+                    "in this tab would beat your compose file, so a wrong one could lock everyone out."
+                ),
+                "settings": _logins_rows(),
             },
         ],
         "organize_modes": ORGANIZE_MODES,

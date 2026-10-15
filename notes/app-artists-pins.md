@@ -308,7 +308,8 @@ said Home "looks a bit empty" and accepted that these two are what fill it.
     when the id arrives with its Navidrome id. A new pin goes FIRST. A 409 past PINS_MAX, a 503 for a
     database that can't keep them.
 - **`adopt_local(user)`** (store.py), step 3's take-over, written and tested now and called by nothing
-  yet (users.py names it): local's `user_prefs` and `pins` become the first admin's in one transaction,
+  yet (users.py names it; **called since 2.0.0-player.48** by an admin's Navidrome sign-in - see "Logins
+  and roles"): local's `user_prefs` and `pins` become the first admin's in one transaction,
   theirs winning (INSERT OR IGNORE - a preference they chose, a pin they have, keeps its place), local's
   other pins after theirs in local's order while under PINS_MAX, local left with nothing; into `local`
   itself it takes nothing; None when the store can't.

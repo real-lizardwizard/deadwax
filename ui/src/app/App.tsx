@@ -48,6 +48,7 @@ import { Sidebar } from './Sidebar'
 import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
 import { useFrame } from './useFrame'
+import { adminUntilAsked } from './session'
 import { useInfoDetails } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
 import { setPinned, usePins } from './usePins'
@@ -254,8 +255,8 @@ export function App() {
   const { pick: libraryView, hasSongs } = useLibraryPick()
   //? the sidebar's Managing shows unless deadwax says this user isn't an admin - with logins off, everyone
   //? is (You's row asks the same). Asked as the desktop frame shows (a phone has no sidebar); a failed ask
-  //? leaves it as it was
-  const [admin, setAdmin] = useState(true)
+  //? leaves it as it was. With logins on (2.0.0-player.48) it starts from the session's word (session.ts)
+  const [admin, setAdmin] = useState(adminUntilAsked)
   const meRequests = useMemo(latestOnly, [])
   useEffect(() => {
     if (!desktop) return

@@ -6197,6 +6197,51 @@ input[type="checkbox"]:focus-visible { outline: 1px dotted var(--white-secondary
     .download-progress-track.is-waiting { animation: none; background-image: none; background-color: var(--accent-muted); }
 }
 
+/*
+ * Signed out (2.0.0-player.48, ui/src/components/SignedOutNotice.tsx): with logins on, a plain message
+ * over the whole page and a link to the app's sign-in, which comes back here. The main page gets no
+ * sign-in of its own - it retires once the app does everything it does.
+ */
+.signed-out {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-toast);
+    display: flex;
+    overflow-y: auto;
+    padding: var(--space-4);
+    background: var(--scrim);
+}
+.signed-out-card {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: calc(var(--space-7) * 8);
+    margin: auto;
+    padding: var(--space-5);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    background: var(--surface-overlay);
+    box-shadow: var(--shadow-xl);
+    color: var(--white-text);
+}
+.signed-out-title { margin: 0; font-size: var(--text-xl); font-weight: var(--font-bold); }
+.signed-out-text { margin: var(--space-3) 0 0; font-size: var(--text-base); line-height: var(--leading-normal); }
+.signed-out-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-lg);
+    margin-top: var(--space-4);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-md);
+    background: var(--gloss-button-hover);
+    color: var(--white-text);
+    font-size: var(--text-base);
+    font-weight: var(--font-bold);
+    text-decoration: none;
+}
+.signed-out-link:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.signed-out-note { margin: var(--space-3) 0 0; color: var(--white-secondary-text); font-size: var(--text-xs); }
+
 /* ============================================================================
  * ? RESPONSIVE  --  KEEP THIS LAST IN THE FILE
  *

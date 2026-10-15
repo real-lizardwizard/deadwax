@@ -25,7 +25,8 @@ also shows every path as the container sees it, and whether it exists and can be
 written.
 
 Two settings can't be changed from the settings tab, and the tab says why: `DB_PATH` is where
-the tab's own overrides are stored, and `PUID`/`PGID` are used before the app starts.
+the tab's own overrides are stored, and `PUID`/`PGID` are used before the app starts. Nor can the
+four [logins](#logins-environment-only) settings: the tab shows them, locked, under Connections.
 
 ### In the app
 
@@ -161,6 +162,49 @@ can land seconds off.
 | `PUID` / `PGID` | `1000` / `1000` | the user and group the app runs as, and so the owner of every file it writes. Match them to slskd and your other media containers. |
 | `TRUSTED_ORIGINS` | | environment only. Changes that another website sends are refused, by checking each request's `Origin` against the address it's being reached at. Behind a reverse proxy that rewrites the `Host` header (nginx does unless told `proxy_set_header Host $http_host`), every change looks foreign, the phone player's plays included. List the address you open deadwax at here, comma-separated with the scheme, e.g. `https://music.example.com`. It can't be set in the settings tab, because it guards that tab's own save. |
 
+### Logins (environment only)
+
+Off by default (since 2.0.0-player.48). With `AUTH_MODE=on`, everyone signs in with their
+**Navidrome** user name and password, and only deadwax's admins can change the library - see
+[Turning logins on](getting-started.md#turning-logins-on). All four are read from the container's
+environment (compose's `environment:` block or `.env`) and nowhere else: the settings tab, and the
+app's **Managing → Settings**, show them under **Connections**, locked, saying so - a value saved
+there would beat your compose file, so a wrong one could lock everyone out with no way back from the
+page that saved it. Change one in compose and restart deadwax.
+
+| setting | default | what it does |
+| --- | --- | --- |
+| `AUTH_MODE` | `off` | `off`: deadwax as it always was - no sign-in, and anyone who can reach the port can use it, as its one admin. `on`: everyone signs in. Anything else is read as `on`, so a typo never leaves deadwax open, and the log says so. With logins on, `/docs` and `/openapi.json` (the API's own pages) are switched off. |
+| `DEADWAX_ADMINS` | | who is deadwax's admin, by Navidrome user name, comma-separated (case doesn't matter): `james`, or `james,someone`. Navidrome's own admin setting isn't used: an admin here needn't be one there, and the other way round. |
+| `DEADWAX_SECRET_KEY` | | **required with logins on**: at least 32 characters - make one with `openssl rand -hex 32`. Signing in keeps a token made from your Navidrome password in deadwax's database, `DB_PATH` (on Navidrome's API it is as good as the password, for as long as the password stands), encrypted with this key. Without it nobody can sign in: everything but the health check and the pages themselves answers 503, saying why, and the sign-in screen shows it. Changing it signs everyone out within a few minutes. |
+| `DEADWAX_ADMIN_PASSWORD` | | optional: the **break-glass** sign-in. User name `admin`, this password - an admin who needs neither Navidrome nor the database, for when Navidrome is down or nobody else can sign in. It lasts 12 hours, and ends at once if this password changes. Unset, there is no such sign-in. Since `admin` is this sign-in's name, a Navidrome account called `admin` can't sign in to deadwax. |
+
+**Who can do what.** An admin can do everything. Anyone else signed in can search, find and get
+albums, play, pin to Home and choose their own Getting albums settings; editing the library (applying
+a release, tags, covers, lyrics, CD art, deleting, an artist's pictures and re-filing, rescans), the
+albums that need a look, the log and the server settings are an admin's - the app doesn't show them to
+anyone else, and deadwax refuses them (a 403 that says so). **One gap remains until requests become
+each person's own** (a later version): everyone signed in sees the whole download queue, and can
+cancel, retry or clear any download in it.
+
+**Staying signed in.** Signing in keeps you signed in on that device for 30 days from when you last
+used deadwax there, through restarts. Every few minutes deadwax asks Navidrome whether the login you
+signed in with still stands, so changing your Navidrome password, or your account being deleted, signs
+you out within about six minutes; Navidrome merely being down signs nobody out. Your deadwax user is
+your Navidrome user name, lowercased: renamed in Navidrome, you sign in again under the new name.
+Three wrong passwords for one name within a minute and deadwax stops asking Navidrome about that name
+for the rest of the minute ("Too many tries"), so a mistyped password - or someone guessing - never
+gets the account locked in Navidrome. The session is a cookie, `deadwax_session`: HttpOnly, SameSite
+Strict, and Secure when deadwax is reached over HTTPS (directly, or through a proxy that sends
+`X-Forwarded-Proto`). Plain http is fine on your own network and over WireGuard; **put HTTPS in front
+of deadwax before reaching it from anywhere else**, since over plain http a password and a session can
+be read on the way.
+
+**The database holds the tokens.** `DB_PATH` (`/config/deadwax.db`) keeps each signed-in session's
+Navidrome token, encrypted with `DEADWAX_SECRET_KEY`, and only a hash of each session's cookie. Keep
+the file as private as the key: a copy of both is as good as the passwords on Navidrome's API until
+they change.
+
 ## Preferences (per browser)
 
 These are stored in your browser, so each browser and device has its own. They're the
@@ -218,8 +262,9 @@ Three settings in the app's **You → Getting albums** (since 2.0.0-player.15; F
 2.0.0-player.41) decide what **Get** does
 ([Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source)). They are kept
 **on deadwax, per user** - not on the device - so they follow you from the phone to a browser and
-back. With logins off, as deadwax runs today, there is one user, so every device shares them; once
-logins exist, each person has their own. Each is a list to tap in You: the choice shows at once and
+back. With logins off (the default) there is one user, so every device shares them; with
+[logins](#logins-environment-only) on, each person has their own - and the first admin to sign in
+takes over the ones chosen before. Each is a list to tap in You: the choice shows at once and
 is saved behind it, and if deadwax can't keep it (its database isn't writable) it goes back to what
 deadwax has and You says so. Choices made quickly are saved one after another, in the order you made
 them, so the last one is what stays. The app asks deadwax for them each time You is opened, on

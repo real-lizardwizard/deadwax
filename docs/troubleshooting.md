@@ -345,6 +345,83 @@ A value saved in the settings tab **overrides** compose and `.env`, and the row 
 `SETTING=${SETTING}` in `environment:`, which quietly sets it to empty when compose has no such
 variable of its own; the log warns about this at start-up.
 
+## Signing in
+
+With [logins](configuration.md#logins-environment-only) on (since 2.0.0-player.48). What each message
+on the sign-in screen means, and what to do about it:
+
+### Locked out: nobody can sign in
+
+- **"Navidrome isn't answering, so deadwax can't check your password right now"**: signing in asks
+  Navidrome, so with Navidrome down nobody can. That's what the **break-glass** sign-in is for: user
+  name `admin`, password `DEADWAX_ADMIN_PASSWORD`. It needs neither Navidrome nor deadwax's database,
+  and lasts 12 hours. If it isn't set, set it in compose and recreate the container. Sessions already
+  signed in carry on while Navidrome is down - only new sign-ins need it.
+- **"Logins are on, but DEADWAX_SECRET_KEY isn't set"** (or "is shorter than 32 characters"): logins
+  don't work without the key: the pages load, but everything they ask deadwax for (the health check
+  aside) answers 503 until it's set, and the sign-in screen says so. Make one with
+  `openssl rand -hex 32`, put it in compose and recreate the container.
+- **"deadwax can't read its database, so it can't check who you are"**: nothing is let in while the
+  database can't be read - check `DB_PATH` is on a volume the container can write. The health check
+  stays healthy, since restarting doesn't fix a missing volume. The break-glass sign-in still works.
+  A volume that's full or has gone read-only signs nobody out - devices already signed in carry on
+  (their 30 days just stop moving on) - but a new sign-in answers this until it's fixed.
+- **You've lost the way in altogether**: set `AUTH_MODE=off` in compose and recreate the container -
+  deadwax is then exactly as it was before logins. The pins and Getting albums settings the first
+  admin took over stay with that admin, for when logins are back on.
+
+### "Sign in to use deadwax." everywhere, and no sign-in screen
+
+The app was open from before logins were switched on, running a version older than 2.0.0-player.48
+(one that is newer reloads itself and shows the sign-in). Close the home-screen app - swipe it away -
+and open it again, or reload the tab.
+
+### Signed out after changing your Navidrome password
+
+Every few minutes deadwax asks Navidrome whether the login you signed in with still stands. After you
+change your Navidrome password - or your account is deleted - that answer is no, and within about six
+minutes deadwax signs you out on every device. The app's sign-in screen comes back over whatever was
+showing, saying "Navidrome no longer accepts the login you signed in with": sign in with the new
+password and the app is as it was underneath. **The music doesn't wait**, though: from the moment the
+session ends, the player can't fetch any more of it. The song playing goes on only as far as your
+device has already fetched it (with Gapless on, a few seconds), and then the player skips through the
+rest of the queue as it does with any song that won't play - **Skipped "…" - it wouldn't play**, one
+song after another - and stops at the end with a reason that blames the song. Nothing is wrong with the
+songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` signs everyone out
+the same way ("DEADWAX_SECRET_KEY has changed since you signed in").
+
+### "Too many tries for … - wait N seconds and try again"
+
+Three wrong passwords for one user name within a minute, and deadwax stops asking Navidrome about that
+name until the minute is up - the message says how long. It's there so a mistyped password, or someone
+guessing, never gets the account locked in Navidrome itself (which blocks a user for a while after a run
+of failures). Other names aren't affected. The break-glass `admin` is held to the same.
+
+### "That user name and password didn't work"
+
+It's your **Navidrome** user name and password - not anything set in deadwax (except the break-glass
+`admin`). Case doesn't matter in the name. Two names can't be used: `local` (what deadwax calls its one
+user with logins off) and `admin` (the break-glass sign-in's). An LDAP account can't sign in at all -
+Navidrome can't check it with a token, and deadwax says so.
+
+### "Your sign-in ran out after 30 days without use"
+
+A session lasts 30 days from when you last used deadwax on that device; using it moves that on. Sign in
+again.
+
+### A button says "That's for deadwax's admin"
+
+You're signed in as someone `DEADWAX_ADMINS` doesn't name. Editing the library, the albums that need a
+look, the log and the server settings are an admin's. If you should be one, add your Navidrome user name
+to `DEADWAX_ADMINS` and recreate the container. (The app doesn't show those to anyone else; the main page
+still does, until it retires, and refuses them with this.)
+
+### The main page says "You're signed out"
+
+Logins are on and this browser isn't signed in. **Sign in** opens the app's sign-in screen and brings you
+back to the main page once you have. Signed in somewhere else in the meantime - another tab - or come
+back to this page with **Back**? The page asks again as it comes back, and starts again signed in.
+
 ## Saving or pressing a button says "Refused: it came from another website"
 
 deadwax only accepts changes from its own page, to stop another website you have open from

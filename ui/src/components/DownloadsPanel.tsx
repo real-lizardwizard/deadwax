@@ -6,6 +6,7 @@ import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { PendingDownload } from '../lib/downloadOverlay'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { DownloadJobRow } from './DownloadJobRow'
+import { signedOutNow } from './SignedOutNotice'
 
 /**
  * The downloads dropdown, in full - toggle, badge, toolbar and list.
@@ -67,7 +68,8 @@ export function DownloadsPanel() {
   }, [])
 
   useEffect(() => {
-    if (error) console.error(`Downloads refresh error: ${error}`)
+    //? (2.0.0-player.48) signed out is said over the whole page (SignedOutNotice), not as a failure here
+    if (error && !signedOutNow()) console.error(`Downloads refresh error: ${error}`)
   }, [error])
 
   //? a press that began inside and was released outside doesn't count - see useDismiss

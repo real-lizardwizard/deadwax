@@ -47,11 +47,41 @@ async function readDetail(response: Response): Promise<string | null> {
   }
 }
 
+/**
+ * What the page is told when a session ends (2.0.0-player.48): a 401 from any route but the sign-in's
+ * own, with the server's words as the event's `detail`. The app's sign-in screen comes back over
+ * whatever shows (app/signInGate.tsx), and the main page says it is signed out
+ * (components/SignedOutNotice.tsx). With logins off nothing answers 401, so nothing is ever said.
+ */
+export const SIGNED_OUT = 'deadwax:signed-out'
+
+/**
+ * Which session the page's requests go out under: one more each time the app's sign-in screen goes
+ * because someone signed in (app/signInGate.tsx calls `newSession`). A request carries the cookie it
+ * was SENT with, so a 401 for one sent before then - under the session the sign-in replaced - says
+ * nothing about the new one, and isn't taken for it ending: else a poll that left just before the
+ * sign-in answered, and was answered just after, brought the sign-in straight back over someone who
+ * had just signed in (over WireGuard, a few times in a hundred).
+ */
+let session = 0
+
+export function newSession(): void {
+  session += 1
+}
+
+function noteSignedOut(path: string, status: number, detail: string | null, sentUnder: number): void {
+  if (status !== 401 || path.startsWith('/auth/') || sentUnder !== session) return
+  if (typeof globalThis.dispatchEvent !== 'function') return
+  globalThis.dispatchEvent(new CustomEvent(SIGNED_OUT, { detail }))
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const sentUnder = session
   const response = await fetch(`${BASE}${path}`, init)
 
   if (!response.ok) {
     const detail = await readDetail(response)
+    noteSignedOut(path, response.status, detail, sentUnder)
     // deliberately not special-cased here: 503 only means "MusicBrainz is down" on the
     // MusicBrainz routes, and slskd answers 502 for its own refusals. Mapping status codes
     // to meanings is each module's job - see musicbrainz.ts.
@@ -72,9 +102,11 @@ export function get<T>(path: string, signal?: AbortSignal): Promise<T> {
  * library's body is a 304 (v0.9.20), and its ETag says whether the body needs reading at all.
  */
 export async function fetchOk(path: string, init?: RequestInit): Promise<Response> {
+  const sentUnder = session
   const response = await fetch(`${BASE}${path}`, init)
   if (!response.ok) {
     const detail = await readDetail(response)
+    noteSignedOut(path, response.status, detail, sentUnder)
     throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`)
   }
   return response

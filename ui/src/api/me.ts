@@ -1,7 +1,8 @@
 /**
  * Who the page is talking to - `GET /deadwax/me` (src/routes/me.py). With logins off, the one
- * implicit admin, `local`; the app shows or hides its admin-only rows, and Sign out, from this
- * rather than from assumptions, so step 3's logins change what it says and nothing in the page.
+ * implicit admin, `local`; with them on (2.0.0-player.48), the signed-in user - or a 401, which brings
+ * the sign-in screen (app/signInGate.tsx). The app shows or hides its admin-only rows, and Sign out,
+ * from this rather than from assumptions.
  */
 
 import type { GetSettings, GetSettingsAnswer } from '../lib/getSettings'
@@ -11,7 +12,7 @@ import { get, post, put } from './http'
 export interface Me {
   user: string
   admin: boolean
-  /** 'off' while deadwax has no logins */
+  /** 'off' while deadwax has no logins; 'on' with AUTH_MODE on (2.0.0-player.48) */
   auth: 'off' | 'on'
   /** src/__init__.py's __version__ - "2.0.0-player.12" */
   version: string

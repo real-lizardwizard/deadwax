@@ -13,8 +13,9 @@ this module exists rather than the page calling Navidrome itself:
 
 What passes through is a fixed list of calls in routes/navidrome.py, each with its own
 parameters - never a general proxy. The account configured here may well be Navidrome's admin,
-and deadwax has no login of its own, so a general proxy would hand anybody who can reach
-deadwax the means to create users or delete playlists on Navidrome.
+and deadwax has no login of its own unless AUTH_MODE is on (2.0.0-player.48) - and even then
+every signed-in user would reach it - so a general proxy would hand them the means to create users
+or delete playlists on Navidrome.
 """
 
 import hashlib
@@ -77,11 +78,14 @@ class NavidromeError(Exception):
     """
 
     def __init__(self, message: str, status: int = 502, headers: dict[str, str] | None = None,
-                 unreachable: bool = False):
+                 unreachable: bool = False, code: int | None = None):
         super().__init__(message)
         self.status = status
         self.headers = headers
         self.unreachable = unreachable
+        #? Subsonic's own error code, when Navidrome answered with one - 40 is the one logins read
+        #? (src/auth.py): the login no longer stands, so the session ends
+        self.code = code
 
 
 def unusable_url(problem: str) -> str:
@@ -127,7 +131,7 @@ def subsonic_body(payload) -> dict:
         error = body.get("error") if isinstance(body.get("error"), dict) else {}
         code = error.get("code")
         message = SUBSONIC_ERRORS.get(code) or f"Navidrome said: {error.get('message') or 'failed'}"
-        raise NavidromeError(message, 404 if code == 70 else 502)
+        raise NavidromeError(message, 404 if code == 70 else 502, code=code if isinstance(code, int) else None)
 
     return body
 

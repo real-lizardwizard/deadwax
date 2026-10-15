@@ -1,13 +1,16 @@
 import re
 import asyncio
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
+from src.routes import auth as auth_routes
+from src import auth
+from src.users import current_user, require_admin
 from src.logger import logger, cleanup_logging
 from src.poller import run_download_poller
 from src.store import JobStore
@@ -39,6 +42,13 @@ def serves_media(path: str) -> bool:
     return path in MEDIA_PATHS or path.startswith(MEDIA_PREFIXES)
 
 
+#? What a page's head carries when logins are on (2.0.0-player.48): ui/src/api/auth.ts reads it.
+LOGINS_MARK = '<meta name="deadwax-auth" content="on">'
+#? ...and the app's page, the sign-in screen's own stylesheet beside it - linked only then, so with logins
+#? off the page is exactly what it was
+SIGNIN_SHEET = '<link rel="stylesheet" href="/player/signin.css">'
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.musicbrainz_client = MusicBrainzClient()
@@ -58,6 +68,8 @@ async def lifespan(app: FastAPI):
     #? in the settings tab would otherwise be reported missing on every single restart.
     Config.report_musicbrainz()
     Config.report_navidrome()
+    #? after the overrides too: whether a sign-in can reach Navidrome depends on NAVIDROME_URL, which can be one
+    Config.report_logins()
 
     #? An empty store index - the first start of a version with one - is filled from the saved
     #? scan, so Find knows what the library holds before anyone opens its tab (step 2). After the
@@ -70,14 +82,23 @@ async def lifespan(app: FastAPI):
     #? kept where /health can see it - see there
     app.state.poller_task = poller_task
 
+    #? logins (2.0.0-player.48): each session's login put to Navidrome again every few minutes - only
+    #? with them on, and a database to keep sessions in (without one, every protected route is a 503)
+    session_checks = None
+    if Config.logins_on() and app.state.store.available:
+        session_checks = asyncio.create_task(auth.run_session_checks(app.state.store))
+
     yield
     logger.info("Shutting down API server...")
 
-    poller_task.cancel()
-    try:
-        await poller_task
-    except asyncio.CancelledError:
-        pass
+    for task in (poller_task, session_checks):
+        if task is None:
+            continue
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     await app.state.musicbrainz_client.close_client()
     await app.state.slskd_client.close_client()
@@ -85,16 +106,22 @@ async def lifespan(app: FastAPI):
     await library.artist_images_client.close_client()
     await lrclib.close_client()
     await navidrome_client.close_client()
+    await auth.login_client.close_client()
 
     cleanup_logging()
 
 
 def start() -> FastAPI:
     logger.info("Starting API server")
+    #? (2.0.0-player.48) With logins on, the API's own pages go: /docs, /redoc and /openapi.json would
+    #? describe every route to anybody who can reach the port. AUTH_MODE is the environment's alone, so
+    #? it is read once, here.
+    logins = Config.logins_on()
     app = FastAPI(
         title="deadwax",
         summary="Search MusicBrainz, download through slskd",
-        lifespan=lifespan
+        lifespan=lifespan,
+        **({"docs_url": None, "redoc_url": None, "openapi_url": None} if logins else {}),
     )
 
     #? Vite writes these with a content hash in the filename, so a given URL's contents can
@@ -247,19 +274,28 @@ def start() -> FastAPI:
     app.add_middleware(SameOriginWrites)
 
     logger.info("adding routers")
-    app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"])
-    app.include_router(search_musicbrainz.router, prefix="/deadwax/search_musicbrainz", tags=["search_musicbrainz"])
-    app.include_router(monitor_slskd.router, prefix="/deadwax/monitor_slskd", tags=["monitor_slskd"])
-    app.include_router(download.router, prefix="/deadwax/download", tags=["download"])
-    app.include_router(library.router, prefix="/deadwax/library", tags=["library"])
-    app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"])
-    app.include_router(navidrome.router, prefix="/deadwax/navidrome", tags=["navidrome"])
-    #? who the page is talking to - the implicit admin while logins are off (src/users.py)
-    app.include_router(me.router, prefix="/deadwax/me", tags=["me"])
+    #? (2.0.0-player.48) EVERY router is checked by a dependency: current_user - with logins off the
+    #? implicit admin, reading nothing; on, a session or 401 - and require_admin, 403 for a user who isn't an
+    #? admin, on the log and the server settings whole (and per route on the library's writers, in
+    #? routes/library.py). A dependency, never @app.middleware("http"), which hides disconnects. A router
+    #? added here without one is caught by tests/test_logins.py's walk of every route.
+    signed_in = [Depends(current_user)]
+    admin = [Depends(require_admin)]
+    app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"], dependencies=admin)
+    app.include_router(search_musicbrainz.router, prefix="/deadwax/search_musicbrainz", tags=["search_musicbrainz"], dependencies=signed_in)
+    app.include_router(monitor_slskd.router, prefix="/deadwax/monitor_slskd", tags=["monitor_slskd"], dependencies=signed_in)
+    app.include_router(download.router, prefix="/deadwax/download", tags=["download"], dependencies=signed_in)
+    app.include_router(library.router, prefix="/deadwax/library", tags=["library"], dependencies=signed_in)
+    app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"], dependencies=admin)
+    app.include_router(navidrome.router, prefix="/deadwax/navidrome", tags=["navidrome"], dependencies=signed_in)
+    #? who the page is talking to - the implicit admin while logins are off, the signed-in user with them on
+    app.include_router(me.router, prefix="/deadwax/me", tags=["me"], dependencies=signed_in)
     #? what each user pinned to the app's Home (2.0.0-player.18) - deadwax's own, never Navidrome's stars
-    app.include_router(pins.router, prefix="/deadwax/me/pins", tags=["me"])
+    app.include_router(pins.router, prefix="/deadwax/me/pins", tags=["me"], dependencies=signed_in)
     #? the id bridge (2.0.0-player.17): one album across the store index, MusicBrainz and Navidrome
-    app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"])
+    app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"], dependencies=signed_in)
+    #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
+    app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
 
     @app.get("/deadwax/health")
     async def health():
@@ -284,6 +320,17 @@ def start() -> FastAPI:
 
     logger.info("mounting static interface files")
     interface_path = Path(__file__).parent.parent.parent / "interface"
+
+    def with_logins_mark(html: str, sign_in: bool = False) -> str:
+        """
+        A page with LOGINS_MARK in its head when logins are on (2.0.0-player.48), so its script knows to
+        ask who is signed in before drawing anything - and the app's page (`sign_in`) the sign-in screen's
+        stylesheet, SIGNIN_SHEET, too. Off, the page exactly as it is: the app then draws at once, as it
+        always has, with no extra round trip. The pages stay public; the mark says only that logins are on.
+        """
+        if not logins:
+            return html
+        return html.replace("</head>", f"{LOGINS_MARK}\n{SIGNIN_SHEET if sign_in else ''}\n</head>", 1)
     #? The app's page, with each stylesheet and script it names stamped with that file's own size and
     #? time of writing (`?v=`). The page itself is still asked for on every launch (no-cache, above);
     #? what it names is then kept for good, because a file that changed has another stamp and so
@@ -293,7 +340,7 @@ def start() -> FastAPI:
     STAMPED = re.compile(r'''(?P<attr>href|src)="(?P<path>/(?:player|dist|styles)/[^"?#]+\.(?:css|js))"''')
 
     def stamped_page(page: str = "player/index.html") -> Response:
-        html = (interface_path / page).read_text(encoding="utf-8")
+        html = with_logins_mark((interface_path / page).read_text(encoding="utf-8"), page == "player/index.html")
 
         def stamp(match: re.Match) -> str:
             try:
@@ -320,6 +367,19 @@ def start() -> FastAPI:
     @app.get("/player/lab/index.html")
     async def serve_lab_by_name():
         return stamped_page("player/lab/index.html")
+
+    if logins:
+        #? the main page, with the mark (see with_logins_mark): before the mount, which would otherwise
+        #? answer "/" itself. Off, the mount serves it exactly as it always has.
+        @app.get("/")
+        async def serve_main_page_with_logins():
+            return Response(with_logins_mark((interface_path / "index.html").read_text(encoding="utf-8")),
+                            media_type="text/html")
+
+        @app.get("/index.html")
+        async def serve_main_page_by_name_with_logins():
+            return Response(with_logins_mark((interface_path / "index.html").read_text(encoding="utf-8")),
+                            media_type="text/html")
 
     app.mount("/", StaticFiles(directory=interface_path, html=True), name="interface")
     logger.info("adding root endpoint to serve index.html")

@@ -4,6 +4,7 @@ import { CandidatesPanel } from './components/CandidatesPanel'
 import { DownloadsPanel } from './components/DownloadsPanel'
 import { LibraryView } from './components/LibraryView'
 import { SettingsView } from './components/SettingsView'
+import { watchSignedOut } from './components/SignedOutNotice'
 import { Tabs, type TabId } from './components/Tabs'
 import { bridge } from './bridge'
 import { useNewImports } from './hooks/useNewImports'
@@ -74,6 +75,9 @@ function renderShell(active: TabId): void {
 //? the releases grid's two Find buttons build what they send with the app's own builder
 //? (lib/releasePayload.ts, 2.0.0-player.15) - one payload builder for the main page and the app
 bridge().buildDownloadRelease = buildDownloadRelease
+
+//? with logins on (2.0.0-player.48), a page signed out says so over itself and links to the app's sign-in
+watchSignedOut()
 
 mount('downloads-root', <DownloadsPanel />)
 mount('candidates-root', <CandidatesPanel />)

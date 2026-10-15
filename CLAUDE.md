@@ -106,7 +106,7 @@ src/
   store.py         SQLite job store + transfer reconciliation helpers. Also the store index
                    (store_album): every album folder under an id that survives a rename - and,
                    per user, the app's preferences (user_prefs) and pins (pins), with
-                   adopt_local() for step 3.
+                   adopt_local() (an admin's first sign-in) - and who is signed in (sessions).
   pins.py          PURE. What a pin to the app's Home keys on (store:<store_album.id>, mb:<mbid>)
                    and the PUT's list - see "Pins, and a finished Home". Never Navidrome stars.
   store_index.py   keeps the store index in step with every scan and writer, and the "already
@@ -153,8 +153,12 @@ src/
                    writing is narrow - see "CD art and embedded pictures".
   tagkeys.py       tag names mutagen's Easy MP4 doesn't know (the disc title), registered once,
                    and easy_file() to open a file with them - see "Disc titles".
-  users.py         current_user(), a FastAPI dependency: the implicit admin `local` while logins
-                   are off - the seam step 3 fills in. routes/me.py answers GET /deadwax/me from it.
+  users.py         current_user(), the FastAPI dependency every router is checked by: the implicit
+                   admin `local` while logins are off, the signed-in user (or 401) with them on;
+                   require_admin, the admin-only routes' 403. routes/me.py answers GET /deadwax/me.
+  auth.py          logins (AUTH_MODE, 2.0.0-player.48): sign-in through Navidrome's getUser, the
+                   session cookie and table, the re-check, break-glass, the throttle - see
+                   "Logins and roles".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
@@ -167,7 +171,8 @@ src/
                    app"), library,
                    settings (editable since v0.5.1 - see "The settings tab"), navidrome
                    (the player's FIXED list of Subsonic calls - see "The phone player"),
-                   me, store_album (the app's id bridge - see "Artists, and the two
+                   me, auth (sign-in and sign-out, the two routes needing no session),
+                   store_album (the app's id bridge - see "Artists, and the two
                    libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"
@@ -178,9 +183,10 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
                    value here restyles the vanilla and Preact sides together. Raw values in
                    main.css or in a component are a bug. NOTE it is @import-ed, so it caches
                    separately - hard-refresh when verifying a palette change.
-  player/          the app's page at /player/, manifest, icons, and two stylesheets: player.css
+  player/          the app's page at /player/, manifest, icons, and its stylesheets: player.css
                    (the player; mechanics its own, look on theme.css section 10) and app.css (the
-                   tab bar, Home, Requests, You) - see "The one app". player/lab/ is the turntable's
+                   tab bar, Home, Requests, You) - see "The one app" - and signin.css (the sign-in
+                   and Sign out, linked only with logins on). player/lab/ is the turntable's
                    test bench's page and its own lab.css.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
@@ -208,7 +214,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             2561 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2637 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -247,6 +253,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | Requests, Search, the album you don't have, Sources and Get | `notes/app-requests-search-get.md` |
 | artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
+| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen | `notes/logins.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
 | the turntable's sound following the hand (.24) | `notes/turntable-sound.md` |
 | the turntable's sound since: warble, echo, kernel, first turn, clock, recorder, limiter (.27-.35), less delay (.40) | `notes/turntable-fixes.md` |
@@ -283,6 +290,8 @@ table above), never here. Add to this file only a rule that holds everywhere.
   in a rule is a bug. `app-desktop.css` rules live only inside its desktop media queries.
 - **Links out of the app open beside it** (`target="_blank" rel="noopener"`): following one in the page
   unloads the player.
+- **Every route is decided** - public, a user's or an admin's (`tests/test_logins.py` ROUTES): a router is
+  included with `current_user` or `require_admin` (src/users.py), never middleware.
 - **The Navidrome routes are a fixed list** (`test_there_is_no_general_proxy`); middleware is plain
   ASGI only, never `@app.middleware("http")` (it hides disconnects).
 - **pydantic drops undeclared fields without a word**: a field the browser sends must be declared on
@@ -450,7 +459,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2561 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2637 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -488,7 +497,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2561 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2637 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
@@ -509,7 +518,8 @@ most likely to break on deployment are exactly the parts tests can't reach:
 - Navidrome, the same way (1.0.3). Every Navidrome in the suite is a fake shaped from its source
   as read at 46c4327, not recorded from a real 0.64.2: what a transcode really sends, what
   `getScanStatus` really answers mid-scan, and how the watcher really times its scans are the
-  first places to look when the player or the scan wait misbehaves.
+  first places to look when the player or the scan wait misbehaves - and what `getUser` and its
+  failure limits really do, when a sign-in does (notes/logins.md).
 
 A green suite here means the logic is sound, not that it works against real infrastructure.
 

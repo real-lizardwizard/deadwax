@@ -156,7 +156,9 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
-  version, and that logins are off. For an admin, **Managing deadwax**: **Albums that need a look**,
+  version, and whether logins are on - with them on, who you're signed in as and **Sign out**, which
+  ends this device's session (and stops what's playing) and goes back to the sign-in screen
+  ([Signing in](#signing-in)). For an admin, **Managing deadwax**: **Albums that need a look**,
   with how many, which opens **Needs a look**, then **Library care**, **Server settings** and **Log** -
   on a phone as on a desktop since 2.0.0-player.47 ([below](#looking-after-deadwax-from-a-phone)) - and
   **Open the main page**, which opens it beside the app.
@@ -337,7 +339,8 @@ looking, and fills in where it is:
 
 ### Managing an artist
 
-For an admin (everyone, while logins are off), on a phone and on a desktop:
+For an admin (everyone, while logins are off; with them on, the names in `DEADWAX_ADMINS`), on a phone
+and on a desktop:
 
 - **Artist images…** (under In your library) shows every picture of them found - Wikimedia Commons
   always, TheAudioDB and fanart.tv when deadwax's settings have their keys (under **Connections**;
@@ -441,8 +444,8 @@ way that differ only in how they were typed (accents, case, which dash) are one 
 - **Not in Navidrome yet** - deadwax has it, but Navidrome doesn't (yet): it may still be scanning.
 
 **Where they're kept.** On deadwax, for you - not on the phone, and **never as stars in Navidrome**
-(stars belong to each Navidrome user and mean something else there). With logins off, as deadwax runs
-today, there is one user, so every device sees the same pins; once logins exist, each person has
+(stars belong to each Navidrome user and mean something else there). With logins off (the default)
+there is one user, so every device sees the same pins; with [logins](#signing-in) on, each person has
 their own, and the first admin to sign in takes over the ones pinned before. They're in deadwax's
 database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pins` and
 `POST /deadwax/me/pins/toggle`. Home holds up to 50.
@@ -1555,9 +1558,39 @@ They aren't:
 
 So leave that player's Transcoding and Max Bit Rate unset.
 
+## Signing in
+
+With logins on ([turning them on](getting-started.md#turning-logins-on)), the app opens on a sign-in
+screen: your **Navidrome** user name and password. Nothing else of the app is drawn until you've signed
+in, and then you stay signed in on that device - the home-screen app included - for 30 days from when
+you last used it. Admins (deadwax's `DEADWAX_ADMINS`) see everything described here; anyone else sees no
+**Managing deadwax** in You or the sidebar, no **Edit** on an album and no managing on an artist's page,
+and can do everything else - search, **Get**, play, pin.
+
+If your session ends while you're using the app - you changed your Navidrome password, say, or your
+account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
+**over** whatever was showing, saying why: as soon as the app next asks deadwax for something, as it
+comes back to the front, or as a song fails to load. Sign in again as the same person and it goes, leaving the app as it
+was underneath. **The music doesn't wait for you, though**: until you've signed in again the player
+can't fetch any more of it. The song playing goes on only as far as your device has already fetched
+it - with **Gapless** on that's a few seconds, since its stream is fetched a few seconds at a time - and
+after that the player does what it does with any song that won't play: it asks for each song left in
+the queue once more and skips it (**Skipped "…" - it wouldn't play**), so by the time you've signed in
+it has usually reached the end of the queue and stopped, with a reason that blames the song (it was the
+sign-in). Play the album, or the song, again once you're back. Signing in as someone else there starts
+the app again, since the queue, the pins and the settings in it were the other person's. The app also
+asks who is signed in each time it comes back to the front, so a session that ended while the phone was
+in your pocket shows the sign-in as you pick it up - and a sign-in screen left showing after you signed
+in somewhere else (another tab, say) goes. On a desktop with the visualizer in full screen, the sign-in
+takes the screen back first (the visualizer closes), since nothing else can show over full screen. An
+app left open while logins are switched on reloads itself into the sign-in screen
+([Turning logins on](getting-started.md#turning-logins-on)). What each message means:
+[Troubleshooting → Signing in](troubleshooting.md#signing-in).
+
 ## Using it away from home
 
-There's no login in deadwax, so don't open a port to the internet for it. Reach it over a VPN
+Unless you've turned logins on there's no login in deadwax, so don't open a port to the internet for
+it - and with them on, don't do it without HTTPS in front of deadwax. Reach it over a VPN
 instead, such as **WireGuard** or **Tailscale**, and open `/player/` at deadwax's address on that
 network. Only deadwax needs to be reachable: the phone never talks to Navidrome.
 

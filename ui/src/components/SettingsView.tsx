@@ -31,7 +31,8 @@ const SETTINGS_TABS: readonly { id: SettingsTab; label: string; hint: string }[]
  * yet goes under Library rather than nowhere, so a setting added later is never unreachable.
  */
 export function tabForGroup(groupId: string): SettingsTab {
-  if (groupId === 'connections') return 'connections'
+  //? (2.0.0-player.48) logins - read-only, the environment's - sit with Navidrome, whose accounts they are
+  if (groupId === 'connections' || groupId === 'logins') return 'connections'
   if (groupId === 'downloads' || groupId === 'soulseek') return 'downloads'
   return 'library'
 }

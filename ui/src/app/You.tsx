@@ -18,6 +18,8 @@ import { LookChoice } from './LookChoice'
 import { QualityChoice } from './QualityChoice'
 import { askGetSettings, chooseGetSettings, useGetSettings } from './useGetSettings'
 import { WindDownChoice } from './WindDownChoice'
+import { adminUntilAsked } from './session'
+import { SignOutRow } from './SignOutRow'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
 
@@ -77,7 +79,7 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
  *   row is its own live region, read whole ("slskd, Connected"): the three answers land in any
  *   order, and a bare "Connected" says nothing about which service it is.
- * - About: from `GET /deadwax/me` - the version, and that logins are off. Asked with the pings, and
+ * - About: from `GET /deadwax/me` - the version, and logins (on: who, and Sign out). Asked with the pings, and
  *   again on "Check again": deadwax restarting under Komodo while You first opened must not leave
  *   "unknown" there until the app is killed.
  * - The link to the main page opens it BESIDE the app (a new tab in a browser), so the music playing
@@ -170,8 +172,9 @@ export function You({
     }
   }, [shown])
 
-  //? admin-only rows show unless deadwax has said this user isn't one - with logins off, everyone is
-  const admin = who ? who.admin : true
+  //? admin-only rows show unless deadwax has said this user isn't one - with logins off, everyone is; on,
+  //? the session's word until /me answers here (session.ts, 2.0.0-player.48)
+  const admin = who ? who.admin : adminUntilAsked()
   //? only what deadwax has said: nothing while it hasn't answered, "…" while it is being asked
   const identity = who ? (who.auth === 'off' ? 'Logins are off' : who.user) : whoFailed ? null : '…'
 
@@ -329,6 +332,8 @@ export function You({
           </div>
         </dl>
         {whoFailed && <p class="app-footnote app-error">deadwax didn't answer: {whoFailed}</p>}
+        {/* (2.0.0-player.48) only with logins on - off, there is nobody to sign out */}
+        {who?.auth === 'on' && <SignOutRow user={who.user} />}
       </section>
     </section>
   )
