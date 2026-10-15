@@ -748,19 +748,19 @@ def test_adopting_local_hands_its_pins_and_preferences_to_the_first_admin(store)
     put_pins(store, LOCAL_USER, ["store:1", "store:2", "store:3"])
     put_pins(store, "james", ["store:2", "store:9"])
 
-    assert run(store.adopt_local("james")) == (2, 2)
+    assert run(store.adopt_local("james")) == (2, 2, 0)
 
     #? theirs first and theirs winning; local's after, in local's order; local left with nothing
     assert [row[2:] for row in rows(store)] == [("store:2", 0), ("store:9", 1), ("store:1", 2), ("store:3", 3)]
     assert {row[0] for row in rows(store)} == {"james"}
     assert prefs(store) == [("james", "_seeded", "1"), ("james", "get_mode", "sources"), ("james", "quality_floor", "lossless")]
     #? and a second time there is nothing left to take
-    assert run(store.adopt_local("james")) == (0, 0)
+    assert run(store.adopt_local("james")) == (0, 0, 0)
 
 
 def test_adopting_into_local_itself_takes_nothing(store):
     put_pins(store, LOCAL_USER, ["store:1"])
-    assert run(store.adopt_local(LOCAL_USER)) == (0, 0)
+    assert run(store.adopt_local(LOCAL_USER)) == (0, 0, 0)
     assert rows(store) == [(LOCAL_USER, "album", "store:1", 0)]
 
 

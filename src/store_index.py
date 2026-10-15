@@ -48,6 +48,7 @@ from src.library import SCAN_FORMAT, edition_from_dirname, read_album_dir
 from src.logger import logger
 from src.matching import AUDIO_EXTENSIONS, file_extension, normalize
 from src.organizer import existing_tracks, planned_key, read_album_mbid, resolve_album_dir
+from src.store import still_coming
 
 
 def _usable(store) -> bool:
@@ -523,20 +524,57 @@ async def other_pressings(store, root: str, release_group_mbid: str | None,
         return []
 
 
+#? Failed downloads the poller is moving to their next peer this moment (AUTO_RETRY_PEER), by job id -
+#? from just before it marks one failed until its retry has had its turn (poller._auto_retry). One
+#? process runs one poller, so memory is where this lives, as _FILING_NOW does. Such a job is still
+#? on its way (2.0.0-player.49: "downloading now" counts every state in between): a second person's
+#? Get in that moment joins it, rather than starting another download the retry would then refuse.
+_RETRY_PENDING: dict[int, int] = {}
+
+
+def retry_pending_started(job_id: int | None) -> None:
+    if job_id is not None:
+        _RETRY_PENDING[job_id] = _RETRY_PENDING.get(job_id, 0) + 1
+
+
+def retry_pending_finished(job_id: int | None) -> None:
+    if job_id is None or job_id not in _RETRY_PENDING:
+        return
+    _RETRY_PENDING[job_id] -= 1
+    if _RETRY_PENDING[job_id] <= 0:
+        del _RETRY_PENDING[job_id]
+
+
+def retry_pending() -> frozenset[int]:
+    """The failed jobs with a retry pending, now."""
+    return frozenset(_RETRY_PENDING)
+
+
+def is_whole(job: dict, release: dict | None = None) -> bool:
+    """Whether this job fetches the WHOLE pressing - at least as many files as its audio tracks."""
+    return len(job.get("files") or []) >= len(audio_tracks(release if release is not None else job.get("release") or {}))
+
+
+def coming_now(job: dict) -> bool:
+    """store.still_coming for this job, with organizing and the retries as they are now."""
+    return still_coming(job, filing=Config.organizing_enabled(), retry_pending=retry_pending())
+
+
 async def in_flight(store, release_mbid: str | None, excluding_job_id: int | None = None,
                     release: dict | None = None, whole: bool = True) -> dict | None:
     """
     A job already bringing this release in (store.in_flight_job), or None. `whole` asks for one
     bringing the WHOLE pressing - fetching at least as many files as the release has audio
-    tracks - which is what stops Find and refuses a download; `whole=False` for any, for the note
-    that a download of part of it is running. A `complete` job only counts while organizing is on.
+    tracks - which is what stops Find and refuses (since 2.0.0-player.49, for anyone else: joins) a
+    download; `whole=False` for any, for the note that a download of part of it is running. A
+    `complete` job only counts while organizing is on; a `failed` one only while its retry is pending.
     """
     if not _usable(store) or not release_mbid:
         return None
     covering = len(audio_tracks(release or {})) if whole else 0
     try:
         return await store.in_flight_job(release_mbid, excluding_job_id, filing=Config.organizing_enabled(),
-                                         covering=covering)
+                                         covering=covering, retry_pending=retry_pending())
     except Exception as e:
         logger.warning(f"could not look for a download of {release_mbid} in flight: {e}")
         return None
@@ -546,14 +584,51 @@ async def in_flight(store, release_mbid: str | None, excluding_job_id: int | Non
 FILING_STATUSES = ("organizing", "complete")
 
 
-def describe_job(job: dict) -> dict:
-    """What Find says about a download already in flight - the panel adds how far it has got."""
-    return {
+def job_formats(job: dict) -> list[str]:
+    """The formats a job's copy is in: as its candidate showed them, else read off its files' names."""
+    shown = (job.get("quality") or {}).get("formats")
+    if shown:
+        return sorted({str(f).lower() for f in shown if f})
+    return sorted({file_extension(f.get("filename") or "") for f in job.get("files") or []} & AUDIO_EXTENSIONS)
+
+
+def describe_job(job: dict, user: str | None = None, requesters: list[str] | None = None,
+                 admin: bool = False) -> dict:
+    """
+    What Find says about a download already in flight - the panel adds how far it has got.
+
+    With logins on (2.0.0-player.49, `requesters` given) also whether it is the asker's own (`yours`:
+    their request on it is active), whether somebody else is waiting for it (`shared` - a user's
+    cancel then only withdraws their request, so another peer is no cancel away) and, for an `admin`,
+    who (`requested_by`, as /jobs says it) - and what the copy is: its formats, and the bitrates, bit
+    depths and sample rates its candidate showed, so someone else is told what they'd get by joining
+    it. With logins off it is exactly what it was: there is one user, and every download is theirs.
+    """
+    described = {
         "job_id": job.get("id"),
         "status": job.get("status"),
         "username": job.get("username") or "",
         "files": len(job.get("files") or []),
     }
+    if requesters is not None:
+        quality = job.get("quality") or {}
+        others = [name for name in requesters if name != user]
+        described.update({
+            "yours": user in requesters,
+            "shared": bool(others),
+            **({"requested_by": others} if admin else {}),
+            "formats": job_formats(job),
+            **{key: quality[key] for key in ("bitrates", "bit_depths", "sample_rates", "variable_bitrate") if key in quality},
+        })
+    return described
+
+
+def in_flight_words(job: dict) -> str:
+    """Why a download of a release this job is already bringing in doesn't start: the 409's words."""
+    peer = job.get("username") or "another peer"
+    if job.get("status") in FILING_STATUSES:
+        return f"already downloaded from {peer}, and being filed now"
+    return f"already downloading from {peer}"
 
 
 async def already_have(store, release: dict, excluding_job_id: int | None = None) -> str | None:
@@ -569,10 +644,7 @@ async def already_have(store, release: dict, excluding_job_id: int | None = None
     try:
         job = await in_flight(store, release_mbid, excluding_job_id, release)
         if job is not None:
-            peer = job.get("username") or "another peer"
-            if job.get("status") in FILING_STATUSES:
-                return f"already downloaded from {peer}, and being filed now"
-            return f"already downloading from {peer}"
+            return in_flight_words(job)
         held = await held_copy(store, Config.LIBRARY_PATH or "", release_mbid, release)
         if held is not None and held["complete"]:
             return f"already in your library: {held['path']}"

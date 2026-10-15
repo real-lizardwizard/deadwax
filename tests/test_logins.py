@@ -93,12 +93,13 @@ ROUTES = {
     ("POST", "/deadwax/download/store_state"): "user",
     ("POST", "/deadwax/download/find_candidates"): "user",
     ("POST", "/deadwax/download/enqueue"): "user",
-    #? everyone's downloads, for everyone, until step 4 makes requests per person - the one known gap
+    #? a user's own downloads, an admin's everyone's (2.0.0-player.49, step 4 - tests/test_downloads_per_person.py)
     ("GET", "/deadwax/download/jobs"): "user",
     ("POST", "/deadwax/download/jobs/{job_id}/cancel"): "user",
     ("POST", "/deadwax/download/jobs/{job_id}/retry"): "user",
     ("POST", "/deadwax/download/jobs/{job_id}/retry_same"): "user",
     ("POST", "/deadwax/download/jobs/clear"): "user",
+    ("POST", "/deadwax/download/jobs/{job_id}/join"): "user",
     ("GET", "/deadwax/library/albums"): "user",
     ("GET", "/deadwax/library/owned"): "user",
     ("POST", "/deadwax/library/rescan"): "admin",
@@ -210,6 +211,10 @@ def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "DEADWAX_ADMINS", " James , someone-else ")
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", GLASS)
     monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
+    #? (2.0.0-player.49) logins need organizing on - copy or move, both folders set - or every route is a 503
+    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "slskd"))
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(auth, "throttle", auth.Throttle())
     auth.forget_sessions()
     fake = FakeNavidrome()

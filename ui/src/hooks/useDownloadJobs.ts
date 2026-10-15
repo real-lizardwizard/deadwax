@@ -8,6 +8,7 @@ import {
   visibleJobs, visiblePending, withAdded, withPending, withRemoved, withoutRefused,
   type Overlays, type PendingDownload,
 } from '../lib/downloadOverlay'
+import { onDownloadsChanged } from '../lib/downloadRequests'
 import { announceAlbumsFiled, newlyOrganized, statusesOf } from '../lib/libraryEvents'
 import { sampleSpeeds, type SpeedSamples } from '../lib/speed'
 
@@ -189,6 +190,9 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
       if (timer !== undefined) clearTimeout(timer)
     }
   }, [open, nonce])
+
+  //? a download joined anywhere in the page (2.0.0-player.49): asked again, so it is listed at once
+  useEffect(() => onDownloadsChanged(refresh), [refresh])
 
   /** Stop overlaying ids the server never confirmed. See OPTIMISTIC_TTL_MS. */
   const expire = useCallback((key: 'cancelling' | 'cleared', ids: number[]) => {

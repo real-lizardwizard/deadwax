@@ -126,11 +126,19 @@ WRONG_LOGIN = "That user name and password didn't work."
 
 
 def unusable() -> str | None:
-    """Why nobody can sign in at all right now, in words for whoever asks - or None. Logins on only."""
+    """Why nobody can sign in at all right now, in words for whoever asks - or None. Logins on only.
+
+    The secret key missing; and (2.0.0-player.49) organizing not on: downloads are per person with
+    logins on, and under ORGANIZE_MODE dry_run (or off) nothing is ever filed, so nothing could be
+    granted to the people who asked or found already held - logins are refused until it's copy or move
+    (Config.describe_logins_organizing), every protected route answering 503 with the reason, as for the key."""
     problem = describe_secret_key(Config.DEADWAX_SECRET_KEY)
     if problem:
         return (f"Logins are on, but DEADWAX_SECRET_KEY {problem}, so deadwax can't sign anyone in. "
                 f"Set it in the container's environment and restart deadwax.")
+    organizing = Config.describe_logins_organizing()
+    if organizing:
+        return f"Logins are on, but {organizing}"
     return None
 
 
@@ -285,12 +293,19 @@ _ended: "OrderedDict[str, str]" = OrderedDict()
 ENDED_KEPT = 1000
 
 
+#? (2.0.0-player.49) whether this process has looked for what `local` still holds, to hand it to the
+#? first admin it sees with a session - _take_over_leftovers. Under _lock.
+_leftovers_looked = False
+
+
 def forget_sessions() -> None:
-    """Drop everything held in memory (tests; the database is untouched)."""
+    """Drop everything held in memory (tests; the database is untouched) - as a restart would."""
+    global _leftovers_looked
     with _lock:
         _held.clear()
         _ended.clear()
         _revoked_glass.clear()
+        _leftovers_looked = False
 
 
 def _note_ended(key: str, reason: str) -> None:
@@ -391,12 +406,46 @@ def user_for(request) -> str:
     if store is None or not getattr(store, "available", False):
         raise HTTPException(status_code=503, detail=NO_DATABASE)
     try:
-        return session_user(store, raw)
+        user = session_user(store, raw)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"could not read a session from the database, so the request was refused ({type(e).__name__}: {e})")
         raise HTTPException(status_code=503, detail=NO_DATABASE) from e
+    if user in Config.admins():
+        _take_over_leftovers(store, user)
+    return user
+
+
+def _take_over_leftovers(store, user: str) -> None:
+    """
+    The first admin seen with a session after a start takes over what `local` still holds - the
+    downloads, pins and Getting albums settings saved while logins were off (store.adopt_local_now),
+    as a sign-in does (sign_in). For an admin whose session outlived the restart that switched logins
+    on - a session lasts 30 days from its last use - and who so may never sign in again: an upgrade
+    from 2.0.0-player.48 (every download from before became `local`'s as job_requests was made), or
+    logins switched off and on again (2.0.0-player.49 review: their rows read "Asked by local", and a
+    finished download nobody can clear for `local` was never deleted). Logins only change at a
+    restart and `local` gains nothing while they're on, so once a process is enough. Best effort and
+    tried once: a database that fails here is logged, and the admin's next sign-in takes it over.
+    SYNCHRONOUS, in FastAPI's thread pool, as user_for is.
+    """
+    global _leftovers_looked
+    with _lock:
+        if _leftovers_looked:
+            return
+        _leftovers_looked = True
+    try:
+        if not store.local_has_anything():
+            return
+        pins, preferences, requests = store.adopt_local_now(user)
+    except Exception as e:
+        logger.error(f"could not hand {user} what deadwax saved before logins ({type(e).__name__}: {e}) - their "
+                     f"next sign-in takes it over", extra={"frontend": True})
+        return
+    if pins or preferences or requests:
+        logger.info(f"{user} took over what deadwax saved before logins: {pins} pin(s), {preferences} "
+                    f"preference(s) and {requests} download(s)", extra={"frontend": True})
 
 
 # ===== asking Navidrome =============================================================================
@@ -628,9 +677,9 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
         if user in Config.admins():
             taken = await store.adopt_local(user)
             if taken and any(taken):
-                pins, preferences = taken
-                logger.info(f"{user} took over what deadwax saved before logins: {pins} pin(s) and "
-                            f"{preferences} preference(s)", extra={"frontend": True})
+                pins, preferences, requests = taken
+                logger.info(f"{user} took over what deadwax saved before logins: {pins} pin(s), "
+                            f"{preferences} preference(s) and {requests} download(s)", extra={"frontend": True})
         logger.info(f"signed in: {user}", extra={"frontend": True})
         return user, raw, COOKIE_MAX_AGE
 

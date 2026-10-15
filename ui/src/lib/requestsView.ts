@@ -2,6 +2,7 @@ import type { DownloadJob } from '../api/types'
 import type { PendingDownload } from './downloadOverlay'
 import { formatSpeed } from './format'
 import { isActive } from './jobs'
+import { CANCEL_WORDS, askedByText, cancelWords, type CancelWords } from './perPerson'
 
 /**
  * The app's Requests tab and Home's Arriving (2.0.0-player.12): which download goes under which
@@ -11,7 +12,8 @@ import { isActive } from './jobs'
  * The input is exactly what useDownloadJobs gives - the polled jobs with the overlays laid on
  * (lib/downloadOverlay.ts), the downloads still asking slskd, the derived speeds - so every state
  * the main page's downloads panel shows has its words here too: asking slskd…, refused,
- * cancelling…, trying next peer…, asking again…, try N, organizing.
+ * cancelling… (leaving… for a cancel that only withdraws your request - 2.0.0-player.49), trying next
+ * peer…, asking again…, try N, organizing.
  *
  * - Downloading: bytes are moving (downloading, or queued with progress slskd reports before the
  *   poller has moved it on), or it is being filed (organizing).
@@ -94,6 +96,14 @@ export interface RequestRow {
   release: string | null
   /** ...and it was filed by this download: the row's ▶ plays it */
   plays: boolean
+  /** with logins on (2.0.0-player.49), who asked (lib/perPerson.ts askedByText): an admin's row
+   *  "Asked by ethan", "Asked by you and ethan"; a user's row of a download somebody else waits for
+   *  too SHARED_TEXT ("Someone else asked for it too", nobody named) - null for one only you asked
+   *  for, and with logins off */
+  askedBy: string | null
+  /** what the ✕ asks first, and its answer: a user's on a shared download leaves it, an admin's on one
+   *  somebody else waits for cancels it for everyone (lib/perPerson.ts cancelWords) */
+  cancelWords: CancelWords
 }
 
 export interface RequestsInput {
@@ -196,7 +206,7 @@ export function sectionOf(job: Pick<DownloadJob, 'status' | 'progress'>): Sectio
 const blank = (key: string, jobId: number | null, section: Section, title: string, artist: string, album = ''): RequestRow => ({
   key, jobId, section, title, artist, cover: null, line: '', lineTone: 'plain', reason: null, problem: null,
   progress: 0, data: null, brief: '', cancel: null, nextPeer: null, askAgain: null, busy: false, dimmed: false,
-  arriving: false, album, release: null, plays: false,
+  arriving: false, album, release: null, plays: false, askedBy: null, cancelWords: CANCEL_WORDS,
 })
 
 /** The endings whose album is in the library (2.0.0-player.17): a Done row of one opens it... */
@@ -208,7 +218,11 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
   const section = sectionOf(job)
   const row = blank(`job-${job.id}`, job.id, section, titleOf(job.album, job.edition), job.artist || '', job.album || '')
   row.cover = jobCoverUrl(job.release_mbid)
+  row.askedBy = askedByText(job)
+  row.cancelWords = cancelWords(job)
   const cancelling = input.cancelling.has(job.id)
+  //? (2.0.0-player.49) a cancel that only withdraws your request says so while it is out
+  const going = row.cancelWords.leaves ? 'leaving…' : 'cancelling…'
   const done = job.files_done ?? 0
   const total = job.files_total ?? 0
 
@@ -217,11 +231,11 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
     const speed = input.speeds.get(job.id)
     row.line = who(row.artist, job.username, tryText(job))
     row.progress = organizing ? 100 : Math.min(100, Math.max(0, job.progress || 0))
-    row.data = cancelling ? 'cancelling…'
+    row.data = cancelling ? going
       : organizing ? `${files(done, total)} · organizing`
       : [files(done, total), job.files_failed ? `${job.files_failed} failed` : null, speed ? formatSpeed(speed) : null]
         .filter(Boolean).join(' · ')
-    row.brief = cancelling ? 'cancelling…' : organizing ? 'organizing' : `${done} of ${total}`
+    row.brief = cancelling ? going : organizing ? 'organizing' : `${done} of ${total}`
     //? nothing in slskd is left to cancel once it is being filed, and the filing can't be stopped
     row.cancel = organizing ? null : cancelling ? 'cancelling' : 'ready'
     row.dimmed = cancelling
@@ -231,13 +245,13 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
 
   if (section === 'waiting') {
     const place = job.queue_position ?? null
-    const state = cancelling ? 'cancelling…' : place !== null ? `#${place} in their queue` : 'starting'
+    const state = cancelling ? going : place !== null ? `#${place} in their queue` : 'starting'
     //? files the peer already refused while the rest wait in its queue, said now, in amber - as the
     //? downloads panel says it: otherwise it reads as an ordinary wait right up until it fails
     const failed = !cancelling && job.files_failed ? `${job.files_failed} failed` : null
     row.line = who(row.artist, job.username, state, failed, tryText(job))
     if (failed) row.lineTone = 'warning'
-    row.brief = cancelling ? 'cancelling…' : place !== null ? `#${place} in queue` : 'starting'
+    row.brief = cancelling ? going : place !== null ? `#${place} in queue` : 'starting'
     row.cancel = cancelling ? 'cancelling' : 'ready'
     row.dimmed = cancelling
     row.arriving = !cancelling
@@ -396,19 +410,25 @@ function sectionWords(row: RequestRow): string {
  *   "...: In your library · just now".
  * - A retry's refusal appearing: "Heligoland: no other peer would take it".
  * - A tap's answer starting: "Heligoland: trying next peer…", "...: asking again…",
- *   "...: cancelling…" - the button tapped says it too, but its new name isn't read by itself.
+ *   "...: cancelling…" ("...: leaving…" for a cancel that only withdraws your request) - the button
+ *   tapped says it too, but its new name isn't read by itself.
+ * - A row you were leaving gone from your list (2.0.0-player.49): "Heligoland: left - it carries on
+ *   for whoever else asked" - the one way a tap on a card takes the card away.
  *
- * A row that has only just appeared, or has gone (cleared), says nothing. Empty `said` when there
- * is nothing to say.
+ * Any other row that has only just appeared, or has gone (cleared), says nothing. Empty `said` when
+ * there is nothing to say. `gone` is every row of `before` that `now` hasn't got, with the row to put
+ * focus on in its place (focusAfterGone) - for a page whose focus was in it.
  */
-export function changes(before: RequestsView | null, now: RequestsView): { said: string; moved: string[] } {
-  if (!before || before === now) return { said: '', moved: [] }
+export function changes(before: RequestsView | null, now: RequestsView): { said: string; moved: string[]; gone: Map<string, string | null> } {
+  if (!before || before === now) return { said: '', moved: [], gone: new Map() }
   const was = new Map<string, RequestRow>()
   for (const section of SECTIONS) for (const row of before.sections[section]) was.set(row.key, row)
   const phrases: string[] = []
   const moved: string[] = []
+  const still = new Set<string>()
   for (const section of SECTIONS) {
     for (const row of now.sections[section]) {
+      still.add(row.key)
       const prev = was.get(row.key)
       if (!prev) continue
       if (prev.section !== row.section) {
@@ -420,11 +440,41 @@ export function changes(before: RequestsView | null, now: RequestsView): { said:
         const label = row.askAgain?.label === 'Asking again…' ? 'asking again…' : 'trying next peer…'
         phrases.push(`${row.title}: ${label}`)
       } else if (row.cancel === 'cancelling' && prev.cancel !== 'cancelling') {
-        phrases.push(`${row.title}: cancelling…`)
+        phrases.push(`${row.title}: ${row.cancelWords.leaves ? 'leaving…' : 'cancelling…'}`)
       }
     }
   }
-  return { said: phrases.join('. '), moved }
+  const gone = new Map<string, string | null>()
+  for (const [key, prev] of was) {
+    if (still.has(key)) continue
+    gone.set(key, focusAfterGone(before, now, key))
+    if (prev.cancel === 'cancelling' && prev.cancelWords.leaves) phrases.push(`${prev.title}: left - it carries on for whoever else asked`)
+  }
+  return { said: phrases.join('. '), moved, gone }
+}
+
+/**
+ * Where focus goes when the row `key` - in `before`, not in `now` - had it (2.0.0-player.49: a leave
+ * takes the card away): the card that came after it under its heading, still there; else the one
+ * before it; else the first card on the page; null with no card left (the page's heading then).
+ */
+export function focusAfterGone(before: RequestsView, now: RequestsView, key: string): string | null {
+  const present = new Set<string>()
+  for (const section of SECTIONS) for (const row of now.sections[section]) present.add(row.key)
+  for (const section of SECTIONS) {
+    const rows = before.sections[section]
+    const at = rows.findIndex((row) => row.key === key)
+    if (at < 0) continue
+    const after = rows.slice(at + 1).find((row) => present.has(row.key))
+    if (after) return after.key
+    const earlier = rows.slice(0, at).reverse().find((row) => present.has(row.key))
+    if (earlier) return earlier.key
+  }
+  for (const section of SECTIONS) {
+    const first = now.sections[section][0]
+    if (first) return first.key
+  }
+  return null
 }
 
 /**

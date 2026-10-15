@@ -70,6 +70,17 @@
  *    lossless", and names the Format and where it is - with the query still there to edit - to the eye
  *    and to VoiceOver; Soulseek answering nothing, or any other Format, still says it found nothing.
  *
+ * And downloads per person (2.0.0-player.49): a download somebody else asked for stands where the
+ * cards would be with what you'd get and your quality floor's word, nothing picked; its Join joins
+ * that download and hands over to Requests, as a Get does. JoinDownload drawn: keyed on the
+ * download, only where the page gives a way to join and the download isn't yours; the tap asks at
+ * once and waits (aria-disabled), a second tap asks nothing; a refusal in deadwax's words in an
+ * alert, with Join back; joined, the button gives way to saying so, handing its focus to the box
+ * (never to the page) - unless focus had moved on. The main page's box (components/StoreStatusBox.tsx)
+ * drawn too: Join, waiting aria-disabled (never disabled), refused in an alert, joined - its focus
+ * handed to the box - and no Join for a download of your own. A Get - a card's, and a pick for you -
+ * sends its folder's quality, and each runner-up's, as candidateQuality puts it.
+ *
  * Run it with:  node ui/test/sources.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -80,7 +91,7 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-sources-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/Sources.tsx', '--rootDir', 'src', '--outDir', OUT,
+  'src/app/Sources.tsx', 'src/components/StoreStatusBox.tsx', '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -121,6 +132,7 @@ exports.findCandidates = (body, signal) => globalThis.__sources.find(body, signa
 `)
 fs.writeFileSync(path.join(OUT, 'lib/downloadRequests.js'), `
 exports.requestDownload = (body) => globalThis.__sources.request(body)
+exports.joinDownload = (jobId) => globalThis.__sources.join(jobId)
 `)
 fs.writeFileSync(path.join(OUT, 'app/useGetSettings.js'), `
 exports.useGetSettings = (ask) => { globalThis.__sources.settingsAsked.push(ask); return { settings: globalThis.__sources.settings, canSave: true, problem: null } }
@@ -141,7 +153,9 @@ function deferred() {
 
 const asks = []
 const requested = []
+const joined = []
 globalThis.__sources = {
+  join(jobId) { joined.push(jobId); return Promise.resolve(true) },
   settings: { get_mode: 'sources', quality_floor: 'lossless' },
   settingsAsked: [],
   //? the store asked (askGetSettings) and the Format read for a search (formatPreferenceNow), in order
@@ -164,7 +178,8 @@ function check(label, actual, expected) {
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { Sources, SignalsChip } = require(path.join(OUT, 'app/Sources.js'))
 const { SourceCard } = require(path.join(OUT, 'app/SourceCard.js'))
-const { StoreState } = require(path.join(OUT, 'app/StoreState.js'))
+const { JoinDownload, StoreState } = require(path.join(OUT, 'app/StoreState.js'))
+const { StoreStatusBox } = require(path.join(OUT, 'components/StoreStatusBox.js'))
 
 let tree = null
 function find(test, within = tree) {
@@ -285,6 +300,13 @@ async function main() {
   cards()[1].props.onGet(cards()[1].props.candidate)
   check('asked for at once, as the release the search was FOR', [requested.length, requested[0]?.username, requested[0]?.release.release_mbid], [1, 'bob', 'rel-third'])
   check('...with the runners-up as shown, the one got left out', requested[0]?.alternatives.map((alt) => alt.username), ['vinylhead', 'crate_dig'])
+  //? what the copy is (2.0.0-player.49): kept on the job, for whoever is offered to join it - and each
+  //? runner-up's, for a retry to the next peer to take on
+  check('...with its folder\'s quality', requested[0]?.quality,
+    { formats: ['flac'], bitrates: [], bit_depths: [16], sample_rates: [44100], variable_bitrate: false })
+  check('...and each runner-up\'s', requested[0]?.alternatives.map((alt) => alt.quality),
+    [{ formats: ['flac'], bitrates: [], bit_depths: [16], sample_rates: [44100], variable_bitrate: false },
+      { formats: ['flac'], bitrates: [], bit_depths: [16], sample_rates: [44100], variable_bitrate: false }])
   check('...and handed over to Requests', queued.length, 1)
   cards()[0].props.onGet(cards()[0].props.candidate)
   check('a second tap before the sheet went asks nothing more', [requested.length, queued.length], [1, 1])
@@ -320,6 +342,7 @@ async function main() {
   await settle()
   draw()
   check('the 24/96 picked, asked for, handed over', [requested.length - before, requested.at(-1)?.username, queued.length], [1, 'hires', 2])
+  check('...sending the 24/96\'s own quality', [requested.at(-1)?.quality?.bit_depths, requested.at(-1)?.quality?.sample_rates], [[24], [96000]])
   draw({ request: { release: RELEASE, subtitle: 'Third', key: 6 } })
   asks[5].resolve(answer([source('cd', { score: 0.95 }), source('hires', { score: 0.7, bit_depths: [24], sample_rates: [96000] })]))
   await settle()
@@ -614,6 +637,101 @@ async function main() {
     check('the title, each line - the last the detail - and the notes', [text(classed('app-store-title')[0]), classed('app-store-line').map((line) => [text(line), line.props.class.includes('is-detail')]), classed('app-store-note').map(text)],
       ['Already in your library', [['Portishead/Third (2008)', false], ['11 of 11 tracks · FLAC', true]], ['You also have another pressing: 2008 vinyl']])
     check('...and nothing at all with nothing to say', StoreState({ status: null, notes: [] }), null)
+
+    //? (2.0.0-player.49) somebody else's download: Join under its words - its own component, keyed on it
+    const status = { kind: 'downloading', title: 'Already downloading for someone else', lines: ['From bob · FLAC · queued', 'Join it…'], joinJobId: 7 }
+    const asked = []
+    let answerJoin = null
+    const onJoin = (jobId) => { asked.push(jobId); return new Promise((resolve, reject) => { answerJoin = { resolve, reject } }) }
+    tree = StoreState({ status, notes: [], onJoin })
+    const join = find((node) => node.type === JoinDownload)[0]
+    check('a download somebody else asked for: Join, for it, keyed on it', [join?.props.jobId, join?.key], [7, 7])
+    tree = StoreState({ status, notes: [] })
+    check('...none where the page gives no way to join', find((node) => node.type === JoinDownload).length, 0)
+    tree = StoreState({ status: { ...status, joinJobId: undefined }, notes: [], onJoin })
+    check('...nor for a download of your own', find((node) => node.type === JoinDownload).length, 0)
+
+    const drawJoin = hooks.root(JoinDownload)
+    tree = drawJoin({ jobId: 7, onJoin })
+    const button = () => find((node) => node.type === 'button')[0]
+    check('Join this download', [text(button()), button().props['aria-disabled']], ['Join this download', false])
+    button().props.onClick()
+    tree = drawJoin({ jobId: 7, onJoin })
+    check('the tap asks at once, and the button waits - still in the tab order', [asked, text(button()), button().props['aria-disabled']], [[7], 'Joining…', true])
+    button().props.onClick()
+    check('...a second tap asks nothing more', asked, [7])
+    answerJoin.reject(new Error('that download has been filed into the library since - get it again to see where it stands'))
+    await settle()
+    tree = drawJoin({ jobId: 7, onJoin })
+    check('refused: deadwax\'s words in an alert, and Join there to try again',
+      [find((node) => node.props?.role === 'alert').map(text), text(button()), button().props['aria-disabled']],
+      [['that download has been filed into the library since - get it again to see where it stands'], 'Join this download', false])
+    //? the page as far as focus goes: the button in its box, and where the focus is
+    const focused = []
+    const storeBox = { focus: (options) => focused.push(['box', options]) }
+    const fakeButton = { closest: (selector) => (selector === '.app-store-box' ? storeBox : null) }
+    globalThis.document = { body: {}, activeElement: fakeButton }
+    button().props.onClick()
+    button().props.ref.current = fakeButton
+    answerJoin.resolve(true)
+    await settle()
+    tree = drawJoin({ jobId: 7, onJoin })
+    check('joined: the button gives way to saying so', [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text)],
+      [0, ["Joined - it's in your Requests."]])
+    check('...handing the focus it had to the box, which the page keeps drawn - never dropped to the page', focused, [['box', { preventScroll: true }]])
+    tree = StoreState({ status, notes: [], onJoin })
+    check('...a box that can hold it (a target, not in the tab order)', classed('app-store-box')[0].props.tabIndex, -1)
+
+    //? focus somewhere else as the answer lands (the person moved on): left where it is
+    const elsewhere = hooks.root(JoinDownload)
+    tree = elsewhere({ jobId: 8, onJoin })
+    globalThis.document.activeElement = { somewhere: 'else' }
+    button().props.onClick()
+    button().props.ref.current = fakeButton
+    answerJoin.resolve(true)
+    await settle()
+    check('...but focus elsewhere by then is left alone', focused.length, 1)
+    delete globalThis.document
+  }
+
+  console.log('\nthe main page\'s store box (components/StoreStatusBox.tsx): Join, waiting, joined, refused')
+  {
+    const answers = []
+    const realJoin = globalThis.__sources.join
+    globalThis.__sources.join = (jobId) => new Promise((resolve, reject) => { answers.push({ jobId, resolve, reject }) })
+    const status = { kind: 'downloading', title: 'Already downloading for someone else', lines: ['From bob · FLAC 16/44.1 · queued',
+      'Join it to have it in your Downloads too - one download, everyone who asked waiting for it.'], joinJobId: 5 }
+    const draw = hooks.root(StoreStatusBox)
+    tree = draw({ status })
+    const button = () => find((node) => node.type === 'button')[0]
+    check('the title, the lines, and Join', [text(find((node) => node.type === 'h4')[0]), find((node) => node.type === 'p').map(text), text(button()), button().props['aria-disabled']],
+      ['Already downloading for someone else', status.lines, 'Join this download', false])
+    check('...a box that can hold the focus Join gives up', find((node) => byClass('candidates-store')(node))[0].props.tabIndex, -1)
+    button().props.onClick()
+    tree = draw({ status })
+    check('the tap asks at once; the button waits, aria-disabled - still focusable, never disabled',
+      [answers.map((a) => a.jobId), text(button()), button().props['aria-disabled'], button().props.disabled], [[5], 'Joining…', true, undefined])
+    button().props.onClick()
+    check('...a second tap asks nothing more', answers.length, 1)
+    answers[0].reject(new Error('that download has been cancelled since - get it again to see where it stands'))
+    await settle()
+    tree = draw({ status })
+    check('refused: deadwax\'s words in an alert, and Join back', [find((node) => node.props?.role === 'alert').map(text), text(button())],
+      [['that download has been cancelled since - get it again to see where it stands'], 'Join this download'])
+    const focused = []
+    const fakeButton = { closest: (selector) => (selector === '.candidates-store' ? { focus: () => focused.push('box') } : null) }
+    globalThis.document = { body: {}, activeElement: fakeButton }
+    button().props.onClick()
+    button().props.ref.current = fakeButton
+    answers[1].resolve(true)
+    await settle()
+    tree = draw({ status })
+    check('joined: "Joined - it\'s in Downloads.", the button gone - its focus handed to the box',
+      [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text), focused], [0, ["Joined - it's in Downloads."], ['box']])
+    delete globalThis.document
+    tree = draw({ status: { ...status, joinJobId: undefined } })
+    check('a download of your own: no Join', find((node) => node.type === 'button').length, 0)
+    globalThis.__sources.join = realJoin
   }
 
   console.log('\na card, drawn: Speed leading, the facts, the missing line')
@@ -870,6 +988,37 @@ async function main() {
     fresh.draw()
     check('held whole - the store\'s box, nothing searched: no Search again', again(), undefined)
     fresh.draw({ open: false })
+  }
+
+  console.log('\nsomebody else\'s download (2.0.0-player.49): what you\'d get, your floor\'s word, and Join - which hands over to Requests')
+  {
+    globalThis.__sources.settings = { get_mode: 'pick', quality_floor: 'lossless' }
+    const before = requested.length
+    const fresh = sheet()
+    fresh.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 490 } })
+    asks.at(-1).resolve(answer([], { downloading: { job_id: 7, status: 'downloading', username: 'mp3guy', files: 11, done_files: 3, yours: false,
+      formats: ['mp3'], bitrates: [320], bit_depths: [], sample_rates: [44100], variable_bitrate: false }, query: '', queries: [] }))
+    await settle()
+    fresh.draw()
+    const box = find((node) => node.type === StoreState)[0]
+    check('"Already downloading for someone else": the peer, the copy, how far - below the floor, said - and what Join does', box?.props.status,
+      { kind: 'downloading', title: 'Already downloading for someone else', lines: [
+        'From mp3guy · MP3 320k · 3 of 11 files',
+        "It's below your quality floor (Lossless), and getting a copy of your own isn't offered yet.",
+        'Join it to have it in your Requests too - one download, everyone who asked waiting for it.'], joinJobId: 7 })
+    check('...nothing picked for you, and nothing asked for', [requested.length - before, fresh.queued.length], [0, 0])
+    await box.props.onJoin(7)
+    check('Join joins that download, and hands over to Requests, as a Get does', [joined, fresh.queued.length], [[7], 1])
+    //? a join answering after the sheet was closed hands over nothing - the sheet stays closed
+    fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 491 } })
+    asks.at(-1).resolve(answer([], { downloading: { job_id: 8, status: 'queued', username: 'bob', files: 11, yours: false, formats: ['flac'] }, query: '', queries: [] }))
+    await settle()
+    fresh.draw()
+    const joining = find((node) => node.type === StoreState)[0].props.onJoin(8)
+    fresh.draw({ open: false })
+    await joining
+    check('...but not once the sheet has closed meanwhile', [joined, fresh.queued.length], [[7, 8], 1])
+    globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

@@ -1455,6 +1455,9 @@ html.app-viz-open { overflow: hidden; }
 
 .app-requests-section .app-section-title { margin-bottom: var(--app-job-gap); }
 
+/* the title takes focus when the card that had it went and none is left (2.0.0-player.49: a leave) */
+.app-requests .pl-large-title:focus { outline: none; }
+
 .app-jobs,
 .app-done-list {
     display: flex;
@@ -2184,6 +2187,14 @@ button.app-result:active { background: var(--dw-pressed); }
 
 .app-store-line.is-detail { color: var(--dw-text-3); }
 .app-store-notes { display: flex; flex-direction: column; gap: var(--app-store-gap); margin: 0; padding: 0; list-style: none; }
+
+/* (2.0.0-player.49) a download somebody else asked for: Join, at the box's start under its words -
+   waiting faded while deadwax is asked (aria-disabled, so focus stays), and a refusal in red under it */
+.app-store-join { align-self: flex-start; margin-top: var(--app-store-gap); }
+/* the box holds the focus a Join gave up as it was answered (a target, not a control: no ring) */
+.app-store-box:focus { outline: none; }
+.app-store-join[aria-disabled='true'] { opacity: var(--app-job-busy); }
+.app-store-line.is-refused { color: var(--dw-danger-text); }
 
 /* ===== a Get chip on a Search row (2.0.0-player.15): the row opens the album, the chip gets it ===== */
 

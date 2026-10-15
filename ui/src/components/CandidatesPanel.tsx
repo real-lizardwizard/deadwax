@@ -10,12 +10,14 @@ import {
   activeQualityCount, activeSignalCount, bitrateText, candidateKey, depthRateText, measuredSpeed,
   noSignalMinimums, passesFilters, peerSpeedLabel, queryOverride, resultFormats, scoreClass,
   sortCandidates, storeNotes, storeStatus, trackSummary, type CandidateFilters, type CandidateSort,
-  type QualityFilters, type StoreStatus,
+  type QualityFilters,
 } from '../lib/candidates'
 import { requestDownload } from '../lib/downloadRequests'
+import { candidateQuality, storeStatusFor } from '../lib/perPerson'
 import { formatSize } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
 import { readDownloadDefaults, readPreferences } from '../state/persisted'
+import { StoreStatusBox } from './StoreStatusBox'
 
 /**
  * The Soulseek candidates window - ported from interface/scripts/main.js in v0.9.10.
@@ -45,7 +47,9 @@ interface Search {
   error: string | null
 }
 
-type DownloadState = 'queueing' | 'queued' | 'failed'
+//? 'joined': deadwax found somebody else's download of the pressing on its way and joined it
+//? instead of fetching this folder (2.0.0-player.49, logins on)
+type DownloadState = 'queueing' | 'queued' | 'joined' | 'failed'
 
 export function CandidatesPanel() {
   const [open, setOpen] = useState(false)
@@ -174,7 +178,7 @@ export function CandidatesPanel() {
     setDownloads((current) => new Map(current).set(key, 'queueing'))
 
     try {
-      await requestDownload({
+      const answer = await requestDownload({
         username: candidate.username,
         files: candidate.files,
         directory: candidate.directory,
@@ -185,9 +189,11 @@ export function CandidatesPanel() {
         alternatives: list
           .filter((c) => candidateKey(c) !== key)
           .slice(0, 10)
-          .map((c) => ({ username: c.username, directory: c.directory, files: c.files, score: c.score })),
+          .map((c) => ({ username: c.username, directory: c.directory, files: c.files, score: c.score, quality: candidateQuality(c) })),
+        //? what the copy is, for someone offered to join it (2.0.0-player.49)
+        quality: candidateQuality(candidate),
       })
-      setDownloads((current) => new Map(current).set(key, 'queued'))
+      setDownloads((current) => new Map(current).set(key, answer.joined ? 'joined' : 'queued'))
     } catch (caught) {
       console.error(`Enqueue error: ${caught instanceof Error ? caught.message : caught}`)
       setDownloads((current) => new Map(current).set(key, 'failed'))
@@ -485,8 +491,9 @@ function CandidatesBody(
   const { candidates, response_count: responses, queries } = result
   const notes = <StoreNotes notes={storeNotes(result)} />
 
-  //? already in the library complete, or already downloading: nothing was searched (step 2)
-  const status = storeStatus(result)
+  //? already in the library complete, or already downloading: nothing was searched (step 2) - and
+  //? one downloading for somebody else is yours to join (2.0.0-player.49)
+  const status = storeStatusFor(result)
   if (status) {
     return (
       <>
@@ -544,25 +551,6 @@ function CandidatesBody(
   )
 }
 
-/**
- * What stands where the results would, when Find didn't search (step 2): the pressing is in your
- * library complete, or downloading already. No Download - Downloads is where a download in
- * flight is cancelled, and a better copy replacing a held one is not built yet.
- */
-function StoreStatusBox({ status }: { status: StoreStatus }) {
-  return (
-    <div class={`candidates-store is-${status.kind}`}>
-      <h4 class="text white candidates-store-title">{status.title}</h4>
-      {status.lines.map((line, index) => (
-        //? the folders (or the peer) first; the last line is the detail under them
-        <p key={index} class={`text ${index && index === status.lines.length - 1 ? 'default-muted' : 'default-secondary'} candidates-store-line`}>
-          {line}
-        </p>
-      ))}
-    </div>
-  )
-}
-
 /** Part of this pressing held, and other pressings of the album held - above the results. */
 function StoreNotes({ notes }: { notes: string[] }) {
   if (!notes.length) return null
@@ -573,6 +561,10 @@ function StoreNotes({ notes }: { notes: string[] }) {
   )
 }
 
+/** What a Download that joined somebody else's download says it did (2.0.0-player.49) - the copy is
+ *  theirs, and the Downloads panel lists it from their peer. */
+const JOINED_HINT = "Somebody else's download of this pressing was already on its way, so you joined it instead of fetching this folder - it's in Downloads, from their user."
+
 function CandidateRow(
   { candidate, state, onDownload }:
   { candidate: Candidate; state: DownloadState | undefined; onDownload: (candidate: Candidate) => void },
@@ -582,7 +574,7 @@ function CandidateRow(
   const measured = measuredSpeed(candidate)
 
   return (
-    <div class={`candidate-box${state === 'queued' ? ' queued' : ''}`}>
+    <div class={`candidate-box${state === 'queued' || state === 'joined' ? ' queued' : ''}`}>
       <div class="candidate-main">
         <div class={`candidate-score ${scoreClass(percent)}`}>{percent}</div>
         <div class="candidate-body">
@@ -640,12 +632,14 @@ function CandidateRow(
         <button
           type="button"
           class="candidate-download-button"
-          disabled={state === 'queueing' || state === 'queued'}
+          disabled={state === 'queueing' || state === 'queued' || state === 'joined'}
           onClick={() => onDownload(candidate)}
         >
-          {state === 'queueing' ? 'Queueing…' : state === 'queued' ? 'Queued ✓' : state === 'failed' ? 'Failed' : 'Download'}
+          {state === 'queueing' ? 'Queueing…' : state === 'queued' ? 'Queued ✓' : state === 'joined' ? 'Joined ✓'
+            : state === 'failed' ? 'Failed' : 'Download'}
         </button>
       </div>
+      {state === 'joined' && <p class="text default-secondary candidates-store-line" role="status">{JOINED_HINT}</p>}
     </div>
   )
 }

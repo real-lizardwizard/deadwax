@@ -54,9 +54,11 @@ const without = <V,>(map: ReadonlyMap<string, V>, key: string): Map<string, V> =
  * (JobCard.tsx says why). One card asks at a time.
  *
  * For a screen reader, one polite live region says what changed (lib/requestsView.ts's `changes`):
- * a card under another heading, a retry's refusal, a tap's answer starting. A card that moved is
- * drawn afresh in another list, so the control a keyboard had on it is gone; focus goes to the card
- * in its new place instead of falling to the page.
+ * a card under another heading, a retry's refusal, a tap's answer starting, a download you left gone
+ * from your list. A card that moved is drawn afresh in another list, so the control a keyboard had on
+ * it is gone; focus goes to the card in its new place instead of falling to the page - and from a card
+ * that went altogether (2.0.0-player.49: a leave takes it from your list) to the card beside it, or
+ * the page's heading with none left.
  *
  * Done rows (2.0.0-player.17's id bridge): one whose album is in the library opens it - Navidrome's
  * album for the release, which the server looks up (GET /store/album) - and one this download filed
@@ -280,14 +282,16 @@ export function Requests({
   }
 
   //? what the live region says, worked out once per new view (a view is a new object per change)
-  const seen = useRef<{ view: RequestsView | null; said: string; moved: string[] }>({ view: null, said: '', moved: [] })
+  const seen = useRef<{ view: RequestsView | null; said: string; moved: string[]; gone: Map<string, string | null> }>(
+    { view: null, said: '', moved: [], gone: new Map() })
   if (seen.current.view !== view) {
-    const { said, moved } = changes(seen.current.view, view)
-    seen.current = { view, said: said || seen.current.said, moved }
+    const { said, moved, gone } = changes(seen.current.view, view)
+    seen.current = { view, said: said || seen.current.said, moved, gone }
   }
 
   //? the card a keyboard was in, so focus can follow it to another heading
   const page = useRef<HTMLElement | null>(null)
+  const heading = useRef<HTMLHeadingElement | null>(null)
   const focusedRow = useRef<string | null>(null)
   const onFocusIn = (event: FocusEvent) => {
     const card = (event.target as HTMLElement | null)?.closest?.('[data-row]') as HTMLElement | null
@@ -300,11 +304,19 @@ export function Requests({
   }
   useLayoutEffect(() => {
     const key = focusedRow.current
-    if (!key || !seen.current.moved.includes(key)) return
+    if (!key) return
+    const gone = seen.current.gone.has(key)
+    if (!gone && !seen.current.moved.includes(key)) return
     const active = document.activeElement
     if (active && active !== document.body) return
-    const card = page.current?.querySelector<HTMLElement>(`[data-row="${CSS.escape(key)}"]`)
-    card?.focus()
+    //? a card that went (2.0.0-player.49: left) hands focus to the card beside it, or the heading
+    const target = gone ? seen.current.gone.get(key) ?? null : key
+    const card = target ? page.current?.querySelector<HTMLElement>(`[data-row="${CSS.escape(target)}"]`) : null
+    if (card) card.focus()
+    else if (gone) {
+      focusedRow.current = null
+      heading.current?.focus({ preventScroll: true })
+    }
   })
 
   const cancelNow = (row: RequestRow) => {
@@ -351,7 +363,7 @@ export function Requests({
   return (
     <section class="app-requests" ref={page} onFocusIn={onFocusIn} onFocusOut={onFocusOut}>
       <header class="pl-large-header">
-        <h1 class="pl-large-title">Requests</h1>
+        <h1 class="pl-large-title" ref={heading} tabIndex={-1}>Requests</h1>
         <button type="button" class="app-text-button app-clear-done" disabled={!view.clearable} onClick={clear}>
           Clear done
         </button>

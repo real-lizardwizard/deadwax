@@ -273,7 +273,36 @@ CREATE TABLE IF NOT EXISTS sessions (
     checked_at  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user);
+
+CREATE TABLE IF NOT EXISTS job_requests (
+    -- Who asked for each download (2.0.0-player.49, step 4 of the multi-user plan). Its own table:
+    -- `jobs.username` is the Soulseek PEER, and several people can want one download - a second
+    -- person's Get of a release already downloading whole JOINS it, a row here, instead of fetching
+    -- it twice. Keyed on src/users.py's user: `local` while logins are off, and every job made before
+    -- this table existed is local's (JobStore.init), which the first admin's take-over moves to them
+    -- (adopt_local).
+    --
+    -- `requested_at` is when they asked - NULL for a row that is no request at all: an admin who hid
+    -- somebody else's finished download from their own list (an admin sees everyone's). `left_at` is
+    -- set when they cancelled while someone else still wanted it (their request withdrawn; the
+    -- download carries on for the others); the LAST requester's cancel cancels the download itself
+    -- and leaves their row as it was, so they see it cancelled and can retry it. `hidden_at` is "Clear
+    -- finished" for them; the job's row goes once every request on it is hidden or left.
+    -- Deleted with the job, by hand (the connection doesn't enforce foreign keys).
+    job_id        INTEGER NOT NULL,
+    user          TEXT NOT NULL,
+    requested_at  TEXT,
+    left_at       TEXT,
+    hidden_at     TEXT,
+    PRIMARY KEY (job_id, user)
+);
+CREATE INDEX IF NOT EXISTS idx_job_requests_user ON job_requests(user, job_id);
 """
+
+#? A request still waiting for its download: asked for, not withdrawn, not cleared from its list.
+#? `r` is the job_requests row. One definition - who sees a row, who a cancel leaves behind, and when a
+#? job may go all read it.
+ACTIVE_REQUEST = "r.requested_at IS NOT NULL AND r.left_at IS NULL AND r.hidden_at IS NULL"
 
 #? The columns a pin row has, in the order they are written.
 PIN_COLUMNS = ("kind", "ref", "label", "sub", "navidrome_id", "cover", "created_at")
@@ -283,7 +312,27 @@ PIN_COLUMNS = ("kind", "ref", "label", "sub", "navidrome_id", "cover", "created_
 JOB_COLUMNS = {
     "alternatives_json": "TEXT NOT NULL DEFAULT '[]'",
     "tried_json": "TEXT NOT NULL DEFAULT '[]'",
+    #? (2.0.0-player.49) what the copy being fetched is, as the candidate it was picked from showed it -
+    #? {formats, bitrates, bit_depths, sample_rates, variable_bitrate} - so a second person offered to
+    #? join it is told what they'd get. '{}' for a job from before, or a caller that sent none.
+    "quality_json": "TEXT NOT NULL DEFAULT '{}'",
 }
+
+#? the parts of a candidate's quality a job keeps (quality_json), and nothing else it might be sent
+QUALITY_KEYS = ("formats", "bitrates", "bit_depths", "sample_rates", "variable_bitrate")
+
+
+def job_quality(quality: dict | None) -> dict:
+    """What quality_json keeps of what the page sent: QUALITY_KEYS, lists as lists, and no more."""
+    kept = {}
+    for key in QUALITY_KEYS:
+        value = (quality or {}).get(key)
+        if key == "variable_bitrate":
+            if value is not None:
+                kept[key] = bool(value)
+        elif isinstance(value, list):
+            kept[key] = list(value)
+    return kept
 
 #? how many runners-up a job keeps - enough to get past a run of offline peers, not the whole list
 MAX_ALTERNATIVES = 10
@@ -366,6 +415,40 @@ def pair_moved(found: list[str], missing: list[tuple[int, str]]) -> dict[str, in
     }
 
 
+def _recent(stamp: str | None, seconds: int, at: datetime) -> bool:
+    """Whether an ISO timestamp is within `seconds` before `at` - never for one nobody can read."""
+    try:
+        when = datetime.fromisoformat(stamp or "")
+    except ValueError:
+        #? a timestamp nobody can read can't prove the job is still moving
+        return False
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when >= at - timedelta(seconds=seconds)
+
+
+def still_coming(job: dict, filing: bool = True, now: datetime | None = None,
+                 retry_pending: frozenset[int] = frozenset()) -> bool:
+    """
+    Whether this download is still on its way into the library - "downloading now", every state in
+    between counted (2.0.0-player.49): queued or downloading; `complete` with no error within
+    COMPLETE_IN_FLIGHT_SECONDS while organizing is on (`filing` - the moment before the poller files
+    it); `organizing` with no error within FILING_IN_FLIGHT_SECONDS; and `failed` while the poller is
+    moving it to its next peer (`retry_pending`, store_index's - AUTO_RETRY_PEER). What a Find stops
+    at, /enqueue joins and the join route takes.
+    """
+    status = job.get("status")
+    if status in OPEN_STATUSES:
+        return True
+    if status == "failed":
+        return job.get("id") in retry_pending
+    if status == "organizing" or (status == "complete" and filing):
+        #? filing that stopped with an error has stopped - see _organize_if_enabled
+        bound = FILING_IN_FLIGHT_SECONDS if status == "organizing" else COMPLETE_IN_FLIGHT_SECONDS
+        return not job.get("error") and _recent(job.get("updated_at"), bound, now or datetime.now(timezone.utc))
+    return False
+
+
 class JobStore:
     def __init__(self, path: str | None = None):
         self.path = path or Config.DB_PATH
@@ -381,6 +464,9 @@ class JobStore:
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
 
             with self._connect() as connection:
+                #? (2.0.0-player.49) whether this database already knew who asked for each download
+                had_requests = connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'job_requests'").fetchone() is not None
                 connection.executescript(SCHEMA)
                 #? CREATE TABLE IF NOT EXISTS never alters a table that is already there, so a
                 #? column added since a database was made has to be added to it by hand
@@ -388,6 +474,13 @@ class JobStore:
                 for column, definition in JOB_COLUMNS.items():
                     if column not in existing:
                         connection.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+                if not had_requests:
+                    #? Once, as the table is made: every download from before belongs to `local`, the one
+                    #? user there was - asked for when it was made - and the first admin to sign in takes
+                    #? them over with the rest of what local saved (adopt_local).
+                    connection.execute(
+                        "INSERT OR IGNORE INTO job_requests (job_id, user, requested_at) "
+                        "SELECT id, ?, created_at FROM jobs", (LOCAL_USER,))
 
             self.available = True
             logger.info(f"job store ready at {self.path}")
@@ -413,23 +506,33 @@ class JobStore:
         job["files"] = json.loads(job.pop("files_json"))
         job["alternatives"] = json.loads(job.pop("alternatives_json", None) or "[]")
         job["tried"] = json.loads(job.pop("tried_json", None) or "[]")
+        if "quality_json" in job:  # list_jobs() leaves it out
+            job["quality"] = json.loads(job.pop("quality_json") or "{}")
+        if "requesters_json" in job:  # list_jobs() only
+            job["requesters"] = json.loads(job.pop("requesters_json") or "[]")
         return job
 
     # sqlite3 is blocking, so every call hops to a worker thread to keep the loop free.
 
     async def create_job(self, username: str, directory: str, files: list[dict], release: dict,
-                         alternatives: list[dict] | None = None) -> int | None:
+                         alternatives: list[dict] | None = None, user: str = LOCAL_USER,
+                         quality: dict | None = None) -> int | None:
+        """
+        Record a download slskd has accepted, and who asked for it (`user` - 2.0.0-player.49), in one
+        transaction: a job nobody asked for would be in nobody's list. `username` is the PEER.
+        """
         if not self.available:
             return None
 
         def write():
+            now = _now()
             with self._connect() as connection:
                 cursor = connection.execute(
                     """
                     INSERT INTO jobs (release_mbid, artist, album, year, username, directory,
                                       release_json, files_json, status, created_at, updated_at,
-                                      alternatives_json, tried_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)
+                                      alternatives_json, tried_json, quality_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)
                     """,
                     (
                         release.get("release_mbid"),
@@ -440,12 +543,15 @@ class JobStore:
                         directory,
                         json.dumps(release),
                         json.dumps(files),
-                        _now(),
-                        _now(),
+                        now,
+                        now,
                         json.dumps((alternatives or [])[:MAX_ALTERNATIVES]),
                         json.dumps([{"username": username, "directory": directory}]),
+                        json.dumps(job_quality(quality)),
                     ),
                 )
+                connection.execute("INSERT INTO job_requests (job_id, user, requested_at) VALUES (?, ?, ?)",
+                                   (cursor.lastrowid, user, now))
                 return cursor.lastrowid
 
         try:
@@ -455,7 +561,7 @@ class JobStore:
             logger.error("failed to record the download job", extra={"frontend": True, "src": "slskd"})
             return None
 
-    async def list_jobs(self, limit: int = 50) -> list[dict]:
+    async def list_jobs(self, limit: int = 50, user: str | None = None, everyone: bool = False) -> list[dict]:
         """
         The newest jobs as the downloads panel polls them - twice a second while it's open.
 
@@ -470,9 +576,29 @@ class JobStore:
         the usernames are - never decoded here: the edition is the one set by hand, else
         MusicBrainz's disambiguation, a blank being none. A row whose release isn't valid JSON
         gives neither, rather than failing the whole poll.
+
+        Per person (2.0.0-player.49): with a `user`, only the downloads they're waiting for - an
+        active request of theirs (ACTIVE_REQUEST: asked, not left, not cleared) - or, `everyone` (an
+        admin), every download but those they cleared from their own list; each row then also has
+        `requesters`, everyone whose request on it is active, in the order they asked. Without a
+        user, every download, as before.
         """
         if not self.available:
             return []
+
+        if user is None:
+            where, params = "", ()
+        elif everyone:
+            where = "WHERE NOT EXISTS (SELECT 1 FROM job_requests h WHERE h.job_id = jobs.id AND h.user = ? AND h.hidden_at IS NOT NULL)"
+            params = (user,)
+        else:
+            where = f"WHERE EXISTS (SELECT 1 FROM job_requests r WHERE r.job_id = jobs.id AND r.user = ? AND {ACTIVE_REQUEST})"
+            params = (user,)
+        requesters = (
+            f""", (SELECT json_group_array(user) FROM (SELECT r.user FROM job_requests r
+                     WHERE r.job_id = jobs.id AND {ACTIVE_REQUEST} ORDER BY r.requested_at, r.rowid)) AS requesters_json"""
+            if user is not None else ""
+        )
 
         def read():
             with self._connect() as connection:
@@ -490,10 +616,10 @@ class JobStore:
                            CASE WHEN status IN ({retryable}) THEN
                                (SELECT json_group_array(json_object('username', json_extract(value, '$.username')))
                                   FROM json_each(alternatives_json))
-                           ELSE '[]' END AS alternatives_json
-                      FROM jobs ORDER BY id DESC LIMIT ?
-                    """.format(retryable=", ".join("?" * len(RETRYABLE_STATUSES))),
-                    (*RETRYABLE_STATUSES, limit),
+                           ELSE '[]' END AS alternatives_json{requesters}
+                      FROM jobs {where} ORDER BY id DESC LIMIT ?
+                    """.format(retryable=", ".join("?" * len(RETRYABLE_STATUSES)), requesters=requesters, where=where),
+                    (*RETRYABLE_STATUSES, *params, limit),
                 ).fetchall()
                 return [self._row_to_job(r) for r in rows]
 
@@ -526,13 +652,16 @@ class JobStore:
             return []
 
     async def move_to_peer(self, job_id: int, username: str, directory: str, files: list[dict],
-                           tried: list[dict]) -> bool:
+                           tried: list[dict], quality: dict | None = None) -> bool:
         """
         Point a job at another peer's folder and start it again, recording where it has been.
 
         The same job rather than a new one: it is the same album, it keeps its place in the
         list, and "try the next peer" should read as the download carrying on, not as a second
-        download appearing beside a dead one.
+        download appearing beside a dead one - for everyone who asked for it (2.0.0-player.49: its
+        requests are the job's, and stay; a requester who had cleared it is left withdrawn, and an
+        admin's clearing of it from their list is undone, since it is on its way again). `quality` is the new folder's (job_quality); None keeps what the job
+        had - the same peer asked again.
         """
         if not self.available:
             return False
@@ -542,11 +671,21 @@ class JobStore:
                 connection.execute(
                     """
                     UPDATE jobs SET username = ?, directory = ?, files_json = ?, tried_json = ?,
-                                    status = 'queued', error = NULL, updated_at = ?
+                                    status = 'queued', error = NULL, updated_at = ?,
+                                    quality_json = COALESCE(?, quality_json)
                     WHERE id = ?
                     """,
-                    (username, directory, json.dumps(files), json.dumps(tried), _now(), job_id),
+                    (username, directory, json.dumps(files), json.dumps(tried), _now(),
+                     None if quality is None else json.dumps(job_quality(quality)), job_id),
                 )
+                #? (2.0.0-player.49) on its way again. A requester who had cleared it from their list had
+                #? given up on it: their request becomes a withdrawn one (left), so it stays out of a
+                #? user's list - and an admin, who sees everyone's but what they hid, sees it again, as
+                #? an admin who never asked does (whose clearing is a row that is no request, deleted).
+                connection.execute(
+                    "UPDATE job_requests SET left_at = COALESCE(left_at, hidden_at), hidden_at = NULL "
+                    "WHERE job_id = ? AND requested_at IS NOT NULL AND hidden_at IS NOT NULL", (job_id,))
+                connection.execute("DELETE FROM job_requests WHERE job_id = ? AND requested_at IS NULL", (job_id,))
 
         try:
             await asyncio.to_thread(write)
@@ -611,13 +750,18 @@ class JobStore:
 
 
     async def delete_jobs(self, statuses: tuple[str, ...]) -> int:
-        """Forget finished jobs. Only ever removes rows in the given terminal states."""
+        """Forget finished jobs. Only ever removes rows in the given terminal states - and who asked
+        for each with it (job_requests)."""
         if not self.available:
             return 0
 
         def write():
             placeholders = ",".join("?" for _ in statuses)
             with self._connect() as connection:
+                connection.execute(
+                    f"DELETE FROM job_requests WHERE job_id IN (SELECT id FROM jobs WHERE status IN ({placeholders}))",
+                    statuses,
+                )
                 cursor = connection.execute(
                     f"DELETE FROM jobs WHERE status IN ({placeholders})", statuses
                 )
@@ -629,6 +773,169 @@ class JobStore:
         except Exception:
             logger.error("failed to clear finished jobs")
             return 0
+
+    # ===== who asked for each download (2.0.0-player.49, step 4) ================
+    #
+    # job_requests in the schema says what each column means. Every one of these degrades as the rest
+    # of the job store does: no store, nobody's request - the routes then answer as before this existed.
+
+    async def requesters(self, job_id: int) -> list[str]:
+        """Everyone whose request on this download is active (ACTIVE_REQUEST), in the order they asked."""
+        if not self.available:
+            return []
+
+        def read():
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"SELECT r.user FROM job_requests r WHERE r.job_id = ? AND {ACTIVE_REQUEST} "
+                    f"ORDER BY r.requested_at, r.rowid", (job_id,)).fetchall()
+            return [row["user"] for row in rows]
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not read who asked for job {job_id} ({e})")
+            return []
+
+    async def request_job(self, job_id: int, user: str) -> str | None:
+        """
+        `user` joins this download - asked for now, as if new: a request withdrawn or cleared before is
+        asked again. 'joined' when they weren't waiting for it already, 'waiting' when they were,
+        'gone' when the job's row is no longer there (cleared - deleted - since the caller read it:
+        nothing is written, so no request is left pointing at nothing), None when nothing could be
+        written. One IMMEDIATE transaction, so a clear deleting the job either lands before it - 'gone'
+        - or waits for it, and then sees this request keeping the job.
+        """
+        if not self.available:
+            return None
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                if connection.execute("SELECT 1 FROM jobs WHERE id = ?", (job_id,)).fetchone() is None:
+                    return "gone"
+                waiting = connection.execute(
+                    f"SELECT 1 FROM job_requests r WHERE r.job_id = ? AND r.user = ? AND {ACTIVE_REQUEST}",
+                    (job_id, user)).fetchone() is not None
+                if waiting:
+                    return "waiting"
+                connection.execute(
+                    "INSERT INTO job_requests (job_id, user, requested_at) VALUES (?, ?, ?) "
+                    "ON CONFLICT(job_id, user) DO UPDATE SET requested_at = excluded.requested_at, "
+                    "left_at = NULL, hidden_at = NULL",
+                    (job_id, user, now))
+            return "joined"
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not record {user} joining job {job_id} ({e})", extra={"frontend": True})
+            return None
+
+    async def leave_job(self, job_id: int, user: str) -> str:
+        """
+        Cancel means leave: `user`'s request on this download is withdrawn - 'left' - while someone
+        else's is still active; when theirs is the LAST active request it is left as it is and this
+        answers 'last', for the caller to cancel the download itself (they then see it cancelled, and
+        can retry it). 'none' when they have no active request on it, or nothing could be read. One
+        transaction, so two last requesters leaving at once can't both see the other still waiting.
+        """
+        if not self.available:
+            return "none"
+
+        def write():
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                active = [row["user"] for row in connection.execute(
+                    f"SELECT r.user FROM job_requests r WHERE r.job_id = ? AND {ACTIVE_REQUEST}", (job_id,))]
+                if user not in active:
+                    return "none"
+                if len(active) == 1:
+                    return "last"
+                connection.execute("UPDATE job_requests SET left_at = ? WHERE job_id = ? AND user = ?",
+                                   (_now(), job_id, user))
+            return "left"
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not record {user} leaving job {job_id} ({e})", extra={"frontend": True})
+            return "none"
+
+    def _finished_in_view(self, connection, user: str, everyone: bool, statuses: tuple[str, ...]) -> list[int]:
+        """The finished downloads in `user`'s list (list_jobs' rule), ids only."""
+        placeholders = ",".join("?" for _ in statuses)
+        if everyone:
+            sql = (f"SELECT id FROM jobs WHERE status IN ({placeholders}) AND NOT EXISTS (SELECT 1 FROM job_requests h "
+                   f"WHERE h.job_id = jobs.id AND h.user = ? AND h.hidden_at IS NOT NULL)")
+        else:
+            sql = (f"SELECT id FROM jobs WHERE status IN ({placeholders}) AND EXISTS (SELECT 1 FROM job_requests r "
+                   f"WHERE r.job_id = jobs.id AND r.user = ? AND {ACTIVE_REQUEST})")
+        return [row["id"] for row in connection.execute(sql, (*statuses, user))]
+
+    @staticmethod
+    def _nobody_else(connection, job_id: int, user: str) -> bool:
+        """Whether no request on this job but `user`'s is active - so it goes once they clear it."""
+        return connection.execute(
+            f"SELECT 1 FROM job_requests r WHERE r.job_id = ? AND r.user != ? AND {ACTIVE_REQUEST}",
+            (job_id, user)).fetchone() is None
+
+    async def jobs_to_forget(self, user: str, everyone: bool = False,
+                             statuses: tuple[str, ...] = CLEARABLE_STATUSES) -> list[dict]:
+        """The downloads `user`'s "Clear finished" would delete outright - those nobody else is still
+        waiting for - whole, so their cancelled transfers can be taken out of slskd's list first."""
+        if not self.available:
+            return []
+
+        def read():
+            with self._connect() as connection:
+                ids = [job_id for job_id in self._finished_in_view(connection, user, everyone, statuses)
+                       if self._nobody_else(connection, job_id, user)]
+                rows = [connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone() for job_id in ids]
+            return [self._row_to_job(row) for row in rows if row is not None]
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not work out which downloads clearing would forget ({e})")
+            return []
+
+    async def hide_finished(self, user: str, everyone: bool = False,
+                            statuses: tuple[str, ...] = CLEARABLE_STATUSES) -> tuple[int, int] | None:
+        """
+        "Clear finished" for `user`: every finished download in their list (list_jobs' rule, so an
+        admin's - `everyone` - takes other people's too) is hidden FOR THEM, and a download is deleted
+        once every request on it is hidden or withdrawn. An admin hiding a download they never asked
+        for gets a row that is no request (requested_at NULL), which never keeps a job. Anything still
+        moving is left alone, as before. One transaction. Returns (hidden from their list, deleted) -
+        None when it couldn't be done. With logins on only: with them off there is one user, and
+        routes/download.py's clear forgets every finished job (delete_jobs), as it always did.
+        """
+        if not self.available:
+            return None
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                ids = self._finished_in_view(connection, user, everyone, statuses)
+                deleted = 0
+                for job_id in ids:
+                    connection.execute(
+                        "INSERT INTO job_requests (job_id, user, hidden_at) VALUES (?, ?, ?) "
+                        "ON CONFLICT(job_id, user) DO UPDATE SET hidden_at = excluded.hidden_at",
+                        (job_id, user, now))
+                    if self._nobody_else(connection, job_id, user):
+                        connection.execute("DELETE FROM job_requests WHERE job_id = ?", (job_id,))
+                        deleted += connection.execute("DELETE FROM jobs WHERE id = ?", (job_id,)).rowcount
+            return len(ids), deleted
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"could not clear {user}'s finished downloads ({e})", extra={"frontend": True})
+            return None
 
     async def get_job(self, job_id: int) -> dict | None:
         if not self.available:
@@ -648,7 +955,7 @@ class JobStore:
 
     async def in_flight_job(self, release_mbid: str | None, excluding_job_id: int | None = None,
                             filing: bool = True, now: datetime | None = None,
-                            covering: int = 0) -> dict | None:
+                            covering: int = 0, retry_pending: frozenset[int] = frozenset()) -> dict | None:
         """
         The newest job still bringing this release in, or None (step 2).
 
@@ -660,23 +967,15 @@ class JobStore:
         turned on. `excluding_job_id` is the job being retried, which is not another download of
         the release but the same one. `covering` is how many files a job must be fetching to count:
         the release's audio tracks, to ask for a job bringing the WHOLE pressing in - one for part
-        of it (a lone disc folder, a 9-of-10 folder) is no reason to refuse the rest.
+        of it (a lone disc folder, a 9-of-10 folder) is no reason to refuse the rest. And
+        (2.0.0-player.49) a `failed` job in `retry_pending` - one the poller is moving to its next
+        peer this moment (AUTO_RETRY_PEER) - is still coming: still_coming says it all.
         """
         if not self.available or not release_mbid:
             return None
 
-        statuses = OPEN_STATUSES + ("organizing",) + (("complete",) if filing else ())
+        statuses = OPEN_STATUSES + ("organizing",) + (("complete",) if filing else ()) + (("failed",) if retry_pending else ())
         at = now or datetime.now(timezone.utc)
-
-        def recent(stamp: str | None, seconds: int) -> bool:
-            try:
-                when = datetime.fromisoformat(stamp or "")
-            except ValueError:
-                #? a timestamp nobody can read can't prove the job is still moving
-                return False
-            if when.tzinfo is None:
-                when = when.replace(tzinfo=timezone.utc)
-            return when >= at - timedelta(seconds=seconds)
 
         def read():
             placeholders = ",".join("?" for _ in statuses)
@@ -691,11 +990,7 @@ class JobStore:
                 job = self._row_to_job(row)
                 if len(job["files"]) < covering:
                     continue
-                if row["status"] in OPEN_STATUSES:
-                    return job
-                #? filing that stopped with an error has stopped - see _organize_if_enabled
-                bound = FILING_IN_FLIGHT_SECONDS if row["status"] == "organizing" else COMPLETE_IN_FLIGHT_SECONDS
-                if not row["error"] and recent(row["updated_at"], bound):
+                if still_coming(job, filing=filing, now=at, retry_pending=retry_pending):
                     return job
             return None
 
@@ -918,20 +1213,41 @@ class JobStore:
             logger.error(f"could not follow pinned albums in the store index ({e})")
             return None
 
-    async def adopt_local(self, user: str) -> tuple[int, int] | None:
+    async def adopt_local(self, user: str) -> tuple[int, int, int] | None:
         """
-        Step 3's take-over (src/auth.py sign_in calls it on an admin's sign-in, 2.0.0-player.48): what
-        `local` saved while logins were off - its pins and its preferences - becomes `user`'s, the first
+        Step 3's take-over (src/auth.py sign_in calls it on an admin's sign-in, 2.0.0-player.48 - and,
+        since 2.0.0-player.49, the first request of an admin already signed in after a start, as
+        adopt_local_now): what `local` saved while logins were off - its pins and its preferences, and
+        (2.0.0-player.49) its requests, every download made before logins - becomes `user`'s, the first
         admin to sign in, and `local` is left with nothing. What `user` has already set wins: a preference they chose is kept over local's,
         and a pin they already have keeps its place; local's other pins come after theirs, in local's
-        order, while Home holds them (pins.PINS_MAX). One transaction: all of it moves or none.
-        Returns (pins taken, preferences taken) - None when it couldn't be done - and adopting into
-        `local` itself takes nothing.
+        order, while Home holds them (pins.PINS_MAX); a download they already have a row on keeps theirs.
+        One transaction: all of it moves or none.
+        Returns (pins taken, preferences taken, requests taken) - None when it couldn't be done - and
+        adopting into `local` itself takes nothing.
         """
         if not self.available:
             return None
         if not user or user == LOCAL_USER:
-            return 0, 0
+            return 0, 0, 0
+        try:
+            return await asyncio.to_thread(self.adopt_local_now, user)
+        except Exception as e:
+            logger.error(f"could not hand what {LOCAL_USER} saved to {user} ({e})", extra={"frontend": True})
+            return None
+
+    def local_has_anything(self) -> bool:
+        """Whether `local` has anything an admin's take-over would move - pins, preferences or requests.
+        SYNCHRONOUS (src/auth.py's first-admin check runs in FastAPI's thread pool); raises on an error."""
+        with self._connect() as connection:
+            return any(connection.execute(f"SELECT 1 FROM {table} WHERE user = ? LIMIT 1", (LOCAL_USER,)).fetchone()
+                       for table in ("job_requests", "pins", "user_prefs"))
+
+    def adopt_local_now(self, user: str) -> tuple[int, int, int]:
+        """adopt_local's write, SYNCHRONOUS - for src/auth.py's first admin seen after a start, which runs
+        in FastAPI's thread pool. Raises on a database error; `local` or no user takes nothing."""
+        if not user or user == LOCAL_USER:
+            return 0, 0, 0
 
         def write():
             with self._connect() as connection:
@@ -956,13 +1272,15 @@ class JobStore:
                         (user, pin["kind"], pin["ref"], pin["label"], pin["sub"], pin["navidrome_id"], pin["cover"],
                          theirs + taken, pin["created_at"])).rowcount
                 connection.execute("DELETE FROM pins WHERE user = ?", (LOCAL_USER,))
-            return taken, preferences
 
-        try:
-            return await asyncio.to_thread(write)
-        except Exception as e:
-            logger.error(f"could not hand what {LOCAL_USER} saved to {user} ({e})", extra={"frontend": True})
-            return None
+                requests = connection.execute(
+                    "INSERT OR IGNORE INTO job_requests (job_id, user, requested_at, left_at, hidden_at) "
+                    "SELECT job_id, ?, requested_at, left_at, hidden_at FROM job_requests WHERE user = ?",
+                    (user, LOCAL_USER)).rowcount
+                connection.execute("DELETE FROM job_requests WHERE user = ?", (LOCAL_USER,))
+            return taken, preferences, requests
+
+        return write()
 
     # ===== who is signed in (2.0.0-player.48) ===================================
     #

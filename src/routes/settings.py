@@ -1039,6 +1039,43 @@ def _moved_without_secret(updates: list[SettingUpdate]) -> dict[str, str]:
     return refused
 
 
+#? the settings logins need organizing to keep (Config.describe_logins_organizing)
+ORGANIZING_KEYS = ("ORGANIZE_MODE", "SLSKD_DOWNLOAD_PATH", "LIBRARY_PATH")
+
+
+def _stops_organizing(updates: list[SettingUpdate]) -> dict[str, str]:
+    """
+    Each setting this batch may not change while logins are on, with why (2.0.0-player.49). Empty
+    when it may - always, with logins off.
+
+    Logins need organizing on (ORGANIZE_MODE copy or move, both folders set): without it every route
+    answers 503 - this tab's own save included - so a save that switched organizing off would lock
+    everyone out, the admin who saved it too, with the way back only through logins off. What the
+    batch would leave is worked out first: a value saved, or a revert (None) to what the environment
+    said.
+    """
+    if not Config.logins_on():
+        return {}
+    wanted = {update.key: update.value for update in updates if update.key in ORGANIZING_KEYS}
+    if not wanted:
+        return {}
+
+    def after(key: str) -> str:
+        if key not in wanted:
+            return getattr(Config, key) or ""
+        value = wanted[key]
+        if value is None:
+            value = Config.ENV_VALUES.get(key, getattr(Config, key)) if Config.ENV_VALUES else getattr(Config, key)
+        return (value or "").strip()
+
+    if after("ORGANIZE_MODE") in ("copy", "move") and after("SLSKD_DOWNLOAD_PATH") and after("LIBRARY_PATH"):
+        return {}
+    reason = ("logins are on, and they need organizing to stay on - Organize mode copy or move, with "
+              "SLSKD_DOWNLOAD_PATH and LIBRARY_PATH set - since each download is the person's who asked "
+              "for it once it's filed. Switch logins off (AUTH_MODE=off) first to change this")
+    return {key: reason for key in wanted}
+
+
 @router.put("")
 @router.put("/")
 async def update_settings(updates: list[SettingUpdate], request: Request):
@@ -1075,6 +1112,10 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
 
     #? After validation, so an address that is unusable anyway is told that rather than this
     for key, reason in _moved_without_secret(updates).items():
+        problems.setdefault(key, reason)
+
+    #? ...and a batch that would leave logins with organizing off (2.0.0-player.49)
+    for key, reason in _stops_organizing(updates).items():
         problems.setdefault(key, reason)
 
     if problems:

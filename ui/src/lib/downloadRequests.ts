@@ -26,3 +26,27 @@ export function handleDownloadRequests(enqueue: Enqueue): () => void {
 export function requestDownload(body: EnqueueRequest): Promise<EnqueueResponse> {
   return handler ? handler(body) : api.enqueue(body)
 }
+
+/*
+ * Joining a download somebody else asked for (2.0.0-player.49) - from the Sources sheet, the album
+ * page's line, or the main page's candidates panel - is no enqueue, so it lays no pending row down;
+ * instead every downloads list in the page is told to ask again, so the joined download is in
+ * Requests (and the panel) by the time it shows. useDownloadJobs listens (onDownloadsChanged).
+ */
+
+const listeners = new Set<() => void>()
+
+/** Ask again whenever a download was joined. Returns the unsubscribe, for an effect. */
+export function onDownloadsChanged(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+/** Join the download; every downloads list asks again once deadwax has it. Rejects with deadwax's words. */
+export async function joinDownload(jobId: number): Promise<boolean> {
+  const answer = await api.joinJob(jobId)
+  for (const listener of [...listeners]) listener()
+  return answer.joined
+}

@@ -57,6 +57,12 @@ names the user it's coming from. Open **Downloads** (or the app's **Requests** t
 is there, and cancelling it (or letting it fail) lets **Find** search again. A download of only
 part of it, such as one disc's folder, doesn't stop the search: it's a note above the results.
 
+**"Already downloading for someone else"** (logins on, since 2.0.0-player.49) is a download somebody
+else asked for, so it isn't in your Requests and isn't yours to cancel: **Join this download** to
+wait for it too (see [downloading](downloading.md#with-logins-on-downloads-per-person)), or ask an
+admin, whose cancel is for everyone. If it's below your quality floor, getting a copy of your own
+instead isn't offered yet.
+
 "Already downloaded", with "being filed into your library now", means every file has arrived and
 it's being filed. That takes seconds. A download that finished while organizing was off is never
 filed later, and stops counting two minutes after it finished. One that deadwax was stopped or
@@ -89,8 +95,29 @@ when the album was
 started or filed somewhere else - another tab, the main page, another phone - after the app last
 looked: the album page's line under Get, and the sources sheet, said what they knew when
 they asked. Nothing is lost: the download that is already on its way is in Requests (cancel it
-there to try another user, then Get again), and an album you have is in your library. **Clear done**
+there to try another user, then Get again - with logins on, unless somebody else is waiting for it
+too: your cancel then only takes it off your list), and an album you have is in your library. **Clear done**
 removes the refused row. A download of only part of a pressing - one disc's folder - refuses nothing.
+
+With logins on (since 2.0.0-player.49), a download somebody else started isn't refused: your Get
+joins it, and it shows in your Requests. "already downloading from bob" then means you're already
+waiting for that download yourself.
+
+## I cancelled a download, and it's still downloading
+
+With logins on (since 2.0.0-player.49), somebody else asked for it too: your ✕ withdrew only your
+request - it said "Leave this download?" - and the download carries on for them. It's gone from your
+Requests; Get it again while it's still on its way and you're back in. The download itself stops
+when the last person waiting for it cancels, or when an admin cancels it - which is also the only
+way to send a download you share to another user (another user isn't offered for one yet).
+
+## "Join this download" says the download has finished, failed or been cancelled
+
+Joining asks deadwax again, and the download moved on after the page last looked: "that download
+has been filed into the library since", "has finished", "has failed", "has been cancelled", or "has
+been cleared from the list since". Get it again: the page then says what's true now - in your
+library, or nothing on its way, so the sources are searched. "That download brings only part of this
+pressing" is a download of one disc's folder, which can't be joined: Get the pressing as usual.
 
 ## The app's Get shows "slskd isn't logged in…", or nothing to choose from
 
@@ -152,8 +179,11 @@ The sources sheet asks slskd to search Soulseek, as **Find** does, so the same t
 ## A search fails with "not logged in", or slskd refused it
 
 Searches are refused while slskd isn't signed in to Soulseek; it answers with a `409`, which the
-panel explains. It also runs one search at a time, so a search started while another is still
-running can be refused with "Only one concurrent operation is permitted": wait and search again.
+panel explains. It also starts one search at a time, so a search started while another is still
+starting can be refused with "Only one concurrent operation is permitted": wait and search again.
+Since 2.0.0-player.49 deadwax's own searches wait their turn to start, across everyone using it, so
+two people searching at once don't cause it; something else starting a search at that moment (slskd's
+own page, another app) still can.
 
 ## A search finds nothing
 
@@ -357,6 +387,16 @@ on the sign-in screen means, and what to do about it:
   name `admin`, password `DEADWAX_ADMIN_PASSWORD`. It needs neither Navidrome nor deadwax's database,
   and lasts 12 hours. If it isn't set, set it in compose and recreate the container. Sessions already
   signed in carry on while Navidrome is down - only new sign-ins need it.
+- **"Logins are on, but ORGANIZE_MODE is 'dry_run', so nothing downloaded would ever be filed into
+  the library"** (or `'off'`, or "LIBRARY_PATH is not set", since 2.0.0-player.49): with logins on,
+  each download is the person's who asked for it once it's filed, so organizing has to be on -
+  `ORGANIZE_MODE` `copy` or `move`, with `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set. Until it is,
+  everything but the health check and the pages answers 503 saying so, the break-glass sign-in
+  included. Set it in compose and recreate the container. If the message says it's **saved in the
+  settings tab** - a value saved there beats compose, and the tab can't be reached while this
+  stands - set `AUTH_MODE=off`, recreate, set Organize mode to `copy` or `move` in the settings tab
+  (or revert it to compose's), and switch logins on again. While logins are on, the settings tab
+  refuses to switch organizing off ("they need organizing to stay on").
 - **"Logins are on, but DEADWAX_SECRET_KEY isn't set"** (or "is shorter than 32 characters"): logins
   don't work without the key: the pages load, but everything they ask deadwax for (the health check
   aside) answers 503 until it's set, and the sign-in screen says so. Make one with
@@ -368,7 +408,10 @@ on the sign-in screen means, and what to do about it:
   (their 30 days just stop moving on) - but a new sign-in answers this until it's fixed.
 - **You've lost the way in altogether**: set `AUTH_MODE=off` in compose and recreate the container -
   deadwax is then exactly as it was before logins. The pins and Getting albums settings the first
-  admin took over stay with that admin, for when logins are back on.
+  admin took over stay with that admin, for when logins are back on. Every download is listed, the
+  ones people asked for while logins were on included, and **Clear finished** forgets every finished
+  one, as it always did. What you get or pin meanwhile goes to the first admin back - at their next
+  sign-in, or their first visit if they're still signed in.
 
 ### "Sign in to use deadwax." everywhere, and no sign-in screen
 

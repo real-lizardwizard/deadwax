@@ -745,6 +745,14 @@
 
     .app-desk .app-rg-get-icon { display: none; }
 
+    /* (2.0.0-player.49) Join, in the store box under Get - on the album page and in the Sources
+       panel - the frame's control, as Get is, never the phone's finger-sized button */
+    .app-desk .app-store-join {
+        min-height: var(--app-desk-control);
+        padding: 0 var(--app-desk-control-pad);
+        font-size: var(--app-desk-text);
+    }
+
     /* pressed while the panel shows its sources: the toggled tint - the best match's Get is then the
        screen's one solid purple button */
     .app-desk .app-rg-get[aria-pressed="true"] {

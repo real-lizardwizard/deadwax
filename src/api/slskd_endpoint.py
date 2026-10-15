@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 from urllib.parse import quote
 from types import SimpleNamespace
 import re
@@ -77,8 +78,12 @@ class SlskdSearchRefused(Exception):
 #? wrong. Traced through slskd's SearchesController.Post, SearchService.StartAsync and
 #? SoulseekClient.SearchAsync rather than guessed at.
 #?
-#? 429 is slskd's own one-at-a-time limiter - a static SemaphoreSlim(1, 1) taken with Wait(0) -
-#? so two overlapping searches get it: two browser tabs, or a retry on top of one still running.
+#? 429 is slskd's own one-at-a-time limiter - a static SemaphoreSlim(1, 1) taken with Wait(0) - held
+#? while a search STARTS, so a second start made while one is starting gets it. Since 2.0.0-player.49
+#? every start deadwax makes waits its turn at SEARCH_GATE, so two tabs, two people or a retry inside
+#? deadwax no longer meet it; something else starting a search at that moment (slskd's own page,
+#? another app) still can - and so can a start the gate let through after SEARCH_TURN_SECONDS behind
+#? one stuck starting. The words keep "one at a time": of starts, that is true.
 SEARCH_REFUSALS = {
     400: "slskd rejected the search itself",
     401: "slskd refused the API key",
@@ -224,6 +229,84 @@ def describe_server_state(state: dict | None) -> dict:
         "code": code,
         "detail": f"{note} ({reported}){_waiting_on(state, transitioning)}{advice}",
     }
+
+
+#? How long a search waits for its turn to START before it starts anyway (2.0.0-player.49). A start is
+#? one POST that slskd answers at once, so a turn is a fraction of a second; this is the far end -
+#? slskd hanging on one - past which the gate gives up waiting rather than holding a Find for ever,
+#? and a start still going gives up its turn so the next goes ahead (SearchGate).
+SEARCH_TURN_SECONDS = 30.0
+
+
+class SearchGate:
+    """
+    One Soulseek search STARTS at a time, across the whole process (2.0.0-player.49).
+
+    slskd starts one search at a time - a static SemaphoreSlim(1, 1) taken with Wait(0) around the
+    start (SEARCH_REFUSALS' 429) - and refuses a second START made while one is starting, though
+    searches already started run side by side. One person's Find starts its searches in turn
+    (_run_searches), so a single user never met it; two people's Finds at once could, and the second
+    was told "slskd is already running a search". So every start in the process takes its turn here
+    first, waiting in line - bounded by SEARCH_TURN_SECONDS, after which it starts regardless - and
+    never refusing. Only the start is held, never the listening for answers, so two Finds still cost
+    barely more than one.
+
+    A turn is bounded the same way: one still in its start after SEARCH_TURN_SECONDS gives up its
+    place itself, so the next start goes ahead. The start runs in a thread no cancel can stop, and
+    slskd_api sends its requests with no timeout, so a POST never answered (a connection dropped
+    without a reset) would otherwise hold the gate for the life of the process, and every start after
+    it - anyone's - would wait the whole bound. One stuck start holds up the line once, not for ever.
+
+    Its lock is made for the event loop it is used in (each test runs its own loop, and asyncio's
+    lock belongs to the first loop it waits in).
+    """
+
+    def __init__(self, bound: float = SEARCH_TURN_SECONDS):
+        self.bound = bound
+        self._lock: asyncio.Lock | None = None
+        self._loop = None
+
+    def _lock_here(self) -> asyncio.Lock:
+        loop = asyncio.get_running_loop()
+        if self._lock is None or self._loop is not loop:
+            self._lock, self._loop = asyncio.Lock(), loop
+        return self._lock
+
+    @asynccontextmanager
+    async def turn(self, query: str = ""):
+        lock = self._lock_here()
+        try:
+            await asyncio.wait_for(lock.acquire(), timeout=self.bound)
+            held = True
+        except asyncio.TimeoutError:
+            #? waited its whole bound behind another start: starting anyway is better than never
+            held = False
+            logger.warning(f"waited {self.bound:.0f}s for another Soulseek search to start; starting "
+                           f"{query!r} anyway", extra={"frontend": True, "src": "slskd"})
+
+        timer = None
+        if held:
+            def give_up_the_turn():
+                #? still starting after the whole bound: the next start goes ahead, rather than every
+                #? start after this one waiting the bound behind it (see the docstring)
+                nonlocal held
+                held = False
+                lock.release()
+                logger.warning(f"the Soulseek search for {query!r} has taken over {self.bound:.0f}s to "
+                               f"start; letting the next one start", extra={"frontend": True, "src": "slskd"})
+
+            timer = asyncio.get_running_loop().call_later(self.bound, give_up_the_turn)
+        try:
+            yield
+        finally:
+            if timer is not None:
+                timer.cancel()
+            if held:
+                lock.release()
+
+
+#? the process's one gate - every SlskdClient's starts go through it
+SEARCH_GATE = SearchGate()
 
 
 class SlskdClient:
@@ -372,22 +455,26 @@ class SlskdClient:
             #? mid-start waits for the start and records its id before going on, or _abandon never
             #? hears of that search and slskd runs it to its timeout for nobody (v1.1.7 - CI's
             #? slower runner cancelled during the second start of two).
-            start = asyncio.ensure_future(asyncio.to_thread(
-                client.searches.search_text,
-                searchText=query,
-                searchTimeout=search_timeout_ms,
-            ))
+            #? (2.0.0-player.49) in turn with every other start in the process - another person's
+            #? Find included - held until slskd has answered this one (SearchGate)
             try:
-                state = await asyncio.shield(start)
+                async with SEARCH_GATE.turn(query):
+                    start = asyncio.ensure_future(asyncio.to_thread(
+                        client.searches.search_text,
+                        searchText=query,
+                        searchTimeout=search_timeout_ms,
+                    ))
+                    try:
+                        state = await asyncio.shield(start)
 
-            except asyncio.CancelledError:
-                try:
-                    begun = (await start).get("id")
-                except Exception:
-                    begun = None
-                if begun:
-                    running.append((query, begun))
-                raise
+                    except asyncio.CancelledError:
+                        try:
+                            begun = (await start).get("id")
+                        except Exception:
+                            begun = None
+                        if begun:
+                            running.append((query, begun))
+                        raise
 
             except HTTPError as exc:
                 #? slskd refused to START the search, which is a different thing from a search

@@ -2108,6 +2108,12 @@ h5.white-tertiary{
     font-size: var(--text-xs);
     overflow-wrap: anywhere;
 }
+/* (2.0.0-player.49) Join, for a download somebody else asked for - the row's own button, at its start */
+.candidates-store-join { align-self: flex-start; }
+/* waiting for deadwax: aria-disabled rather than disabled, so the focus on it stays - "Joining…" says it */
+.candidates-store-join[aria-disabled="true"] { cursor: progress; }
+/* the box holds the focus Join gave up as it was answered - a target, not a control */
+.candidates-store:focus { outline: none; }
 .candidates-notes {
     display: flex;
     flex-direction: column;

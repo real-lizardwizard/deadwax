@@ -40,7 +40,9 @@ export function JobBar({ progress }: { progress: number }) {
 /**
  * What a card with a ✕ takes. A tap on the ✕ is the page's to interpret (Requests.tsx): it cancels
  * at once, or - with "Confirm before cancelling" on - asks first, IN the card (`asking`): a line
- * saying what it costs, "Keep it" and "Cancel download". Never window.confirm(): a blocking dialog
+ * saying what it costs, "Keep it" and "Cancel download" (with logins on, the row's own words - "Leave
+ * it" on a download somebody else waits for too, an admin's "Cancel for everyone": lib/perPerson.ts
+ * cancelWords, 2.0.0-player.49). Never window.confirm(): a blocking dialog
  * holds the page's JavaScript, and this page plays the music - the next song, a stream's refill and
  * the lock screen's controls would all wait for it.
  */
@@ -61,7 +63,8 @@ const confirmId = (row: RequestRow) => `app-confirm-${row.key}`
  * ✕ - a tap target tall, the board's 32px box drawn inside it. It opens the card's question (and a
  * second tap closes it), so it says it is expanded while that shows. While its cancel is on its
  * way it waits, aria-disabled rather than disabled: a disabled button drops the focus a keyboard
- * or VoiceOver had on it, and the tap is refused here instead.
+ * or VoiceOver had on it, and the tap is refused here instead. Named for what it does: "Leave …" on
+ * a download somebody else waits for too, whose cancel only withdraws your request (2.0.0-player.49).
  */
 function CancelButton({ row, onCancel, asking = false }: { row: RequestRow; onCancel: (row: RequestRow) => void; asking?: boolean }) {
   if (!row.cancel) return null
@@ -70,7 +73,7 @@ function CancelButton({ row, onCancel, asking = false }: { row: RequestRow; onCa
     <button
       type="button"
       class="app-job-cancel"
-      aria-label={`Cancel ${row.title}`}
+      aria-label={`${row.cancelWords.leaves ? 'Leave' : 'Cancel'} ${row.title}`}
       aria-disabled={waiting}
       aria-expanded={asking}
       {...(asking ? { 'aria-controls': confirmId(row) } : {})}
@@ -96,14 +99,14 @@ function CancelConfirm({
   onConfirm: ((row: RequestRow) => void) | undefined
 }) {
   return (
-    <div class="app-job-confirm" id={confirmId(row)} role="group" aria-label={`Cancel ${row.title}?`}>
-      <span class="app-job-confirm-text">Cancel this download? You'll lose your place in this peer's queue.</span>
+    <div class="app-job-confirm" id={confirmId(row)} role="group" aria-label={`${row.cancelWords.leaves ? 'Leave' : 'Cancel'} ${row.title}?`}>
+      <span class="app-job-confirm-text">{row.cancelWords.question}</span>
       <div class="app-job-actions">
         <button type="button" class="app-job-action is-secondary" onClick={() => onKeep?.()}>
           <span class="app-job-action-label">Keep it</span>
         </button>
         <button type="button" class="app-job-action is-secondary is-danger" onClick={() => onConfirm?.(row)}>
-          <span class="app-job-action-label">Cancel download</span>
+          <span class="app-job-action-label">{row.cancelWords.action}</span>
         </button>
       </div>
     </div>
@@ -123,6 +126,7 @@ export function DownloadingCard({ row, onCancel, asking = false, onKeep, onConfi
       <div class="app-job-body">
         <span class="app-job-title">{row.title}</span>
         <span class="app-job-line">{row.line}</span>
+        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
         <JobBar progress={row.progress} />
         <span class="app-job-data">{row.data}</span>
       </div>
@@ -144,6 +148,7 @@ export function WaitingCard({ row, onCancel, asking = false, onKeep, onConfirm }
       <div class="app-job-body">
         <span class="app-job-title">{row.title}</span>
         <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
+        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
       </div>
       <CancelButton row={row} onCancel={onCancel} asking={question} />
       {question && <CancelConfirm row={row} onKeep={onKeep} onConfirm={onConfirm} />}
@@ -174,6 +179,7 @@ export function AttentionCard({
         <div class="app-job-body">
           <span class="app-job-title">{row.title}</span>
           {row.line && <span class="app-job-line">{row.line}</span>}
+          {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
           {row.reason && <span class="app-job-reason">{row.reason}</span>}
           {row.problem && <span class="app-job-reason">{row.problem}</span>}
         </div>
@@ -237,6 +243,7 @@ export function DoneRow({
       <span class="app-job-body">
         <span class="app-job-title">{row.title}</span>
         <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
+        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
         {note && <span class="app-job-line is-warning">{note}</span>}
       </span>
     </>

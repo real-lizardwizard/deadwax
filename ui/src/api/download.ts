@@ -5,6 +5,7 @@ import type {
   EnqueueRequest,
   EnqueueResponse,
   FindCandidatesRequest,
+  JoinJobResponse,
   FindCandidatesResponse,
   JobsResponse,
   RetryResponse,
@@ -49,6 +50,17 @@ export function retryJobSamePeer(jobId: number): Promise<RetrySameResponse> {
   return post<RetrySameResponse>(`/download/jobs/${jobId}/retry_same`)
 }
 
+/**
+ * Join a download somebody else asked for (2.0.0-player.49): the whole pressing already on its way
+ * becomes yours too - one download, two people waiting for it. Refused (409, in words) once it has
+ * landed, stopped or been cleared since the page asked.
+ */
+export function joinJob(jobId: number): Promise<JoinJobResponse> {
+  return post<JoinJobResponse>(`/download/jobs/${jobId}/join`)
+}
+
+/** Cancel a download - with logins on, a user's cancel withdraws only their request while somebody
+ *  else still waits for it (`left`); the last one's, or an admin's, cancels the download itself. */
 export function cancelJob(jobId: number): Promise<CancelJobResponse> {
   return post<CancelJobResponse>(`/download/jobs/${jobId}/cancel`)
 }

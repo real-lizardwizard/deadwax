@@ -178,7 +178,13 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   are fetched while Requests shows (an album filed while you watch once Navidrome has had a few
   seconds to scan it, looked for again until it has), and otherwise by opening the album, where you
   play it. A row that can't be opened says why: Navidrome hasn't found the album yet, no folder in
-  your library is tagged with its release, or Navidrome isn't set up or answering.
+  your library is tagged with its release, or Navidrome isn't set up or answering. With
+  [logins](#signing-in) on (since 2.0.0-player.49) they're **your** downloads - the ones you asked for
+  or joined - and an admin's are everyone's, each saying who asked ("Asked by you and ethan"); a ✕ on
+  one somebody else is waiting for too leaves it to them ("Leave it"), and an admin's cancels it for
+  everyone. A pressing somebody else is already downloading offers **Join this download** where its
+  sources would be, and under **Get the album**. [Downloading](downloading.md#with-logins-on-downloads-per-person)
+  has the rules.
 - **Search**: one box, your library first, then MusicBrainz. **In your library** lists the
   artist you typed (as the **Top result**), the other artists found, albums and songs; an artist
   opens [their page](#artist-pages), an album opens it, and a song plays
@@ -1699,7 +1705,8 @@ question the whole player existed to answer. Still to find out:
   off on the phone - it's kept per device, so a home-screen app has its own), the count on the tab, Home's Arriving coming
   and going, a download started on the main page showing up when you come back to the app, what
   VoiceOver reads out as downloads change, and the covers fetched from the Cover Art Archive over
-  your VPN;
+  your VPN; with logins on (2.0.0-player.49), **Join this download** and the ✕'s "Leave it" under a
+  real finger, and Requests on two phones signed in as two people showing each their own;
 - **Search** against your Navidrome: what its search finds for an artist, an album and a song
   (it hasn't been tried against a real Navidrome yet), a song's tap starting its album, the
   pressing list scrolling under a finger without the page moving, and the Cover Art Archive's

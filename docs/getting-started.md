@@ -166,11 +166,17 @@ else searches, gets albums and plays. Three settings, in the container's environ
       #- DEADWAX_ADMIN_PASSWORD=...
 ```
 
-`NAVIDROME_URL` has to be set too, since signing in asks Navidrome. Recreate the container, open
-deadwax, and sign in.
+`NAVIDROME_URL` has to be set too, since signing in asks Navidrome, and organizing has to be on -
+`ORGANIZE_MODE` `copy` or `move` (step 6 above), since with logins on each download is the person's
+who asked for it once it's filed (until then deadwax refuses everything, saying why). Recreate the
+container, open deadwax, and sign in.
 
-- **The first admin to sign in takes over** what was saved while logins were off - the pins on Home
-  and the Getting albums settings in You - in one step. Anyone signing in after starts with their own.
+- **The first admin to sign in takes over** what was saved while logins were off - the pins on Home,
+  the Getting albums settings in You, and the downloads - in one step (an admin still signed in from
+  before a restart takes it over on their first visit). Anyone signing in after starts with their
+  own.
+- **Downloads are each person's own**: you see yours, join one somebody else has on its way, and
+  your cancel leaves it to them - see [Downloading](downloading.md#with-logins-on-downloads-per-person).
 - **The app** (`/player/`, the home-screen app included) shows a sign-in screen; **You → About** has
   **Sign out**. **The main page** says you're signed out and links to the app's sign-in, which brings
   you back to it.

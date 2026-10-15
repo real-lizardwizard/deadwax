@@ -43,6 +43,24 @@
  *    again when a later download of the release may have added to them, or the tab comes back
  *    after a while - and, with effects running, the tab doing just that.
  *
+ *  - Downloads per person (2.0.0-player.49, lib/perPerson.ts): an admin's rows say who asked
+ *    ("Asked by ethan", "Asked by you, ethan and sam") on every card, a user's own-only and logins-off
+ *    rows nothing; the ✕'s question says what a cancel does - a user's on a shared download "Leave it",
+ *    an admin's on one somebody else waits for "Cancel for everyone", naming them, anything else the
+ *    words it always had; how a folder's quality is put for a Get to send (candidateQuality - that a
+ *    Get sends it is sources.sim's); and the store line for somebody else's
+ *    download - the peer, the copy, how far, the quality floor's word (below, or not said by its
+ *    folder; never "Get your own copy", not offered yet) and what Join does, in the page's own place -
+ *    the copy as a source card's Quality says it; your own that somebody else waits for too, as a user,
+ *    saying a cancel only leaves it; one failed and moving to its next peer by itself, saying so and
+ *    nothing about cancelling; with your own, and logins off, word for word as before. A user's shared
+ *    row says somebody else waits for it (never who); a leave reads "leaving…", is heard so, and once
+ *    the card has gone is heard as left, focus going to the card beside it (focusAfterGone) - and,
+ *    Requests' layout effect run against a stand-in document, really put there, or on the heading
+ *    with no card left, and nowhere while focus is somewhere else; the ✕ is named for leaving. And a
+ *    join tells every downloads list in the page to ask again - useDownloadJobs itself, effects
+ *    running, polling again after a join.
+ *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
  * Run it with:  node ui/test/requests.sim.cjs
@@ -56,7 +74,8 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-requests-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/requestsView.ts', 'src/lib/downloadOverlay.ts', 'src/app/Requests.tsx', 'src/app/JobCard.tsx',
-  'src/app/Arriving.tsx', 'src/app/TabBar.tsx', 'src/app/Home.tsx', 'src/state/persisted.ts',
+  'src/app/Arriving.tsx', 'src/app/TabBar.tsx', 'src/app/Home.tsx', 'src/state/persisted.ts', 'src/lib/downloadRequests.ts',
+  'src/hooks/useDownloadJobs.ts',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -76,9 +95,13 @@ exports.useState = (v) => { const s = slot(() => ({ v: typeof v === 'function' ?
 exports.useMemo = (f, deps) => { const s = slot(() => ({})); if (changed(s.deps, deps)) { s.v = f(); s.deps = deps } return s.v }
 exports.useRef = (v) => slot(() => ({ current: v }))
 exports.useCallback = (f) => f
-//? effects run only where a test asks for them (globalThis.__effects), on its commit - and never
-//? layout effects, which reach for a document this stand-in hasn't got
-exports.useLayoutEffect = () => {}
+//? effects run only where a test asks for them (globalThis.__effects), on its commit - and layout
+//? effects, which reach for a document, only where a test gives them a stand-in one
+//? (globalThis.__layoutEffects); either way each takes its slot, so a root's hooks keep their places
+exports.useLayoutEffect = (f, deps) => {
+  const s = slot(() => ({}))
+  if (globalThis.__layoutEffects && changed(s.deps, deps)) { s.deps = deps; current.effects.push(s); s.f = f }
+}
 exports.useEffect = (f, deps) => {
   const s = slot(() => ({}))
   if (globalThis.__effects && changed(s.deps, deps)) { s.deps = deps; current.effects.push(s); s.f = f }
@@ -95,6 +118,11 @@ exports.root = (component) => {
 //? and the id bridge, answered as the test says
 fs.writeFileSync(path.join(OUT, 'app/context.js'), `exports.usePlayerActions = () => globalThis.__requests.actions\n`)
 fs.writeFileSync(path.join(OUT, 'api/store.js'), `exports.storeAlbum = (by, signal) => globalThis.__requests.bridge(by.release_mbid, signal)\n`)
+//? deadwax's join route, answered as the test says (lib/downloadRequests.ts joinDownload, 2.0.0-player.49)
+//? and the jobs list useDownloadJobs polls, counted (a join makes it ask again)
+fs.writeFileSync(path.join(OUT, 'api/download.js'), `exports.joinJob = (jobId) => globalThis.__joinAnswer(jobId)\nexports.enqueue = () => new Promise(() => {})
+exports.listJobs = () => { globalThis.__listed = (globalThis.__listed || 0) + 1; return Promise.resolve({ jobs: [], tracking_enabled: true }) }
+`)
 //? the player's calls Requests and Home make: an album's songs asked for when the test says
 fs.writeFileSync(path.join(OUT, 'player/api.js'), `
 exports.albumPage = () => new Promise(() => {})
@@ -671,7 +699,8 @@ console.log('\nwhen App asks for the downloads again')
 /* ========================================================================== */
 console.log('\nwhat a screen reader hears as rows change')
 {
-  const said = (before, after) => V.changes(before, after)
+  //? what is said and what moved - `gone` (where focus goes from a card that went) has checks of its own
+  const said = (before, after) => { const { said, moved } = V.changes(before, after); return { said, moved } }
   const f = job('failed', { error: 'offline', alternatives_left: 2, album: 'Heligoland' })
   const failedView = view([f])
   check('nothing to say the first time, or for the same view', [said(null, failedView), said(failedView, failedView)],
@@ -891,6 +920,235 @@ console.log('\nthe Requests tab as a whole')
   const refusedView = view([f1], { retryProblems: new Map([[f1.id, 'the peer refused']]) })
   check('the live region reads out a refused retry', regionOf(deep(speak({ view: refusedView, trackingEnabled: true, error: null, ...actions }))), 'Heligoland: the peer refused')
   check('...and keeps it through a re-render that changes nothing', regionOf(deep(speak({ view: refusedView, trackingEnabled: true, error: null, ...actions }))), 'Heligoland: the peer refused')
+}
+
+/* ========================================================================== */
+console.log('\ndownloads per person (2.0.0-player.49): who asked, what a cancel does, and what joining offers')
+{
+  const P = require(path.join(OUT, 'lib/perPerson.js'))
+  //? logins off - none of the fields - and a user's own row: no line, and the question as it was
+  const plain = view([job('queued')]).sections.waiting[0]
+  check('logins off: no "asked by", the cancel as it always was', [plain.askedBy, plain.cancelWords],
+    [null, { question: "Cancel this download? You'll lose your place in this peer's queue.", action: 'Cancel download', leaves: false }])
+  const own = view([job('queued', { mine: true, shared: false })]).sections.waiting[0]
+  check('a user\'s own, nobody else waiting: the same', [own.askedBy, own.cancelWords.action], [null, 'Cancel download'])
+
+  //? a user's on a download somebody else waits for too: cancel LEAVES it
+  const sharedJob = job('downloading', { mine: true, shared: true, album: 'Shared' })
+  const leaving = view([sharedJob]).sections.downloading[0]
+  check('a user\'s shared download: that somebody else waits, never who (the admin\'s to see) - and the ✕ leaves it', [leaving.askedBy, leaving.cancelWords],
+    ['Someone else asked for it too', { question: 'Leave this download? Someone else asked for it too, so it carries on for them.', action: 'Leave it', leaves: true }])
+
+  //? an admin's rows: who asked, and a cancel that is for everyone
+  const theirs = view([job('queued', { mine: false, shared: true, requested_by: ['ethan'] })]).sections.waiting[0]
+  check('an admin\'s row of ethan\'s: "Asked by ethan", and the ✕ cancels it for him too', [theirs.askedBy, theirs.cancelWords],
+    ['Asked by ethan', { question: 'Cancel this download for everyone? ethan asked for it.', action: 'Cancel for everyone', leaves: false }])
+  const both = view([job('organized', { outcome: 'filed', mine: true, shared: true, requested_by: ['ethan', 'sam'] })]).sections.done[0]
+  check('...one they share: "Asked by you, ethan and sam" - the others in the order they asked', [both.askedBy, P.cancelWords({ mine: true, shared: true, requested_by: ['ethan'] }).question],
+    ['Asked by you, ethan and sam', 'Cancel this download for everyone? ethan asked for it too.'])
+  const alone = view([job('queued', { mine: true, shared: false, requested_by: [] })]).sections.waiting[0]
+  check('...and one only they asked for says nothing more', [alone.askedBy, alone.cancelWords.action], [null, 'Cancel download'])
+
+  //? drawn: the line under the title, and the question's words
+  const drawnWait = deep(H.root(Cards.WaitingCard)({ row: theirs, onCancel() {}, asking: true, onKeep() {}, onConfirm() {} }))
+  check('the card says who asked, under its line', byClass(drawnWait, 'app-job-line').map(text), ['Massive Attack · from mellotron · starting', 'Asked by ethan'])
+  const question = byClass(drawnWait, 'app-job-confirm')[0]
+  check('...and asks what its cancel does', [text(byClass(question, 'app-job-confirm-text')), all(question, (n) => n.type === 'button').map(text)],
+    ['Cancel this download for everyone? ethan asked for it.', ['Keep it', 'Cancel for everyone']])
+  const drawnDone = deep(H.root(Cards.DoneRow)({ row: both }))
+  check('a Done row says who asked too', byClass(drawnDone, 'app-job-line').map(text).includes('Asked by you, ethan and sam'), true)
+  const drawnDown = deep(H.root(Cards.DownloadingCard)({ row: theirs.section === 'downloading' ? theirs : view([job('downloading', { mine: false, shared: true, requested_by: ['ethan'] })]).sections.downloading[0], onCancel() {} }))
+  check('...and a Downloading card', byClass(drawnDown, 'app-job-line').map(text).includes('Asked by ethan'), true)
+  const drawnAttention = deep(H.root(Cards.AttentionCard)({ row: view([job('failed', { error: 'offline', mine: false, shared: true, requested_by: ['ethan'] })]).sections.attention[0], onRetry() {} }))
+  check('...and a Needs attention card', byClass(drawnAttention, 'app-job-line').map(text).includes('Asked by ethan'), true)
+
+  //? how a folder's quality is put for a Get to send, for someone offered to join it (that a Get sends
+  //? it, and each runner-up's, is sources.sim's)
+  check('a folder\'s quality, as a Get sends it', P.candidateQuality({ formats: ['flac'], bitrates: [], bit_depths: [24], sample_rates: [96000], variable_bitrate: false }),
+    { formats: ['flac'], bitrates: [], bit_depths: [24], sample_rates: [96000], variable_bitrate: false })
+
+  //? the store line for somebody else's download
+  const theirsInFlight = (fields = {}) => ({ job_id: 9, status: 'queued', username: 'bob', files: 10, yours: false, formats: ['flac'], bitrates: [], bit_depths: [16], sample_rates: [44100], variable_bitrate: false, ...fields })
+  const answerWith = (downloading) => ({ held: null, downloading })
+  check('somebody else\'s download: who from, the copy as a source card says it, how far, what Join does - and the job Join joins',
+    P.storeStatusFor(answerWith(theirsInFlight({ bitrates: [902] })), 'Requests', 'any'),
+    { kind: 'downloading', title: 'Already downloading for someone else',
+      lines: ['From bob · FLAC 16/44.1 · queued', 'Join it to have it in your Requests too - one download, everyone who asked waiting for it.'], joinJobId: 9 })
+  check('...the main page\'s names its own place, Downloads', P.storeStatusFor(answerWith(theirsInFlight()))?.lines[1],
+    'Join it to have it in your Downloads too - one download, everyone who asked waiting for it.')
+  check('the copy: lossless by depth and rate, never a bitrate; lossy by its bitrate - a source card\'s Quality',
+    [P.copyText(theirsInFlight({ bitrates: [902] })), P.copyText(theirsInFlight({ formats: ['flac'], bit_depths: [24], sample_rates: [96000], bitrates: [2800, 3100] })),
+      P.copyText(theirsInFlight({ formats: ['mp3'], bitrates: [320], bit_depths: [], sample_rates: [44100] })), P.copyText(theirsInFlight({ formats: [] }))],
+    ['FLAC 16/44.1', 'FLAC 24/96', 'MP3 320k', ''])
+  check('...being filed: already downloaded', P.storeStatusFor(answerWith(theirsInFlight({ status: 'organizing' })), 'Requests', 'any').title, 'Already downloaded for someone else')
+  check('...below your floor: said, with no copy of your own offered yet', P.storeStatusFor(answerWith(theirsInFlight()), 'Requests', '24bit').lines[1],
+    "It's below your quality floor (24-bit), and getting a copy of your own isn't offered yet.")
+  check('...a floor its folder doesn\'t answer: said as unknown, not as below', P.storeStatusFor(answerWith(theirsInFlight({ bit_depths: [] })), 'Requests', '24bit').lines[1],
+    "Its folder doesn't say whether it meets your quality floor (24-bit), and getting a copy of your own isn't offered yet.")
+  check('the floor\'s own rules: lossless meets Lossless and 320; a 320 MP3 meets 320 but not Lossless; Any always',
+    [P.floorVerdict(theirsInFlight(), 'lossless'), P.floorVerdict(theirsInFlight(), '320'), P.floorVerdict(theirsInFlight({ formats: ['mp3'], bitrates: [320], bit_depths: [] }), '320'),
+      P.floorVerdict(theirsInFlight({ formats: ['mp3'], bitrates: [320], bit_depths: [] }), 'lossless'), P.floorVerdict(theirsInFlight({ formats: [] }), 'any')],
+    [null, null, null, 'below', null])
+  check('...and a copy known only by its files\' names: the format alone', P.copyText({ job_id: 1, status: 'queued', username: 'bob', files: 2, formats: ['flac'] }), 'FLAC')
+  check('your own, or logins off (no `yours`): the store line word for word as it was', [P.storeStatusFor(answerWith(theirsInFlight({ yours: true })), 'Requests').title,
+    P.storeStatusFor(answerWith({ job_id: 3, status: 'queued', username: 'bob', files: 11 }), 'Requests').lines],
+    ['Already downloading', ['From bob · queued', 'Open Requests to cancel it if you want another peer.']])
+
+  //? your own that somebody else waits for too: a user's cancel only leaves it - no peer is a cancel away
+  check('your own, shared, as a user: what a cancel does there instead of "another peer"', P.storeStatusFor(answerWith(theirsInFlight({ yours: true, shared: true })), 'Requests').lines,
+    ['From bob · queued', "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another peer isn't offered for a download you share."])
+  check('...an admin\'s (their cancel is for everyone): as it was', P.storeStatusFor(answerWith(theirsInFlight({ yours: true, shared: true, requested_by: ['ethan'] })), 'Requests').lines,
+    ['From bob · queued', 'Open Requests to cancel it if you want another peer.'])
+
+  //? failed, its retry pending (AUTO_RETRY_PEER): moving to the next peer by itself - logins on or off
+  const moving = { job_id: 4, status: 'failed', username: 'bob', files: 11 }
+  check('a download moving to its next peer: said so, and nothing about cancelling it for one', P.storeStatusFor(answerWith(moving), 'Requests'),
+    { kind: 'downloading', title: 'Already downloading', lines: ['From bob · failed - moving to the next peer'] })
+  check('...the same when it\'s somebody else\'s', P.storeStatusFor(answerWith({ ...theirsInFlight(), status: 'failed' }), 'Requests').lines[0],
+    'From bob · FLAC 16/44.1 · failed - moving to the next peer')
+
+  //? leaving: the overlay, what is heard, and where focus goes once the card has gone from the list
+  const leavingNow = view([sharedJob], { cancelling: new Set([sharedJob.id]) })
+  check('a leave on its way says "leaving…", not "cancelling…"', [leavingNow.sections.downloading[0].data, leavingNow.sections.downloading[0].brief], ['leaving…', 'leaving…'])
+  const waitingShared = job('queued', { mine: true, shared: true, album: 'Waiting' })
+  check('...a waiting card too', view([waitingShared], { cancelling: new Set([waitingShared.id]) }).sections.waiting[0].line, 'Massive Attack · from mellotron · leaving…')
+  const other = job('downloading', { album: 'Other' })
+  const shown = view([sharedJob, other])
+  const tapped = view([sharedJob, other], { cancelling: new Set([sharedJob.id]) })
+  const after = view([other])
+  check('...and is heard so', V.changes(shown, tapped).said, 'Shared: leaving…')
+  const went = V.changes(tapped, after)
+  check('the card gone from your list: heard that it carries on for the others, and focus to the card beside it',
+    [went.said, [...went.gone.entries()]], ['Shared: left - it carries on for whoever else asked', [[`job-${sharedJob.id}`, `job-${other.id}`]]])
+  check('...a card cleared away says nothing, as before', V.changes(view([other]), view([])).said, '')
+  const third = job('queued', { album: 'Third' })
+  check('focus from a gone card: the one after it, else before it, else the first on the page, else none (the heading)',
+    [V.focusAfterGone(view([sharedJob, other]), view([sharedJob]), `job-${other.id}`), V.focusAfterGone(view([other, third]), view([third]), `job-${other.id}`),
+      V.focusAfterGone(view([other]), view([third]), `job-${other.id}`), V.focusAfterGone(view([other]), view([]), `job-${other.id}`)],
+    [`job-${sharedJob.id}`, `job-${third.id}`, `job-${third.id}`, null])
+  const row3 = [job('downloading', { album: 'A' }), job('downloading', { album: 'B' }), job('downloading', { album: 'C' })]
+  const listed = view(row3).sections.downloading.map((row) => row.key)
+  check('...under one heading, the card that came AFTER it, not the one before',
+    V.focusAfterGone(view(row3), view(row3.filter((each) => `job-${each.id}` !== listed[1])), listed[1]), listed[2])
+  const drawnLeave = deep(H.root(Cards.DownloadingCard)({ row: leaving, onCancel() {}, asking: true, onKeep() {}, onConfirm() {} }))
+  check('the ✕ and its question are named for leaving', [all(drawnLeave, (n) => n.props.class === 'app-job-cancel')[0].props['aria-label'],
+    byClass(drawnLeave, 'app-job-confirm')[0].props['aria-label']], ['Leave Shared', 'Leave Shared?'])
+  check('...and a user\'s card says somebody else waits for it', byClass(drawnLeave, 'app-job-line').map(text).includes('Someone else asked for it too'), true)
+}
+
+console.log('\njoining a download tells every downloads list in the page to ask again (2.0.0-player.49)')
+{
+  const asked = []
+  globalThis.__joinAnswer = (jobId) => { asked.push(jobId); return Promise.resolve({ status: 'ok', job_id: jobId, joined: true }) }
+  const R = require(path.join(OUT, 'lib/downloadRequests.js'))
+  const heard = []
+  const stop = R.onDownloadsChanged(() => heard.push('panel'))
+  R.onDownloadsChanged(() => heard.push('requests'))
+  await_(async () => {
+    const joined = await R.joinDownload(7)
+    check('a join asks deadwax, answers whether you joined, and tells every list', [asked, joined, heard], [[7], true, ['panel', 'requests']])
+    stop()
+    await R.joinDownload(8)
+    check('...a list that stopped listening isn\'t told', heard, ['panel', 'requests', 'requests'])
+    globalThis.__joinAnswer = () => Promise.reject(new Error('that download has been cancelled since - get it again to see where it stands'))
+    let refused = null
+    await R.joinDownload(9).catch((caught) => { refused = caught.message })
+    check('...a refusal is deadwax\'s words, and nobody is told to ask again', [refused, heard.length],
+      ['that download has been cancelled since - get it again to see where it stands', 3])
+  })
+}
+
+console.log('\nthe downloads hook itself asks again after a join, effects running (2.0.0-player.49)')
+{
+  const { useDownloadJobs } = require(path.join(OUT, 'hooks/useDownloadJobs.js'))
+  const R = require(path.join(OUT, 'lib/downloadRequests.js'))
+  await_(async () => {
+    const tick = () => new Promise((resolve) => setImmediate(() => setImmediate(resolve)))
+    globalThis.__effects = true
+    try {
+      const hook = H.root(({ open }) => useDownloadJobs(open))
+      globalThis.__listed = 0
+      hook({ open: false })
+      hook.commit()
+      await tick()
+      hook({ open: false })
+      hook.commit()
+      await tick()
+      check('mounted, closed and nothing active: the jobs asked for once, and no more', globalThis.__listed, 1)
+      globalThis.__joinAnswer = (jobId) => Promise.resolve({ status: 'ok', job_id: jobId, joined: true })
+      await R.joinDownload(11)
+      hook({ open: false })
+      hook.commit()
+      await tick()
+      check('...a download joined anywhere in the page: asked for again at once, so it is listed', globalThis.__listed, 2)
+    } finally {
+      globalThis.__effects = false
+    }
+  })
+}
+
+console.log('\nRequests puts focus where a left card\'s went, its layout effect run (2.0.0-player.49)')
+{
+  const body = { tag: 'body' }
+  const focused = []
+  const cardFor = (key) => ({ focus: () => focused.push(key) })
+  const withDocument = (fn) => {
+    const had = { document: globalThis.document, CSS: globalThis.CSS }
+    globalThis.document = { body, activeElement: body }
+    globalThis.CSS = { escape: (value) => value }
+    globalThis.__layoutEffects = true
+    try { fn() } finally {
+      globalThis.__layoutEffects = false
+      globalThis.document = had.document
+      globalThis.CSS = had.CSS
+    }
+  }
+  //? the page drawn and committed, its refs pointed at stand-ins: the section finds cards by data-row
+  const mount = () => {
+    const tab = H.root(Requests)
+    let tree = null
+    const draw = (jobs, more) => {
+      tree = tab({ view: view(jobs, more), trackingEnabled: true, error: null, active: true, onCancel: async () => {}, onRetry: async () => {}, onClear: async () => {}, onOpenAlbum() {} })
+      const section = all(tree, (n) => n.type === 'section' && n.props.ref)[0]
+      section.props.ref.current = {
+        querySelector: (selector) => { const key = /data-row="([^"]+)"/.exec(selector)?.[1]; return key ? cardFor(key) : null },
+        contains: () => true,
+      }
+      all(tree, (n) => n.type === 'h1' && n.props.ref)[0].props.ref.current = { focus: () => focused.push('heading') }
+      tab.commit()
+      return tree
+    }
+    const focusIn = (key) => all(tree, (n) => n.type === 'section' && n.props.onFocusIn)[0].props
+      .onFocusIn({ target: { closest: () => ({ dataset: { row: key } }) } })
+    return { draw, focusIn }
+  }
+  withDocument(() => {
+    const left = job('downloading', { mine: true, shared: true, album: 'Left' })
+    const beside = job('downloading', { album: 'Beside' })
+    const page = mount()
+    page.draw([left, beside])
+    page.focusIn(`job-${left.id}`)
+    page.draw([left, beside], { cancelling: new Set([left.id]) })
+    check('a leave on its way moves no focus', focused, [])
+    page.draw([beside])
+    check('the left card gone: focus put on the card beside it', focused, [`job-${beside.id}`])
+
+    focused.length = 0
+    page.focusIn(`job-${beside.id}`)
+    page.draw([beside], { cancelling: new Set([beside.id]) })
+    page.draw([])
+    check('...the last card gone: focus on the page\'s heading', focused, ['heading'])
+
+    focused.length = 0
+    const again = mount()
+    const one = job('downloading', { mine: true, shared: true, album: 'One' })
+    const two = job('downloading', { album: 'Two' })
+    again.draw([one, two])
+    again.focusIn(`job-${one.id}`)
+    globalThis.document.activeElement = { tag: 'search field' }
+    again.draw([two])
+    check('...and none moved while focus is somewhere else on the page', focused, [])
+  })
 }
 
 /* ========================================================================== */

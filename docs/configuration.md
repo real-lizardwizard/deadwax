@@ -125,7 +125,7 @@ can land seconds off.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `ORGANIZE_MODE` | `dry_run` | what happens when a download finishes. `off`: nothing. `dry_run`: the log says where each file would go, and nothing is written. `copy`: files are tagged and copied into the library, and slskd's copies stay. `move`: files are tagged and moved, and slskd's emptied folder is removed. See [Organizing](organizing.md). |
+| `ORGANIZE_MODE` | `dry_run` | what happens when a download finishes. `off`: nothing. `dry_run`: the log says where each file would go, and nothing is written. `copy`: files are tagged and copied into the library, and slskd's copies stay. `move`: files are tagged and moved, and slskd's emptied folder is removed. See [Organizing](organizing.md). With [logins](#logins-environment-only) on it has to be `copy` or `move` (since 2.0.0-player.49). |
 | `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | how an album's folder is named. The artist folder above it is always the artist. See [folder names](organizing.md#folder-names). |
 | `COUNTRY_IN_FOLDER` | `off` | `on` lets a release's country name its folder when nothing else tells the pressing apart, as in `Dummy (1994) [GB]`. Two different releases never share a folder either way. |
 | `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, the metadata editor writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (its three settings, [above](#navidrome-settings--connections)), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the editor says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
@@ -183,9 +183,17 @@ page that saved it. Change one in compose and restart deadwax.
 albums, play, pin to Home and choose their own Getting albums settings; editing the library (applying
 a release, tags, covers, lyrics, CD art, deleting, an artist's pictures and re-filing, rescans), the
 albums that need a look, the log and the server settings are an admin's - the app doesn't show them to
-anyone else, and deadwax refuses them (a 403 that says so). **One gap remains until requests become
-each person's own** (a later version): everyone signed in sees the whole download queue, and can
-cancel, retry or clear any download in it.
+anyone else, and deadwax refuses them (a 403 that says so). **Downloads are each person's own**
+(since 2.0.0-player.49): you see the downloads you asked for, and join one somebody else already has
+on its way rather than fetching it twice; your cancel leaves a download others still want, and your
+Clear done clears it from your list - an admin sees, and cancels, everyone's. See
+[Downloading](downloading.md#with-logins-on-downloads-per-person).
+
+**Organizing has to be on** (since 2.0.0-player.49): with logins on, `ORGANIZE_MODE` must be `copy` or
+`move`, with `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set - a download is the person's who asked for it
+once it's filed, and in dry run nothing ever is. Until it is, everything but the health check and the
+pages answers 503 saying why, and start-up logs it; while logins are on, the settings tab refuses a
+save that would switch organizing off.
 
 **Staying signed in.** Signing in keeps you signed in on that device for 30 days from when you last
 used deadwax there, through restarts. Every few minutes deadwax asks Navidrome whether the login you

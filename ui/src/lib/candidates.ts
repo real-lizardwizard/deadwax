@@ -611,6 +611,9 @@ export function downloadProgressText(download: DownloadInFlight): string {
       return 'queued'
     case 'downloading':
       return download.done_files === undefined ? 'downloading' : `${download.done_files} of ${download.files} files`
+    case 'failed':
+      //? only ever in flight while it moves to its next peer by itself (2.0.0-player.49)
+      return 'failed - moving to the next peer'
     default:
       return download.status
   }
@@ -621,6 +624,8 @@ export interface StoreStatus {
   kind: 'held' | 'downloading'
   title: string
   lines: string[]
+  /** a download somebody else asked for, which Join joins (lib/perPerson.ts storeStatusFor, 2.0.0-player.49) */
+  joinJobId?: number
 }
 
 /**

@@ -119,6 +119,17 @@ export interface DownloadJob {
   updated_at?: string
   /** How it ended, from the status and deadwax's named messages; null while it's still going. */
   outcome?: JobOutcome | null
+
+  /*
+   * Who asked for it (2.0.0-player.49, downloads per person) - sent only with logins on; with them
+   * off there is one user and every row is theirs.
+   */
+  /** The asker is waiting for it - always, in a user's own list. */
+  mine?: boolean
+  /** Somebody else is waiting for it too: a user's cancel only withdraws their request; an admin's is for everyone. */
+  shared?: boolean
+  /** An admin's rows only: the OTHER people waiting for it, in the order they asked. */
+  requested_by?: string[]
 }
 
 /**
@@ -330,14 +341,38 @@ export interface HeldPressing {
   filed_to: string | null
 }
 
-export interface DownloadInFlight {
+export interface DownloadInFlight extends Partial<JobQuality> {
   job_id: number
-  /** queued | downloading | organizing | complete (downloaded, being filed this moment) */
+  /** queued | downloading | organizing | complete (downloaded, being filed this moment) | failed (moving
+   *  to its next peer by itself, 2.0.0-player.49) */
   status: string
   username: string
   files: number
   /** How many have arrived, when slskd said. */
   done_files?: number
+  /**
+   * With logins on (2.0.0-player.49): whether you're waiting for it. Somebody else's is yours to join
+   * (POST /download/jobs/{id}/join) - and then its copy is said too (formats and the rest, from
+   * JobQuality: as the candidate it was picked from showed them; formats alone, from its files' names,
+   * for a download picked without them). Absent with logins off: every download is the one user's.
+   */
+  yours?: boolean
+  /** With logins on: somebody else is waiting for it too - so a user's cancel only withdraws theirs. */
+  shared?: boolean
+  /** With logins on, an admin's answer only: the OTHER people waiting for it, as /jobs says it. */
+  requested_by?: string[]
+}
+
+/**
+ * What a folder's files are, as its candidate showed them - sent with a Get so the download keeps it
+ * (2.0.0-player.49), and said to someone offered to join it. Each list the folder's distinct values.
+ */
+export interface JobQuality {
+  formats: string[]
+  bitrates: number[]
+  bit_depths: number[]
+  sample_rates: number[]
+  variable_bitrate: boolean
 }
 
 export interface OtherPressing {
@@ -360,6 +395,8 @@ export interface EnqueueRequest {
   release?: DownloadRelease
   /** The rest of the list as shown, in order - where "try next peer" goes (v0.9.12). */
   alternatives?: EnqueueAlternative[]
+  /** The picked folder's quality (2.0.0-player.49), for someone offered to join the download. */
+  quality?: JobQuality
 }
 
 /** A runner-up from the candidates list, kept with the job for "try next peer" (v0.9.12). */
@@ -368,6 +405,8 @@ export interface EnqueueAlternative {
   directory: string
   files: CandidateFile[]
   score?: number
+  /** Its quality, which the download takes on if it moves there (2.0.0-player.49). */
+  quality?: JobQuality
 }
 
 export interface RetryResponse {
@@ -391,11 +430,25 @@ export interface EnqueueResponse {
   status: string
   queued: number
   job_id: number
+  /**
+   * The whole pressing was already on its way for somebody else, and this request joined that
+   * download instead of starting another (2.0.0-player.49) - `queued` is 0 then.
+   */
+  joined?: boolean
+}
+
+/** POST /download/jobs/{id}/join (2.0.0-player.49). `joined` false: you were already waiting for it. */
+export interface JoinJobResponse {
+  status: string
+  job_id: number
+  joined: boolean
 }
 
 export interface CancelJobResponse {
   status: string
   cancelled: number
+  /** Your request was withdrawn and the download carries on for the others (2.0.0-player.49). */
+  left?: boolean
 }
 
 export interface ClearJobsResponse {

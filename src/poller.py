@@ -21,7 +21,8 @@ from src.lyrics import fetch_album_lyrics
 from src.organizer import organize_job, remove_empty_incomplete_dirs, remove_incomplete_downloads
 from src.peer_speed import RateAccumulator, measured_rate, observe
 from src.store import RETRYABLE_STATUSES, index_transfers_by_user, settled_transfer_ids, summarize_transfers
-from src.store_index import already_have, filing_finished, filing_started, index_folder, release_lock
+from src.store_index import (already_have, filing_finished, filing_started, index_folder, release_lock,
+                             retry_pending_finished, retry_pending_started)
 
 
 POLL_INTERVAL_SECONDS = 5.0
@@ -73,11 +74,10 @@ async def poll_downloads_once(
                     f"the peer is probably gone",
                     extra={"frontend": True, "src": "slskd"},
                 )
-                await store.update_status(job_id, "failed", "no transfers reported by slskd")
                 missing_counts.pop(job_id, None)
                 if rate_samples is not None:
                     rate_samples.pop(job_id, None)
-                await _auto_retry(slskd_client, store, job)
+                await _fail(slskd_client, store, job, "no transfers reported by slskd")
 
             continue
 
@@ -123,13 +123,31 @@ async def poll_downloads_once(
             #? exactly one you want a number for next time. A refusal that moved no bytes
             #? measures nothing and records nothing - see measured_rate().
             await _settle_peer_speed(job, store, rate_samples)
-            await store.update_status(job_id, "failed", detail)
-            await _auto_retry(slskd_client, store, job)
+            await _fail(slskd_client, store, job, detail)
             continue
 
         if job["status"] == "queued" and summary["progress"] > 0:
             logger.info(f"downloading {label}", extra={"frontend": True, "src": "slskd"})
             await store.update_status(job_id, "downloading")
+
+
+async def _fail(slskd_client, store, job: dict, error: str) -> None:
+    """
+    Mark a download failed, and move it to its next peer when AUTO_RETRY_PEER says to. From just
+    before the status is written until the retry has had its turn, the job counts as still coming
+    (store_index.retry_pending - 2.0.0-player.49): "downloading now" counts a failed download with a
+    retry pending, so a second person's Get in that moment joins it rather than starting another
+    download for the retry to then refuse.
+    """
+    pending = _retries_by_itself(job)
+    if pending:
+        retry_pending_started(job["id"])
+    try:
+        await store.update_status(job["id"], "failed", error)
+        await _auto_retry(slskd_client, store, job)
+    finally:
+        if pending:
+            retry_pending_finished(job["id"])
 
 
 async def _settle_peer_speed(
@@ -438,11 +456,12 @@ MOVED_ON = "this download has already moved on - it's been retried or restarted 
 CLEARED = "this download has been cleared from the list - search again to download it"
 
 
-def _retry_lock(job: dict) -> str | None:
+def job_lock_key(job: dict) -> str | None:
     """
     What a retry of this job locks on: its release - or, for a job with no release id, the job
     itself. Without that a job with no release id took no lock, so two retries of it (auto-retry
-    and a click) both got past the re-read below and asked two peers (step 2 review).
+    and a click) both got past the re-read below and asked two peers (step 2 review). A cancel and a
+    join take it too (2.0.0-player.49), so who is waiting is settled one change at a time.
     """
     release_mbid = _job_release(job)["release_mbid"]
     if release_mbid:
@@ -487,7 +506,7 @@ async def retry_next_peer(slskd_client, store, job: dict) -> dict:
     comes through here too, puts it in the log). Checked on the job as it is now, and the peers
     asked, under the release's lock (the job's own, with no release id), as /enqueue does.
     """
-    async with release_lock(_retry_lock(job)):
+    async with release_lock(job_lock_key(job)):
         job, problem = await _fresh_job(store, job)
         problem = problem or await already_have(store, _job_release(job), excluding_job_id=job.get("id"))
         if problem:
@@ -519,8 +538,9 @@ async def _move_to_next_peer(slskd_client, store, job: dict) -> dict:
         except Exception as e:
             logger.warning(f"couldn't tidy the previous attempt of job {job['id']}: {e}")
 
+        #? the new folder's quality, as its candidate showed it - none sent, none known (2.0.0-player.49)
         await store.move_to_peer(job["id"], alternative["username"], alternative.get("directory") or "",
-                                 files, tried)
+                                 files, tried, quality=alternative.get("quality") or {})
         logger.info(
             f"trying the next peer for {job.get('artist')} - {job.get('album')}: {alternative['username']}",
             extra={"frontend": True, "src": "slskd"},
@@ -554,7 +574,7 @@ async def retry_same_peer(slskd_client, store, job: dict) -> dict:
     Refused, as retry_next_peer is, for a release filed complete or downloading under another
     job since, or a job that has moved on since the caller read it (step 2), under the same lock.
     """
-    async with release_lock(_retry_lock(job)):
+    async with release_lock(job_lock_key(job)):
         job, problem = await _fresh_job(store, job)
         problem = problem or await already_have(store, _job_release(job), excluding_job_id=job.get("id"))
         if problem:
@@ -594,9 +614,14 @@ async def _ask_same_peer(slskd_client, store, job: dict) -> dict:
     return {"retried": True, "username": username, "files": len(wanted), "problem": None}
 
 
+def _retries_by_itself(job: dict) -> bool:
+    """Whether a failure of this job moves it on by itself: AUTO_RETRY_PEER on, and a runner-up left."""
+    return (Config.AUTO_RETRY_PEER or "off").strip().lower() == "on" and bool(untried_alternatives(job))
+
+
 async def _auto_retry(slskd_client, store, job: dict) -> None:
     """After a failure, when AUTO_RETRY_PEER is on and there is a runner-up to try."""
-    if (Config.AUTO_RETRY_PEER or "off").strip().lower() != "on" or not untried_alternatives(job):
+    if not _retries_by_itself(job):
         return
     outcome = await retry_next_peer(slskd_client, store, job)
     if not outcome["moved"] and outcome["problem"] not in (MOVED_ON, CLEARED):

@@ -19,9 +19,14 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   string (slskd declares `[Produces("application/json")]` and returns plain strings), a
   ProblemDetails object, or text - and `describe_search_refusal()` explains the status around
   it. **Any other slskd call that shows an error to the user should read the body the same way.**
-  429 is the other status worth knowing: slskd runs ONE search at a time, behind a static
-  `SemaphoreSlim(1, 1)` taken with `Wait(0)`, so two tabs or a retry on top of a slow search get
-  "Only one concurrent operation is permitted".
+  429 is the other status worth knowing: slskd STARTS one search at a time, behind a static
+  `SemaphoreSlim(1, 1)` taken with `Wait(0)` and held while a search starts (searches already
+  started run side by side), so a second start made while one is starting gets "Only one
+  concurrent operation is permitted". Since 2.0.0-player.49 every start deadwax makes waits its
+  turn at `slskd_endpoint.SEARCH_GATE` (notes/logins.md "Downloads per person"), so two tabs, two
+  people or a retry inside deadwax no longer meet it; another client starting a search at that
+  moment still can, and so can a start the gate lets through after its 30 s bound (a wait that
+  long, or a start slskd hasn't answered in 30 s giving up its turn).
 - **Pinging slskd's API says nothing about its connection to Soulseek, and the pill claimed
   otherwise.** `application.state()` answers 200 whenever the container is up and the key is
   right; slskd sits there logged out and serves it perfectly. So the connection pill read

@@ -5,7 +5,8 @@ import { storeState } from '../api/download'
 import { MusicBrainzUnavailable } from '../api/http'
 import { getReleaseGroup } from '../api/musicbrainz'
 import type { ReleaseGroup, ReleaseGroupResponse, StoreStateResponse } from '../api/types'
-import { storeNotes, storeStatus } from '../lib/candidates'
+import { storeNotes } from '../lib/candidates'
+import { joinDownload } from '../lib/downloadRequests'
 import { isAbort, latestOnly } from '../lib/latest'
 import { onAlbumsFiled } from '../lib/libraryEvents'
 import { ownedForGroup } from '../lib/owned'
@@ -13,6 +14,7 @@ import {
   anyPressingDiffers, coverAddresses, getGroup, groupMbid, leftOut, metaLine, pageHeader, pressingLabel, pressingsView, summaryLine,
   trackRows, type PageRelease, type TrackRow,
 } from '../lib/pressings'
+import { storeStatusFor } from '../lib/perPerson'
 import { buildDownloadRelease } from '../lib/releasePayload'
 import { soleCredit } from '../lib/artistPage'
 import { ChevronLeftIcon, GetIcon } from '../player/icons'
@@ -21,6 +23,7 @@ import { PressingPicker } from './PressingPicker'
 import { keep, kept } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { StoreState } from './StoreState'
+import { useGetSettings } from './useGetSettings'
 import { takeOpener } from './useSheet'
 import { useOwned } from './useOwned'
 
@@ -331,6 +334,11 @@ export function ReleaseGroupPage({
     return () => stateRequests.supersede()
   }, [chosen?.id, group?.id, filed, shown])
   const known = store && store.id === chosen?.id ? store.state : null
+  //? (2.0.0-player.49) a download somebody else asked for: judged against your quality floor, and
+  //? joined from the line - which then asks the store again, and says it's yours
+  const { settings } = useGetSettings(shown)
+  const floor = settings?.quality_floor ?? null
+  const join = (jobId: number) => joinDownload(jobId).then(() => setFiled((n) => n + 1))
 
   //? a desktop's Sources panel shows the sources of the pressing on screen: Get is drawn pressed
   const sourcesHere = sourcesPressing !== null && sourcesPressing === chosen?.id
@@ -398,7 +406,7 @@ export function ReleaseGroupPage({
           {/* a desktop's pressing dropdown sits inline after Get, as its board has it */}
           {desktop && picker}
           <div class="app-rg-store" aria-live="polite">
-            {known && <StoreState status={storeStatus(known, 'Requests')} notes={storeNotes(known)} />}
+            {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} onJoin={join} />}
           </div>
         </div>
       </div>

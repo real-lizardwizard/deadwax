@@ -95,7 +95,9 @@ fails closed.
   alone, as it always did).
 - **`adopt_local(user)`** (written in 2.0.0-player.18) is called on every Navidrome sign-in of an
   admin: the first takes what `local` saved, theirs winning; after that `local` is empty and it takes
-  nothing. Switching logins off again leaves those rows with the admin.
+  nothing. Switching logins off again leaves those rows with the admin. Since 2.0.0-player.49 the
+  first admin seen with a session after a start takes over what `local` still holds too (see
+  "Downloads per person" - a session outlives the restart that switches logins on).
 - **The pages** carry `<meta name="deadwax-auth" content="on">` (`LOGINS_MARK`) when logins are on -
   the app's page also the sign-in's own stylesheet (`SIGNIN_SHEET`, `interface/player/signin.css`) -
   injected by `with_logins_mark`; off, every page is byte for byte what it was (no extra stylesheet, no
@@ -135,8 +137,8 @@ fails closed.
 | --- | --- | --- |
 | search, find on Soulseek, request (Get) | yes | yes |
 | their own Getting albums preferences, pins | yes | yes |
-| leave or retry their own requests, hide finished ones | yes (step 4 makes requests per person) | yes |
-| see and cancel everyone's downloads | **the one known gap**: until step 4, a user sees and acts on the whole queue, as everyone did | yes |
+| leave or retry their own requests, hide finished ones | yes (since step 4, 2.0.0-player.49 - "Downloads per person") | yes |
+| see and cancel everyone's downloads | no - their own and joined ones only (the gap step 3 left, closed by step 4) | yes |
 | edit the shared library: apply a release, edit tags, delete, covers, lyrics, CD art, re-file an artist, artist images (and their artist search), bulk runs, rescan | no | yes |
 | the review queue (Needs a look, `/queue/*`) and the new-imports badge | no | yes |
 | the event log (`/interface_logs/*`) | no | yes |
@@ -269,3 +271,285 @@ it has when its session ends (it fetches by range - likely seconds); the back-fo
 unlocked (seen only in desktop Chromium); whether iOS keeps the home-screen app in memory across a
 container recreated with logins on, and its reload into the sign-in there; leaving full screen in Safari
 and Firefox (the webkit form is in, unwatched).
+
+### Downloads per person (2.0.0-player.49)
+
+Step 4 of the multi-user plan (the Claude Doc's "Requests and downloads"), closing the one gap
+"Logins and roles (2.0.0-player.48)" left: every signed-in user saw, and acted on, the whole queue.
+Every rule was decided with James on 2026-09-27 - don't re-open them. The spec is
+`deadwax-scratch/uplan/slice-downloads-per-person.md`. **With logins off nothing changes**: one user,
+`local`, the admin - every existing test passed unchanged, but for the changes on purpose listed at
+the end - downloads somebody asked for while logins were on included (review): `/jobs` lists every
+download (`list_jobs()` with no user, as before), Clear finished deletes every finished one
+(`delete_jobs`, tidying every cancelled one first) and `/enqueue` refuses one already on its way
+(its join runs only with logins on). The one change logins-off sees, by the rule itself: a download
+failed and moving to its next peer by itself counts as in flight (below), so a Find in those seconds
+stops at it - worded "failed - moving to the next peer", nothing said about cancelling it for one.
+
+- **Requesters are their own table**, `job_requests` (job_id, user, requested_at, left_at, hidden_at;
+  store.py's schema says what each means): `jobs.username` is the Soulseek PEER, and several people
+  can want one download. `create_job(..., user=)` writes the job and its asker's row in one
+  transaction. A database from before the table gets it once (`JobStore.init`, only when the table
+  didn't exist): every job `local`'s, asked when it was made - so a later start never hands back to
+  `local` what an admin took. `adopt_local` moves local's requests with its pins and preferences (it
+  answers `(pins, preferences, requests)` now - test_pins.py's three tuples changed with it), and -
+  review - not only at a sign-in: `auth._take_over_leftovers` hands what `local` still holds to the
+  FIRST ADMIN SEEN with a session after a start (`store.local_has_anything`, then `adopt_local_now`,
+  its synchronous write, in FastAPI's thread pool; once a process, best effort, a failure logged and
+  left to the next sign-in). A session lasts 30 days from its last use and outlives a restart, so an
+  admin may never sign in again: an upgrade from .48 with logins on (every download became local's as
+  the table was made) or logins switched off and on again left their rows "Asked by local" and the
+  finished ones undeletable (`local`'s request kept them). Logins only change at a restart, and
+  `local` gains nothing while they're on, so once is enough. One
+  definition of a request still waiting, `ACTIVE_REQUEST` (asked, not left, not hidden), read by the
+  list, a cancel and a clear alike. No foreign keys (the connection doesn't enforce them): rows are
+  deleted with their job, by hand (`delete_jobs`, `hide_finished`).
+- **Who sees what** (`list_jobs(user=, everyone=)`, `routes/download._per_person`): a user their
+  active requests (joined ones too); an admin everyone's but what they hid. With logins on each row
+  carries `mine` and `shared` (somebody else is waiting on it), and for an admin `requested_by` - the
+  OTHER requesters, in the order they asked (`ORDER BY requested_at, rowid`). Off, none of the three
+  (the payload as it was). The app draws an admin's row "Asked by ethan" / "Asked by you and ethan" /
+  "Asked by you, ethan and sam" (`lib/perPerson.ts askedByText`) - and, review, a user's row of a
+  download somebody else waits for too "Someone else asked for it too" (`SHARED_TEXT`, nobody named),
+  so a Get that joined somebody's download and a ✕ that will only leave aren't a surprise - under the
+  line of every card - Downloading, Waiting, Needs attention, Done - and the main page's Downloads
+  panel beside the user. Requests, Home's Arriving and
+  the badge draw whatever `/jobs` gives, so they follow by themselves; the event log stays the
+  admin's, and a user's failures show on their own rows.
+- **Acting on somebody else's**: `_job_for` answers 404 - as for no job - to a user who isn't an
+  active requester of it, for cancel, retry and retry_same (a user can't even learn the id is real);
+  an admin may act on any.
+- **Joining**: `/enqueue`, under the release's lock, finds the whole pressing already coming
+  (`store_index.in_flight`) for somebody ELSE and adds a request instead of refusing -
+  `{"queued": 0, "job_id", "joined": true}`, nothing asked of slskd - with logins on only (review: with
+  them off `local` is missing from every download asked for while they were on, and joined one of those
+  instead of the 409). The same person asking twice is
+  still the 409 ("already downloading from bob") - guarded twice, by the route's requester check and
+  by `request_job` answering `'waiting'` for someone already waiting (each alone passes the test; both
+  removed fail it). `request_job` answers `'joined'`, `'waiting'`, `'gone'` or None, and writes only
+  while the job's row is there, in its IMMEDIATE transaction (review: a Clear - which takes no release
+  lock - deleting a complete-while-filing or retry-pending job between a join's look and its write left
+  a request pointing at nothing, and answered `joined`): the join route then answers its "cleared from
+  the list since" 409, and `/enqueue` falls through to `already_have` - nothing on its way now, so the
+  Get fetches it. `POST /download/jobs/{job_id}/join` is the explicit join the store line's button
+  makes: under the job's lock, only a download `still_coming` and whole (`store_index.is_whole`),
+  else a 409 in words ("that download has been filed into the library since - get it again to see
+  where it stands", "brings only part of this pressing"); `joined` false when already waiting. A
+  download not there at all - the usual way: the last who asked cleared it after the page drew its
+  line - is the same "cleared from the list since" 409 (second review: the first look answered 404
+  "No such download job", so the words the docs promise came only in the race; a join has no id to
+  hide, unlike cancel and retry).
+  `store_state`/`find_candidates` describe a download in flight with logins on as `yours`, `shared`
+  (somebody else waits for it - review) and, for an admin, `requested_by`, plus what
+  its copy is (`describe_job`: `formats` - the candidate's, else read off the files' names - and the
+  `bitrates`, `bit_depths`, `sample_rates`, `variable_bitrate` it was picked with). For that a Get
+  now sends the picked folder's `quality` (and each runner-up's), kept as `jobs.quality_json`
+  (JOB_COLUMNS; `job_quality` keeps only those keys) and taken on by a retry to the next peer (the
+  same peer asked again keeps it). Find still doesn't search for a pressing downloading whole: the
+  box stands where the sources would (`lib/perPerson.ts storeStatusFor`): "Already downloading for
+  someone else", "From glassbeads · FLAC 16/44.1 · 3 of 11 files" (`copyText`: the copy as a source
+  card's Quality says it, `qualityText` - review: it was "FLAC 902kbps 16-bit 44.1kHz", a bitrate the
+  cards never show for lossless, in an order neither page uses), the quality
+  floor's word when the copy falls short of You's floor ("It's below your quality floor (24-bit), and
+  getting a copy of your own isn't offered yet." - or "Its folder doesn't say whether it meets…"
+  when the folder didn't report what the floor asks about; judged by the floor's own rules through
+  `passesFilters`; the app's only - the main page has no per-user floor), then what Join does
+  (`joinNote(place)`: "Join it to have it in your Requests too - one download, everyone who asked
+  waiting for it.", Downloads on the main page - review: it named Requests there, and "both of you"
+  however many waited), and `JoinDownload` (StoreState.tsx - its own component, keyed on the job, so
+  StoreState stays a leaf): the tap asks at once, waits aria-disabled, says a refusal in an alert, and
+  gives way to "Joined - it's in your Requests." - handing the focus it had to the store box
+  (`keepJoinFocus`; the box is `tabIndex={-1}` and stays drawn through the album page's next look, so
+  focus is never dropped to the page - review), and on a desktop at the frame's control size, as Get
+  is (`.app-desk .app-store-join` - review). In the Sources sheet a join
+  hands over to Requests as a Get does - only while the sheet still shows the Get that joined; on the
+  album page the line asks the store again and becomes yours; the main page's candidates panel has
+  its own Join ("Joined - it's in Downloads."), in `components/StoreStatusBox.tsx` since the review
+  (out of CandidatesPanel, so sources.sim draws it; aria-disabled while it waits, never `disabled`,
+  which dropped the focus, and its focus handed to `.candidates-store`). The album page asks You's
+  settings each time it shows (`useGetSettings(shown)`), beside the store, so the floor's word is in
+  hand as the line draws - added to useGetSettings' and app-requests-search-get.md's lists of when
+  they're asked (review: a gate on `yours === false` was weighed and left - the floor line would then
+  land after the line had drawn, in the polite live region). Every downloads list in the page asks again after a
+  join (`lib/downloadRequests.ts` `joinDownload`/`onDownloadsChanged`, which `useDownloadJobs`
+  listens to). The box's Join never picks for you - "Pick the best source for me" doesn't join from
+  it - but a Get, a pick for you included, that reaches `/enqueue` just as somebody else's download of
+  the pressing has started joins it (the race the spec makes a join): the app says so afterwards -
+  the row in Requests is that download, from its peer, "Someone else asked for it too" - and the main
+  page's card says **Joined ✓** with why, not "Queued ✓" (review: the answer's `joined` was read
+  nowhere).
+  **Not in this step, on purpose**: "start your own" when the copy is worse than your filters, and
+  "when it lands it replaces the worse copy for everyone" - that is deadwax deleting audio by itself,
+  refused at three layers today (notes/store-index.md "Not built, on purpose"); James's to design.
+  The box says a copy of your own isn't offered yet.
+- **"Downloading now" counts every state in between** (`store.still_coming`, the one predicate
+  `in_flight_job` and the join route read): queued, downloading, `complete` in the seconds before
+  filing (organizing on), `organizing`, and - new - `failed` with a retry pending: the poller's
+  `_fail` marks the job in `store_index._RETRY_PENDING` (memory: one process runs one poller) from
+  just before it writes `failed` until `_auto_retry` has had its turn (AUTO_RETRY_PEER on, a
+  runner-up left), so a second person's Get in that moment joins it instead of starting a download the
+  retry would then refuse. Find's answer for one says `status: 'failed'` and claims no files in
+  (`_describe_in_flight` sets `done_files = files` for the filing statuses only), and the store line
+  says "failed - moving to the next peer" (`downloadProgressText`'s one new case) with nothing about
+  cancelling it for another peer (`storeStatusFor`) - review: it read "From bob · failed" under
+  "Already downloading", and told you to cancel it for a peer it was already moving to. Logins on or
+  off: the rule counts it either way. The poll loop's two failures (refused, never reported) go
+  through `_fail`, and `_fail`'s `finally` clears the mark when the retry raises - both pinned since
+  the review.
+- **The per-release lock** (`store_index.release_lock`, since step 2) covers the check, the join,
+  slskd's enqueue and the job insert for everyone: two people's Gets of one release at once make one
+  download and one join (tested through two concurrent signed-in clients). Cancel and join take the
+  same lock (`poller.job_lock_key`, formerly `_retry_lock`), so a join never lands between a last
+  request leaving and the download being cancelled.
+- **Cancel means leave** (`store.leave_job`, one IMMEDIATE transaction): a user's cancel withdraws
+  their request (`left_at`) while somebody else's is active - `{"left": true}`, slskd untouched, the
+  download carrying on; the LAST active request's cancel leaves the row as it is and cancels the
+  download itself (`_cancel_download`, today's body: slskd's transfers, the status, the tidy, the
+  partials under SLSKD_INCOMPLETE_PATH), so the last one sees it cancelled and can retry it. An
+  admin's cancel is always the download's - for everyone, theirs shared included. The app's ✕ asks
+  what it will do (`cancelWords`): a user's on a shared download "Leave this download? Someone else
+  asked for it too, so it carries on for them." / **Leave it**; an admin's on one somebody else waits
+  for "Cancel this download for everyone? ethan asked for it (too)." / **Cancel for everyone**;
+  anything else the words it always had. The main page's confirm() says the same for a shared one.
+  Review: a leave is a leave everywhere - the ✕ and its question are named "Leave …" (`cancelWords`'s
+  `leaves`), the card reads "leaving…" while it is asked and is heard so, and once the row has gone
+  from your list (the one way a tap takes a card away) the page says "<album>: left - it carries on
+  for whoever else asked" and puts the focus on the card beside it, else the page's heading
+  (`requestsView.changes`' `gone`, `focusAfterGone`, Requests.tsx's layout effect) - it fell to the
+  page. And the store line of a download of yours somebody else waits for too, as a user, says
+  "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another
+  peer isn't offered for a download you share." instead of "Open Requests to cancel it if you want
+  another peer" (`sharedNote`, `leavesOnCancel`: `shared` and no `requested_by`) - a cancel that only
+  leaves gives no other peer, and the next Get would join it again. An admin's line is as it was: their
+  cancel is for everyone. A double-tapped ✕ (two cancels from one person at once) leaves once and
+  cancels nothing - `leave_job`'s `'none'` is the 404 - and a join can't land between the last leave
+  and the cancel (the job's lock): both pinned with requests really at once since the review.
+- **Retry is open to any requester**, and an admin: the one job moves (`move_to_peer`), its
+  requests the job's, so everyone waiting moves with it. A requester who had cleared a failed job
+  from their list isn't waiting for it and stays cleared: `move_to_peer` turns their hidden request
+  into a withdrawn one (`left_at`, `hidden_at` cleared) - review: an admin who had asked too and
+  cleared it kept `hidden_at`, so the download running again was in nobody's view of theirs, with no
+  ✕ to cancel it; now an admin sees it again, as one who never asked does. Asking again (a Get, a
+  Join) brings either back.
+- **Clear finished hides it for you** (`store.hide_finished`, one transaction): every finished
+  download in the asker's list gets their `hidden_at`, and a job is deleted once no request on it is
+  active (`_nobody_else`). An admin hiding somebody else's gets a row that is NO request
+  (`requested_at` NULL), which never keeps a job - and `move_to_peer` deletes such rows, so a download
+  an admin cleared shows again once it's retried. Before deleting, only the cancelled jobs this clear
+  will really delete have their transfers tidied out of slskd's list (`jobs_to_forget`). `removed` is
+  how many left the asker's list. With logins off the route keeps its old body - every finished job
+  deleted (`delete_jobs`), every cancelled one tidied first (`jobs_with_status`) - whoever asked for it
+  (review: `hide_finished('local', everyone=True)` only hid a job somebody had asked for while logins
+  were on, so it came back to their Done list once logins did). Not changed: Clear still deletes a
+  `complete` job in the seconds before filing, and a failed one whose retry is pending, though both
+  count as coming (Clear's statuses are older than this step; a join racing it is answered above).
+- **One Soulseek search starts at a time, across all users** (`slskd_endpoint.SearchGate`,
+  `SEARCH_GATE`): slskd's limiter (SemaphoreSlim(1,1), Wait(0)) covers STARTING a search, and one
+  person's Find always started its searches in turn - two people's at once could collide, and one
+  Find failed "slskd is already running a search". Each start now takes the process-wide gate,
+  held until slskd has answered that start (the cancel-mid-start path included), waiting in line
+  `SEARCH_TURN_SECONDS` (30) at most and then starting anyway - never refusing. A turn is bounded
+  too (review): one still in its start after the bound gives its place up itself (a `call_later`
+  timer, cancelled when the turn ends in time; the turn then never releases the lock again, so a
+  stuck start that does end leaves the next holder holding it). slskd_api sends with no timeout and
+  the start's thread can't be cancelled, so a POST never answered (a connection dropped without a
+  reset) held the gate for the life of the process, and every later start - anyone's, each name's
+  query - waited the whole 30s behind it; now it holds up the line once. The listening for
+  answers is shared as before. The lock is made per event loop (the tests run a loop each). Two tabs
+  or two people inside deadwax no longer meet slskd's 429; another client starting a search at that
+  moment, or a start the gate lets through after its bound, still can - slskd_endpoint.py's comment
+  and notes/backend-gotchas.md say so since the review (they still blamed "two tabs").
+- **Organizing must be on** (`Config.describe_logins_organizing`): with logins on, `ORGANIZE_MODE`
+  `copy` or `move` and both of organizing's folders set - under dry_run nothing is filed, so nothing
+  could be granted or deduplicated. Otherwise `auth.unusable()` says why, exactly as for a missing
+  secret key: every protected route and the sign-in answer 503 with it (the app's sign-in screen
+  shows it; the break-glass admin is refused too), the health check and pages stay 200, and
+  `report_logins` logs it at start-up - saying where the value comes from: a mode saved in the
+  settings tab (OVERRIDDEN) beats compose, and with logins refused the tab can't be reached, so the
+  way back is logins off. To keep an admin from locking everyone out from inside, the settings PUT
+  refuses, with logins on, a batch that would leave organizing off (a value, or a revert to an
+  environment that says dry_run - `_stops_organizing`). test_logins.py's `on` fixture sets copy and
+  both folders for this (changed on purpose).
+- **Changed on purpose** in existing tests: test_logins.py's ROUTES (the join route; the comment on
+  the gap) and its `on` fixture (organizing on); test_pins.py's three adopt_local tuples. In the sims
+  (review): requests.sim's `changes` checks read `said` and `moved` (it answers `gone` too), and a
+  user's shared row now says "Someone else asked for it too" where it said nothing.
+
+**Verified**: 2698 Python tests (2696 passed, 2 skipped; 61 new - tests/test_downloads_per_person.py,
+35 at first, 20 from the review and 6 from the second), pyflakes, tsc, every sim (requests.sim.cjs,
+sources.sim.cjs and, since the review, group.sim.cjs - the album page's Join asking the store again -
+extended), the build; the engine files have no diff. Mutation-checked, 49 rules, each test failing with its rule broken and the file restored
+byte for byte (PYTHONDONTWRITEBYTECODE - a stale .pyc of the same size and second hid two at first):
+the migration's once, the asker's row, a user's own list, requested_by the admin's, the 404, joining
+on Get, the same person refused (both guards together), the join under the lock (moved outside, the
+concurrent test failed), `yours`, join only what's coming and whole, retry pending in flight and the
+poller marking it, the last leave and a leave, an admin's cancel for everyone, retry by either, hide
+for you and delete once everyone has, an admin's hide being no request, a retried download showing
+again for the admin, clearing tidying only what it deletes, adopt_local's move and copy, the search
+gate and its bound, organizing on and its folders, start-up saying so, the settings refusal and a
+revert counting, the quality kept and taken on by a retry, logins off sending no new fields, the route
+walk; and in the UI the joinable box, the floor's word, unknown not below, who asked, a user's leave,
+the card's line and the question's words, Join offered, waiting, its refusal, Sources handing over -
+only while it shows - and judging by your floor. **Not mutation-checkable**: `leave_job`'s IMMEDIATE
+transaction (two last requesters leaving at once - the test passes without it too; the race is
+microseconds wide). **The review's fixes**, mutation-checked the same way (each test failing with its
+fix undone): logins off refusing rather than joining, and its Clear deleting and tidying as before;
+the first admin seen taking local's over (an upgrade's and an off-and-on's, an admin's never a
+user's, looked for once a process and again after a restart); a retried download's hidden requester withdrawn (an admin seeing it, a user
+staying cleared); a join for a job gone writing nothing, the route's 409, Get falling through; Find's
+`shared` and an admin's `requested_by`; a download moving on claiming no files; the poll's two
+failures through `_fail`, and its `finally`; re-joining after a leave, and after clearing one still
+coming; blanking
+SLSKD_DOWNLOAD_PATH refused, and logins-off saves allowed; a second cancel's 404, the cancel's and
+the join's locks; the order they asked (three wrong orders); the same peer keeping the quality,
+adopt_local keeping the admin's own row, job_quality's keys; the join's 503; and in the UI the copy's
+words, Join's note (its place, no count), "moving to the next peer" and no cancel line for it, your
+shared one's line (and not an admin's), a user's shared row, "leaving…" and its announcement, a left
+card heard and its focus to the next card or the first, the ✕ and its question named Leave, Join's
+focus to the box (only when the button had it; the box a target), the main page's box waiting
+aria-disabled, joined, refused and its focus, a join telling every list, the album page asking the
+store again. Not covered by a sim: the main page's "Joined ✓" card (CandidatesPanel isn't drawn by
+any) - tsc and the real page only. **The second review's**, the same way: a turn still starting
+after the bound giving up its place (and only it - a turn ended in time leaves no timer, a stuck one
+that ends leaves the next holder holding); a join of a download cleared before the tap, and of no
+such id, the "cleared since" 409; SLSKD_DOWNLOAD_PATH's half of organizing's folders (only
+LIBRARY_PATH's was pinned, so "organizing on and its folders" above was half true); the cancel's
+re-read under the job's lock, with a retry holding it (an admin's cancel and the last requester's);
+and in the sims, three that were pinned only through pure helpers: a Get's body carrying its
+folder's quality and each runner-up's (sources.sim read only the usernames), useDownloadJobs asking
+again after a join (requests.sim had only its own stand-in listeners), and Requests putting the
+focus where a left card's went (requests.sim stubbed every layout effect away: it runs Requests'
+now, against a stand-in document whose cards are found by `data-row`).
+**Real page** (dl49's own instance, logins on, a scratch database, a hard-linked library copy, a
+stand-in Navidrome checking token auth for james and ethan, its own fake slskd; two headless
+Chromiums as deadwax.test over plain http, 390x844 and 1440x900; 48 checks in two drivers, and one
+more on a third instance): james Got Dummy from the
+sources; ethan's album page said "Already downloading for someone else · From glassbeads · FLAC
+902kbps 16-bit 44.1kHz · queued" with Join, which joined (the line then said it's his, Requests had
+it, no names); james's row said "Asked by you and ethan"; ethan's ✕ asked "Leave this download?…" and
+Leave it took it from his list while it went on for james (his row naming nobody); ethan's own
+download asked the plain question and his cancel - the last - cancelled it, still listed for him;
+james saw it under Needs attention "Asked by ethan" and his Next peer moved it for both ("try 2");
+ethan joined Dummy again and james's ✕ asked "Cancel this download for everyone? ethan asked for it
+too.", cancelling it for ethan; ethan's Clear done hid it from him alone, james's then deleted it
+(no job row, no request rows); the main page's Downloads panel showed ethan only his, and james "Asked
+by you and ethan"; the Sources sheet (phone and the desktop panel) stood the box with Join where the
+cards would be and handed over to Requests; logins off (another instance): no new fields, the old
+question, cancel and Clear done as before; logins on with dry_run (a third): 503 with the reason on
+every route and the sign-in screen saying it, health 200. No console errors, nothing past the edge at
+390. **The review's fixes on the real page** (the fixer's own instance, logins on, a fresh database, its
+own stand-in Navidrome and fake slskd; two headless Chromiums as deadwax.test over plain http, james
+at 390 and ethan at 1440x900; 15 checks): james Got Dummy from the sources; ethan's album page said
+"From glassbeads · FLAC 16/44.1 · 0 of 11 files" and "...one download, everyone who asked waiting for
+it.", its Join 14px and 34px tall as Get; Join from the keyboard (Enter) left the focus on the store
+box - as "Joined" showed, and after the line became his ("Someone else asked for it too, so
+cancelling it in Requests only takes it off your list..."); in Requests his Dummy row said "Someone
+else asked for it too" (no names), its ✕ "Leave Dummy" and the question "Leave Dummy?", and Leave it
+from the keyboard took the row away with the focus on his other card and the live region saying
+"Dummy: left - it carries on for whoever else asked", the download still going for james; no console
+errors. Not looked at there: the main page's store box and its "Joined ✓" card, and the Sources
+panel's Join (sim-checked).
+**NOT verified**: on James's iPhone (Join and Leave it under a finger); against a real slskd with
+two people searching at once (the 429 is read from slskd's source and rehearsed with a fake that
+refuses an overlapping start); the copy's quality for a download started on the main page before this
+version (none kept: the format alone, from its files' names).

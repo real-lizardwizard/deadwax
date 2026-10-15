@@ -869,6 +869,13 @@ class Config:
                 f"it is set in the container's environment",
                 extra={"frontend": True},
             )
+        organizing = cls.describe_logins_organizing()
+        if organizing:
+            logger.error(
+                f"logins are on but {organizing} Every request but the health check and the pages answers "
+                f"503 saying so (the app's sign-in screen shows it).",
+                extra={"frontend": True},
+            )
         admins = sorted(cls.admins())
         if not admins:
             logger.error(
@@ -905,6 +912,37 @@ class Config:
     @classmethod
     def organizing_enabled(cls) -> bool:
         return bool(cls.SLSKD_DOWNLOAD_PATH and cls.LIBRARY_PATH and cls.ORGANIZE_MODE != "off")
+
+    @classmethod
+    def describe_logins_organizing(cls) -> str | None:
+        """
+        Why logins can't be on with organizing as it is - or None when it files (2.0.0-player.49).
+
+        With logins on, downloads are each person's own, and what someone asked for is theirs once it is
+        FILED: under dry_run (or off) nothing ever is, so nothing could be granted to the people who
+        asked, nor found already held for the next. So logins need ORGANIZE_MODE copy or move, with
+        both of organizing's folders set (organizing_enabled). Said where the value comes from: a mode
+        saved in the settings tab beats the environment, and with logins refused that tab can't be
+        reached - so the way back is through logins off.
+        """
+        if cls.ORGANIZE_MODE not in ("copy", "move"):
+            where = (
+                "it's saved in the settings tab, which beats the environment: switch logins off "
+                "(AUTH_MODE=off), set Organize mode there to copy or move, and switch them on again"
+                if "ORGANIZE_MODE" in cls.OVERRIDDEN
+                else "set ORGANIZE_MODE=copy or move in the container's environment and restart deadwax"
+            )
+            return (f"ORGANIZE_MODE is '{cls.ORGANIZE_MODE}', so nothing downloaded would ever be filed into "
+                    f"the library - and with logins on each download is the person's who asked for it, which "
+                    f"needs it filed. Until it's copy or move nobody can use deadwax: {where}.")
+        missing = [name for name in ("SLSKD_DOWNLOAD_PATH", "LIBRARY_PATH") if not getattr(cls, name)]
+        if missing:
+            return (f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so nothing "
+                    f"downloaded would ever be filed into the library - and with logins on each download is the "
+                    f"person's who asked for it, which needs it filed. Until organizing is on nobody can use "
+                    f"deadwax: set {' and '.join(missing)} and restart deadwax (or set "
+                    f"{'it' if len(missing) == 1 else 'them'} in the settings tab with logins off).")
+        return None
 
 
 SEARCH_TIMEOUT_RANGE = (3, 60)

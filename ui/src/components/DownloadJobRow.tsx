@@ -2,6 +2,7 @@ import { readPreferences } from '../state/persisted'
 
 import type { DownloadJob } from '../api/types'
 import { JOB_STATUS_CLASS, isActive, jobDetailClass, jobDetailText } from '../lib/jobs'
+import { askedByText, cancelWords } from '../lib/perPerson'
 
 interface Props {
   job: DownloadJob
@@ -49,6 +50,7 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
   //? point, so its progress takes the line back
   const problem = stopped ? retryProblem : null
   const percent = Math.round(job.progress || 0)
+  const askedBy = askedByText(job)
 
   const cancel = async (event: MouseEvent) => {
     event.stopPropagation()
@@ -64,7 +66,10 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
      */
     if (readPreferences().confirmCancel) {
       const label = [job.artist, job.album].filter(Boolean).join(' — ') || 'this download'
-      if (!confirm(`Cancel ${label}?\n\nYou'll lose your place in this peer's queue.`)) return
+      //? (2.0.0-player.49) shared with somebody else: a user's cancel leaves it, an admin's is for everyone
+      const question = job.shared ? `${label}\n\n${cancelWords(job).question}`
+        : `Cancel ${label}?\n\nYou'll lose your place in this peer's queue.`
+      if (!confirm(question)) return
     }
 
     try {
@@ -138,6 +143,9 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
 
       <div class="download-job-meta">
         <span class="text default-secondary download-job-user">{job.username}</span>
+        {/* with logins on (2.0.0-player.49): an admin's row who asked for it, a user's of a download
+            somebody else waits for too "Someone else asked for it too" (askedByText) */}
+        {askedBy && <span class="text default-muted">· {askedBy}</span>}
         <span class="text default-muted">·</span>
         <span class={`download-job-detail text ${problem ? 'red' : jobDetailClass(job)}`}>
           {problem ?? jobDetailText(job, liveSpeed)}

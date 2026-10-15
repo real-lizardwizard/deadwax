@@ -27,7 +27,8 @@ from src import auth
 from src.config import Config
 
 #? The one user there is while logins are off. Rows saved per user before logins exist are saved
-#? under this name, which is what the first admin's sign-in takes over (JobStore.adopt_local).
+#? under this name, which is what the first admin's sign-in takes over (JobStore.adopt_local) - or, since
+#? 2.0.0-player.49, the first admin seen with a session after a start (src/auth.py _take_over_leftovers).
 LOCAL_USER = "local"
 
 #? What a signed-in user who isn't an admin is told by an admin-only route.

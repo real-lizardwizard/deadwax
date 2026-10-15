@@ -111,6 +111,7 @@ exports.ChevronLeftIcon = exports.ChevronDownIcon = exports.CheckIcon = exports.
 //? the store's answer for a pressing (2.0.0-player.15), faked; and the opener a tap would focus
 fs.writeFileSync(path.join(OUT, 'api/download.js'), `
 exports.storeState = (body, signal) => globalThis.__group.storeState(body, signal)
+exports.joinJob = (jobId) => globalThis.__group.joinJob(jobId)
 `)
 fs.writeFileSync(path.join(OUT, 'app/useSheet.js'), `
 exports.takeOpener = (event) => event.currentTarget
@@ -493,6 +494,35 @@ async function main() {
     await settle()
     draw()
     check('...then no longer said', find((node) => node.type === StoreState)[0]?.props.status ?? null, null)
+  }
+
+  console.log('\nsomebody else\'s download on the album page (2.0.0-player.49): Join from the line, then the store asked again')
+  {
+    const { StoreState } = require(path.join(OUT, 'app/StoreState.js'))
+    stateAsks.length = 0
+    const joins = []
+    globalThis.__group.joinJob = (jobId) => { joins.push(jobId); return Promise.resolve({ status: 'ok', job_id: jobId, joined: true }) }
+    const { draw } = page({ id: slowRush.group.id, preview: PREVIEW })
+    draw()
+    stateAsks.at(-1).resolve({ held: null, downloading: { job_id: 12, status: 'queued', username: 'glassbeads', files: 12, yours: false,
+      formats: ['flac'], bitrates: [], bit_depths: [16], sample_rates: [44100], variable_bitrate: false }, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    const box = find((node) => node.type === StoreState)[0]
+    check('"Already downloading for someone else" under Get, what you\'d get, and a way to join it',
+      [box?.props.status.title, box?.props.status.lines[0], box?.props.status.joinJobId, typeof box?.props.onJoin],
+      ['Already downloading for someone else', 'From glassbeads · FLAC 16/44.1 · queued', 12, 'function'])
+    const asksBefore = stateAsks.length
+    await box.props.onJoin(12)
+    draw()
+    check('Join joins it - and the store is asked again, so the line can say it is yours', [joins, stateAsks.length], [[12], asksBefore + 1])
+    stateAsks.at(-1).resolve({ held: null, downloading: { job_id: 12, status: 'queued', username: 'glassbeads', files: 12, yours: true, shared: true,
+      formats: ['flac'] }, downloading_part: null, other_pressings: [] })
+    await settle()
+    draw()
+    check('...and it does: yours now, a cancel only taking it off your list', find((node) => node.type === StoreState)[0]?.props.status,
+      { kind: 'downloading', title: 'Already downloading', lines: ['From glassbeads · queued',
+        "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another peer isn't offered for a download you share."] })
   }
 
   console.log('\na cold link: Get builds from the group the pressings carry, the pressing\'s credit where it has none')

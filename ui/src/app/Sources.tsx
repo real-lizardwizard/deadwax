@@ -7,8 +7,10 @@ import { useDismiss } from '../hooks/useDismiss'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import {
   NOTHING_LOSSLESS_NOTE, SIGNAL_LABELS, SORT_LABELS, candidateKey, noSignalMinimums, nothingLossless, nothingLosslessLine, passesFilters,
-  queriesText, searchedLine, searchingLine, sortCandidates, sourcesAnnouncement, storeNotes, storeStatus, type CandidateSort,
+  queriesText, searchedLine, searchingLine, sortCandidates, sourcesAnnouncement, storeNotes, type CandidateSort,
 } from '../lib/candidates'
+import { joinDownload } from '../lib/downloadRequests'
+import { storeStatusFor } from '../lib/perPerson'
 import {
   GET_SETTINGS_DEFAULT, NO_SOURCE_FILTERS, PICK_SORT, candidateFilters, floorFilters, pressedCount, signalsSet, sourceChips,
   type SourceFilters,
@@ -225,6 +227,9 @@ export function Sources({
   filtersNow.current = filters
   const minimumsNow = useRef(minimums)
   minimumsNow.current = minimums
+  //? what the sheet shows now, read as a join answers (2.0.0-player.49)
+  const showingNow = useRef({ open, key: request?.key })
+  showingNow.current = { open, key: request?.key }
 
   const state = useCandidateSearch({
     //? read as the answer lands: the settings as they are then, and the chips
@@ -377,7 +382,16 @@ export function Sources({
     if (state.download(candidate, shown)) onQueued()
   }
 
-  const status = result ? storeStatus(result, 'Requests') : null
+  //? (2.0.0-player.49) a download somebody else asked for is yours to join - judged against your floor -
+  //? and joining hands over to Requests, as a Get does
+  const status = result ? storeStatusFor(result, 'Requests', floor) : null
+  const join = (jobId: number) => {
+    const asked = request?.key
+    //? handed over only while the sheet still shows the Get that joined (closed meanwhile, it stays closed)
+    return joinDownload(jobId).then(() => {
+      if (showingNow.current.open && showingNow.current.key === asked) onQueued()
+    })
+  }
   const notes = result ? storeNotes(result) : []
   const announcement = search
     ? sourcesAnnouncement({
@@ -480,7 +494,7 @@ export function Sources({
               </button>
             </div>
           ) : status ? (
-            <StoreState status={status} notes={notes} />
+            <StoreState status={status} notes={notes} onJoin={join} />
           ) : (
             <>
               <StoreState status={null} notes={notes} />

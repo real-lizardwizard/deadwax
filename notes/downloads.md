@@ -4,6 +4,10 @@ The candidates panel, quality filters, retries, peers' speeds and the downloads 
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 
+**With logins on, downloads are per person** (2.0.0-player.49): who sees which, joining a download
+somebody else asked for, cancel as leave, retry by any requester, Clear finished as hide, and one
+Soulseek search starting at a time - notes/logins.md "Downloads per person (2.0.0-player.49)".
+
 ### The candidates panel in Preact (v0.9.10)
 
 One of the 1.0 items, and first because the quality filters and "retry with the next peer" build

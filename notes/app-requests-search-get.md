@@ -645,7 +645,9 @@ and the sources are for; "Get the album" is the screen's ONE solid purple button
   as one. The client store `app/useGetSettings.ts` (a module, as useOwned): asked when Search first
   shows, each time You's tab is opened (its new `current` prop) and on Check again, and each time
   the sheet opens (since 2.0.0-player.41 before every search it starts - see "Get, as the main page
-  had it") - never at start-up - an answer in hand ASKED AGAIN and standing meanwhile (a
+  had it"), and since 2.0.0-player.49 each time an album page shows (its store line judges somebody
+  else's download against the floor - notes/logins.md "Downloads per person") - never at start-up
+  from a tab mounted hidden - an answer in hand ASKED AGAIN and standing meanwhile (a
   change made on another device arrives in a home-screen app left open for days - review); the
   defaults until the first answer (a Get then shows the sources: the safe way round); SEEDED ONCE -
   a read with `seeded` false and `can_save` PUTs `seedFromPreferences(readPreferences())`, which is

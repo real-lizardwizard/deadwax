@@ -14,8 +14,11 @@ import { readDownloadDefaults, readPreferences } from '../state/persisted'
  * answer.
  *
  *  - ASKED when You or Search first shows, each time You's tab is opened, on You's "Check again", every
- *    time a Get opens the Sources sheet, and before every search the sheet starts (a Get or a pressing
- *    reaching a desktop panel already open, Try again, a Re-search - review) - never as the app starts. They are kept per user so
+ *    time a Get opens the Sources sheet, before every search the sheet starts (a Get or a pressing
+ *    reaching a desktop panel already open, Try again, a Re-search - review), and each time an album
+ *    page shows (2.0.0-player.49: its store line judges a download somebody else asked for against the
+ *    quality floor - asked beside the store, so the floor's word is in hand as the line draws, and the
+ *    page's own Get has them) - never as the app starts, from a tab mounted hidden. They are kept per user so
  *    they follow a person between devices, and a home-screen app stays open for days: an answer in
  *    hand is asked again rather than trusted for the page's life (review), and stands meanwhile.
  *    Until the first answer is in, the settings are the defaults, and a Get shows the sources: the

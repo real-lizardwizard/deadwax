@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
@@ -10,12 +10,13 @@ from src.config import Config, search_timeout_seconds
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
-from src.poller import (job_outcome, retry_next_peer, retry_same_peer, tidy_cancelled_later,
+from src.poller import (job_lock_key, job_outcome, retry_next_peer, retry_same_peer, tidy_cancelled_later,
                         tidy_cancelled_transfers, untried_alternatives)
 from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
-from src.store_index import (already_have, describe_job, filing_folder, held_copy, in_flight,
-                             other_pressings, release_lock)
+from src.store_index import (FILING_STATUSES, already_have, coming_now, describe_job, filing_folder, held_copy,
+                             in_flight, is_whole, other_pressings, release_lock)
+from src.users import current_user, is_admin
 
 router = APIRouter()
 
@@ -127,12 +128,27 @@ class EnqueueRelease(BaseModel):
     edition_label: str | None = None
 
 
+class Quality(BaseModel):
+    """
+    What a folder's files are, as its candidate showed them (2.0.0-player.49) - kept with the job
+    (store.quality_json) so someone offered to join the download is told what they'd get. Declared,
+    every field: pydantic drops what it wasn't told about without a word.
+    """
+    formats: list[str] = Field(default_factory=list)
+    bitrates: list[int | float] = Field(default_factory=list)
+    bit_depths: list[int | float] = Field(default_factory=list)
+    sample_rates: list[int | float] = Field(default_factory=list)
+    variable_bitrate: bool | None = None
+
+
 class Alternative(BaseModel):
     """A runner-up from the candidates list - somewhere else the same album could come from."""
     username: str
     directory: str = ""
     files: list[EnqueueFile]
     score: float | None = None
+    #? (2.0.0-player.49) its quality, which the job takes on if a retry moves it here
+    quality: Quality | None = None
 
 
 class EnqueueRequest(BaseModel):
@@ -144,6 +160,17 @@ class EnqueueRequest(BaseModel):
     #? peer". Declared - pydantic drops an undeclared field without a word, the trap this file
     #? has fallen into four times - and optional, so a caller that sends none still works.
     alternatives: list[Alternative] = Field(default_factory=list)
+    #? the picked folder's quality (2.0.0-player.49) - optional, as everything added since is
+    quality: Quality | None = None
+
+
+def _asker(user) -> str:
+    """
+    Who is asking: the user FastAPI resolved for the request (current_user, in the route's signature)
+    - or, for a route called straight from Python, as the tests call them, whoever current_user says
+    with no request at all: `local` with logins off, and a 401 with them on (never a guess).
+    """
+    return user if isinstance(user, str) else current_user()
 
 
 #? How long the Soulseek search will wait on MusicBrainz for an artist's former names. It runs
@@ -270,20 +297,24 @@ def _nothing_here() -> dict:
     return {"downloading": None, "downloading_part": None, "held": None, "other_pressings": []}
 
 
-async def _describe_in_flight(request: Request, job: dict) -> dict:
-    """describe_job, with how far it has got: slskd's count while it downloads, every file after."""
-    described = describe_job(job)
+async def _describe_in_flight(request: Request, job: dict, user: str | None = None) -> dict:
+    """describe_job, with how far it has got: slskd's count while it downloads, every file after - and,
+    with logins on (2.0.0-player.49), whether it's the asker's own, whether somebody else waits for it
+    and what the copy is."""
+    requesters = await request.app.state.store.requesters(job["id"]) if Config.logins_on() else None
+    described = describe_job(job, user, requesters, admin=bool(user) and is_admin(user))
     if job["status"] in OPEN_STATUSES:
         done = await _files_done(request.app.state.slskd_client, job)
         if done is not None:
             described["done_files"] = done
-    else:
+    elif job["status"] in FILING_STATUSES:
         #? organizing, or complete and about to be: every file is in
         described["done_files"] = described["files"]
+    #? failed, its retry pending (2.0.0-player.49): moving to its next peer - nothing is in from it yet
     return described
 
 
-async def _store_state(request: Request, body: "FindCandidatesRequest") -> dict:
+async def _store_state(request: Request, body: "FindCandidatesRequest", user: str | None = None) -> dict:
     """
     What the library and the downloads already have of this pressing (step 2), for a Find:
     {"downloading", "downloading_part", "held", "other_pressings"}. Only for a release with an
@@ -292,7 +323,9 @@ async def _store_state(request: Request, body: "FindCandidatesRequest") -> dict:
 
     `downloading` is a job bringing the WHOLE pressing in (as many files as it has audio tracks),
     which stops the search. A job for part of it - a lone disc folder, a 9-of-10 folder - will
-    never bring the rest, so it is `downloading_part`, a note, and the search runs.
+    never bring the rest, so it is `downloading_part`, a note, and the search runs. With logins on
+    (2.0.0-player.49) each says whether it is `user`'s own - one somebody else asked for is theirs to
+    join - and what its copy is (describe_job).
     """
     state = _nothing_here()
     if not body.release_mbid:
@@ -305,12 +338,12 @@ async def _store_state(request: Request, body: "FindCandidatesRequest") -> dict:
         state["other_pressings"] = await other_pressings(store, root, body.release_group_mbid, body.release_mbid)
         job = await in_flight(store, body.release_mbid, release=release)
         if job is not None:
-            state["downloading"] = await _describe_in_flight(request, job)
+            state["downloading"] = await _describe_in_flight(request, job, user)
             return state
 
         part = await in_flight(store, body.release_mbid, release=release, whole=False)
         if part is not None:
-            state["downloading_part"] = await _describe_in_flight(request, part)
+            state["downloading_part"] = await _describe_in_flight(request, part, user)
         held = await held_copy(store, root, body.release_mbid, release)
         if held is not None and not held["complete"]:
             #? a download fills in a part only when filing would put it in that very folder
@@ -324,7 +357,7 @@ async def _store_state(request: Request, body: "FindCandidatesRequest") -> dict:
 
 
 @router.post("/store_state")
-async def store_state(request: Request, body: FindCandidatesRequest):
+async def store_state(request: Request, body: FindCandidatesRequest, user: str = Depends(current_user)):
     """
     What the library and the downloads already have of this pressing - and NO Soulseek search
     (2.0.0-player.15). The app's album-you-don't-have page asks it before Get, so it can say
@@ -334,11 +367,11 @@ async def store_state(request: Request, body: FindCandidatesRequest):
     The body is a Find's (the release the Get would download), so the same pressing is judged the
     same way by both. Never fails: a check that can't be made says nothing.
     """
-    return await _store_state(request, body)
+    return await _store_state(request, body, _asker(user))
 
 
 @router.post("/find_candidates")
-async def find_candidates(request: Request, body: FindCandidatesRequest):
+async def find_candidates(request: Request, body: FindCandidatesRequest, user: str = Depends(current_user)):
     """
     Search Soulseek for the release the user picked and rank what comes back against it.
 
@@ -360,7 +393,7 @@ async def find_candidates(request: Request, body: FindCandidatesRequest):
 
         #? before any search starts - a few indexed reads, and per folder held a listing and each
         #? audio file's tags (existing_tracks), in a thread
-        store_state = await _store_state(request, body)
+        store_state = await _store_state(request, body, _asker(user))
         if store_state["downloading"] or (store_state["held"] and store_state["held"]["complete"]):
             what = "downloading" if store_state["downloading"] else "in your library"
             logger.info(f"not searching for {body.artist} - {body.album}: it is already {what}",
@@ -549,9 +582,9 @@ def _serialize_candidate(candidate: dict) -> dict:
 
 
 @router.post("/enqueue")
-async def enqueue(request: Request, body: EnqueueRequest):
+async def enqueue(request: Request, body: EnqueueRequest, user: str = Depends(current_user)):
     """
-    Queue a download with slskd, and record the job.
+    Queue a download with slskd, and record the job - and who asked for it (2.0.0-player.49).
 
     Refused with 409 when the whole release is already downloading, or already in the library
     complete (step 2) - Find says so first, so this is the race it can't see: a second tab, a
@@ -559,14 +592,31 @@ async def enqueue(request: Request, body: EnqueueRequest):
     folder) refuses nothing: it will never bring the rest. The check, slskd's enqueue and the
     job's row are all under the release's lock, so of two at once only one reaches slskd; the
     other finds its job. A release with no id is neither checked nor locked.
+
+    Per person (2.0.0-player.49), with logins on: the whole release already on its way for SOMEBODY
+    ELSE is joined rather than refused - a request on that job, nothing asked of slskd (`joined`, and
+    its `job_id`). Only one already waiting for it is refused, as before. With logins off there is one
+    user, and every download already on its way is refused, as it always was - even one somebody asked
+    for while logins were on.
     """
+    user = _asker(user)
     try:
         slskd_client = request.app.state.slskd_client
+        store = getattr(request.app.state, "store", None)
         files = [f.model_dump() for f in body.files]
         release = body.release.model_dump()
 
         async with release_lock(release.get("release_mbid")):
-            problem = await already_have(getattr(request.app.state, "store", None), release)
+            #? the whole pressing already coming for someone else: join it, under the same lock (logins on)
+            coming = await in_flight(store, release.get("release_mbid"), release=release) if Config.logins_on() else None
+            if coming is not None and user not in await store.requesters(coming["id"]):
+                #? 'waiting', 'gone' (cleared since) or None fall through: already_have says what's true now
+                if await store.request_job(coming["id"], user) == "joined":
+                    logger.info(f"{user} joined the download of {coming.get('artist')} - {coming.get('album')} "
+                                f"from {coming.get('username')}", extra={"frontend": True, "src": "slskd"})
+                    return {"status": "ok", "queued": 0, "job_id": coming["id"], "joined": True}
+
+            problem = await already_have(store, release)
             if problem:
                 #? the downloads panel shows this on the row you just asked for, as "refused: ..."
                 raise HTTPException(status_code=409, detail=problem)
@@ -584,7 +634,10 @@ async def enqueue(request: Request, body: EnqueueRequest):
                 directory=body.directory,
                 files=files,
                 release=release,
-                alternatives=[a.model_dump() for a in body.alternatives],
+                #? a runner-up sent without a quality is stored as it always was
+                alternatives=[a.model_dump(exclude=None if a.quality else {"quality"}) for a in body.alternatives],
+                user=user,
+                quality=body.quality.model_dump() if body.quality else None,
             )
 
         return {"status": "ok", "queued": len(files), "job_id": job_id}
@@ -597,17 +650,39 @@ async def enqueue(request: Request, body: EnqueueRequest):
         raise HTTPException(status_code=500, detail=f"Error queueing download: {e}")
 
 
+def _per_person(job: dict, user: str, admin: bool) -> dict:
+    """
+    What a row says about who asked for it, with logins on (2.0.0-player.49): `mine` (the asker's
+    request on it is active - always, in a user's own list), `shared` (somebody else's is too: a
+    cancel there only withdraws yours, or - an admin's - cancels it for them as well) and, for an
+    admin, `requested_by`: the OTHER people waiting for it, in the order they asked - "you and
+    ethan". Nothing with logins off: one user, and the rows as they always were.
+    """
+    if not Config.logins_on():
+        return {}
+    requesters = job.get("requesters") or []
+    others = [name for name in requesters if name != user]
+    return {"mine": user in requesters, "shared": bool(others), **({"requested_by": others} if admin else {})}
+
+
 @router.get("/jobs")
-async def jobs(request: Request):
+async def jobs(request: Request, user: str = Depends(current_user)):
     """
     Tracked download jobs, merged with live progress from slskd.
 
     Progress is computed per request rather than stored - slskd is the source of truth for
     it and it changes every second, so persisting it would be churn for no benefit.
+
+    Per person (2.0.0-player.49): a user's own - the downloads they're waiting for, joined ones too
+    - and an admin's everyone's, but those they cleared, each saying who asked (_per_person). With
+    logins off the one user is `local`, the admin, and every download is theirs.
     """
+    user = _asker(user)
+    admin = is_admin(user)
     try:
         store = request.app.state.store
-        stored = await store.list_jobs()
+        #? with logins off, every download, as it always was
+        stored = await (store.list_jobs(user=user, everyone=admin) if Config.logins_on() else store.list_jobs())
 
         if not stored:
             return {"jobs": [], "tracking_enabled": store.available}
@@ -667,6 +742,7 @@ async def jobs(request: Request):
                 #? (list_jobs reads the runners-up for no other job), and 0 hides the button
                 **({"alternatives_left": len(untried_alternatives(job))}
                    if job["status"] in RETRYABLE_STATUSES else {}),
+                **_per_person(job, user, admin),
             })
 
         return {"jobs": merged, "tracking_enabled": store.available}
@@ -686,8 +762,20 @@ async def _first_queue_position(slskd_client, job: dict, transfers_by_user: dict
     return None
 
 
+async def _job_for(request: Request, job_id: int, user: str) -> dict:
+    """
+    The download, if `user` may act on it - an admin any, anyone else one they're waiting for
+    (2.0.0-player.49) - else 404, as for no download at all: somebody else's isn't theirs to see.
+    """
+    store = request.app.state.store
+    job = await store.get_job(job_id)
+    if job is None or not (is_admin(user) or user in await store.requesters(job_id)):
+        raise HTTPException(status_code=404, detail="No such download job")
+    return job
+
+
 @router.post("/jobs/{job_id}/cancel")
-async def cancel_job(request: Request, job_id: int):
+async def cancel_job(request: Request, job_id: int, user: str = Depends(current_user)):
     """
     Stop a download and mark the job cancelled.
 
@@ -697,61 +785,31 @@ async def cancel_job(request: Request, job_id: int):
     folder is removed only when SLSKD_INCOMPLETE_PATH says where that folder is - slskd keeps
     partials deliberately so a retried download can resume from them, so pointing deadwax at
     it is the explicit "no, a cancelled download is finished with" signal.
+
+    Cancel means LEAVE (2.0.0-player.49): a user's cancel withdraws their request (`left`), and the
+    download carries on for whoever else is waiting for it; slskd is cancelled, and the partials
+    removed, only when the last one waiting leaves - or an admin cancels, which is for everyone.
+    Decided under the job's lock (poller.job_lock_key), so a join or a retry is never half-way
+    through as the last request goes. With logins off the one user is the admin: as it always was.
     """
+    user = _asker(user)
     try:
         store = request.app.state.store
-        job = await store.get_job(job_id)
+        job = await _job_for(request, job_id, user)
 
-        if job is None:
-            raise HTTPException(status_code=404, detail="No such download job")
-
-        slskd_client = request.app.state.slskd_client
-        downloads = await slskd_client.get_downloads([job["username"]])
-        transfers_by_user = index_transfers_by_user(downloads)
-
-        wanted = {f["filename"] for f in job["files"]}
-        cancelled = 0
-
-        for transfer in transfers_by_user.get(job["username"], []):
-            if transfer.get("filename") in wanted and transfer.get("id"):
-                if await slskd_client.cancel_download(job["username"], transfer["id"]):
-                    cancelled += 1
-
-        await store.update_status(job_id, "cancelled", "cancelled from deadwax")
-
-        #? slskd removes a transfer from its list only once the cancel has SETTLED, which is a
-        #? moment after this - so the removal is asked for again when it has (see poller.py)
-        tidy_cancelled_later(slskd_client, job)
-
-        #? After the transfers are cancelled, never before: slskd holds the file open while a
-        #? transfer is live, and deleting it underneath would be a race with slskd's own writer.
-        removed = await asyncio.to_thread(
-            remove_incomplete_downloads,
-            Config.SLSKD_INCOMPLETE_PATH or "",
-            job["files"],
-            job.get("directory", ""),
-        )
-
-        logger.info(
-            f"cancelled {job['artist']} - {job['album']} ({cancelled} transfer(s))"
-            + (f", removed {len(removed['removed'])} partial file(s)" if removed["removed"] else ""),
-            extra={"frontend": True, "src": "slskd"},
-        )
-
-        for skipped in removed["skipped"]:
-            logger.warning(
-                f"left a partial file in place: {skipped}",
-                extra={"frontend": True, "src": "slskd"},
-            )
-
-        return {
-            "status": "ok",
-            "cancelled": cancelled,
-            "partials_removed": len(removed["removed"]),
-            #? surfaced rather than swallowed so "why is my incomplete folder still full" has
-            #? an answer in the response as well as the log
-            "partials_problem": removed["problem"],
-        }
+        async with release_lock(job_lock_key(job)):
+            if not is_admin(user):
+                outcome = await store.leave_job(job_id, user)
+                if outcome == "none":
+                    raise HTTPException(status_code=404, detail="No such download job")
+                if outcome == "left":
+                    logger.info(f"{user} left {job['artist']} - {job['album']}; it carries on for whoever else asked",
+                                extra={"frontend": True, "src": "slskd"})
+                    return {"status": "ok", "left": True, "cancelled": 0, "partials_removed": 0,
+                            "partials_problem": None}
+            #? the last request, or an admin: the download itself, as it is now
+            job = await store.get_job(job_id) or job
+            return await _cancel_download(request, job)
 
     except HTTPException:
         raise
@@ -761,19 +819,73 @@ async def cancel_job(request: Request, job_id: int):
         raise HTTPException(status_code=500, detail=f"Error cancelling download: {e}")
 
 
+async def _cancel_download(request: Request, job: dict) -> dict:
+    """The download itself cancelled: slskd's transfers, the status, the tidy, the partials."""
+    store = request.app.state.store
+    job_id = job["id"]
+    slskd_client = request.app.state.slskd_client
+    downloads = await slskd_client.get_downloads([job["username"]])
+    transfers_by_user = index_transfers_by_user(downloads)
+
+    wanted = {f["filename"] for f in job["files"]}
+    cancelled = 0
+
+    for transfer in transfers_by_user.get(job["username"], []):
+        if transfer.get("filename") in wanted and transfer.get("id"):
+            if await slskd_client.cancel_download(job["username"], transfer["id"]):
+                cancelled += 1
+
+    await store.update_status(job_id, "cancelled", "cancelled from deadwax")
+
+    #? slskd removes a transfer from its list only once the cancel has SETTLED, which is a
+    #? moment after this - so the removal is asked for again when it has (see poller.py)
+    tidy_cancelled_later(slskd_client, job)
+
+    #? After the transfers are cancelled, never before: slskd holds the file open while a
+    #? transfer is live, and deleting it underneath would be a race with slskd's own writer.
+    removed = await asyncio.to_thread(
+        remove_incomplete_downloads,
+        Config.SLSKD_INCOMPLETE_PATH or "",
+        job["files"],
+        job.get("directory", ""),
+    )
+
+    logger.info(
+        f"cancelled {job['artist']} - {job['album']} ({cancelled} transfer(s))"
+        + (f", removed {len(removed['removed'])} partial file(s)" if removed["removed"] else ""),
+        extra={"frontend": True, "src": "slskd"},
+    )
+
+    for skipped in removed["skipped"]:
+        logger.warning(
+            f"left a partial file in place: {skipped}",
+            extra={"frontend": True, "src": "slskd"},
+        )
+
+    return {
+        "status": "ok",
+        #? (2.0.0-player.49) the download itself was cancelled - not only a request withdrawn
+        "left": False,
+        "cancelled": cancelled,
+        "partials_removed": len(removed["removed"]),
+        #? surfaced rather than swallowed so "why is my incomplete folder still full" has
+        #? an answer in the response as well as the log
+        "partials_problem": removed["problem"],
+    }
+
 
 @router.post("/jobs/{job_id}/retry")
-async def retry_job(request: Request, job_id: int):
+async def retry_job(request: Request, job_id: int, user: str = Depends(current_user)):
     """
     Move a failed or cancelled download to the next peer from the list it was picked from
     (v0.9.12). Answers 200 either way: `moved` false with a `problem` - every peer refused, or
-    none left to try - is an outcome to show on the row, not a server error.
+    none left to try - is an outcome to show on the row, not a server error. Open to anyone
+    waiting for it, and an admin (2.0.0-player.49): the one download moves, and everyone waiting
+    moves with it.
     """
     store = request.app.state.store
-    job = await store.get_job(job_id)
+    job = await _job_for(request, job_id, _asker(user))
 
-    if job is None:
-        raise HTTPException(status_code=404, detail="No such download job")
     if job["status"] not in RETRYABLE_STATUSES:
         raise HTTPException(status_code=409, detail=f"this download is {job['status']}, not failed or cancelled")
 
@@ -785,17 +897,16 @@ async def retry_job(request: Request, job_id: int):
 
 
 @router.post("/jobs/{job_id}/retry_same")
-async def retry_job_same_peer(request: Request, job_id: int):
+async def retry_job_same_peer(request: Request, job_id: int, user: str = Depends(current_user)):
     """
     Ask the same peer for a failed or cancelled download again (v1.0.7), for the files that
     didn't arrive. 200 either way, as /retry: `retried` false with a `problem` - the peer
-    refused, or slskd is still stopping the last attempt - is shown on the row.
+    refused, or slskd is still stopping the last attempt - is shown on the row. Open to anyone
+    waiting for it, and an admin, as /retry is (2.0.0-player.49).
     """
     store = request.app.state.store
-    job = await store.get_job(job_id)
+    job = await _job_for(request, job_id, _asker(user))
 
-    if job is None:
-        raise HTTPException(status_code=404, detail="No such download job")
     if job["status"] not in RETRYABLE_STATUSES:
         raise HTTPException(status_code=409, detail=f"this download is {job['status']}, not failed or cancelled")
 
@@ -807,23 +918,86 @@ async def retry_job_same_peer(request: Request, job_id: int):
 
 
 @router.post("/jobs/clear")
-async def clear_jobs(request: Request):
-    """Forget finished jobs. Anything still moving is deliberately left alone."""
+async def clear_jobs(request: Request, user: str = Depends(current_user)):
+    """
+    Forget finished jobs. Anything still moving is deliberately left alone.
+
+    Per person (2.0.0-player.49), with logins on: "Clear finished" HIDES them from the asker's list -
+    an admin's, so everyone's in it - and a download goes for good once everyone who asked has cleared
+    it (or left it): store.hide_finished. `removed` is how many left the asker's list. With logins off
+    there is one user: every finished job is deleted, as it always was - one somebody asked for while
+    logins were on too.
+    """
+    user = _asker(user)
+    admin = is_admin(user)
+    logins = Config.logins_on()
     try:
         store = request.app.state.store
 
         #? the last chance to take a cancelled job's transfers out of slskd's list - once its
-        #? row is gone nothing can match them to it. Best effort: failing it clears anyway.
+        #? row is gone nothing can match them to it. Best effort: failing it clears anyway. With
+        #? logins on, only the jobs this clear will really delete: the rest are still somebody's.
         try:
-            cancelled = await store.jobs_with_status(("cancelled",))
+            cancelled = ([job for job in await store.jobs_to_forget(user, admin) if job["status"] == "cancelled"]
+                         if logins else await store.jobs_with_status(("cancelled",)))
             if cancelled:
                 await tidy_cancelled_transfers(request.app.state.slskd_client, cancelled)
         except Exception as e:
             logger.error(f"couldn't tidy cancelled transfers before clearing: {e}")
 
-        removed = await store.delete_jobs(CLEARABLE_STATUSES)
-        return {"status": "ok", "removed": removed}
+        if not logins:
+            return {"status": "ok", "removed": await store.delete_jobs(CLEARABLE_STATUSES)}
+        cleared = await store.hide_finished(user, admin)
+        return {"status": "ok", "removed": cleared[0] if cleared else 0}
 
     except Exception as e:
         logger.error(f"Exception in /jobs/clear: {e}")
         raise HTTPException(status_code=500, detail=f"Error clearing jobs: {e}")
+
+
+#? the join route's 409 for a download deleted since the page asked
+CLEARED_SINCE = "that download has been cleared from the list since - get it again"
+
+
+@router.post("/jobs/{job_id}/join")
+async def join_job(request: Request, job_id: int, user: str = Depends(current_user)):
+    """
+    Join a download somebody else asked for (2.0.0-player.49): the whole pressing already on its
+    way - Find's "Already downloading", the album page's line - becomes yours too, a request on the
+    one download rather than a second copy fetched. `joined` false: you were already waiting for it.
+
+    Only a download still coming (store.still_coming: queued, downloading, being filed, or failed
+    with its retry pending) and bringing the whole pressing; anything else is a 409 in words - it has
+    landed, stopped, or been cleared since the page asked. Under the job's lock, so it never lands
+    between a last request leaving and the download being cancelled.
+    """
+    user = _asker(user)
+    store = request.app.state.store
+    job = await store.get_job(job_id)
+    if job is None:
+        #? the usual way a Join meets no download: the last who asked cleared it from their list after
+        #? the page drew its line. Said in words, not "No such download job" - joining somebody else's
+        #? download is this route's point, so there is no id to hide (cancel and retry 404 instead)
+        raise HTTPException(status_code=409, detail=CLEARED_SINCE)
+
+    async with release_lock(job_lock_key(job)):
+        job = await store.get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=409, detail=CLEARED_SINCE)
+        if not coming_now(job):
+            ended = {"organized": "has been filed into the library", "complete": "has finished",
+                     "failed": "has failed", "cancelled": "has been cancelled"}.get(job["status"], f"is {job['status']}")
+            raise HTTPException(status_code=409, detail=f"that download {ended} since - get it again to see where it stands")
+        if not is_whole(job):
+            raise HTTPException(status_code=409, detail="that download brings only part of this pressing, so it can't be joined")
+        outcome = await store.request_job(job_id, user)
+
+    if outcome is None:
+        raise HTTPException(status_code=503, detail="deadwax couldn't write to its database, so you couldn't join it")
+    if outcome == "gone":
+        #? a clear (it takes no release lock) deleted it between the look above and the write
+        raise HTTPException(status_code=409, detail=CLEARED_SINCE)
+    if outcome == "joined":
+        logger.info(f"{user} joined the download of {job.get('artist')} - {job.get('album')} from {job.get('username')}",
+                    extra={"frontend": True, "src": "slskd"})
+    return {"status": "ok", "job_id": job_id, "joined": outcome == "joined"}

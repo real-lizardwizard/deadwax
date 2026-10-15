@@ -33,7 +33,13 @@ downloads, by its MusicBrainz release id:
 - **Already downloading**: a download of that whole pressing is queued or arriving. Soulseek
   isn't searched for this either. The panel names the user it's coming from and how far it has
   got ("queued", "4 of 10 files"). To try another user, cancel it in Downloads and press **Find**
-  again.
+  again. Since 2.0.0-player.49 a download that has just failed and is being moved to the next
+  user by itself (`AUTO_RETRY_PEER` on) counts too, for the few seconds that takes: it says
+  "failed - moving to the next peer", and nothing about cancelling it for another user, since it's
+  already going to one. With logins on, one somebody else asked for says **Already downloading for
+  someone else**, and you can join it; and one of yours that somebody else is waiting for too says
+  that cancelling it only takes it off your list - another user isn't offered for a download you
+  share ([below](#with-logins-on-downloads-per-person)).
 - **Part of it downloading**: a download of only some of its tracks is under way, such as one
   disc's folder on its own (fewer files than the pressing has tracks). It will never bring the
   rest, so the search runs as usual, with a note above the results naming the user and how far
@@ -271,7 +277,8 @@ elsewhere meanwhile) - the row there says **refused**, in their own words, under
 The sheet's other states:
 
 - **Already in your library** or **Already downloading**, in a box where the cards would be: Soulseek
-  wasn't searched. A download in flight is cancelled in Requests, if you want another user.
+  wasn't searched. A download in flight is cancelled in Requests, if you want another user (with
+  logins on, not one somebody else is waiting for too: the box says so).
 - Notes above the cards for a part held, a part downloading, and another pressing held.
 - **"41 folders on Soulseek, none pass your filters"**, with **Clear filters** and **Search again**.
 - **"Soulseek found nothing for "Portishead Third""**, with the query to edit and **Re-search**. An
@@ -371,7 +378,8 @@ since 2.0.0-player.15 so does starting one ([above](#on-the-phone-get-and-choosi
   **isn't answering just now**; or **Couldn't look it up just now** when deadwax itself didn't
   answer.
 - **Clear done**, at the top, does what **Clear finished** does: it removes every finished, failed
-  and cancelled download, the ones under Needs attention included.
+  and cancelled download, the ones under Needs attention included (with logins on, from your list -
+  [below](#with-logins-on-downloads-per-person)).
 
 Each album shows its cover from the Cover Art Archive (the pressing's front cover), or a plain
 square when there's none, or no internet to fetch it from.
@@ -389,6 +397,75 @@ whenever Home comes into view and whenever you come back to the app, so a downlo
 main page shows up without anything left running. If deadwax stops answering while something is on
 its way (restarting, or the phone off your network for a moment), the app keeps asking every half
 second until it answers, and Arriving says that what it shows is deadwax's last answer.
+
+## With logins on: downloads per person
+
+Since 2.0.0-player.49. With [logins](configuration.md#logins-environment-only) on, a download is
+the person's who asked for it. With them off there's one user, and everything above is exactly as
+it was (but for a download moving to its next user by itself counting as **Already downloading**,
+above) - downloads somebody asked for while logins were on included: every one is listed, **Clear
+finished** forgets every finished one, and a Get of a pressing one of them is bringing in is
+refused ("already downloading from bob") rather than joined.
+
+- **Who sees what.** Requests, Home's **Arriving** and the count on the Requests tab hold the
+  downloads *you* asked for, and the ones you joined. An admin sees everyone's, each row saying who
+  asked: **Asked by ethan**, or **Asked by you and ethan** for one you share (a row only you asked
+  for says nothing more). A user's row of a download somebody else is waiting for too says **Someone
+  else asked for it too** - never who. The main page's **Downloads** panel follows the same rules -
+  nobody but an admin sees somebody else's download there - with the same words beside the user.
+  The event log stays an admin's; a download that fails says why on its own row, as it always has.
+- **Joining.** A pressing somebody else is already downloading whole isn't fetched a second time.
+  The sources sheet, the line under **Get the album** and the main page's candidates panel say
+  **Already downloading for someone else** (or **Already downloaded for someone else** while it's
+  being filed), with what you'd get: the user it's coming from, its format and quality as their
+  folder showed it when it was picked, as a source card's Quality says it ("FLAC 24/96", "MP3
+  320k"; just the format, read off its files' names, when deadwax wasn't told more) and how far it
+  has got - and **Join this download**. Joining puts it in your Requests (the main page: Downloads)
+  too: one download, everyone who asked waiting for it. In the sheet it then switches to Requests,
+  as a Get does; on the album's page the line says it's yours. In the app, if the copy is below your
+  quality floor (You → Getting albums), or its folder doesn't say whether it meets it, the box says
+  so - getting a copy of your own instead isn't offered yet. A Get that reaches deadwax just as
+  somebody else's download of the same pressing has started joins it too, rather than being
+  refused - "Pick the best source for me" included: its row in Requests is then that download, from
+  their user, saying **Someone else asked for it too**, and the main page's card says **Joined ✓**
+  with why. Asking for one you're already waiting for is still refused ("already downloading from
+  bob"). Only a download still on its way can be joined - queued, downloading, being filed, or failed
+  and being moved to the next user by itself (`AUTO_RETRY_PEER`); one that has finished, stopped or
+  been cleared since the page asked is refused, saying which.
+- **Cancel means leave.** **✕** on a download somebody else is waiting for too takes away only your
+  request: it leaves your Requests and carries on for them. Its question says so - "Leave this
+  download? Someone else asked for it too, so it carries on for them.", with **Leave it** - and so
+  does the ✕ itself to a screen reader ("Leave …"), the card while it's asked ("leaving…") and,
+  once it's gone, the page ("left - it carries on for whoever else asked"). So a download you
+  share is no cancel away from another user: Get it again and you'd join it again. The
+  download itself is cancelled - slskd told, and the half-finished files removed when
+  `SLSKD_INCOMPLETE_PATH` is set - only when the last person waiting for it cancels (they then see it
+  cancelled, and can retry it), or when an admin cancels: an admin's ✕ is for everyone, and asks
+  "Cancel this download for everyone? ethan asked for it." with **Cancel for everyone**.
+- **Retrying.** **Next peer** and **Ask again** (the main page's **↻ next peer** and **↻ retry**) are
+  anyone's who is waiting for the download, and an admin's: the one download moves, and everyone
+  waiting moves with it. Anyone else's cancel or retry of it is answered as if it weren't there.
+- **Clear done** (the main page's **Clear finished**) clears finished, failed and cancelled downloads
+  from *your* list; a download is forgotten for good once everyone who asked has cleared it, or left
+  it. An admin's clears everyone's finished downloads from the admin's own list - the people who
+  asked still see theirs - and one cleared that way shows again if it's retried, whether the admin
+  asked for it too or not. A user who cleared a failed download somebody else then retries isn't
+  waiting for it any more, and it stays out of their list - until they Get it again.
+- **One Soulseek search starts at a time.** slskd refuses a search started while another is starting,
+  so two people's Finds or Gets at the same moment could fail one of them. Each search now waits its
+  turn to start - a moment, since only the start is held, not the listening for answers - and never
+  refuses; after 30 seconds' wait (slskd stuck on one) it starts anyway, and a start slskd still
+  hasn't answered after 30 seconds gives up its turn, so one stuck search holds the others up once,
+  not until deadwax restarts.
+- **Organizing has to be on.** With logins on, `ORGANIZE_MODE` must be `copy` or `move`, with
+  `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set: in dry run nothing is ever filed, so nothing could
+  become the people's who asked for it. Until it is, deadwax refuses everything but the health check
+  and the pages, saying why (see [troubleshooting](troubleshooting.md#locked-out-nobody-can-sign-in)),
+  and the settings tab won't switch organizing off while logins are on.
+- Downloads from before logins were switched on are the one user's from then, and the first admin to
+  sign in takes them over, with the pins and Getting albums settings - or, when an admin's session
+  outlived the restart that switched logins on (an upgrade from 2.0.0-player.48, or logins switched
+  off and on again), the first admin to use deadwax after it starts.
 
 ## The event log
 

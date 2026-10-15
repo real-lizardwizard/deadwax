@@ -4,6 +4,12 @@ The store index and the "already have it" checks.
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.
 
+**Step 4** (2.0.0-player.49, notes/logins.md "Downloads per person (2.0.0-player.49)"): `in_flight`
+now also counts a `failed` job whose retry is pending (`retry_pending`, `store.still_coming`), and
+/enqueue, with logins on, JOINS the whole pressing already coming for somebody else under the same
+`release_lock` rather than refusing it; the same person asking twice is still refused, and with
+logins off every one is refused, as before.
+
 ### Already in the store (step 2, 2.0.0-player.7)
 
 Step 2 of the multi-user plan (the plan is a Claude Doc, linked from the agent's memory): "Store
@@ -177,9 +183,10 @@ below).
   one album. A job no longer failed or cancelled answers `MOVED_ON`; a row that has GONE ("clear
   finished" while the retry waited) answers `CLEARED` - slskd would fetch an album no job watches -
   unless the store is down, when the caller's copy is all there is. A retry of a job with no
-  release id locks on the job (`poller._retry_lock`: `job:<id>`), so the re-read still stops two
-  retries of it at once. Two enqueues, or two retries, at once with a slow slskd reach slskd once.
-  An ENQUEUE with no release id takes no lock - two such provably run side by side.
+  release id locks on the job (`poller.job_lock_key`, formerly `_retry_lock`: `job:<id>`), so the
+  re-read still stops two retries of it at once. Two enqueues, or two retries, at once with a slow
+  slskd reach slskd once. An ENQUEUE with no release id takes no lock - two such provably run side
+  by side.
 - **Find's lookup costs little and runs before any search**: one indexed read for the release, one
   for its group, one for jobs, and per held folder a listing, the first file's release tag and each
   file's title and (disc, track); for a part held, one `resolve_album_dir`. For a download in flight it asks
