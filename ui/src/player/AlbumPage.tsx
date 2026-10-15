@@ -1,12 +1,15 @@
 import { Fragment } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
+import { addToMyLibrary, removeFromMyLibrary } from '../api/me'
 import { storeAlbum } from '../api/store'
 import type { StoreAlbumResponse } from '../api/types'
 import type { ViewerImage } from '../components/ArtViewer'
 import { AlbumProperties } from '../app/AlbumProperties'
 import { CoverViewer } from '../app/CoverViewer'
 import { PINS_UNSAVED, PinToggle } from '../app/PinToggle'
+import { keepJoinFocus } from '../app/StoreState'
+import { hasLibrary } from '../app/useMyLibrary'
 import { takeOpener } from '../app/useSheet'
 import { sayPins, setPinned, usePins } from '../app/usePins'
 import { discHeadings } from '../lib/discTitles'
@@ -15,7 +18,9 @@ import { editAlbum, type EditAlbum } from '../lib/albumEdit'
 import { albumProperties } from '../lib/albumProperties'
 import { alsoChips, otherPressingsGroup } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
+import { announceAddedToLibrary, announceRemovedFromLibrary } from '../lib/libraryEvents'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
+import { ADD_FROM_PAGE, albumMine } from '../lib/whose'
 import { album as fetchAlbum, coverFullUrl, coverUrl, prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
@@ -80,6 +85,19 @@ import type { Player } from './usePlayer'
  * songs, the album's Properties (app/AlbumProperties.tsx, lib/albumProperties.ts) - its year against this
  * pressing's, its size, its release on musicbrainz.org (opening beside the app) and when deadwax first saw
  * it - from the bridge's answer the page asks already, drawn once it has answered.
+ *
+ * Since 2.0.0-player.52 (step 6 of the multi-user plan), with logins on and a library of your own, "In your
+ * library" means YOURS (lib/whose.ts albumMine): an album Navidrome has is in the store, always - it says "In
+ * your library" when you starred it (Navidrome's `starred`, asked as you) or your library holds it (the
+ * bridge's `yours`), with Remove from my library under Play; else "In the store", with Add to my library (or a
+ * line saying why it can't be added). Each asks deadwax at once from its tap, waits (aria-disabled, so the
+ * focus stays), and gives way to what happened, handing its focus to the line; a refusal is said in an alert.
+ * Remove deletes nothing - its words say so - and asks for no confirmation: Add undoes it, and for an album
+ * Add can't put back (no release id, or a folder deadwax hasn't found) the line after it says how to have it
+ * back - star it in Amperfy (review). Whose it is waits for the album's own answer (its `starred`, never a
+ * list's tile) and the bridge's; until both are in, the chips row is unseen and the line under Play holds
+ * its place (review). With logins off, and for the break-glass admin, the badge reads "In your library" as
+ * it always did and nothing is offered.
  */
 export function AlbumPage({
   id,
@@ -127,6 +145,11 @@ export function AlbumPage({
   //? the cover, full size (2.0.0-player.44), and the control that opened it - focus goes back there
   const [viewing, setViewing] = useState<ViewerImage[] | null>(null)
   const viewOpener = useRef<HTMLElement | null>(null)
+  //? (2.0.0-player.52) Add to my library / Remove from my library: what this page just did, the ask out, a refusal
+  const [changed, setChanged] = useState<'added' | 'removed' | null>(null)
+  const [mineBusy, setMineBusy] = useState(false)
+  const [mineRefused, setMineRefused] = useState<string | null>(null)
+  const mineButton = useRef<HTMLButtonElement | null>(null)
 
   //? the refresh last asked for: a new one is an edit's (2.0.0-player.21), asked afresh and drawn over
   //? what is on screen rather than blanking it
@@ -161,6 +184,9 @@ export function AlbumPage({
       setStore(null)
       setStoreFailed(false)
     }
+    //? another album, or this one asked afresh: what the page last did is told by deadwax's answer now
+    setChanged(null)
+    setMineRefused(null)
     storeAlbum({ navidrome_id: id }, request.signal).then(
       (answer) => {
         if (request.current()) setStore(answer)
@@ -197,6 +223,48 @@ export function AlbumPage({
     kind: 'album', release_mbid: release, navidrome_id: id, label: shown?.name ?? '', sub: artistName, cover: shown?.coverArt ?? null,
   }
   const pinned = pinOf(pins, pinTarget) !== null
+
+  //? (2.0.0-player.52) whose it is - yours, or the store's - and what is offered. Starred by the album's OWN
+  //? answer, never a list's tile (review: one kept from before a Remove offered Remove again) - unknown until
+  //? it comes, or false once it has failed (the page says so; Add is harmless if it was starred after all)
+  const mine = albumMine({
+    personal: hasLibrary(),
+    starred: album ? !!album.starred : error ? false : null,
+    storeDone,
+    bridgeFailed: storeFailed,
+    bridgeYours: store?.yours,
+    present: store?.present.length ?? 0,
+    release,
+    releaseSaid: album ? album.musicBrainzId ?? '' : null,
+    changed,
+  })
+
+  const changeMine = (action: 'add' | 'remove') => {
+    if (mineBusy) return
+    setMineBusy(true)
+    setMineRefused(null)
+    const first = store?.present[0]
+    const asked = action === 'add'
+      ? addToMyLibrary({
+        artist: first?.artist || artistName, album_artist: first?.artist || artistName, artist_mbids: [],
+        album: first?.album || shown?.name || '', year: first?.year || null, original_year: null, release_mbid: release,
+        edition_tags: [], tracks: [], release_group_mbid: store?.release_group_mbid ?? null,
+      })
+      : removeFromMyLibrary(id)
+    asked.then(
+      () => {
+        keepJoinFocus(mineButton.current, '.app-album-mine')
+        setMineBusy(false)
+        setChanged(action === 'add' ? 'added' : 'removed')
+        if (action === 'add') announceAddedToLibrary()
+        else announceRemovedFromLibrary()
+      },
+      (caught: unknown) => {
+        setMineBusy(false)
+        setMineRefused(caught instanceof Error ? caught.message : String(caught))
+      },
+    )
+  }
 
   const play = (start: number | null, shuffle = false) => {
     if (!album || !tracks.length) return
@@ -276,10 +344,10 @@ export function AlbumPage({
         {/* drawn from the first frame: an "Also" chip landing in it moves nothing below. Unseen until the
             bridge has answered or failed (2.0.0-player.41), so "In your library" first shows where it
             stays - on a phone's centred row it slid sideways as "Other pressings" landed beside it */}
-        <div class={`app-album-chips${storeDone ? '' : ' is-waiting'}`}>
-          <span class="app-held-badge">
-            <CheckIcon class="app-held-badge-icon" />
-            <span class="app-held-badge-text">In your library</span>
+        <div class={`app-album-chips${storeDone && !mine.pending ? '' : ' is-waiting'}`}>
+          <span class={`app-held-badge${mine.yours === true ? '' : ' is-store'}`}>
+            {mine.yours === true && <CheckIcon class="app-held-badge-icon" />}
+            <span class="app-held-badge-text">{mine.badge}</span>
           </span>
           {chips.map((chip) => (
             <button
@@ -334,6 +402,43 @@ export function AlbumPage({
           )}
         </div>
       </div>
+
+      {/* (2.0.0-player.52) yours or the store's: Add to my library, or Remove from it - logins on only. While
+          whose it is is still to come and the songs are drawn, the line and Add most likely to land hold
+          their place, unseen (review: landing late, they pushed the songs down under a finger) */}
+      {mine.pending && album && !mineRefused && (
+        <div class="app-album-mine is-waiting" aria-hidden="true">
+          <p class="app-store-line">{ADD_FROM_PAGE}</p>
+          <button type="button" class="app-button app-album-mine-button" tabIndex={-1}>
+            Add to my library
+          </button>
+        </div>
+      )}
+      {(mine.action || mine.note || mineRefused) && (
+        <div class="app-album-mine" tabIndex={-1}>
+          {mine.note && (
+            <p class="app-store-line" role="status">
+              {mine.note}
+            </p>
+          )}
+          {mine.action && (
+            <button
+              ref={mineButton}
+              type="button"
+              class={mine.action === 'remove' ? 'app-text-button app-album-mine-button' : 'app-button app-album-mine-button'}
+              aria-disabled={mineBusy}
+              onClick={() => changeMine(mine.action!)}
+            >
+              {mine.action === 'add' ? (mineBusy ? 'Adding…' : 'Add to my library') : mineBusy ? 'Removing…' : 'Remove from my library'}
+            </button>
+          )}
+          {mineRefused && (
+            <p class="app-store-line is-refused" role="alert">
+              {mineRefused}
+            </p>
+          )}
+        </div>
+      )}
 
       {error && <p class="pl-notice">{error}</p>}
       {!album && !error && <div class="pl-spinner" aria-label="Loading" />}

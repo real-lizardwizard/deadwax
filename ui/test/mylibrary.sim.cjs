@@ -83,10 +83,11 @@ write('app/session.js', `exports.sessionMe = () => globalThis.__lib.me\n`)
 write('lib/libraryEvents.js', `
 exports.onAlbumsFiled = (listener) => { globalThis.__lib.filedListeners.push(listener); return () => {} }
 exports.onAddedToLibrary = (listener) => { globalThis.__lib.addedListeners.push(listener); return () => {} }
+exports.onRemovedFromLibrary = (listener) => { globalThis.__lib.removedListeners.push(listener); return () => {} }
 `)
 
 const L = globalThis.__lib = {
-  me: null, asks: [], open: [], seen: [], filedListeners: [], addedListeners: [],
+  me: null, asks: [], open: [], seen: [], filedListeners: [], addedListeners: [], removedListeners: [],
   ask(name, signal, ...args) {
     L.asks.push([name, ...args])
     let resolve, reject
@@ -226,6 +227,13 @@ async function run() {
     answer('library', LIBRARY)
     await settle()
     L.addedListeners[0]()
+    answer('library', LIBRARY)
+    await settle()
+    //? (2.0.0-player.52) Remove from my library takes one out: the count moves, so it asks again too
+    check('...and a Remove from an album page (heard once)', L.removedListeners.length, 1)
+    const before = L.asks.length
+    L.removedListeners[0]()
+    check('...which asks your library again', L.asks.slice(before).map((a) => a[0]), ['library'])
     answer('library', LIBRARY)
     await settle()
 

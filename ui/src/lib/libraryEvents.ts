@@ -61,6 +61,26 @@ export function announceAddedToLibrary(): void {
 }
 
 /**
+ * "An album went out of your library" (2.0.0-player.52, Remove from my library) - said by the album page that
+ * removed it, heard by your library's store (app/useMyLibrary.ts) and your albums (app/useYourAlbums.ts), so
+ * the count and the Library's own views follow. Nothing left the store, so the store's views, the badge and
+ * the owned marks' store half have nothing to learn from it - but whose it is did change, and the owned marks
+ * hear it for that (app/useOwned.ts).
+ */
+const removed = new Set<Listener>()
+
+export function onRemovedFromLibrary(listener: Listener): () => void {
+  removed.add(listener)
+  return () => {
+    removed.delete(listener)
+  }
+}
+
+export function announceRemovedFromLibrary(): void {
+  for (const listener of [...removed]) listener()
+}
+
+/**
  * The jobs that became `organized` since the previous poll.
  *
  * `organized` and nothing else: it is the one status meaning files reached the library.

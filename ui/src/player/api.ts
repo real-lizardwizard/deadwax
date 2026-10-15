@@ -39,6 +39,11 @@ export interface Album {
   /** OpenSubsonic: when it was last played (ISO), sent only once it has been - Home's "Not played in
    *  a while" (2.0.0-player.18, lib/home.ts) */
   played?: string
+  /** when the asker starred it (ISO) - sent only if they have: with logins on deadwax asks as you
+   *  (2.0.0-player.52), so it says the album is in YOUR library - your starred albums */
+  starred?: string
+  /** when Navidrome first had it (ISO) - "Recently added", for your library's own order (lib/yourLibrary.ts) */
+  created?: string
 }
 
 export interface Song {
@@ -93,7 +98,7 @@ export function navidromeStatus(signal?: AbortSignal): Promise<NavidromeStatus> 
 }
 
 export async function albumPage(
-  order: AlbumOrder, offset: number, signal?: AbortSignal, size: number = PAGE_SIZE,
+  order: AlbumOrder | 'starred', offset: number, signal?: AbortSignal, size: number = PAGE_SIZE,
 ): Promise<Album[]> {
   const page = await get<{ albums: Album[] }>(
     `/navidrome/albums?order=${order}&size=${size}&offset=${offset}`,

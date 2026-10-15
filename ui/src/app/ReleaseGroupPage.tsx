@@ -11,9 +11,10 @@ import { joinDownload } from '../lib/downloadRequests'
 import { isAbort, latestOnly } from '../lib/latest'
 import { announceAddedToLibrary, onAddedToLibrary, onAlbumsFiled } from '../lib/libraryEvents'
 import { releaseUrl } from '../lib/albumProperties'
-import { describeGroupOwnership, ownedForGroup } from '../lib/owned'
+import { describeGroupOwnership, ownedForGroup, type OwnedAlbum } from '../lib/owned'
+import { anyYours, groupPagePlace, heldPhrase, isYours, withStoreLine } from '../lib/whose'
 import {
-  anyPressingDiffers, coverAddresses, getGroup, groupMbid, holdingOf, leftOut, metaLine, pageHeader, pressingLabel, pressingsView,
+  anyPressingDiffers, chosenPressingId, coverAddresses, getGroup, groupMbid, holdingOf, leftOut, metaLine, pageHeader, pressingLabel, pressingsView,
   releaseGroupUrl, summaryLine, trackRows, type PageRelease, type TrackRow,
 } from '../lib/pressings'
 import { storeStatusFor } from '../lib/perPerson'
@@ -28,7 +29,8 @@ import type { GetRequest } from './Sources'
 import { StoreState } from './StoreState'
 import { useGetSettings } from './useGetSettings'
 import { takeOpener } from './useSheet'
-import { useOwned } from './useOwned'
+import { hasLibrary } from './useMyLibrary'
+import { refreshOwned, useOwned } from './useOwned'
 
 export { PRESSINGS_KEPT } from './pressingLists'
 
@@ -253,7 +255,14 @@ export function ReleaseGroupPage({
   const [answer, setAnswer] = useState<ReleaseGroupResponse | null>(() => (mbid && kept(mbid)) || null)
   const [trouble, setTrouble] = useState<Trouble | null>(null)
   const requests = useMemo(latestOnly, [])
-  const owned = useOwned(true)
+  //? what the library holds - asked again EVERY time the page shows (second review), as the store line under
+  //? Get is: with logins on whose an album is moves outside this tab (an unstar in Amperfy read back, a Remove
+  //? on another device), and an answer kept from earlier in the session said "in your library" over a fresh
+  //? "In the store, not in your library". Cheap: an unchanged library is a 304
+  const owned = useOwned(false)
+  useEffect(() => {
+    if (shown) void refreshOwned()
+  }, [shown])
 
   function load() {
     if (!mbid) {
@@ -309,14 +318,30 @@ export function ReleaseGroupPage({
     title: credited?.title || releases[0]?.title || title,
     artists: [creditName(credited?.['artist-credit']), currentName(credited?.['artist-credit'])],
   }) : null
-  const holding = ownership ? ownership.held : null
+  //? (second review) ...and whose each folder is as the line under Get last said it of the pressing on screen -
+  //? that line is asked as the page shows, and the two lines on screen must never disagree (lib/whose.ts)
+  const [store, setStore] = useState<{ id: string; state: StoreStateResponse } | null>(null)
+  const shownId = useMemo(() => chosenPressingId(releases, release), [answer, release])
+  const said = store && store.id === shownId ? store.state : null
+  const holding = ownership ? withStoreLine(ownership.held, said) : null
   const held = holding ? holding.length > 0 : null
   const maybe = holdingOf(ownership) === 'maybe' ? describeGroupOwnership(ownership!) : null
-  //? ...and which pressings those are, by release id: each marked in the pressing list (2.0.0-player.41)
-  const heldKey = [...new Set((holding ?? []).map((album) => (album.release_mbid ?? '').trim().toLowerCase()).filter(Boolean))].sort().join(' ')
+  //? (2.0.0-player.52) with logins on and a library of your own: held by the store isn't yours unless a folder
+  //? of it is - the meta line says "in the store" then, as the store line under Get does (its place below)
+  const personal = hasLibrary()
+  //? ...and which pressings those are, by release id: each marked in the pressing list (2.0.0-player.41) -
+  //? and which of them are yours (null with logins off: the store is your library)
+  const releaseIds = (albums: readonly OwnedAlbum[]) =>
+    [...new Set(albums.map((album) => (album.release_mbid ?? '').trim().toLowerCase()).filter(Boolean))].sort().join(' ')
+  const heldKey = releaseIds(holding ?? [])
+  const yoursKey = personal ? releaseIds((holding ?? []).filter(isYours)) : null
   const heldIds = useMemo(() => new Set(heldKey ? heldKey.split(' ') : []), [heldKey])
-  const view = useMemo(() => (releases.length ? pressingsView(releases, release, heldIds) : null), [answer, release, heldIds])
+  const yoursIds = useMemo(() => (yoursKey === null ? null : new Set(yoursKey ? yoursKey.split(' ') : [])), [yoursKey])
+  const view = useMemo(() => (releases.length ? pressingsView(releases, release, heldIds, yoursIds) : null), [answer, release, heldIds, yoursIds])
   const chosen = releases.find((candidate) => candidate.id === view?.chosenId) ?? null
+  //? ...and with a pressing of it yours but the one on screen the store's, "another pressing in your library":
+  //? never "in your library" over a store line saying "In the store, not in your library" (review)
+  const place = groupPagePlace(personal, holding ?? [], view?.chosenId)
   const header = pageHeader(releases, chosen, preview)
   const diff = view && chosen ? view.diffs.get(chosen.id) ?? null : null
   const rows = trackRows(chosen, diff)
@@ -333,7 +358,6 @@ export function ReleaseGroupPage({
   const pressing = answer?.releases.find((release) => release.id === chosen?.id) ?? null
   const download = group && pressing ? buildDownloadRelease(group, pressing) : null
   const stateRequests = useMemo(latestOnly, [])
-  const [store, setStore] = useState<{ id: string; state: StoreStateResponse } | null>(null)
   const [filed, setFiled] = useState(0)
   useEffect(() => onAlbumsFiled(() => setFiled((n) => n + 1)), [])
   //? (2.0.0-player.51) added to your library - from this page's line, or the Sources panel's beside it: the
@@ -360,7 +384,8 @@ export function ReleaseGroupPage({
     )
     return () => stateRequests.supersede()
   }, [chosen?.id, group?.id, filed, shown])
-  const known = store && store.id === chosen?.id ? store.state : null
+  //? the store's answer for the pressing on screen (`said`, above: chosen and shownId are the same pressing)
+  const known = said
   //? (2.0.0-player.49) a download somebody else asked for: judged against your quality floor, and
   //? joined from the line - which then asks the store again, and says it's yours
   const { settings } = useGetSettings(shown)
@@ -436,10 +461,10 @@ export function ReleaseGroupPage({
               {metaLine(header, null)}
               {metaLine(header, null) ? ' · ' : ''}
               <span class="app-rg-maybe" title={maybe.title}>
-                maybe in your library
+                maybe {heldPhrase(personal, anyYours(ownership?.guessed ?? []))}
               </span>
             </>
-          ) : metaLine(header, held)}
+          ) : metaLine(header, held, place)}
         </p>
 
         {/* where the album page has Play and Shuffle: the pressing, Get, and what's already here of

@@ -33,13 +33,13 @@ from src.api.lrclib_endpoint import lrclib
 from src.lyrics import fetch_album_lyrics, read_track_lyrics
 from src.retag import (changes_player_ids, execute_retag, hold_back_rename, move_retagged, plan_cover_art,
                        plan_retag, save_cover_art)
-from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, client_for, navidrome
+from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, SignedOut, client_for, navidrome
 from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_SECONDS,
                            SCAN_WAIT_CAP_SECONDS, ScanStatus, WaitState, begin, read_status,
                            scanned_since_hold, step)
 from src.store_index import index_folder, mark_deleted, reconcile_scan, reindex_merged, reindex_moved
 from src.track_tags import execute_tag_edits, plan_tag_edits
-from src.users import LOCAL_USER, require_admin
+from src.users import LOCAL_USER, current_user, require_admin
 from src import library_ledger
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
@@ -319,13 +319,18 @@ OWNED_FIELDS = ("path", "artist", "album", "year", "edition", "release_mbid",
 
 
 @router.get("/owned")
-async def owned(request: Request):
+async def owned(request: Request, user: str = Depends(current_user)):
     """
     Every album in the library, reduced to what says WHICH album and edition it is.
 
     For the search view, which marks the release groups and the pressings you already hold
     (v0.9.1, asked for: "a way to see which editions are already in my library when I'm
     searching for new ones"). The matching is done there, in interface/scripts/owned.mjs.
+
+    (2.0.0-player.52) With logins on, each album also says whether it is in the asker's OWN library -
+    `yours`, from their ledger (library_ledger.yours_paths) - so the app says "in your library" of what is
+    theirs and "in the store" of the rest. Left out with logins off, for the break-glass admin, and when the
+    ledger can't be read: the store is then what "in your library" means, as it always was.
 
     Answers from the saved scan when nothing has changed since the last full walk, and walks
     the library otherwise - after a retag, an art fetch, a delete, or an album the poller
@@ -343,8 +348,13 @@ async def owned(request: Request):
         result = await asyncio.to_thread(scan_library, root, False)
         await _persist_cache(request, result)
 
+    albums = [{field: album.get(field) for field in OWNED_FIELDS} for album in result["albums"]]
+    yours = await library_ledger.yours_paths(_store(request), root, user)
+    if yours is not None:
+        for album in albums:
+            album["yours"] = album.get("path") in yours
     return _json_with_etag(request, {
-        "albums": [{field: album.get(field) for field in OWNED_FIELDS} for album in result["albums"]],
+        "albums": albums,
         #? no `stale`: nothing reads it, and it differed between a scan and a snapshot of the
         #? same albums, which made identical answers carry different ETags
         "problem": result.get("problem"),
@@ -1145,6 +1155,9 @@ async def _navidrome_release(album_id: str, client: NavidromeClient) -> str | No
     """
     try:
         body = await client.call("getAlbum", {"id": album_id})
+    except SignedOut:
+        #? (2.0.0-player.52) the asker's login refused: their session has ended - a 401, not a plain record
+        raise
     except NavidromeError as e:
         logger.debug(f"no release for Navidrome album {album_id!r}: {e}")
         return None

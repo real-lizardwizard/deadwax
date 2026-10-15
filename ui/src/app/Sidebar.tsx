@@ -4,6 +4,7 @@ import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP
 import { needsLookLabel } from '../lib/needsLook'
 import { badgeLabel, badgeText } from '../lib/requestsView'
 import { SEARCH_MAX_CHARS } from '../lib/searchQuery'
+import { searchWords } from '../lib/searchResults'
 import { SearchIcon, YouIcon } from '../player/icons'
 import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
 
@@ -11,7 +12,9 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
  * The desktop's sidebar (2.0.0-player.19), as DesktopLibrary.dc.html draws it: the wordmark, the
  * search field, Home and Requests (with the count of what is arriving, the phone tab's badge), the
  * Library's views (Recently added, Albums, Artists, Songs), Managing, and You at the foot - the
- * phone's five tabs, laid out for a desktop. Every item is App's to interpret through
+ * phone's five tabs, laid out for a desktop. With logins on and a library of your own (2.0.0-player.52),
+ * the Library's views are yours (Recently added, Albums, Artists) and a group of its own under them,
+ * Browse, lists the store's (Albums, Artists, Songs) - lib/appFrame.ts libraryItems and browseItems. Every item is App's to interpret through
  * lib/appFrame.ts's sidebarMove: Home, Requests and You are their tabs' buttons (as left, or back to
  * the root when showing); a Library view shows that view at the Library's root. The item for where
  * the app is says so (`aria-current`), in Explorer's selection.
@@ -38,6 +41,8 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
 export function Sidebar({
   current,
   library,
+  browse = [],
+  personal = false,
   arriving,
   admin = true,
   needsLook = null,
@@ -48,6 +53,10 @@ export function Sidebar({
   current: SidebarId | null
   /** the Library's views, Songs left out when Navidrome lists none (lib/appFrame.ts libraryItems) */
   library: readonly SidebarItem[]
+  /** (2.0.0-player.52) Browse's views - the store's - with a library of your own; none with logins off */
+  browse?: readonly SidebarItem[]
+  /** (2.0.0-player.52) a library of your own: the field searches the store first (its name says so) */
+  personal?: boolean
   /** downloads on their way: Requests' count, as the phone tab's badge */
   arriving: number
   /** deadwax's /me says this user is an admin (true until it has answered, as You's rows) */
@@ -112,7 +121,7 @@ export function Sidebar({
             }}
             maxLength={SEARCH_MAX_CHARS}
             placeholder="Search everything"
-            aria-label="Search your library and MusicBrainz"
+            aria-label={searchWords(personal).label}
             enterKeyHint="search"
             autoComplete="off"
             autoCapitalize="none"
@@ -129,6 +138,15 @@ export function Sidebar({
         </h2>
         <ul class="app-side-list">{library.map(item)}</ul>
       </section>
+
+      {browse.length > 0 && (
+        <section class="app-side-group" aria-labelledby="app-side-browse">
+          <h2 id="app-side-browse" class="app-side-label">
+            Browse
+          </h2>
+          <ul class="app-side-list">{browse.map(item)}</ul>
+        </section>
+      )}
 
       {admin && (
         <section class="app-side-group" aria-labelledby="app-side-managing">

@@ -122,7 +122,9 @@ Every setting is described in [Configuration](configuration.md).
    `http://navidrome:4533`), `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections (or
    uncomment the three lines waiting for them in `docker-compose.example.yml` or `.env.example`) -
    [the phone player's setup](player.md#setting-it-up) has the details. Then open
-   `http://your-server:8080/player/`: Home and the Library show your albums from Navidrome.
+   `http://your-server:8080/player/`: Home and the Library show your albums from Navidrome (with
+   logins on, the Library is each person's own and **Browse** is the store - [turning logins
+   on](#turning-logins-on)).
 
 **What the app shows without Navidrome.** Home's shelves, the Library tab, the albums and artists
 you have and Search's look in your library each say **Connect Navidrome** (or **Can't reach
@@ -183,6 +185,13 @@ container, open deadwax, and sign in.
   into their library, once (after deadwax's first scan of the library, if it hasn't scanned it yet);
   everyone else starts with only the albums they'd already starred - see [your
   library](player.md#your-library-with-logins-on).
+- **The player is each person's** (since 2.0.0-player.52): it plays as the account they signed in with,
+  so their plays, play counts and Last.fm scrobbles are their own; the **Library** tab is their library,
+  with **Browse** for the whole store, and **Add to my library** / **Remove from my library** on an
+  album's page - see [the player as you](player.md#the-player-as-you-with-logins-on). `NAVIDROME_USER`
+  stays set: deadwax still asks as it for what is nobody's in particular (it fetches songs into the
+  player's cache - so if Navidrome gives users libraries of their own, give this account every one),
+  and the break-glass `admin` plays as it.
 - **The app** (`/player/`, the home-screen app included) shows a sign-in screen; **You → About** has
   **Sign out**. **The main page** says you're signed out and links to the app's sign-in, which brings
   you back to it.

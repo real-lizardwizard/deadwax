@@ -1167,7 +1167,13 @@ def test_other_pressings_never_gives_way_and_a_held_pressing_is_marked_green():
     narrow = "@container app-album-chips (max-width: 600px)"
     assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-long", narrow) == {"display": "none"}
     assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-short", narrow) == {"display": "inline"}
-    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge-text", narrow) == declarations(APP, ".app-visually-hidden")
+    #? ...(2.0.0-player.52 review) and "In the store", which has no tick to keep, gives way whole - its words left
+    #? alone it was an empty box; shown, the Also chip said "Also: t…" at 320px
+    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge:not(.is-store) .app-held-badge-text", narrow) == declarations(APP, ".app-visually-hidden")
+    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge.is-store", narrow) == declarations(APP, ".app-visually-hidden")
+    #? ...which is said in the line's grey with no box - never one more chip beside "Other pressings ›"
+    assert declarations(APP, ".app-held-badge.is-store") == {"padding": "0", "border-color": "transparent", "background": "transparent",
+                                                           "color": "var(--dw-text-2)"}
     #? ...never by the frame: no rule outside that query shortens them, and the desktop's stylesheet has none
     desk = (PLAYER / "app-desktop.css").read_text()
     for css in (APP, desk):

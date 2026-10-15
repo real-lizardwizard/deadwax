@@ -28,6 +28,9 @@ export interface OwnedAlbum {
   /** WHO the album is by, as MusicBrainz ids (2.0.0-player.17): one for one artist, several for a
    *  collaboration, none for a folder not tagged with any - absent from an older server */
   albumartist_mbids?: string[] | null
+  /** (2.0.0-player.52, logins on) whether it is in YOUR library - absent when "your library" means the store
+   *  (logins off, the break-glass admin) or deadwax couldn't read yours (lib/whose.ts) */
+  yours?: boolean
 }
 
 export interface OwnedIndex {

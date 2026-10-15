@@ -59,6 +59,14 @@
  * aside, saying when nothing matches, its field's own keys left to it, ArrowDown and ArrowUp between it
  * and the first pressing, and empty again once the list closes - by a pick or by the Pressing button.
  *
+ * And with logins on and a library of your own (2.0.0-player.52, second review), drawn as ethan: an album the
+ * store holds that isn't his is "in the store" in the meta line, "In the store, not in your library" under Get
+ * and "In the store" in the pressing list - the page taking `personal` from the session, never drawn as logins
+ * off; the library asked again every time the page shows; and a library answer kept from earlier in the
+ * session (an unstar in Amperfy since, read back) giving way to the store line's fresh word once it lands - the
+ * meta line never "in your library" over "In the store, not in your library", nor the other way round. Logins
+ * off after it: "in your library" and "Already in your library", as ever.
+ *
  * Run it with:  node ui/test/group.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -111,6 +119,7 @@ exports.getReleaseGroup = (id, signal) => globalThis.__group.ask(id, signal)
 `)
 fs.writeFileSync(path.join(OUT, 'app/useOwned.js'), `
 exports.useOwned = (ask) => globalThis.__group.owned
+exports.refreshOwned = () => { globalThis.__group.ownedAsks += 1; return Promise.resolve() }
 `)
 fs.writeFileSync(path.join(OUT, 'hooks/useDismiss.js'), `
 exports.useDismiss = () => {}
@@ -136,6 +145,8 @@ const owning = (albums) => ({ index: OwnedIndex.buildOwnedIndex(albums), artists
 const stateAsks = []
 globalThis.__group = {
   owned: null,
+  //? how many times the page asked the library again (2.0.0-player.52, second review: every time it shows)
+  ownedAsks: 0,
   storeState(body, signal) {
     const d = {}
     d.promise = new Promise((yes, no) => { d.resolve = yes; d.reject = no })
@@ -825,6 +836,77 @@ async function main() {
     show(big)
     check('...and opened again by it, the whole list back as it folds', [field()?.props.value, find((node) => node.props?.role === 'option').length, classed('app-picker-more').length > 0],
       ['', shown, true])
+  }
+
+  console.log('\nwith logins on: "in your library" means yours - and the store line\'s fresh word over a kept answer (2.0.0-player.52)')
+  {
+    const session = require(path.join(OUT, 'app/session.js'))
+    const { StoreState } = require(path.join(OUT, 'app/StoreState.js'))
+    const shownId = dummy.expected.representative
+    const folder = 'Portishead/Dummy (1994)'
+    const heldLine = (yours) => ({ held: { path: folder, paths: [folder], artist: 'Portishead', album: 'Dummy', edition: '', track_count: 11, expected_tracks: 11,
+      formats: ['flac'], complete: true, fills_gaps: false, filed_to: null, ...(yours === undefined ? {} : { yours }) }, downloading: null, downloading_part: null, other_pressings: [] })
+    const owns = (yours) => owning([{ path: folder, artist: 'Portishead', album: 'Dummy', release_group_mbid: dummy.group.id, release_mbid: shownId,
+      ...(yours === undefined ? {} : { yours }) }])
+    const meta = () => text(classed('pl-hero-meta')[0])
+    const storeLine = () => find((node) => node.type === StoreState)[0]?.props.status?.title ?? null
+    const mark = () => {
+      const view = find((node) => node.type === PressingPicker)[0].props.view
+      const row = [...view.shown, ...view.more].find((each) => each.id === shownId)
+      return [row.id === view.chosenId, row.held, !!row.inStore]
+    }
+    session.setSessionMe({ user: 'ethan', auth: 'on', admin: false })
+    globalThis.__group.ownedAsks = 0
+    globalThis.__group.owned = owns(false)
+    answers.push(answering(dummy))
+    const first = page({ id: dummy.group.id })
+    first.draw()
+    await settle()
+    first.draw()
+    check('ethan, Dummy the store\'s and not his: the library asked as the page shows, the meta line "in the store"',
+      [globalThis.__group.ownedAsks, meta()], [1, '1994 · in the store'])
+    stateAsks.at(-1).resolve(heldLine(false))
+    await settle()
+    first.draw()
+    check('...under "In the store, not in your library", the pressing on screen marked "In the store"',
+      [meta(), storeLine(), mark()], ['1994 · in the store', 'In the store, not in your library', [true, true, true]])
+    first.draw({ shown: false })
+    const hidden = globalThis.__group.ownedAsks
+    first.draw({ shown: true })
+    check('the library not asked as the page goes out of view, and asked again as it shows again', [hidden, globalThis.__group.ownedAsks], [1, 2])
+
+    //? the library's answer kept from earlier in the session says Dummy is his; he has unstarred it in Amperfy
+    //? since, and the read-back has taken it out of his library - the store line, asked as the page shows, says so
+    globalThis.__group.owned = owns(true)
+    const stale = page({ id: dummy.group.id })
+    stale.draw()
+    check('a library answer kept from before an unstar was read back: the page asks the library again as it shows',
+      [globalThis.__group.ownedAsks, meta(), storeLine()], [3, '1994 · in your library', null])
+    stateAsks.at(-1).resolve(heldLine(false))
+    await settle()
+    stale.draw()
+    check('...and the store line\'s fresh word wins: "in the store" over "In the store, not in your library" - never "in your library" over it',
+      [meta(), storeLine(), mark(), / · in your library$/.test(meta())], ['1994 · in the store', 'In the store, not in your library', [true, true, true], false])
+    //? ...and the other way: starred in Amperfy since, read back into his library
+    globalThis.__group.owned = owns(false)
+    const starred = page({ id: dummy.group.id })
+    starred.draw()
+    stateAsks.at(-1).resolve(heldLine(true))
+    await settle()
+    starred.draw()
+    check('...the other way too: starred since, "in your library" over "Already in your library", the pressing unmarked',
+      [meta(), storeLine(), mark()], ['1994 · in your library', 'Already in your library', [true, true, false]])
+
+    session.setSessionMe(null)
+    globalThis.__group.owned = owns(undefined)
+    const off = page({ id: dummy.group.id })
+    off.draw()
+    stateAsks.at(-1).resolve(heldLine(undefined))
+    await settle()
+    off.draw()
+    check('logins off: "in your library" over "Already in your library", nothing marked the store\'s - as ever',
+      [meta(), storeLine(), mark()], ['1994 · in your library', 'Already in your library', [true, true, false]])
+    globalThis.__group.owned = null
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

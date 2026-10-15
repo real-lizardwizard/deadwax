@@ -16,6 +16,7 @@ from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
 from src.store_index import (FILING_STATUSES, already_have, coming_now, describe_job, filing_folder, held_copy,
                              in_flight, is_whole, other_pressings, release_lock)
+from src import library_ledger
 from src.auth import BREAK_GLASS_USER
 from src.users import current_user, is_admin
 
@@ -337,6 +338,13 @@ async def _store_state(request: Request, body: "FindCandidatesRequest", user: st
     release = body.model_dump()
     try:
         state["other_pressings"] = await other_pressings(store, root, body.release_group_mbid, body.release_mbid)
+        #? (2.0.0-player.52) with logins on, whether each is the asker's own: "The store also has another
+        #? pressing" for one that isn't - left out when that means the store, or the ledger can't be read
+        if state["other_pressings"]:
+            yours = await library_ledger.yours_paths(store, root, user)
+            if yours is not None:
+                for pressing in state["other_pressings"]:
+                    pressing["yours"] = pressing["path"] in yours
         job = await in_flight(store, body.release_mbid, release=release)
         if job is not None:
             state["downloading"] = await _describe_in_flight(request, job, user)

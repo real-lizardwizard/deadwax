@@ -259,9 +259,12 @@ def _navidrome_rows() -> list[dict]:
             "NAVIDROME_USER",
             Config.NAVIDROME_USER,
             effect=(
-                "The Navidrome account the player plays as. Its play counts (and Last.fm or "
-                "ListenBrainz scrobbles, if that account has them) are recorded there. It doesn't "
-                "need to be an admin - a non-admin account of your own is the one to use"
+                "The Navidrome account the player plays as with logins off. Its play counts (and "
+                "Last.fm or ListenBrainz scrobbles, if that account has them) are recorded there. With "
+                "logins on each person plays as their own account, and this one still fetches songs "
+                "into the player's cache, answers what is nobody's in particular, and plays for the "
+                "break-glass admin - so with Navidrome's per-user libraries it needs every library. It "
+                "doesn't need to be an admin - a non-admin account of your own is the one to use"
             ),
             status="error" if partial and not Config.NAVIDROME_USER else None,
             detail=missing if partial and not Config.NAVIDROME_USER else None,

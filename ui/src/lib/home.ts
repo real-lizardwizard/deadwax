@@ -10,8 +10,9 @@
  * and there is no shelf at all - nor when no album carries `played`: a Navidrome that doesn't send it
  * would otherwise have every album "not played in a while", or none, on no evidence.
  *
- * The plays are Navidrome's, for the account deadwax signs in with - the shared one while logins are
- * off (step 6 signs as the user, and then they are each person's own). `recent` stops at its first
+ * The plays are Navidrome's, for the account the player asks as - the shared one while logins are off
+ * (and for the break-glass admin); with logins on (2.0.0-player.52) each signed-in person's own, asked with
+ * their own login. `recent` stops at its first
  * RECENT_LISTED albums, so in a library with more played albums than that, the very oldest plays
  * past it are not looked at.
  */

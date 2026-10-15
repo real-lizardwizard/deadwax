@@ -2,41 +2,77 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import { albumCountLine, sortArtists, type ArtistOrder } from '../lib/artistPage'
 import { isAbort, latestOnly } from '../lib/latest'
+import { IN_THE_STORE } from '../lib/whose'
+import { EMPTY_LIBRARY_HOW, NO_ARTISTS_OF_YOURS, yourArtists } from '../lib/yourLibrary'
 import {
   SONGS_PAGE, dropPrefetch, libraryArtists, librarySongs, prefetchAlbum, type Album, type Artist, type Song,
 } from '../player/api'
 import { Cover } from '../player/Cover'
 import { usePaged } from './usePaged'
+import { useYourAlbumsGeneration, yourAlbums } from './useYourAlbums'
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 export { ARTIST_ORDERS, countText, type ArtistOrder } from '../lib/artistPage'
 
 /**
+ * (2.0.0-player.52) Your library empty - Ethan's, at first: `lead` (what is empty), how to fill it, and Browse
+ * the store - the one way to the whole store, for Your albums in any order and Your artists alike (review).
+ */
+export function EmptyLibrary({ lead, onBrowse }: { lead: string; onBrowse?: (() => void) | undefined }) {
+  return (
+    <div class="pl-notice app-library-empty">
+      <p>{lead}</p>
+      <p>{EMPTY_LIBRARY_HOW}</p>
+      {onBrowse && (
+        <button type="button" class="pl-text-button" onClick={onBrowse}>
+          Browse the store
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
  * Library > Artists (2.0.0-player.17): every artist Navidrome has - the album artists, which is what
  * it groups a library on, so an artist who renamed is one row under the name deadwax files them
  * under (Ye, with Donda and BULLY) - a row each, opening their page. getArtists, asked as the view
  * is first shown and once more each time it is chosen again.
+ *
+ * (2.0.0-player.52) `yours`: Your artists - the artists of your albums (lib/yourLibrary.ts yourArtists), each
+ * counting your albums of theirs, asked again as your albums change; `inStore`: Browse's, whose counts are the
+ * store's ("2 albums in the store").
  */
 export function ArtistsView({
   order,
   shown,
   onOpenArtist,
   onCount,
+  yours = false,
+  inStore = false,
+  onBrowse,
 }: {
   order: ArtistOrder
   shown: boolean
   onOpenArtist: (artist: Artist) => void
   onCount: (count: number | null) => void
+  yours?: boolean
+  inStore?: boolean
+  /** Your artists empty: Browse the store */
+  onBrowse?: () => void
 }) {
   const [artists, setArtists] = useState<Artist[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const requests = useMemo(latestOnly, [])
+  const generation = useYourAlbumsGeneration()
 
   function load() {
     const request = requests.begin()
     setError(null)
-    libraryArtists(true).then(
+    const asking = yours
+      ? Promise.all([libraryArtists(true), yourAlbums()]).then(([every, albums]) => yourArtists(every, albums))
+      : libraryArtists(true)
+    asking.then(
       (found) => {
         if (!request.current()) return
         setArtists(found)
@@ -50,7 +86,7 @@ export function ArtistsView({
 
   useEffect(() => {
     if (shown) load()
-  }, [shown])
+  }, [shown, yours ? generation : 0])
 
   useEffect(() => () => requests.supersede(), [])
 
@@ -67,7 +103,7 @@ export function ArtistsView({
     )
   }
   if (!artists) return <div class="pl-spinner" aria-label="Loading" />
-  if (!artists.length) return <p class="pl-notice">No artists in Navidrome yet.</p>
+  if (!artists.length) return yours ? <EmptyLibrary lead={NO_ARTISTS_OF_YOURS} onBrowse={onBrowse} /> : <p class="pl-notice">No artists in Navidrome yet.</p>
   return (
     <ul class="app-results app-library-list">
       {listed.map((artist) => (
@@ -76,7 +112,9 @@ export function ArtistsView({
             <Cover id={artist.coverArt} size={112} class="app-result-cover is-round" />
             <span class="app-result-text">
               <span class="app-result-title">{artist.name}</span>
-              {albumCountLine(artist.albumCount) && <span class="app-result-line">{albumCountLine(artist.albumCount)}</span>}
+              {albumCountLine(artist.albumCount, inStore ? IN_THE_STORE : undefined) && (
+                <span class="app-result-line">{albumCountLine(artist.albumCount, inStore ? IN_THE_STORE : undefined)}</span>
+              )}
             </span>
           </button>
         </li>

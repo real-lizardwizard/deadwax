@@ -179,6 +179,27 @@ def has_library(user: str | None) -> bool:
     return bool(user) and user != BREAK_GLASS_USER
 
 
+def personal(user: str | None) -> bool:
+    """
+    (2.0.0-player.52) Whether "in your library" means `user`'s own library rather than the store: logins on,
+    and somebody who can have a library (not the break-glass admin, who sees the store as deadwax with logins
+    off does). With logins off it means the store, as it always did.
+    """
+    return Config.logins_on() and isinstance(user, str) and has_library(user)
+
+
+async def yours_paths(store, root: str, user: str | None) -> set[str] | None:
+    """
+    (2.0.0-player.52) The store's folders (relative to `root`) of the albums `user` holds - what marks an album
+    "in your library" with logins on (store.ledger_held_paths: waiting or starred). None when it means the store
+    (personal() false) or the ledger can't be read: nothing is then marked "not yours" on a guess, and the
+    page reads as it always did.
+    """
+    if not personal(user) or not root or store is None or not getattr(store, "available", False):
+        return None
+    return await store.ledger_held_paths(root, user)
+
+
 # ----------------------------------------------------------------- grants from a filing
 
 async def grant_job(store, job: dict, results: dict | None, album_id: int | None, same_release: bool,

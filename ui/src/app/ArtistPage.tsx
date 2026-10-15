@@ -29,6 +29,7 @@ import { usePlayerActions } from './context'
 import { PINS_UNSAVED, PinToggle } from './PinToggle'
 import { keep, kept as keptPressings, usualGet } from './pressingLists'
 import type { GetRequest } from './Sources'
+import { hasLibrary } from './useMyLibrary'
 import { ownedNow, useOwned, whenOwned } from './useOwned'
 import { sayPins, setPinned, usePins } from './usePins'
 import { takeOpener } from './useSheet'
@@ -250,6 +251,10 @@ export function ArtistPage({
   const ref = useMemo(() => artistRef(id), [id])
   const kept = useMemo(() => keptArtist(id), [id])
   const owned = useOwned(true)
+  //? (2.0.0-player.52) a library of your own: the page lists the STORE's albums of theirs - Navidrome's, asked as
+  //? you - each row saying whether it is yours (lib/artistPage.ts rowLine), and its library facts are the store's
+  const personal = hasLibrary()
+  const where = personal ? 'the store' : 'your library'
   //? /library/owned has answered once, or failed to: what isn't held can be said only after
   const [ownedKnown, setOwnedKnown] = useState(() => ownedNow() !== null)
   //? the page shows, read when an answer lands
@@ -809,10 +814,10 @@ export function ArtistPage({
    *  once it has something to say; once drawn, it stays. */
   const librarySection = !libraryOnScreen.current ? null : (
     <section class="app-artist-section" aria-labelledby="app-artist-library-title" aria-busy={!libraryHalfKnown}>
-      <h2 id="app-artist-library-title" class="app-section-title">In your library</h2>
+      <h2 id="app-artist-library-title" class="app-section-title">{personal ? 'In the store' : 'In your library'}</h2>
       {shownLibrary && summariesFailed && (
         <p class="app-footnote app-artist-stale">
-          deadwax couldn't read your library just now - this is what it said before.{' '}
+          deadwax couldn't read {where} just now - this is what it said before.{' '}
           <button type="button" class="app-text-button app-artist-retry is-inline" aria-busy={summaryAsking} onClick={retrySummaries}>
             Try again
           </button>
@@ -849,17 +854,17 @@ export function ArtistPage({
       ) : !libraryHalfKnown ? (
         <div class="app-asking" role="status">
           <span class="app-sweep" aria-hidden="true" />
-          <span class="app-asking-text">Looking in your library…</span>
+          <span class="app-asking-text">Looking in {where}…</span>
         </div>
       ) : summariesFailed ? (
         <div class="app-search-problem">
-          <p class="app-search-empty">deadwax couldn't read your library just now.</p>
+          <p class="app-search-empty">deadwax couldn't read {where} just now.</p>
           <button type="button" class="app-button app-artist-retry" aria-busy={summaryAsking} onClick={retrySummaries}>
             Try again
           </button>
         </div>
       ) : (
-        <p class="app-search-empty">Nothing of theirs in your library.</p>
+        <p class="app-search-empty">Nothing of theirs in {where}.</p>
       )}
       {/* couldn't be read: still drawn, stepped back, saying why (review) */}
       {manages && (shownLibrary || summariesFailed) && (
@@ -933,7 +938,7 @@ export function ArtistPage({
                   Shuffle
                 </button>
               </div>
-              <p class="app-artist-plays" aria-live="polite">{playsLine(playing.length, inHand.length, settled, library.state)}</p>
+              <p class="app-artist-plays" aria-live="polite">{playsLine(playing.length, inHand.length, settled, library.state, personal)}</p>
               {settled && inHand.length < playing.length && (
                 <button type="button" class="app-text-button app-artist-again" onClick={askAgain}>
                   Try again
@@ -979,8 +984,8 @@ export function ArtistPage({
                       <span class="app-result-text">
                         <span class="app-result-title">{row.title}</span>
                         <span class="app-result-line app-artist-line">
-                          {row.held === true && <CheckIcon class="app-artist-held" />}
-                          <span class="app-artist-line-text">{rowLine(row)}</span>
+                          {row.held === true && (!personal || row.yours !== false) && <CheckIcon class="app-artist-held" />}
+                          <span class="app-artist-line-text">{rowLine(row, personal)}</span>
                         </span>
                       </span>
                     </button>
@@ -1003,7 +1008,7 @@ export function ArtistPage({
             {asking ? (
               <div class="app-asking" role="status">
                 <span class="app-sweep" aria-hidden="true" />
-                <span class="app-asking-text">{discography.state === 'asking' ? 'Asking MusicBrainz…' : 'Looking in your library…'}</span>
+                <span class="app-asking-text">{discography.state === 'asking' ? 'Asking MusicBrainz…' : `Looking in ${where}…`}</span>
               </div>
             ) : discography.state === 'failed' ? (
               <div class="app-search-problem">
@@ -1022,8 +1027,8 @@ export function ArtistPage({
               <div class="app-artist-unknown">
                 <p class="app-search-empty">
                   {held.length
-                    ? "MusicBrainz doesn't know who this is from your files, so only the albums you have are here."
-                    : "Nothing of theirs in your library, and MusicBrainz doesn't know who this is."}
+                    ? `MusicBrainz doesn't know who this is from ${personal ? 'the files' : 'your files'}, so only the albums ${personal ? 'in the store' : 'you have'} are here.`
+                    : `Nothing of theirs in ${where}, and MusicBrainz doesn't know who this is.`}
                 </p>
                 {/* (2.0.0-player.45) the picker's MusicBrainz search, for a shared name or files that don't say */}
                 {manages && (

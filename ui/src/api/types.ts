@@ -396,6 +396,9 @@ export interface OtherPressing {
   year: string
   track_count: number
   formats: string[]
+  /** (2.0.0-player.52, logins on) whether it is in YOUR library - "The store also has another pressing" when
+   *  not; absent when "your library" means the store (logins off, the break-glass admin) or deadwax couldn't say */
+  yours?: boolean
 }
 
 export interface EnqueueRequest {
@@ -622,7 +625,10 @@ export interface StoreAlbumResponse {
   navidrome_id: string | null
   /** the store's live folders of the release - each with what the scan and its review row say of it */
   present: (StoreRow & StoreFacts)[]
-  other_pressings: (StoreRow & { navidrome_id: string | null })[]
+  other_pressings: (StoreRow & { navidrome_id: string | null; yours?: boolean })[]
+  /** (2.0.0-player.52, logins on) whether the album is in YOUR library (your ledger holds one of its folders) -
+   *  absent when "your library" means the store (logins off, the break-glass admin) or deadwax couldn't say */
+  yours?: boolean
 }
 
 /** GET /library/owned: every album, reduced to what says which album and edition it is. */
@@ -1218,6 +1224,17 @@ export interface AddedToLibrary {
   already: boolean
   /** false: the store holds only part of it, added marked incomplete */
   complete: boolean
+  /** (2.0.0-player.52) starred for you in Navidrome at once - false: it waits for deadwax to star it */
+  starred?: boolean
+}
+
+/** POST /deadwax/me/library/remove (2.0.0-player.52): unstarred for you, out of your library - nothing deleted. */
+export interface RemovedFromLibrary {
+  removed: boolean
+  /** how many of your library's entries went (0 for an album starred elsewhere that deadwax never kept) */
+  entries: number
+  /** what the page says: it's still in the store, nothing deleted */
+  words: string
 }
 
 /** GET /deadwax/library/held (2.0.0-player.51, admin): what nobody holds, and the flagged downloads. */

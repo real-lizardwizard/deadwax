@@ -16,7 +16,8 @@ roles"); notes/logins.md has the reasoning. In short:
   sign-in comes from deadwax's one IP, so one mistyped password would have locked everybody out.
 
   THE TOKEN IS AS GOOD AS THE PASSWORD on Navidrome's API, for as long as the password stands. It is
-  kept (the re-check below needs it, and step 6 will play as each user with it) ENCRYPTED with a key
+  kept (the re-check below needs it, and since 2.0.0-player.52 the player asks Navidrome as each user with
+  it - src/api/navidrome_endpoint.py's client_for) ENCRYPTED with a key
   from the environment, DEADWAX_SECRET_KEY, through the `cryptography` package's Fernet - never a
   cipher of our own. Without the key logins don't work at all: every protected route answers 503
   and says why, rather than storing a token bare. The password itself is never kept or logged.
@@ -281,6 +282,9 @@ class _Held:
     expires_at: float
     touched: float      # when its expiry was last written forward (or tried: _touch)
     loaded: float       # time.monotonic() when it was read from the database
+    #? (2.0.0-player.52) the sealed Navidrome login the session was signed in with - what the player asks
+    #? Navidrome AS (PlayerLogin, src/api/navidrome_endpoint.py client_for)
+    credential: str = ""
 
 
 #? Guards everything below: current_user runs in FastAPI's thread pool, the sign-in and the re-check on
@@ -356,6 +360,12 @@ def session_user(store, raw: str, now: float | None = None) -> str:
     turns into a 503. Held in memory for CACHE_SECONDS between reads; its expiry written forward at most
     every TOUCH_SECONDS.
     """
+    return _session(store, raw, now)[1].user
+
+
+def _session(store, raw: str, now: float | None = None) -> tuple[str, _Held]:
+    """session_user's work: the session's id hash and what is held of it (its user, and since
+    2.0.0-player.52 the login it was signed in with). Raises as session_user does."""
     key = id_hash(raw)
     now = time.time() if now is None else now
     with _lock:
@@ -366,7 +376,7 @@ def session_user(store, raw: str, now: float | None = None) -> str:
     if held is not None and time.monotonic() - held.loaded < CACHE_SECONDS and held.expires_at > now:
         if now - held.touched >= TOUCH_SECONDS:
             _touch(store, key, held, now)
-        return held.user
+        return key, held
 
     row = store.session(key)
     if row is None:
@@ -376,12 +386,35 @@ def session_user(store, raw: str, now: float | None = None) -> str:
     if row["expires_at"] <= now:
         end_session(store, key, EXPIRED)
         raise signed_out(EXPIRED)
-    held = _Held(row["user"], row["expires_at"], row["last_seen"], time.monotonic())
+    #? (2.0.0-player.52 review) the login the session was signed in with must still open: the player asks
+    #? Navidrome with it, and one sealed under another DEADWAX_SECRET_KEY (changed, and deadwax restarted -
+    #? which empties what is held here, so the first request after reads the row) would have every player
+    #? call refused while /me and the rest still said "signed in" - and the app's sign-in screen, asking /me,
+    #? come and go until the re-check ended it minutes later. So the session ends here, at its first request,
+    #? as the re-check would end it. Opened once per read of the row (CACHE_SECONDS), never per byte range.
+    if unseal_credential(row.get("credential") or "") is None:
+        _end_unopenable(store, key, row)
+        raise signed_out(KEY_CHANGED)
+    held = _Held(row["user"], row["expires_at"], row["last_seen"], time.monotonic(), row.get("credential") or "")
     with _lock:
         _held[key] = held
     if now - held.touched >= TOUCH_SECONDS:
         _touch(store, key, held, now)
-    return held.user
+    return key, held
+
+
+def _end_unopenable(store, key: str, row: dict) -> None:
+    """(2.0.0-player.52 review) A session whose login won't open (another DEADWAX_SECRET_KEY) ends as the re-check
+    ends it - KEY_CHANGED told to the next request, the user's kept login dead when it is that same one. Best
+    effort: a database that refuses the delete leaves it ended in memory, and the next read tries again."""
+    _note_ended(key, KEY_CHANGED)
+    try:
+        store.delete_session(key)
+    except Exception as e:
+        logger.warning(f"could not take {row.get('user')}'s ended session out of the database ({type(e).__name__}: {e})")
+    _credential_dead(store, row, KEY_CHANGED)
+    logger.info(f"signed {row.get('user')} out: their sign-in was sealed with another DEADWAX_SECRET_KEY",
+                extra={"frontend": True})
 
 
 def user_for(request) -> str:
@@ -400,21 +433,90 @@ def user_for(request) -> str:
         user = break_glass_user(raw)
         if user is None:
             raise signed_out(BREAK_GLASS_ENDED)
+        #? (2.0.0-player.52) no Navidrome account behind it: the player asks as the shared one
+        _remember_login(request, SHARED_LOGIN)
         return user
 
     store = getattr(request.app.state, "store", None)
     if store is None or not getattr(store, "available", False):
         raise HTTPException(status_code=503, detail=NO_DATABASE)
     try:
-        user = session_user(store, raw)
+        key, held = _session(store, raw)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"could not read a session from the database, so the request was refused ({type(e).__name__}: {e})")
         raise HTTPException(status_code=503, detail=NO_DATABASE) from e
+    user = held.user
+    _remember_login(request, PlayerLogin(key, user, held.credential, store))
     if user in Config.admins():
         _take_over_leftovers(store, user)
     return user
+
+
+# ===== the player, as you (2.0.0-player.52) ===========================================================
+
+@dataclass(frozen=True)
+class PlayerLogin:
+    """
+    Who the player asks Navidrome as, for one request (step 6 of the multi-user plan): the session's id hash,
+    its user and the sealed login they signed in with - laid on every player call by
+    src/api/navidrome_endpoint.py's client_for, so plays, scrobbles, "Not played", play counts and
+    favourites are theirs. Set by user_for, on the request's state.
+    """
+    key: str
+    user: str
+    sealed: str
+    store: object = None
+
+
+#? The break-glass admin's: no Navidrome account of its own, so the player asks as NAVIDROME_USER - the
+#? shared account, which a deadwax with logins off asks as for everyone (notes/logins.md says why)
+SHARED_LOGIN = "shared"
+
+#? The request state's name for it
+LOGIN_STATE = "navidrome_login"
+
+
+def _remember_login(request, login) -> None:
+    """What the player asks as, kept on the request for client_for - quietly nothing for a request
+    without state (a test's stand-in)."""
+    state = getattr(request, "state", None)
+    if state is not None:
+        setattr(state, LOGIN_STATE, login)
+
+
+def session_ended(key: str) -> str | None:
+    """Why the session with this id hash was ended in this process (signed out, refused, expired), or None."""
+    with _lock:
+        return _ended.get(key)
+
+
+def player_refused(login: PlayerLogin, why: str = LOGIN_GONE) -> bool:
+    """
+    Navidrome refused the login a player call was made as (error 40 - the password changed, or the account
+    is gone): the session ends as the re-check would end it - from memory and the database, `why` said to
+    the next request - and the user's kept login dies too when it is that same login (a newer sign-in's
+    stands). Also for a login that won't open at all (`why` KEY_CHANGED - another DEADWAX_SECRET_KEY, met
+    while the session was still held in memory). True the first time for a session, so it is logged once
+    however many calls were in flight. SYNCHRONOUS (the database); best effort - a database that fails
+    still has the session ended here.
+    """
+    with _lock:
+        first = login.key not in _ended
+    _note_ended(login.key, why)
+    store = login.store
+    if store is not None and getattr(store, "available", False):
+        try:
+            store.delete_session(login.key)
+        except Exception as e:
+            logger.warning(f"could not take {login.user}'s ended session out of the database ({type(e).__name__}: {e})")
+        _credential_dead(store, {"user": login.user, "credential": login.sealed}, why)
+    if first:
+        said = ("their sign-in was sealed with another DEADWAX_SECRET_KEY" if why == KEY_CHANGED
+                else "Navidrome no longer accepts the login they signed in with (the player was refused)")
+        logger.info(f"signed {login.user} out: {said}", extra={"frontend": True})
+    return first
 
 
 def _take_over_leftovers(store, user: str) -> None:

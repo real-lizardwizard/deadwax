@@ -42,7 +42,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src import pins as rules
-from src.api.navidrome_endpoint import NavidromeError, client_for
+from src.api.navidrome_endpoint import NavidromeError, SignedOut, client_for
 from src.config import Config
 from src.routes import store_album as bridge
 from src.routes.navidrome import ID_MAX
@@ -154,6 +154,9 @@ async def _navidrome_for(client, release: str, title: str, known: str | None, co
     if candidate:
         try:
             body = await client.call("getAlbum", {"id": candidate})
+        except SignedOut:
+            #? (2.0.0-player.52) the asker's login refused: their session has ended
+            raise
         except NavidromeError as e:
             if e.status != 404:
                 return known or candidate, cover
@@ -168,6 +171,8 @@ async def _navidrome_for(client, release: str, title: str, known: str | None, co
         return None, cover
     try:
         album = (await client.call("getAlbum", {"id": found})).get("album")
+    except SignedOut:
+        raise
     except NavidromeError:
         album = None
     return found, (album.get("coverArt") if isinstance(album, dict) else None) or None
@@ -331,6 +336,8 @@ async def toggle_pin(request: Request, body: PinToggle, user: str = Depends(curr
         if release is None and body.navidrome_id:
             try:
                 release = await bridge.album_release(client_for(request), body.navidrome_id)
+            except SignedOut:
+                raise
             except NavidromeError as e:
                 #? an unpin needs no release: the pin is matched by Navidrome's id then (same, below)
                 if body.pinned and e.status != 404:

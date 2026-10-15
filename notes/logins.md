@@ -743,7 +743,7 @@ methods, `src/routes/my_library.py` (`/deadwax/me/library`, a user's) and
   library, "You also have another pressing") still means the STORE - so an album page can say "in your
   library" in its meta line above a store line saying "In the store, not in your library" (seen on the
   real page). The player's calls are still NAVIDROME_USER's (client_for), so Home's Recently added and
-  Not played are the shared account's.
+  Not played are the shared account's. **Done in 2.0.0-player.52** - "The player as you" below.
 - **Changed on purpose** in existing tests: test_store_index's `test_held_complete` (held_copy's
   `album_ids`); test_logins' ROUTES (seven routes) and `concrete` (`{flag_id}`); app-rules.sim's two Home
   source checks (the memo's deps and `ready`). After review: test_personal_libraries' `on` fixture counts
@@ -879,3 +879,359 @@ Find) "In the store, not in your library" with the add note and Add, then after 
 library", no add note, the Added words - Third his, `added`; logins off: `/me/library` `{"on": false}`,
 the main page's box "Already in your library" with no Add. No console errors. **NOT verified**: as above -
 all of it against a real Navidrome 0.64.
+
+### The player as you (2.0.0-player.52)
+
+Step 6 of the multi-user plan (the Claude Doc's "The phone player"). The decisions of 2026-09-27 stand -
+one Navidrome library, your library = your starred albums, two-way with Amperfy - and with logins off
+nothing visible changes. The spec is `deadwax-scratch/uplan/slice-player-per-user.md`. The pieces:
+`src/api/navidrome_endpoint.py` (client_for, UserClient, SignedOut, SHARED_ACCOUNT_USES), `src/auth.py`
+(PlayerLogin, player_refused, session_ended), `src/routes/navidrome.py` (`_theirs`, the access check),
+`src/routes/my_library.py` (Remove, Add's star at once), `library_ledger.personal`/`yours_paths` and three
+store reads/writes (ledger_held_paths, ledger_drop, ledger_by_navidrome); in the app `lib/whose.ts` (the
+words and whose an album is), `lib/yourLibrary.ts` and `app/useYourAlbums.ts` (your albums), and the
+Library's Browse (`lib/appFrame.ts`, `player/Library.tsx`, `app/LibraryViews.tsx`, `app/Sidebar.tsx`).
+
+- **Every call is made as you.** `auth.user_for` (current_user's, so every route but the public ones) keeps
+  a `PlayerLogin` - the session's id hash, its user, the sealed login THAT SESSION was signed in with (held
+  in `_Held` beside the user, read with the session) and the store - on `request.state`; `client_for`
+  opens it and answers a `UserClient`: NavidromeClient's own `call`/`open`, the user's `u`/`t`/`s` laid on
+  LAST (a page-sent `u` can't stand in), over the shared client's httpx pool (one pool; dropped with it
+  when NAVIDROME_URL changes). The session's login, not user_credentials' - a phone signed in yesterday
+  and a laptop today each ask as their own. Logins off: the shared client, whatever the request. **The
+  break-glass `admin`**: the shared client (`auth.SHARED_LOGIN`) - picked over "sign in with your Navidrome
+  account to play" because break-glass is the admin getting in when their own login won't, and refusing
+  its player would leave the album pages - and so the Edit panel reached from them - out of reach exactly
+  then; NAVIDROME_USER is the account deadwax was set up with, and always set when the player works at all
+  (navidrome_configured needs all three). It sees deadwax as logins-off does (`library_ledger.personal`
+  false): the store is its library. **Fail closed**: logins on and no login on the request, or one that
+  won't open (another DEADWAX_SECRET_KEY - `KEY_CHANGED`) is `_NoLogin`, every call a 401 in words - never
+  the shared account in its place. Since review a login that won't open ENDS its session: `auth._session`
+  opens the credential each time it reads the session's row (once per CACHE_SECONDS, and always the first
+  request after a restart - which is when a key changes) and ends it there (`_end_unopenable`: KEY_CHANGED,
+  the kept login dead too), and `_NoLogin` ends one still held in memory at its first call
+  (`player_refused(login, KEY_CHANGED)`) - so /me and the player agree (see After review).
+- **What still asks as the shared account** - `SHARED_ACCOUNT_USES`, the one list, held to the code by
+  test_player_as_you's walk of the imports: the stream cache's make (player_cache: the version check, the
+  download, the turntable's byte ranges), album_context (a hi-res song's neighbours, for the same make),
+  routes/library.py's getScanStatus (its only shared call, also pinned), navidrome_listing ("Not in
+  Navidrome"), and settings/app (drop and close it). routes/navidrome.py, store_album, pins and my_library
+  ask through client_for alone (`asks_as_shared` answers whether a client is the shared one, so the player's
+  routes never import it).
+- **The cached stream is still checked per user** (`_theirs`): before `answer` (wrap=mp4), `answer_fragmented`
+  (fmp4) and `answer_window` (scrub), one getSong AS THEM; a yes kept ACCESS_SECONDS = 300 per (user, song),
+  ACCESS_KEPT = 4096 pairs. Five minutes because a song is asked for many times while it plays (Safari's
+  probe and every seek, the gapless stream's fragments by range, the turntable's windows) and a round trip
+  before each would sit in front of every seek - and no longer, so access Navidrome took away (a library
+  its admin closed to them - Navidrome's multi-library is its only per-user visibility) can't outlast the
+  re-check's own few minutes. Only a yes is kept (a song not scanned yet is asked afresh); a no is the
+  song's own answer (70 - a 404). Not before the plain relay: it asks as the user, so Navidrome's answer is
+  the check. Nothing for the shared account (logins off, break-glass). The bytes are the same whoever asks
+  (pinned: the MP4, the fragmented MP4, a window and the FLAC as ethan, james and logins off).
+- **A login that dies mid-session**: a UserClient call answered 40 runs `auth.player_refused` in the thread
+  pool - the session ended as the re-check would end it (`_note_ended` with LOGIN_GONE, then the database),
+  the user's kept login dead when it is that same login (`_credential_dead`), "signed X out" logged once
+  however many calls were in flight - and raises `SignedOut` (a NavidromeError, 401). `api/app.py` answers a
+  SignedOut that reaches it as a 401 in words; the places that turn a NavidromeError into "Navidrome didn't
+  say" re-raise it (the status route - never "not set up" -, the bridge's lookups, the turntable's disc art,
+  the pins' lookups); the app's 401 handling (api/http.ts) brings the sign-in up saying why. **No retry
+  storm**: the next request is current_user's 401 from `_ended` before any route runs, and a UserClient
+  checks `session_ended` before every call, so a request already past current_user asks nothing either
+  once the refusal is recorded. **And no burst** (review): calls made TOGETHER - Home's shelves and
+  covers, the pins resolved by `asyncio.gather`, the bridge's other pressings - had each passed that check
+  before the first 40 came back, so one Home after a password change sent Navidrome a refused login per
+  call (20 from 20 pins), and Navidrome 0.64.1+ blocks a user name from one address for 20 s after 5
+  (the right password included, `server/subsonic/auth_limiter.go`) - the new password typed into the
+  sign-in then refused too. So until a call as the login has been answered in the last CONFIRMED_SECONDS
+  (5), a UserClient's calls go one at a time (`_gate`, a lock per session, per event loop): the first asks;
+  answered (any answer but 40 - Navidrome checks the login first; or unreachable, no failed login either)
+  the rest go at once, refused they are SignedOut without asking. Another device of the same user ends at
+  its own first refusal, or at the re-check - one failed login each.
+- **Library is your starred albums.** `GET /navidrome/albums?order=starred` (already on the fixed list -
+  no new Navidrome route), asked as you, every page of YOURS_PAGE = 500 up to YOURS_MAX = 10000
+  (`useYourAlbums`, one ask shared by every view), sorted in the app (`sortYourAlbums`) since Subsonic has no
+  "starred by title": Recently added by `created`, Recently played the ones with `played` (Navidrome keeps
+  it per user), Artist by foldName then year then title, Title by foldName - Navidrome's sort names aren't
+  sent, so an album or two can sit where its store grid wouldn't. **Artists** = Navidrome's getArtists
+  filtered to the album artists of your albums, counting yours (`yourArtists`). **Browse** = the store: the
+  views the tab always had (every album, every artist "N albums in the store", every song) - **Songs is
+  Browse's**, Navidrome lists songs store-wide. LibraryPick gains `store` and `storeArtists` (kept on the
+  device like the rest; with logins off `shownPick` shows them as albums and artists, and Songs falling back
+  goes to the store's albums with a library of your own). A phone: a scope row of two chips over the views,
+  **Your library** | **Browse**, drawn only with a library of your own; a desktop: the sidebar's Library
+  group (Recently added, Albums, Artists - yours) and a **Browse** group (Albums, Artists, Songs), titled
+  "Your albums", "Albums in the store"... (`libraryTitle`). An empty library: "Nothing in your library
+  yet." with how to fill it and **Browse the store** - in any order (review: the order is the device's,
+  shared with Browse, and Recently played said only "Nothing in your library played yet."; `yourEmptyNotice`
+  asks the one list how many albums you have) and under Your artists too (`EmptyLibrary`); Browse the store
+  hands its focus to Browse's chip, or the title where no chip is drawn (a desktop), when it fell. Asked again (a new generation, which the grid keys on)
+  after an Add or a Remove here, and your library's starred count moving (the Library watches
+  useMyLibrary's answer - the worker's star, a read-back) - not after a filing (second review: see After the
+  second review).
+- **"In your library" means yours** (`library_ledger.personal`: logins on, not break-glass). The server says
+  whose: /library/owned's albums `yours`, the bridge's `yours` (the album's present folders) and each other
+  pressing's, the store line's other pressings' - all from `ledger_held_paths` (waiting or starred, present
+  folders), all left out with logins off, for break-glass and when the ledger can't be read (never "not
+  yours" on a guess). A Navidrome album (asked as you) is yours when it is `starred` - deadwax's or
+  Amperfy's star, before the read-back - or your library holds its release (`navidromeYours`). Words in
+  `lib/whose.ts`, applied: the album page (`albumMine` - see Add and Remove), the album you don't have's meta
+  line ("in the store" when none of the folders it holds is yours - `metaLine`'s `place`; and since review
+  "another pressing in your library" when one is but the pressing on screen is held and isn't -
+  `groupPagePlace`: the line speaks of the album, the store line of the pressing, and with two pressings
+  in the store, one yours, they read "in your library" over "In the store, not in your library"; THE
+  CONTRADICTION is pinned in whose.sim, one pressing and two, and since the second review rendered in
+  group.sim as ethan - a library answer kept from before an unstar included, which the page now asks again
+  as it shows and outvotes with the store line's word: `withStoreLine`) and its Pressing list ("In the
+  store" marks, found by the filter), "maybe in the store", Search (the library half titled **In the
+  store**, its album rows "· in your library"/"· in the store", artists' counts the store's, **Not in the
+  store yet**, its words and its field's name `searchWords`), the artist page's rows (`rowYours`: starred or
+  held; the tick only for yours), its "In the store" facts and Play's "the 2 albums in the store", Info's
+  folder heading and artist count, "The store also has another pressing". The album page says "In the store"
+  while whose it is can't be told - true of any album Navidrome has. **Left as it was on purpose**: the main
+  page (its search marks and library tab mean the store; it retires).
+- **Add and Remove, on the album page** (where an album's actions live; Browse's tiles open it), under Play
+  in a line of their own (`.app-album-mine`, outside the hero's grid). **Add to my library** for one in the
+  store not yours: step 5's route with a Find body built from the bridge (the release, its folder's artist
+  and album, no tracklist - held whole), and since this step the route stars what it added AT ONCE as you
+  (`_star_now`: the session's login, step 5's `stars.star_entry` unchanged - found, starred, confirmed;
+  anything that stops it leaves the entry to the worker), so the Library has it when you go back - the
+  answer's `starred` says. No Add for an album with no release id (deadwax keeps libraries by release): the
+  line says to star it in Amperfy. **Remove from my library** (`POST /deadwax/me/library/remove`, a user's,
+  `{navidrome_id}`): getAlbum, `unstar` and getAlbum again AS YOU (a star Navidrome kept is a 502, the
+  ledger untouched), then your entries of it - the release's present folders, and any starred as that
+  Navidrome album (`ledger_by_navidrome`, for one whose release id is gone since) - removed BY YOU
+  (`ledger_drop`, `unstarred`, waiting or starred), never a tombstone: not "removed by the admin", nothing
+  new, nothing in You. Unstar first so a refused Remove leaves the ledger as it was (the next read-back
+  would otherwise add it back). It deletes nothing - its words say so - and Add undoes it, so **no
+  confirmation** (the plan's delete has one because there is no undo; here there is) - and where Add can't
+  (no release id, or a folder deadwax hasn't found), the line after it says how to have it back: star it
+  in Amperfy (`REMOVED_STAR_TO_RETURN`, review). Each from its tap,
+  aria-disabled while out, a refusal in an alert, its focus handed to the line; it announces itself
+  (`announceAddedToLibrary` / the new `announceRemovedFromLibrary`), heard by your library, your albums
+  and the owned marks.
+- **Home**: Recently added and Not played in a while ask as you through client_for (so "not played" is
+  yours); New in your library as step 5 left it. **Search** keeps both halves: the store first, then "not
+  here? find it".
+- **Changed on purpose** in existing tests: test_logins' ROUTES (the Remove route); test_personal_libraries'
+  Add answer (`starred`); app-rules.sim's chip-row badge (its class), the Library's Songs chip and showing
+  (yours or Browse's views, shownPick), its title (`libraryTitle`) and `choose` (a LibraryPick), the
+  sidebar's `sidebarCurrent(..., hasLibrary())`, the pressing list (`yoursIds`, the store mark);
+  mylibrary.sim's libraryEvents stand-in (`onRemovedFromLibrary`).
+
+**Verified** (as built, before review): 2852 Python tests (2850 passed, 2 skipped; 28 new -
+tests/test_player_as_you.py), pyflakes, tsc, all 52 sims (whose.sim new; app-rules and mylibrary
+extended), the build; the engine files have no diff. **Mutation-checked, 61 rules**
+(`deadwax-scratch/work/pl52-builder/mutate.py`, each file restored byte for byte by hash,
+PYTHONDONTWRITEBYTECODE), each failing the test or sim meant for it: client_for as the user, break-glass
+shared, no login refused, a login that won't open, the login laid on last, an ended session asking
+nothing and error 40 ending the session - each in `call` (review found `open`'s unpinned: see After
+review) - (off the loop, said once, the kept login dying), SignedOut a 401 app-wide and let through by the
+status, the bridge by Navidrome id (`navidrome_release`), the disc art and the pins' toggle - review found
+the bridge by release and Home's pins unpinned - the shared account's list (a line match - review: an AST
+walk now);
+the access check before each of the three cached answers, the shared account unchecked, a yes kept, five
+minutes, only a yes, the bound; Remove unstarring as you, by you not a tombstone, a waiting entry too,
+unstar before the ledger, the Navidrome album's own entries, break-glass refused; Add starring at once;
+owned's, the bridge's and the store line's `yours`, yours only with a library of your own; in the app
+heldPhrase, starred is yours, albumMine's Remove-over-a-stale-star, no Add without a release and the
+unknown case, the meta line's place and the page passing it, the picker's store mark, Search's words,
+its MusicBrainz rows and its library rows' place, the artist rows' words and a starred row yours, "The
+store also has", your albums' Recently played and folded Artist, your artists' counts, logins off with no
+Browse and Browse's picks shown as the library's, Songs Browse's, your albums forgotten on a Remove and as
+the count moves, the scope row only with a library of your own, your library asked again after a Remove.
+A guard found redundant by a mutation (the bridge's `yours` only with present folders - other pressings
+are only ever found from those) was taken out. **Real page** (pl52-builder's own instances: logins on at
+8116 and off at 8117, scratch databases, a library of four albums of real short sine FLACs - Dummy's
+songs 32 s so a play counts - and a copy of step 5's stand-in Navidrome on 4546 extended to keep each
+user's plays, now playing, `played` and `playCount` apart, getAlbumList2 `starred`, ISO `created`, and
+`hidden.json` keeping albums from a user; headless Chromiums as deadwax.test over plain http; 73 checks in
+three drivers, all passing on a clean run): james's first sign-in seeded all four, the worker starred the
+three with release ids as him; his desktop sidebar Library (Recently added, Albums, Artists) and Browse
+(Albums, Artists, Songs), "Your albums" his three, "Albums in the store" all four, his Artists the two of
+his albums; ethan's phone (390 and 320): the scope row, his Albums and Artists, "Nothing in your library
+yet." with Browse the store, Browse all four with Albums/Artists/Songs, Browse's artists "1 album in the
+store"; Dummy for him "In the store", the add line, Add - "In your library", the added words, Remove,
+starred AS ethan at once, `added`/`starred` in the ledger, in his Library; his play: now playing and a play
+scrobbled as ethan, streamed as ethan, his play count 1 and james's 0; Search "In the store", Dummy "· in
+your library", Third "· in the store"; Remove - "In the store", "nothing was deleted", Add; unstarred as
+ethan, james's stars standing, his entry `removed`/`unstarred`, james's untouched, the folder there, You
+listing nothing, his Library empty again; an untagged album "In the store" with no Add and the line saying
+why; Mezzanine kept from ethan: james's fragmented MP4 200 from the cache, ethan's 404 and his window 404,
+and given back to him the very same bytes; the break-glass admin: no scope row, every album, "In your
+library" green with nothing offered, its stream and scrobble as demo; ethan's password changed: his next
+call (Browse) refused, the sign-in saying "Navidrome no longer accepts the login you signed in with…",
+that session gone from the database, his kept login dead, nothing more asked of the stand-in as him, the
+refusal logged once, and signing in with the new password back on Browse; logins off at 390, 320 and 1440:
+no scope row (the three chips) or Browse group (the sidebar's four), "Albums", every album, the album page
+"In your library" with no Add or Remove, Search "In your library" with unmarked rows and "Not in your
+library yet", the song streamed as demo; nothing past the edge anywhere looked at (390, 320, 1440); no
+console errors. **NOT verified**: against a real Navidrome 0.64 - getAlbumList2 `starred` and the
+`starred`, `played` and `playCount` it sends per user, getSong refusing a song outside a user's libraries
+(its multi-library), scrobble as each user - are read from its source and the plan, and faked; Safari's
+`wrap=mp4` path and the iPhone (Chromium only here - the check before each cached answer is driven through
+the API and the tests); Amperfy itself; the sort of your albums against Navidrome's own sort names.
+
+**After review** (2.0.0-player.52, the same version - nothing shipped between). 25 findings, each confirmed by
+a majority of three skeptics, merged here into what changed:
+
+- **A login that won't open ends its session** (a changed DEADWAX_SECRET_KEY): `_NoLogin` refused every
+  player call while /me - `user_for` never opened the credential - still said signed in for up to ~6 minutes
+  (the re-check's 60 s wait plus RECHECK_SECONDS), so the sign-in screen came and went with each page show,
+  and a playing queue skipped to its end with /me saying all was well. Now `_session` opens it on each read
+  of the session's row - always the first request after a restart, which is when a key changes - and ends
+  it there (`_end_unopenable`: KEY_CHANGED, the session deleted, the kept login dead, logged once); a session
+  still held in memory ends at `_NoLogin`'s first call (`player_refused(login, KEY_CHANGED)`, in the thread
+  pool). Tests: each of /me, the status and the raw stream as the first request after a restart ends it, /me
+  and the player agree from then on, Navidrome asked nothing, james's session untouched until its own
+  request; the held case ends the session too.
+- **No burst of refused logins** (two findings): see "And no burst" above - `CONFIRMED_SECONDS` = 5, a lock
+  per session made afresh per event loop (the tests' loops come and go), an answer other than 40 confirming
+  the login, unreachable letting the waiters go together. One Home's pins after a password change: 1 refused
+  login, not 20. Fresh calls still go together (ten at once in flight), after a pause one goes first and nine
+  together, refused only the first asks, Navidrome down holds nothing up one by one. The docs no longer
+  promise "can't lock your account": they say what is bounded - one refused login per device - and
+  troubleshooting says to wait half a minute if the new password is refused anyway.
+- **The album page** (`albumMine`, `AlbumPage.tsx`): whose it is waits for the album's OWN answer -
+  `starred` from it alone, never the list tile's (Browse's tile, kept from before a Remove, offered Remove
+  again until the album answered); the chips row stays unseen until then too, so the badge doesn't flip.
+  A failed bridge (`bridgeFailed`), or one answering no release where Navidrome names one (`releaseSaid`),
+  says nothing - never "no MusicBrainz release id" for a check that couldn't be made (Properties showed the
+  release on the same page). A release whose folder the store index hasn't got says that
+  (`NOT_FOUND_TO_ADD`) - it said "no release id" with the bridge's `yours` false, and nothing at all
+  without it. A Remove Add can't undo (no release id, or no folder found) says the way back
+  (`REMOVED_STAR_TO_RETURN`: star it in Amperfy) - "Add undoes it, so no confirmation" didn't hold for
+  those. While whose it is is pending under songs already drawn, the line and Add most likely to land hold
+  their place unseen (`.app-album-mine.is-waiting`, `pending`): they pushed the songs ~100 px down under a
+  finger as the bridge landed (measured on the real page: the first song's top constant through a bridge
+  held back 700 ms). The rarer answers (Remove only; nothing) close the place up again.
+- **"In the store"** has no box - grey words, as the pressing list says it - so it doesn't read as one more
+  chip; beside an Also chip and Pressings in a row of 600 px or less it gives way whole (visually hidden,
+  still read, out of the row): its words left alone were an empty box, shown they left the Also chip
+  "Also: t…" at 320 - and the line under Play says the album isn't yours.
+- **Two pressings** (two findings, one skeptic dissenting - "each line is true at its own scope"): the
+  album you don't have's meta line says "another pressing in your library" (`groupPagePlace`) when a pressing
+  is yours but the one on screen is held and isn't - the store line under Get says "In the store, not in
+  your library" for exactly that pressing. Logins off unchanged; the docs' "never" now holds and says how.
+- **Remove's ledger write failing** (`ledger_drop` None on failure, `ledger_by_navidrome` None read as a
+  failure): a 503 `REMOVE_UNWRITTEN` - never "Removed" over an entry still waiting, which the worker would
+  have starred again. Remove again finishes it (pinned with a SQLite trigger refusing the UPDATE, waiting and
+  starred both).
+- **The Library's empty**: in any order (`yourEmptyNotice` - "Nothing in your library played yet." only over
+  albums, none played) and under Your artists (`EmptyLibrary`); Browse the store hands its focus to Browse's
+  chip, else the title (a desktop), when it fell with the view that hid it.
+- **Tests that pinned less than claimed**: an `open()` refused first (a cover, the raw stream) and an ended
+  session opening nothing; Remove then owned's and the bridge's `yours` False (and True after Add); the store
+  line's other pressing not yours; a release in two folders, one held; the bridge by release and Home's pins
+  as 401s, and a refusal never making the bridge forget the Navidrome id it keeps for everyone; the shared
+  account's guard an AST walk (a wrapped import, `navidrome_endpoint.navidrome`, an alias - self-tested);
+  the access cache's least-recently-asked order.
+- **Docs**: Home's Not played, the setup's account and table row, the settings tab's NAVIDROME_USER help
+  (`routes/settings.py`), Info (its folder heading and artist count describe the store - the docs had it
+  among "yours or the store's"), the shared account needing every library with Navidrome's per-user
+  libraries (configuration, getting started, player, troubleshooting: a song skipped on an iPhone, silent
+  on the turntable, gapped under Gapless), the key change; stale "step 6 will" comments in auth.py and
+  lib/home.ts.
+
+**Verified** (after review): 2869 Python tests (2867 passed, 2 skipped; 17 new), pyflakes, tsc, all 52 sims
+(whose.sim and app-rules extended), the build; the engine files have no diff. Changed on purpose:
+test_app_css's chip-row test (the store badge's own rules), app-rules' chip row (`!mine.pending`) and the
+Library's title (`ref`, `tabIndex`). **Mutation-checked, 45 rules** (`deadwax-scratch/work/pl52-fixer/mutate.py`,
+each file restored by hash): 38 for the fixes, each failing the test or sim meant for it - two first missed
+and were then pinned (the gate per event loop; the failed bridge with no album answer) - and 7 of the
+builder's on code this review rewrote; the builder's whole 61 run again (`builder-mutate.py`): 56 caught as
+written, and the 5 whose text this review changed (an ended session asking nothing, a login that won't open,
+the kept login dying, Remove's Navidrome-album entries, albumMine's unknown) caught as adapted among the 45.
+**Real page** (pl52-fixer's own: logins on at 8118 and off at 8119, a copy of the builder's stand-in on 4550
+answering 30 ms after it is asked and logging every failed login, a fifth album - a second pressing of Dummy
+- for the Also chip; headless Chromium as deadwax.test over plain http; 32 checks in one driver, all
+passing on a clean run): ethan's empty library under Recently played chosen in Browse, and Your artists,
+each with the how-to and Browse the store; Browse the store by keyboard focusing Browse's chip (390) and the
+title "Albums in the store" (1440); Dummy with the bridge held 700 ms - the songs drawn, Add's place held,
+the first song's top never moving; "In the store" with no box beside Third's Other pressings, and given way
+whole beside Dummy's Also chip at 390 and 320 (the Also chip whole at 390); Add, Remove, back, and Dummy
+again with its album held 1.5 s - no Remove from the tile's old star; Third with the bridge answering 503 -
+no "no release id" line; the untagged album starred as ethan, removed, the way back said; a password change
+and a burst of seven requests (four covers, the pins, two album lists) - all 401, ONE failed login at the
+stand-in, the new password straight in; DEADWAX_SECRET_KEY changed and 8118 restarted - the sign-in saying
+why, /me 401, staying up through visibilitychange and pageshow, Navidrome asked nothing; logins off at 390
+and 320 - the green badge with its tick, no held place, no scope row, nothing past the edge, no console
+errors. **NOT verified**: still against a real Navidrome 0.64 - its limiter is read from its source
+(`auth_limiter.go`, through the reviewers), not met; an iPhone.
+
+**After the second review** (2.0.0-player.52, the same version). 10 findings, each confirmed by a majority of
+three skeptics, merged here into what changed:
+
+- **A kept library answer under a fresh store line** (minor): the album you don't have read whose an album is
+  from /library/owned, kept for the app's life (`useOwned(true)` asked only when nothing was held), while the
+  store line under Get is asked every time the page shows - and with logins on whose an album is moves outside
+  the tab (an unstar in Amperfy read back by `stars.sync_user`, a Remove on another device). So after either,
+  the page said "1994 · Album · in your library" over "In the store, not in your library" - the very
+  contradiction this step exists to end. Now the page asks the library again EVERY time it shows
+  (`useOwned(false)` and `refreshOwned()` on `shown` - a 304 when nothing changed), and lays the store line's
+  word over the folders it names (`withStoreLine` in lib/whose.ts: the pressing's own folders yours when any is,
+  as `ledger_holds` says it, and each other pressing's `yours`) before the meta line and the pressing list's
+  marks are drawn from them - so the two lines on screen agree whichever answered last. The store line is
+  about the pressing on screen: `chosenPressingId` (lib/pressings.ts, pressingsView's own rule, now shared)
+  names it before the view is made, and `known` is that same answer. Logins off, or a ledger unread: no
+  `yours`, nothing laid over - as before.
+- **Your albums emptied by a filing** (minor): `useYourAlbums` forgot your albums on every `onAlbumsFiled` -
+  anybody's download an admin's poll watches, each Edit panel write, an artist moved, Rescan, a Library care
+  run - so the grid keyed on their generation emptied, asked every page of getAlbumList2 `starred` again (hidden
+  under an album page too, where Back then found 60 tiles to scroll back into) - for nothing: a filed album is
+  starred only later, by the worker once Navidrome has scanned it, and the Library's watch on your library's
+  count catches that. Now only an Add or a Remove (and the count moving) forgets them; the store's grid never
+  did either.
+- **Pins that pinned less than they claimed** (one major as reported, the skeptics said minor - the code was
+  right; four minor): THE CONTRADICTION's page check matched the call's text, not where `personal` came from,
+  and the album page's, the Library's, the sidebar's, Search's, the artist page's and Info's wiring could each
+  be drawn as logins-off with every test green. Now group.sim renders the album you don't have as ethan (logins
+  on): "in the store" in the meta line, "In the store, not in your library" under Get and "In the store" in the
+  list; the library asked as it shows and not while hidden; a kept answer giving way to the store line's word,
+  both ways; logins off as ever. whose.sim reads the wiring element by element: `const personal =
+  hasLibrary()` on the four pages that have it (anchored, so `hasLibrary() && false` or `sessionMe()?.auth ===
+  'on'` - true for break-glass - fails), albumMine's whole call and Add's release, each of the Library's three
+  views of yours and Browse's two (the albums with no `yours`, the artists `inStore`, LibraryViews' count line),
+  the sidebar's Browse group and App's `libraryItems`/`browseItems`/`personal`/`sidebarMove` by hasLibrary(),
+  Search's words, both artist counts, More's note, the MusicBrainz rows' place and the two titles, the artist
+  page's heading, `where`, the tick, `rowLine` and `playsLine`, Info's rows and heading. And your albums' module
+  runs as it is in whose.sim (a stand-in getAlbumList2): asked once and shared, asked again after an Add and a
+  Remove, not after a filing.
+- **Docs** (three minor and a nit): downloading.md's Find note and the lines under Get now give the logins-on
+  words ("The store has 9 of 10 tracks…", **In the store, not in your library** with Add, "The store also has
+  another pressing…" - the step-5 ones too); player.md's Artist pages say what logins on changes (Play plays
+  their albums in the store, the ✓ for yours alone, a store row "2008 · in the store" with no Get, the facts
+  headed **In the store**, "Looking in the store…"), its player-as-you bullet says so too, and that the album you
+  don't have asks again as it shows; "In the store" giving way whole beside an Also chip (player.md,
+  finding-music.md) and "maybe in the store" (player.md, finding-music.md, README) are said.
+
+**Verified** (after the second review): 2869 Python tests (2867 passed, 2 skipped - no Python changed),
+pyflakes, tsc, all 52 sims, the build; the engine files have no diff. Changed on purpose: whose.sim's "a filing
+forgets them" (now: it doesn't), app-rules' owned check on the album page (asked on `shown`, `useOwned(false)`)
+and its pressing-list check (`withStoreLine`), group.sim's useOwned stand-in (a `refreshOwned` that counts).
+**Mutation-checked, 43 rules** (`deadwax-scratch/work/pl52-fixer2/mutate.py`, each file restored by hash), every
+one failing the sim meant for it - the reason read for each: the refresh on show (and `useOwned(true)` back),
+the store line laid over, for the pressing on screen alone, withStoreLine's held folders, other pressings and
+unchanged folders, chosenPressingId; a filing forgetting your albums - subscribed, and by any path (a filing told
+to the Add listeners, which only the module run catches) - and an Add no longer forgetting them; the album you
+don't have's `personal` (rendered in group.sim, read in whose.sim, and the break-glass-true `sessionMe()` source);
+albumMine's personal, bridgeYours and present, Add's release; the Library's three views of yours, its `personal`,
+Browse's artists and albums, the sidebar's group, App's three items; Search's `personal`, words, both counts,
+More, the MusicBrainz place, its title; the artist page's row words, tick, heading, Play line, `personal`,
+`where`; Info's rows and heading. The first review's 45 (`pl52-fixer/mutate.py`) run again: 45 caught; the
+builder's 60 (`builder-mutate.py`): 55 caught as written, the 5 whose text the first review rewrote among its
+45. **Real page** (pl52-fixer2's own: logins on at 8112 and off at 8113, a copy of the first review's stand-in on
+4552, the album's MusicBrainz answer faked in the browser by CDP's Fetch domain - no real MusicBrainz asked;
+headless Chromium as deadwax.test over plain http; 21 checks in `rp/fix2.cjs`, all passing on a clean run):
+ethan's Dummy added (starred at once), the Search tab's /library/owned kept, Dummy removed on his second
+device; back on the first phone with no reload, Browse → Dummy → Other pressings: "1994 · Album · in the store"
+over "In the store, not in your library", the library asked again, both pressings "In the store" in the list,
+nothing past the edge at 390 and 320; added again on a third device, the page shown again (Home and back by the
+tab bar): asked again, "in your library" over "Already in your library"; james's desktop Your albums, Library
+care's Rescan (his library's count asked again - the filing said), back: no getAlbumList2 `starred` asked and
+the very same tile elements; logins off at 390, 320 and 1440: no scope row or Browse group, the album you don't
+have "in your library" over "Already in your library", nothing past the edge; no console errors. And each
+check shown failing on the old code: with the page's refresh and the overlay taken out (rebuilt), the same run
+read "1994 · Album · in your library" over "In the store, not in your library", the CD marked "In your library",
+nothing asked again; with `onAlbumsFiled(forgetYourAlbums)` back, Rescan cost one `starred` ask and new tiles.
+**NOT verified**: still a real Navidrome 0.64, and an iPhone; the read-back of an Amperfy unstar itself
+(SYNC_SECONDS, five minutes) stood in for by a Remove on another device - both leave the ledger the same.

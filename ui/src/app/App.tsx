@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
-import { closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type ManagingKind, type SidebarId } from '../lib/appFrame'
+import { browseItems, closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type ManagingKind, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { CARE_PAGE, LOG_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
@@ -937,7 +937,7 @@ export function App() {
   //? the Library view showing; another Library view is that view at the Library's root - from another
   //? tab, or a page on the Library's, opened at its top (lib/appFrame.ts sidebarMove).
   const chooseFromSidebar = useCallback((item: SidebarId) => {
-    const move = sidebarMove(item, libraryPick(), librarySongs())
+    const move = sidebarMove(item, libraryPick(), librarySongs(), hasLibrary())
     if (move.how === 'tab') {
       chooseTab(move.tab)
       return
@@ -1270,8 +1270,10 @@ export function App() {
             {/* a desktop's sidebar, in the tab bar's place (2.0.0-player.19) - first, as it is on screen */}
             {desktop && (
               <Sidebar
-                current={sidebarCurrent(nav.tab, libraryView, hasSongs, topNow)}
-                library={libraryItems(hasSongs)}
+                current={sidebarCurrent(nav.tab, libraryView, hasSongs, topNow, hasLibrary())}
+                library={libraryItems(hasSongs, hasLibrary())}
+                browse={browseItems(hasSongs, hasLibrary())}
+                personal={hasLibrary()}
                 arriving={view.arriving.length}
                 admin={admin}
                 needsLook={needsLook}

@@ -167,6 +167,12 @@ If nothing matches, it says *Nothing in your library matches "…"*. If Navidrom
 can't be reached, this half says so (**Connect Navidrome** or **Can't reach Navidrome**, as Home
 does) and MusicBrainz is still searched below it.
 
+**With logins on** (since 2.0.0-player.52) this half is the **store** - Navidrome's search finds everything
+deadwax holds - so it is titled **In the store**, each album row ends **· in your library** or **· in the
+store** (yours: starred by you, or in your library), an artist's count is the store's ("Artist · 2 albums in
+the store"), and the half below is **Not in the store yet**. With logins off, everything here is as
+written - [the player as you](player.md#the-player-as-you-with-logins-on).
+
 ### Not in your library yet
 
 From MusicBrainz, 12 albums at a time, **leaving out any you already have** - judged by MusicBrainz's
@@ -227,13 +233,18 @@ It opens like an album you have: back, the cover in the middle (the Cover Art Ar
 pressing shown, else for the album), the title, the artist (since 2.0.0-player.17 a link to
 [their page](player.md#artist-pages) when the album is credited to one artist; a collaboration's
 names stay plain), and "2008 · Album ·
-not in your library" - "in your library" if you have some pressing of it after all. That last part
+not in your library" - "in your library" if you have some pressing of it after all (with logins on, "in
+the store" when the store has a pressing of it but none is yours, and "another pressing in your library"
+when one is but the pressing chosen is the store's - the line speaks of the album, the one under Get of
+the pressing, so it never says "in your library" over **In the store, not in your library**; the
+**Pressing** list marks each pressing **In your library** or **In the store**). That last part
 appears once deadwax has said what you have, never before, so it can't claim you don't have an
 album you do; and it counts a folder tagged with any of the album's pressings, the .m4a albums
 above included. Since 2.0.0-player.50, when nothing is tagged as the album but a folder **with no
 MusicBrainz ids at all** has its name and its artist's (as credited, or the name they go by now), it
-says **maybe in your library**, in a dashed box, as the main page's card does - the name can't tell
-which album that folder is, let alone which pressing. Point at it (on a computer) for the folder;
+says **maybe in your library**, in a dashed box, as the main page's card does (with logins on,
+**maybe in the store** when that folder isn't in your library) - the name can't tell which album that
+folder is, let alone which pressing. Point at it (on a computer) for the folder;
 matching its release in the metadata editor settles it. Opened from a saved link or after a reload it
 says the same, since the album's
 title, kind and year come with its pressings. A link whose address isn't a MusicBrainz album says
@@ -241,7 +252,8 @@ title, kind and year come with its pressings. A link whose address isn't a Music
 Shuffle; then **Get the album**, the page's one purple button, which gets **the pressing chosen**
 ([Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source)); under it,
 what you already have of that pressing, if anything ("Already in your library", "Already
-downloading", "You have 9 of 10 tracks of this pressing…", "You also have another pressing…" -
+downloading", "You have 9 of 10 tracks of this pressing…", "You also have another pressing…" - or,
+with logins on, "The store also has another pressing…" for one that isn't yours -
 asked of deadwax without searching Soulseek, for the pressing chosen, and again as you come back to
 the page); and then **that pressing's tracklist**.
 
@@ -342,6 +354,8 @@ folder tagged with no album id (an .m4a deadwax filed carries the pressing's id 
 album's) has no chip. Beside an **Also** chip, in a row too narrow for all three whole - a phone
 held upright, or a computer's album page with a panel open beside it - it reads **Pressings** and
 **In your library** keeps only its green tick, so the Also chip has room to say which pressing it
-is; a screen reader still hears "Other pressings" and "In your library". It's the row's own width
+is; a screen reader still hears "Other pressings" and "In your library". With logins on, **In the
+store** - grey words with no tick to keep - gives way whole there instead, and a screen reader still
+hears it. It's the row's own width
 that decides (600 pixels or less shortens), so a phone on its side, a tablet and a wide computer
 window say every word.

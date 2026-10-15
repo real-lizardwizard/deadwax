@@ -426,15 +426,23 @@ and open it again, or reload the tab.
 
 Every few minutes deadwax asks Navidrome whether the login you signed in with still stands. After you
 change your Navidrome password - or your account is deleted - that answer is no, and within about six
-minutes deadwax signs you out on every device. The app's sign-in screen comes back over whatever was
+minutes deadwax signs you out on every device. Since 2.0.0-player.52 the player asks Navidrome as you,
+so it is often sooner: the first thing the app asks of Navidrome with the old login - opening Browse or
+an album, a cover, the next song - is refused, and that session ends there and then (another device
+ends at its own first refusal, or at the six-minute check). Nothing more is asked with the old login,
+and until Navidrome has taken a login in the last few seconds the app's requests go to it one at a time,
+so a page's burst of covers and pins is one refused login per device, not one each - Navidrome blocks an
+account for 20 seconds after five. If the new password is refused anyway right after the change ("That
+user name and password didn't work"), wait half a minute and try again. The app's sign-in screen comes back over whatever was
 showing, saying "Navidrome no longer accepts the login you signed in with": sign in with the new
 password and the app is as it was underneath. **The music doesn't wait**, though: from the moment the
 session ends, the player can't fetch any more of it. The song playing goes on only as far as your
 device has already fetched it (with Gapless on, a few seconds), and then the player skips through the
 rest of the queue as it does with any song that won't play - **Skipped "…" - it wouldn't play**, one
 song after another - and stops at the end with a reason that blames the song. Nothing is wrong with the
-songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` signs everyone out
-the same way ("DEADWAX_SECRET_KEY has changed since you signed in").
+songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` (and restarting
+deadwax) signs everyone out too, each session at its next request ("DEADWAX_SECRET_KEY has changed since
+you signed in").
 
 ### Your library says deadwax can't star albums for you
 
@@ -593,6 +601,24 @@ ask again. A Navidrome that answers an empty
 search with nothing (an older one, or one set up to) can't list songs this way, and the Library
 shows Albums and Artists only. The albums of the songs are all in Albums.
 
+## The app's Library looks empty
+
+With logins on (since 2.0.0-player.52) the **Library** tab is **your** library - your starred albums
+in Navidrome - not the whole store. An account that hasn't starred anything yet, and hasn't had
+anything filed for it, sees **Nothing in your library yet** - in any order, Recently played too - and
+the same under Artists: tap **Browse the store** (or **Browse** over the views - on a desktop, the
+sidebar's **Browse** group) for every album deadwax holds, and open one to **Add to my library**. A few
+more things that make your library look short:
+
+- **An album waiting to be starred** isn't there yet: your Library lists what Navidrome has starred for
+  you, and a download is starred once Navidrome has scanned it. **You → Your library** says what's
+  waiting, and why.
+- **An album with no MusicBrainz release id** can't be added from its page (deadwax keeps your library
+  by release, and the page says so). Star it in Amperfy - your Library is your Navidrome favourites, so
+  it shows there - or have an admin match its release.
+- **The break-glass `admin`** has no library of its own: its Library is the whole store.
+- **Signed in on the main page only**: the main page's library tab is the store's, as it always was.
+
 ## The app's Home has no "Not played in a while"
 
 It shows only with at least four albums you last played more than 30 days ago, and only when
@@ -600,8 +626,9 @@ Navidrome says when each album was last played (OpenSubsonic's `played`, on its 
 list). A library you've been listening through - everything played in the last month - or a fresh
 Navidrome has nothing to show yet. A Navidrome that doesn't send `played` never shows it: Info →
 Debug's **Navidrome sent** row lists the fields it sends for the album playing. The plays are the
-ones Navidrome counts for the account deadwax signs in with, so plays made in another app under
-another Navidrome user don't count.
+ones Navidrome counts for the account the player asks as - `NAVIDROME_USER` with logins off, your own
+with them on (since 2.0.0-player.52) - so plays made in another app under another Navidrome user don't
+count.
 
 ## A pinned album says "Removed from the store", "Not on disk just now" or "Not in Navidrome yet"
 
@@ -878,7 +905,9 @@ before you save. Saving the address it already is, or reverting it, doesn't need
 - **A song counts once you've heard half of it or four minutes**, whichever comes first, and only
   songs longer than 30 seconds count. Skipping ahead adds nothing, so a song you skipped through
   isn't a play.
-- **Plays go to the `NAVIDROME_USER` account.** Look at that account's play counts.
+- **Plays go to the `NAVIDROME_USER` account with logins off**, and to your own - the account you
+  signed in with - with logins on (since 2.0.0-player.52; the break-glass `admin`'s go to
+  `NAVIDROME_USER`). Look at that account's play counts.
 - **Behind a reverse proxy that rewrites the `Host` header**, deadwax takes the player's play
   reports for requests from another website and refuses them, and the phone doesn't say so. The
   main page's **Log** names each refusal. Pass the original `Host` through, or set
@@ -928,6 +957,11 @@ for it again.
 - **"The connection dropped while this song was loading"**: the phone lost deadwax (a VPN
   dropping, say), or deadwax lost Navidrome. The player asks again by itself; if it has stopped,
   tap play.
+- **With logins on and libraries of their own in Navidrome** (its multi-library setting), a song that
+  plays on a computer but is skipped on an iPhone or iPad, is silent on the turntable, or plays with a
+  gap under Gapless: deadwax fetches those songs into its own cache as `NAVIDROME_USER`, and Navidrome
+  tells that account it has nothing by that id when it can't see the song's library. Give
+  `NAVIDROME_USER` access to every library in Navidrome ([the player as you](player.md#the-player-as-you-with-logins-on)).
 
 ## The now-playing screen no longer shows how the song was sent, or the last gap and seek
 

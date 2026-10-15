@@ -158,6 +158,8 @@ ROUTES = {
     ("POST", "/deadwax/me/library/add"): "user",
     ("POST", "/deadwax/me/library/seen"): "user",
     ("POST", "/deadwax/me/library/dismiss"): "user",
+    #? (2.0.0-player.52, step 6) Remove from my library - tests/test_player_as_you.py
+    ("POST", "/deadwax/me/library/remove"): "user",
     ("GET", "/deadwax/library/held"): "admin",
     ("POST", "/deadwax/library/held/flags/{flag_id}/add"): "admin",
     ("POST", "/deadwax/library/held/flags/{flag_id}/dismiss"): "admin",

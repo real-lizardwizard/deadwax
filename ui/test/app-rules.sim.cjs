@@ -976,8 +976,9 @@ console.log('\nSearch: a song plays from the tap, with its album in hand; the ne
       /useEffect\(\(\) => \{\s*if \(ask && !held && !asking\) void refreshOwned\(\)\s*\}, \[ask\]\)/.test(owned),
       /onAlbumsFiled\(\(\) => \{\s*if \(wanted\) void refreshOwned\(\)/.test(owned)],
     [true, true, true, true, true])
-  check('...when the album page opens, and beside each MusicBrainz search, which waits a moment for its answer',
-    [/const owned = useOwned\(true\)/.test(page), /const ownedAnswered = refreshOwned\(\)/.test(askMusicBrainz),
+  //? (2.0.0-player.52, second review) the album page asks EVERY time it shows, as its store line is asked
+  check('...whenever the album page shows, and beside each MusicBrainz search, which waits a moment for its answer',
+    [/const owned = useOwned\(false\)\s*useEffect\(\(\) => \{\s*if \(shown\) void refreshOwned\(\)\s*\}, \[shown\]\)/.test(page), /const ownedAnswered = refreshOwned\(\)/.test(askMusicBrainz),
       /await Promise\.race\(\[ownedAnswered, wait\(OWNED_WAIT_MS\)\]\)/.test(askMusicBrainz)],
     [true, true, true])
   check('...and what MusicBrainz found is left out once, as drawn - never filtered again as the library\'s answer changes',
@@ -1145,7 +1146,9 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   check('...a held row\'s look called off with the chip\'s, when the box changes or the root stops showing',
     /function standDown\(\) \{\s*getRequests\.supersede\(\)\s*setResolving\(null\)\s*heldRequests\.supersede\(\)/.test(code(read('app/Search.tsx'))), true)
   check('the album page\'s chip row is drawn from the first frame, so a chip landing moves nothing below it - unseen until the bridge has answered or failed (2.0.0-player.41), so nothing in it slides',
-    [/<div class=\{`app-album-chips\$\{storeDone \? '' : ' is-waiting'\}`\}>\s*<span class="app-held-badge">/.test(album),
+    //? (2.0.0-player.52) the badge says whose it is - "In the store" (is-store) when, with logins on, it isn't yours -
+    //? and (review) with logins on the row waits for whose it is too (the album's own answer), so the badge doesn't flip
+    [/<div class=\{`app-album-chips\$\{storeDone && !mine\.pending \? '' : ' is-waiting'\}`\}>\s*<span class=\{`app-held-badge\$\{mine\.yours === true \? '' : ' is-store'\}`\}>/.test(album),
       /const storeDone = store !== null \|\| storeFailed/.test(album)],
     [true, true])
   check('Search\'s held row opens the album you have with its credited artist, so the page\'s artist line holds its place',
@@ -1162,8 +1165,9 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   check('Songs only where Navidrome\'s empty search lists songs: asked once, for one, the chip left out on an empty answer (and the albums shown)',
     //? (2.0.0-player.19: told to the Library's store, app/libraryPick.ts, which the desktop sidebar reads too)
     [/librarySongs\(0, 1, request\.signal\)\.then\(\s*\(songs\) => \{\s*if \(request\.current\(\)\) setLibrarySongs\(songs\.length > 0\)/.test(library),
-      /const views = VIEWS\.filter\(\(entry\) => entry\.id !== 'songs' \|\| hasSongs !== false\)/.test(library),
-      /const showing: LibraryView = view === 'songs' && hasSongs === false \? 'albums' : view/.test(library)],
+      //? (2.0.0-player.52) the chips are yours or Browse's with a library of your own; Songs falls back by shownPick
+      /const views = \(personal \? \(browsing \? BROWSE_VIEWS : YOUR_VIEWS\) : VIEWS\)\.filter\(\(entry\) => entry\.id !== 'songs' \|\| hasSongs !== false\)/.test(library),
+      /const showing: LibraryPick = shownPick\(pick, hasSongs, 'phone', personal\)/.test(library)],
     [true, true, true])
 }
 
@@ -1338,8 +1342,9 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
     [true, true, true, true])
   const library = code(read('player/Library.tsx'))
   check('the Library reads its view from the store the sidebar chooses from, titled by it on a desktop, Recently added the albums newest first',
-    [/const \{ pick, hasSongs \} = useLibraryPick\(\)/.test(library), /<h1 class="pl-large-title">\{desktop \? LIBRARY_TITLES\[drawn\] : 'Library'\}<\/h1>/.test(library),
-      /<div hidden=\{drawn !== 'recent'\}>\s*<AlbumsView order="newest"/.test(library), /const choose = \(next: LibraryView\) => \{\s*if \(next !== showing\) chooseLibrary\(next\)/.test(library)],
+    //? (2.0.0-player.52) titled yours or the store's with a library of your own (lib/appFrame.ts libraryTitle)
+    [/const \{ pick, hasSongs \} = useLibraryPick\(\)/.test(library), /<h1 class="pl-large-title" ref=\{title\} tabIndex=\{-1\}>\{desktop \? libraryTitle\(drawn, personal\) : 'Library'\}<\/h1>/.test(library),
+      /<div hidden=\{drawn !== 'recent'\}>\s*<AlbumsView order="newest"/.test(library), /const choose = \(next: LibraryPick\) => \{\s*if \(next !== showing\) chooseLibrary\(next\)/.test(library)],
     [true, true, true, true])
 }
 
@@ -1680,7 +1685,7 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
     [true, true])
   check('the sidebar\'s item: Managing\'s first, an admin\'s, with the count',
     [/\{admin && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul class="app-side-list">\s*\{item\(SIDEBAR_QUEUE\)\}/.test(side),
-      /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow\)/.test(app)],
+      /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow, hasLibrary\(\)\)/.test(app)],
     [true, true, true])
   //? (2.0.0-player.47: on both frames - You is told no frame at all now)
   check('You\'s row: in Managing (an admin\'s), above the link to the main page - on a phone as on a desktop',
@@ -2143,9 +2148,11 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
     [/const page: Page = \{ kind: 'group', id: group\.id, \.\.\.\(group\.title \? \{ label: group\.title \} : \{\}\) \}/.test(held), /router\.open\(page\)/.test(held), /groupPreviews/.test(held),
       /title=\{page\.label \?\? ''\}/.test(app), /<h1 class="pl-hero-title">\{header\.title \|\| title\}<\/h1>/.test(page), /getGroup\(mbid, preview, releases, chosen\)/.test(page)],
     [true, true, false, true, true, true])
-  check('the pressing list marks what the library holds, from the page\'s one /library/owned answer',
-    [/const ownership = owned \? ownedForGroup\(owned\.index, \{\s*groupId: mbid,\s*releaseIds: releases\.map\(\(release\) => release\.id\),[\s\S]*?\}\) : null\s*const holding = ownership \? ownership\.held : null/.test(page),
-      /pressingsView\(releases, release, heldIds\)/.test(page), /\{row\.held && <span class="app-picker-held">In your library<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
+  check('the pressing list marks what the library holds, from the page\'s one /library/owned answer (whose each is, as the store line last said - second review)',
+    [/const ownership = owned \? ownedForGroup\(owned\.index, \{\s*groupId: mbid,\s*releaseIds: releases\.map\(\(release\) => release\.id\),[\s\S]*?\}\) : null\s*(?:const [^\n]*\n\s*){3}const holding = ownership \? withStoreLine\(ownership\.held, said\) : null/.test(page),
+      //? (2.0.0-player.52) and which of those are yours: "In the store" for one that isn't, with a library of your own
+      /pressingsView\(releases, release, heldIds, yoursIds\)/.test(page),
+      /\{row\.held && <span class=\{`app-picker-held\$\{row\.inStore \? ' is-store' : ''\}`\}>\{row\.inStore \? 'In the store' : 'In your library'\}<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
     [true, true, true])
   //? James's decision kept (pin both): Search's MusicBrainz half leaves held groups out, and the artist
   //? page's held rows still open the album you have - the way to another pressing is the album page's

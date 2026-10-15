@@ -85,6 +85,8 @@ export interface PressingRow {
   isDefault: boolean
   /** a pressing your library holds (2.0.0-player.41): marked "In your library", never folded away */
   held: boolean
+  /** (2.0.0-player.52) held by the store but not yours - logins on, a library of your own: marked "In the store" */
+  inStore?: boolean
 }
 
 export interface PressingsView {
@@ -192,7 +194,7 @@ export function filterPressings(rows: readonly PressingRow[], typed: string): Pr
   const words = foldText(typed).split(' ').filter(Boolean)
   if (!words.length) return [...rows]
   return rows.filter((row) => {
-    const text = foldText([row.label, row.facts, row.note, row.held ? 'in your library' : ''].join(' '))
+    const text = foldText([row.label, row.facts, row.note, row.held ? (row.inStore ? 'in the store' : 'in your library') : ''].join(' '))
     const closed = text.replace(/ /g, '')
     return words.every((word) => text.includes(word) || closed.includes(word))
   })
@@ -242,20 +244,37 @@ export function sharedBy(base: Pick<Base, 'count' | 'total'>): string {
 const sortDate = (release: PressingRelease) => `${release.date || release['release-events']?.[0]?.date || ''}~`
 
 /**
+ * Which pressing of a group is shown: the one `asked` for (the address's) when the group has it, else the
+ * default - the representative pressing. pressingsView's `chosenId`, also asked before the view is made by the
+ * album you don't have, which lays what the line under Get says of that pressing over the library's answer
+ * before the view's marks are drawn from it (lib/whose.ts withStoreLine).
+ */
+export function chosenPressingId(
+  releases: readonly PageRelease[],
+  asked: string | null = null,
+  defaultId: string | null = representativeRelease(releases)?.id ?? releases[0]?.id ?? null,
+): string | null {
+  return asked && releases.some((release) => release.id === asked) ? asked : defaultId
+}
+
+/**
  * Every pressing of a group as the dropdown lists them, and which is shown - `asked` is the one the
  * address names, when the group has it; `held`, the release ids your library holds (lowercase), each
- * marked and kept out of the fold.
+ * marked and kept out of the fold. `yours` (2.0.0-player.52): with logins on and a library of your own, the
+ * release ids of those that are YOURS - a held one not among them is marked "In the store"; null (logins off)
+ * when the store is your library.
  */
 export function pressingsView(
   releases: readonly PageRelease[],
   asked: string | null = null,
   held: ReadonlySet<string> = new Set(),
+  yours: ReadonlySet<string> | null = null,
 ): PressingsView {
   const base = chooseBase(releases)
   const usualKey = base ? tracklistKey(base.tracks) : null
   const fallback = representativeRelease(releases)
   const defaultId = fallback?.id ?? releases[0]?.id ?? null
-  const chosenId = asked && releases.some((release) => release.id === asked) ? asked : defaultId
+  const chosenId = chosenPressingId(releases, asked, defaultId)
   //? what every pressing is compared with: the usual titles at the DEFAULT pressing's lengths (it
   //? always holds them - representativeRelease picks from chooseBase's pool), never the lengths of
   //? whichever pressing MusicBrainz happened to list first
@@ -272,8 +291,10 @@ export function pressingsView(
       : !base ? 'usual'
       : diff && !differs(diff) && tracklistKey(tracks) === usualKey ? 'usual' : 'differs'
     const isDefault = release.id === defaultId
+    const holds = held.has(release.id.toLowerCase())
     return { id: release.id, label: pressingLabel(release), facts: pressingFacts(release), note: pressingNote(kind, diff, isDefault, base), kind, isDefault,
-      held: held.has(release.id.toLowerCase()), format: pressingFormat(release), date: sortDate(release) }
+      held: holds, ...(holds && yours && !yours.has(release.id.toLowerCase()) ? { inStore: true } : {}),
+      format: pressingFormat(release), date: sortDate(release) }
   })
 
   const byDate = (a: { date: string; label: string }, b: { date: string; label: string }) =>
@@ -430,10 +451,13 @@ export function pageHeader(
  * The meta line under the artist: "2008 · Album · not in your library". `held` is null until the
  * library has said what it holds - and then the line says neither, rather than "not in your
  * library" for an album that turns out to be there (the first /library/owned after a restart walks
- * the whole library).
+ * the whole library). `place` (2.0.0-player.52): where a held album is - "in the store" when, with a
+ * library of your own, none of what the store holds of it is yours, and "another pressing in your library"
+ * when one is but not the pressing on screen, which the store holds (lib/whose.ts groupPagePlace): never
+ * "in your library" over a store line saying "In the store, not in your library".
  */
-export function metaLine(header: { year: string; kind: string }, held: boolean | null): string {
-  const holding = held === null ? '' : held ? 'in your library' : 'not in your library'
+export function metaLine(header: { year: string; kind: string }, held: boolean | null, place = 'in your library'): string {
+  const holding = held === null ? '' : held ? place : 'not in your library'
   return [header.year, header.kind, holding].filter(Boolean).join(' · ')
 }
 

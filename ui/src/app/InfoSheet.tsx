@@ -8,6 +8,7 @@ import type { QueueTrack } from '../lib/playQueue'
 import { Cover } from '../player/Cover'
 import { ChevronRightIcon } from '../player/icons'
 import type { Player } from '../player/usePlayer'
+import { hasLibrary } from './useMyLibrary'
 import { useSheet } from './useSheet'
 
 export type InfoTab = 'about' | 'debug'
@@ -142,7 +143,7 @@ export function InfoSheet({
   const track = player.track
   if (open && track) {
     if (tab === 'about') {
-      drawn.current = { about: aboutRows(track, album, details), debug: null }
+      drawn.current = { about: aboutRows(track, album, details, hasLibrary()), debug: null }
     } else {
       const answer = album as Readonly<Record<string, unknown>> | null
       const song = album?.song?.find((candidate) => candidate.id === track.id) ?? null
@@ -307,7 +308,8 @@ export function InfoSheet({
               {about.album?.folder && (
                 <section class="app-info-section" aria-labelledby="app-info-where">
                   <h3 id="app-info-where" class="app-section-title">
-                    In your library
+                    {/* (2.0.0-player.52) the album's folder in the store - with a library of your own, said so */}
+                    {hasLibrary() ? 'In the store' : 'In your library'}
                   </h3>
                   <dl class="app-group app-kv">
                     <div class="app-kv-row">

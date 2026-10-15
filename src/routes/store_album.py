@@ -27,6 +27,11 @@ Given `navidrome_id`, the release is Navidrome's own reading of the album's file
 `musicBrainzId`, internally, as the turntable's disc art asks it) - none means nothing in the store
 can be said to be that album, and the answer is empty but for the id.
 
+(2.0.0-player.52) With logins on, `yours` says whether the album is in the asker's OWN library (their ledger
+holds one of its present folders - library_ledger.yours_paths), and each other pressing says the same - what
+the album page's "In your library" or "In the store" with Add to my library reads. Left out with logins off,
+for the break-glass admin, and when the ledger can't be read.
+
 Exactly one of the two is taken (anything else is a 422): a release id as MusicBrainz writes one,
 or a Navidrome id of at most 256 characters, which is only ever Navidrome's `id` parameter, never
 part of a path. A GET that writes nothing but a tombstone for a folder that has gone - the
@@ -38,9 +43,10 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, client_for
+from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, SignedOut, client_for
+from src import library_ledger
 from src.config import Config
 from src.library import cached_album
 from src.logger import logger
@@ -50,6 +56,7 @@ from src.organizer import is_within
 from src.routes.library import _ensure_cache_loaded
 from src.routes.navidrome import ID_MAX
 from src.routes.search_musicbrainz import MBID_PATTERN
+from src.users import current_user
 
 router = APIRouter()
 
@@ -149,6 +156,9 @@ async def navidrome_album(client: NavidromeClient, release_mbid: str | None, tit
             album = body.get("album")
             if isinstance(album, dict) and _same_release(album, release_mbid):
                 return known
+        except SignedOut:
+            #? (2.0.0-player.52) the asker's login refused: their session has ended - never "not found"
+            raise
         except NavidromeError as e:
             if e.unreachable:
                 return known  # Navidrome not there: what was found stands, as it always did
@@ -158,6 +168,8 @@ async def navidrome_album(client: NavidromeClient, release_mbid: str | None, tit
             body = await client.call("search3", {
                 "query": query, "albumCount": SEARCH_ALBUMS, "artistCount": 0, "songCount": 0,
             })
+        except SignedOut:
+            raise
         except NavidromeError as e:
             logger.debug(f"no Navidrome album for {release_mbid}: {e}")
             return None
@@ -185,6 +197,8 @@ async def navidrome_release(client: NavidromeClient, album_id: str) -> str | Non
     """The release a Navidrome album is, by Navidrome's reading of its files - or None."""
     try:
         return await album_release(client, album_id)
+    except SignedOut:
+        raise
     except NavidromeError as e:
         logger.debug(f"no release for Navidrome album {album_id!r}: {e}")
         return None
@@ -262,6 +276,7 @@ async def store_album(
     request: Request,
     release_mbid: str | None = Query(None, pattern=MBID_PATTERN),
     navidrome_id: str | None = Query(None, min_length=1, max_length=ID_MAX),
+    user: str = Depends(current_user),
 ):
     """
     One album, across the three ids: the store's rows of the release, its other pressings, and
@@ -313,4 +328,11 @@ async def store_album(
         {**_row(row), "navidrome_id": ids[index] if index < len(ids) else None}
         for index, row in enumerate(others)
     ]
+    #? (2.0.0-player.52) with logins on: whether each is in the asker's own library
+    yours = await library_ledger.yours_paths(store, root, user) if present or others else None
+    if yours is not None:
+        #? asked only when the store has a folder of the release (other pressings are found from those)
+        answer["yours"] = any(row["path"] in yours for row in present)
+        for pressing in answer["other_pressings"]:
+            pressing["yours"] = pressing["path"] in yours
     return answer

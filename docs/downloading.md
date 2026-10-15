@@ -48,7 +48,8 @@ downloads, by its MusicBrainz release id:
   your library right now. There's nothing to cancel; once it's filed, **Find** says what your
   library holds of it.
 - **Part of it held**: the library has some of its tracks but not all. The search runs as usual,
-  with a note above the results: "You have 9 of 10 tracks of this pressing, in *folder*." The
+  with a note above the results: "You have 9 of 10 tracks of this pressing, in *folder*." - with
+  logins on, "The store has 9 of 10 tracks…" when that folder isn't in your library. The
   note then says what a download would do, because that depends on where it would be filed:
   - "Downloading it files only the tracks that folder doesn't have yet": the part you have is
     in the folder a download of it is filed into, so the tracks already there aren't filed a
@@ -57,7 +58,9 @@ downloads, by its MusicBrainz release id:
     part you have is in a folder named some other way (by Picard, or by an older folder naming
     template), so a download is filed as a separate folder, tracks you have included.
 - **Another pressing of the same album held**: the search runs, with a note for each pressing
-  you have, "You also have another pressing:" and its edition (or year), format and folder. This
+  you have, "You also have another pressing:" and its edition (or year), format and folder. With
+  logins on, one the store holds that isn't in your library says "The store also has another
+  pressing:" instead ([the player as you](player.md#the-player-as-you-with-logins-on)). This
   note shows beside the others as well.
 
 What counts as held is checked on disk every time: the folder has to still be there, with its
@@ -219,7 +222,10 @@ Under **Get the album**, the album's page says what the library and the download
 the pressing chosen - the same checks as [When you already have it](#when-you-already-have-it), made
 without searching Soulseek: **Already in your library** with the folder and "11 of 11 tracks · FLAC",
 **Already downloading** with who from and how far, "You have 9 of 10 tracks of this pressing, in …",
-"A download of part of this pressing is already running", "You also have another pressing: …". It's
+"A download of part of this pressing is already running", "You also have another pressing: …" - with
+logins on, for what the store holds that isn't in your library, **In the store, not in your library**
+with **Add to my library**, "The store has 9 of 10 tracks of this pressing, in …" and "The store also has
+another pressing: …" ([the player as you](player.md#the-player-as-you-with-logins-on)). It's
 asked again when you choose another pressing, when an album is filed, and when you come back to the
 page - so after a Get it says **Already downloading**, and a download cancelled in Requests stops
 being said. While it's asked again, what it said last stays.

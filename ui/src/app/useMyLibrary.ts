@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { markLibrarySeen, myLibrary } from '../api/me'
 import type { MyLibrary } from '../api/types'
 import { latestOnly } from '../lib/latest'
-import { onAddedToLibrary, onAlbumsFiled } from '../lib/libraryEvents'
+import { onAddedToLibrary, onAlbumsFiled, onRemovedFromLibrary } from '../lib/libraryEvents'
 import { isNew, newMarks } from '../lib/myLibrary'
 import { sessionMe } from './session'
 
@@ -48,9 +48,11 @@ export function askMyLibrary(): void {
   if (!hasLibrary()) return
   if (!hearing) {
     hearing = true
-    //? a filing puts albums into libraries, and Add to my library one: what's new, and the count, move
+    //? a filing puts albums into libraries, and Add to my library one: what's new, and the count, move -
+    //? and (2.0.0-player.52) Remove from my library takes one out
     onAlbumsFiled(() => askMyLibrary())
     onAddedToLibrary(() => askMyLibrary())
+    onRemovedFromLibrary(() => askMyLibrary())
   }
   const request = requests.begin()
   myLibrary(request.signal).then(

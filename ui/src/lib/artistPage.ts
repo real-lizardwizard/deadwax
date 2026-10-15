@@ -42,8 +42,15 @@
 
 import type { ArtistCredit, ArtistFacts, ReleaseGroup } from '../api/types'
 import { heldInOrder } from './idBridge'
-import { foldName, ownedForGroup, type OwnedAlbum, type OwnedIndex } from './owned'
+import { foldName, ownedForGroup, ownedForRelease, type OwnedAlbum, type OwnedIndex } from './owned'
 import { groupKind, groupYear } from './searchResults'
+import { IN_THE_STORE, IN_YOUR_LIBRARY, anyYours, heldPhrase } from './whose'
+
+/** (2.0.0-player.52) Whether a row's album is yours: an album of it you starred, or a folder of it your library
+ *  holds (with logins off every folder is - the store is your library). */
+function rowYours(folders: readonly OwnedAlbum[], albums: readonly HeldAlbumFields[]): boolean {
+  return albums.some((album) => !!album.starred) || (folders.length > 0 && anyYours(folders))
+}
 
 /** An artist page's id for one known only by MusicBrainz: `mb:<mbid>`. */
 export const MB_PREFIX = 'mb:'
@@ -90,6 +97,8 @@ export interface HeldAlbumFields {
   year?: number
   coverArt?: string
   musicBrainzId?: string
+  /** (2.0.0-player.52) starred by you - asked as you, so in YOUR library (lib/whose.ts) */
+  starred?: string
 }
 
 /** Every album /library/owned listed, once each, whichever way the index holds it. */
@@ -168,6 +177,9 @@ export interface ArtistRow {
   group: ReleaseGroup | null
   /** in the library; null while the library hasn't said (/library/owned not answered) */
   held: boolean | null
+  /** (2.0.0-player.52) held, and yours: a folder of it in your library, or an album of it you starred - with
+   *  logins on and a library of your own, a held row not yours says "in the store" (rowLine) */
+  yours?: boolean
   /** how many releases of it the library holds: "2 editions" past one */
   editions: number
   /** the releases the library holds of it - what the id bridge asks Navidrome about when the row
@@ -255,6 +267,7 @@ export function artistRows(
       coverArt: albums[0]?.coverArt ?? null,
       group,
       held: mine ? true : index ? false : null,
+      ...(mine ? { yours: rowYours(holding, albums) } : {}),
       editions: editionsOf(holding, albums),
       releases,
       kind: kind === 'Album' ? null : kind,
@@ -280,6 +293,7 @@ export function artistRows(
         coverArt: albums[0]!.coverArt ?? null,
         group: null,
         held: true,
+        yours: rowYours(holding, albums),
         editions: editionsOf(holding, albums),
         releases,
         kind: null,
@@ -295,6 +309,7 @@ export function artistRows(
       coverArt: album.coverArt ?? null,
       group: null,
       held: true,
+      yours: rowYours(ownedForRelease(index, mbidOf(album.musicBrainzId)), [album]),
       editions: 1,
       releases: mbidOf(album.musicBrainzId) ? [mbidOf(album.musicBrainzId)!] : [],
       kind: null,
@@ -309,12 +324,13 @@ export function artistRows(
 }
 
 /** A row's second line, the board's: "1994 · in your library · 2 editions", "2008 · not in your
- *  library", "1998 · Live album · not in your library" - and neither while the library hasn't said. */
-export function rowLine(row: Pick<ArtistRow, 'year' | 'held' | 'editions' | 'kind'>): string {
+ *  library", "1998 · Live album · not in your library" - and neither while the library hasn't said.
+ *  `personal` (2.0.0-player.52): a held row not yours says "in the store" (lib/whose.ts). */
+export function rowLine(row: Pick<ArtistRow, 'year' | 'held' | 'editions' | 'kind' | 'yours'>, personal = false): string {
   return [
     row.year,
     row.kind,
-    row.held === null ? null : row.held ? 'in your library' : 'not in your library',
+    row.held === null ? null : row.held ? heldPhrase(personal, row.yours) : 'not in your library',
     row.held && row.editions > 1 ? `${row.editions} editions` : null,
   ].filter(Boolean).join(' · ')
 }
@@ -329,13 +345,17 @@ export function playOrder(rows: readonly Pick<ArtistRow, 'albumId'>[]): string[]
  * nothing to play, what Navidrome said (`library`): still asking, or none of theirs - the line is
  * drawn from the first frame wherever albums could be had, so its answer moves nothing (review).
  */
-export function playsLine(albums: number, inHand: number, settled: boolean, library: 'asking' | 'done' | 'failed' = 'done'): string {
-  if (!albums) return library === 'asking' ? 'Looking for their albums in your library…' : library === 'done' ? 'Navidrome has none of their albums to play' : ''
-  const all = albums === 1 ? 'Plays the album you have' : `Plays the ${albums} albums you have`
-  if (!settled) return `Getting the songs of the ${albums === 1 ? 'album' : `${albums} albums`} you have…`
+export function playsLine(
+  albums: number, inHand: number, settled: boolean, library: 'asking' | 'done' | 'failed' = 'done', personal = false,
+): string {
+  //? (2.0.0-player.52) with a library of your own, Play plays their albums in the store - Navidrome's, whoever asks
+  const had = personal ? IN_THE_STORE : 'you have'
+  if (!albums) return library === 'asking' ? `Looking for their albums ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}…` : library === 'done' ? 'Navidrome has none of their albums to play' : ''
+  const all = albums === 1 ? `Plays the album ${had}` : `Plays the ${albums} albums ${had}`
+  if (!settled) return `Getting the songs of the ${albums === 1 ? 'album' : `${albums} albums`} ${had}…`
   if (inHand >= albums) return all
   if (!inHand) return "Navidrome didn't send the songs"
-  return `Plays ${inHand} of the ${albums} albums you have - Navidrome didn't send the rest`
+  return `Plays ${inHand} of the ${albums} albums ${had} - Navidrome didn't send the rest`
 }
 
 /** Who they are, in a line: "Group · Bristol · since 1991", "Group · London · 1965 to 2014". */
@@ -363,10 +383,11 @@ export function inTurns<T>(items: readonly T[], limit: number, start: (item: T) 
   for (let count = 0; count < Math.max(1, limit); count++) more()
 }
 
-/** "2 albums in your library" - '' for none, or an artist Navidrome didn't count. */
-export function albumCountLine(count: number | null | undefined): string {
+/** "2 albums in your library" - '' for none, or an artist Navidrome didn't count. `place` (2.0.0-player.52):
+ *  "in the store" for a count of the store's, with a library of your own (lib/whose.ts storeCountPlace). */
+export function albumCountLine(count: number | null | undefined, place = 'in your library'): string {
   const albums = count ?? 0
-  return albums > 0 ? `${albums} ${albums === 1 ? 'album' : 'albums'} in your library` : ''
+  return albums > 0 ? `${albums} ${albums === 1 ? 'album' : 'albums'} ${place}` : ''
 }
 
 /**

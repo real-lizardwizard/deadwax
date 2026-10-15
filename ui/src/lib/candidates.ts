@@ -741,7 +741,9 @@ export function storeNotes(
   }
   for (const pressing of result?.other_pressings ?? []) {
     const parts = [pressing.edition || pressing.year, formatNames(pressing.formats), pressing.path].filter(Boolean)
-    notes.push(`You also have another pressing: ${parts.join(' · ')}`)
+    //? (2.0.0-player.52, logins on) one the store holds that isn't in your library is the store's
+    const who = pressing.yours === false ? 'The store also has' : 'You also have'
+    notes.push(`${who} another pressing: ${parts.join(' · ')}`)
   }
   return notes
 }

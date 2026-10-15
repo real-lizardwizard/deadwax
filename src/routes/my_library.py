@@ -12,8 +12,13 @@ Your library (2.0.0-player.51, step 5 of the multi-user plan) - the user's own r
                   pressing is judged the way the store line judged it.
   POST "/seen"    you opened it: the new marker goes (by release id, or by the store's album ids).
   POST "/dismiss" put away an album the admin deleted.
+  POST "/remove"  (2.0.0-player.52) Remove from my library: the album unstarred AS YOU in Navidrome, and your
+                  ledger's entries of it removed BY YOU - never a tombstone, it isn't "removed by the admin".
+                  Nothing in the store goes: the folder, the files and everyone else's libraries stay.
 
-The starring itself is src/stars.py's, in the background; these write the ledger and wake it.
+The starring itself is src/stars.py's, in the background; these write the ledger and wake it - and since
+2.0.0-player.52 Add also stars what it added right away, as you, so it is in your Library by the time the
+page asks again.
 """
 
 import asyncio
@@ -21,11 +26,13 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from src import auth
+from src import auth, stars
 from src import library_ledger as rules
+from src.api.navidrome_endpoint import NavidromeError, client_for
 from src.config import Config
 from src.logger import logger
 from src.routes.download import FindCandidatesRequest
+from src.routes.navidrome import ID_MAX
 from src.store_index import held_copy
 from src.users import current_user
 
@@ -138,8 +145,41 @@ async def add_to_my_library(request: Request, body: FindCandidatesRequest, user:
     if not already:
         logger.info(f"{user} added {held.get('artist')} - {held.get('album')} to their library from the store",
                     extra={"frontend": True})
+    starred = await _star_now(request, store, user, held["album_ids"])
     rules.kick()
-    return {"added": True, "already": bool(already), "complete": held["complete"]}
+    return {"added": True, "already": bool(already), "complete": held["complete"], "starred": starred}
+
+
+async def _star_now(request: Request, store, user: str, album_ids: list[int]) -> bool:
+    """
+    (2.0.0-player.52) What Add just put in your library, starred right away AS YOU - with the login your session
+    was signed in with - so your Library (your starred albums in Navidrome) shows it when the page asks again,
+    rather than after the worker's next pass. stars.star_entry's rules, unchanged: found by its release id,
+    starred, confirmed by getAlbum. Best effort: anything that stops it - Navidrome hasn't scanned the album
+    yet, isn't answering, refused the login - leaves the entry waiting for the worker, as before. True when
+    every entry of it is starred.
+    """
+    login = getattr(getattr(request, "state", None), auth.LOGIN_STATE, None)
+    opened = auth.unseal_credential(login.sealed) if isinstance(login, auth.PlayerLogin) and login.sealed else None
+    if opened is None:
+        return False
+    entries = await store.ledger_entries(user)
+    wanted = set(album_ids)
+    due = [entry for entry in entries or [] if entry["album_id"] in wanted and entry["state"] in ("waiting", "starred")]
+    if not due:
+        return False
+    as_user = stars.AsUser(user, *opened)
+    done = True
+    for entry in due:
+        if entry["state"] == "starred":
+            continue
+        try:
+            done = await stars.star_entry(store, as_user, entry) is True and done
+        except (stars.CredentialDead, stars.NavidromeDown) as e:
+            #? the worker finds the same and says so on the entry - nothing more to do here
+            logger.debug(f"could not star {user}'s added album at once: {e}")
+            return False
+    return done
 
 
 class Seen(BaseModel):
@@ -167,3 +207,60 @@ async def dismiss(request: Request, body: Dismiss, user: str = Depends(current_u
     if not Config.logins_on() or not _usable(store):
         return {"dismissed": False}
     return {"dismissed": await store.ledger_dismiss(user, body.album_id)}
+
+
+class Remove(BaseModel):
+    #? Navidrome's album id - the album as your Library shows it; only ever Navidrome's `id` parameter
+    navidrome_id: str = Field(..., min_length=1, max_length=ID_MAX)
+
+
+#? what the page says once it is done - and what the event log says
+REMOVED = "Removed from your library - it's still in the store, and nothing was deleted."
+#? (review) Navidrome unstarred it, and deadwax's own record of your library couldn't be written: said, not
+#? "Removed" - an entry still waiting would be starred again by the worker. Remove again is safe: unstarring
+#? what isn't starred changes nothing.
+REMOVE_UNWRITTEN = ("Navidrome has unstarred it, but deadwax couldn't write that to its database, so it may come "
+                    "back - try Remove again in a moment.")
+
+
+@router.post("/remove")
+async def remove_from_my_library(request: Request, body: Remove, user: str = Depends(current_user)):
+    """
+    (2.0.0-player.52) Remove from my library: the album unstarred AS YOU in Navidrome (`unstar`, confirmed by
+    getAlbum - as Add's star is), then your ledger's entries of it - every present folder of its release, and
+    any starred as this Navidrome album - removed by you (`unstarred`, as an unstar in Amperfy reads back):
+    not a tombstone, nothing "removed by the admin", nothing new. In that order, so a Remove Navidrome
+    refused leaves the ledger as it was (the next read-back would otherwise put it back). NEVER deletes
+    anything: the store keeps the folder and its files, and everyone else's libraries keep it. Undone by Add.
+    409s in words: logins off, the break-glass admin.
+    """
+    if not Config.logins_on():
+        raise HTTPException(status_code=409, detail=LOGINS_OFF)
+    if not has_library(user):
+        raise HTTPException(status_code=409, detail=NO_ACCOUNT)
+    store = getattr(request.app.state, "store", None)
+    if not _usable(store):
+        raise HTTPException(status_code=503, detail="deadwax can't read its database, so it can't keep your library")
+    client = client_for(request)
+    try:
+        album = (await client.call("getAlbum", {"id": body.navidrome_id})).get("album")
+        await client.call("unstar", {"albumId": body.navidrome_id})
+        after = (await client.call("getAlbum", {"id": body.navidrome_id})).get("album")
+    except NavidromeError as e:
+        if e.status == 401:
+            raise
+        raise HTTPException(status_code=e.status, detail=str(e)) from e
+    if isinstance(after, dict) and after.get("starred"):
+        raise HTTPException(status_code=502, detail="Navidrome kept the star - try Remove again in a moment.")
+    album = album if isinstance(album, dict) else {}
+    release = album.get("musicBrainzId")
+    release = release.strip().lower() if isinstance(release, str) else ""
+    root = Config.LIBRARY_PATH or ""
+    ids = [row["id"] for row in await store.index_present(root, release)] if release and root else []
+    starred_as = await store.ledger_by_navidrome(user, body.navidrome_id)
+    dropped = await store.ledger_drop(user, ids + (starred_as or []))
+    if starred_as is None or dropped is None:
+        raise HTTPException(status_code=503, detail=REMOVE_UNWRITTEN)
+    logger.info(f"{user} removed {album.get('artist') or 'an album'} - {album.get('name') or body.navidrome_id} from their "
+                f"library (it stays in the store)", extra={"frontend": True})
+    return {"removed": True, "entries": dropped, "words": REMOVED}

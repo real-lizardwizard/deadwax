@@ -16,10 +16,21 @@ parameters - never a general proxy. The account configured here may well be Navi
 and deadwax has no login of its own unless AUTH_MODE is on (2.0.0-player.48) - and even then
 every signed-in user would reach it - so a general proxy would hand them the means to create users
 or delete playlists on Navidrome.
+
+WHO IS ASKED AS (2.0.0-player.52, step 6 of the multi-user plan): with logins on, every player call is
+made AS THE SIGNED-IN USER - client_for(request) lays the login their session was signed in with over
+each call (UserClient), so their plays, scrobbles, "Not played", play counts and favourites are theirs.
+NAVIDROME_USER and NAVIDROME_PASSWORD stay for logins off (one account, everybody's), for the
+break-glass admin (no Navidrome account of its own), and for the questions that answer for nobody in
+particular - SHARED_ACCOUNT_USES below, the one list of them, which tests/test_player_as_you.py holds
+the code to.
 """
 
+import asyncio
 import hashlib
 import secrets
+import time
+from collections import OrderedDict
 
 import httpx
 from starlette.requests import Request
@@ -261,21 +272,231 @@ class NavidromeClient:
 #? route drops it when NAVIDROME_URL changes.
 navidrome = NavidromeClient()
 
+#? (2.0.0-player.52) What asks Navidrome as NAVIDROME_USER even with logins on - the shared `navidrome`
+#? itself, never client_for: questions that answer for nobody in particular. Each file, and why:
+#?   src/player_cache.py      the stream cache's make: a song's file fetched ONCE for every phone that plays
+#?                            it (its version check, its download, the turntable's byte ranges) - the
+#?                            route checks the asker may have the song first (routes/navidrome.py _theirs)
+#?   src/album_context.py     the songs beside a hi-res song, for the cache's resample of it - the same make
+#?   src/routes/library.py    the apply's getScanStatus: whether Navidrome has finished a scan, a question
+#?                            about the server
+#?   src/navidrome_listing.py "Not in Navidrome": which album folders Navidrome lists at all
+#?   src/routes/settings.py   drops the client when NAVIDROME_URL changes (asks nothing)
+#?   src/api/app.py           closes it at shutdown (asks nothing)
+#? A file added here is a decision, like a route added to routes/navidrome.py.
+SHARED_ACCOUNT_USES = (
+    "src/player_cache.py", "src/album_context.py", "src/routes/library.py", "src/navidrome_listing.py",
+    "src/routes/settings.py", "src/api/app.py",
+)
+
+
+#? (2.0.0-player.52 review) How long a login Navidrome last took is believed to stand before a call made with
+#? it goes ALONE again (UserClient). Navidrome 0.64.1+ blocks a user name, from one address, for 20 s after 5
+#? failed logins in 20 s - correct passwords included (server/subsonic/auth_limiter.go) - and every call
+#? deadwax makes comes from deadwax's one address, its sign-in's getUser too. Calls are often many at once:
+#? Home's shelves and covers, the pins resolved together (routes/pins.py), the bridge's other pressings. Had
+#? they all gone out with a login that died a moment before (a password changed), each would have been a
+#? failed login, and the new password typed into the sign-in screen refused by the block. So until a call
+#? as this login has been answered in the last few seconds, one goes first and the rest wait for it: it
+#? standing lets them all go at once; it refused ends the session, and they are a 401 without asking. A few
+#? seconds, so a page's burst after a pause waits one round trip at most - and so the calls that can still
+#? go out with a login that died are only those already on their way within seconds of the last answer.
+CONFIRMED_SECONDS = 5.0
+#? ...kept for this many sessions at most, the least recently answered going first
+CONFIRMED_KEPT = 1000
+
+#? session id hash -> time.monotonic() when a call as its login was last answered
+_confirmed: "OrderedDict[str, float]" = OrderedDict()
+#? session id hash -> (the event loop, its lock): one call at a time while the login isn't confirmed. A lock
+#? is the loop's it is first waited on in - the server runs one, the tests a new one per run - so one is
+#? made afresh for another loop
+_gates: "OrderedDict[str, tuple[asyncio.AbstractEventLoop, asyncio.Lock]]" = OrderedDict()
+
+
+def forget_confirmed() -> None:
+    """Every login's confirmation forgotten (the tests)."""
+    _confirmed.clear()
+    _gates.clear()
+
+
+def _gate(key: str) -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    held = _gates.get(key)
+    if held is None or held[0] is not loop:
+        held = (loop, asyncio.Lock())
+        _gates[key] = held
+    _gates.move_to_end(key)
+    while len(_gates) > CONFIRMED_KEPT:
+        _gates.popitem(last=False)
+    return held[1]
+
+
+class UserClient(NavidromeClient):
+    """
+    Navidrome asked AS ONE SIGNED-IN USER (2.0.0-player.52): every call carries the token and salt their
+    session was signed in with (auth.PlayerLogin), laid on LAST as the shared login is, so nothing the page
+    sent stands in for it. The HTTP connections are the shared client's - one pool for the process, dropped
+    with it when NAVIDROME_URL changes.
+
+    Navidrome REFUSING the login (error 40 - the password changed, or the account was deleted) ends the
+    session as the re-check would (auth.player_refused) and is a 401 saying why (SignedOut), which brings
+    the app's sign-in screen up with the reason. A session already ended in this process asks Navidrome
+    nothing - a 401 at once - and (review) until a call as this login has been answered in the last
+    CONFIRMED_SECONDS, calls go ONE AT A TIME: the first asks, and the rest wait for its answer - so a burst
+    of calls (Home's covers, the pins resolved together) made just after a password changed is one failed
+    login against the account, not one per call, and never Navidrome's block.
+    """
+
+    def __init__(self, shared: NavidromeClient, login, username: str, token: str, salt: str):
+        super().__init__()
+        self.shared, self.login = shared, login
+        self.username, self.token, self.salt = username, token, salt
+
+    async def get_client(self) -> httpx.AsyncClient:
+        return await self.shared.get_client()
+
+    async def close_client(self) -> None:
+        #? the connections are the shared client's - closing them is its owner's business
+        return None
+
+    def _params(self, params: dict) -> dict:
+        #? The login goes on LAST, so nothing the page sent can stand in for it.
+        return {
+            **{key: value for key, value in params.items() if value is not None},
+            "u": self.username, "t": self.token, "s": self.salt, "v": API_VERSION, "c": CLIENT_NAME, "f": "json",
+        }
+
+    def _ended(self) -> None:
+        from src import auth
+
+        reason = auth.session_ended(self.login.key)
+        if reason is not None:
+            raise SignedOut(reason)
+
+    async def _refused(self, error: NavidromeError) -> None:
+        from src import auth
+
+        if error.code == 40:
+            _confirmed.pop(self.login.key, None)
+            await asyncio.to_thread(auth.player_refused, self.login)
+            raise SignedOut(auth.LOGIN_GONE, code=40) from error
+
+    def _fresh(self) -> bool:
+        at = _confirmed.get(self.login.key)
+        return at is not None and time.monotonic() - at < CONFIRMED_SECONDS
+
+    def _stood(self) -> None:
+        key = self.login.key
+        _confirmed[key] = time.monotonic()
+        _confirmed.move_to_end(key)
+        while len(_confirmed) > CONFIRMED_KEPT:
+            _confirmed.popitem(last=False)
+
+    async def _answered(self, ask):
+        """`ask()` - then the login confirmed by any answer but a refusal: Navidrome checks the login before
+        anything else, so its "not found" stood too; and nothing answering at all (down, unreachable) was no
+        failed login either, so the calls waiting on it needn't go one by one to find that out."""
+        try:
+            answer = await ask()
+        except NavidromeError as e:
+            await self._refused(e)
+            self._stood()
+            raise
+        self._stood()
+        return answer
+
+    async def _asked(self, ask):
+        self._ended()
+        if not self._fresh():
+            async with _gate(self.login.key):
+                #? waited on the call before: it ended the session, or confirmed the login
+                self._ended()
+                if not self._fresh():
+                    return await self._answered(ask)
+        return await self._answered(ask)
+
+    async def call(self, endpoint: str, params: dict | None = None) -> dict:
+        return await self._asked(lambda: super(UserClient, self).call(endpoint, params))
+
+    async def open(self, endpoint: str, params: dict, headers: dict | None = None) -> httpx.Response:
+        return await self._asked(lambda: super(UserClient, self).open(endpoint, params, headers))
+
+
+class SignedOut(NavidromeError):
+    """The asker's session has ended - Navidrome refused their login, or something else ended it: a 401
+    in words (src/api/app.py answers one that reaches it), which brings the app's sign-in up saying why.
+    Anything that quietly turns a NavidromeError into "Navidrome didn't say" lets this one through."""
+
+    def __init__(self, message: str, code: int | None = None):
+        super().__init__(message, 401, code=code)
+
+
+class _NoLogin(NavidromeClient):
+    """With logins on, a request that carries no login to ask as - never the shared account in its place:
+    every call is a 401 saying why (fail closed). Every route is included with current_user, which sets one,
+    so this answers only a mistake - or a login that won't open (another DEADWAX_SECRET_KEY), met while its
+    session was still held in memory (auth's _session ends one at its first read from the database): that
+    session ends at the first call, as the re-check would end it, so /me says signed out too (review) and the
+    app's sign-in screen stays up."""
+
+    def __init__(self, why: str, login=None):
+        super().__init__()
+        self.why, self.login = why, login
+
+    async def _refuse(self):
+        if self.login is not None:
+            from src import auth
+
+            await asyncio.to_thread(auth.player_refused, self.login, self.why)
+        raise SignedOut(self.why)
+
+    async def call(self, endpoint: str, params: dict | None = None) -> dict:
+        await self._refuse()
+
+    async def open(self, endpoint: str, params: dict, headers: dict | None = None) -> httpx.Response:
+        await self._refuse()
+
+
+def asks_as_shared(client: NavidromeClient) -> bool:
+    """Whether `client` is the shared account itself (logins off, the break-glass admin) - the account the
+    stream cache asks as, so a cached answer needs no check of the asker's own access."""
+    return client is navidrome
+
 
 def client_for(request: Request | None) -> NavidromeClient:
     """
-    The Navidrome client to ask on behalf of whoever made `request` (2.0.0-player.13).
+    The Navidrome client to ask on behalf of whoever made `request` (2.0.0-player.13; as them since
+    2.0.0-player.52, step 6 of the multi-user plan).
 
-    THE SEAM for per-user Navidrome logins (step 6 of the multi-user plan): every player route,
-    and every internal call made while answering one (the turntable's getAlbum), asks through
-    this, so step 6 changes this function's body - the user's own credential, from the session
-    current_user() reads - and no route. With logins off there is one account, and this is the
-    one shared client, whatever the request.
+    THE SEAM for per-user Navidrome logins: every player route, and every internal call made while
+    answering one (the turntable's getAlbum, the id bridge's lookups, the pins'), asks through this.
 
-    What does NOT come through here, on purpose: the stream cache's make and the album context
-    (player_cache.py, album_context.py), which fetch a file ONCE for every phone that asks for it
-    and so have no one request to answer for - step 6 checks a user's access at the route before
-    handing them the cached answer; and the apply's getScanStatus (routes/library.py), a question
-    about the server, not about anybody's library.
+      - Logins OFF: the one shared client, whatever the request - one account, everybody's.
+      - Logins ON, signed in through Navidrome: a UserClient carrying the login the session was signed
+        in with (src/auth.py's user_for keeps it on the request as current_user resolves it), so the
+        calls are theirs. Error 40 ends the session (UserClient).
+      - The break-glass admin: the shared client - it has no Navidrome account of its own (notes/logins.md
+        "The player as you" says why that, and not a refusal).
+      - Logins on and nothing to ask as: a client that refuses every call with a 401 - never the shared
+        account in its place.
+
+    What does NOT come through here, on purpose - SHARED_ACCOUNT_USES above: the stream cache's make and
+    the album context (player_cache.py, album_context.py), which fetch a file ONCE for every phone that asks
+    for it and so have no one request to answer for - the stream and scrub routes check the asker's access
+    first (routes/navidrome.py _theirs); the apply's getScanStatus (routes/library.py) and the "Not in
+    Navidrome" listing (navidrome_listing.py), questions about the server, not about anybody's library.
     """
-    return navidrome
+    if request is None or not Config.logins_on():
+        return navidrome
+    from src import auth
+
+    login = getattr(getattr(request, "state", None), auth.LOGIN_STATE, None)
+    if login == auth.SHARED_LOGIN:
+        return navidrome
+    if not isinstance(login, auth.PlayerLogin):
+        return _NoLogin(auth.SIGN_IN)
+    opened = auth.unseal_credential(login.sealed) if login.sealed else None
+    if opened is None:
+        #? a login that won't open (another DEADWAX_SECRET_KEY) asks nothing, and its first call ends the session
+        return _NoLogin(auth.KEY_CHANGED, login)
+    return UserClient(navidrome, login, *opened)

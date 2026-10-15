@@ -257,6 +257,7 @@
        the meta line below, which take no taps */
     --app-hero-link-reach: calc((var(--pl-hit) - 1.25em) / 2);
     --app-album-chips-gap: 14px;     /* the meta line to "In your library" */
+    --app-album-mine-gap: 6px;       /* (2.0.0-player.52) Add/Remove's line to its button */
     --app-held-badge-gap: 5px;
     --app-held-badge-icon: 13px;
     /* the Library's chips, as Library.dc.html draws them: 32px, reaching 44 */
@@ -2051,6 +2052,8 @@ button.app-result:active { background: var(--dw-pressed); }
     font-weight: var(--dw-weight-semibold);
     line-height: var(--dw-leading-note);
 }
+/* (2.0.0-player.52) held by the store but not yours: said, not in green */
+.app-picker-held.is-store { color: var(--dw-text-2); }
 
 .app-picker-more {
     width: 100%;
@@ -3059,6 +3062,33 @@ button.app-result:active { background: var(--dw-pressed); }
 }
 
 .app-held-badge-icon { flex: none; width: var(--app-held-badge-icon); height: var(--app-held-badge-icon); }
+/* (2.0.0-player.52) "In the store": in the store but not yours - said in the line's grey with no box, no
+   green and no tick, as the pressing list says it (.app-picker-held.is-store): in the chip's own box it read
+   as one more button beside "Other pressings ›" (review) */
+.app-held-badge.is-store {
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--dw-text-2);
+}
+
+/* (2.0.0-player.52) Add to my library / Remove from my library, under Play: the line, then the button -
+   centred under a phone's centred hero, at the page's edge on a desktop (app-desktop.css) */
+.app-album-mine {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--app-album-mine-gap);
+    padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left);
+    margin-top: var(--app-album-chips-gap);
+    text-align: center;
+}
+
+.app-album-mine:focus { outline: none; }
+/* ...its place held, unseen, while whose the album is is still to come (review): the songs under it are
+   drawn already, and the line and Add landing late pushed them down under a finger */
+.app-album-mine.is-waiting { visibility: hidden; }
+.app-album-mine-button[aria-disabled='true'] { opacity: var(--app-job-busy); }
 .app-also { max-width: 100%; }
 .app-also-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-chip-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
@@ -3076,7 +3106,19 @@ button.app-result:active { background: var(--dw-pressed); }
     .app-album-chips:has(.app-also) .app-other-long { display: none; }
     .app-album-chips:has(.app-also) .app-other-short { display: inline; }
 
-    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge-text {
+    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge:not(.is-store) .app-held-badge-text {
+        position: absolute;
+        width: var(--dw-hairline);
+        height: var(--dw-hairline);
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    /* ...and "In the store", with no tick to keep, gives way WHOLE - still read, never shown, and out of the
+       row, so it leaves neither an empty box nor a gap: the Also chip keeps its room (at 320px its words beside
+       it left "Also: t…"), and the line under Play says the album isn't yours (2.0.0-player.52 review) */
+    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge.is-store {
         position: absolute;
         width: var(--dw-hairline);
         height: var(--dw-hairline);
@@ -3142,6 +3184,10 @@ button.app-result:active { background: var(--dw-pressed); }
 }
 
 .app-library-count { color: var(--dw-text-2); white-space: nowrap; }
+/* (2.0.0-player.52) your library empty: what it is, what to do, and Browse the store under them */
+.app-library-empty { display: flex; flex-direction: column; align-items: center; gap: var(--app-album-mine-gap); }
+/* the Library's title takes the focus Browse the store hands on, where no Browse chip is drawn (a desktop) */
+.pl-library .pl-large-title:focus { outline: none; }
 .app-library-list { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
 
 /* Search's other artists: round, the size of an album's cover */

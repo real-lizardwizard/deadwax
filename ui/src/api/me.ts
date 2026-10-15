@@ -8,7 +8,7 @@
 import type { GetSettings, GetSettingsAnswer } from '../lib/getSettings'
 import type { PinKind, PinsAnswer, PinToggleBody } from '../lib/pins'
 import { get, post, put } from './http'
-import type { AddedToLibrary, FindCandidatesRequest, MyLibrary } from './types'
+import type { AddedToLibrary, FindCandidatesRequest, MyLibrary, RemovedFromLibrary } from './types'
 
 export interface Me {
   user: string
@@ -70,6 +70,14 @@ export function myLibrary(signal?: AbortSignal): Promise<MyLibrary> {
 /** Add to my library: a pressing the store holds - the release a Get would download - into yours. */
 export function addToMyLibrary(release: FindCandidatesRequest): Promise<AddedToLibrary> {
   return post<AddedToLibrary>('/me/library/add', release)
+}
+
+/**
+ * Remove from my library (2.0.0-player.52): the album, by Navidrome's id for it, unstarred for you and taken
+ * out of your library - never deleted: the store keeps it, and Add puts it back.
+ */
+export function removeFromMyLibrary(navidromeId: string): Promise<RemovedFromLibrary> {
+  return post<RemovedFromLibrary>('/me/library/remove', { navidrome_id: navidromeId })
 }
 
 /** You opened it: the "new in your library" marker goes from it - by release id, or by the store's ids. */

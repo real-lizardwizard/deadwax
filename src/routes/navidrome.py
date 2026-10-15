@@ -6,6 +6,8 @@ whatever it is sent - see src/api/navidrome_endpoint.py for why that line matter
 call means adding a route here, on purpose.
 """
 
+import time
+from collections import OrderedDict
 from typing import Literal
 
 import httpx
@@ -15,7 +17,7 @@ from fastapi.responses import Response, StreamingResponse
 from starlette.background import BackgroundTask
 
 from src import player_cache
-from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, client_for
+from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, SignedOut, asks_as_shared, client_for
 from src.config import Config
 from src.logger import logger
 from src.routes.download import ClientGone, unless_abandoned
@@ -89,6 +91,54 @@ def audio_type(value: str | None) -> str:
 
 def _fail(error: NavidromeError) -> HTTPException:
     return HTTPException(status_code=error.status, detail=str(error), headers=error.headers)
+
+
+#? (2.0.0-player.52) How long Navidrome's word that a user may have a song - getSong answered AS THEM - is
+#? believed before the stream cache hands them its copy again without asking: five minutes, the same few
+#? minutes the re-check takes to end a session whose password changed (auth.RECHECK_SECONDS). A song is
+#? asked for many times while it plays - Safari's probe and every seek, the gapless stream's fragments by
+#? range, the turntable's windows - and asking each time would put a round trip in front of every seek;
+#? longer would let access Navidrome took away (a library its admin closed to them) outlast the re-check.
+#? Only a yes is kept: a song Navidrome hasn't scanned yet is asked about afresh.
+ACCESS_SECONDS = 300
+#? ...for this many (user, song) pairs at most, the least recently asked going first
+ACCESS_KEPT = 4096
+
+_access: "OrderedDict[tuple[str, str], float]" = OrderedDict()
+
+
+def forget_access() -> None:
+    """Every user's access forgotten (the tests; a start)."""
+    _access.clear()
+
+
+async def _theirs(request: Request, song_id: str) -> None:
+    """
+    Before the stream cache answers - a cached MP4 or fragmented MP4, a turntable window cut from one - the
+    song is confirmed to be one Navidrome would give THIS user (2.0.0-player.52): the cache fetches a file
+    once for every phone, as the shared account (navidrome_endpoint.SHARED_ACCOUNT_USES), so with one library
+    everyone sees everything - and a Navidrome giving users their own libraries must not leak through
+    deadwax's cache. One getSong as them, kept ACCESS_SECONDS per user and song. Nothing for the shared
+    account itself (logins off, the break-glass admin), which is what the cache asks as. Raises NavidromeError
+    as the song itself would: 404 for a song that isn't theirs, 401 for a login Navidrome refused.
+    """
+    client = client_for(request)
+    if asks_as_shared(client):
+        return
+    who = getattr(getattr(client, "login", None), "user", None)
+    key = (who, song_id) if who else None
+    now = time.monotonic()
+    if key is not None:
+        at = _access.get(key)
+        if at is not None and now - at < ACCESS_SECONDS:
+            _access.move_to_end(key)
+            return
+    await client.call("getSong", {"id": song_id})
+    if key is not None:
+        _access[key] = now
+        _access.move_to_end(key)
+        while len(_access) > ACCESS_KEPT:
+            _access.popitem(last=False)
 
 
 def _conditions(request: Request, names: tuple[str, ...]) -> dict[str, str]:
@@ -178,6 +228,9 @@ async def status(request: Request):
 
     try:
         body = await client_for(request).call("ping")
+    except SignedOut:
+        #? (2.0.0-player.52) the asker's login refused: their session has ended - a 401, never "not set up"
+        raise
     except NavidromeError as e:
         return {"configured": True, "ok": False, "server": None, "problem": str(e)}
 
@@ -410,6 +463,8 @@ async def stream(
             raise HTTPException(status_code=400, detail="wrap=fmp4 needs format=raw: only the file as it is "
                                                         "can be repackaged")
         try:
+            #? (2.0.0-player.52) the cache's copy only for a user Navidrome would give the song to
+            await _theirs(request, song_id)
             #? as for the MP4: the phone hanging up is looked for, and cancels the answer
             return await unless_abandoned(request, player_cache.cache.answer_fragmented(song_id, request, rate))
         except ClientGone:
@@ -419,6 +474,7 @@ async def stream(
 
     if wrap == "mp4" and format == "raw":
         try:
+            await _theirs(request, song_id)
             #? uvicorn never cancels a handler whose phone has gone, so this looks every half second
             #? and cancels the answer itself - which takes the request off the MP4 it waits for, and a
             #? make nobody waits for stops, its download from Navidrome included
@@ -492,6 +548,9 @@ async def scrub(
         raise HTTPException(status_code=422, detail="the turntable's window takes only at, seconds and max_rate")
     try:
         rate = int(max_rate) if max_rate else None
+        #? (2.0.0-player.52) cut from the cache's copy, or from the FLAC as the shared account - only for a
+        #? user Navidrome would give the song to
+        await _theirs(request, song_id)
         return await unless_abandoned(request, player_cache.cache.answer_window(song_id, at, seconds, rate))
     except ClientGone:
         return Response(status_code=204)

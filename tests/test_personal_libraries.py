@@ -940,7 +940,8 @@ def test_add_to_my_library_adds_a_pressing_the_store_holds(on):
 
     answer = ethan.post(f"{LIBRARY}/add", json=release_body())
 
-    assert answer.json() == {"added": True, "already": False, "complete": True}
+    #? (2.0.0-player.52) Add stars it at once as ethan - Navidrome hasn't the album here, so it waits
+    assert answer.json() == {"added": True, "already": False, "complete": True, "starred": False}
     entry = entries(on, "ethan")[album]
     #? added while looking at it: no new marker
     assert (entry["how"], entry["state"], entry["incomplete"]) == ("added", "waiting", 0) and entry["seen_at"]

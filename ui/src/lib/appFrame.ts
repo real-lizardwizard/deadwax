@@ -121,8 +121,24 @@ export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: b
  * its own, so the Albums view keeps the order chosen for it. It is the desktop's alone - a phone has
  * three chips, and shows the albums for it - and isn't kept on the device (state/persisted.ts keeps
  * albums, artists or songs).
+ *
+ * YOUR LIBRARY AND BROWSE (2.0.0-player.52, step 6 of the multi-user plan): with logins on, for somebody
+ * with a library of their own (`personal`), the Library is YOURS - 'albums' your starred albums, 'artists'
+ * the artists of them, 'recent' yours newest first - and BROWSE is the store, everything deadwax holds:
+ * 'store' every album, 'storeArtists' every artist, 'songs' every song (Navidrome lists songs store-wide,
+ * so Songs is Browse's). With logins off - and for the break-glass admin - there is no Browse: the store
+ * is the library, and 'store' and 'storeArtists' (kept on a device that had them) show as 'albums' and
+ * 'artists' - exactly the Library as it always was.
  */
-export type LibraryPick = 'recent' | 'albums' | 'artists' | 'songs'
+export type LibraryPick = 'recent' | 'albums' | 'artists' | 'songs' | 'store' | 'storeArtists'
+
+/** Browse's views (2.0.0-player.52): the store's albums, artists and songs. */
+export const BROWSE_PICKS: readonly LibraryPick[] = ['store', 'storeArtists', 'songs']
+
+/** Whether a pick is Browse's (the store) - only ever with a library of your own. */
+export function isBrowse(pick: LibraryPick, personal: boolean): boolean {
+  return personal && BROWSE_PICKS.includes(pick)
+}
 
 /** The sidebar's items - `queue` is Managing's "Needs a look" (2.0.0-player.25), `care` its "Library
  *  care" (2.0.0-player.42), `settings` and `log` its "Settings" and "Log" (2.0.0-player.33) - an admin's. */
@@ -147,12 +163,37 @@ export const SIDEBAR_LIBRARY: readonly SidebarItem[] = [
   { id: 'songs', label: 'Songs' },
 ]
 
+/** Browse's views under their own group label (2.0.0-player.52) - the store's. */
+export const SIDEBAR_BROWSE: readonly SidebarItem[] = [
+  { id: 'store', label: 'Albums' },
+  { id: 'storeArtists', label: 'Artists' },
+  { id: 'songs', label: 'Songs' },
+]
+
 /** What the Library's title says on a desktop, for each view - the sidebar's own words. */
 export const LIBRARY_TITLES: Readonly<Record<LibraryPick, string>> = {
   recent: 'Recently added',
   albums: 'Albums',
   artists: 'Artists',
   songs: 'Songs',
+  //? never shown with logins off (shownPick turns them into albums and artists) - as the sidebar would say
+  store: 'Albums',
+  storeArtists: 'Artists',
+}
+
+/** ...and with a library of your own (2.0.0-player.52): yours, and the store's. */
+export const PERSONAL_TITLES: Readonly<Record<LibraryPick, string>> = {
+  recent: 'Recently added',
+  albums: 'Your albums',
+  artists: 'Your artists',
+  songs: 'Songs in the store',
+  store: 'Albums in the store',
+  storeArtists: 'Artists in the store',
+}
+
+/** The desktop Library's title for a view. */
+export function libraryTitle(pick: LibraryPick, personal = false): string {
+  return (personal ? PERSONAL_TITLES : LIBRARY_TITLES)[pick]
 }
 
 /** Managing's own item (2.0.0-player.25): the review queue, above the link to the main page. */
@@ -166,15 +207,28 @@ export const SIDEBAR_SETTINGS: SidebarItem = { id: 'settings', label: 'Settings'
 export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Log' }
 
 /** The Library's views the sidebar lists: Songs left out when Navidrome's empty search lists none,
- *  as the phone leaves out its chip (null: not known yet, so it stays). */
-export function libraryItems(hasSongs: boolean | null): SidebarItem[] {
+ *  as the phone leaves out its chip (null: not known yet, so it stays). With a library of your own
+ *  (2.0.0-player.52) the Library's are yours - Recently added, Albums, Artists - and Songs is Browse's. */
+export function libraryItems(hasSongs: boolean | null, personal = false): SidebarItem[] {
+  if (personal) return SIDEBAR_LIBRARY.filter((item) => item.id !== 'songs')
   return SIDEBAR_LIBRARY.filter((item) => item.id !== 'songs' || hasSongs !== false)
 }
 
+/** Browse's views the sidebar lists (2.0.0-player.52): none with logins off; with a library of your own the
+ *  store's albums, artists and songs - Songs left out as above. */
+export function browseItems(hasSongs: boolean | null, personal = false): SidebarItem[] {
+  if (!personal) return []
+  return SIDEBAR_BROWSE.filter((item) => item.id !== 'songs' || hasSongs !== false)
+}
+
 /** The view the Library is showing for a pick: Songs falls back to the albums when Navidrome lists
- *  none; "Recently added" is the desktop's, and a phone shows the albums for it. */
-export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Frame): LibraryPick {
-  if (pick === 'songs' && hasSongs === false) return 'albums'
+ *  none - the store's, Browse's own, with a library of your own; "Recently added" is the desktop's, and a
+ *  phone shows the albums for it. With logins off Browse's two (kept on a device) are the albums and the
+ *  artists - the store is the library then. */
+export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Frame, personal = false): LibraryPick {
+  if (!personal && pick === 'store') return 'albums'
+  if (!personal && pick === 'storeArtists') return 'artists'
+  if (pick === 'songs' && hasSongs === false) return personal ? 'store' : 'albums'
   if (pick === 'recent' && frame === 'phone') return 'albums'
   return pick
 }
@@ -182,7 +236,7 @@ export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Fr
 /** The sidebar item for where the app is: its tab - and in the Library, the view showing. Search has
  *  none: its place is the field, which says what it is searching for. Needs a look is its own item
  *  while its page is the one on top (`page`, the tab's top page), whatever tab it was pushed on. */
-export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null): SidebarId | null {
+export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null, personal = false): SidebarId | null {
   if (page?.kind === 'queue') return 'queue'
   //? Library care (2.0.0-player.42), the same way
   if (page?.kind === 'care') return 'care'
@@ -190,7 +244,7 @@ export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | 
   if (page?.kind === 'settings') return 'settings'
   if (page?.kind === 'log') return 'log'
   if (tab === 'search') return null
-  if (tab === 'library') return shownPick(pick, hasSongs, 'desktop')
+  if (tab === 'library') return shownPick(pick, hasSongs, 'desktop', personal)
   return tab
 }
 
@@ -211,10 +265,10 @@ export type SidebarMove =
   /** Library care, the server's settings, or the log: its page, on You (App's openManaging) */
   | { how: 'managing'; tab: 'you'; kind: ManagingKind }
 
-export function sidebarMove(item: SidebarId, pick: LibraryPick, hasSongs: boolean | null): SidebarMove {
+export function sidebarMove(item: SidebarId, pick: LibraryPick, hasSongs: boolean | null, personal = false): SidebarMove {
   if (item === 'queue') return { how: 'queue', tab: 'you' }
   if (item === 'care' || item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
   if (item === 'home' || item === 'requests' || item === 'you') return { how: 'tab', tab: item }
-  if (item === shownPick(pick, hasSongs, 'desktop')) return { how: 'tab', tab: 'library' }
+  if (item === shownPick(pick, hasSongs, 'desktop', personal)) return { how: 'tab', tab: 'library' }
   return { how: 'view', tab: 'library', pick: item }
 }

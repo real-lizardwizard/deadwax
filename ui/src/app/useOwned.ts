@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 
 import { owned } from '../api/library'
-import { onAlbumsFiled } from '../lib/libraryEvents'
+import { onAddedToLibrary, onAlbumsFiled, onRemovedFromLibrary } from '../lib/libraryEvents'
 import { buildOwnedIndex, type OwnedIndex } from '../lib/owned'
 
 /**
@@ -13,7 +13,10 @@ import { buildOwnedIndex, type OwnedIndex } from '../lib/owned'
  * refreshOwned rule): the asks are sequential, so the answer that lands last is always the newest
  * question's - the reason latestOnly() exists, met here by never having two out at once. Asked
  * when a screen that reads it first SHOWS (`ask`: the Search tab, an album page), beside each
- * MusicBrainz search (cheap: an unchanged library is a 304), and when the downloads say an album
+ * MusicBrainz search (cheap: an unchanged library is a 304), every time the album you don't have
+ * shows (2.0.0-player.52, second review: with logins on, whose an album is moves outside the tab -
+ * an unstar in Amperfy read back, a Remove on another device - and its meta line must agree with
+ * the store line under Get, which is asked as it shows), and when the downloads say an album
  * was filed (lib/libraryEvents.ts) once anything has asked - never as the app starts: Search is
  * mounted then, hidden, and the first /library/owned after deadwax restarts walks the whole
  * library, which on a spun-down array is the whole wait (the saved scan's note in CLAUDE.md). A
@@ -117,6 +120,13 @@ export function useOwned(ask: boolean): Owned | null {
       onAlbumsFiled(() => {
         if (wanted) void refreshOwned()
       })
+      //? (2.0.0-player.52) and with logins on, whose an album is: Add to my library and Remove from it
+      //? change its `yours` (lib/whose.ts)
+      const whose = () => {
+        if (wanted) void refreshOwned()
+      }
+      onAddedToLibrary(whose)
+      onRemovedFromLibrary(whose)
     }
     return () => {
       listeners.delete(listener)

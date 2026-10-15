@@ -13,8 +13,10 @@ import {
   type SearchPlan,
 } from '../lib/searchQuery'
 import {
-  albumsToPrefetch, appendPage, artistLine, groupHeld, groupLine, morePageWords, morePages, notInLibrary, songIndex, topArtist,
+  albumsToPrefetch, appendPage, artistLine, groupHeld, groupLine, groupPlace, morePageWords, morePages, notInLibrary, searchWords,
+  songIndex, topArtist,
 } from '../lib/searchResults'
+import { navidromePlace, navidromeYours } from '../lib/whose'
 import {
   dropPrefetch, prefetchAlbum, rememberPlayed, searchLibrary, toQueueTrack,
   type Album, type AlbumWithSongs, type Artist, type LibraryResults, type NavidromeStatus, type Song,
@@ -28,6 +30,7 @@ import { keep, kept, usualGet } from './pressingLists'
 import { onSearchSubmitted, onSearchTyped, shareSearchText } from './searchBox'
 import type { GetRequest } from './Sources'
 import { useGetSettings } from './useGetSettings'
+import { hasLibrary } from './useMyLibrary'
 import { ownedNow, refreshOwned, useOwned } from './useOwned'
 import { takeOpener } from './useSheet'
 
@@ -115,6 +118,13 @@ type Musicbrainz =
  * Each half's answers go through its own latestOnly(): a superseded search never draws, and its
  * fetch is called off. The Navidrome gate covers the library half alone - MusicBrainz works with
  * Navidrome unset or down. A page: it reads the player's actions from context.
+ *
+ * WITH LOGINS ON (2.0.0-player.52, step 6 of the multi-user plan) - for somebody with a library of their own -
+ * the library half is the STORE: Navidrome's search3, asked as you, finds everything deadwax holds, so it is
+ * titled "In the store" and each album row says whether it is in your library or only in the store
+ * (lib/whose.ts navidromeYours: starred by you, or held by your library), an artist's count of albums is
+ * the store's; the MusicBrainz half, "Not in the store yet", is "not here? find it" - what deadwax doesn't
+ * have - and a row the store turns out to hold says whose it is. With logins off every word is as it was.
  */
 export function Search({
   shown,
@@ -142,6 +152,9 @@ export function Search({
   const actions = usePlayerActions()
   //? asked the first time the tab shows - not as the app starts, when it is mounted hidden
   const owned = useOwned(shown)
+  //? (2.0.0-player.52) a library of your own: the library half is the store, its rows marked yours or not
+  const personal = hasLibrary()
+  const words = searchWords(personal)
   //? You > Getting albums, asked as the tab first shows, so a Get knows them by the time it is tapped
   useGetSettings(shown)
   const input = useRef<HTMLInputElement>(null)
@@ -437,7 +450,7 @@ export function Search({
   //? whether "More from MusicBrainz" has another page to ask for (lib/searchResults.ts morePages)
   const pages = musicbrainz.state === 'done' ? morePages(musicbrainz.nextOffset, musicbrainz.count, musicbrainz.last, MUSICBRAINZ_LIMIT) : 'end'
   const more = musicbrainz.state === 'done' ? musicbrainz.more : null
-  const moreWords = more?.state === 'added' ? morePageWords(more.added, more.held) : null
+  const moreWords = more?.state === 'added' ? morePageWords(more.added, more.held, personal) : null
 
   //? More's last page landed with focus on it (review): the button goes with that page, and the page's
   //? focus would fall to the page itself - so it goes to the first row the page brought, or to the note
@@ -471,7 +484,7 @@ export function Search({
             onInput={(event) => setText((event.currentTarget as HTMLInputElement).value)}
             maxLength={SEARCH_MAX_CHARS}
             placeholder="Artists, albums and songs"
-            aria-label="Search your library and MusicBrainz"
+            aria-label={words.label}
             enterKeyHint="search"
             autoComplete="off"
             autoCapitalize="none"
@@ -481,7 +494,7 @@ export function Search({
       </form>
 
       {!query ? (
-        <p class="app-search-hint">Your library first, then MusicBrainz for the albums you don't have yet.</p>
+        <p class="app-search-hint">{words.hint}</p>
       ) : (
         <>
           <NeedsNavidrome status={status} onRetry={onRetry}>
@@ -494,7 +507,7 @@ export function Search({
                 </button>
               </div>
             ) : !results ? (
-              <div class="pl-spinner" aria-label="Searching your library" />
+              <div class="pl-spinner" aria-label={words.searching} />
             ) : (
               <>
                 {top && (
@@ -504,13 +517,13 @@ export function Search({
                       <Cover id={top.coverArt} size={112} class="app-result-cover is-round" />
                       <span class="app-result-text">
                         <span class="app-result-title is-large">{top.name}</span>
-                        <span class="app-result-line">{artistLine(top.albumCount)}</span>
+                        <span class="app-result-line">{artistLine(top.albumCount, personal)}</span>
                       </span>
                     </button>
                   </section>
                 )}
                 <section class="app-section app-search-section" aria-labelledby="app-search-library">
-                  <h2 id="app-search-library" class="app-section-title app-search-title">In your library</h2>
+                  <h2 id="app-search-library" class="app-section-title app-search-title">{words.libraryTitle}</h2>
                   {artists.length || results.albums.length || results.songs.length ? (
                     <ul class="app-results">
                       {artists.map((artist) => (
@@ -519,7 +532,7 @@ export function Search({
                             <Cover id={artist.coverArt} size={96} class="app-result-cover is-round is-small" />
                             <span class="app-result-text">
                               <span class="app-result-title">{artist.name}</span>
-                              <span class="app-result-line">{artistLine(artist.albumCount)}</span>
+                              <span class="app-result-line">{artistLine(artist.albumCount, personal)}</span>
                             </span>
                           </button>
                         </li>
@@ -536,7 +549,9 @@ export function Search({
                             <Cover id={album.coverArt} size={96} class="app-result-cover" />
                             <span class="app-result-text">
                               <span class="app-result-title">{album.name}</span>
-                              <span class="app-result-line">{['Album', album.artist, album.year].filter(Boolean).join(' · ')}</span>
+                              <span class="app-result-line">
+                                {['Album', album.artist, album.year, navidromePlace(personal, navidromeYours(album, owned?.index ?? null))].filter(Boolean).join(' · ')}
+                              </span>
                             </span>
                           </button>
                         </li>
@@ -559,7 +574,7 @@ export function Search({
                       })}
                     </ul>
                   ) : (
-                    <p class="app-search-empty">{top ? 'No albums or songs of theirs match.' : `Nothing in your library matches “${library!.text}”.`}</p>
+                    <p class="app-search-empty">{top ? 'No albums or songs of theirs match.' : words.nothing(library!.text)}</p>
                   )}
                 </section>
               </>
@@ -567,7 +582,7 @@ export function Search({
           </NeedsNavidrome>
 
           <section ref={musicSection} class="app-section app-search-section" aria-labelledby="app-search-musicbrainz" aria-busy={musicbrainz.state === 'searching'}>
-            <h2 id="app-search-musicbrainz" class="app-section-title app-search-title app-search-title-tight">Not in your library yet</h2>
+            <h2 id="app-search-musicbrainz" class="app-section-title app-search-title app-search-title-tight">{words.musicbrainzTitle}</h2>
             <p class="app-search-from">From MusicBrainz</p>
             {musicbrainz.state === 'idle' ? (
               //? three characters or more ask by themselves in a moment; fewer wait for Search
@@ -599,7 +614,7 @@ export function Search({
                           <ArchiveCover addresses={coverAddresses(null, group.id, 250)} class="app-result-cover" />
                           <span class="app-result-text">
                             <span class="app-result-title">{group.title ?? ''}</span>
-                            <span class="app-result-line">{groupLine(group, held)}</span>
+                            <span class="app-result-line">{groupLine(group, held, groupPlace(owned?.index ?? null, group.id, personal))}</span>
                           </span>
                         </button>
                         {!held && (
@@ -620,7 +635,7 @@ export function Search({
               ) : (
                 <p class="app-search-empty">
                   {musicbrainz.groups.length
-                    ? 'Everything MusicBrainz found is in your library already.'
+                    ? words.allHeld
                     : `Nothing on MusicBrainz for “${musicbrainz.text}”.`}
                 </p>
               )}

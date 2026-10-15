@@ -622,6 +622,10 @@
     /* "In your library" and its chips start under the title, as Play and Shuffle do - the phone's
        centred row left them floating mid-column beside a left-aligned hero */
     .app-desk .app-album-chips { justify-content: flex-start; }
+    /* (2.0.0-player.52) Add / Remove from my library, at the page's edge under the hero, as the tracks are */
+    .app-desk .app-album-mine { align-items: flex-start; text-align: left; }
+    /* ...Remove's words at the edge itself, its padding (its reach) out past it */
+    .app-desk .app-album-mine > .app-text-button { margin-left: calc(-1 * var(--dw-gutter-grouped)); }
 
     /* Play and Shuffle, a row of the board's 34px buttons */
     .app-desk .pl-hero-actions {

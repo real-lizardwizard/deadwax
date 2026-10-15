@@ -12,6 +12,38 @@
 import type { ReleaseGroup } from '../api/types'
 import { foldName, ownedForGroup, type OwnedIndex } from './owned'
 import { creditName } from './release'
+import { IN_THE_STORE, IN_YOUR_LIBRARY, anyYours, heldPhrase } from './whose'
+
+/**
+ * The Search tab's words (2.0.0-player.52): with logins on and a library of your own (`personal`), the library
+ * half is the STORE - Navidrome's search, asked as you, finds everything deadwax holds - each row saying
+ * whether it is yours (lib/whose.ts), and the MusicBrainz half is what the store doesn't have. With logins off
+ * the store is your library, and every word is what it always was.
+ */
+export function searchWords(personal: boolean): {
+  hint: string; label: string; libraryTitle: string; searching: string; musicbrainzTitle: string; allHeld: string
+  nothing: (text: string) => string
+} {
+  return personal
+    ? {
+      hint: "The store first - what's in your library says so - then MusicBrainz for the albums deadwax doesn't have yet.",
+      label: 'Search the store and MusicBrainz',
+      libraryTitle: 'In the store',
+      searching: 'Searching the store',
+      musicbrainzTitle: 'Not in the store yet',
+      allHeld: 'Everything MusicBrainz found is in the store already.',
+      nothing: (text) => `Nothing in the store matches “${text}”.`,
+    }
+    : {
+      hint: "Your library first, then MusicBrainz for the albums you don't have yet.",
+      label: 'Search your library and MusicBrainz',
+      libraryTitle: 'In your library',
+      searching: 'Searching your library',
+      musicbrainzTitle: 'Not in your library yet',
+      allHeld: 'Everything MusicBrainz found is in your library already.',
+      nothing: (text) => `Nothing in your library matches “${text}”.`,
+    }
+}
 
 /** How many distinct albums of the songs found are asked for as the answer lands, so a tap plays. */
 export const SONG_ALBUMS_PREFETCHED = 5
@@ -49,15 +81,23 @@ export function groupKind(group: Pick<ReleaseGroup, 'primary-type' | 'secondary-
 /**
  * A MusicBrainz row's second line: "Album · Portishead · 2008" - and "· in your library" on a row
  * the library turned out to hold after the list was drawn (it stays where it is; see notInLibrary).
+ * `place` (2.0.0-player.52): where it is held - "in the store" for one the store has that isn't yours.
  */
-export function groupLine(group: ReleaseGroup, held = false): string {
-  return [groupKind(group), creditName(group['artist-credit']), groupYear(group), held ? 'in your library' : '']
+export function groupLine(group: ReleaseGroup, held = false, place: string = IN_YOUR_LIBRARY): string {
+  return [groupKind(group), creditName(group['artist-credit']), groupYear(group), held ? place : '']
     .filter(Boolean).join(' · ')
 }
 
 /** Whether the library holds a group, by its id - false without an answer, which claims nothing. */
 export function groupHeld(index: OwnedIndex | null, groupId: string): boolean {
   return !!index && ownedForGroup(index, { groupId }).held.length > 0
+}
+
+/** Where a group the store holds is held, in a row's words (2.0.0-player.52): "in your library" when a folder of
+ *  it is yours, else - with a library of your own - "in the store". */
+export function groupPlace(index: OwnedIndex | null, groupId: string, personal: boolean): string {
+  if (!index) return IN_YOUR_LIBRARY
+  return heldPhrase(personal, anyYours(ownedForGroup(index, { groupId }).held))
 }
 
 /**
@@ -113,10 +153,12 @@ export function appendPage(
  * albums the library holds every one of says so, by how many there were; a page that brought nothing new
  * - none at all, or only albums already drawn - says that, never that they are in your library (review).
  */
-export function morePageWords(added: number, held: number): { note: string | null; said: string } {
+export function morePageWords(added: number, held: number, personal = false): { note: string | null; said: string } {
+  //? (2.0.0-player.52) with a library of your own, what MusicBrainz's half leaves out is what the store has
+  const place = personal ? IN_THE_STORE : IN_YOUR_LIBRARY
   if (added) return { note: null, said: `${added} more ${added === 1 ? 'album' : 'albums'} from MusicBrainz` }
-  if (held === 1) return { note: 'The next album MusicBrainz found is in your library already.', said: 'The next album is in your library already' }
-  if (held) return { note: `The next ${held} albums MusicBrainz found are all in your library already.`, said: `The next ${held} albums are all in your library already` }
+  if (held === 1) return { note: `The next album MusicBrainz found is ${place} already.`, said: `The next album is ${place} already` }
+  if (held) return { note: `The next ${held} albums MusicBrainz found are all ${place} already.`, said: `The next ${held} albums are all ${place} already` }
   return { note: 'MusicBrainz sent nothing new.', said: 'MusicBrainz sent nothing new' }
 }
 
@@ -157,8 +199,9 @@ export function songIndex(songs: readonly { id: string }[] | undefined, id: stri
   return (songs ?? []).findIndex((song) => song.id === id)
 }
 
-/** "Artist · 2 albums in your library". */
-export function artistLine(albumCount: number | null | undefined): string {
+/** "Artist · 2 albums in your library" - "in the store" with a library of your own (2.0.0-player.52): Navidrome
+ *  counts the store's albums of theirs, whoever asks. */
+export function artistLine(albumCount: number | null | undefined, personal = false): string {
   const count = albumCount ?? 0
-  return count ? `Artist · ${count} ${count === 1 ? 'album' : 'albums'} in your library` : 'Artist'
+  return count ? `Artist · ${count} ${count === 1 ? 'album' : 'albums'} ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}` : 'Artist'
 }

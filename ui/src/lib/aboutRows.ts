@@ -32,6 +32,7 @@
 
 import type { ArtistFacts, StoreAlbumResponse } from '../api/types'
 import { albumCountLine, factsLine } from './artistPage'
+import { storeCountPlace } from './whose'
 import { discHeadings, type DiscTitleEntry } from './discTitles'
 import { sharedFormat, trackTime } from './format'
 import { folderLine, pressingLine } from './idBridge'
@@ -189,7 +190,7 @@ function discLine(song: AboutSongFields, album: AboutAlbumFields): string {
  * What About shows for the song playing. `album` is the answer its queue was played from, or null
  * when that isn't in hand (the lines that need it are then left out).
  */
-export function aboutRows(track: QueueTrack, album: AboutAlbumFields | null, details: AboutDetails | null = null): About {
+export function aboutRows(track: QueueTrack, album: AboutAlbumFields | null, details: AboutDetails | null = null, personal = false): About {
   const songs = album?.song ?? []
   const song = songs.find((candidate) => candidate.id === track.id) ?? null
   //? the song as Navidrome has it now, else as it was when the album was played from
@@ -223,7 +224,8 @@ export function aboutRows(track: QueueTrack, album: AboutAlbumFields | null, det
   const pageName = artistId && artistId === album?.artistId ? albumArtist || name : name
   const theirs = !!details?.artist && details.artist.id === artistId
   const facts = theirs ? factsLine(details?.facts ?? null) : ''
-  const held = theirs ? albumCountLine(details!.artist!.albumCount) : ''
+  //? (2.0.0-player.52) Navidrome counts the store's albums of theirs, whoever asks: "in the store" with a library of your own
+  const held = theirs ? albumCountLine(details!.artist!.albumCount, storeCountPlace(personal)) : ''
 
   return {
     song: { title: track.title, artist: track.artist, lines, ...(writers ? { writtenBy: writers } : {}) },

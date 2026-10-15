@@ -2745,6 +2745,50 @@ class JobStore:
 
         return await self._ledger(read, f"read whether {user} holds an album")
 
+    async def ledger_held_paths(self, root: str, user: str) -> set[str] | None:
+        """(2.0.0-player.52) The folders, relative to `root`, of every present album `user` holds (waiting or
+        starred) - what "in your library" means with logins on. None when unread."""
+        def read():
+            with self._connect() as connection:
+                return {row["path"] for row in connection.execute(
+                    "SELECT a.path FROM library_membership m JOIN store_album a ON a.id = m.album_id "
+                    "WHERE m.user = ? AND a.root = ? AND a.state = 'present' AND m.state IN ('waiting', 'starred')",
+                    (user, root))}
+
+        return await self._ledger(read, f"read which albums {user} holds")
+
+    async def ledger_drop(self, user: str, album_ids: list[int]) -> int | None:
+        """
+        (2.0.0-player.52) Remove from my library: `user`'s entries of these albums - waiting or starred - removed
+        BY THEM (`unstarred`, as an unstar in Amperfy reads back), never a tombstone: it isn't "removed by the
+        admin", and nothing in the store goes. How many - None when the write failed (review: a full /config
+        read as "nothing to take out" left a waiting entry for the worker to star again after the Remove).
+        """
+        ids = [album_id for album_id in dict.fromkeys(album_ids) if album_id is not None]
+        if not ids:
+            return 0
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                return connection.execute(
+                    f"UPDATE library_membership SET state = 'removed', removed_at = ?, removed_why = 'unstarred', "
+                    f"next_try = NULL, problem = NULL, updated_at = ? WHERE user = ? AND state IN ('waiting', 'starred') "
+                    f"AND album_id IN ({', '.join('?' for _ in ids)})", (now, now, user, *ids)).rowcount
+
+        return await self._ledger(write, f"take {len(ids)} album(s) out of {user}'s library")
+
+    async def ledger_by_navidrome(self, user: str, navidrome_id: str) -> list[int] | None:
+        """(2.0.0-player.52) The albums of `user`'s held entries starred as Navidrome's album `navidrome_id` - None
+        when unread."""
+        def read():
+            with self._connect() as connection:
+                return [row["album_id"] for row in connection.execute(
+                    "SELECT album_id FROM library_membership WHERE user = ? AND navidrome_id = ? "
+                    "AND state IN ('waiting', 'starred')", (user, navidrome_id))]
+
+        return await self._ledger(read, f"read which of {user}'s albums Navidrome knows as {navidrome_id}")
+
     async def ledger_unheld(self, root: str) -> list[dict] | None:
         """Every album in the store nobody holds (no entry waiting or starred) - "held by nobody"."""
         def read():

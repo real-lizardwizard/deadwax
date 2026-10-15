@@ -251,12 +251,16 @@ export function writePlayerOrder(order: string): void {
 
 /* ===== deadwax-player-library-view ===== */
 
-export type LibraryView = 'albums' | 'artists' | 'songs'
+export type LibraryView = 'albums' | 'artists' | 'songs' | 'store' | 'storeArtists'
 
-/** What the Library tab shows: anything but 'artists' or 'songs' is the albums. */
+//? (2.0.0-player.52) Browse's two - the store's albums and artists - kept like the rest; with logins off
+//? the Library shows them as the albums and the artists (lib/appFrame.ts shownPick)
+const LIBRARY_VIEWS: readonly string[] = ['artists', 'songs', 'store', 'storeArtists']
+
+/** What the Library tab shows: anything but one of its other views is the albums. */
 export function readPlayerLibraryView(): LibraryView {
   const saved = readRaw(STORAGE_KEYS.playerLibraryView)
-  return saved === 'artists' || saved === 'songs' ? saved : 'albums'
+  return saved !== null && LIBRARY_VIEWS.includes(saved) ? (saved as LibraryView) : 'albums'
 }
 
 export function writePlayerLibraryView(view: LibraryView): void {

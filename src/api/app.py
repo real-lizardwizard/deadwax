@@ -20,7 +20,7 @@ from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
 from src.api.same_origin import SameOriginWrites
-from src.api.navidrome_endpoint import navidrome as navidrome_client
+from src.api.navidrome_endpoint import SignedOut, navidrome as navidrome_client
 from src.config import Config
 from src import __version__
 
@@ -304,6 +304,13 @@ def start() -> FastAPI:
     app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
     app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
+
+    #? (2.0.0-player.52) a player call Navidrome refused the asker's login for - the session ended
+    #? (navidrome_endpoint.UserClient) - is a 401 in words wherever it surfaces, as current_user's own are:
+    #? the app's sign-in screen comes up saying why
+    @app.exception_handler(SignedOut)
+    async def signed_out(request, error: SignedOut):
+        return JSONResponse(status_code=401, content={"detail": str(error)})
 
     @app.get("/deadwax/health")
     async def health():
