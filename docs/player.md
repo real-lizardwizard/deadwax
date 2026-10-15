@@ -192,11 +192,15 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   first five albums of the songs found are fetched as the answer arrives), and otherwise opens its
   album. **Not in your library yet** is MusicBrainz's albums, less the ones you have, asked when
   you press Search on the keyboard or a moment after you stop typing (one your library turns out
-  to hold after the list is drawn says "in your library", and opens the album you have). Tap one
+  to hold after the list is drawn says "in your library", and opens the album you have) - 12 at a
+  time, with **More from MusicBrainz** under them for the next 12 (since 2.0.0-player.50). Tap one
   for **the album you don't have**: laid out like an album you have - its artist a link to their
   page when it's credited to one artist - with a **Pressing** button where Play would be,
-  starting on the usual pressing, and that pressing's tracklist, with its bonus tracks, other
-  versions and renamed or missing tracks marked. MusicBrainz isn't asked for anything until you
+  starting on the usual pressing - its status, date, labels, catalogue number and barcode under it,
+  every pressing's in the list, and a filter there for an album of more than 30 - and that
+  pressing's tracklist, with its bonus tracks, other versions and renamed or missing tracks marked;
+  "maybe in your library", dashed, when only a folder with no MusicBrainz ids has its name; and the
+  album and the pressing on musicbrainz.org at its foot. MusicBrainz isn't asked for anything until you
   search, and the album page works with Navidrome down. [Finding music](finding-music.md#on-the-phone-the-apps-search-tab)
   has how the box is read and what every note means.
 - **Get**: **Get the album** on the album you don't have - under the Pressing button, with a line
@@ -207,8 +211,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   green, or their own average, or none reported), Tracks, Quality, Size and when it **Starts**, and
   what it's missing in amber - and, behind a tap on the score (since 2.0.0-player.41), why it scored
   what it did: the score's six parts as chips and the edition words in the folder's name.
-  **Lossless**, **24-bit**, **Free slot** and the sort narrow the list, and **Search again** under
-  it opens the query to edit. The search is scored by You's **Format**.
+  **Lossless**, **24-bit**, **Free slot**, **Complete albums only** and the sort narrow the list,
+  and **Search again** under it opens the query to edit. The search is scored by You's **Format**.
   A card's **Get** queues it and switches to Requests, where it already shows. With **Pick the best
   source for me** in You, Get queues the best match itself when one scores 75 or more under your
   quality floor (never for the album as a whole, with no tracklist to judge by).
@@ -575,11 +579,14 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **The Sources panel** is the same cards as on a phone - the score, the folder and who it's from,
   then Speed first, Tracks, Quality, Size and Starts in a row, and the score's parts as chips, always
   showing - with **Search again** under them, and **Lossless**, **24-bit**,
-  **Free slot**, **Signals** and the sort. **Signals** sets the least each part of the match score
+  **Free slot**, **Signals**, **Complete albums only**, a sample-rate floor (any, 44.1, 48, 88.2 or
+  96 kHz and up, by the folder's worst file - since 2.0.0-player.50) and the sort. **Signals** sets
+  the least each part of the match score
   may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a slider each -
-  as the main page's candidates panel does, and its chip counts how many are set. They're the
-  panel's alone: narrow the window to a phone's with the panel open and they stop filtering (there's
-  no Signals chip on a phone), until it's wide again. The page stays usable beside the panel:
+  as the main page's candidates panel does, and its chip counts how many are set. Signals and the
+  sample-rate floor are the panel's alone: narrow the window to a phone's with the panel open and
+  they stop filtering (neither
+  chip is drawn on a phone), until it's wide again. The page stays usable beside the panel:
   **choose another pressing and the sources are searched again for it**, keeping the filters you set
   and never picking one for you (even with **Pick the best source for me**) - and go back and open
   the same album again with the panel still open, and they're searched for the pressing it shows. A

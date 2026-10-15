@@ -49,6 +49,16 @@
  * album's name from the page that opened it - standing in as the title on a cold page until
  * MusicBrainz's own group arrives, never over it.
  *
+ * And for the search extras (2.0.0-player.50): the chosen pressing's facts in one line under the picker
+ * (under Get and it on a desktop), its whole in the tooltip, every option's facts between its label and
+ * its note; "maybe in your library", dashed, for a folder of the album's name and artist with no ids -
+ * never beside a pressing held by id, nor for another artist's or another album's folder, nor before the
+ * library answers - its folders in the tooltip; the album and the pressing chosen on musicbrainz.org,
+ * opening beside the app, last on the page (none for a link that isn't an album's); and the list's filter
+ * for more than 30 pressings - outside the listbox, matching folded pressings with the fold stepped
+ * aside, saying when nothing matches, its field's own keys left to it, ArrowDown and ArrowUp between it
+ * and the first pressing, and empty again once the list closes - by a pick or by the Pressing button.
+ *
  * Run it with:  node ui/test/group.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -433,8 +443,8 @@ async function main() {
     check('the answer drawn under the pressing: already downloading, cancelled in Requests', find((node) => node.type === StoreState)[0]?.props.status,
       { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'Open Requests to cancel it if you want another peer.'] })
     check('...in a polite live region that is always there', classed('app-rg-store')[0]?.props['aria-live'], 'polite')
-    check('...UNDER Get, where an answer landing late moves nothing a finger is reaching for',
-      classed('app-rg-actions')[0]?.props.children.filter(Boolean).map((child) => child.type === 'button' ? child.props.class : child.props?.class ?? child.type?.name), ['PressingPicker', 'app-rg-get', 'app-rg-store'].map((name) => name))
+    check('...UNDER Get, where an answer landing late moves nothing a finger is reaching for (the pressing\'s facts, 2.0.0-player.50, under its picker)',
+      classed('app-rg-actions')[0]?.props.children.filter(Boolean).map((child) => child.type === 'button' ? child.props.class : child.props?.class ?? child.type?.name), ['PressingPicker', 'app-rg-facts', 'app-rg-get', 'app-rg-store'].map((name) => name))
 
     //? another pressing: asked about afresh; the first's late answer must not stand for it
     const japan = byPrefix(slowRush, '452ccdb4')
@@ -552,9 +562,9 @@ async function main() {
       const element = find((node) => node.type?.name === 'DeskTracklist')[0]
       return element ? element.type(element.props) : null
     }
-    check('Get first, the pressing inline after it, what is already here under both',
+    check('Get first, the pressing inline after it, its facts (2.0.0-player.50) and what is already here under both',
       classed('app-rg-actions')[0]?.props.children.filter(Boolean).map((child) => child.type === 'button' ? child.props.class : child.props?.class ?? child.type?.name),
-      ['app-rg-get', 'PressingPicker', 'app-rg-store'])
+      ['app-rg-get', 'PressingPicker', 'app-rg-facts', 'app-rg-store'])
     check('...Get not pressed: the panel isn\'t showing this page\'s sources', classed('app-rg-get')[0].props['aria-pressed'], false)
     check('the tracklist: "Tracklist", the line, and a table - its "Against the usual tracklist" column, since some pressings differ',
       [text(find(byClass('app-rg-desk-title'), table())[0]), text(find(byClass('app-rg-summary'), table())[0]), find((node) => node.type === 'th', table()).map(text), classed('app-rg-list').length],
@@ -690,6 +700,131 @@ async function main() {
     await settle()
     cold.draw()
     check('...then MusicBrainz\'s own title for the album, never the name it was opened with', text(classed('pl-hero-title')[0]), 'Dummy')
+  }
+
+  console.log('\nsearch extras (2.0.0-player.50): the pressing\'s facts, the maybe, the links out, the list\'s filter')
+  {
+    globalThis.__group.owned = owning([])
+    const { draw } = page({ id: slowRush.group.id, preview: PREVIEW })
+    draw()
+    const facts = () => classed('app-rg-facts')[0]
+    const japan = byPrefix(slowRush, '452ccdb4')
+    const usual = byPrefix(slowRush, '1cf564b9')
+    check('the chosen pressing\'s facts under the picker - the one element, its whole in its tooltip',
+      [classed('app-rg-facts').length, text(facts()), facts()?.props.title], [1, P.pressingFacts(usual), P.pressingFacts(usual)])
+    check('...the usual CD\'s, as MusicBrainz gives them', text(facts()), 'Official · 2020-02-14 · Fiction / Interscope Records / Island · Cat. no. 7757960')
+    draw({ release: japan.id })
+    check('another pressing chosen: the same line, saying its facts', [classed('app-rg-facts').length, text(facts())], [1, 'Official · 2020-02-14 · Fiction / Island · Cat. no. UICB-1004'])
+    check('...and every pressing\'s are in the list the picker draws', find((node) => node.type === PressingPicker)[0].props.view.shown.every((row) => row.facts === P.pressingFacts(slowRush.releases.find((release) => release.id === row.id))), true)
+    const links = () => classed('app-rg-link').map((link) => [text(link), link.props.href, link.props.target, link.props.rel])
+    check('the album and the pressing chosen on musicbrainz.org, at the foot, opening beside the app', links(), [
+      ['The album ↗', `https://musicbrainz.org/release-group/${slowRush.group.id}`, '_blank', 'noopener'],
+      ['This pressing ↗', `https://musicbrainz.org/release/${japan.id}`, '_blank', 'noopener']])
+    check('...after the tracklist, the page\'s last part', find(byClass('app-rg'))[0].props.children.filter(Boolean).at(-1)?.props.class, 'app-rg-links')
+    check('not in your library: said as ever, no maybe', [text(classed('pl-hero-meta')[0]), classed('app-rg-maybe').length], ['2020 · Album · not in your library', 0])
+    //? a folder with no MusicBrainz ids of the album's name, filed under its artist
+    globalThis.__group.owned = owning([{ path: 'Old Rips/Tame Impala - The Slow Rush', artist: 'Tame Impala', album: 'The Slow Rush', formats: ['mp3'] }])
+    draw()
+    const maybe = classed('app-rg-maybe')[0]
+    check('a folder of its name with no ids: "maybe in your library", dashed - the year and kind still before it',
+      [text(classed('pl-hero-meta')[0]), text(maybe), maybe?.type], ['2020 · Album · maybe in your library', 'maybe in your library', 'span'])
+    check('...its folders in its tooltip, as the main page\'s card says them', maybe?.props.title.includes('Old Rips/Tame Impala - The Slow Rush (MP3)') && maybe.props.title.startsWith('A folder with this name, not tagged with MusicBrainz ids'), true)
+    globalThis.__group.owned = owning([{ path: 'Old Rips/Tame Impala - The Slow Rush', artist: 'Tame Impala', album: 'The Slow Rush' },
+      { path: 'Tame Impala/The Slow Rush (2020)', release_mbid: usual.id, release_group_mbid: slowRush.group.id }])
+    draw()
+    check('held by an id as well: "in your library", no maybe', [text(classed('pl-hero-meta')[0]), classed('app-rg-maybe').length], ['2020 · Album · in your library', 0])
+    globalThis.__group.owned = owning([{ path: 'Old Rips/Someone Else - The Slow Rush', artist: 'Someone Else', album: 'The Slow Rush' },
+      { path: 'Old Rips/Tame Impala - Lonerism', artist: 'Tame Impala', album: 'Lonerism' }])
+    draw()
+    check('a folder of the name by another artist, or of another album by the artist: no maybe', [text(classed('pl-hero-meta')[0]), classed('app-rg-maybe').length], ['2020 · Album · not in your library', 0])
+    globalThis.__group.owned = null
+    draw()
+    check('the library not answered: nothing said of it, maybe or not', [text(classed('pl-hero-meta')[0]), classed('app-rg-maybe').length], ['2020 · Album', 0])
+
+    const refused = page({ id: 'not-a-group' })
+    refused.draw()
+    check('a link that isn\'t an album\'s: no links out', classed('app-rg-links').length, 0)
+
+    //? an album of many pressings: The Slow Rush four times over, each a pressing of its own
+    const many = slowRush.releases.flatMap((release, copy) => [0, 1, 2, 3].map((n) => ({ ...release, id: `${release.id.slice(0, -2)}${copy}${n}` })))
+    const big = P.pressingsView(many)
+    const picker = hooks.root(PressingPicker)
+    const picks = []
+    const show = (view) => { tree = picker({ view, onPick: (id) => picks.push(id) }); picker.commit(); return tree }
+    show(P.pressingsView(slowRush.releases))
+    classed('app-picker-button')[0].props.onClick()
+    show(P.pressingsView(slowRush.releases))
+    check('ten pressings: no filter; each option its label, then its facts, then its note',
+      [classed('app-picker-filter').length, find((node) => node.props?.role === 'option')[0]?.props.children[1].props.children.filter(Boolean).map((part) => part.props.class)],
+      [0, ['app-picker-option-label', 'app-picker-facts', 'app-picker-note']])
+    const said = () => find((node) => node.props?.role === 'status', classed('app-picker-popover')[0])
+    check('...and no region to say what a filter left', said().length, 0)
+    classed('app-picker')[0].props.onKeyDown({ key: 'Escape', preventDefault() {} })
+    show(big)
+    classed('app-picker-button')[0].props.onClick()
+    show(big)
+    const field = () => find((node) => node.type === 'input' && byClass('app-picker-filter-input')(node))[0]
+    const listbox = () => find((node) => node.props?.role === 'listbox')[0]
+    check('forty: a filter at the top, outside the listbox, named, its list the one it controls',
+      [many.length, !!field(), find(byClass('app-picker-filter'), listbox()).length, text(find(byClass('app-visually-hidden'), classed('app-picker-filter')[0])[0]), field()?.props['aria-controls'] === listbox()?.props.id],
+      [40, true, 0, 'Filter the pressings', true])
+    check('...its placeholder saying what works, as the rows say it - a country by its code (review: "country" asked for "Japan")',
+      field()?.props.placeholder, 'JP, CD, a label or cat. no.')
+    //? (review: "No pressing matches" was a region made with its words, which VoiceOver doesn't read, and
+    //? nothing said how many matched) one region, there before a word is typed, saying what's left
+    check('...and a polite live region in the list before anything is typed, read out but never drawn, empty',
+      [said().length, said()[0]?.props.class, said()[0]?.props['aria-live'], text(said()[0])], [1, 'app-visually-hidden', 'polite', ''])
+    const shown = find((node) => node.props?.role === 'option').length
+    field().props.onInput({ currentTarget: { value: 'jp' } })
+    show(big)
+    check('typed "jp": only the Japanese CDs, folded ones included - and the fold steps aside',
+      [find((node) => node.props?.role === 'option').map((option) => option.key.slice(0, 8)), classed('app-picker-more').length, shown < 40],
+      [['452ccdb4', '452ccdb4', '452ccdb4', '452ccdb4'], 0, true])
+    check('...said by the region: how many match', [said().length, text(said()[0])], [1, '4 pressings match.'])
+    field().props.onInput({ currentTarget: { value: 'jp vinyl' } })
+    show(big)
+    check('nothing matches: said, in words', [find((node) => node.props?.role === 'option').length, text(classed('app-picker-none')[0])], [0, 'No pressing matches “jp vinyl”.'])
+    check('...by the same one region - the line drawn under the list no region of its own, so it isn\'t said twice',
+      [said().length, text(said()[0]), said()[0]?.props.class, classed('app-picker-none')[0]?.props.role], [1, 'No pressing matches “jp vinyl”.', 'app-visually-hidden', undefined])
+    //? the keys, with the page's elements stood in for
+    const focused = []
+    const input = { focus: () => focused.push('field') }
+    const first = { focus: () => focused.push('first') }
+    const second = { focus: () => focused.push('second') }
+    field().props.onInput({ currentTarget: { value: 'jp' } })
+    show(big)
+    field().props.ref.current = input
+    classed('app-picker')[0].props.ref.current = { querySelectorAll: () => [first, second], contains: () => true }
+    globalThis.document = { activeElement: input }
+    const keys = []
+    const key = (name) => classed('app-picker')[0].props.onKeyDown({ key: name, preventDefault: () => keys.push(name) })
+    key('Home')
+    key('ArrowUp')
+    check('in the field, its own keys stay its own - Home, the arrows across its text', [focused, keys], [[], []])
+    key('ArrowDown')
+    check('...ArrowDown goes to the first pressing', [focused, keys], [['first'], ['ArrowDown']])
+    globalThis.document = { activeElement: first }
+    key('ArrowUp')
+    check('...and ArrowUp from the first pressing back up to the filter', focused, ['first', 'field'])
+    delete globalThis.document
+    find((node) => node.props?.role === 'option')[1].props.onClick()
+    show(big)
+    check('a pick handed on, the list closed', [picks.length, classed('app-picker-popover')[0].props.hidden], [1, true])
+    check('...the region kept, emptied with the filter', [said().length, text(said()[0])], [1, ''])
+    classed('app-picker-button')[0].props.onClick()
+    show(big)
+    check('...and opened again, the filter empty and the whole list back as it folds', [field()?.props.value, find((node) => node.props?.role === 'option').length, classed('app-picker-more').length > 0],
+      ['', shown, true])
+    //? (review: the Pressing button's own press closed the list and kept the words typed)
+    field().props.onInput({ currentTarget: { value: 'jp' } })
+    show(big)
+    classed('app-picker-button')[0].props.onClick()
+    show(big)
+    check('closed by the Pressing button itself: the list hidden and the filter emptied', [classed('app-picker-popover')[0].props.hidden, field()?.props.value], [true, ''])
+    classed('app-picker-button')[0].props.onClick()
+    show(big)
+    check('...and opened again by it, the whole list back as it folds', [field()?.props.value, find((node) => node.props?.role === 'option').length, classed('app-picker-more').length > 0],
+      ['', shown, true])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

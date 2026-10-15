@@ -5,6 +5,13 @@ from src.logger import logger
 
 router = APIRouter()
 
+#? How far into a search's answers /fully_search pages (2.0.0-player.50): the app's "More from
+#? MusicBrainz" asks for the next dozen by offset. A bound, so a page can't send MusicBrainz - rate
+#? limited, often away - deep into a relevance tail nobody reads; ui/src/lib/searchResults.ts keeps
+#? the same number, and says so when a search reaches it.
+FULLY_SEARCH_OFFSET_MAX = 1000
+
+
 @router.get("/fully_search")
 async def fully_search(
     request: Request,
@@ -16,10 +23,14 @@ async def fully_search(
     #? full release list (five requests and 1.4 MB for a big album) was spent on a payload it
     #? never looked at.
     releases: bool = True,
+    #? Where in MusicBrainz's answers this page starts (2.0.0-player.50, the app's "More from
+    #? MusicBrainz"). 0 - the first page - is asked as it always was, with no offset sent, so every
+    #? existing search keeps its request and its cache entry.
+    offset: int = Query(0, ge=0, le=FULLY_SEARCH_OFFSET_MAX),
 ):
     try:
         mb_client = request.app.state.musicbrainz_client
-        search_result = await mb_client.fully_search(query, limit, include_releases=releases)
+        search_result = await mb_client.fully_search(query, limit, include_releases=releases, offset=offset)
         return search_result
 
     except MusicBrainzUnavailable as e:

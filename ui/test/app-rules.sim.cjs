@@ -189,6 +189,14 @@
  *    Managing pages. Needs a look warns when ignores can't be saved. The Edit panel has no link to the
  *    main page left ("Choose the folder"), and its Lyrics note names Managing's Settings; the sidebar's
  *    "Open the main page" names nothing left only there (2.0.0-player.45).
+ *  - Search extras (2.0.0-player.50): More from MusicBrainz through the MusicBrainz half's own
+ *    latestOnly, appended by the first page's held rule to the search it was asked for, its button a
+ *    secondary one under the rows; the chosen pressing's facts drawn with the picker (the store line
+ *    still last); the maybe from owned's name match only when nothing is held by id; the album's and
+ *    the pressing's links to musicbrainz.org opening beside; the pressing list's filter outside the
+ *    listbox, only for a long list, emptied as it closes, its field's own keys left to it. After review:
+ *    More's last page handing focus on when it had it; the Pressing button's close emptying the filter
+ *    too; a pressing the list reveals kept clear of the filter by its scroll-padding.
  *  - Inside a track (2.0.0-player.44): the Edit panel's track inspector (app/TrackInspector.tsx), the cover
  *    viewer (app/CoverViewer.tsx) and an album page's Properties (app/AlbumProperties.tsx) call no playback
  *    action - nothing on the list below gains a file. The inspector is drawn by the Edit panel alone, in
@@ -501,10 +509,11 @@ console.log('\na link out of the app opens beside it')
   //? (2.0.0-player.47: the four phone notes went - Needs a look, Library care, the settings and the log are
   //? drawn on a phone - and so did the gate's link to the main page's settings tab: "Set up Navidrome" opens
   //? the app's own Settings at Connections)
-  check('...and there are links to look at (You, the desktop sidebar, the server settings\' line, Info > Debug\'s test bench, an artist\'s About, an album\'s Properties)',
+  check('...and there are links to look at (You, the desktop sidebar, the server settings\' line, Info > Debug\'s test bench, an artist\'s About, an album\'s Properties, the album you don\'t have)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
-    //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+    //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org;
+    //? 2.0.0-player.50: the album you don't have, its group and its pressing on musicbrainz.org)
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/ReleaseGroupPage.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -984,6 +993,46 @@ console.log('\nSearch: a song plays from the tap, with its album in hand; the ne
       ['app/ReleaseGroupPage.tsx', 'app/PressingPicker.tsx', 'app/Search.tsx'].filter((file) => /is-primary|app-primary/.test(code(read(file)))),
       /class=\{`app-result-get\b/.test(code(read('app/Search.tsx')))],
     [1, [], true])
+}
+
+console.log('\nsearch extras (2.0.0-player.50): More from MusicBrainz, the pressing facts, the maybe, the links out')
+{
+  const search = code(read('app/Search.tsx'))
+  const more = /async function askMore\(\) \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
+  check('More from MusicBrainz goes through the MusicBrainz half\'s own latestOnly(), the fetch called off when superseded, drawing only while newest',
+    [/const request = musicRequests\.begin\(\)/.test(more), /fullySearch\(was\.query, MUSICBRAINZ_LIMIT, false, request\.signal, was\.nextOffset\)/.test(more),
+      /const found = await fullySearch\([^)]*\)\s*if \(!request\.current\(\)\) return/.test(more), /catch \(reason\) \{\s*if \(!request\.current\(\) \|\| isAbort\(reason\)\) return/.test(more)],
+    [true, true, true, true])
+  check('...appended by the first page\'s rule (held albums left out by the library\'s answer), and only to the search it was asked for',
+    [/appendPage\(now\.groups, now\.shown, page, ownedNow\(\)\?\.index \?\? null\)/.test(more), /now\.state === 'done' && now\.text === term/.test(more)],
+    [true, true])
+  check('...and its button under the rows, a secondary button (no solid purple on Search), drawn only while morePages says there is more',
+    [/\{found\.length \? \([\s\S]*?<\/ul>[\s\S]*?\{pages === 'more' \? \(\s*<button/.test(search), /class=\{`app-button app-search-more\b/.test(search),
+      /const pages = musicbrainz\.state === 'done' \? morePages\(/.test(search)],
+    [true, true, true])
+  check('...its last page landing with focus on it hands focus on (review): only when the button had it, never over focus gone elsewhere',
+    [/moreFocus\.current = button && typeof document !== 'undefined' && document\.activeElement === button \? was\.shown\.length : null/.test(more),
+      /useLayoutEffect\(\(\) => \{\s*const from = moreFocus\.current\s*moreFocus\.current = null\s*if \(from === null \|\| pages === 'more'[^\n]*\) return\s*const active = document\.activeElement\s*if \(active && active !== document\.body\) return[\s\S]*?\}, \[musicbrainz\]\)/.test(search)],
+    [true, true])
+  const page = code(read('app/ReleaseGroupPage.tsx'))
+  check('the chosen pressing\'s facts drawn with the picker - under it on a phone, under Get and it on a desktop - and the store line still last',
+    [/\{!desktop && picker\}\s*\{!desktop && facts\}\s*\{download && \(/.test(page), /\{desktop && picker\}\s*\{desktop && facts\}\s*<div class="app-rg-store"/.test(page)],
+    [true, true])
+  check('"maybe in your library" from lib/owned.ts\'s name match, said only when nothing is held by an id',
+    [/title: credited\?\.title \|\| releases\[0\]\?\.title \|\| title,\s*artists: \[creditName\(credited\?\.\['artist-credit'\]\), currentName\(credited\?\.\['artist-credit'\]\)\]/.test(page),
+      /const maybe = holdingOf\(ownership\) === 'maybe' \? describeGroupOwnership\(ownership!\) : null/.test(page)],
+    [true, true])
+  check('the album and the chosen pressing on musicbrainz.org, each opening beside the app',
+    [...page.matchAll(/<a class="app-rg-link" href=\{([^}]*)\}[^>]*>/g)].map((match) => [match[1], opensBeside(match[0])]),
+    [['releaseGroupUrl(mbid)', true], ['releaseUrl(chosen.id)', true]])
+  const picker = code(read('app/PressingPicker.tsx'))
+  check('the pressing list\'s filter: outside the listbox, only past PRESSING_FILTER_MIN, emptied as the list closes - by the Pressing button too (review) - the field\'s own keys left to it',
+    [/\{filterable && \([\s\S]*?<input[\s\S]*?\)\}\s*<div id=\{listId\} ref=\{list\} role="listbox"/.test(picker), /const filterable = all\.length > PRESSING_FILTER_MIN/.test(picker),
+      /const close = \(focus = true\) => \{\s*setOpen\(false\)\s*setTyped\(''\)/.test(picker) && /onClick=\{\(\) => \(open \? close\(false\) : setOpen\(true\)\)\}/.test(picker),
+      /if \(field\.current && document\.activeElement === field\.current\) \{\s*if \(event\.key !== 'ArrowDown' \|\| !options\.length\) return/.test(picker)],
+    [true, true, true, true])
+  check('...a pressing revealed by the list itself kept clear of the filter, by the list\'s own scroll-padding the arrows\' focus scrolling honours (review)',
+    /const clear = typeof getComputedStyle === 'function' \? parseFloat\(getComputedStyle\(box\)\.scrollPaddingTop\) \|\| 0 : 0[\s\S]*?if \(top - clear < box\.scrollTop\) box\.scrollTop = top - clear/.test(picker), true)
 }
 
 console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
@@ -2078,7 +2127,7 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
       /title=\{page\.label \?\? ''\}/.test(app), /<h1 class="pl-hero-title">\{header\.title \|\| title\}<\/h1>/.test(page), /getGroup\(mbid, preview, releases, chosen\)/.test(page)],
     [true, true, false, true, true, true])
   check('the pressing list marks what the library holds, from the page\'s one /library/owned answer',
-    [/const holding = owned \? ownedForGroup\(owned\.index, \{ groupId: mbid, releaseIds: releases\.map\(\(release\) => release\.id\) \}\)\.held : null/.test(page),
+    [/const ownership = owned \? ownedForGroup\(owned\.index, \{\s*groupId: mbid,\s*releaseIds: releases\.map\(\(release\) => release\.id\),[\s\S]*?\}\) : null\s*const holding = ownership \? ownership\.held : null/.test(page),
       /pressingsView\(releases, release, heldIds\)/.test(page), /\{row\.held && <span class="app-picker-held">In your library<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
     [true, true, true])
   //? James's decision kept (pin both): Search's MusicBrainz half leaves held groups out, and the artist

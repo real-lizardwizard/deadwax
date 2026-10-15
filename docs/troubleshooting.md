@@ -137,7 +137,10 @@ The sources sheet asks slskd to search Soulseek, as **Find** does, so the same t
   the app asks, it carries over the main page's **Format** from that browser.
 - **"N folders on Soulseek, none pass your filters"**: the chips above the list are hiding them -
   **Lossless** and **24-bit** start pressed when your quality floor (You → Getting albums) says so.
-  **Clear filters**, or tap the chip, to see them all.
+  **Clear filters**, or tap the chip, to see them all. **Complete albums only** leaves out every folder
+  missing one of the pressing's tracks. On a computer a **Signals** minimum and the sample-rate floor
+  leave folders out too - and no folder passes the floor when its user's client reported no sample
+  rate, which many don't.
 - **"Didn't pick a source for you: …"** with **Pick the best source for me** on: nothing scored 75 or
   more through the chips, or you already have part of the pressing (or part of it is downloading),
   or it was the album as a whole (below), with no tracklist to judge the folders by. The sources

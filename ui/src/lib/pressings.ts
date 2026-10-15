@@ -24,6 +24,10 @@
  *    2.0.0-player.41 so is every pressing you hold (`held`, by release id from /library/owned), each
  *    marked "In your library": v0.9.1's ask, "a way to see which editions are already in my library
  *    when I'm searching for new ones".
+ *  - EACH PRESSING'S FACTS (2.0.0-player.50): what else tells one CD from another - its status, full
+ *    date, labels, catalogue number and barcode, as MusicBrainz gives them (pressingFacts) - in the
+ *    dropdown's rows and the page's line for the one chosen; and an album of more than
+ *    PRESSING_FILTER_MIN pressings gets a text filter over them (filterPressings).
  *  - THE TRACKLIST is the chosen pressing's own - its titles, its lengths, its discs - with a Bonus
  *    row for a track the usual tracklist hasn't, "Other version" for one far enough from the usual
  *    length, "Renamed" for a new title at about the same length, and what it leaves out listed
@@ -44,8 +48,10 @@ export interface PageRelease extends PressingRelease {
   id: string
   title?: string
   country?: string
+  /** '' when MusicBrainz says it has none, null when nobody has entered one */
+  barcode?: string | null
   'artist-credit'?: ArtistCredit[]
-  'label-info'?: readonly { label?: { name?: string } | null }[]
+  'label-info'?: readonly { label?: { name?: string } | null; 'catalog-number'?: string | null }[]
   /** the album it is a pressing of - /release_group asks MusicBrainz for it (`inc=release-groups`) */
   'release-group'?: ReleaseGroup | null
 }
@@ -69,6 +75,9 @@ export interface PressingRow {
   id: string
   /** "CD · 2008 · GB · Island" */
   label: string
+  /** what else tells it apart, as MusicBrainz gives it (2.0.0-player.50): "Official · 2008-04-28 ·
+   *  Cat. no. 1764013 · Barcode 602517640132" - pressingFacts */
+  facts: string
   /** how it compares with the usual tracklist, in a few words */
   note: string
   kind: PressingKind
@@ -132,6 +141,76 @@ export function pressingLabel(release: PageRelease): string {
   return parts.length ? parts.join(' · ') : release.title || 'A pressing'
 }
 
+//? MusicBrainz's word for a release with no catalogue number: there is nothing to tell it apart by
+const NO_CATALOGUE = '[none]'
+
+/**
+ * What else tells a pressing apart (2.0.0-player.50), as MusicBrainz gives it - the facts the main page's
+ * releases grid had columns for, which pressingLabel leaves out: its status ("Official", "Promotion",
+ * "Bootleg"), its full date when it is more than the year the label already says, its labels when the
+ * label line shows a disambiguation in their place (and any after the first one it shows), its catalogue
+ * numbers, its barcode, and "Worldwide" for the release the label line leaves its country off. Each said
+ * once, in that order: "Official · 2008-04-28 · Cat. no. 1764013 · Barcode 602517640132". Nothing made up
+ * - '' when MusicBrainz says nothing more - and nothing the label line already says.
+ */
+export function pressingFacts(release: PageRelease): string {
+  const parts: string[] = []
+  const status = (release.status ?? '').trim()
+  if (status) parts.push(status)
+  const date = (release.date || release['release-events']?.[0]?.date || '').trim()
+  if (date.length > 4) parts.push(date)
+  const named = !release.disambiguation?.trim()
+  const shown = named ? release['label-info']?.find((info) => info?.label?.name)?.label?.name?.trim() ?? null : null
+  const labels = [...new Set((release['label-info'] ?? []).map((info) => info?.label?.name?.trim() ?? '').filter(Boolean))]
+    .filter((name) => name !== shown)
+  if (labels.length) parts.push(labels.join(' / '))
+  const numbers = [...new Set((release['label-info'] ?? []).map((info) => info?.['catalog-number']?.trim() ?? ''))]
+    .filter((number) => number && number !== NO_CATALOGUE)
+  if (numbers.length) parts.push(`Cat. no. ${numbers.join(' / ')}`)
+  const barcode = (release.barcode ?? '').trim()
+  if (barcode) parts.push(`Barcode ${barcode}`)
+  if (release.country === 'XW') parts.push('Worldwide')
+  return parts.join(' · ')
+}
+
+/** An album with more pressings than this gets a text filter in its dropdown (2.0.0-player.50). */
+export const PRESSING_FILTER_MIN = 30
+
+/** Text as the dropdown's filter compares it: accents and case folded, anything but letters and digits a space. */
+function foldText(text: string): string {
+  return text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+}
+
+/**
+ * The dropdown's filter (2.0.0-player.50), for an album of more than PRESSING_FILTER_MIN pressings: the
+ * pressings whose label, facts or note hold every word typed - "jp cd", "uicb 1004", "promotion" - in the
+ * dropdown's own order, folded ones included; every pressing for nothing typed. A word is found in the
+ * text as folded, or with its gaps closed up, so a catalogue number typed without its dash or space -
+ * "uicb1004" - still finds UICB-1004 (review).
+ */
+export function filterPressings(rows: readonly PressingRow[], typed: string): PressingRow[] {
+  const words = foldText(typed).split(' ').filter(Boolean)
+  if (!words.length) return [...rows]
+  return rows.filter((row) => {
+    const text = foldText([row.label, row.facts, row.note, row.held ? 'in your library' : ''].join(' '))
+    const closed = text.replace(/ /g, '')
+    return words.every((word) => text.includes(word) || closed.includes(word))
+  })
+}
+
+/**
+ * What the dropdown's filter says as it narrows the list (review): how many pressings match the words
+ * typed - "4 pressings match." - or that none does, as the list's own line says it; '' while nothing is
+ * typed. Said by a live region always in the list while it has a filter, since VoiceOver reads a region
+ * only once it is already there.
+ */
+export function pressingFilterWords(matching: number, typed: string): string {
+  const words = typed.trim()
+  if (!words) return ''
+  if (!matching) return `No pressing matches “${words}”.`
+  return `${matching} ${matching === 1 ? 'pressing matches' : 'pressings match'}.`
+}
+
 /** Whether a pressing differs from the usual tracklist - a length's few seconds aside. */
 export function differs(diff: TracklistDiff): boolean {
   return !!(diff.added.length || diff.removed.length || diff.renamed.length || diff.versions.length)
@@ -193,7 +272,7 @@ export function pressingsView(
       : !base ? 'usual'
       : diff && !differs(diff) && tracklistKey(tracks) === usualKey ? 'usual' : 'differs'
     const isDefault = release.id === defaultId
-    return { id: release.id, label: pressingLabel(release), note: pressingNote(kind, diff, isDefault, base), kind, isDefault,
+    return { id: release.id, label: pressingLabel(release), facts: pressingFacts(release), note: pressingNote(kind, diff, isDefault, base), kind, isDefault,
       held: held.has(release.id.toLowerCase()), format: pressingFormat(release), date: sortDate(release) }
   })
 
@@ -359,6 +438,18 @@ export function metaLine(header: { year: string; kind: string }, held: boolean |
 }
 
 /**
+ * What the meta line says of the library (2.0.0-player.50): 'held' by an id - the group's or a
+ * pressing's; 'maybe' when nothing is held by id but a folder with NO MusicBrainz ids has the album's
+ * name and an artist's it could be filed under (lib/owned.ts's name match) - which can't say it is this
+ * album, so it is said as a maybe, dashed as the main page's card says it; 'not'; or null until the
+ * library has answered.
+ */
+export function holdingOf(holding: { held: readonly unknown[]; guessed: readonly unknown[] } | null): 'held' | 'maybe' | 'not' | null {
+  if (!holding) return null
+  return holding.held.length ? 'held' : holding.guessed.length ? 'maybe' : 'not'
+}
+
+/**
  * The release group a Get on this page builds its download from (2.0.0-player.15, through
  * lib/releasePayload.ts) - the group Search handed over, else the one the pressings carry - so the
  * album is searched under its credit and filed under its current name and its own year, exactly as
@@ -382,6 +473,10 @@ export function getGroup(
     ...(credit ? { 'artist-credit': credit } : {}),
   }
 }
+
+/** The album's page on musicbrainz.org (2.0.0-player.50) - the release group; a pressing's is
+ *  lib/albumProperties.ts releaseUrl. Both open beside the app. */
+export const releaseGroupUrl = (group: string): string => `https://musicbrainz.org/release-group/${encodeURIComponent(group)}`
 
 /** The Cover Art Archive's front for the pressing shown, then for the album as a whole. */
 export function coverAddresses(releaseId: string | null, groupId: string, size = 500): string[] {

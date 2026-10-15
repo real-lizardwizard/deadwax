@@ -169,7 +169,7 @@ does) and MusicBrainz is still searched below it.
 
 ### Not in your library yet
 
-From MusicBrainz, up to 12 albums, **leaving out any you already have** - judged by MusicBrainz's
+From MusicBrainz, 12 albums at a time, **leaving out any you already have** - judged by MusicBrainz's
 own id for the album, so a folder deadwax filed as FLAC or MP3 (or one tagged by Picard) is
 recognised. A folder with no MusicBrainz ids in its tags can't be, and nor can an **.m4a album
 deadwax filed**: it carries the pressing's id but not the album's (Picard writes that one; deadwax
@@ -190,6 +190,17 @@ holds for the pressing you have) - or, while Navidrome hasn't found it, the albu
 which says "in your library". To get **another pressing** of an album you have, open the album you
 have and tap **Other pressings** ([below](#another-pressing-of-an-album-you-have)) - the list here
 keeps to albums you haven't got, and an artist's page opens the albums you have as yours.
+
+**More from MusicBrainz** (since 2.0.0-player.50), under the rows, asks for the next 12 of the same
+search and adds them below, so nothing you were looking at moves - leaving out the albums you have, as
+the first 12 do (and never showing one twice). It reads **Asking MusicBrainz…** while it asks; if
+MusicBrainz isn't answering it says so and reads **Try again**. When every new album of the next 12 is
+one you have it says so ("The next 12 albums MusicBrainz found are all in your library already"); when
+MusicBrainz sends nothing it hasn't already shown you, it says *MusicBrainz sent nothing new.* The
+button goes once MusicBrainz has nothing more for the search, and if it had keyboard focus, focus moves
+to the first album the last page added (or to the words said in its place). No page starts more than
+1,000 answers in; a search with more than that says *That's as far into one search as deadwax goes -
+add a word to narrow it.* Typing something else, or searching again, drops a page still on its way.
 
 How the box is read, since there's only one:
 
@@ -219,7 +230,12 @@ names stay plain), and "2008 · Album ·
 not in your library" - "in your library" if you have some pressing of it after all. That last part
 appears once deadwax has said what you have, never before, so it can't claim you don't have an
 album you do; and it counts a folder tagged with any of the album's pressings, the .m4a albums
-above included. Opened from a saved link or after a reload it says the same, since the album's
+above included. Since 2.0.0-player.50, when nothing is tagged as the album but a folder **with no
+MusicBrainz ids at all** has its name and its artist's (as credited, or the name they go by now), it
+says **maybe in your library**, in a dashed box, as the main page's card does - the name can't tell
+which album that folder is, let alone which pressing. Point at it (on a computer) for the folder;
+matching its release in the metadata editor settles it. Opened from a saved link or after a reload it
+says the same, since the album's
 title, kind and year come with its pressings. A link whose address isn't a MusicBrainz album says
 *That isn't a link to an album on MusicBrainz.* Under it is the **Pressing** button, where an album you have has Play and
 Shuffle; then **Get the album**, the page's one purple button, which gets **the pressing chosen**
@@ -242,6 +258,14 @@ usual pressing**: one with the album's most common tracklist, an official releas
 bootleg, a CD or digital release over vinyl, one with no disambiguation, then the earliest. That's
 the pressing a card's **Find** on the main page downloads as, and the one a row's **Get** gets.
 
+Under it (since 2.0.0-player.50) is what else tells that pressing apart, as MusicBrainz gives it: its
+**status** (Official, Promotion, Bootleg), its **full date** when MusicBrainz has more than the year,
+its **labels** when the button shows a disambiguation in their place (and any after the first one it
+shows), its **catalogue number** and its **barcode**, and "Worldwide" for a release whose country the
+button leaves off - "Official · 2008-04-28 · Cat. no. 1764013 · Barcode 602517640132". It keeps two
+lines' room on a phone (one on a computer) whatever it says, so choosing another pressing moves nothing
+under it; the whole of it is in its tooltip, and in the list.
+
 Tap it for the list of pressings, each with a note of how it compares. It opens below the button
 and, on a phone, scrolls the page so the whole list is in view above the tab bar and the mini
 player (it's never taller than that, and scrolls inside itself past that):
@@ -253,6 +277,17 @@ player (it's never taller than that, and scrolls inside itself past that):
   Fire**, **1 other version: Borderline, 4:34**, **2 tracks renamed**;
 - **No tracklist on MusicBrainz** for one nobody has entered the tracks of;
 - then **N more pressings with the usual tracklist**, folded away - tap it to show them.
+
+Each pressing in the list says its facts under its label (since 2.0.0-player.50), the same ones as the
+line under the button. An album with **more than 30 pressings** has a **filter** at the top of the list:
+type a country's code as the list shows it, a format, a label, a catalogue number or a word of a note
+("jp cd", "uicb 1004", "promotion", "bonus") and only the pressings holding every word show, folded ones
+included; *No pressing matches "…"* when none does. With VoiceOver on, it says how many match as you type
+("4 pressings match."). A catalogue number is found however its parts are typed - "UICB-1004", "uicb
+1004" or "uicb1004". Opening the list still puts you on the chosen pressing,
+not in the filter (on a phone the keyboard would cover the list); from the filter the down arrow goes to
+the first pressing, the arrows never leave the pressing they move to under the filter, and closing the
+list, however you close it, empties it.
 
 Since 2.0.0-player.41 every pressing you already have says **In your library** under its note, in
 green, and is never folded away - judged by the pressing's MusicBrainz id in your folders' tags, once
@@ -284,6 +319,10 @@ different about each pressing](#whats-different-about-each-pressing)) - 15 secon
 track, if that's more) for another version, within 5 seconds for a rename - but the app doesn't
 mark a small length change at all, where the main page shows it as an "N lengths" chip: such a
 pressing reads *Same tracklist as the usual one* here.
+
+At the foot of the page (since 2.0.0-player.50), after the words **On MusicBrainz**, **The album ↗** and
+**This pressing ↗** open the album's page and the chosen pressing's on musicbrainz.org, beside the app -
+in a new tab, so the music keeps playing.
 
 ### Another pressing of an album you have
 

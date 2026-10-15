@@ -12,8 +12,8 @@ import {
 import { joinDownload } from '../lib/downloadRequests'
 import { storeStatusFor } from '../lib/perPerson'
 import {
-  GET_SETTINGS_DEFAULT, NO_SOURCE_FILTERS, PICK_SORT, candidateFilters, floorFilters, pressedCount, signalsSet, sourceChips,
-  type SourceFilters,
+  GET_SETTINGS_DEFAULT, NO_SOURCE_FILTERS, PICK_SORT, SAMPLE_RATE_FLOORS, candidateFilters, floorFilters, pressedCount, sampleRateChip, signalsSet,
+  sourceChips, type SourceFilters,
 } from '../lib/getSettings'
 import { ChevronDownIcon, CloseIcon } from '../player/icons'
 import { SourceCard } from './SourceCard'
@@ -113,6 +113,34 @@ export function SignalsChip({
 }
 
 /**
+ * The desktop panel's sample-rate floor (2.0.0-player.50), beside Signals: Any, 44.1, 48, 88.2 or 96 kHz
+ * and up, judged by the folder's worst file, a folder that reported no sample rate never passing one
+ * (lib/candidates.ts). A chip holding the platform's own picker, as the sort is - the select covers it
+ * whole, unseen, and the chip says the floor, pressed while one is set so it is never a filter on out of
+ * sight. A panel's alone, as Signals is.
+ */
+export function RateChip({ rate, onChange }: { rate: number; onChange: (rate: number) => void }) {
+  return (
+    <label class={`app-chip app-sources-rate${rate ? ' is-on' : ''}`}>
+      <span class="app-visually-hidden">The least sample rate</span>
+      <span aria-hidden="true">{sampleRateChip(rate)}</span>
+      <select
+        class="app-sources-sort-select"
+        value={String(rate)}
+        onChange={(event) => onChange(Number((event.currentTarget as HTMLSelectElement).value))}
+      >
+        {SAMPLE_RATE_FLOORS.map((floor) => (
+          <option key={floor.value} value={String(floor.value)}>
+            {floor.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDownIcon class="app-sources-sort-icon" />
+    </label>
+  )
+}
+
+/**
  * Choose a source (2.0.0-player.15, Sources.dc.html): the sheet a Get opens - "Get the album" on the
  * album you don't have, or a Get chip on a Search row - over everything, under Now Playing's menu and
  * Info (z 25). Soulseek is searched for the release the Get was for (hooks/useCandidateSearch.ts),
@@ -120,9 +148,10 @@ export function SignalsChip({
  * the pending row is in Requests from that moment - and `onQueued` closes the sheet and shows
  * Requests.
  *
- *  - THE CHIPS: Lossless (every file lossless: unknown never passes), 24-bit, Free slot, and the
- *    sort. They start as the quality floor (You > Getting albums) - a floor drawn as a chip pressed,
- *    never a filter on out of sight; a 320 kbps floor has its own chip, shown only then.
+ *  - THE CHIPS: Lossless (every file lossless: unknown never passes), 24-bit, Free slot, Complete
+ *    albums only (2.0.0-player.50: every track of the pressing present, as the cards count Tracks),
+ *    and the sort. They start as the quality floor (You > Getting albums) - a floor drawn as a chip
+ *    pressed, never a filter on out of sight; a 320 kbps floor has its own chip, shown only then.
  *  - THE BEST MATCH - the highest score through the chips - has the purple edge and the one solid
  *    Get wherever the sort puts it: "smallest first" moves it down the list, never onto another
  *    card (review).
@@ -179,7 +208,10 @@ export function SignalsChip({
  * side by side. So no scroll lock and no backdrop, and Escape closes it only from inside it (its box
  * takes focus from a click on anything in it that can't, so a click on its heading still counts). Its
  * head is the board's: "Sources", what they are for under it, and a close button; its chips gain
- * Signals (SignalsChip, above), whose minimums filter only while it is a panel. The cards are the SAME
+ * Signals (SignalsChip, above), whose minimums filter only while it is a panel - and, since
+ * 2.0.0-player.50, a sample-rate floor (RateChip, above), the same way - Signals right after Free
+ * slot, Complete albums only and the floor after it, so Signals keeps its place on the row's first line
+ * (review). The cards are the SAME
  * cards - James chose cards over a comparison table on a desktop too. The album page asks it to search
  * again as another pressing is chosen (`again`): the chips you set stay set, and nothing is picked for
  * you.
@@ -215,6 +247,8 @@ export function Sources({
   const [filters, setFilters] = useState<SourceFilters>(() => floorFilters(floor))
   //? the desktop's Signals chip: the least each signal may be (none on a phone, where none is drawn)
   const [signals, setSignals] = useState<Record<string, number>>(noSignalMinimums)
+  //? the desktop's sample-rate floor (2.0.0-player.50), Hz, 0 for any - a panel's alone, as Signals is
+  const [rate, setRate] = useState(0)
   const [sort, setSort] = useState<CandidateSort>('score')
   //? the chips were tapped since this Get began: the settings landing late don't re-seed them then
   const touched = useRef(false)
@@ -223,6 +257,7 @@ export function Sources({
   //? a phone's sheet (a window narrowed under 1024px, an iPad turned upright, the panel open) they are
   //? kept for the panel again but filter nothing: a minimum is never a filter on out of sight.
   const minimums = modal ? undefined : signals
+  const minRate = modal ? 0 : rate
   const filtersNow = useRef(filters)
   filtersNow.current = filters
   const minimumsNow = useRef(minimums)
@@ -230,12 +265,14 @@ export function Sources({
   //? what the sheet shows now, read as a join answers (2.0.0-player.49)
   const showingNow = useRef({ open, key: request?.key })
   showingNow.current = { open, key: request?.key }
+  const minRateNow = useRef(minRate)
+  minRateNow.current = minRate
 
   const state = useCandidateSearch({
     //? read as the answer lands: the settings as they are then, and the chips
     picking: () => ({
       pick: getSettingsNow().get_mode === 'pick',
-      filters: candidateFilters(filtersNow.current, minimumsNow.current),
+      filters: candidateFilters(filtersNow.current, minimumsNow.current, minRateNow.current),
       sort: PICK_SORT,
     }),
     onPicked: onQueued,
@@ -279,6 +316,7 @@ export function Sources({
     touched.current = false
     setFilters(floorFilters(getSettingsNow().quality_floor))
     setSignals(noSignalMinimums())
+    setRate(0)
     setSort('score')
     begin(request.release)
   }, [open, request?.key])
@@ -308,7 +346,7 @@ export function Sources({
     void askGetSettings()
     state.requery()
   }
-  const chosen = useMemo(() => candidateFilters(filters, minimums), [filters, minimums])
+  const chosen = useMemo(() => candidateFilters(filters, minimums, minRate), [filters, minimums, minRate])
   const passing = useMemo(() => (result?.candidates ?? []).filter((candidate) => passesFilters(candidate, chosen)), [result, chosen])
   const shown = useMemo(() => sortCandidates(passing, sort), [passing, sort])
   //? the best match through the chips - the top of the list by score, as a pick goes - wherever the
@@ -377,6 +415,15 @@ export function Sources({
     touched.current = true
     setFilters((now) => ({ ...now, [key]: !now[key] }))
   }
+  //? the chips, and on a desktop Complete albums only drawn after Signals (review, 2.0.0-player.50):
+  //? before it, it put Signals at the panel row's very edge, so the label growing as a minimum was set
+  //? wrapped Signals - and its popover, anchored to it - out from under the slider being dragged
+  const chipList = sourceChips(floor, filters)
+  const chipButton = (chip: (typeof chipList)[number]) => (
+    <button key={chip.key} type="button" class={`app-chip${chip.on ? ' is-on' : ''}`} aria-pressed={chip.on} onClick={() => toggle(chip.key)}>
+      {chip.label}
+    </button>
+  )
 
   const get = (candidate: Candidate) => {
     if (state.download(candidate, shown)) onQueued()
@@ -433,17 +480,7 @@ export function Sources({
         <p class="app-visually-hidden" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
 
         <div class="app-sources-chips" role="group" aria-label="Filter the sources">
-          {sourceChips(floor, filters).map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              class={`app-chip${chip.on ? ' is-on' : ''}`}
-              aria-pressed={chip.on}
-              onClick={() => toggle(chip.key)}
-            >
-              {chip.label}
-            </button>
-          ))}
+          {chipList.filter((chip) => modal || chip.key !== 'complete').map(chipButton)}
           {/* a desktop's Signals chip, before the sort as its board has it */}
           {!modal && (
             <SignalsChip
@@ -451,6 +488,17 @@ export function Sources({
               onChange={(next) => {
                 touched.current = true
                 setSignals(next)
+              }}
+            />
+          )}
+          {/* ...then Complete albums only, and its sample-rate floor (2.0.0-player.50) */}
+          {!modal && chipList.filter((chip) => chip.key === 'complete').map(chipButton)}
+          {!modal && (
+            <RateChip
+              rate={rate}
+              onChange={(next) => {
+                touched.current = true
+                setRate(next)
               }}
             />
           )}
@@ -519,7 +567,7 @@ export function Sources({
                     <p class="app-sources-state-text">
                       {result!.candidates.length} {result!.candidates.length === 1 ? 'folder' : 'folders'} on Soulseek, none pass your filters
                     </p>
-                    {pressedCount(filters, minimums) > 0 && (
+                    {pressedCount(filters, minimums, minRate) > 0 && (
                       <button
                         type="button"
                         class="app-button"
@@ -528,6 +576,7 @@ export function Sources({
                           touched.current = true
                           setFilters(NO_SOURCE_FILTERS)
                           setSignals(noSignalMinimums())
+                          setRate(0)
                         }}
                       >
                         Clear filters

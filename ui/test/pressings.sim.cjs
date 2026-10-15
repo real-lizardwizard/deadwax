@@ -9,7 +9,12 @@
  * under "N more"; disc headings without MusicBrainz's medium titles; a pressing called "the usual
  * tracklist" that isn't - or the page reading backwards because MusicBrainz listed a single mix
  * first (every pressing is compared at the DEFAULT pressing's lengths, so no order changes a
- * word); and a cold link claiming "not in your library" before the library has said.
+ * word); and a cold link claiming "not in your library" before the library has said. And
+ * (2.0.0-player.50) each pressing's facts - status, full date, labels beside a disambiguation, catalogue
+ * numbers once, the barcode, "Worldwide" - never repeating the label line and never made up, a label
+ * said once whatever numbers it carries; the dropdown's filter over labels, facts and notes, accents
+ * folded and a catalogue number found with its dash, a space or nothing between its parts; the meta
+ * line's held / maybe / not; the album's page.
  *
  * Run it with:  node ui/test/pressings.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -194,6 +199,63 @@ check('formats run together, digital in a word', [P.pressingFormat(byPrefix(slow
 check('a worldwide release says no country; Europe in a word', [P.pressingLabel(byPrefix(slowRush, '2912c9db')), P.pressingLabel(byPrefix(dummy, '76df3287'))],
   ['Digital · 2020 · Universal Music Australia Pty Ltd.', 'CD · 1994 · Europe · Go! Beat'])
 check('nothing to say: its title', P.pressingLabel({ id: 'x', title: 'Dummy' }), 'Dummy')
+
+console.log('\neach pressing\'s facts (2.0.0-player.50): what else tells it apart, as MusicBrainz gives it')
+check('Third\'s German-made CD: its labels beside the disambiguation the label line shows, its catalogue number once',
+  [P.pressingLabel(byPrefix(third, '064fa38d')), P.pressingFacts(byPrefix(third, '064fa38d'))],
+  ['CD · 2008 · Europe · Made in Germany by EDC', 'Official · Go! Discs / Island / Island Records Group · Cat. no. 1764013'])
+check('...the Japanese CD: the full date, never the label its line already says, its catalogue number',
+  [P.pressingLabel(byPrefix(third, 'cae2ac10')), P.pressingFacts(byPrefix(third, 'cae2ac10'))], ['Enhanced CD · 2008 · JP · Island', 'Official · 2008-04-30 · Cat. no. UICI-1069'])
+check('...two labels with no disambiguation: the second beside the one the line shows; a catalogue number they share said once',
+  P.pressingFacts(byPrefix(third, 'daa9710c')), 'Official · 2008-04-25 · Island Records Group · Cat. no. 1766401')
+check('...a month alone is more than the year, and said', P.pressingFacts(byPrefix(third, '18256dad')), 'Official · 2008-04 · Cat. no. 1766390')
+check('...no catalogue number entered: none said', P.pressingFacts(byPrefix(third, '5add188d')), 'Official · 2008-04-28')
+check('the barcode, a promo, MusicBrainz\'s "[none]" (no catalogue number) left out, and the worldwide release its line leaves the country off',
+  [P.pressingFacts({ id: 'a', status: 'Official', date: '1994-10-17', country: 'US', barcode: '042282855320', 'label-info': [{ 'catalog-number': '422-828 553-2', label: { name: 'Go! Discs' } }, { 'catalog-number': '422-828 553-2', label: { name: 'London Records' } }] }),
+    P.pressingFacts({ id: 'b', status: 'Promotion', date: '1994', 'label-info': [{ 'catalog-number': '[none]', label: { name: 'Go! Discs' } }] }),
+    P.pressingFacts({ id: 'c', status: 'Official', country: 'XW', barcode: '', 'release-events': [{ date: '2020-02-14' }] })],
+  ['Official · 1994-10-17 · London Records · Cat. no. 422-828 553-2 · Barcode 042282855320', 'Promotion', 'Official · 2020-02-14 · Worldwide'])
+check('...nothing more to say: nothing made up', [P.pressingFacts({ id: 'd' }), P.pressingFacts({ id: 'e', status: null, barcode: null, date: '2008' })], ['', ''])
+//? (review: only the catalogue numbers' once was pinned) a disambiguation beside one label under three numbers
+check('...one label under three catalogue numbers, beside a disambiguation: the label said once, every number',
+  [P.pressingLabel(byPrefix(wywh, '588ca0a5')), P.pressingFacts(byPrefix(wywh, '588ca0a5'))],
+  ['2×CD · 2011 · Europe · Experience edition', 'Official · 2011-11-04 · EMI · Cat. no. 50999 029450 2 6 / 50999 029451 2 5 / 50999 029452 2 4'])
+check('...and every row of the dropdown carries its facts', P.pressingsView(third.releases).shown.map((row) => typeof row.facts === 'string' && row.facts.startsWith('Official')).every(Boolean), true)
+
+console.log('\nthe dropdown\'s filter (2.0.0-player.50), for an album of many pressings')
+{
+  const view = P.pressingsView(third.releases)
+  const all = [...view.shown, ...view.more]
+  const ids = (rows) => rows.map((row) => row.id.slice(0, 8))
+  check('more than 30 pressings gets one', P.PRESSING_FILTER_MIN, 30)
+  check('nothing typed: every pressing, in the dropdown\'s order', ids(P.filterPressings(all, '  ')), ids(all))
+  check('a country and a format, any order and case', [ids(P.filterPressings(all, 'jp cd')), ids(P.filterPressings(all, 'CD JP'))], [['cae2ac10'], ['cae2ac10']])
+  //? (review: the check above typed no accent) accents folded both ways
+  const spanish = [{ id: 'es000001', label: 'CD · 1999 · ES · Sony Music España', facts: '', note: '' }, { id: 'pt000001', label: 'CD · 1999 · PT · Edição', facts: '', note: '' },
+    { id: 'gb000001', label: 'CD · 1999 · GB · Harvest', facts: '', note: '' }]
+  check('...accents aside, typed or not: "espana" and "ESPAÑA" find España, "edicao" finds Edição', [ids(P.filterPressings(spanish, 'espana')), ids(P.filterPressings(spanish, 'ESPAÑA')), ids(P.filterPressings(spanish, 'edicao'))],
+    [['es000001'], ['es000001'], ['pt000001']])
+  check('...a catalogue number as written, with spaces for its dashes - or with nothing for them (review)',
+    [ids(P.filterPressings(all, 'UICI-1069')), ids(P.filterPressings(all, 'uici 1069')), ids(P.filterPressings(all, 'UICI1069'))], [['cae2ac10'], ['cae2ac10'], ['cae2ac10']])
+  //? (review: "magic doors" was in 7da10d5d's label too, its disambiguation, so nothing tested the note) a word
+  //? only a note holds - 5add188d's bonus track, said in neither its label nor its facts
+  const machine = all.find((row) => row.id.startsWith('5add188d'))
+  check('...a word only its note holds: its bonus track',
+    [ids(P.filterPressings(all, 'machine gun')), /machine gun/i.test(`${machine?.label} ${machine?.facts}`), /machine gun/i.test(machine?.note ?? '')], [['5add188d'], false, true])
+  check('...a label beside a disambiguation', ids(P.filterPressings(all, 'go discs')), ['064fa38d'])
+  check('...every word must match', P.filterPressings(all, 'jp mercury').length, 0)
+  check('...a pressing you hold, by "in your library"', ids(P.filterPressings(P.pressingsView(third.releases, null, new Set([byPrefix(third, 'e4f5a41f').id])).shown, 'in your library')), ['e4f5a41f'])
+  //? (review: nothing said how many matched, and "none" only by a region made with its words)
+  check('what the filter says as it narrows: nothing for nothing typed, how many match, or that none does',
+    [P.pressingFilterWords(40, ''), P.pressingFilterWords(40, '   '), P.pressingFilterWords(4, 'jp'), P.pressingFilterWords(1, ' jp cd '), P.pressingFilterWords(0, ' jp vinyl ')],
+    ['', '', '4 pressings match.', '1 pressing matches.', 'No pressing matches \u201cjp vinyl\u201d.'])
+}
+
+console.log('\nthe meta line\'s word for the library, and MusicBrainz\'s pages (2.0.0-player.50)')
+check('held by an id, a maybe by name alone, not held, or nothing until the library answers',
+  [P.holdingOf({ held: [1], guessed: [] }), P.holdingOf({ held: [], guessed: [1] }), P.holdingOf({ held: [1], guessed: [1] }), P.holdingOf({ held: [], guessed: [] }), P.holdingOf(null)],
+  ['held', 'maybe', 'held', 'not', null])
+check('the album\'s page on musicbrainz.org, its id encoded', P.releaseGroupUrl('163339ab-813b-3d29-bba8-e1d5acf63cab'), 'https://musicbrainz.org/release-group/163339ab-813b-3d29-bba8-e1d5acf63cab')
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

@@ -9,12 +9,14 @@ import { storeNotes } from '../lib/candidates'
 import { joinDownload } from '../lib/downloadRequests'
 import { isAbort, latestOnly } from '../lib/latest'
 import { onAlbumsFiled } from '../lib/libraryEvents'
-import { ownedForGroup } from '../lib/owned'
+import { releaseUrl } from '../lib/albumProperties'
+import { describeGroupOwnership, ownedForGroup } from '../lib/owned'
 import {
-  anyPressingDiffers, coverAddresses, getGroup, groupMbid, leftOut, metaLine, pageHeader, pressingLabel, pressingsView, summaryLine,
-  trackRows, type PageRelease, type TrackRow,
+  anyPressingDiffers, coverAddresses, getGroup, groupMbid, holdingOf, leftOut, metaLine, pageHeader, pressingLabel, pressingsView,
+  releaseGroupUrl, summaryLine, trackRows, type PageRelease, type TrackRow,
 } from '../lib/pressings'
 import { storeStatusFor } from '../lib/perPerson'
+import { creditName, currentName } from '../lib/release'
 import { buildDownloadRelease } from '../lib/releasePayload'
 import { soleCredit } from '../lib/artistPage'
 import { ChevronLeftIcon, GetIcon } from '../player/icons'
@@ -195,6 +197,15 @@ function DeskTracklist({
  * shows that box in place of any search (the server searches nothing for it). Opened from there it
  * has no group from Search to draw its header from, so `title` - the album's name as the page that
  * opened it knew it - stands in as the title until MusicBrainz's own group arrives with the pressings.
+ *
+ * SEARCH EXTRAS (2.0.0-player.50), as the main page had them: the chosen pressing's FACTS under the
+ * picker - status, full date, labels, catalogue number, barcode, as MusicBrainz gives them, one line of
+ * fixed height (two on a phone) so choosing another pressing moves nothing under it - with every
+ * pressing's in the dropdown, and a filter there for an album of many pressings (PressingPicker);
+ * "MAYBE IN YOUR LIBRARY", dashed as the main page's card says it, when no folder holds the album by an
+ * id but one with no MusicBrainz ids has its name (lib/owned.ts's name match - its folders in the
+ * tooltip); and its page and the chosen pressing's on musicbrainz.org, at the foot, opening beside the
+ * app.
  */
 export function ReleaseGroupPage({
   id,
@@ -283,10 +294,23 @@ export function ReleaseGroupPage({
   }, [mbid, requests])
 
   const releases = (answer?.releases ?? []) as PageRelease[]
+  //? the album as credited - Search's group, else the one the pressings carry - for its title and the
+  //? names it could be filed under
+  const credited = preview ?? releases.find((each) => each['release-group'])?.['release-group'] ?? null
   //? what the library holds of this album: its folders by the group's id or any pressing's - null
-  //? until the library has answered, and the meta line then says neither
-  const holding = owned ? ownedForGroup(owned.index, { groupId: mbid, releaseIds: releases.map((release) => release.id) }).held : null
+  //? until the library has answered, and the meta line then says neither. And, held by no id, a folder
+  //? with no MusicBrainz ids that has the album's name and an artist's it could be filed under - the
+  //? credit, or the name they go by now - said as a MAYBE (2.0.0-player.50), as the main page's card
+  //? says it: the name can't tell which album it is, let alone which pressing
+  const ownership = owned ? ownedForGroup(owned.index, {
+    groupId: mbid,
+    releaseIds: releases.map((release) => release.id),
+    title: credited?.title || releases[0]?.title || title,
+    artists: [creditName(credited?.['artist-credit']), currentName(credited?.['artist-credit'])],
+  }) : null
+  const holding = ownership ? ownership.held : null
   const held = holding ? holding.length > 0 : null
+  const maybe = holdingOf(ownership) === 'maybe' ? describeGroupOwnership(ownership!) : null
   //? ...and which pressings those are, by release id: each marked in the pressing list (2.0.0-player.41)
   const heldKey = [...new Set((holding ?? []).map((album) => (album.release_mbid ?? '').trim().toLowerCase()).filter(Boolean))].sort().join(' ')
   const heldIds = useMemo(() => new Set(heldKey ? heldKey.split(' ') : []), [heldKey])
@@ -298,7 +322,6 @@ export function ReleaseGroupPage({
   const missing = leftOut(diff)
   const summary = view ? summaryLine(view, releases.length) : null
   //? the artist, a link to their page when the album is credited to ONE artist MusicBrainz knows
-  const credited = preview ?? releases.find((each) => each['release-group'])?.['release-group'] ?? null
   const artistLink = onArtist ? soleCredit(credited?.['artist-credit']?.length ? credited['artist-credit'] : chosen?.['artist-credit']) : null
 
   //? What Get would download: the chosen pressing, as the one payload builder makes it from the
@@ -369,6 +392,15 @@ export function ReleaseGroupPage({
   }, [shown, sourcesPressing, chosen?.id])
 
   const picker = view && <PressingPicker view={view} onPick={(picked) => onPick(id, picked === view.defaultId ? null : picked)} />
+  //? the chosen pressing's facts (2.0.0-player.50): status, full date, labels, catalogue number,
+  //? barcode, as MusicBrainz gives them - drawn with the picker, one fixed height (app.css), so another
+  //? pressing chosen moves nothing under it; the whole of it in its tooltip, and in the list's rows
+  const chosenRow = view ? [...view.shown, ...view.more].find((row) => row.id === view.chosenId) ?? null : null
+  const facts = view && (
+    <p class="app-rg-facts" title={chosenRow?.facts || undefined}>
+      {chosenRow?.facts ?? ''}
+    </p>
+  )
 
   return (
     <section class="pl-album-page app-rg">
@@ -389,13 +421,25 @@ export function ReleaseGroupPage({
         ) : (
           <p class="pl-hero-artist app-hero-plain">{header.artist}</p>
         )}
-        {/* said once something is known - a cold link has nothing to say until the pressings come */}
-        <p class="pl-hero-meta">{preview || answer ? metaLine(header, held) : ''}</p>
+        {/* said once something is known - a cold link has nothing to say until the pressings come; a
+            folder of this name with no ids is a dashed "maybe", its folders in the tooltip */}
+        <p class="pl-hero-meta">
+          {!(preview || answer) ? '' : maybe ? (
+            <>
+              {metaLine(header, null)}
+              {metaLine(header, null) ? ' · ' : ''}
+              <span class="app-rg-maybe" title={maybe.title}>
+                maybe in your library
+              </span>
+            </>
+          ) : metaLine(header, held)}
+        </p>
 
         {/* where the album page has Play and Shuffle: the pressing, Get, and what's already here of
             it - under Get, where an answer landing late moves nothing a finger is reaching for */}
         <div class="app-rg-actions">
           {!desktop && picker}
+          {!desktop && facts}
           {download && (
             //? a desktop's Get says whether the panel shows its sources: pressed, a click closes them
             <button ref={getButton} type="button" class="app-rg-get" onClick={get} {...(desktop ? { 'aria-pressed': sourcesHere } : {})}>
@@ -403,8 +447,9 @@ export function ReleaseGroupPage({
               Get the album
             </button>
           )}
-          {/* a desktop's pressing dropdown sits inline after Get, as its board has it */}
+          {/* a desktop's pressing dropdown sits inline after Get, as its board has it - its facts under both */}
           {desktop && picker}
+          {desktop && facts}
           <div class="app-rg-store" aria-live="polite">
             {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} onJoin={join} />}
           </div>
@@ -477,6 +522,22 @@ export function ReleaseGroupPage({
             </section>
           )}
         </section>
+      )}
+
+      {/* on musicbrainz.org (2.0.0-player.50), opening beside the app - following a link in the page
+          would unload the player: the album, and the pressing chosen */}
+      {mbid && (
+        <p class="app-rg-links">
+          <span class="app-rg-links-label">On MusicBrainz</span>
+          <a class="app-rg-link" href={releaseGroupUrl(mbid)} target="_blank" rel="noopener">
+            The album ↗
+          </a>
+          {chosen && (
+            <a class="app-rg-link" href={releaseUrl(chosen.id)} target="_blank" rel="noopener">
+              This pressing ↗
+            </a>
+          )}
+        </p>
       )}
     </section>
   )

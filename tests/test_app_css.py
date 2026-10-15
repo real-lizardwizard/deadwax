@@ -139,6 +139,18 @@ And for the artist page as the main page had it (2.0.0-player.45):
   and stepped back (still in reach) while they can't be used; the folder a path, a folder per line,
   broken anywhere; a link and a fold a finger's target; a past member stepped back by a token.
 
+And for the search extras (2.0.0-player.50):
+
+- More from MusicBrainz the rows' width, a secondary button a finger tall, faded while it asks; the
+  note that takes focus in its place drawn without a ring (review).
+- The chosen pressing's facts a fixed height of whole lines (two on a phone), clamped, so choosing
+  another pressing moves nothing under the picker; strangers' labels and numbers broken anywhere.
+- The pressing list's filter never small enough for iOS to zoom into, held at the top of the list as it
+  scrolls, its ring drawn inside - and its band kept clear of the pressing the arrows move to, by the
+  list's scroll-padding (review).
+- "maybe in your library" dashed, an inline box, so the meta line keeps its height.
+- The links out a finger's height without moving their line; the sample-rate chip ringed as the sort is.
+
 And for the speed fader (2.0.0-player.39):
 
 - The fader takes every touch on it (touch-action: none), a tap target wide - a share of the plinth on
@@ -1386,6 +1398,85 @@ def test_an_album_pages_properties_break_a_release_id_and_reach_a_finger():
     #? ...and all of it hit: positioned, so drawn over the rows either side, never under the next row (a
     #? grid item drawn after it, which took the bottom of the reach)
     assert link["position"] == "relative"
+
+
+# ---------------------------------------------------------------- search extras (2.0.0-player.50)
+
+def test_more_from_musicbrainz_is_the_rows_width_and_a_finger_tall():
+    more = declarations(APP, ".app-search-more")
+    assert more["width"] == "100%"
+    #? an .app-button: a tap target tall, STYLE.md's secondary look - never the solid purple
+    assert declarations(APP, ".app-button")["min-height"] == "var(--dw-row)" and px("--dw-row") >= px("--pl-hit")
+    assert declarations(APP, ".app-search-more.is-busy")["opacity"] == "var(--app-job-busy)"
+    #? (review) a note in the button's place takes focus when the last page goes with it: no ring on words
+    assert declarations(APP, ".app-search-more-note:focus")["outline"] == "none"
+
+
+def test_the_pressing_lists_filter_never_covers_the_pressing_the_arrows_move_to():
+    """(review) The filter is sticky over the list's top edge, which is exactly where the browser's focus
+    scrolling brings a pressing to rest: the list keeps the filter's band - the field and the filter's
+    padding over and under it - and its gap clear by scroll-padding, which focus scrolling honours (and
+    PressingPicker's reveal() reads back)."""
+    assert declarations(APP, ".app-picker-popover:has(.app-picker-filter)")["scroll-padding-top"] == "var(--app-picker-filter-block)"
+    holder = declarations(APP, ".app-picker-filter")
+    assert holder["padding"] == "var(--app-picker-inset)"
+    covered = length("--app-field") + 2 * length("--app-picker-inset")
+    assert length("--app-picker-filter-block") == covered + length("--app-picker-filter-gap")
+    #? only a list with the filter: a short one's pressings still come to rest at its very edge
+    assert "scroll-padding-top" not in declarations(APP, ".app-picker-popover")
+
+
+def test_the_chosen_pressings_facts_hold_their_height_whatever_they_say():
+    """Choosing another pressing must move nothing under the picker: the line is a fixed height of
+    whole lines - two on a phone, one on a desktop - its words clamped to them and the rest hidden
+    (they are whole in its tooltip and in the list)."""
+    facts = declarations(APP, ".app-rg-facts")
+    assert facts["height"] == "calc(var(--app-rg-facts-lines) * var(--dw-leading-note) * var(--dw-text-label))"
+    assert (facts["font-size"], facts["line-height"]) == ("var(--dw-text-label)", "var(--dw-leading-note)")
+    assert (facts["overflow"], facts["display"], facts["-webkit-box-orient"], facts["-webkit-line-clamp"]) == (
+        "hidden", "-webkit-box", "vertical", "var(--app-rg-facts-lines)")
+    assert ALL_TOKENS["--app-rg-facts-lines"] == "2"
+    #? strangers' catalogue numbers and labels break anywhere rather than run off a phone
+    assert facts["overflow-wrap"] == "anywhere"
+
+
+def test_the_pressing_lists_filter_never_zooms_and_stays_over_the_list():
+    field = declarations(APP, ".app-picker-filter-input")
+    assert field["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert (field["height"], field["appearance"]) == ("var(--app-field)", "none")
+    holder = declarations(APP, ".app-picker-filter")
+    assert (holder["position"], holder["top"], holder["background"]) == ("sticky", "calc(-1 * var(--app-picker-inset))", "var(--dw-popover)")
+    assert holder["z-index"] == "var(--app-picker-filter-z)"
+    #? its ring inside: the list clips what runs past its edge
+    assert declarations(APP, ".app-picker-filter-input:focus-visible")["outline-offset"] == "var(--app-ring-inset)"
+    assert declarations(APP, ".app-picker-facts")["overflow-wrap"] == "anywhere"
+
+
+def test_maybe_in_your_library_is_dashed_and_keeps_the_meta_lines_height():
+    maybe = declarations(APP, ".app-rg-maybe")
+    assert maybe["border"] == "var(--dw-hairline) dashed var(--dw-text-3)"
+    #? an inline box - a border there never makes the line taller - kept whole
+    assert "display" not in maybe and maybe["white-space"] == "nowrap"
+
+
+def test_the_links_out_reach_a_finger_without_moving_their_line():
+    links = declarations(APP, ".app-rg-links")
+    assert (links["font-size"], links["line-height"]) == ("var(--dw-text-footnote)", "var(--dw-leading-note)")
+    link = declarations(APP, ".app-rg-link")
+    assert (link["padding"], link["margin"], link["min-height"], link["position"]) == (
+        "var(--app-rg-link-reach) 0", "calc(-1 * var(--app-rg-link-reach)) 0", "var(--pl-hit)", "relative")
+    line = px("--dw-text-footnote") * float(ALL_TOKENS["--dw-leading-note"])
+    assert round(2 * length("--app-rg-link-reach") + line, 6) >= px("--pl-hit")
+    #? one row, never wrapping onto a second whose reach would lie over the first's
+    assert links["gap"] == "0 var(--app-rg-links-gap)"
+
+
+def test_the_sample_rate_chip_rings_as_the_sort_does():
+    ring = declarations(APP, ".app-sources-rate:has(.app-sources-sort-select:focus-visible)")
+    assert (ring["outline"], ring["outline-offset"]) == ("var(--app-ring) solid var(--dw-accent)", "var(--app-ring)")
+    #? its picker is the sort's, covering it whole, unseen, never small enough for iOS to zoom
+    select = declarations(APP, ".app-sources-sort-select")
+    assert (select["position"], select["inset"], select["font-size"]) == ("absolute", "0", "var(--dw-text-body)")
 
 
 # ---------------------------------------------------------------- looking after deadwax from a phone (2.0.0-player.47)

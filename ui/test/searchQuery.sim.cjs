@@ -8,7 +8,11 @@
  * dash between artist and title; and the query ALWAYS in brackets before a type filter is ANDed on
  * - without them `AND` binds to the last word of free text alone (CLAUDE.md's type filter decision).
  * Then the halves: a held album left out of "Not in your library yet" by its group id, never by a
- * name; the kind and line of a row; which albums are asked for so a song's tap plays.
+ * name; the kind and line of a row; which albums are asked for so a song's tap plays. And (2.0.0-player.50)
+ * More from MusicBrainz: a page appended below by the first page's held rule, a group got twice drawn
+ * once, and whether another page is there - by MusicBrainz's count, a full page without one, never past
+ * the route's bound; what a page brought said in words, a page of repeats or none never "in your library"
+ * (review).
  *
  * Run it with:  node ui/test/searchQuery.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -154,6 +158,36 @@ const songs = [
 check('the first five DISTINCT albums of the songs found are asked for', R.albumsToPrefetch(songs), ['a', 'b', 'c', 'd', 'e'])
 check('...fewer when there are fewer', R.albumsToPrefetch(songs.slice(0, 3)), ['a', 'b'])
 check('a song\'s place in its album\'s own answer', [R.songIndex([{ id: 'x' }, { id: 's2' }], 's2'), R.songIndex([{ id: 'x' }], 's9'), R.songIndex(undefined, 's1')], [1, -1, -1])
+
+console.log('\nMore from MusicBrainz (2.0.0-player.50): the next page appended, and whether there is one')
+{
+  const owned = O.buildOwnedIndex([{ path: 'Portishead/Dummy', artist: 'Portishead', album: 'Dummy', release_group_mbid: 'g-held' }])
+  const first = [{ id: 'g1' }, { id: 'g2' }]
+  const page = [{ id: 'g2' }, { id: 'g-held' }, { id: 'g3' }, { id: 'g3' }]
+  const appended = R.appendPage(first, first, page, owned)
+  check('a page appended below: the groups not already got, the held one left out as the first page leaves it - and counted as held',
+    [appended.groups.map((g) => g.id), appended.shown.map((g) => g.id), appended.added, appended.held], [['g1', 'g2', 'g-held', 'g3'], ['g1', 'g2', 'g3'], 1, 1])
+  check('...what was drawn kept, in its order and whole - nothing above moves', appended.shown.slice(0, 2), first)
+  check('...no library answer yet: nothing left out (it claims nothing)', R.appendPage(first, first, page, null).shown.map((g) => g.id), ['g1', 'g2', 'g-held', 'g3'])
+  check('...a page all held: nothing added, the list as it was', [R.appendPage(first, first, [{ id: 'g-held' }], owned).added, R.appendPage(first, first, [{ id: 'g-held' }], owned).shown.length], [0, 2])
+  //? (review) a page of repeats, or none, is not a page of albums you have
+  const counts = (got) => [got.added, got.held]
+  check('...held counts only NEW albums the library holds: none for a page of repeats, an empty page, or repeats with no library answer',
+    [counts(R.appendPage(first, first, [{ id: 'g2' }], owned)), counts(R.appendPage(first, first, [], owned)), counts(R.appendPage(first, first, [{ id: 'g1' }], null))],
+    [[0, 0], [0, 0], [0, 0]])
+  check('...a held album with a repeat beside it: the one held, the repeat not counted', counts(R.appendPage(first, first, [{ id: 'g-held' }, { id: 'g1' }], owned)), [0, 1])
+  check('what a page brought, in words: rows only to VoiceOver; every new album held, said by how many; nothing new said as that',
+    [R.morePageWords(10, 2), R.morePageWords(1, 0), R.morePageWords(0, 1), R.morePageWords(0, 12), R.morePageWords(0, 0)],
+    [{ note: null, said: '10 more albums from MusicBrainz' }, { note: null, said: '1 more album from MusicBrainz' },
+      { note: 'The next album MusicBrainz found is in your library already.', said: 'The next album is in your library already' },
+      { note: 'The next 12 albums MusicBrainz found are all in your library already.', said: 'The next 12 albums are all in your library already' },
+      { note: 'MusicBrainz sent nothing new.', said: 'MusicBrainz sent nothing new' }])
+  check('more to ask for by MusicBrainz\'s count; none once every answer is in', [R.morePages(12, 30, 12, 12), R.morePages(24, 30, 12, 12), R.morePages(30, 30, 6, 12)], ['more', 'more', 'end'])
+  check('...no count from the server: a full last page may have more, a short one hasn\'t', [R.morePages(12, null, 12, 12), R.morePages(7, null, 7, 12), R.morePages(12, undefined, 12, 12)], ['more', 'end', 'more'])
+  check('...a page that brought nothing ends it, whatever the count says', R.morePages(12, 500, 0, 12), 'end')
+  check('...past the route\'s bound, "far": narrow the search', [R.morePages(R.MUSICBRAINZ_OFFSET_MAX, 5000, 12, 12), R.morePages(R.MUSICBRAINZ_OFFSET_MAX + 8, 5000, 12, 12)], ['more', 'far'])
+  check('...the bound the route\'s own (FULLY_SEARCH_OFFSET_MAX)', R.MUSICBRAINZ_OFFSET_MAX, 1000)
+}
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

@@ -3245,6 +3245,31 @@
     .app-desk .app-care .app-text-button { min-height: var(--pl-hit); }
 }
 
+/* ===== search extras on a desktop (2.0.0-player.50) =====
+   The chosen pressing's facts, the pressing list's facts and filter, the maybe and the links out are
+   drawn by app.css on both frames; here only what the desktop changes: the facts one line under Get and
+   the pressing, the row's whole width (the pressing's own width never grows with them, so it never
+   wraps under Get), in the desktop's small words - and room under More from MusicBrainz. */
+@media (min-width: 1024px) {
+    :root {
+        --app-desk-rg-facts-lines: 1;
+    }
+
+    .app-desk .app-rg-facts {
+        flex-basis: 100%;
+        height: calc(var(--app-desk-rg-facts-lines) * var(--dw-leading-note) * var(--app-desk-text-sm));
+        margin: 0;
+        padding: 0;
+        font-size: var(--app-desk-text-sm);
+        -webkit-line-clamp: var(--app-desk-rg-facts-lines);
+    }
+
+    .app-desk .app-picker-facts { font-size: var(--app-desk-text-sm); }
+
+    /* More from MusicBrainz, the Search column's last box, kept off the player bar's edge (review) */
+    .app-desk .app-search-more { margin-bottom: var(--app-desk-gap); }
+}
+
 /* ===== inside a track, the cover viewer and Properties on a desktop (2.0.0-player.44) =====
    The inspector, the album page's viewer and its Properties are drawn by app.css on both frames; here only
    what the desktop changes: the viewer's frame the panel's viewer's size, a track's name in the Tags list

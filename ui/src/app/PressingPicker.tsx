@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { useDismiss } from '../hooks/useDismiss'
-import type { PressingRow, PressingsView } from '../lib/pressings'
+import { PRESSING_FILTER_MIN, filterPressings, pressingFilterWords, type PressingRow, type PressingsView } from '../lib/pressings'
 import { CheckIcon, ChevronDownIcon } from '../player/icons'
 
 /**
@@ -33,6 +33,20 @@ import { CheckIcon, ChevronDownIcon } from '../player/icons'
  * scrolled into the list's own view, then the list into the page's - `scrollIntoView` honours the
  * page's scroll-padding, which already clears the bars.
  *
+ * EACH PRESSING'S FACTS (2.0.0-player.50): under its label, what else tells it apart as MusicBrainz
+ * gives it - status, full date, labels, catalogue number, barcode (lib/pressings.ts pressingFacts) - the
+ * main page's grid's columns, so one CD can be told from another against the copy in your hand. And
+ * an album of more than PRESSING_FILTER_MIN pressings gets a FILTER at the top of the list: a field
+ * outside the listbox (only options belong in one), every word typed matched against each pressing's
+ * label, facts and note, folded ones included - the fold steps aside while it filters. Opening still
+ * puts focus on the chosen pressing, never the field (on a phone that would put the keyboard up over
+ * the list); ArrowDown from the field goes to the first pressing, ArrowUp from the first pressing back
+ * to it, and the field's own keys (Home, End, the arrows across its text) stay its own. Closing empties it,
+ * however it closes - the Pressing button's own press included (review). How many match is said as it
+ * narrows - "4 pressings match.", "No pressing matches “…”." - by a live region in the list for as long
+ * as it has a filter, empty while nothing is typed: VoiceOver reads a region only once it is already
+ * there, never one made with its words (review).
+ *
  * A leaf: what it shows and what a pick does come from the page.
  */
 //? each picker's list its own id: a page stays mounted on each tab it was opened on
@@ -42,20 +56,27 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
   const listId = useMemo(() => `app-pressings-${++pickers}`, [])
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  //? the filter's words (2.0.0-player.50) - only for an album of more than PRESSING_FILTER_MIN pressings
+  const [typed, setTyped] = useState('')
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const popover = useRef<HTMLDivElement>(null)
+  const field = useRef<HTMLInputElement>(null)
 
   const close = (focus = true) => {
     setOpen(false)
+    setTyped('')
     if (focus) button.current?.focus()
   }
   useDismiss(root, open, () => close(false))
 
   const all = [...view.shown, ...view.more]
   const chosen = all.find((row) => row.id === view.chosenId) ?? null
-  const rows: PressingRow[] = expanded ? all : view.shown
+  const filterable = all.length > PRESSING_FILTER_MIN
+  //? filtering: every pressing that matches, the fold stepped aside; otherwise the list as it folds
+  const filtering = filterable && typed.trim() !== ''
+  const rows: PressingRow[] = filtering ? filterPressings(all, typed) : expanded ? all : view.shown
 
   //? as it opens: focus to the chosen pressing (or the first), so the arrows start from there, and
   //? the list - the chosen one in it - brought into view
@@ -75,14 +96,17 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
     reveal(target)
   }, [expanded])
 
-  /** An option in the list's own view, then the whole list in the page's, clear of its bars. */
+  /** An option in the list's own view - clear of the filter, by the list's own scroll-padding, which
+   *  the arrows' focus scrolling honours and this must too (review) - then the whole list in the
+   *  page's, clear of its bars. */
   function reveal(option: HTMLElement | undefined) {
     const box = popover.current
     if (!box || typeof box.scrollIntoView !== 'function') return
     if (option) {
+      const clear = typeof getComputedStyle === 'function' ? parseFloat(getComputedStyle(box).scrollPaddingTop) || 0 : 0
       const top = option.offsetTop
       const bottom = top + option.offsetHeight
-      if (top < box.scrollTop) box.scrollTop = top
+      if (top - clear < box.scrollTop) box.scrollTop = top - clear
       else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight
     }
     box.scrollIntoView({ block: 'nearest' })
@@ -95,7 +119,21 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
       return
     }
     const options = [...(root.current?.querySelectorAll<HTMLElement>('[role="option"], .app-picker-more') ?? [])]
+    //? in the filter's field only ArrowDown leaves it, for the first pressing - Home, End and the
+    //? arrows across its text are the field's own
+    if (field.current && document.activeElement === field.current) {
+      if (event.key !== 'ArrowDown' || !options.length) return
+      event.preventDefault()
+      options[0]?.focus()
+      return
+    }
     const at = options.indexOf(document.activeElement as HTMLElement)
+    //? ArrowUp from the first pressing goes back up to the filter, where there is one
+    if (event.key === 'ArrowUp' && at === 0 && field.current) {
+      event.preventDefault()
+      field.current.focus()
+      return
+    }
     const to = event.key === 'ArrowDown' ? at + 1 : event.key === 'ArrowUp' ? at - 1
       : event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : null
     if (to === null || !options.length) return
@@ -127,7 +165,8 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        onClick={() => setOpen((was) => !was)}
+        //? closing by the button empties the filter too, as every other way of closing does (review)
+        onClick={() => (open ? close(false) : setOpen(true))}
       >
         <span class="app-picker-text">
           <span class="app-picker-label">Pressing</span>
@@ -136,6 +175,27 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
         <ChevronDownIcon class="app-picker-chevron" />
       </button>
       <div class="app-picker-popover" ref={popover} hidden={!open}>
+        {filterable && (
+          //? outside the listbox, as the fold is: only options belong in one
+          <label class="app-picker-filter">
+            <span class="app-visually-hidden">Filter the pressings</span>
+            <input
+              ref={field}
+              class="app-picker-filter-input"
+              type="search"
+              value={typed}
+              onInput={(event) => setTyped((event.currentTarget as HTMLInputElement).value)}
+              //? what works, as the rows say it - a country by its code, as MusicBrainz gives it (review:
+              //? "country" asked for "Japan", which no row says)
+              placeholder="JP, CD, a label or cat. no."
+              aria-controls={listId}
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellcheck={false}
+            />
+          </label>
+        )}
         <div id={listId} ref={list} role="listbox" aria-label="Pressings">
           {rows.map((row) => {
             const selected = row.id === view.chosenId
@@ -152,6 +212,7 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
                 <CheckIcon class={`app-picker-tick${selected ? '' : ' is-off'}`} />
                 <span class="app-picker-text">
                   <span class="app-picker-option-label">{row.label}</span>
+                  {row.facts && <span class="app-picker-facts">{row.facts}</span>}
                   <span class={`app-picker-note${row.kind === 'differs' ? ' is-differs' : ''}`}>{row.note}</span>
                   {row.held && <span class="app-picker-held">In your library</span>}
                 </span>
@@ -159,7 +220,13 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
             )
           })}
         </div>
-        {view.more.length > 0 && !expanded && (
+        {filtering && !rows.length && <p class="app-picker-none">{pressingFilterWords(0, typed)}</p>}
+        {filterable && (
+          //? what the filter left, said as the list narrows (review): a region always in the list while
+          //? it has a filter - one made with its words, VoiceOver doesn't read - empty until a word is typed
+          <p class="app-visually-hidden" role="status" aria-live="polite">{pressingFilterWords(rows.length, typed)}</p>
+        )}
+        {view.more.length > 0 && !expanded && !filtering && (
           //? tabIndex -1, as the options: WebKit focuses a tapped button only with one, so a tap on
           //? it keeps focus inside the picker; the arrows reach it as they reach the options
           <button type="button" class="app-picker-more" tabIndex={-1} onClick={() => setExpanded(true)}>

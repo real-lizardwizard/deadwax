@@ -27,9 +27,16 @@ export async function fullySearch(
   includeReleases = true,
   /** lib/latest.ts aborts a search a newer one has superseded (2.0.0-player.13) */
   signal?: AbortSignal,
+  /**
+   * Where in MusicBrainz's answers this page starts (2.0.0-player.50, the app's "More from
+   * MusicBrainz"): sent only past the first page, so a first page is asked - and cached - as ever. The
+   * route refuses past MUSICBRAINZ_OFFSET_MAX (lib/searchResults.ts).
+   */
+  offset = 0,
 ): Promise<FullySearchResponse> {
   const params = new URLSearchParams({ query, limit: String(limit) })
   if (!includeReleases) params.set('releases', 'false')
+  if (offset > 0) params.set('offset', String(offset))
 
   try {
     return await get<FullySearchResponse>(`/search_musicbrainz/fully_search?${params}`, signal)

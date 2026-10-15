@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { MusicBrainzUnavailable } from '../api/http'
 import { fullySearch, getReleaseGroup } from '../api/musicbrainz'
@@ -12,7 +12,9 @@ import {
   LIBRARY_SETTLE_MS, MUSICBRAINZ_SETTLE_MS, SEARCH_MAX_CHARS, artistNames, asksMusicBrainzBySettling, musicBrainzOnTyping, searchQuery,
   type SearchPlan,
 } from '../lib/searchQuery'
-import { albumsToPrefetch, artistLine, groupHeld, groupLine, notInLibrary, songIndex, topArtist } from '../lib/searchResults'
+import {
+  albumsToPrefetch, appendPage, artistLine, groupHeld, groupLine, morePageWords, morePages, notInLibrary, songIndex, topArtist,
+} from '../lib/searchResults'
 import {
   dropPrefetch, prefetchAlbum, rememberPlayed, searchLibrary, toQueueTrack,
   type Album, type AlbumWithSongs, type Artist, type LibraryResults, type NavidromeStatus, type Song,
@@ -41,11 +43,24 @@ export const OWNED_WAIT_MS = 1500
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+/** "More from MusicBrainz" (2.0.0-player.50): the next page asked for, its failure, or what the last one brought. */
+type MorePage =
+  | { state: 'idle' }
+  | { state: 'asking' }
+  | { state: 'failed'; message: string; unavailable: boolean }
+  //? the rows the last page added, and how many of its new albums the library holds (lib/searchResults.ts)
+  | { state: 'added'; added: number; held: number }
+
 type Musicbrainz =
   | { state: 'idle' }
   | { state: 'searching'; text: string }
-  //? `shown`: the groups less the held ones, worked out once as the list was drawn (notInLibrary)
-  | { state: 'done'; text: string; plan: SearchPlan; groups: ReleaseGroup[]; shown: ReleaseGroup[] }
+  //? `shown`: the groups less the held ones, worked out once as the list was drawn (notInLibrary).
+  //? `query` is what MusicBrainz was asked (the free text, when a fielded read found nothing), and the
+  //? next page is asked by it from `nextOffset`; `count` is MusicBrainz's total, `last` the last page's size
+  | {
+    state: 'done'; text: string; plan: SearchPlan; groups: ReleaseGroup[]; shown: ReleaseGroup[]
+    query: string; nextOffset: number; count: number | null; last: number; more: MorePage
+  }
   | { state: 'failed'; text: string; message: string; unavailable: boolean }
 
 /**
@@ -87,6 +102,12 @@ type Musicbrainz =
  *    called off - and the chip says Get again - the moment you move on: the box changing, or the
  *    tab's root no longer what shows (App's `active`: another tab, a page opened over it, Now
  *    Playing, the sheet). A late answer then opens nothing over what you went to (review).
+ *  - MORE FROM MUSICBRAINZ (2.0.0-player.50): MUSICBRAINZ_LIMIT is a screenful, and under the rows a
+ *    button asks for the next one - the same search by offset (the route's own paging), appended below,
+ *    so nothing drawn moves, with held albums left out as the first page leaves them. It shows while
+ *    MusicBrainz's count says more match, up to the route's bound (MUSICBRAINZ_OFFSET_MAX), then says
+ *    to narrow the search. A page whose albums are all held says so; a failure says why, and the
+ *    button tries again. Through the half's own latestOnly - a new search calls it off.
  *
  * The albums of the songs found are asked for KEPT (prefetchAlbum's `keep`): a tile or an album
  * row pressed and scrolled shares the ask, and must not call off the one a song's tap waits for.
@@ -148,6 +169,10 @@ export function Search({
   //? what the asks read when a pause ends: this render's, never the one that started the pause
   const navidromeOk = useRef(false)
   navidromeOk.current = !!status?.ok
+  //? More's page landed while its button had focus: the first row it brought, should the button go with
+  //? that page (review) - see the layout effect under askMore
+  const moreFocus = useRef<number | null>(null)
+  const musicSection = useRef<HTMLElement>(null)
   const artistsKnown = useRef<string[]>([])
   artistsKnown.current = [...(owned?.artists ?? []), ...(library?.results.artists ?? []).map((artist) => artist.name)]
 
@@ -185,22 +210,61 @@ export function Search({
     const request = musicRequests.begin()
     setMusicbrainz({ state: 'searching', text: term })
     try {
+      let query = plan.query
       let found = await fullySearch(plan.query, MUSICBRAINZ_LIMIT, false, request.signal)
       //? a read that finds nothing - an artist's name that happens to start a title - is asked
       //? again as the words typed, as the metadata editor falls back to free text
       if (!found['release-groups']?.length && plan.kind !== 'free' && request.current()) {
-        found = await fullySearch(term.split(/\s+/).join(' '), MUSICBRAINZ_LIMIT, false, request.signal)
+        query = term.split(/\s+/).join(' ')
+        found = await fullySearch(query, MUSICBRAINZ_LIMIT, false, request.signal)
       }
       const groups = found['release-groups'] ?? []
       //? the library's answer to go with it, a moment at most: what it holds is left out before the
       //? list is drawn, and never taken away once it is
       if (request.current()) await Promise.race([ownedAnswered, wait(OWNED_WAIT_MS)])
       if (!request.current()) return
-      setMusicbrainz({ state: 'done', text: term, plan, groups, shown: notInLibrary(groups, ownedNow()?.index ?? null) })
+      setMusicbrainz({ state: 'done', text: term, plan, groups, shown: notInLibrary(groups, ownedNow()?.index ?? null),
+        query, nextOffset: groups.length, count: typeof found.count === 'number' ? found.count : null, last: groups.length, more: { state: 'idle' } })
     } catch (reason) {
       if (!request.current() || isAbort(reason)) return
       asked.current = null
       setMusicbrainz({ state: 'failed', text: term, message: message(reason), unavailable: reason instanceof MusicBrainzUnavailable })
+    }
+  }
+
+  /**
+   * "More from MusicBrainz" (2.0.0-player.50): the next MUSICBRAINZ_LIMIT of the same search, by
+   * offset, appended below the rows already drawn - nothing above them moves - with the albums the
+   * library holds left out as the first page leaves them (appendPage). Through the MusicBrainz half's
+   * own latestOnly: a new search, or the box cut back, calls it off, and an answer for a search no
+   * longer shown draws nothing.
+   */
+  async function askMore() {
+    const was = musicbrainz
+    if (was.state !== 'done' || was.more.state === 'asking') return
+    const term = was.text
+    const request = musicRequests.begin()
+    const asking = (now: Musicbrainz): now is Extract<Musicbrainz, { state: 'done' }> => now.state === 'done' && now.text === term
+    setMusicbrainz((now) => (asking(now) ? { ...now, more: { state: 'asking' } } : now))
+    try {
+      const found = await fullySearch(was.query, MUSICBRAINZ_LIMIT, false, request.signal, was.nextOffset)
+      if (!request.current()) return
+      const page = found['release-groups'] ?? []
+      const button = musicSection.current?.querySelector('.app-search-more') ?? null
+      moreFocus.current = button && typeof document !== 'undefined' && document.activeElement === button ? was.shown.length : null
+      setMusicbrainz((now) => {
+        if (!asking(now)) return now
+        const appended = appendPage(now.groups, now.shown, page, ownedNow()?.index ?? null)
+        return {
+          ...now, groups: appended.groups, shown: appended.shown, nextOffset: now.nextOffset + page.length, last: page.length,
+          count: typeof found.count === 'number' ? found.count : now.count, more: { state: 'added', added: appended.added, held: appended.held },
+        }
+      })
+    } catch (reason) {
+      if (!request.current() || isAbort(reason)) return
+      setMusicbrainz((now) => (asking(now)
+        ? { ...now, more: { state: 'failed', message: message(reason), unavailable: reason instanceof MusicBrainzUnavailable } }
+        : now))
     }
   }
 
@@ -370,6 +434,25 @@ export function Search({
   const top = results ? topArtist(results.artists, library!.text) : null
   const artists = (results?.artists ?? []).filter((artist) => artist !== top)
   const found = musicbrainz.state === 'done' ? musicbrainz.shown : []
+  //? whether "More from MusicBrainz" has another page to ask for (lib/searchResults.ts morePages)
+  const pages = musicbrainz.state === 'done' ? morePages(musicbrainz.nextOffset, musicbrainz.count, musicbrainz.last, MUSICBRAINZ_LIMIT) : 'end'
+  const more = musicbrainz.state === 'done' ? musicbrainz.more : null
+  const moreWords = more?.state === 'added' ? morePageWords(more.added, more.held) : null
+
+  //? More's last page landed with focus on it (review): the button goes with that page, and the page's
+  //? focus would fall to the page itself - so it goes to the first row the page brought, or to the note
+  //? said in the button's place. Only when the button had focus (a tap on WebKit gives it none, so a
+  //? finger's page is never scrolled), and never over focus that has gone somewhere since.
+  useLayoutEffect(() => {
+    const from = moreFocus.current
+    moreFocus.current = null
+    if (from === null || pages === 'more' || typeof document === 'undefined') return
+    const active = document.activeElement
+    if (active && active !== document.body) return
+    const box = musicSection.current
+    const target = box?.querySelectorAll<HTMLElement>('.app-result')[from] ?? box?.querySelector<HTMLElement>('.app-search-more-note')
+    target?.focus()
+  }, [musicbrainz])
 
   return (
     <section class="app-search">
@@ -483,7 +566,7 @@ export function Search({
             )}
           </NeedsNavidrome>
 
-          <section class="app-section app-search-section" aria-labelledby="app-search-musicbrainz" aria-busy={musicbrainz.state === 'searching'}>
+          <section ref={musicSection} class="app-section app-search-section" aria-labelledby="app-search-musicbrainz" aria-busy={musicbrainz.state === 'searching'}>
             <h2 id="app-search-musicbrainz" class="app-section-title app-search-title app-search-title-tight">Not in your library yet</h2>
             <p class="app-search-from">From MusicBrainz</p>
             {musicbrainz.state === 'idle' ? (
@@ -503,41 +586,70 @@ export function Search({
                   Try again
                 </button>
               </div>
-            ) : found.length ? (
-              <ul class="app-results">
-                {found.map((group) => {
-                  const held = groupHeld(owned?.index ?? null, group.id)
-                  const asking = resolving === group.id
-                  return (
-                    <li key={group.id} class="app-result-row">
-                      <button type="button" class={`app-result${opening === group.id ? ' is-busy' : ''}`} aria-busy={opening === group.id} onClick={() => (held ? openGroup(group) : onOpenGroup(group))}>
-                        <ArchiveCover addresses={coverAddresses(null, group.id, 250)} class="app-result-cover" />
-                        <span class="app-result-text">
-                          <span class="app-result-title">{group.title ?? ''}</span>
-                          <span class="app-result-line">{groupLine(group, held)}</span>
-                        </span>
-                      </button>
-                      {!held && (
-                        <button
-                          type="button"
-                          class={`app-result-get${asking ? ' is-busy' : ''}`}
-                          aria-label={`Get ${group.title ?? 'this album'}`}
-                          aria-busy={asking}
-                          onClick={(event) => void getAlbum(group, event)}
-                        >
-                          {asking ? 'Get…' : 'Get'}
-                        </button>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
             ) : (
-              <p class="app-search-empty">
-                {musicbrainz.groups.length
-                  ? 'Everything MusicBrainz found is in your library already.'
-                  : `Nothing on MusicBrainz for “${musicbrainz.text}”.`}
+              <>
+              {found.length ? (
+                <ul class="app-results">
+                  {found.map((group) => {
+                    const held = groupHeld(owned?.index ?? null, group.id)
+                    const asking = resolving === group.id
+                    return (
+                      <li key={group.id} class="app-result-row">
+                        <button type="button" class={`app-result${opening === group.id ? ' is-busy' : ''}`} aria-busy={opening === group.id} onClick={() => (held ? openGroup(group) : onOpenGroup(group))}>
+                          <ArchiveCover addresses={coverAddresses(null, group.id, 250)} class="app-result-cover" />
+                          <span class="app-result-text">
+                            <span class="app-result-title">{group.title ?? ''}</span>
+                            <span class="app-result-line">{groupLine(group, held)}</span>
+                          </span>
+                        </button>
+                        {!held && (
+                          <button
+                            type="button"
+                            class={`app-result-get${asking ? ' is-busy' : ''}`}
+                            aria-label={`Get ${group.title ?? 'this album'}`}
+                            aria-busy={asking}
+                            onClick={(event) => void getAlbum(group, event)}
+                          >
+                            {asking ? 'Get…' : 'Get'}
+                          </button>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p class="app-search-empty">
+                  {musicbrainz.groups.length
+                    ? 'Everything MusicBrainz found is in your library already.'
+                    : `Nothing on MusicBrainz for “${musicbrainz.text}”.`}
+                </p>
+              )}
+              {/* More from MusicBrainz (2.0.0-player.50): under the rows, so the page it brings lands
+                  below them and nothing above moves */}
+              {moreWords?.note && <p class="app-search-empty app-search-more-note" tabIndex={-1}>{moreWords.note}</p>}
+              {more?.state === 'failed' && (
+                <p class="app-search-empty app-search-more-note">
+                  {more.unavailable ? "MusicBrainz isn't answering just now - it often goes away for a few minutes." : more.message}
+                </p>
+              )}
+              {pages === 'more' ? (
+                <button
+                  type="button"
+                  class={`app-button app-search-more${more?.state === 'asking' ? ' is-busy' : ''}`}
+                  aria-busy={more?.state === 'asking'}
+                  aria-disabled={more?.state === 'asking'}
+                  onClick={() => void askMore()}
+                >
+                  {more?.state === 'asking' ? 'Asking MusicBrainz…' : more?.state === 'failed' ? 'Try again' : 'More from MusicBrainz'}
+                </button>
+              ) : pages === 'far' ? (
+                <p class="app-search-empty app-search-more-note" tabIndex={-1}>That's as far into one search as deadwax goes - add a word to narrow it.</p>
+              ) : null}
+              {/* what a page brought, said to VoiceOver - a region always there, which iOS reads */}
+              <p class="app-visually-hidden" role="status" aria-live="polite">
+                {moreWords?.said ?? ''}
               </p>
+              </>
             )}
           </section>
         </>

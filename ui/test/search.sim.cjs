@@ -32,6 +32,16 @@
  *    `active`) or the box changes.
  *  - The desktop's search field (2.0.0-player.19, app/searchBox.ts): this box's text is shared for the
  *    sidebar's field to show, typing there is typing here, and its Enter asks both halves at once.
+ *  - More from MusicBrainz (2.0.0-player.50): under the rows, a secondary button asking for the same
+ *    search's next twelve by offset (the words typed when a fielded read fell back to them), busy and
+ *    refusing a second tap meanwhile; the page appended below with every row above as it was, the held
+ *    albums left out and a group got twice drawn once, said to VoiceOver; a page all held said so;
+ *    MusicBrainz away said, the rows kept and the same page asked again; no button once every answer is
+ *    in, and none past the route's bound (said instead); a page still out called off by a new search or
+ *    the box cut back, and its answer drawing nothing. After review: two held albums said with their
+ *    number; a page of repeats or an empty one said as nothing new, never as albums you have; another
+ *    failure's own reason; each page's count heeded, grown or shrunk; and the last page landing with
+ *    focus on More handing it to the first row it brought, or to the note in its place.
  *
  * Run it with:  node ui/test/search.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -50,6 +60,8 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 
 //? the real prefetch, kept aside before player/api.js is faked for the component
 fs.copyFileSync(path.join(OUT, 'player/api.js'), path.join(OUT, 'player/api.real.js'))
+//? ...and the real MusicBrainz client (2.0.0-player.50: the offset it sends)
+fs.copyFileSync(path.join(OUT, 'api/musicbrainz.js'), path.join(OUT, 'api/musicbrainz.real.js'))
 
 //? JSX as plain objects, and hooks with a cursor, as Preact's are - the stand-in group.sim.cjs uses
 fs.mkdirSync(path.join(OUT, 'node_modules/preact'), { recursive: true })
@@ -83,7 +95,7 @@ exports.root = (component) => {
 /* ===== Navidrome, MusicBrainz and the library, faked: each answer is what the test says next ===== */
 
 fs.writeFileSync(path.join(OUT, 'api/musicbrainz.js'), `
-exports.fullySearch = (query, limit, releases, signal) => globalThis.__search.fullySearch(query, limit, releases, signal)
+exports.fullySearch = (query, limit, releases, signal, offset) => globalThis.__search.fullySearch(query, limit, releases, signal, offset)
 exports.getReleaseGroup = (id, signal) => globalThis.__search.getReleaseGroup(id, signal)
 `)
 //? You > Getting albums, asked as the tab shows; and the opener a chip's tap focuses
@@ -163,9 +175,9 @@ globalThis.__search = {
   actions: { playTracks: (queue, at) => globalThis.__search.calls.push(['playTracks', queue.map((track) => track.id), at]) },
   owned() { const d = deferred(); asks.owned.push(d); return d.promise },
   searchLibrary(text, signal) { const d = deferred(); asks.library.push({ text, signal, ...d }); return d.promise },
-  fullySearch(query, limit, releases, signal) {
+  fullySearch(query, limit, releases, signal, offset) {
     const d = deferred()
-    asks.musicbrainz.push({ query, limit, releases, signal, ...d })
+    asks.musicbrainz.push({ query, limit, releases, signal, offset, ...d })
     if (signal) signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; d.reject(error) })
     return d.promise
   },
@@ -509,6 +521,277 @@ async function main() {
     await settle()
     check('...and its Enter asks both halves at once, as this form\'s submit - no pause waited for',
       [asks.library.length - libraryBefore, asks.library.at(-1)?.text, asks.musicbrainz.length - musicBefore], [1, 'portishead third', 1])
+  }
+
+  console.log('\nMore from MusicBrainz (2.0.0-player.50): the next page of the same search, appended below')
+  {
+    const { MusicBrainzUnavailable } = require(path.join(OUT, 'api/http.js'))
+    const more = () => find(byClass('app-search-more'), section())[0]
+    const notes = () => find(byClass('app-search-more-note'), section()).map(text)
+    const said = () => text(find((node) => node.props?.role === 'status' && byClass('app-visually-hidden')(node), section())[0])
+    const albums = (from, to) => Array.from({ length: to - from }, (_, n) => ({
+      id: `00000000-0000-4000-8000-${String(from + n).padStart(12, '0')}`, title: `Album ${from + n}`, 'primary-type': 'Album' }))
+    type('bristol sound')
+    await advance(700)
+    const first = asks.musicbrainz.at(-1)
+    check('(the first page asked as ever: no offset)', [first.query, first.offset], ['bristol sound', undefined])
+    first.resolve({ 'release-groups': albums(0, 12), count: 30 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    const listed = find((node) => node.type === 'ul' && byClass('app-results')(node), section())[0]
+    check('twelve drawn, and under them More from MusicBrainz - a secondary button, never a row',
+      [rows().length, text(more()), more()?.type, more()?.props.class.split(' ').includes('app-button'), more()?.props.class.includes('app-result')], [12, 'More from MusicBrainz', 'button', true, false])
+    check('...after the list in the section, with the live region there before any page lands', [!!listed, said()], [true, ''])
+    more().props.onClick()
+    draw()
+    const second = asks.musicbrainz.at(-1)
+    check('a tap asks for the same search\'s next twelve, by offset', [asks.musicbrainz.length, second.query, second.limit, second.releases, second.offset],
+      [asks.musicbrainz.indexOf(first) + 2, 'bristol sound', 12, false, 12])
+    check('...the button busy meanwhile, refusing a tap rather than dropping focus', [text(more()), more().props['aria-busy'], more().props['aria-disabled'], more().props.disabled],
+      ['Asking MusicBrainz…', true, true, undefined])
+    more().props.onClick()
+    check('...a second tap asks nothing', asks.musicbrainz.at(-1) === second, true)
+    const above = rows()
+    //? one group the first page had already (relevance ties shift), and Dummy, which the library holds
+    second.resolve({ 'release-groups': [...albums(11, 12), DUMMY, ...albums(12, 22)], count: 30 })
+    await settle()
+    draw()
+    check('the page appended below: the held album left out, the repeat drawn once - every row above as it was',
+      [rows().length, JSON.stringify(rows().slice(0, 12)) === JSON.stringify(above), rows().slice(12).map(([title]) => title)],
+      [22, true, albums(12, 22).map((group) => group.title)])
+    check('...said to VoiceOver, and the button back', [said(), text(more())], ['10 more albums from MusicBrainz', 'More from MusicBrainz'])
+    more().props.onClick()
+    draw()
+    const third = asks.musicbrainz.at(-1)
+    check('the next page starts past every answer got, the held one and the repeat included', third.offset, 24)
+    third.reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
+    await settle()
+    draw()
+    check('MusicBrainz away: said, the rows kept, and the button tries again',
+      [notes(), rows().length, text(more())], [["MusicBrainz isn't answering just now - it often goes away for a few minutes."], 22, 'Try again'])
+    more().props.onClick()
+    draw()
+    const retried = asks.musicbrainz.at(-1)
+    check('...the same page asked again', [retried !== third, retried.offset], [true, 24])
+    retried.resolve({ 'release-groups': albums(22, 28), count: 28 })
+    await settle()
+    draw()
+    check('every answer in: the last rows, and no button any more', [rows().length, more(), notes()], [28, undefined, []])
+
+    //? a page whose albums the library holds every one of
+    type('portishead live')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND], count: 2 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    more().props.onClick()
+    draw()
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [DUMMY], count: 2 })
+    await settle()
+    draw()
+    check('a page all held: nothing added, and said so - in the page and to VoiceOver', [rows().map(([title]) => title), notes(), said(), more()],
+      [['Roseland NYC Live'], ['The next album MusicBrainz found is in your library already.'], 'The next album is in your library already', undefined])
+
+    //? the first page all held: "Everything ... already", and More still offered under it
+    type('portishead dummy remaster')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [DUMMY], count: 5 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    check('everything on the first page held: said, and More still offered', [text(find(byClass('app-search-empty'), section())[0]), text(more())],
+      ['Everything MusicBrainz found is in your library already.', 'More from MusicBrainz'])
+
+    //? a page out as a new search starts: called off, and its answer draws nothing
+    more().props.onClick()
+    const out = asks.musicbrainz.at(-1)
+    //? (review: only later pages' offsets were pinned) the first page's held album counts too - every
+    //? answer got, not the rows drawn, or each page after would start one early, its overlap hidden
+    check('...its next page asked from past the held one: the first page\'s every answer counted', out.offset, 1)
+    find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
+    check('a new search calls a page still out off', out.signal.aborted, true)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [THIRD], count: 1 })
+    await answerOwned(holding(DUMMY))
+    out.resolve({ 'release-groups': albums(40, 45), count: 5 })
+    await settle()
+    draw()
+    check('...only the new search drawn, with nothing more to ask for', [rows().map(([title]) => title), more()], [['Third'], undefined])
+
+    //? the box cut back below three characters: a page out is called off with the rest
+    type('massive')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(50, 62), count: 40 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    more().props.onClick()
+    const dropped = asks.musicbrainz.at(-1)
+    type('ma')
+    check('the box cut back: the page out called off too', dropped.signal.aborted, true)
+
+    //? a fielded read that found nothing was asked again as the words typed: More pages THAT search
+    type('portishead roseland')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
+    await settle()
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(70, 82), count: 20 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    more().props.onClick()
+    check('a search that fell back to the words typed: its next page is of the words typed', [asks.musicbrainz.at(-1).query, asks.musicbrainz.at(-1).offset], ['portishead roseland', 12])
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(82, 90), count: 20 })
+    await settle()
+    draw()
+
+    //? past the route's bound: narrowing is the way on
+    type('various')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(0, 12), count: 50000 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    const before = asks.musicbrainz.length
+    let pages = 0
+    while (more() && pages < 100) {
+      more().props.onClick()
+      const page = asks.musicbrainz.at(-1)
+      page.resolve({ 'release-groups': albums(1000 + pages * 12, 1012 + pages * 12), count: 50000 })
+      await settle()
+      draw()
+      pages++
+    }
+    check('a search with tens of thousands of answers pages up to the route\'s bound, never past it - then says to narrow it',
+      [asks.musicbrainz.slice(before).every((ask) => ask.offset <= 1000), asks.musicbrainz.at(-1).offset, more(), notes()],
+      [true, 996, undefined, ["That's as far into one search as deadwax goes - add a word to narrow it."]])
+
+    //? (review) every new album of a page held, two of them: the number said, in the page and to VoiceOver
+    type('portishead held twice')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND], count: 3 })
+    await answerOwned(holding(DUMMY, THIRD))
+    draw()
+    more().props.onClick()
+    draw()
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [DUMMY, THIRD], count: 3 })
+    await settle()
+    draw()
+    check('a page of two albums, both held: said with their number - in the page and to VoiceOver', [rows().map(([title]) => title), notes(), said()],
+      [['Roseland NYC Live'], ['The next 2 albums MusicBrainz found are all in your library already.'], 'The next 2 albums are all in your library already'])
+
+    //? (review) a page of nothing but rows already drawn, then an empty one: never "in your library"
+    type('portishead repeats')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(100, 112), count: 20 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    more().props.onClick()
+    draw()
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(111, 112), count: 20 })
+    await settle()
+    draw()
+    check('a page of a repeat alone: nothing added, said as nothing new - never as albums you have - and More still offered',
+      [rows().length, notes(), said(), text(more())], [12, ['MusicBrainz sent nothing new.'], 'MusicBrainz sent nothing new', 'More from MusicBrainz'])
+    more().props.onClick()
+    draw()
+    asks.musicbrainz.at(-1).resolve({})
+    await settle()
+    draw()
+    check('...then an empty page (MusicBrainz\'s count ran ahead): nothing new said, never "the next 0", and the button gone',
+      [rows().length, notes(), said(), more()], [12, ['MusicBrainz sent nothing new.'], 'MusicBrainz sent nothing new', undefined])
+
+    //? (review) a failure that isn't MusicBrainz away: its own reason, and Try again
+    type('portishead broken')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(200, 212), count: 40 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    more().props.onClick()
+    draw()
+    asks.musicbrainz.at(-1).reject(new Error('MusicBrainz answered 502'))
+    await settle()
+    draw()
+    check('a page failing for another reason: that reason said, the rows kept, and Try again', [notes(), rows().length, text(more())], [['MusicBrainz answered 502'], 12, 'Try again'])
+
+    //? (review) each page's own count: a count grown keeps the button, one shrunk ends it
+    type('portishead grows')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(300, 312), count: 24 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    more().props.onClick()
+    draw()
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(312, 324), count: 60 })
+    await settle()
+    draw()
+    check('the next page\'s count grown past the first\'s: the button stays for what more now match', [rows().length, text(more())], [24, 'More from MusicBrainz'])
+    type('portishead shrinks')
+    await advance(700)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(400, 412), count: 40 })
+    await answerOwned(holding(DUMMY))
+    draw()
+    more().props.onClick()
+    draw()
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(412, 424), count: 24 })
+    await settle()
+    draw()
+    check('...shrunk to the answers already got: the button goes, no empty page asked for', [rows().length, more()], [24, undefined])
+
+    //? (review) the last page lands with focus on the button: focus to the first row it brought, or to
+    //? the note in the button's place - only when the button had it, and never over focus gone elsewhere
+    const focused = []
+    const body = { name: 'body' }
+    const button = { name: 'More' }
+    const note = { focus: () => focused.push('note') }
+    const page = (n) => Array.from({ length: n }, (_, at) => ({ focus: () => focused.push(`row ${at}`) }))
+    const standIn = (count) => {
+      section().props.ref.current = {
+        querySelector: (selector) => (selector === '.app-search-more' ? button : selector === '.app-search-more-note' ? note : null),
+        querySelectorAll: (selector) => (selector === '.app-result' ? page(count) : []),
+      }
+    }
+    const lastPage = async (title, first, next, focus, count) => {
+      type(title)
+      await advance(700)
+      asks.musicbrainz.at(-1).resolve(first)
+      await answerOwned(holding(DUMMY))
+      draw()
+      more().props.onClick()
+      draw()
+      globalThis.document = { activeElement: focus, body }
+      standIn(count)
+      asks.musicbrainz.at(-1).resolve(next)
+      await settle()
+      //? the button going takes the page's focus with it, as a browser does
+      if (globalThis.document.activeElement === button) globalThis.document.activeElement = body
+      draw()
+    }
+    await lastPage('portishead focus', { 'release-groups': albums(500, 512), count: 18 }, { 'release-groups': albums(512, 518), count: 18 }, button, 18)
+    check('the last page landing with focus on More: the button gone, focus on the first row the page brought', [more(), focused], [undefined, ['row 12']])
+    focused.length = 0
+    await lastPage('portishead focus held', { 'release-groups': [ROSELAND], count: 2 }, { 'release-groups': [DUMMY], count: 2 }, button, 1)
+    check('...a last page that brought no row: focus on the note said in the button\'s place', [more(), focused], [undefined, ['note']])
+    focused.length = 0
+    await lastPage('portishead focus tapped', { 'release-groups': albums(520, 532), count: 18 }, { 'release-groups': albums(532, 538), count: 18 }, body, 18)
+    check('...More tapped by a finger on WebKit (which focuses nothing): focus left alone, so the page isn\'t scrolled', [more(), focused], [undefined, []])
+    await lastPage('portishead focus elsewhere', { 'release-groups': albums(560, 572), count: 18 }, { 'release-groups': albums(572, 578), count: 18 }, { name: 'a Get' }, 18)
+    check('...focus moved on from More before the page landed: left where it went', [more(), focused], [undefined, []])
+    await lastPage('portishead focus stays', { 'release-groups': albums(540, 552), count: 40 }, { 'release-groups': albums(552, 564), count: 40 }, button, 24)
+    check('...a page with more after it: the button stays, and keeps its focus', [text(more()), focused], ['More from MusicBrainz', []])
+    delete globalThis.document
+    section().props.ref.current = null
+  }
+
+  console.log('\nthe real MusicBrainz client (api/musicbrainz.ts): an offset sent only past the first page')
+  {
+    const urls = []
+    const fetchBefore = globalThis.fetch
+    globalThis.fetch = (url) => { urls.push(url); return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) }
+    const MB = require(path.join(OUT, 'api/musicbrainz.real.js'))
+    await MB.fullySearch('artist:"Portishead"', 12, false)
+    await MB.fullySearch('artist:"Portishead"', 12, false, undefined, 0)
+    await MB.fullySearch('artist:"Portishead"', 12, false, undefined, 24)
+    const query = (url) => Object.fromEntries(new URL(url, 'http://deadwax.test').searchParams)
+    check('the first page asked as it always was - no offset, so the same request and cache entry; a later page by its offset',
+      urls.map(query), [{ query: 'artist:"Portishead"', limit: '12', releases: 'false' }, { query: 'artist:"Portishead"', limit: '12', releases: 'false' },
+        { query: 'artist:"Portishead"', limit: '12', releases: 'false', offset: '24' }])
+    globalThis.fetch = fetchBefore
   }
 
   console.log('\nthe real prefetch (player/api.ts): a scroll calls off a tile\'s ask, never one Search keeps')

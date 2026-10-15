@@ -67,6 +67,8 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   it on both frames), a track's name in the Tags list the table's row height, and the rings of the
   inspector's controls, the track names and Artwork's cover and CD art drawn inside the panel's clipping
   body - a class more than the panel's own ring rule.
+- Search extras (2.0.0-player.50): the chosen pressing's facts one line under Get and the pressing, the
+  row's whole width, held at that height; More from MusicBrainz kept off the player bar's edge (review).
 - Looking after deadwax from a phone (2.0.0-player.47) draws nothing differently here: the settings page's
   full-height column still skips the note anyone but the admin gets, by the class the note carries now
   (`.is-refused`, which was `.is-phone`), and every `:not(.x)` in the app's two stylesheets names a class
@@ -888,6 +890,23 @@ def test_inside_a_track_on_a_desktop_the_viewer_is_the_panels_size_and_the_rings
                      ".app-desk .app-edit .app-inspect-summary:focus-visible", ".app-desk .app-edit .app-edit-track-open:focus-visible",
                      ".app-desk .app-edit .app-edit-cover-open:focus-visible", ".app-desk .app-edit .app-edit-disc:focus-visible"):
         assert declarations(DESKTOP, selector, DESK)["outline-offset"] == "var(--app-ring-inset)", selector
+
+
+def test_the_chosen_pressings_facts_are_one_line_the_rows_whole_width_on_a_desktop():
+    """Under Get and the pressing, its own row (flex-basis 100%), one line held whatever it says - so
+    the pressing's own width never grows with them and never wraps under Get, and choosing another
+    moves nothing under it."""
+    facts = declarations(DESKTOP, ".app-desk .app-rg-facts", DESK)
+    assert facts["flex-basis"] == "100%"
+    assert facts["height"] == "calc(var(--app-desk-rg-facts-lines) * var(--dw-leading-note) * var(--app-desk-text-sm))"
+    assert (facts["font-size"], facts["-webkit-line-clamp"]) == ("var(--app-desk-text-sm)", "var(--app-desk-rg-facts-lines)")
+    assert media_tokens(DESKTOP, DESK)["--app-desk-rg-facts-lines"] == "1"
+
+
+def test_more_from_musicbrainz_keeps_off_the_player_bar():
+    """(review) The desktop's shell keeps exactly the bar's height under the page, so the Search column's
+    last box - the bordered More button - sat flush on the bar's edge: it keeps the main area's gap."""
+    assert declarations(DESKTOP, ".app-desk .app-search-more", DESK)["margin-bottom"] == "var(--app-desk-gap)"
 
 
 def test_every_class_a_not_exclusion_names_is_still_drawn():

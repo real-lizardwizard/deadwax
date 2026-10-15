@@ -2702,6 +2702,149 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-sources-again { display: flex; justify-content: center; }
 .app-sources-state.is-again { padding-top: var(--app-sources-again-pad); }
 
+/* ===== search extras, as the main page had them (2.0.0-player.50) =====
+   More from MusicBrainz under Search's rows; each pressing's facts in the dropdown and under the
+   picker, and the dropdown's filter for an album of many pressings; "maybe in your library", dashed as
+   the main page's card says it; the album's and the pressing's pages on musicbrainz.org; and the
+   desktop panel's sample-rate chip, which holds the sort's own covering picker. */
+:root {
+    --app-search-more-gap: 12px;     /* Search's rows to More from MusicBrainz */
+    --app-rg-facts-lines: 2;         /* the chosen pressing's facts: two lines' room on a phone, whatever it says */
+    --app-rg-facts-gap: 4px;         /* ...that close under the picker */
+    --app-rg-maybe-pad: 4px;         /* the dashed maybe's sides */
+    --app-rg-links-top: 20px;        /* the tracklist to the links out */
+    --app-rg-links-bottom: 24px;
+    --app-rg-links-gap: 16px;
+    --app-rg-link-reach: calc((var(--pl-hit) - var(--dw-text-footnote) * var(--dw-leading-note)) / 2);
+    --app-picker-filter-gap: 6px;    /* the filter to the first pressing */
+    --app-picker-filter-z: 1;        /* over the pressings scrolling under it */
+    /* the band the filter covers at the list's top, and its gap: where a pressing focused or revealed
+       comes to rest, never under the filter (review) */
+    --app-picker-filter-block: calc(var(--app-field) + 2 * var(--app-picker-inset) + var(--app-picker-filter-gap));
+}
+
+/* More from MusicBrainz: the screen's width, a tap target tall, under the rows - the page it brings
+   lands above it, so nothing already drawn moves */
+.app-search-more { width: 100%; margin-top: var(--app-search-more-gap); }
+.app-search-more.is-busy { opacity: var(--app-job-busy); }
+/* a note in the button's place takes focus when the last page goes with it (review): no ring on words */
+.app-search-more-note:focus { outline: none; }
+
+/* the chosen pressing's facts, under the picker: two lines' room on a phone always, so choosing a
+   pressing with more (or fewer) facts moves nothing under it - the rest in its tooltip and the list */
+.app-rg-facts {
+    display: -webkit-box;
+    height: calc(var(--app-rg-facts-lines) * var(--dw-leading-note) * var(--dw-text-label));
+    margin: calc(var(--app-rg-facts-gap) - var(--app-rg-get-gap)) 0 0;
+    padding: 0 var(--app-picker-pad-x);
+    overflow: hidden;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+    text-align: left;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--app-rg-facts-lines);
+}
+
+/* ...and every pressing's, in the list, under its label */
+.app-picker-facts {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+/* the list's filter (an album of many pressings): held at the top as the list scrolls under it - and
+   the list keeps that band clear of the pressing the arrows move to, which the browser would otherwise
+   bring to rest under the filter (review) */
+.app-picker-popover:has(.app-picker-filter) { scroll-padding-top: var(--app-picker-filter-block); }
+
+.app-picker-filter {
+    position: sticky;
+    top: calc(-1 * var(--app-picker-inset));
+    z-index: var(--app-picker-filter-z);
+    display: block;
+    margin: calc(-1 * var(--app-picker-inset)) calc(-1 * var(--app-picker-inset)) var(--app-picker-filter-gap);
+    padding: var(--app-picker-inset);
+    background: var(--dw-popover);
+}
+
+.app-picker-filter-input {
+    width: 100%;
+    height: var(--app-field);
+    padding: 0 var(--app-field-pad);
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-field);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--dw-text-body);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.app-picker-filter-input::placeholder { color: var(--dw-text-2); }
+.app-picker-filter-input:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring-inset); }
+
+.app-picker-none {
+    margin: 0;
+    padding: var(--app-picker-pad-y) var(--app-picker-option-pad-x);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+/* "maybe in your library": a folder of the album's name with no MusicBrainz ids - said, but dashed, as
+   the main page's card says it; an inline box, so the meta line keeps its height */
+.app-rg-maybe {
+    padding: 0 var(--app-rg-maybe-pad);
+    border: var(--dw-hairline) dashed var(--dw-text-3);
+    border-radius: var(--dw-radius-tag);
+    color: var(--dw-text-2);
+    white-space: nowrap;
+    cursor: help;
+}
+
+/* on musicbrainz.org, at the page's foot: each link a finger's height without moving its line */
+.app-rg-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--app-rg-links-gap);
+    margin: 0;
+    padding: var(--app-rg-links-top) var(--pl-edge-right) var(--app-rg-links-bottom) var(--pl-edge-left);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-rg-link {
+    position: relative;
+    display: inline-block;
+    min-height: var(--pl-hit);
+    margin: calc(-1 * var(--app-rg-link-reach)) 0;
+    padding: var(--app-rg-link-reach) 0;
+    color: var(--dw-accent);
+    text-decoration: none;
+}
+
+.app-rg-link:hover { color: var(--dw-accent-text); text-decoration: underline; }
+
+.app-rg-link:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+/* the desktop panel's sample-rate chip: the sort's look, its picker covering it whole, unseen */
+.app-sources-rate:has(.app-sources-sort-select:focus-visible) {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
 /* ===== Artists, and the two libraries joined (2.0.0-player.17) ===== */
 
 /* the artist page's hero: the picture under it, its own colour in place of one; the back link at

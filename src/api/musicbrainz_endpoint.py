@@ -579,7 +579,7 @@ class MusicBrainzClient:
         ]
 
 
-    async def fully_search(self, query: str, limit: int = 5, include_releases: bool = True) -> dict:
+    async def fully_search(self, query: str, limit: int = 5, include_releases: bool = True, offset: int = 0) -> dict:
         """
         Release groups matching the query, and by default the releases of the best one.
 
@@ -589,6 +589,11 @@ class MusicBrainzClient:
         renders those releases immediately. The metadata editor does not: it ranks the groups
         itself and then asks for the ones it actually wants, so the eager fetch was five round
         trips spent on a payload it dropped on the floor.
+
+        `offset` (2.0.0-player.50) pages on through the answers - the app's "More from
+        MusicBrainz". It is sent only when it isn't 0, so the first page is asked exactly as before
+        (the same request, the same cache entry). The answer carries MusicBrainz's `count` - how
+        many groups match in all - so a page can tell whether there are more to ask for.
         """
         logger.info("searching musicbrainz...", extra={"frontend": True, "src":"musicbrainz"})
         params = {
@@ -596,6 +601,8 @@ class MusicBrainzClient:
             "fmt": "json",
             "limit": limit
         }
+        if offset:
+            params["offset"] = offset
         release_groups =  await self.request_with_retries("release-group/", params)
 
         #? request_with_retries returns an error dict rather than raising when it gives up, so
@@ -618,16 +625,22 @@ class MusicBrainzClient:
 
         logger.info("release groups parsed", extra={"frontend": True, "src":"musicbrainz"})
 
+        #? how many groups match in all, as MusicBrainz counts them - a page reads it to know whether
+        #? another page is there to ask for (absent when MusicBrainz didn't say)
+        count = release_groups.get("count")
+        counted = {"count": count} if isinstance(count, int) and not isinstance(count, bool) else {}
+
         if not include_releases:
             #? the key is still present, so callers reading it don't have to special-case this
-            return {"release-groups": release_groups["release-groups"], "best-match-releases": []}
+            return {"release-groups": release_groups["release-groups"], "best-match-releases": [], **counted}
 
         first_release_group = release_groups["release-groups"][0]
         first_release_group_releases = await self.get_releases(first_release_group["id"], log=False)
 
         return {
             "release-groups": release_groups["release-groups"],
-            "best-match-releases": first_release_group_releases["releases"]
+            "best-match-releases": first_release_group_releases["releases"],
+            **counted,
         }
     
     async def ping(self) -> dict:

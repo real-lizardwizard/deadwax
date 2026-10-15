@@ -133,23 +133,47 @@ export function seedFromPreferences(
 /**
  * The Sources sheet's chips: Lossless, 24-bit and Free slot, as Sources.dc.html draws them - and
  * 320 kbps, which the board has no chip for, drawn only while the floor is 320 so that floor is
- * never a filter on out of sight.
+ * never a filter on out of sight - and Complete albums only (2.0.0-player.50, the main page's, on
+ * both frames): every track of the pressing present, as the card counts its Tracks
+ * (lib/candidates.ts everyTrackPresent). No setting presses it: every Get starts with it off.
  */
 export interface SourceFilters {
   lossless: boolean
   bit24: boolean
   freeSlot: boolean
   kbps320: boolean
+  complete: boolean
 }
 
-export const NO_SOURCE_FILTERS: SourceFilters = { lossless: false, bit24: false, freeSlot: false, kbps320: false }
+export const NO_SOURCE_FILTERS: SourceFilters = { lossless: false, bit24: false, freeSlot: false, kbps320: false, complete: false }
+
+/**
+ * The desktop panel's sample-rate floor (2.0.0-player.50), beside Signals: the least the folder's WORST
+ * file's sample rate may be, in Hz, 0 for any - and a folder whose client reported no sample rate never
+ * passes one (lib/candidates.ts passesQuality, the main page's own rule: many clients report none, and a
+ * folder that might be 44.1 must not pass "96 kHz+"). A desktop's alone, as Signals is: a phone's sheet
+ * draws no such chip, so none applies there.
+ */
+export const SAMPLE_RATE_FLOORS: readonly { value: number; label: string; chip: string }[] = [
+  { value: 0, label: 'Any sample rate', chip: 'Sample rate' },
+  { value: 44100, label: '44.1 kHz or more', chip: '44.1 kHz+' },
+  { value: 48000, label: '48 kHz or more', chip: '48 kHz+' },
+  { value: 88200, label: '88.2 kHz or more', chip: '88.2 kHz+' },
+  { value: 96000, label: '96 kHz or more', chip: '96 kHz+' },
+]
+
+/** What the sample-rate chip says: "Sample rate" for any, else its floor - "48 kHz+". */
+export function sampleRateChip(rate: number): string {
+  return (SAMPLE_RATE_FLOORS.find((floor) => floor.value === rate) ?? SAMPLE_RATE_FLOORS[0]!).chip
+}
 
 /** What the chips start as, for a Get: the quality floor, pressed. */
 export function floorFilters(floor: QualityFloor): SourceFilters {
   return { ...NO_SOURCE_FILTERS, lossless: floor === 'lossless', bit24: floor === '24bit', kbps320: floor === '320' }
 }
 
-/** The chips the sheet draws, in order, for a floor and what is pressed now. */
+/** The chips the sheet draws, in order, for a floor and what is pressed now - the desktop panel drawing
+ *  Complete albums only after its Signals chip (Sources.tsx, review). */
 export function sourceChips(floor: QualityFloor, filters: SourceFilters): { key: keyof SourceFilters; label: string; on: boolean }[] {
   const chips: { key: keyof SourceFilters; label: string; on: boolean }[] = [
     { key: 'lossless', label: 'Lossless', on: filters.lossless },
@@ -157,30 +181,35 @@ export function sourceChips(floor: QualityFloor, filters: SourceFilters): { key:
     { key: 'freeSlot', label: 'Free slot', on: filters.freeSlot },
   ]
   if (floor === '320' || filters.kbps320) chips.splice(2, 0, { key: 'kbps320', label: '320 kbps', on: filters.kbps320 })
+  chips.push({ key: 'complete', label: 'Complete albums only', on: filters.complete })
   return chips
 }
 
 /**
  * The chips as lib/candidates.ts's filters - what passesFilters, the cards and a pick all go by. And
  * on a desktop (2.0.0-player.19) the Signals chip's per-signal minimums, as the main page's panel has
- * them (DesktopRequest.dc.html draws the chip; the phone's sheet has none, so none apply there).
+ * them (DesktopRequest.dc.html draws the chip; the phone's sheet has none, so none apply there) - and
+ * its sample-rate floor (2.0.0-player.50, Hz, 0 for any), likewise a desktop's alone. Complete albums
+ * only is the app's every-track rule (`everyTrack`), never the main page's `completeOnly`.
  */
-export function candidateFilters(filters: SourceFilters, minSignals?: Readonly<Record<string, number>>): CandidateFilters {
+export function candidateFilters(filters: SourceFilters, minSignals?: Readonly<Record<string, number>>, minSampleRate = 0): CandidateFilters {
   return {
     freeSlotOnly: filters.freeSlot,
     completeOnly: false,
     minScore: 0,
     formats: new Set(),
     minSignals: minSignals ? { ...noSignalMinimums(), ...minSignals } : noSignalMinimums(),
-    quality: { ...NO_QUALITY_FILTERS, minBitDepth: filters.bit24 ? 24 : 0, minBitrate: filters.kbps320 ? 320 : 0 },
+    quality: { ...NO_QUALITY_FILTERS, minBitDepth: filters.bit24 ? 24 : 0, minBitrate: filters.kbps320 ? 320 : 0, minSampleRate },
     lossless: filters.lossless,
+    everyTrack: filters.complete,
   }
 }
 
 /** How many chips are pressed - "Clear filters" shows only when some are - and how many of the
- *  Signals chip's minimums are set (a desktop's), each one as a chip pressed. */
-export function pressedCount(filters: SourceFilters, minSignals?: Readonly<Record<string, number>>): number {
-  return Object.values(filters).filter(Boolean).length + signalsSet(minSignals)
+ *  Signals chip's minimums are set (a desktop's), each one as a chip pressed, and the sample-rate
+ *  floor (2.0.0-player.50, a desktop's) as one more when it is set. */
+export function pressedCount(filters: SourceFilters, minSignals?: Readonly<Record<string, number>>, minSampleRate = 0): number {
+  return Object.values(filters).filter(Boolean).length + signalsSet(minSignals) + (minSampleRate > 0 ? 1 : 0)
 }
 
 /** How many per-signal minimums are set (0 is off): what the Signals chip counts. */

@@ -122,10 +122,11 @@ it (**Wish You Were Here / CD 2**).
   found.
 - **Signals** sets a minimum for each part of the score separately. The number on the button
   counts how many are set.
-- **Quality** sets floors: a minimum **bitrate**, **bit depth** and **sample rate**, and an
-  album **size** range in MB. A folder is judged by its *worst* file, and a folder whose files
-  don't report a value doesn't pass a floor for it, with one exception: a lossless folder
-  passes any bitrate floor, because lossless beats any lossy bitrate.
+- **Quality** sets floors: a minimum **bitrate**, **bit depth** and **sample rate**. A folder is
+  judged by its *worst* file, and a folder whose files don't report a value doesn't pass a floor for
+  it, with one exception: a lossless folder passes any bitrate floor, because lossless beats any
+  lossy bitrate. (This panel also has an album size range in MB; the app has none, and it goes when
+  this page retires.)
 - **Sort**: best match, highest quality (lossless first, then bit depth, sample rate and
   bitrate), largest, or smallest.
 
@@ -253,9 +254,12 @@ by Portishead…**. Each folder found is a card:
   worked out is in [How matching works](matching.md).
 
 Above the cards are **Lossless** (every file lossless; a folder whose format couldn't be told never
-passes), **24-bit**, **Free slot** and the sort (**Best match**, **Highest quality**, **Largest
-first**, **Smallest first**). They start as your **quality floor** (You → Getting albums, below):
-Lossless or 24-bit pressed, or a **320 kbps** chip, which shows only while that's your floor. Under
+passes), **24-bit**, **Free slot**, **Complete albums only** (since 2.0.0-player.50: every track of
+the pressing there, as a card's **Tracks** counts them - so a CD+DVD's whole CD, "14 of 14", passes,
+and a folder with no tracklist to count against, the album as a whole, isn't left out) and the sort
+(**Best match**, **Highest quality**, **Largest first**, **Smallest first**). They start as your
+**quality floor** (You → Getting albums, below): Lossless or 24-bit pressed, or a **320 kbps** chip,
+which shows only while that's your floor; Complete albums only always starts off. Under
 the cards: "Searched Soulseek for "Portishead Third" · 41 folders, 4 match your filters", and
 **Search again** (since 2.0.0-player.41), which opens the query under it to edit: an unedited
 **Re-search** searches every name again, an edited one searches exactly what you typed - the same
@@ -320,8 +324,13 @@ below that. They're the same cards - each with its signal chips always showing -
 match score may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a
 slider each - as the main page's candidates panel has it, with a count on the chip of how many are
 set. Signals is the panel's alone: narrow the window to a phone's with the panel open and its
-minimums stop filtering until it's wide again. **Get the album** sits beside the **Pressing** button
-and shows pressed while the panel shows that pressing's sources (click it again to close them), and
+minimums stop filtering until it's wide again. After it (since 2.0.0-player.50) come **Complete albums
+only**, then a **sample-rate floor** - **Sample rate** (any), **44.1 kHz+**, **48 kHz+**, **88.2 kHz+** or **96 kHz+** - judged by
+the folder's *worst* file; a folder whose user's client reported no sample rate never passes one. It's
+the panel's alone too, starts at any on each Get, stays as you set it when the panel follows the page
+to another pressing, and **Clear filters** clears it with the rest. **Get the album** sits beside the
+**Pressing** button and shows pressed while the panel shows that pressing's sources (click it again
+to close them), and
 the page stays usable: **choose another pressing and the sources are searched again for it**,
 keeping your filters - and never picking a source for you, even with **Pick the best source for
 me**, since you're choosing. The panel's close button, or Escape while you're in it, closes it.

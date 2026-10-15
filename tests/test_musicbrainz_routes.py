@@ -8,6 +8,10 @@ real app, start(), with a real MusicBrainzClient whose network is a fake that co
 - `/release_group` is every pressing of a group WITH its tracklist (the pressing dropdown needs
   every one to find the most common) and its release group (the header, on a cold link), cached
   like every MusicBrainz success, never a failure.
+- `/fully_search` pages on by `offset` (2.0.0-player.50, the app's "More from MusicBrainz"): the first
+  page asked exactly as before (no offset sent - the same cache entry), each page cached apiece,
+  MusicBrainz's `count` passed on, and an offset outside 0-FULLY_SEARCH_OFFSET_MAX a 422 with nothing
+  asked - the app keeps the same bound.
 """
 
 import sys
@@ -184,6 +188,116 @@ def test_release_group_refuses_anything_but_an_mbid(app_client, musicbrainz, bad
 
     assert app_client.get("/deadwax/search_musicbrainz/release_group", params={"release_group_mbid": bad}).status_code == 422
     assert fake.calls == []
+
+
+# ---------------------------------------------------------------- /fully_search's offset (2.0.0-player.50)
+
+class Search:
+    """MusicBrainz's release-group search: `groups` paged by offset and limit, with its `count`."""
+
+    def __init__(self, groups, count=None):
+        self.groups = groups
+        self.count = len(groups) if count is None else count
+        self.calls = []
+
+    async def get(self, endpoint, params=None):
+        self.calls.append((endpoint, dict(params or {})))
+        offset = int((params or {}).get("offset", 0))
+        limit = int((params or {}).get("limit", 25))
+        return Answer({"created": "2026-10-14T00:00:00Z", "count": self.count, "offset": offset,
+                       "release-groups": self.groups[offset:offset + limit]})
+
+
+GROUPS = [{"id": f"g{n}", "title": f"Album {n}"} for n in range(30)]
+
+
+def test_fully_search_asks_its_first_page_as_it_always_did(app_client, musicbrainz):
+    """No offset sent for the first page: the same request, so the same cache entry, as before."""
+    fake = Search(GROUPS)
+    musicbrainz[1]["fake"] = fake
+
+    body = app_client.get("/deadwax/search_musicbrainz/fully_search", params={"query": "portishead", "limit": 12, "releases": "false"}).json()
+
+    [(endpoint, params)] = fake.calls
+    assert endpoint == "release-group/" and "offset" not in params
+    assert [group["id"] for group in body["release-groups"]] == [f"g{n}" for n in range(12)]
+    #? how many match in all, so the app knows there is another page to ask for
+    assert body["count"] == 30 and body["best-match-releases"] == []
+
+
+def test_fully_search_pages_on_by_offset(app_client, musicbrainz):
+    fake = Search(GROUPS)
+    musicbrainz[1]["fake"] = fake
+
+    body = app_client.get("/deadwax/search_musicbrainz/fully_search",
+                          params={"query": "portishead", "limit": 12, "releases": "false", "offset": 12}).json()
+
+    [(_, params)] = fake.calls
+    assert params["offset"] == 12 and params["limit"] == 12 and params["query"] == "portishead"
+    assert [group["id"] for group in body["release-groups"]] == [f"g{n}" for n in range(12, 24)]
+    assert body["count"] == 30
+
+
+def test_fully_search_pages_are_cached_apiece(app_client, musicbrainz):
+    fake = Search(GROUPS)
+    musicbrainz[1]["fake"] = fake
+
+    for offset in (0, 12, 0, 12):
+        app_client.get("/deadwax/search_musicbrainz/fully_search", params={"query": "portishead", "limit": 12, "releases": "false", "offset": offset})
+
+    assert [params.get("offset", 0) for _, params in fake.calls] == [0, 12], "each page asked once, the repeats from the cache"
+
+
+def test_fully_search_past_the_end_is_nothing_found(app_client, musicbrainz):
+    """A page beyond the last answer is `{}`, as a search that matched nothing always was."""
+    musicbrainz[1]["fake"] = Search(GROUPS)
+
+    body = app_client.get("/deadwax/search_musicbrainz/fully_search", params={"query": "portishead", "limit": 12, "releases": "false", "offset": 36}).json()
+
+    assert body == {}
+
+
+def test_fully_search_without_a_count_says_none(app_client, musicbrainz):
+    """An answer with no `count` (or one that isn't a number) passes none on, rather than a made-up one."""
+    class Uncounted(Search):
+        async def get(self, endpoint, params=None):
+            answer = await super().get(endpoint, params)
+            answer.payload.pop("count")
+            return answer
+
+    musicbrainz[1]["fake"] = Uncounted(GROUPS)
+
+    body = app_client.get("/deadwax/search_musicbrainz/fully_search", params={"query": "portishead", "limit": 12, "releases": "false"}).json()
+
+    assert "count" not in body and len(body["release-groups"]) == 12
+
+
+@pytest.mark.parametrize("bad", ["-1", "1001", "twelve", "1.5"])
+def test_fully_search_refuses_an_offset_out_of_bounds(app_client, musicbrainz, bad):
+    from src.routes.search_musicbrainz import FULLY_SEARCH_OFFSET_MAX
+
+    fake = Search(GROUPS)
+    musicbrainz[1]["fake"] = fake
+
+    assert FULLY_SEARCH_OFFSET_MAX == 1000
+    assert app_client.get("/deadwax/search_musicbrainz/fully_search", params={"query": "portishead", "offset": bad}).status_code == 422
+    assert fake.calls == [], "nothing asked of MusicBrainz for a page it would never be asked for"
+
+
+def test_fully_search_takes_the_bounds_themselves(app_client, musicbrainz):
+    fake = Search(GROUPS, count=5000)
+    musicbrainz[1]["fake"] = fake
+
+    for offset in ("0", "1000"):
+        assert app_client.get("/deadwax/search_musicbrainz/fully_search", params={"query": "portishead", "releases": "false", "offset": offset}).status_code == 200
+
+
+def test_the_app_and_the_route_page_no_further_than_one_bound():
+    """lib/searchResults.ts keeps the route's bound, so the app never offers a page the route refuses."""
+    from src.routes.search_musicbrainz import FULLY_SEARCH_OFFSET_MAX
+
+    source = (Path(__file__).resolve().parent.parent / "ui" / "src" / "lib" / "searchResults.ts").read_text()
+    assert f"export const MUSICBRAINZ_OFFSET_MAX = {FULLY_SEARCH_OFFSET_MAX}" in source
 
 
 # ---------------------------------------------------------------- /artist (2.0.0-player.17)

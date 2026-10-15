@@ -23,6 +23,12 @@
  * carry over; and a card's reasons - the score's signals as chips (word, value, band; an unjudged
  * one left out, in the panel's order) and the edition words found in the folder's name, coloured.
  *
+ * And for the search extras (2.0.0-player.50): Complete albums only as the card counts Tracks (every
+ * AUDIO track present - the whole CD of a CD+DVD passes, which the main page's completeOnly, left as it
+ * is, refuses), agreeing with the card's own Tracks and Missing words; and the desktop's sample-rate
+ * floors - Any, 44.1, 48, 88.2, 96 kHz and up - by the folder's worst file, unreported never passing,
+ * each set floor counted as one more filter pressed.
+ *
  * Run it with:  node ui/test/candidates.sim.cjs
  */
 
@@ -234,12 +240,13 @@ console.log('\nthe quality floor (You > Getting albums): the chips it starts as,
   check('the default shows the sources, at any quality (and, since 2.0.0-player.41, prefers lossless)', G.GET_SETTINGS_DEFAULT, { get_mode: 'sources', quality_floor: 'any', format_preference: 'prefer_lossless' });
   check('each floor is a chip pressed: Lossless, 24-bit, 320 kbps - Any none',
     ['any', '320', 'lossless', '24bit'].map((floor) => G.floorFilters(floor)),
-    [{ lossless: false, bit24: false, freeSlot: false, kbps320: false }, { lossless: false, bit24: false, freeSlot: false, kbps320: true },
-     { lossless: true, bit24: false, freeSlot: false, kbps320: false }, { lossless: false, bit24: true, freeSlot: false, kbps320: false }]);
+    [{ lossless: false, bit24: false, freeSlot: false, kbps320: false, complete: false }, { lossless: false, bit24: false, freeSlot: false, kbps320: true, complete: false },
+     { lossless: true, bit24: false, freeSlot: false, kbps320: false, complete: false }, { lossless: false, bit24: true, freeSlot: false, kbps320: false, complete: false }]);
   const labels = (floor, filters) => G.sourceChips(floor, filters).map((chip) => `${chip.label}${chip.on ? '*' : ''}`);
-  check('the chips: Lossless, 24-bit, Free slot - and 320 kbps only while it is the floor (never a filter on out of sight)',
+  check('the chips: Lossless, 24-bit, Free slot, Complete albums only (2.0.0-player.50, never pressed by a floor) - and 320 kbps only while it is the floor (never a filter on out of sight)',
     [labels('lossless', G.floorFilters('lossless')), labels('320', G.floorFilters('320')), labels('320', G.NO_SOURCE_FILTERS), labels('any', G.NO_SOURCE_FILTERS)],
-    [['Lossless*', '24-bit', 'Free slot'], ['Lossless', '24-bit', '320 kbps*', 'Free slot'], ['Lossless', '24-bit', '320 kbps', 'Free slot'], ['Lossless', '24-bit', 'Free slot']]);
+    [['Lossless*', '24-bit', 'Free slot', 'Complete albums only'], ['Lossless', '24-bit', '320 kbps*', 'Free slot', 'Complete albums only'],
+     ['Lossless', '24-bit', '320 kbps', 'Free slot', 'Complete albums only'], ['Lossless', '24-bit', 'Free slot', 'Complete albums only']]);
   const pool = [mp3([320], { username: 'mp3' }), flac({ username: 'cd', bit_depths: [16] }), flac({ username: 'hires', bit_depths: [24], sample_rates: [96000] }), mp3([128], { username: 'thin' })];
   const passing = (sourceFilters) => pool.filter((c) => C.passesFilters(c, G.candidateFilters(sourceFilters))).map((c) => c.username);
   check('as filters: Any keeps all, 320 drops the thin MP3 (lossless passes a bitrate floor), Lossless the MP3s, 24-bit all but the hi-res',
@@ -261,6 +268,43 @@ console.log('\nthe quality floor (You > Getting albums): the chips it starts as,
     [{ candidateMinBitrate: 0, candidateMinBitDepth: 24 }, { candidateMinBitrate: 320, candidateMinBitDepth: 16 }, { candidateMinBitrate: 320, candidateMinBitDepth: 0 }, { candidateMinBitrate: 256, candidateMinBitDepth: 0 }]
       .map((preferences) => G.seedFromPreferences(preferences)),
     [{ quality_floor: '24bit' }, { quality_floor: 'lossless' }, { quality_floor: '320' }, {}]);
+}
+
+console.log('\nComplete albums only and the sample-rate floor (2.0.0-player.50)');
+{
+  //? a folder of the whole CD of a CD+DVD: the card says "14 of 14" (audio_expected) - the main page's
+  //? completeOnly counts the film's tracks too, and refuses it; the app's chip doesn't
+  const cdDvd = flac({ username: 'cddvd', expected_tracks: 34, matched_tracks: 14, audio_expected: 14, missing_count: 0, missing_tracks: [] });
+  const short = flac({ username: 'short', expected_tracks: 11, matched_tracks: 10, audio_expected: 11, missing_count: 1, missing_tracks: [{ position: 3, disc: 1, title: 'Threads' }] });
+  const whole = flac({ username: 'whole', expected_tracks: 11, matched_tracks: 11, audio_expected: 11, missing_count: 0, missing_tracks: [] });
+  const older = flac({ username: 'older', expected_tracks: 11, matched_tracks: 10 });
+  const loose = flac({ username: 'loose', expected_tracks: 0, matched_tracks: 0, audio_file_count: 12 });
+  const named = flac({ username: 'named', expected_tracks: 11, matched_tracks: 11, audio_expected: 11, missing_tracks: [{ position: 3, disc: 1, title: 'Threads' }] });
+  check('every track present, as the card counts Tracks: the whole CD of a CD+DVD and a whole folder pass; one missing a track, by count or by name, doesn\'t',
+    [cdDvd, short, whole, named].map((c) => C.everyTrackPresent(c)), [true, false, true, false]);
+  check('...an answer without audio_expected counts matched against expected, as the main page does; no tracklist, nothing to be complete against',
+    [C.everyTrackPresent(older), C.everyTrackPresent(loose)], [false, true]);
+  check('...and agrees with the card\'s own words: complete exactly when Tracks reads N of N and there is no Missing line',
+    [cdDvd, short, whole].map((c) => [C.tracksText(c), C.missingLine(c), C.everyTrackPresent(c)]),
+    [['14 of 14', null, true], ['10 of 11', 'Missing “Threads”', false], ['11 of 11', null, true]]);
+  const pool = [cdDvd, short, whole, older, loose];
+  const passing = (sourceFilters, minSampleRate) => pool.filter((c) => C.passesFilters(c, G.candidateFilters(sourceFilters, undefined, minSampleRate))).map((c) => c.username);
+  check('the chip filters by it - the app\'s rule, never the main page\'s completeOnly', [passing({ ...G.NO_SOURCE_FILTERS, complete: true }), G.candidateFilters({ ...G.NO_SOURCE_FILTERS, complete: true }).completeOnly],
+    [['cddvd', 'whole', 'loose'], false]);
+  check('...off, it keeps them all', passing(G.NO_SOURCE_FILTERS).length, 5);
+  check('the main page\'s completeOnly is as it was: the CD+DVD\'s whole CD refused there', C.passesFilters(cdDvd, filters({ completeOnly: true })), false);
+  check('the sample-rate floors, as the desktop\'s chip offers them: Any, 44.1, 48, 88.2 and 96 kHz and up',
+    G.SAMPLE_RATE_FLOORS.map((floor) => [floor.value, floor.label, floor.chip]),
+    [[0, 'Any sample rate', 'Sample rate'], [44100, '44.1 kHz or more', '44.1 kHz+'], [48000, '48 kHz or more', '48 kHz+'], [88200, '88.2 kHz or more', '88.2 kHz+'], [96000, '96 kHz or more', '96 kHz+']]);
+  check('...the chip says the floor, "Sample rate" for any (or one it doesn\'t know)', [0, 48000, 96000, 12345].map((rate) => G.sampleRateChip(rate)), ['Sample rate', '48 kHz+', '96 kHz+', 'Sample rate']);
+  const rates = [flac({ username: '44', sample_rates: [44100] }), flac({ username: '48', sample_rates: [48000] }), flac({ username: 'mixed', sample_rates: [96000, 44100] }),
+    flac({ username: '96', sample_rates: [96000] }), flac({ username: '88', sample_rates: [88200, 96000] }), flac({ username: 'unsaid', sample_rates: [] })];
+  const floor = (rate) => rates.filter((c) => C.passesFilters(c, G.candidateFilters(G.NO_SOURCE_FILTERS, undefined, rate))).map((c) => c.username);
+  check('by the folder\'s WORST file, a folder that reported none passing no floor: Any, 44.1, 48, 88.2, 96',
+    [0, 44100, 48000, 88200, 96000].map(floor),
+    [['44', '48', 'mixed', '96', '88', 'unsaid'], ['44', '48', 'mixed', '96', '88'], ['48', '96', '88'], ['96', '88'], ['96']]);
+  check('a floor set is counted as one more pressed, so Clear filters shows; none set counts nothing',
+    [G.pressedCount(G.NO_SOURCE_FILTERS, undefined, 48000), G.pressedCount(G.NO_SOURCE_FILTERS, undefined, 0), G.pressedCount({ ...G.NO_SOURCE_FILTERS, complete: true })], [1, 0, 1]);
 }
 
 console.log('\nFormat, kept for you on deadwax (2.0.0-player.41)');

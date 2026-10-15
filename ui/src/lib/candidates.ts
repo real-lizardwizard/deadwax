@@ -33,6 +33,28 @@ export interface CandidateFilters {
    * builds its filters as it always did.
    */
   lossless?: boolean
+  /**
+   * Every track of the pressing present (2.0.0-player.50) - the app's Complete albums only chip,
+   * judged as a source card counts its Tracks (everyTrackPresent): no AUDIO track missing, so a CD+DVD
+   * shared whole ("14 of 14") passes. `completeOnly` is the main page's own, counted against every
+   * track, a DVD's film included, and left as it is. Optional, as `lossless` is.
+   */
+  everyTrack?: boolean
+}
+
+/**
+ * Whether a folder holds every track of the pressing (2.0.0-player.50), as its card's Tracks counts them
+ * (tracksText) and its Missing line names them: nothing missing of the release's AUDIO tracks - a video
+ * track is never missing from a folder of audio. An answer without `audio_expected` counts matched
+ * against expected, as the main page does. With no tracklist to count against (the album as a whole,
+ * when MusicBrainz couldn't list its pressings) there is nothing to be complete against, and the folder
+ * passes, as the main page's Complete albums only lets it.
+ */
+export function everyTrackPresent(candidate: Candidate): boolean {
+  if (!candidate.expected_tracks) return true
+  const audio = candidate.audio_expected
+  if (typeof audio !== 'number' || audio <= 0) return candidate.matched_tracks >= candidate.expected_tracks
+  return Math.max(candidate.missing_count ?? 0, candidate.missing_tracks?.length ?? 0) === 0
 }
 
 /**
@@ -111,6 +133,8 @@ export function passesFilters(candidate: Candidate, filters: CandidateFilters): 
   if (filters.formats.size && !candidate.formats.some((f) => filters.formats.has(f))) return false
 
   if (filters.lossless && !allLossless(candidate)) return false
+
+  if (filters.everyTrack && !everyTrackPresent(candidate)) return false
 
   for (const [signal, minimum] of Object.entries(filters.minSignals)) {
     if (!minimum) continue

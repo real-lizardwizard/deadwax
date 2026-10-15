@@ -976,6 +976,223 @@ keys read and write as before.
   and waiting for its answer before the search went.
 - **Not built, on purpose**: per-pressing Also links inside the group page (it gets; the album page
   opens); Complete albums only, Min score, a sample-rate floor and more results from MusicBrainz (the
-  audit's "should" rows - another slice); the main page's own Format and Confirm before cancelling
+  audit's "should" rows - another slice: built in 2.0.0-player.50 but Min score, left to the desktop's
+  Signals - see "Search extras"); the main page's own Format and Confirm before cancelling
   following the app's (the main page keeps its copies until it retires, configuration.md says so).
 
+### Search extras (2.0.0-player.50)
+
+James (2026-10-14), finishing the web app: the parity audit (`uplan/parity-audit.json`, the "find" area, the
+critic's SHOULD list and its questions 7 and 8) found these in finding music, and James took its
+recommendations - "More from MusicBrainz" rather than a limit stepper; a Complete albums only chip; a sample-rate
+floor on a desktop; the size range dropped and README.md:123 corrected; Min score left to the desktop's Signals
+(`uplan/slice-search-extras.md`). Phone and desktop alike unless said. The main page is untouched.
+
+- **More from MusicBrainz.** The MusicBrainz half still asks for `MUSICBRAINZ_LIMIT` (12); under its rows a
+  secondary `app-button` (`app-search-more`, the rows' width, a finger tall) asks for the next twelve of the SAME
+  search by offset, appended below - nothing drawn moves (the real page measured the first twelve rows' places
+  before and after, at 390 and 1440).
+  - **The route** (`/search_musicbrainz/fully_search`) gains `offset: int = Query(0, ge=0,
+    le=FULLY_SEARCH_OFFSET_MAX)` (1000): declared and bounded, a 422 outside with nothing asked of MusicBrainz.
+    The client (`MusicBrainzClient.fully_search(..., offset=0)`) sends it ONLY when it isn't 0, so every
+    existing first page - the main page's, the metadata editor's - is the same request and the same
+    ResponseCache entry as before, and each later page is cached apiece. The answer gains MusicBrainz's
+    `count` (how many groups match in all) when it is an int, nothing when MusicBrainz didn't say; a page past
+    the end is `{}`, as a search that matched nothing always was. `tests/test_musicbrainz_routes.py` (11 new)
+    through `start()` with a real client over a fake search: the first page with no offset, a page by offset,
+    pages cached apiece, past the end, no count, four refused offsets (-1, 1001, words, a fraction), the
+    bounds themselves, and the app's bound read out of lib/searchResults.ts as the route's.
+  - **The app** (`api/musicbrainz.ts` `fullySearch(..., signal, offset = 0)`, the param only past 0). Search's
+    `done` state keeps `query` (what MusicBrainz was asked - the words typed when a fielded read fell back to
+    them, so the next page is of THAT search), `nextOffset` (every answer got, held and repeated ones
+    included), `count`, `last` (the last page's size) and `more` (idle, asking, failed, or what the last page
+    added). `askMore` goes through the half's own `musicRequests` latestOnly - a new search, or the box cut
+    back below three characters, calls it off and its answer draws nothing - and appends by
+    `appendPage(groups, shown, page, ownedNow()?.index)` (lib/searchResults.ts, pure): a group got twice
+    (relevance ties shift between pages) drawn once, held albums left out as the first page leaves them.
+    `morePages(nextOffset, count, last, limit)`: 'more' while the count says more match; with no count (an
+    older server) only after a full page; 'end' after a page that brought nothing, whatever the count says;
+    'far' past `MUSICBRAINZ_OFFSET_MAX`, the route's bound - "That's as far into one search as deadwax goes -
+    add a word to narrow it." Busy, the button reads "Asking MusicBrainz…", aria-busy and aria-disabled (the
+    tap refused in the handler, never `disabled`, which drops focus); failed, the reason ("MusicBrainz isn't
+    answering just now…") over it and it reads Try again, asking the same page; a page whose NEW albums are
+    all held says so by their number, "The next 12 albums MusicBrainz found are all in your library already."
+    (`appendPage`'s `held`: the page's new groups the library holds, never a repeat), and a page that brought
+    nothing new - none at all, or only rows already drawn - "MusicBrainz sent nothing new." (`morePageWords`,
+    the words for both the note and the live region). One polite live region, drawn with the rows, says what
+    a page brought ("12 more albums from MusicBrainz"). The button shows under "Everything MusicBrainz found
+    is in your library already" too - more may match. When the page that ends it lands with focus on the
+    button, focus goes to the first row that page brought, or to the note said in its place (tabIndex -1,
+    no ring) - never left to fall to the page.
+  - **Not built**: the main page's 1-100 stepper (James chose More); `#/search?q=` paging in the address.
+- **Each pressing's facts.** `pressingFacts(release)` (lib/pressings.ts, pure): what the main page's releases
+  grid had columns for and `pressingLabel` leaves out, as MusicBrainz gives it - its status ("Official",
+  "Promotion", "Bootleg"), its full date when it says more than the year the label already does ("2008-04-28",
+  "2008-04"), its labels when the label line shows a disambiguation in their place and any after the first one
+  it shows, its catalogue numbers once each ("[none]", MusicBrainz's word for none, left out), its barcode,
+  and "Worldwide" for an XW release (the label line leaves its country off) - "Official · 2008-04-28 · Cat. no.
+  1764013 · Barcode 602517640132"; '' when there's nothing more. **No server change**: `/release_group` already
+  asks `RELEASE_FULL_INC` (`labels` is what brings `label-info` and its catalogue numbers), and status, date,
+  country and barcode are a release's own fields - read off a live answer (Mezzanine's 23 pressings). Language,
+  script and packaging are in the payload too and aren't said (the spec didn't ask). `PressingRow.facts` is
+  new; each option draws label, facts, note (`app-picker-facts`). **The chosen pressing's line**
+  (`app-rg-facts`, with its whole in its tooltip) sits under the picker on a phone - between it and Get, two
+  lines' room always (`--app-rg-facts-lines`, a fixed height, `-webkit-line-clamp`), so choosing a pressing
+  with more or fewer facts moves nothing under it - and on a desktop under Get and the picker, the row's whole
+  width, one line (`--app-desk-rg-facts-lines`): in the button it would have widened the picker until it
+  wrapped under Get. The real page measured Get's place unmoved by a pick.
+- **The dropdown's filter.** An album of more than `PRESSING_FILTER_MIN` (30) pressings gets a field at the top
+  of the list (`app-picker-filter`, sticky over the options as they scroll, 17px so iOS doesn't zoom, outside
+  the listbox - only options belong in one - named "Filter the pressings", `aria-controls` the list).
+  `filterPressings(rows, typed)`: every word typed, folded (accents, case, anything not a letter or digit a
+  space - so "uicb 1004" finds UICB-1004), found in a pressing's label, facts or note ("in your library" for a
+  held one) as folded or with its gaps closed up (so "uicb1004" finds it too), folded pressings included and
+  the fold stepped aside; "No pressing matches “…”." for none. What it left is said by one polite live region
+  in the list for as long as it has a filter (`app-visually-hidden`, empty until a word is typed - VoiceOver
+  reads a region only once it is already there): `pressingFilterWords(matching, typed)`, "4 pressings
+  match.", "1 pressing matches.", or the "No pressing matches" words, the line drawn under the list having no
+  role of its own. Its placeholder says what works, "JP, CD, a
+  label or cat. no." - a country by its code, as the rows say it (no row says "Japan"). Opening still focuses
+  the chosen pressing, never the field (on a phone that would put the keyboard up over the list); in the
+  field only ArrowDown leaves it, for the first pressing (Home, End and the arrows across its text are its
+  own); ArrowUp from the first pressing goes back to it; closing empties it, however it closes - the Pressing
+  button's own press goes through `close(false)`. With the filter the list keeps its band clear by
+  `scroll-padding-top: var(--app-picker-filter-block)` (`.app-picker-popover:has(.app-picker-filter)`), which
+  the arrows' focus scrolling honours, and `reveal()` reads the same padding back for the list's own
+  scrolling.
+- **"Maybe in your library"** on the album you don't have: the page's `ownedForGroup` now passes the album's
+  title and the names it could be filed under (the credit, `creditName`, and the name they go by now,
+  `currentName` - the main page's card's `[artist, albumArtist]`), so a folder with NO MusicBrainz ids of
+  that name is `guessed` when nothing is held by id; `holdingOf` says 'held', 'maybe' or 'not' (null until the
+  library answers). A maybe draws the meta line as "1998 · Album · " and a dashed `app-rg-maybe` span, "maybe
+  in your library" (`--dw-text-3` dashes, an inline box, so the line keeps its height - one line at 320,
+  measured), its tooltip `describeGroupOwnership`'s words with the folders - as the main page's card says it.
+  On a phone there's no tooltip, as on the main page. **Not built**: the maybe on Search's rows (the spec
+  asked for the album page).
+- **Links out**: at the page's foot (`app-rg-links`, after the tracklist - nothing moves), "On MusicBrainz",
+  then "The album ↗" and "This pressing ↗" (three spans, a gap between, no punctuation) - `releaseGroupUrl(mbid)` (new in lib/pressings.ts) and the chosen pressing's
+  `releaseUrl` (lib/albumProperties.ts, .44's) - each `target="_blank" rel="noopener"` (following one in the
+  page would unload the player; app-rules' link rule lists the page now), a finger tall without moving its
+  line (`--app-rg-link-reach`). None for an address that isn't an album's.
+- **Complete albums only**, a chip on both frames - after Free slot in a phone's sheet, after Signals in the
+  desktop panel (review: before it, it put Signals at the row's very edge - see "After review" below):
+  `SourceFilters.complete`, off on every
+  fresh Get (no setting presses it), kept on `again`, cleared by Clear filters, counted for it. It filters by
+  a new optional `CandidateFilters.everyTrack` - `everyTrackPresent(candidate)` (lib/candidates.ts): no AUDIO
+  track of the pressing missing, as the card's Tracks counts and its Missing line names (so the whole CD of a
+  CD+DVD, "14 of 14", passes); an answer without `audio_expected` counts matched against expected; with no
+  tracklist to count against (the album as a whole) a folder passes, as the main page's lets it. The main
+  page's own `completeOnly` - counted against every track, a DVD's film included - is left as it is (the
+  app's `candidateFilters` keeps it false).
+- **The sample-rate floor**, a desktop's (the panel's, like Signals): `RateChip` in Sources.tsx after Signals
+  and Complete albums only,
+  a chip holding the platform's own select as the sort does (it reuses `app-sources-sort-select`; its ring is
+  `.app-sources-rate:has(...)`), "Sample rate" for any, else "44.1 kHz+", "48 kHz+", "88.2 kHz+", "96 kHz+"
+  (`SAMPLE_RATE_FLOORS` in lib/getSettings.ts), pressed while one is set. `candidateFilters(filters,
+  minSignals, minSampleRate)` sets `quality.minSampleRate`, so lib/candidates.ts's own rule judges it: the
+  folder's WORST file, a folder whose client reported no sample rate never passing. It filters only where it
+  is drawn (`minRate = modal ? 0 : rate`): carried into a phone's sheet it filters nothing, and is back on the
+  panel. Off on a fresh Get, kept on `again`, cleared by Clear filters, counted by `pressedCount`, and a pick
+  goes by it.
+- **The size range is dropped**: README.md:123 and docs/downloading.md no longer promise it (the board left it
+  out of the app, "Not built, on purpose" in "Sources and Get"); downloading.md says the main page's Quality
+  dropdown still has one, until it retires. Min score stays the desktop's Signals.
+- **Style** (tokens only): app.css's own section, "search extras", with its own `:root` - `--app-search-more-gap`,
+  `--app-rg-facts-lines`, `--app-rg-facts-gap`, `--app-rg-maybe-pad`, `--app-rg-links-*`, `--app-rg-link-reach`,
+  `--app-picker-filter-gap`, `--app-picker-filter-z`, `--app-picker-filter-block`; app-desktop.css a block of
+  its own with `--app-desk-rg-facts-lines` and More's foot. `test_app_css.py` gains seven (the More button and
+  its note's focus, the facts' fixed height, the filter's 17px and sticky place, the filter's band kept clear,
+  the dashed maybe, the links' reach, the rate chip's ring) and `test_app_desktop_css.py` two (the desktop
+  facts line, More off the player bar).
+- **Real page** (the builder's own deadwax on 8115, logins off, its own fake slskd on 8116 - get41's, Third's
+  four folders: a 16/44.1 peer, a busy one, a 24/96 rip, one missing "Threads" - the stand-in Navidrome, live
+  MusicBrainz, a hard-linked copy of the stub library plus one untagged folder, Massive Attack/Mezzanine;
+  headless Chromium as `deadwax.test` over plain http; `work/srch50-builder/drive.cjs`, 47 checks, all
+  passing, no console errors): at 390x844 "portishead" (90 groups) - twelve rows, More, offset=12 asked, 24
+  rows with the first twelve where they were, the button back, clear of the tab bar at the foot; Mezzanine -
+  "maybe in your library" dashed with its folder in the tooltip, the facts line under the picker with two
+  lines' room, every option's facts, a pick changing the line with Get unmoved, the two links opening beside;
+  at 320x568 the maybe on one line; Animals (90 pressings) - the filter at 17px, focus on the chosen pressing,
+  "jp" leaving the twelve Japanese pressings with the fold aside, "zzzz" said, Escape closing; Third's
+  Japanese CD - Complete albums only hiding the folder missing Threads; and at 1440x900 the facts one line
+  under Get and the picker (on one row), the panel's sample-rate chip after Signals (96 kHz+ and 48 kHz+ the
+  24/96 rip alone, 44.1 all four, with Complete albums only three), More from MusicBrainz, Mezzanine's maybe,
+  and "gb vinyl" over Animals' pressings. Nothing wider than the window anywhere.
+- **After review** (seventeen findings, thirteen once merged, all fixed):
+  - **Signals kept its place** (major): in the desktop panel, Complete albums only (about 150px) before Signals
+    put Signals at the row's very edge (1356-1418 of a content edge at 1420, at 1440 wide), so anything that
+    widened the row's first line - the chip's own label becoming "Signals · 1" as a slider was first dragged,
+    or Complete albums only pressed (semibold) - wrapped Signals to the second row, and its popover, anchored
+    `right: 0` to it, jumped about 350px left and 42px down under the held mouse: a 26px drag from 0 set Titles
+    to 100, and the popover hung 177px over the album page. The panel now draws Lossless, 24-bit, (320 kbps,)
+    Free slot, Signals, Complete albums only, Sample rate, sort - the first line exactly as it was before this
+    change, so Signals never moves; a phone's sheet keeps Complete albums only after Free slot. Measured on the
+    real page: Signals at 1202-1264 at 1440 and 862-924 in the 1100 drawer whatever is pressed, a 26px drag
+    from 0 setting 5, the popover on its row inside the panel. sources.sim pins both rows' order, with a
+    minimum set and Complete pressed.
+  - **The filter emptied by every close**: the Pressing button's own press only toggled `open`, so the words
+    typed survived it; it now closes through `close(false)` (group.sim, app-rules).
+  - **What a More page says**: `added === 0` had said "The next N albums MusicBrainz found are all in your
+    library already" for a page of repeats, an empty page (a count running ahead - "The next 0 albums"), and
+    with no library answer at all; now `appendPage` counts `held` (new groups the library holds) and
+    `morePageWords` says that by its number, or "MusicBrainz sent nothing new." (searchQuery.sim, search.sim).
+  - **The arrows never under the filter**: the browser's focus scrolling brought a pressing to rest at the
+    list's top edge, under the 50px sticky filter (13 of 39 ArrowUps covered half a 72px option); the list keeps
+    the band clear by scroll-padding, and `reveal()` reads it back (a list closed scrolled down and opened again
+    put the chosen one under the filter too). Real page: 0 of 53 steps covered at 1440 and at 390.
+  - **More's last page hands focus on**: the button unmounting with focus dropped it to `<body>`; when it had
+    focus as the page landed, focus goes to the first row the page brought, or the note in its place - not on a
+    WebKit tap (nothing focused), not over focus gone elsewhere. Real page: seven pages of "portishead" by Enter,
+    focus on row 68 of 73, the first of the last page.
+  - **Small ones**: a catalogue number typed without its dash ("uicb1004") finds UICB-1004; the placeholder says
+    what works, "JP, CD, a label or cat. no." (no row says "Japan"; 190px of 244 at 320); More gets the main
+    area's gap above the desktop's player bar; docs/finding-music.md quotes the links' line as drawn (three
+    spans, no colon or dot). And tests for what was unpinned: a later page's count (grown keeps the button,
+    shrunk ends it), the plural all-held words and a plain failure's own reason, accents folded in the filter,
+    a label said once under three catalogue numbers (Wish You Were Here's 588ca0a5); sims.md's app-rules line.
+  - **Real page** (the fixer's own deadwax on 8117, logins off, a fake slskd on 8118, the stand-in Navidrome,
+    live MusicBrainz; `work/srch50-fixer/drive.cjs`, 28 checks, all passing, no console errors, nothing wider
+    than the window).
+- **After a second review** (three findings, all fixed):
+  - **The filter said nothing to VoiceOver** (nit): "No pressing matches" was a `role="status"` paragraph made
+    with its words, which VoiceOver doesn't read, and nothing said how many pressings a filter left. Now one
+    polite region, always in the list while it has a filter (FolderPicker's "N folders match" did this
+    already), says `pressingFilterWords`' words; the drawn line lost its role, so nothing is announced twice
+    (group.sim: the region there and empty before a word is typed, its count, its none, emptied by a pick;
+    pressings.sim: the words).
+  - **The note check that read the label** (minor): pressings.sim's "a word of its note" typed "magic doors",
+    which 7da10d5d's disambiguation puts in its label too, so a filter that stopped reading notes went
+    unnoticed; it types "machine gun", 5add188d's bonus track, in neither its label nor its facts (checked in
+    the same check, so the fixture can't drift under it).
+  - **The first page's offset** (nit): only later pages' offsets were pinned, so a first page counting the rows
+    shown rather than every answer got (one held album: offset 0 for 1) passed every sim; search.sim's
+    all-held first page now checks More asks from offset 1.
+  - **Real page** (the second fixer's own deadwax on 8115, logins off, a fake slskd on 8116, the stand-in
+    Navidrome, live MusicBrainz; `work/srch50-fixer2/drive.cjs`, 22 checks, all passing, no console errors):
+    Animals' 90 pressings at 1440x900, 390x844 and 320x568 - the region in the open list before a word is
+    typed (1px, clipped, empty; a polite status in Chromium's accessibility tree), "12 pressings match." for
+    "jp" with twelve shown, "No pressing matches “jp zzzz”." by the same region with the drawn line no role of
+    its own, empty again once closed and opened; nothing wider than the window.
+- **Verified**: 2657 Python tests (2655 passed, 2 skipped; 20 new), pyflakes, tsc, the build, and all 50 sims
+  (`search`, `searchQuery`, `pressings`, `group`, `sources`, `candidates` and `app-rules` extended). 58
+  mutations, one or more per rule pinned - the route's bounds and offset, the first page's request, the count;
+  the app's bound, client and paging rules; More's busy tap, offset, fallback query, notes, button and
+  latestOnly; every facts rule, the filter's words, threshold, keys, fold and emptying; the maybe, its
+  artists, the facts' place and the links; the every-track rule, its no-tracklist case and named tracks; the
+  chip, the floor, its count, its phone-sheet rule, fresh-Get and Clear-filters resets and the pick; six CSS
+  rules - each caught on a check (ten first failed only to compile, and were made type-valid), the tree
+  byte-identical afterwards (`work/srch50-builder/mutate.py`); and after review 25 more, every fix broken in
+  turn (the chip order, the button's close, `held` and the words, the plain failure, a later page's count, the
+  focus handoff's six conditions, the facts' one label, accents, the closed-up catalogue number, the
+  placeholder, `reveal()`, four CSS rules) - all caught on a check, type-valid, the tree byte-identical
+  afterwards (`work/srch50-fixer/mutate.py`); and after the second review 12 more (the filter's region made on
+  demand, gone, not polite, drawn, counting every pressing, the drawn line a region again; the words' plural,
+  their none, their nothing typed, their trim; a note not searched; the first page's offset by rows shown) -
+  all caught on a check, type-valid, the tree byte-identical afterwards (`work/srch50-fixer2/mutate.py`).
+  The engine guard is empty; `player.sim.cjs`, CandidatesPanel.tsx and the main page are untouched.
+  **NOT verified here**: the iPhone - More under a finger and VoiceOver reading what a page brought (and where
+  its cursor goes as the last page lands: VoiceOver's cursor is its own, not the page's focus), the
+  filter's field and the keyboard over the list (and VoiceOver reading its region as the list narrows), the dashed maybe at 320 on a real screen, the links opening
+  from the home-screen app (outside it, in Safari); a real slskd's sample rates (the fake's say 44.1 or 96);
+  MusicBrainz's `count` for a search with no answers past the first page, and its paging of a very long tail
+  (relevance ties shifting between pages - `appendPage` drops a repeat, nothing finds one skipped).

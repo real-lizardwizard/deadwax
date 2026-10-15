@@ -538,6 +538,9 @@ export interface ReleaseGroup {
 export interface FullySearchResponse {
   'release-groups'?: ReleaseGroup[]
   'best-match-releases'?: Release[]
+  /** how many groups match in all, as MusicBrainz counts them (2.0.0-player.50) - what tells a page
+   *  whether there are more to ask for; absent from an older server, or when MusicBrainz didn't say */
+  count?: number
 }
 
 export interface ReleasesResponse {
