@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.config import Config
 from src.library import note_library_changed
+from src.library_ledger import grant_job
 from src.logger import logger
 from src.lyrics import fetch_album_lyrics
 from src.organizer import organize_job, remove_empty_incomplete_dirs, remove_incomplete_downloads
@@ -195,6 +196,14 @@ FAILED_TO_ORGANIZE = "file(s) failed to organize"
 NO_TRACK_FILED = "no track was filed"
 #? the end of the all-duplicates and all-skipped messages
 NOTHING_FILED = "nothing was filed"
+#? (named in 2.0.0-player.51) nothing placed and nothing already there - usually SLSKD_DOWNLOAD_PATH...
+NOTHING_ORGANIZED = "nothing could be organized, check SLSKD_DOWNLOAD_PATH"
+#? ...and filing that raised: "organize failed: <why>"
+ORGANIZE_FAILED = "organize failed:"
+#? (2.0.0-player.51) the errors job_outcome's `not_filed` takes, as SQL LIKE patterns - what list_jobs reads
+#? the runners-up of, with logins on, beside failed and cancelled. A pattern may match a little more than
+#? the exact test (LIKE folds case; `_` is any character), never less: retryable() decides.
+NOT_FILED_PATTERNS = (NOTHING_ORGANIZED, f"{ORGANIZE_FAILED}%", f"%, {NO_TRACK_FILED}")
 
 
 async def _organize_if_enabled(job: dict, store) -> None:
@@ -226,12 +235,14 @@ async def _organize_if_enabled(job: dict, store) -> None:
         #? Whatever status the job ends on - organized, or complete with some files failed - the
         #? tracks that did land are in the library, and everything that has to know is told BEFORE
         #? the status is written.
+        plan = results.get("plan") or {}
+        album_id = None
         if results.get("organized") and not results.get("dry_run"):
             #? The store index learns the folder (step 2): until the status moves on from
             #? `organizing` a Find of this release sees the job in flight, and after it the index has
             #? to say the album is here, or there is a moment where neither is true and a second
             #? download gets through.
-            await index_folder(store, Config.LIBRARY_PATH, (results.get("plan") or {}).get("album_dir"))
+            album_id = await index_folder(store, Config.LIBRARY_PATH, plan.get("album_dir"))
             #? Until 1.1.2 only a clean `organized` said so, so /owned went on answering from a
             #? snapshot without the album and the new-import badge never counted it. The page reacts
             #? to `organized` by asking /owned and the badge again, and must find both already
@@ -242,6 +253,12 @@ async def _organize_if_enabled(job: dict, store) -> None:
             #? naming an album it can't show you is worse than no badge
             if results.get("tracks_organized"):
                 await _enrol_for_review(job, results, store)
+        elif results.get("skipped") and not results.get("dry_run") and plan.get("album_dir"):
+            #? nothing filed, everything already there: the folder it was all in, for the grant below
+            album_id = await index_folder(store, Config.LIBRARY_PATH, plan.get("album_dir"))
+        #? (2.0.0-player.51) what it gives those who asked, before the status says how it ended - so the
+        #? row never reads "filed" a poll before it says it's in their library
+        await grant_job(store, job, results, album_id, bool(plan.get("same_release")), _filed_path(results))
         for key in filing:
             filing_finished(key)
         filing.clear()
@@ -264,9 +281,7 @@ async def _organize_if_enabled(job: dict, store) -> None:
             #? nothing was placed and nothing was already there - usually the download path
             #? doesn't actually point at slskd's files. Saying "organized" here would send
             #? the user looking for an album that was never filed.
-            await store.update_status(
-                job["id"], "complete", "nothing could be organized, check SLSKD_DOWNLOAD_PATH"
-            )
+            await store.update_status(job["id"], "complete", NOTHING_ORGANIZED)
 
         elif not results["organized"]:
             #? every file was skipped because something was already at its destination, so
@@ -293,7 +308,7 @@ async def _organize_if_enabled(job: dict, store) -> None:
             f"organizing {job['artist']} - {job['album']} failed: {e}",
             extra={"frontend": True, "src": "slskd"},
         )
-        await store.update_status(job["id"], "complete", f"organize failed: {e}")
+        await store.update_status(job["id"], "complete", f"{ORGANIZE_FAILED} {e}")
 
     finally:
         for key in filing:
@@ -469,7 +484,7 @@ def job_lock_key(job: dict) -> str | None:
     return f"job:{job['id']}" if job.get("id") is not None else None
 
 
-async def _fresh_job(store, job: dict) -> tuple[dict, str | None]:
+async def _fresh_job(store, job: dict, same_peer: bool = True) -> tuple[dict, str | None]:
     """
     The job as it is NOW, read under the retry's lock - and why a retry mustn't go on, if so.
 
@@ -484,7 +499,7 @@ async def _fresh_job(store, job: dict) -> tuple[dict, str | None]:
     fresh = await store.get_job(job["id"]) if job.get("id") is not None else None
     if fresh is None:
         return job, (CLEARED if job.get("id") is not None and getattr(store, "available", False) else None)
-    if fresh.get("status") not in RETRYABLE_STATUSES:
+    if not (retryable(fresh) if same_peer is False else fresh.get("status") in RETRYABLE_STATUSES):
         return fresh, MOVED_ON
     return fresh, None
 
@@ -507,7 +522,7 @@ async def retry_next_peer(slskd_client, store, job: dict) -> dict:
     asked, under the release's lock (the job's own, with no release id), as /enqueue does.
     """
     async with release_lock(job_lock_key(job)):
-        job, problem = await _fresh_job(store, job)
+        job, problem = await _fresh_job(store, job, same_peer=False)
         problem = problem or await already_have(store, _job_release(job), excluding_job_id=job.get("id"))
         if problem:
             return {"moved": False, "username": None, "directory": None,
@@ -696,7 +711,7 @@ async def tidy_cancelled_on_start(slskd_client, store) -> int:
 INTERRUPTED_FILING = "deadwax stopped while filing this - check the library and slskd's folder"
 
 
-def job_outcome(status: str | None, error: str | None) -> str | None:
+def job_outcome(status: str | None, error: str | None, not_filed: bool = False) -> str | None:
     """
     How a download ended, for the app's Requests tab (2.0.0-player.12), from its status and the
     named messages this module writes - never parsed out of free text:
@@ -710,10 +725,14 @@ def job_outcome(status: str | None, error: str | None) -> str | None:
       reads as partly filed.
     - `interrupted`: deadwax stopped while filing it (INTERRUPTED_FILING).
     - `failed`: failed or cancelled - the two "try the next peer" and "ask again" can restart.
+    - `not_filed` (2.0.0-player.51, asked with `not_filed` - logins on): downloaded, and nothing of it
+      could be filed - nothing found to file (NOTHING_ORGANIZED), filing that raised (ORGANIZE_FAILED),
+      no track filed (NO_TRACK_FILED). The plan's table: nothing given, "the row says why and offers the
+      next peer" (retryable). With logins off it stays None, as it always was.
     - None while it is still going (queued, downloading, organizing), and for a download that
       finished without filing for another reason its row states: a dry run, organizing off (or
-      no library or slskd folder set), nothing that could be filed, filing that raised, or no
-      track filing.
+      no library or slskd folder set), and - logins off - nothing that could be filed, filing that
+      raised, or no track filing.
     """
     if status == "organized":
         return "filed"
@@ -727,7 +746,22 @@ def job_outcome(status: str | None, error: str | None) -> str | None:
         return "already_there"
     if error.endswith(f" {FAILED_TO_ORGANIZE}"):
         return "partly_filed"
+    if not_filed and (error == NOTHING_ORGANIZED or error.startswith(ORGANIZE_FAILED)
+                      or error.endswith(f", {NO_TRACK_FILED}")):
+        return "not_filed"
     return None
+
+
+def retryable(job: dict, logins: bool | None = None) -> bool:
+    """
+    Whether "try the next peer" may start this download again: failed or cancelled - and (2.0.0-player.51,
+    with logins on - `logins`, Config.logins_on() when not given) one downloaded that nothing of could be
+    filed (job_outcome's `not_filed`). "Ask again" (the same peer) stays failed and cancelled alone.
+    """
+    if job.get("status") in RETRYABLE_STATUSES:
+        return True
+    logins = Config.logins_on() if logins is None else logins
+    return bool(logins) and job_outcome(job.get("status"), job.get("error"), not_filed=True) == "not_filed"
 
 
 async def settle_interrupted_filing(store) -> int:

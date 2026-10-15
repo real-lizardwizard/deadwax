@@ -2,13 +2,14 @@ import { Fragment } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { storeState } from '../api/download'
+import { addToMyLibrary } from '../api/me'
 import { MusicBrainzUnavailable } from '../api/http'
 import { getReleaseGroup } from '../api/musicbrainz'
 import type { ReleaseGroup, ReleaseGroupResponse, StoreStateResponse } from '../api/types'
 import { storeNotes } from '../lib/candidates'
 import { joinDownload } from '../lib/downloadRequests'
 import { isAbort, latestOnly } from '../lib/latest'
-import { onAlbumsFiled } from '../lib/libraryEvents'
+import { announceAddedToLibrary, onAddedToLibrary, onAlbumsFiled } from '../lib/libraryEvents'
 import { releaseUrl } from '../lib/albumProperties'
 import { describeGroupOwnership, ownedForGroup } from '../lib/owned'
 import {
@@ -335,6 +336,9 @@ export function ReleaseGroupPage({
   const [store, setStore] = useState<{ id: string; state: StoreStateResponse } | null>(null)
   const [filed, setFiled] = useState(0)
   useEffect(() => onAlbumsFiled(() => setFiled((n) => n + 1)), [])
+  //? (2.0.0-player.51) added to your library - from this page's line, or the Sources panel's beside it: the
+  //? store asked again, so the line says "Already in your library"
+  useEffect(() => onAddedToLibrary(() => setFiled((n) => n + 1)), [])
   useEffect(() => {
     if (!download || !chosen) {
       stateRequests.supersede()
@@ -362,6 +366,9 @@ export function ReleaseGroupPage({
   const { settings } = useGetSettings(shown)
   const floor = settings?.quality_floor ?? null
   const join = (jobId: number) => joinDownload(jobId).then(() => setFiled((n) => n + 1))
+  //? (2.0.0-player.51) a pressing the store holds that isn't yours, added from the line - which then asks
+  //? the store again (onAddedToLibrary, above), and says it's in your library
+  const add = () => (download ? addToMyLibrary(download.release).then(announceAddedToLibrary) : Promise.reject(new Error('Choose a pressing first.')))
 
   //? a desktop's Sources panel shows the sources of the pressing on screen: Get is drawn pressed
   const sourcesHere = sourcesPressing !== null && sourcesPressing === chosen?.id
@@ -451,7 +458,7 @@ export function ReleaseGroupPage({
           {desktop && picker}
           {desktop && facts}
           <div class="app-rg-store" aria-live="polite">
-            {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} onJoin={join} />}
+            {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} onJoin={join} onAdd={add} />}
           </div>
         </div>
       </div>

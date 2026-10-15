@@ -39,7 +39,8 @@ from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_
                            scanned_since_hold, step)
 from src.store_index import index_folder, mark_deleted, reconcile_scan, reindex_merged, reindex_moved
 from src.track_tags import execute_tag_edits, plan_tag_edits
-from src.users import require_admin
+from src.users import LOCAL_USER, require_admin
+from src import library_ledger
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
 #? rarely and one at a time, so there is nothing to gain from per-request clients and a
@@ -571,7 +572,13 @@ async def retag_apply(request: Request, body: RetagRequest):
     #? the same folder could otherwise plan against it mid-way; queued behind the first, it plans
     #? against what the first left - and is refused plainly if the folder has moved.
     async with _apply_lock(body.album_path):
-        return await _retag_apply(request, body)
+        #? (2.0.0-player.51) while it runs, a star Navidrome loses on this album - between the new tags'
+        #? scan and the rename - is never read back as its holders unstarring it (src/stars.py)
+        retagging = library_ledger.retag_started(body.album_path)
+        try:
+            return await _retag_apply(request, body)
+        finally:
+            library_ledger.retag_finished(retagging)
 
 
 _APPLY_LOCKS: dict[str, asyncio.Lock] = {}
@@ -662,11 +669,15 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
         store = _store(request)
         root = Config.LIBRARY_PATH or ""
         if results.get("merged"):
-            await reindex_merged(store, root, plan["source"], results["moved_to"])
+            album_id = await reindex_merged(store, root, plan["source"], results["moved_to"])
         elif results.get("moved_to"):
-            await reindex_moved(store, root, plan["source"], results["moved_to"])
+            album_id = await reindex_moved(store, root, plan["source"], results["moved_to"])
         else:
-            await index_folder(store, root, plan["source"])
+            album_id = await index_folder(store, root, plan["source"])
+        #? (2.0.0-player.51) the backstop: the two-step apply above is what lets a star follow the album,
+        #? and whatever Navidrome did with it, everyone who holds it has it starred again - asked now
+        if store is not None and album_id is not None and await store.ledger_restar(album_id):
+            library_ledger.kick()
 
         #? Applying a release IS reviewing the album, so this clears it from the new-import
         #? prompt without a second click. It follows the rename because album_review is keyed
@@ -1518,7 +1529,7 @@ class DeleteRequest(BaseModel):
 
 
 @router.post("/delete", dependencies=ADMIN)
-async def delete(request: Request, body: DeleteRequest):
+async def delete(request: Request, body: DeleteRequest, user: str = Depends(require_admin)):
     """
     Remove an album folder and everything in it. Permanent.
 
@@ -1544,8 +1555,10 @@ async def delete(request: Request, body: DeleteRequest):
         await _persist_cache(request)
 
         store = _store(request)
-        #? its store index row stays, as a `deleted` tombstone - step 5's history keys on the id
-        await mark_deleted(store, Config.LIBRARY_PATH or "", body.album_path)
+        #? its store index row stays, as a `deleted` tombstone - step 5's history keys on the id - and
+        #? (2.0.0-player.51) every holder's library entry becomes "removed by the admin", but the deleting
+        #? admin's own, which is put away at once: they chose it
+        await mark_deleted(store, Config.LIBRARY_PATH or "", body.album_path, by=user)
         #? and its review row, which the next full scan would prune - until then an unreviewed
         #? import was counted by the new-imports badge while naming nothing (v1.1.5)
         if store is not None:
@@ -1562,13 +1575,20 @@ async def delete(request: Request, body: DeleteRequest):
 
 
 @router.get("/deletion_summary", dependencies=ADMIN)
-async def deletion_summary(album: str):
+async def deletion_summary(request: Request, album: str, user: str = Depends(require_admin)):
     """
     What deleting this album would remove. Touches nothing.
 
     Read live rather than from the scan so the confirmation describes the folder as it is
     now, and so it can count files the scan ignores - a rip log or a cue sheet in there is
     worth knowing about before it goes.
+
+    With logins on (2.0.0-player.51) also who holds it, so the dialog can name them: deleting it takes it
+    out of their libraries ("removed by the admin") - `holders`, everyone ELSE who holds it, in the order
+    they got it, and `yours`, whether the admin asking does (their own entry is put away as they delete
+    it: nobody tells themselves "request it again"). When deadwax can't read who holds it, neither is
+    sent but `holders_unknown`: the dialog of the one action with no undo never says "nobody has it" on a
+    guess (review).
     """
     root_path = Config.LIBRARY_PATH or ""
 
@@ -1581,7 +1601,19 @@ async def deletion_summary(album: str):
     if not is_within(directory, root) or not directory.is_dir():
         raise HTTPException(status_code=400, detail="that album is not inside the library")
 
-    return await asyncio.to_thread(summarize_for_deletion, directory)
+    summary = await asyncio.to_thread(summarize_for_deletion, directory)
+    if Config.logins_on():
+        store = _store(request)
+        holders = await store.ledger_holders(root_path, album) if store is not None else None
+        if holders is None:
+            summary["holders_unknown"] = True
+        else:
+            #? `local` - logins-off's - is nobody to name: its entries are the first admin's to take over;
+            #? nor the break-glass admin, who has no library
+            named = [holder for holder in holders if holder != LOCAL_USER and library_ledger.has_library(holder)]
+            summary["yours"] = user in named
+            summary["holders"] = [holder for holder in named if holder != user]
+    return summary
 
 
 # ==================== artists ====================

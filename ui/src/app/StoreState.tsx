@@ -1,6 +1,7 @@
 import { useRef, useState } from 'preact/hooks'
 
 import type { StoreStatus } from '../lib/candidates'
+import { ADDED_WORDS } from '../lib/myLibrary'
 
 /**
  * What the library and the downloads already have of a pressing (step 2's store, 2.0.0-player.7),
@@ -19,6 +20,10 @@ import type { StoreStatus } from '../lib/candidates'
  * the page gives an `onJoin`. What a join leads to is the page's: the Sources sheet hands over to
  * Requests, as a Get does; the album page asks the store again, and the line becomes yours.
  *
+ * ADD (2.0.0-player.51, personal libraries): a pressing the store holds that isn't in your library
+ * (storeStatusFor's `add`) has "Add to my library" under its words (AddToLibrary, below), when the page
+ * gives an `onAdd` - which asks the store again afterwards, and the line becomes "Already in your library".
+ *
  * A path is a stranger's folder name as often as not, so every line breaks anywhere rather than
  * push a phone's screen sideways. A leaf: props only.
  */
@@ -26,11 +31,14 @@ export function StoreState({
   status,
   notes,
   onJoin,
+  onAdd,
 }: {
   status: StoreStatus | null
   notes: readonly string[]
   /** join the download this status is about; resolves once deadwax has it, rejects with its words */
   onJoin?: (jobId: number) => Promise<unknown>
+  /** add the pressing this status is about to your library (2.0.0-player.51); resolves once deadwax has it */
+  onAdd?: () => Promise<unknown>
 }) {
   if (!status && !notes.length) return null
   return (
@@ -46,6 +54,7 @@ export function StoreState({
             </p>
           ))}
           {status.joinJobId !== undefined && onJoin && <JoinDownload key={status.joinJobId} jobId={status.joinJobId} onJoin={onJoin} />}
+          {status.add && onAdd && <AddToLibrary key={status.lines[0] ?? ''} onAdd={onAdd} />}
         </div>
       )}
       {notes.length > 0 && (
@@ -108,6 +117,47 @@ export function JoinDownload({ jobId, onJoin }: { jobId: number; onJoin: (jobId:
     <>
       <button ref={button} type="button" class="app-button app-store-join" aria-disabled={state === 'joining'} onClick={join}>
         {state === 'joining' ? 'Joining…' : 'Join this download'}
+      </button>
+      {refused && (
+        <p class="app-store-line is-refused" role="alert">
+          {refused}
+        </p>
+      )}
+    </>
+  )
+}
+
+/**
+ * "Add to my library" (2.0.0-player.51), under a pressing the store holds that isn't yours - as Join is:
+ * the tap asks deadwax at once, the button waits (aria-disabled, so the focus on it stays), and gives way
+ * to the added words, handing its focus to the box; a refusal is said under it, in an alert.
+ */
+export function AddToLibrary({ onAdd }: { onAdd: () => Promise<unknown> }) {
+  const [state, setState] = useState<'idle' | 'adding' | 'added'>('idle')
+  const [refused, setRefused] = useState<string | null>(null)
+  const button = useRef<HTMLButtonElement | null>(null)
+
+  const add = () => {
+    if (state !== 'idle') return
+    setState('adding')
+    setRefused(null)
+    onAdd().then(
+      () => {
+        keepJoinFocus(button.current, '.app-store-box')
+        setState('added')
+      },
+      (caught: unknown) => {
+        setState('idle')
+        setRefused(caught instanceof Error ? caught.message : String(caught))
+      },
+    )
+  }
+
+  if (state === 'added') return <p class="app-store-line" role="status">{ADDED_WORDS}</p>
+  return (
+    <>
+      <button ref={button} type="button" class="app-button app-store-join" aria-disabled={state === 'adding'} onClick={add}>
+        {state === 'adding' ? 'Adding…' : 'Add to my library'}
       </button>
       {refused && (
         <p class="app-store-line is-refused" role="alert">

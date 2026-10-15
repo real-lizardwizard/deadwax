@@ -60,6 +60,12 @@
  *    with no card left, and nowhere while focus is somewhere else; the ✕ is named for leaving. And a
  *    join tells every downloads list in the page to ask again - useDownloadJobs itself, effects
  *    running, polling again after a join.
+ *  - Personal libraries (2.0.0-player.51, lib/myLibrary.ts grantWords): with logins on a Done row says
+ *    what its filing gave - in your library, or (an admin's row of another's) in theirs; a second copy
+ *    not filed, added; another copy's folder, not added and an admin asked to look (amber); partly
+ *    filed, added marked incomplete - and logins off the words it always had. A download nothing of
+ *    could be filed (`not_filed`, logins on) is under Needs attention saying why, the next peer offered
+ *    and no Ask again; with logins off it is Done, as it always was.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -578,6 +584,36 @@ console.log('\nDone: how it ended, and how long ago')
   const unknown = view([job('complete', { outcome: 'partly_filed', error: '1 file(s) failed to organize', updated_at: 'nonsense' })]).sections.done[0]
   check('an age that can\'t be read is left off', [unknown.line, unknown.lineTone], ['Partly filed: 1 file(s) failed to organize', 'warning'])
   check('a done row is not arriving, and has no ✕', [done.arriving, done.cancel], [false, null])
+}
+
+/* ========================================================================== */
+console.log('\npersonal libraries (2.0.0-player.51): what a filing gave, and a download nothing could be filed of')
+{
+  const words = (outcome, error, library, mine) => V.outcomeWords({ outcome, error, library, ...(mine === undefined ? {} : { mine }) })
+  check('filed, into your library', words('filed', null, 'added', true), { text: 'In your library', tone: 'plain' })
+  check('...an admin\'s row of somebody else\'s', words('filed', null, 'added', false), { text: 'Filed - in their library', tone: 'plain' })
+  check('a second copy not filed, given', words('already_there', 'already in the store: all 10 track(s) were already there, nothing was filed', 'added', true),
+    { text: 'Already in the store, added to your library', tone: 'plain' })
+  check('...given to them', words('already_there', 'x', 'added', false).text, 'Already in the store, added to their library')
+  check('everything already in another copy\'s folder: not added, an admin looks - amber', words('already_there', 'x', 'flagged', true),
+    { text: 'Already in the store as another copy, so not added - an admin has been asked to look', tone: 'warning' })
+  check('...the admin\'s Add for them makes it added; their Put away says the admin has looked (review: it kept saying an admin had been asked)',
+    [words('already_there', 'x', 'added', true).text, words('already_there', 'x', 'looked', true)],
+    ['Already in the store, added to your library', { text: 'Already in the store as another copy, so not added - an admin has looked at it', tone: 'warning' }])
+  check('some files failed: added, marked incomplete', words('partly_filed', '2 file(s) failed to organize', 'incomplete', true),
+    { text: 'Partly filed: 2 file(s) failed to organize · in your library, marked incomplete', tone: 'warning' })
+  check('logins off (no `library`): the words it always had', [words('filed', null, undefined).text, words('already_there', 'x', undefined).text],
+    ['In your library', 'Already in your library, nothing filed'])
+  check('...and nothing given says its own words', words(null, 'dry run - not organized', null, true).text, 'Not filed: dry run - not organized')
+
+  const notFiled = job('complete', { outcome: 'not_filed', error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH', alternatives_left: 2 })
+  const v = view([notFiled])
+  const [row] = v.sections.attention
+  check('nothing of it could be filed (logins on): under Needs attention, saying why, the next peer offered - not Ask again',
+    [v.sections.done.length, row.reason, row.nextPeer.label, row.askAgain], [0, 'nothing could be organized, check SLSKD_DOWNLOAD_PATH', 'Next peer · 2 left', null])
+  const off = view([job('complete', { outcome: null, error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH' })])
+  check('...with logins off (no such outcome): Done, as it always was', [off.sections.done.length, off.sections.attention.length, off.sections.done[0].line.startsWith('Not filed: nothing could be organized')],
+    [1, 0, true])
 }
 
 /* ========================================================================== */

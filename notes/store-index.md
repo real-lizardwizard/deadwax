@@ -309,3 +309,13 @@ A second review, of those fixes (in the scratchpad's `verify2step/`), confirmed 
   where filing would go is the same folder, and the note says "separately" when it isn't.
 - With a RELATIVE `LIBRARY_PATH` (`music`), a library-relative path whose artist folder is named
   like the root (`music/...`) is read as root-joined. Absolute paths, the norm, are unaffected.
+
+**Since 2.0.0-player.51** the per-user ledger these ids were kept for exists (library_membership - see
+"Personal libraries (2.0.0-player.51)" in notes/logins.md): `index_merge` and `index_move` union a
+merged row's holders into the row that stays, in the same transaction, and `index_gone(..., 'deleted')`
+turns every holder's entry into a tombstone (but the deleting admin's own, put away at once); `missing`
+touches nobody's. `held_copy` answers the rows' ids (`album_ids`), which the store line takes out before
+it answers the page. `store_index_scanned` records each root the index has been filled from a full scan
+of (`index_reconcile` with albums; at init, every root an index from before already holds) - what tells
+the first admin's seed that the index knows the store, and where a seed held over until then is done; and
+(`index_scanned`) what a user's first read-back of their stars waits for before it counts as done.

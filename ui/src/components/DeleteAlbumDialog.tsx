@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks'
 import * as libraryApi from '../api/library'
 import type { DeletionSummary, LibraryAlbum } from '../api/types'
 import { formatSize } from '../lib/format'
+import { holdersText } from '../lib/myLibrary'
 import { Loading, LoadingPanel } from './Loading'
 
 interface Props {
@@ -22,6 +23,10 @@ interface Props {
  *
  * Deliberately not a browser confirm(): it can't show any of that, and this is the one
  * action in deadwax with no undo.
+ *
+ * With logins on (2.0.0-player.51) it names who has the album in their library (the summary's
+ * `holders`, and `yours` for the admin deleting it): deleting it turns each of theirs into "removed by
+ * the admin, request it again" - and says so when deadwax couldn't read who has it, never "nobody".
  */
 export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
   const [summary, setSummary] = useState<DeletionSummary | null>(null)
@@ -107,6 +112,11 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
               </div>
             )}
           </>
+        )}
+
+        {/* (2.0.0-player.51, logins on) whose libraries it is in - deleting it takes it out of them */}
+        {summary && holdersText(summary) && (
+          <p class="text yellow delete-warning delete-holders">{holdersText(summary)}</p>
         )}
 
         <p class="text red delete-warning">

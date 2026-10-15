@@ -107,7 +107,9 @@ src/
                    (store_album): every album folder under an id that survives a rename - and,
                    per user, the app's preferences (user_prefs) and pins (pins), with
                    adopt_local() (an admin's first sign-in) - who is signed in (sessions), and
-                   who asked for each download (job_requests - see "Downloads per person").
+                   who asked for each download (job_requests - see "Downloads per person"); each
+                   person's library (library_membership, user_credentials, library_flags,
+                   library_seed, store_index_scanned - see "Personal libraries").
   pins.py          PURE. What a pin to the app's Home keys on (store:<store_album.id>, mb:<mbid>)
                    and the PUT's list - see "Pins, and a finished Home". Never Navidrome stars.
   store_index.py   keeps the store index in step with every scan and writer, and the "already
@@ -160,6 +162,12 @@ src/
   auth.py          logins (AUTH_MODE, 2.0.0-player.48): sign-in through Navidrome's getUser, the
                    session cookie and table, the re-check, break-glass, the throttle - see
                    "Logins and roles".
+  library_ledger.py  personal libraries (2.0.0-player.51): the rules - what each way a download ends
+                   gives its requesters, the backoff, the words - and the grants a filing writes. See
+                   "Personal libraries".
+  stars.py         each user's library starred AS THEM in Navidrome (found, starred, confirmed,
+                   retried), their stars read back (two-way with Amperfy) - a lifespan worker with
+                   logins on. See "Personal libraries".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
@@ -174,7 +182,9 @@ src/
                    (the player's FIXED list of Subsonic calls - see "The phone player"),
                    me, auth (sign-in and sign-out, the two routes needing no session),
                    store_album (the app's id bridge - see "Artists, and the two
-                   libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home");
+                   libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home"),
+                   my_library (/deadwax/me/library) and held (/deadwax/library/held, an admin's) -
+                   see "Personal libraries";
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
@@ -212,10 +222,14 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    app/LibraryCare.tsx is Rescan and the bulk runs (both frames; its runs
                    app/useLibraryCare.ts; which albums each takes lib/bulkTargets.ts, the main
                    page's too) - see "Looking after the library".
+                   app/useMyLibrary.ts is your library as the app keeps it (logins on), drawn by
+                   app/YourLibrary.tsx (You), Home's New shelf and the Library's New marks;
+                   app/HeldByNobody.tsx is Library care's; the words lib/myLibrary.ts - see
+                   "Personal libraries".
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             2718 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             2824 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -254,7 +268,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | Requests, Search, the album you don't have, Sources and Get | `notes/app-requests-search-get.md` |
 | artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
-| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person | `notes/logins.md` |
+| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries | `notes/logins.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
 | the turntable's sound following the hand (.24) | `notes/turntable-sound.md` |
 | the turntable's sound since: warble, echo, kernel, first turn, clock, recorder, limiter (.27-.35), less delay (.40) | `notes/turntable-fixes.md` |
@@ -460,7 +474,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2718 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 2824 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -498,7 +512,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2718 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 2824 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

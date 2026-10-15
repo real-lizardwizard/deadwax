@@ -17,6 +17,9 @@
  *    after a failure - its tiles in the rule's order, each opening its album.
  *  - The order, as the board and James have it: Pinned at the top, then Recently added, then Not
  *    played in a while - all inside the Navidrome gate.
+ *  - New in your library (2.0.0-player.51, logins on): under Pinned and over Recently added, its tiles
+ *    opening their albums; none, no shelf; waited for as the pins are (null: not said yet), never past
+ *    the wait; a Home handed nothing (logins off) draws none and waits for none.
  *  - The pins are asked afresh each time Home comes into view, and not while it doesn't show; the
  *    shelves are drawn only once the pins have answered (or failed, or PINNED_WAIT_MS has passed while
  *    Home showed - the wait counts only while it shows, afresh each time it comes into view until it
@@ -289,6 +292,32 @@ async function run() {
     tree = mount(Home).draw(props())
     check('the pins failed: drawn at once, Pinned saying why', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, words(find(byClass('app-pinned-note'), tree))],
       [false, "Couldn't get your pins: refused"])
+  }
+
+  console.log('\nHome: New in your library (2.0.0-player.51, logins on)')
+  {
+    reset(); W.opened = []
+    W.pins = { pins: [], canSave: true, problem: null }
+    const home = mount(Home)
+    let tree = home.draw(props({ newAlbums: null }))
+    check('what is new not said yet: the shelves wait for it, as for the pins', find(byClass('app-home-shelves'), tree)[0]?.props.hidden, true)
+    const fresh = [{ id: 'nd-third', name: 'Third', artist: 'Portishead', coverArt: 'nd-third' }]
+    tree = home.draw(props({ newAlbums: fresh }))
+    check('said: under Pinned, over Recently added', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree)],
+      [false, ['Pinned', 'New in your library', 'Recently added']])
+    find(byClass('app-tile'), tree)[0].props.onClick()
+    check('...its tile opens the album', W.opened.map((a) => a.id), ['nd-third'])
+    tree = home.draw(props({ newAlbums: [] }))
+    check('nothing new: no shelf, no heading', headings(tree).includes('New in your library'), false)
+    reset(); timers.length = 0
+    W.pins = { pins: [], canSave: true, problem: null }
+    const slow = mount(Home)
+    slow.draw(props({ newAlbums: null }))
+    waitOver()
+    tree = slow.draw(props({ newAlbums: null }))
+    check('...and never said: drawn without it once the wait is over', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree)], [false, ['Pinned', 'Recently added']])
+    tree = mount(Home).draw(props())
+    check('a Home handed nothing (logins off): no shelf, and nothing waited for', headings(tree).includes('New in your library'), false)
   }
 
   console.log('\nHome: all of it inside the Navidrome gate')

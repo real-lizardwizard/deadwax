@@ -50,6 +50,10 @@
     --app-ring-inset: calc(-1 * var(--app-ring));  /* drawn inside: for what sits in a clipping box */
     --app-ring-room: calc(2 * var(--app-ring));    /* room for a ring drawn outside, width and gap */
     --app-line-gap: 2px;             /* between a label and the line under it */
+    /* personal libraries (2.0.0-player.51): a Library tile's New mark, and a Held by nobody row */
+    --app-new-pad: 6px;
+    --app-new-inset: 6px;
+    --app-care-held-pad: 8px;
     --app-edge-grouped-left: max(var(--dw-gutter-grouped), var(--pl-safe-left));
     --app-edge-grouped-right: max(var(--dw-gutter-grouped), var(--pl-safe-right));
     /* what opens over Now Playing (20): its ••• menu and Info - never both at once */
@@ -4398,6 +4402,67 @@ html.app-viewer-open { overflow: hidden; }
     outline: var(--app-ring) solid var(--dw-accent);
     outline-offset: var(--app-ring-inset);
     border-radius: var(--dw-radius-control);
+}
+
+/* ===== personal libraries (2.0.0-player.51) ===== */
+
+/* a Library tile's New mark: an album new in your library, until you open it - over the cover's corner,
+   so a marked tile is no taller than the others and its row stays in line */
+.pl-album:has(.pl-album-new) { position: relative; }
+
+.pl-album-new {
+    position: absolute;
+    top: var(--app-new-inset);
+    left: var(--app-new-inset);
+    padding: 0 var(--app-new-pad);
+    border: var(--dw-hairline) solid var(--dw-badge-purple-border);
+    border-radius: var(--dw-radius-tag);
+    /* the card's own colour under the badge's tint: legible whatever the cover behind it */
+    background: linear-gradient(var(--dw-badge-purple-bg), var(--dw-badge-purple-bg)), var(--dw-card);
+    color: var(--dw-accent-text);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* You > Your library: the albums the admin deleted, a card of their own under the count's - each with
+   Request it again and Put away under its words */
+.app-mylib-removed { margin-top: var(--app-heading-gap); }
+/* album names are strangers' tags as often as not: a one-word title breaks anywhere rather than push the
+   page sideways (the waiting lines) or be cut off by the card's clipping (the removed rows) - review */
+.app-mylib-waiting,
+.app-mylib-removed .app-row-label { overflow-wrap: anywhere; }
+.app-mylib-actions { display: flex; flex-basis: 100%; flex-wrap: wrap; gap: var(--app-row-pad); }
+.app-mylib-actions .app-text-button { min-height: var(--pl-hit); padding: 0; }
+.app-mylib-actions [aria-disabled='true'] { opacity: var(--app-job-busy); }
+
+/* Library care > Held by nobody: a row per album - its name, its folder under it - and a flagged
+   download's two buttons under its words */
+.app-care-held { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+.app-care-held-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-line-gap);
+    min-width: 0;
+    padding: var(--app-care-held-pad) 0;
+    border-top: var(--dw-hairline) solid var(--dw-row-border);
+}
+
+.app-care-held-name { color: var(--dw-text); font-size: var(--dw-text-footnote); overflow-wrap: anywhere; }
+
+.app-care-held-path {
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+.app-care-held-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-row-pad);
+    margin-top: var(--app-line-gap);
 }
 
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====

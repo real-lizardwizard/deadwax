@@ -10,12 +10,13 @@ from src.config import Config, search_timeout_seconds
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
-from src.poller import (job_lock_key, job_outcome, retry_next_peer, retry_same_peer, tidy_cancelled_later,
-                        tidy_cancelled_transfers, untried_alternatives)
+from src.poller import (NOT_FILED_PATTERNS, job_lock_key, job_outcome, retry_next_peer, retry_same_peer, retryable,
+                        tidy_cancelled_later, tidy_cancelled_transfers, untried_alternatives)
 from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
 from src.store_index import (FILING_STATUSES, already_have, coming_now, describe_job, filing_folder, held_copy,
                              in_flight, is_whole, other_pressings, release_lock)
+from src.auth import BREAK_GLASS_USER
 from src.users import current_user, is_admin
 
 router = APIRouter()
@@ -345,6 +346,15 @@ async def _store_state(request: Request, body: "FindCandidatesRequest", user: st
         if part is not None:
             state["downloading_part"] = await _describe_in_flight(request, part, user)
         held = await held_copy(store, root, body.release_mbid, release)
+        if held is not None:
+            #? (2.0.0-player.51) the store's rows stay here - and, with logins on, say whether the asker
+            #? holds it: "Already in your library", or "In the store" with Add to my library
+            album_ids = held.pop("album_ids", [])
+            if Config.logins_on() and user and user != BREAK_GLASS_USER:
+                yours = await store.ledger_holds(user, album_ids)
+                #? unread (None) says nothing - the line reads as it always did - never "not yours" on a guess
+                if yours is not None:
+                    held["yours"] = yours
         if held is not None and not held["complete"]:
             #? a download fills in a part only when filing would put it in that very folder
             held["filed_to"] = await filing_folder(root, release)
@@ -679,10 +689,13 @@ async def jobs(request: Request, user: str = Depends(current_user)):
     """
     user = _asker(user)
     admin = is_admin(user)
+    logins = Config.logins_on()
     try:
         store = request.app.state.store
         #? with logins off, every download, as it always was
-        stored = await (store.list_jobs(user=user, everyone=admin) if Config.logins_on() else store.list_jobs())
+        #? (2.0.0-player.51) with them on, the runners-up of a download nothing of could be filed are read too
+        stored = await (store.list_jobs(user=user, everyone=admin, not_filed=NOT_FILED_PATTERNS) if logins
+                        else store.list_jobs())
 
         if not stored:
             return {"jobs": [], "tracking_enabled": store.available}
@@ -734,15 +747,20 @@ async def jobs(request: Request, user: str = Depends(current_user)):
                 "release_mbid": job.get("release_mbid"),
                 "release_group_mbid": job.get("release_group_mbid"),
                 "edition": job.get("edition"),
-                #? how it ended, from the status and poller.py's named messages - None while going
-                "outcome": job_outcome(job["status"], job["error"]),
+                #? how it ended, from the status and poller.py's named messages - None while going (and,
+                #? with logins on, 2.0.0-player.51, `not_filed` for one nothing of could be filed)
+                "outcome": job_outcome(job["status"], job["error"], not_filed=logins),
                 "queue_position": queue_position,
                 **summary,
                 #? how many other peers "try next peer" could still move it to - only where it can
-                #? (list_jobs reads the runners-up for no other job), and 0 hides the button
+                #? (list_jobs reads the runners-up for no other job: failed, cancelled, and with logins on
+                #? one nothing of could be filed), and 0 hides the button
                 **({"alternatives_left": len(untried_alternatives(job))}
-                   if job["status"] in RETRYABLE_STATUSES else {}),
+                   if retryable(job, logins) else {}),
                 **_per_person(job, user, admin),
+                #? (2.0.0-player.51) what its filing gave those who asked - 'added', 'incomplete', 'flagged'
+                #? or None - with logins on only (off, the one library isn't shown)
+                **({"library": job.get("library_grant")} if logins else {}),
             })
 
         return {"jobs": merged, "tracking_enabled": store.available}
@@ -886,7 +904,8 @@ async def retry_job(request: Request, job_id: int, user: str = Depends(current_u
     store = request.app.state.store
     job = await _job_for(request, job_id, _asker(user))
 
-    if job["status"] not in RETRYABLE_STATUSES:
+    #? (2.0.0-player.51) with logins on, also one downloaded that nothing of could be filed (poller.retryable)
+    if not retryable(job):
         raise HTTPException(status_code=409, detail=f"this download is {job['status']}, not failed or cancelled")
 
     try:

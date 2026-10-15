@@ -220,11 +220,12 @@ async def reindex_merged(store, root: str, source_path, target_path) -> int | No
     return await index_folder(store, root, target or target_path)
 
 
-async def mark_deleted(store, root: str, path) -> None:
-    """deadwax deleted this album: its row is kept, as a `deleted` tombstone."""
+async def mark_deleted(store, root: str, path, by: str | None = None) -> None:
+    """deadwax deleted this album: its row is kept, as a `deleted` tombstone - and its holders' library
+    entries too (2.0.0-player.51), but for `by`'s, the admin deleting it (store.index_gone)."""
     relative = library_relative(root, path)
     if _usable(store) and relative:
-        await store.index_gone(root, relative, "deleted")
+        await store.index_gone(root, relative, "deleted", by=by)
 
 
 #? Album folders the poller is filing right now (folded relative path -> how many filings), from
@@ -449,6 +450,9 @@ async def held_copy(store, root: str, release_mbid: str | None, release: dict | 
         return {
             "path": first["path"],
             "paths": [row["path"] for row, _ in verified],
+            #? (2.0.0-player.51) the store's rows of them - what a library entry keys on. Never sent to the
+            #? page: the store line takes it out (routes/download._store_state), Add to my library keeps it
+            "album_ids": [row["id"] for row, _ in verified],
             "artist": first.get("artist") or "",
             "album": first.get("album") or "",
             "edition": first.get("edition") or "",

@@ -44,11 +44,13 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
   //? a failed or cancelled download can always ask its peer again, and move to the next peer
   //? when it has runners-up left
   const stopped = job.status === 'failed' || job.status === 'cancelled'
-  const canRetry = stopped && (job.alternatives_left ?? 0) > 0
+  //? (2.0.0-player.51, logins on) downloaded, and nothing of it could be filed: the next peer too
+  const notFiled = job.outcome === 'not_filed'
+  const canRetry = (stopped || notFiled) && (job.alternatives_left ?? 0) > 0
   //? why a retry didn't go ahead - said only while the row is still stopped: a click that lost to
   //? auto-retry, or to another tab, answers "already moved on", and the row moving on is the
   //? point, so its progress takes the line back
-  const problem = stopped ? retryProblem : null
+  const problem = stopped || notFiled ? retryProblem : null
   const percent = Math.round(job.progress || 0)
   const askedBy = askedByText(job)
 
@@ -102,8 +104,10 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
           One group, so the two move together: on a narrow panel they wrap to a line of their own
           at the right rather than squeezing the album's name to nothing.
         */}
-        {stopped && !retrying && (
+        {(stopped || (notFiled && canRetry)) && !retrying && (
           <span class="download-job-retries">
+          {/* asking the same peer again is for a download that stopped - not one filing couldn't use */}
+          {stopped && (
           <button
             type="button"
             class="download-retry-button"
@@ -113,6 +117,7 @@ export function DownloadJobRow({ job, liveSpeed, cancelling, onCancel, retrying,
           >
             ↻ retry
           </button>
+          )}
           {canRetry && (
             <button
               type="button"

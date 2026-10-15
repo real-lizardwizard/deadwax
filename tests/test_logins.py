@@ -152,6 +152,15 @@ ROUTES = {
     ("PUT", "/deadwax/me/pins"): "user",
     ("POST", "/deadwax/me/pins/toggle"): "user",
     ("GET", "/deadwax/store/album"): "user",
+    #? each user's own library - their starred albums - and the admin's "held by nobody" (2.0.0-player.51,
+    #? step 5 - tests/test_personal_libraries.py)
+    ("GET", "/deadwax/me/library"): "user",
+    ("POST", "/deadwax/me/library/add"): "user",
+    ("POST", "/deadwax/me/library/seen"): "user",
+    ("POST", "/deadwax/me/library/dismiss"): "user",
+    ("GET", "/deadwax/library/held"): "admin",
+    ("POST", "/deadwax/library/held/flags/{flag_id}/add"): "admin",
+    ("POST", "/deadwax/library/held/flags/{flag_id}/dismiss"): "admin",
 }
 
 
@@ -245,7 +254,7 @@ def signed_in(on, name: str) -> TestClient:
 
 def concrete(path: str) -> str:
     return path.replace("{job_id}", "1").replace("{album_id}", "al-1").replace("{artist_id}", "ar-1") \
-        .replace("{song_id}", "so-1").replace("{cover_id}", "co-1")
+        .replace("{song_id}", "so-1").replace("{cover_id}", "co-1").replace("{flag_id}", "1")
 
 
 def app_routes(app) -> set[tuple[str, str]]:

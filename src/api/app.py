@@ -8,8 +8,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
-from src.routes import auth as auth_routes
-from src import auth
+from src.routes import auth as auth_routes, held, my_library
+from src import auth, stars
 from src.users import current_user, require_admin
 from src.logger import logger, cleanup_logging
 from src.poller import run_download_poller
@@ -85,13 +85,17 @@ async def lifespan(app: FastAPI):
     #? logins (2.0.0-player.48): each session's login put to Navidrome again every few minutes - only
     #? with them on, and a database to keep sessions in (without one, every protected route is a 503)
     session_checks = None
+    #? (2.0.0-player.51) each user's library starred as them in Navidrome, and their stars read back - the
+    #? same terms: logins on, and a database to keep the ledger in
+    library_worker = None
     if Config.logins_on() and app.state.store.available:
         session_checks = asyncio.create_task(auth.run_session_checks(app.state.store))
+        library_worker = asyncio.create_task(stars.run_library_worker(app.state.store))
 
     yield
     logger.info("Shutting down API server...")
 
-    for task in (poller_task, session_checks):
+    for task in (poller_task, session_checks, library_worker):
         if task is None:
             continue
         task.cancel()
@@ -107,6 +111,7 @@ async def lifespan(app: FastAPI):
     await lrclib.close_client()
     await navidrome_client.close_client()
     await auth.login_client.close_client()
+    await stars.star_client.close_client()
 
     cleanup_logging()
 
@@ -292,6 +297,9 @@ def start() -> FastAPI:
     app.include_router(me.router, prefix="/deadwax/me", tags=["me"], dependencies=signed_in)
     #? what each user pinned to the app's Home (2.0.0-player.18) - deadwax's own, never Navidrome's stars
     app.include_router(pins.router, prefix="/deadwax/me/pins", tags=["me"], dependencies=signed_in)
+    #? (2.0.0-player.51) each user's own library - their starred albums - and the admin's "held by nobody"
+    app.include_router(my_library.router, prefix="/deadwax/me/library", tags=["me"], dependencies=signed_in)
+    app.include_router(held.router, prefix="/deadwax/library/held", tags=["library"], dependencies=admin)
     #? the id bridge (2.0.0-player.17): one album across the store index, MusicBrainz and Navidrome
     app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py

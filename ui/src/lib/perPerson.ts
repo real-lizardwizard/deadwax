@@ -1,6 +1,7 @@
 import type { Candidate, DownloadInFlight, DownloadJob, FindCandidatesResponse, JobQuality } from '../api/types'
-import { beingFiled, downloadProgressText, passesFilters, qualityText, storeStatus, type StoreStatus } from './candidates'
+import { HELD_TITLE, beingFiled, downloadProgressText, passesFilters, qualityText, storeStatus, type StoreStatus } from './candidates'
 import { QUALITY_FLOORS, candidateFilters, floorFilters, type QualityFloor } from './getSettings'
+import { ADD_NOTE, IN_THE_STORE, heldNotYours } from './myLibrary'
 
 /**
  * Downloads per person (2.0.0-player.49, step 4 of the multi-user plan) - the words, pure, so
@@ -111,6 +112,9 @@ export const sharedNote = (place: 'Downloads' | 'Requests') =>
  *  - one failed and moving to its next peer by itself (its retry pending - AUTO_RETRY_PEER, logins on
  *    or off): it is already going to another peer, so nothing says to cancel it for one, and how far
  *    it has got says it is moving (downloadProgressText).
+ *  - (2.0.0-player.51, personal libraries) a pressing the store holds whole that isn't in YOUR library
+ *    (`held.yours` false - logins on): "In the store, not in your library", what it is, and that adding it
+ *    downloads nothing - `add`, for Add to my library under it.
  *
  * Anything else is storeStatus's, word for word.
  */
@@ -134,11 +138,27 @@ export function storeStatusFor(
     }
   }
   const status = storeStatus(result, cancelIn)
+  //? (2.0.0-player.51) held whole by the store, but not in your library: Add to my library, not a download
+  const held = result?.held
+  if (!download && status && held?.complete && heldNotYours(held)) {
+    return { ...status, title: IN_THE_STORE, lines: [...status.lines, ADD_NOTE], add: true }
+  }
   if (!download || !status || beingFiled(download)) return status
   //? storeStatus's lines here: the peer and how far, then where to cancel it for another peer
   if (download.status === 'failed') return { ...status, lines: status.lines.slice(0, 1) }
   if (leavesOnCancel(download)) return { ...status, lines: [...status.lines.slice(0, 1), sharedNote(cancelIn)] }
   return status
+}
+
+/**
+ * The store line once Add to my library has added the pressing from it, while the page that drew it
+ * doesn't ask the store again (the Sources panel): "Already in your library", the add note gone - so the
+ * box never says "not in your library" above "Added" (review). `add` is kept, so the button's own words
+ * ("Added - it's in your library…") stay where it was. A status without Add is as it was.
+ */
+export function addedStatus(status: StoreStatus): StoreStatus {
+  if (!status.add) return status
+  return { ...status, title: HELD_TITLE, lines: status.lines.filter((line) => line !== ADD_NOTE) }
 }
 
 /** "a", "a and b", "a, b and c". */

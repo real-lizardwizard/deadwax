@@ -66,7 +66,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi import HTTPException
 
-from src import __version__
+from src import __version__, library_ledger
 from src.api.navidrome_endpoint import API_VERSION, CLIENT_NAME, NavidromeError, subsonic_body, unusable_url
 from src.config import Config, describe_navidrome_url, describe_secret_key
 from src.logger import logger
@@ -436,16 +436,24 @@ def _take_over_leftovers(store, user: str) -> None:
             return
         _leftovers_looked = True
     try:
-        if not store.local_has_anything():
-            return
-        pins, preferences, requests = store.adopt_local_now(user)
+        if store.local_has_anything():
+            pins, preferences, requests = store.adopt_local_now(user)
+            if pins or preferences or requests:
+                logger.info(f"{user} took over what deadwax saved before logins: {pins} pin(s), {preferences} "
+                            f"preference(s) and {requests} download(s)", extra={"frontend": True})
     except Exception as e:
         logger.error(f"could not hand {user} what deadwax saved before logins ({type(e).__name__}: {e}) - their "
                      f"next sign-in takes it over", extra={"frontend": True})
         return
-    if pins or preferences or requests:
-        logger.info(f"{user} took over what deadwax saved before logins: {pins} pin(s), {preferences} "
-                    f"preference(s) and {requests} download(s)", extra={"frontend": True})
+    #? (2.0.0-player.51) and the store, into their library - once ever, as at a sign-in ("or the take-over")
+    try:
+        seeded = store.library_seeded()
+    except Exception as e:
+        logger.error(f"could not tell whether the store is in {user}'s library yet ({type(e).__name__}: {e})",
+                     extra={"frontend": True})
+        return
+    if not seeded:
+        _seed_library(store, user)
 
 
 # ===== asking Navidrome =============================================================================
@@ -667,12 +675,17 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
         user = answered.strip().lower() if answered and answered.strip().lower() == name else name
         raw = new_session_id()
         now = time.time()
+        #? sealed once: the session keeps it, and (2.0.0-player.51) so does the user - the same string, so
+        #? the re-check refusing this session's login knows it is the user's latest one dying
+        sealed = seal_credential(typed.strip(), token, salt)
         try:
-            await asyncio.to_thread(store.create_session, id_hash(raw), user, seal_credential(typed.strip(), token, salt),
-                                    now, now + SESSION_IDLE_SECONDS)
+            await asyncio.to_thread(store.create_session, id_hash(raw), user, sealed, now, now + SESSION_IDLE_SECONDS)
         except Exception as e:
             logger.error(f"could not keep {user}'s session ({type(e).__name__}: {e})", extra={"frontend": True})
             raise HTTPException(status_code=503, detail=NO_DATABASE) from e
+        #? in the thread pool, as every write here is: SQLite waiting on another writer's lock must not
+        #? hold the event loop - and every request and stream with it (review)
+        await asyncio.to_thread(_keep_for_library, store, user, sealed, now)
 
         if user in Config.admins():
             taken = await store.adopt_local(user)
@@ -680,8 +693,49 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
                 pins, preferences, requests = taken
                 logger.info(f"{user} took over what deadwax saved before logins: {pins} pin(s), "
                             f"{preferences} preference(s) and {requests} download(s)", extra={"frontend": True})
+            await asyncio.to_thread(_seed_library, store, user)
         logger.info(f"signed in: {user}", extra={"frontend": True})
+        library_ledger.kick()
         return user, raw, COOKIE_MAX_AGE
+
+
+def _keep_for_library(store, user: str, sealed: str, now: float) -> None:
+    """
+    (2.0.0-player.51) The login just signed in with, kept for the USER - so albums filed while they're
+    signed out are still starred as them, and their stars read back (src/stars.py) - alive again if it
+    had died (a password changed since). Best effort: the sign-in stands either way, and a session's own
+    credential stands in until the next sign-in keeps one (store.live_credentials).
+    """
+    try:
+        store.keep_credential(user, sealed, now)
+    except Exception as e:
+        logger.error(f"could not keep {user}'s login for starring their albums ({type(e).__name__}: {e})",
+                     extra={"frontend": True})
+
+
+def _seed_library(store, user: str) -> None:
+    """
+    (2.0.0-player.51) Once, ever, on the first admin's sign-in after this step or their take-over: every
+    album in the store goes into their library, to be starred for them (store.seed_library_now). SYNCHRONOUS
+    and best effort - a failure is logged, and the admin's next sign-in tries again (it is once only when
+    it has been done). Held over, when the store index hasn't been filled from a scan of the library yet:
+    the library's first scan does it (store.index_reconcile).
+    """
+    try:
+        seeded = store.seed_library_now(user, Config.LIBRARY_PATH or "")
+    except Exception as e:
+        logger.error(f"could not put the store into {user}'s library ({type(e).__name__}: {e}) - their next sign-in "
+                     f"tries again", extra={"frontend": True})
+        return
+    if seeded == store.SEED_HELD_OVER:
+        logger.info(f"deadwax hasn't scanned the library yet, so the albums already in the store go into {user}'s "
+                    f"library after its first scan - searching or opening an album's page starts one, as Library "
+                    f"care's Rescan does", extra={"frontend": True})
+        return
+    if seeded is not None:
+        logger.info(f"put {seeded} album(s) already in the store into {user}'s library - deadwax stars each for them "
+                    f"in Navidrome", extra={"frontend": True})
+        library_ledger.kick()
 
 
 def sign_out(store, raw: str | None) -> None:
@@ -719,6 +773,7 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
         credential = unseal_credential(row["credential"])
         if credential is None:
             await asyncio.to_thread(end_session, store, row["id_hash"], KEY_CHANGED)
+            await asyncio.to_thread(_credential_dead, store, row, KEY_CHANGED)
             counts["ended"] += 1
             continue
         username, token, salt = credential
@@ -727,6 +782,7 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
         except NavidromeError as e:
             if e.code == 40:
                 await asyncio.to_thread(end_session, store, row["id_hash"], LOGIN_GONE)
+                await asyncio.to_thread(_credential_dead, store, row, LOGIN_GONE)
                 counts["ended"] += 1
                 logger.info(f"signed {row['user']} out: Navidrome no longer accepts the login they signed in with",
                             extra={"frontend": True})
@@ -740,6 +796,15 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
         _note_ended(key, EXPIRED)
         counts["expired"] += 1
     return counts
+
+
+def _credential_dead(store, session: dict, why: str) -> None:
+    """(2.0.0-player.51) The login a session ended with no longer works - the user's kept one too, when it is
+    that same login (a newer sign-in's stands): their albums wait until they sign in again. Best effort."""
+    try:
+        store.credential_dead(session["user"], why, session["credential"], time.time())
+    except Exception as e:
+        logger.warning(f"could not note that {session.get('user')}'s login no longer works ({type(e).__name__}: {e})")
 
 
 async def run_session_checks(store) -> None:

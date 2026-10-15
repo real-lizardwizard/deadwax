@@ -553,3 +553,329 @@ panel's Join (sim-checked).
 two people searching at once (the 429 is read from slskd's source and rehearsed with a fake that
 refuses an overlapping start); the copy's quality for a download started on the main page before this
 version (none kept: the format alone, from its files' names).
+
+### Personal libraries (2.0.0-player.51)
+
+Step 5 of the multi-user plan (the Claude Doc's "Personal libraries as Navidrome favourites"). Every rule
+was decided with James on 2026-09-27 (option B: one Navidrome library; "your library" is that user's
+Navidrome FAVOURITES - starred albums - two-way with Amperfy) - don't re-open them. The spec is
+`deadwax-scratch/uplan/slice-personal-libraries.md`. The pieces: `src/library_ledger.py` (the rules, pure but
+for the worker's wake-up and the retag marks, and `grant_job`, which writes what `grant_for` decides),
+`src/stars.py` (starring as each user and reading their stars back - a lifespan worker), store.py's five
+tables (library_membership, user_credentials, library_flags, library_seed, store_index_scanned) and their
+methods, `src/routes/my_library.py` (`/deadwax/me/library`, a user's) and
+`src/routes/held.py` (`/deadwax/library/held`, an admin's) - all seven routes in test_logins' ROUTES.
+
+- **The ledger** is `library_membership` (user, album_id, added_at, how, state, incomplete, navidrome_id,
+  starred_at, removed_at, removed_why, seen_at, attempts, next_try, problem; store.py's schema says what
+  each means), keyed on `store_album.id` - never a path or a release id, both of which an apply or a
+  re-file changes. `how`: grabbed | added | seeded | starred (elsewhere). `state`: waiting | starred |
+  removed (`removed_why` unstarred | deleted | dismissed). `seen_at` NULL is the new marker.
+- **Grants on every way a download ends** (`grant_for`, from organize_job's results and the plan's new
+  `same_release` - whether the folder already held this release BEFORE anything was written; reading it
+  files nothing differently): filed - ADDED; every file already there - ADDED in the same release's
+  folder (a second copy of a release held is never filed beside the first: organizer's duplicate rule,
+  v1.0.1), FLAGGED in an untagged or other folder (`library_flags`, a row of its own so the requesters
+  clearing the job can't lose it before an admin looks; the event log says so too); some files failed -
+  INCOMPLETE when a track landed (entries `incomplete`), nothing when none did; a dry run, nothing that
+  could be filed, filing that raised - nothing. Each ACTIVE requester (`store.requesters`: asked, not
+  left, not hidden) gets it - who left gets nothing - and only one who can have a library
+  (`library_ledger.has_library`: never the break-glass admin, whose entry would never be starred or
+  shown yet would count as held; with none left nothing is recorded). With logins off a FLAGGED filing is
+  neither flagged nor said nor recorded on the job (Held by nobody isn't drawn then, and the flag would
+  outlive logins-off naming `local`). Written before the status moves on, so a row never
+  reads "filed" a poll before it says what it gave, and kept on the job (`jobs.album_id`,
+  `jobs.library_grant`, JOB_COLUMNS) for the row's words: `/jobs`' `library`, with logins on only.
+- **"Nothing could be filed" offers the next peer** (the plan's table), with logins on: `job_outcome(...,
+  not_filed=True)` answers `not_filed` for NOTHING_ORGANIZED, ORGANIZE_FAILED (both now named in
+  poller.py, the words unchanged) and "…, no track was filed"; `poller.retryable` takes it, so the retry
+  route, `_fresh_job` (the next peer's only - Ask again stays failed/cancelled) and `/jobs`'
+  `alternatives_left` do too, and list_jobs - passed `poller.NOT_FILED_PATTERNS` (LIKE patterns of those
+  three messages) by the jobs route with logins on only - reads the runners-up of those rows and no other
+  finished one (review: every `complete` row with an error, dry runs above all, doubled the poll). The
+  app puts the row under Needs attention with Next peer and no Ask again (the same files would fail the
+  same way); the main page's row shows ↻ next peer alone. With logins off: as it was (None, Done, a 409) -
+  the spec's "nothing visible changes".
+- **Starred as the user** (`stars.star_entry`): the album found with search3 by its release id, then its
+  title, believed only on its own musicBrainzId (`find_album` - the bridge's rule, but RAISING, so a
+  refused login never reads as "not found"; the bridge's id cache shared, imported lazily: the bridge's
+  module reaches the poller, which reaches library_ledger); `star`; then getAlbum's `starred` as the
+  user - `star` answers OK for any id. Not found (`not_in_navidrome`), not confirmed (`not_confirmed`),
+  folder gone (`missing`), no release id (`no_release`): the entry waits, `next_try` 30 s doubling to
+  1800 s (`retry_after`), for ever. Navidrome unreachable: said on the entry and on everything the user
+  has waiting (`ledger_note_waiting`), NOT counted, and the pass stops. Every call through `AsUser` - the
+  login laid on last - and `star_client`, a LoginClient of its own held to describe_navidrome_url. Never
+  NAVIDROME_USER's login, never Navidrome's admin.
+- **The credential per user** (`user_credentials`): the sign-in seals the token and salt ONCE and keeps
+  the same string in the session and here (`_keep_for_library`, in the thread pool as every write of the
+  sign-in is - review: on the loop, a writer holding the lock stalled every request and stream; best
+  effort; it also asks about everything of theirs waiting at once). Sign-out leaves it (the point: starring while nobody is signed in). It dies
+  - `dead_at` - when the worker's call is refused (error 40) or it won't open (another key), and when the
+  re-check ends a session with LOGIN_GONE or KEY_CHANGED - only if it is still THAT login
+  (`credential_dead` compares the sealed string; a newer sign-in's stands). A user signed in before this
+  table existed gets their newest session's credential copied in (`live_credentials`), so an upgrade from
+  .50 with sessions kept stars without anyone signing in again.
+- **Read back** (`sync_user`, every SYNC_SECONDS = 300 per user, and at the worker's first pass after a
+  start): getStarred2's ALBUMS only (songs and artists stay ordinary favourites), by musicBrainzId. Held
+  and starred there: confirmed (a waiting one becomes starred; a new Navidrome id taken). Starred there
+  and in the store (`index_present`) but not held: added (`ledger_sync_add` - how starred, new; an
+  unstarred one held again). Held as STARRED by deadwax and not starred there: looked up again - not in
+  Navidrome, or back under another id than the one starred: the star was LOST (mid-retag, between
+  scans), so it waits as `star_lost` and is starred again at once; the same id and getAlbum not starred:
+  unstarred - removed, conditionally on the entry still being that star (`ledger_remove ... AND
+  navidrome_id IS ?`). Never for an album not present or being applied to right now
+  (`library_ledger.retagging`, set by `retag_apply` around the whole apply, released in a `finally`).
+  Pins stay deadwax's own. **The first read-back** of a user (`user_credentials.synced_at` NULL) adds what
+  it finds SEEN: favourites from before deadwax kept a ledger are theirs, not news (review: three hundred
+  favourites were three hundred New marks); every read after it marks an add new. It counts as done -
+  `synced_at` written - only when the index knew the store as it began (`index_scanned`: the root in
+  `store_index_scanned`, asked before getStarred2, so a first scan finishing mid-read doesn't count it):
+  before the library's first scan `index_present` finds none of the favourites, and the next read, no
+  longer the first, added every one New (second review - a fresh install, or an upgrade from main whose
+  saved scan is in an older SCAN_FORMAT; a sign-in kicks the worker, so the read-back won that race every
+  time). Until then each read is the first, so a star made before the first scan isn't new either.
+  **A getStarred2 answered with an error** - a Subsonic failure other than 40, an HTTP status, a body
+  that isn't JSON - is that user's alone (`SyncRefused`): logged, their sync backed off to SYNC_SECONDS,
+  their starring still run, nobody else's pass stopped (review: it stopped every pass at that user, so
+  nobody after them in name order was starred, and called it "Navidrome isn't answering"). Unreachable
+  still stops the pass; error 40 still kills the credential.
+- **The worker** (`run_library_worker`): a lifespan task with logins on and a database (beside the
+  re-check), a pass every WORK_SECONDS = 15 s or at a `kick()` (a grant, a sign-in, Add, a flag added, an
+  apply's re-star - call_soon_threadsafe on the worker's own loop; nothing with no worker), STAR_BATCH =
+  25 a user a pass, another pass at once after a full batch. One task, so its Navidrome calls are one at
+  a time. With logins off `work_once` does nothing even if credentials are kept. "A full batch" counts
+  only outcomes the ledger took (`star_due`'s `written`; `star_entry` answers None for a write that
+  didn't land): a full disk, or /config refusing writes while reads work, left the same 25 due and asked
+  for another pass at once, for ever - thousands of Navidrome calls a second (review). Now it waits for
+  the next pass.
+- **Seeding** (`seed_library_now`, once ever): every present album into the first admin's library,
+  waiting, SEEN (no news), except one a download of somebody else's (not theirs, not `local`'s) brought -
+  an entry `grabbed`, still held - at their sign-in after adopt_local, or at the first-admin take-over (`_take_over_leftovers`, after its adopt, in
+  its own try: a session outliving the upgrade). Ethan's starts empty. **Held over until the store index
+  knows the store** (review): a sign-in before the index has been filled from a scan of the root
+  (`store_index_scanned`, written by `index_reconcile` when its scan found albums - a real scan, or the
+  saved scan at start-up; at init, every root a pre-.51 index already holds is counted, so an upgrade
+  from .50 seeds at the sign-in) records the seed as `library_seed` with `seeded_at` and `albums` NULL
+  and the admin's name, says so in the event log, and the first scan that finds albums does it, in its
+  own transaction (`_seed_rows`, shared). Without this, a fresh install with logins on - or an upgrade
+  from main, whose saved scan is in an older SCAN_FORMAT - seeded what little the index held and was done
+  for good, every album the first scan then found belonging to nobody. A scan that found nothing finishes
+  nothing (an unmounted share looks like that); an index that knows the store but holds only others'
+  downloads seeds nothing and is done: an album arriving afterwards without a request belongs to nobody.
+  **Once because of the look before** - `library_seed.seeded_at` set, read under BEGIN IMMEDIATE (and
+  `index_reconcile`'s own `seeded_at IS NULL`): the one row (`id = 1` CHECKed) only records whose seed it
+  is, when it was done and how many it held, or that it is held over, and its write is an upsert since
+  the hold-over, so it would take a second seed without a word (second review: the notes called the two
+  "guards, each alone enough"; breaking the look alone fails four tests). **Only a grant leaves an album
+  out** (second review): an album somebody else holds because they starred it in Amperfy - their first
+  read-back, which a worker pass 15 s after an upgrade's restart can run before the admin's first
+  request, adds their favourites from before - or added it from the store was in the store already, and
+  libraries aren't exclusive, so both hold it; leaving those out made the seed's outcome hang on whether
+  that pass had run first, for good. A grant, `grabbed`, is an album their download brought (or one
+  their download found already there - an edge left as it is: it came with their request).
+- **Logins off**: `local` is given what it files - silently kept, never starred, never shown (`/me/library`
+  answers `{"on": false}`, `yours` and `library` aren't sent, `holders` isn't either, a flagged filing is
+  neither flagged nor said) - and adopt_local
+  moves local's entries to the first admin (`local_has_anything` counts them; moved seen, so nothing of it
+  is "new"; not in the three counts said). Why kept rather than not at all: logins-off is how James runs
+  today, and what he gets with logins off is his - as pins, preferences and requests already follow.
+- **Writers keep it true**: an apply re-stars every holder (`ledger_restar` on the row the reindex
+  answers - starred and waiting both asked now; the two-step apply is what lets a star follow at all);
+  `index_merge` and `index_move`'s newcomer union their holders in their own transactions
+  (`_ledger_union`: an entry only on the source moves; with both, the one held wins - starred over
+  waiting over removed - the new marker kept if either was new); a re-file keeps the id; `index_gone(...,
+  'deleted', by=)` tombstones every live entry in the same transaction ("removed by the admin") - but the
+  deleting admin's own (`by`, the delete route's user, `local` with logins off), which is removed and put
+  away at once (`dismissed`): nobody is told to request again what they chose to delete (review);
+  `missing` touches nothing. A tombstone of the same release is put away (`dismissed`) when it is granted
+  again, added, or starred again in Amperfy. The delete dialog's summary (logins on) carries `holders` -
+  everyone ELSE who holds it, in the order they got it, `local` and the break-glass admin left out - and
+  `yours`, whether the admin asking does; when the ledger can't be read, neither, but `holders_unknown`
+  (review: an unread ledger read "Nobody has it in their library" in the one dialog with no undo).
+- **Add to my library** (`POST /deadwax/me/library/add`, a Find's body): held_copy's verified folders
+  (`album_ids`, which `_store_state` POPS before answering - the page never sees row ids) into the user's
+  library, `added`, seen, incomplete when the store holds part (the route's - the app offers Add only for
+  a pressing held whole). 409s in words: logins off, the break-glass admin (no Navidrome account, no
+  library - the app never offers it Add), no release id, not in the store. `_store_state`'s `held.yours`
+  (logins on, not break-glass) says whether they hold any of those folders - left out when the ledger
+  can't be read, so the line reads as it always did rather than "not yours" on a guess.
+- **The admin's**: `GET /deadwax/library/held` - present albums nobody holds (waiting or starred - local
+  counts) and the open flags; a flag's `add` gives the album (followed through merges, refused when not
+  present) to who asked and turns the job's `library_grant` to `added`; `dismiss` puts it away and turns
+  it to `looked` (`library_ledger.LOOKED`) - each only while the job still says `flagged`
+  (`set_job_grant(..., was=)`), so the requesters' row says what the admin did (second review: it kept
+  saying "so not added - an admin has been asked to look" with the album in their library).
+  `grantWords`: `looked` - "Already in the store as another copy, so not added - an admin has looked at
+  it", amber. `/deadwax/me/library` - count, starred, waiting, the
+  login's state (`ok` | `dead` with LOGIN_GONE/KEY_CHANGED's words | `none`), the waiting albums with
+  `problem_text`, `new` (seen_at NULL), the tombstones; `seen` (by release or ids) and `dismiss`.
+- **The app**: the store line (lib/perPerson.ts storeStatusFor's new case, lib/myLibrary.ts) - held
+  whole, `yours` false: "In the store, not in your library", the folders and what's held, "Add it to your
+  library to have it starred for you in Navidrome - nothing is downloaded.", and Add to my library
+  (StoreState's `AddToLibrary`, the album page and the Sources sheet; StoreStatusBox's own on the main
+  page) - Join's behaviour: asked at once, aria-disabled while out, the refusal in an alert, added words
+  with the focus handed to the box; an add says so (`announceAddedToLibrary`, lib/libraryEvents.ts) and
+  the album page hears it and asks the store again, so its line becomes "Already in your library" -
+  whether the add was its own or the Sources panel's beside it (review: a desktop's panel left the page
+  saying "not in your library"), and the panel, which doesn't ask again, draws `addedStatus` (perPerson:
+  "Already in your library", the add note gone, Add kept so its "Added" words stay) - and so does the main
+  page's StoreStatusBox once its add is in (second review: it said "In the store, not in your library"
+  and the add note above "Added"). A part not yours: "The store has …" (candidates.storeNotes). Requests' Done words
+  (`grantWords`); You > Your library (YourLibrary.tsx, at the top, logins on and a library only); Home's
+  "New in your library" (Home's `newAlbums`, under Pinned, waited for as the pins are) and the Library's
+  New mark over the cover's corner (player/Library.tsx reads the store), both from app/useMyLibrary.ts
+  (latestOnly; asked as Home, the Library tab or You shows, when an album is filed and when a store line
+  adds one; `seenAlbum` from App's openAlbum, by the album's musicBrainzId, AND for the album page on top
+  of the tab showing - reached by its address too - again as each answer lands; an album opened before
+  the first answer is kept and looked at as it lands - review: the Library's marks waited for Home to
+  ask, and an album opened by its address, or before deadwax first said, kept its mark); the delete
+  dialog's holders line ("In your library and ethan's…" for the admin who holds it; deadwax unable to
+  read it said so); You's waiting lines three albums a reason, then "and N more" (`waitingText`), and
+  they and the removed rows' names break anywhere (`.app-mylib-waiting`, review); Library care's Held by
+  nobody (HeldByNobody.tsx, latestOnly, a ref guard against a second tap; "Show all"/"Show fewer" one
+  button). A row that leaves - Put away in You, Add for them or Put away in Held by nobody - hands its
+  focus to the row now in its place, else the one before, else the section's heading (`nextFocus`,
+  applied once the answer without it has drawn and only if focus fell to the page), and what happened
+  is said in the polite region (review: focus fell to the page, nothing said).
+- **What step 6 changes** (left on purpose): the Library tab still lists every album Navidrome has - it
+  becomes the user's starred albums (getAlbumList2 `starred`, as them), Browse the store; and "in your
+  library" elsewhere in the app (an album page's meta line, Search's rows, the artist page's In your
+  library, "You also have another pressing") still means the STORE - so an album page can say "in your
+  library" in its meta line above a store line saying "In the store, not in your library" (seen on the
+  real page). The player's calls are still NAVIDROME_USER's (client_for), so Home's Recently added and
+  Not played are the shared account's.
+- **Changed on purpose** in existing tests: test_store_index's `test_held_complete` (held_copy's
+  `album_ids`); test_logins' ROUTES (seven routes) and `concrete` (`{flag_id}`); app-rules.sim's two Home
+  source checks (the memo's deps and `ready`). After review: test_personal_libraries' `on` fixture counts
+  its library as scanned (seeding's wait has tests of its own), `test_starring_an_album_in_amperfy_adds_it`
+  reads the stars back once before the star (a first read-back's finds are seen), the delete test's
+  holders (`["ethan"]` and `yours`, james's own entry `dismissed`); mylibrary.sim's holders words (the
+  summary is passed); app-rules.sim's ask check (Home or the Library tab).
+
+**Verified** (as built, before review): 2780 Python tests (2778 passed, 2 skipped; 62 new - tests/test_personal_libraries.py), pyflakes,
+tsc, every sim (ui/test/mylibrary.sim.cjs new; sources, requests, home and app-rules extended), the build;
+the engine files have no diff. Mutation-checked, 77 rules (review found that claim partly overstated - see After review), each test failing with its rule broken and the file
+restored byte for byte (PYTHONDONTWRITEBYTECODE): grant_for's flagged/added and incomplete, the backoff,
+the poller's grant and the all-there folder indexed for it, the plan's same_release, a flag giving nobody,
+only active requesters; the star confirmed by getAlbum, every call as the user, the release id first, a
+refused login dying, only that login, the re-check killing it, the sign-in keeping it and asking again at
+once, a session standing in; Navidrome down said and not counted; Amperfy's star added and unstar removed,
+a star lost to a missing album or a new id put back, mid-retag skipped, albums only; seeding once (both
+guards broken together - each alone passed then; since the hold-over fix the row's write is an upsert and
+the look is the one guard - see Seeding), leaving out others' holdings, at an admin's sign-in only and
+at the take-over; the merge union and its ranking, a move's newcomer; delete tombstones and the holders
+without local; a re-grant and an Amperfy re-star putting tombstones away; the apply's re-star and its
+retag mark; `yours`, no row ids sent; Add's seen and incomplete, break-glass refused; the new list; held by
+nobody's query, a flag for an album gone; `library` and not_filed with logins on only, no track filed;
+local's library taken over (counted by local_has_anything, none of it new); the worker idle with logins
+off, `/me/library` with logins off, a kick waking it, the lifespan starting it with logins on only; the
+route walk and held's admin dependency. In the sims: the store line's Add case, "The store has", Add's
+focus handoff, the main page's Add only with a release, the flagged row's amber, not_filed under Needs
+attention without Ask again, Home waiting for what's new and its order, App's seenAlbum, nothing asked for
+break-glass, only a new album telling deadwax, only the newest answer, Put away asking again, one flag at a
+time, a refusal kept, the holders' words, Home's shelf only what Navidrome has, the dialog's line, the
+Library's mark. Not covered by a sim: the main page's ↻ next peer on a not-filed row (DownloadJobRow) -
+tsc only. A guard found redundant by a mutation (grantWords' `library === undefined`) was taken out.
+**Real page** (libs51's own instances: logins on at 8110 and off at 8111, scratch databases, a copied
+library, a stand-in Navidrome on 4541 keeping each user's stars apart (star/unstar/getStarred2, getAlbum's
+`starred` for the asker, search3 by release id) over it, a fake slskd on 5041 writing the files a download
+brings and holding a `hold-*` peer's until released; two headless Chromiums as deadwax.test over plain
+http, ethan at 390x844, james at 1440x900; 69 checks in four drivers, all passing on a clean run, and 4 more
+at 320x568): ethan's library read filled the index, his sign-in seeded nothing; james's first sign-in seeded all
+six, seen, once, and the worker starred the five with release ids AS james (the stand-in's stars: none for
+ethan or the shared login), Windows waiting "no release id" - said in his You; ethan's Get of Third filed,
+in his library alone, starred as him once the stand-in scanned it, confirmed on its id; his Home's New in
+your library under Pinned with Third, the Library's tile marked New ("New in your library" to a screen
+reader), opening it unmarked it in the ledger and took the shelf away; his row "In your library"; BULLY
+asked by ethan from a held peer, joined by james, released, filed, in both libraries, starred as each;
+james's row `added`, asked by both. "Amperfy" (the stand-in, as ethan): Dummy starred - read back after a
+restart, ethan's (how starred, new) and on his Home; Third unstarred - read back, removed (unstarred), not
+starred back. The album page of The Slow Rush for ethan: "In the store, not in your library", the no-download
+line, Add - added, the line asked again saying "Already in your library", starred for him; james's delete
+dialog for Dummy "In james and ethan's libraries: deleting it takes it out, and they'll see it was removed
+by the admin.", deleted, both tombstones; ethan's You "Dummy by Portishead - Removed by the admin - request
+it again to have it back." with Request it again (Dummy's group page) and Put away (gone, dismissed);
+Library care's Held by nobody listing Third (ethan unstarred it); BULLY's folder stripped of its release id
+and got again: flagged, nobody given it, ethan's row in amber, the flag in james's Library care with Add
+for them (closed, nothing doubled); logins off: `{"on": false}`, no Your library, no New shelf or marks, the
+store line with no `yours` or row ids. Nothing past the edge at 390 or 320; no console errors. **NOT
+verified**: against a real Navidrome 0.64 (its search3 by release id, `star` for an unknown id, getAlbum's
+`starred` as the asking user and getStarred2 are read from its source and the plan, and faked); Amperfy
+itself (the stand-in stars as Amperfy would); how Navidrome's album ids behave through a real two-step
+apply (the sync's "another id: lost" rule is what covers it, tested against a fake); on James's iPhone;
+the five-minute sync's timing (driven by restarts on the real page, by `forget_syncs` in the tests).
+
+**After review** (24 findings, majority-confirmed, all fixed; the decisions are in the bullets above):
+logins off writing a flag and an event-log line pointing at a section it doesn't draw; the downloads poll
+reading every finished row's runners-up; an unread ledger read as "nobody" (the delete dialog) and "not
+yours" (the store line); the worker re-passing at once, for ever, when the ledger's writes fail; one
+user's getStarred2 error stopping everyone's pass; a first read-back's favourites all New; a break-glass
+download giving the album to a holder that doesn't exist; seeding done for good on an index that didn't
+know the store yet; the kept login written on the event loop; long names pushing You sideways or cut off;
+the desktop Sources panel's Add leaving it and the page saying "not in your library"; the deleting admin
+told to request again what they deleted, and named in the third person; the Library's New marks waiting
+for Home, and an album opened by its address keeping its mark; Put away / Add for them / Show all
+dropping focus to the page; every waiting album named in one paragraph; and the docs promising an Add for
+a part and words for break-glass the app never offered. The reviewers' mutation runs also showed rules
+the 77-rule claim named only in part - held by nobody's query (starred holders), delete tombstones (only
+live entries), the merge union (the new marker), seeding once (an empty seed) - and a dozen it didn't
+(a grant or Add over an unstarred entry, incomplete cleared, the unstar's navidrome_id guard, an apply
+re-asking waiting entries, a flag followed through a merge, `new` from held entries only, break-glass's
+`yours`, a refused apply's retag mark, a missing album's wait and read-back, the batch's size and
+`more`, `incomplete` counted, find_album's title fallback and its known id, the key-changed credential in
+the worker and the re-check, and three logins-off guards); each has its own test now. **Verified**: 2819
+Python tests (2817 passed, 2 skipped; test_personal_libraries.py 101, 39 more), pyflakes, tsc, all 51 sims
+(mylibrary, sources and app-rules extended), the build; the engine files have no diff. **Mutation-checked,
+65 rules** (`deadwax-scratch/work/libs51-fixer/mutate.py`, each file restored byte for byte by hash,
+PYTHONDONTWRITEBYTECODE): every fix above and every rule in the list just given, each caught by the test
+or sim meant for it. **Real page** (libs51-fixer's own instances: logins on at 8112 and off at 8113,
+scratch databases, a hard-linked copy of libs51-builder's library plus tiny albums - two one-word titles,
+six untagged, 22 copied in by hand - and a copy of its stand-in Navidrome on 4542; 45 checks in four
+drivers, all passing - the first in two goes, its screenshot folder missing the first time): james's sign-in to an unscanned library held the seed over and said so; a search's
+first scan seeded all 15, seen, and the worker starred them as james; his You at 375 named three untagged
+albums "and 5 more", the one-word title broken, nothing past the edge; ethan's two favourites from before
+were added starred and seen, no New shelf; two stars after it were new, and a page opened straight onto
+`#/library` marked both New without Home; one opened by its address was unmarked in the ledger; james's
+delete dialog said "In your library and ethan's: deleting it takes it out, and ethan will see it was
+removed by the admin.", his own entry put away, ethan's tombstoned; ethan's removed cards at 320 wrapped
+inside the card, Put away handed focus to the next row, then the heading, and said so; a desktop's Sources
+panel Add left the panel "Already in your library" with its Added words and the page beside it saying the
+same; Held by nobody's Show all/Show fewer kept its focus, Add for them handed it to the next flag and Put
+away to the heading, "given to ethan" said; logins off: Home's shelves drawn 165 ms in, no New, no Your
+library, no Held by nobody, `/me/library` `{"on": false}`, the delete summary naming nobody. No console
+errors. **NOT verified**: what the list above says is not - all of it against a real Navidrome 0.64.
+
+**After the second review** (12 findings, majority-confirmed; the decisions are in the bullets above):
+the seed leaving out every album another user's first read-back had put in their library (an Amperfy
+favourite from before, read back by a worker pass that can beat the admin's first request) - only a
+grant leaves one out now; a first read-back before the library's first scan counted as the first, so the
+read after it marked every old favourite New - it counts only on an index that knew the store as it
+began; Add for them and Put away leaving the requesters' row saying "an admin has been asked to look" -
+`added` and `looked` now; the main page's store box saying "In the store, not in your library" and the
+add note above "Added" - `addedStatus` there too; docs/player.md and Home.tsx counting Add to my library
+as New (it never is); the Seeding bullet's "two guards, each alone enough" (the look is the one guard);
+"four tables" (five); and three rules with no test - an apply never re-starring a removed entry
+(ledger_restar's state guard), the read-back taking a new Navidrome id for a starred entry, and seenAlbum
+telling deadwax by the store's ids. **Verified**: 2824 Python tests (2822 passed, 2 skipped; test_personal_libraries.py 106, 5 more),
+pyflakes, tsc, all 51 sims (sources, mylibrary and requests extended), the build; the engine files have no
+diff. **Mutation-checked, 13 rules** (`deadwax-scratch/work/libs51-fixer2/mutate.py`, each file restored
+byte for byte by hash, PYTHONDONTWRITEBYTECODE), each failing the test or sim meant for it on an
+assertion: the seed's `how = grabbed` (gone, and excluding nothing), the read-back's index check (gone,
+`index_scanned` always true, `synced_at` never written), Add for them's and Put away's row writes,
+`set_job_grant`'s `was`, the `looked` words, the main page's box after Add, ledger_restar's state guard,
+the read-back's new-id branch, seenAlbum's ids. **Real page** (libs51-fixer2's own instances: logins on at
+8114 and off at 8115, scratch databases, a four-album library made for it - one an untagged rip - and a
+copy of the stand-in Navidrome on 4543; the two flagged downloads filed through the real poller and
+organizer by a script against the stopped server's database, no slskd; 29 checks in four drivers, all
+passing - two driver mistakes, a selector and an unscanned logins-off library, fixed and run again):
+ethan's Mezzanine starred in the stand-in before deadwax; his sign-in's read-back found nothing in an
+unscanned index and wasn't counted; after the first scan and a restart, the worker's read-back added it
+starred and SEEN, no New shelf on his Home; james's first sign-in seeded all four, Mezzanine included, and
+the worker starred the three with release ids AS james, ethan's star his own; ethan's two flagged rows
+amber "an admin has been asked to look"; james's Add for them on one and Put away on the other (Library
+care) turned them into "Already in the store, added to your library" (plain) and "...so not added - an
+admin has looked at it" (amber); nothing past the edge at 390 or 320; the main page's box for Third (ethan's
+Find) "In the store, not in your library" with the add note and Add, then after Add "Already in your
+library", no add note, the Added words - Third his, `added`; logins off: `/me/library` `{"on": false}`,
+the main page's box "Already in your library" with no Add. No console errors. **NOT verified**: as above -
+all of it against a real Navidrome 0.64.

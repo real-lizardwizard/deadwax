@@ -1,6 +1,7 @@
 import type { JSX } from 'preact'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
+import { addToMyLibrary } from '../api/me'
 import type { Candidate, DownloadRelease } from '../api/types'
 import { useCandidateSearch } from '../hooks/useCandidateSearch'
 import { useDismiss } from '../hooks/useDismiss'
@@ -10,7 +11,8 @@ import {
   queriesText, searchedLine, searchingLine, sortCandidates, sourcesAnnouncement, storeNotes, type CandidateSort,
 } from '../lib/candidates'
 import { joinDownload } from '../lib/downloadRequests'
-import { storeStatusFor } from '../lib/perPerson'
+import { announceAddedToLibrary } from '../lib/libraryEvents'
+import { addedStatus, storeStatusFor } from '../lib/perPerson'
 import {
   GET_SETTINGS_DEFAULT, NO_SOURCE_FILTERS, PICK_SORT, SAMPLE_RATE_FLOORS, candidateFilters, floorFilters, pressedCount, sampleRateChip, signalsSet,
   sourceChips, type SourceFilters,
@@ -333,6 +335,8 @@ export function Sources({
 
   const search = state.search
   const result = search?.result ?? null
+  //? (2.0.0-player.51) the answer Add to my library added from: its box says it's yours now
+  const [addedFrom, setAddedFrom] = useState<object | null>(null)
 
   //? Search again opened: focus in the field, the query ready to edit
   useLayoutEffect(() => {
@@ -431,12 +435,24 @@ export function Sources({
 
   //? (2.0.0-player.49) a download somebody else asked for is yours to join - judged against your floor -
   //? and joining hands over to Requests, as a Get does
-  const status = result ? storeStatusFor(result, 'Requests', floor) : null
+  const found = result ? storeStatusFor(result, 'Requests', floor) : null
+  const status = found && result !== null && addedFrom === result ? addedStatus(found) : found
   const join = (jobId: number) => {
     const asked = request?.key
     //? handed over only while the sheet still shows the Get that joined (closed meanwhile, it stays closed)
     return joinDownload(jobId).then(() => {
       if (showingNow.current.open && showingNow.current.key === asked) onQueued()
+    })
+  }
+  //? (2.0.0-player.51) a pressing the store holds that isn't yours is added from the box, not downloaded -
+  //? which then says it's yours, and tells the album page beside it (a desktop's panel leaves the page in
+  //? view, and nothing else would make it ask the store again) and your library's store (review)
+  const add = () => {
+    if (!search || !result) return Promise.reject(new Error('Nothing to add.'))
+    const from = result
+    return addToMyLibrary(search.release).then(() => {
+      setAddedFrom(from)
+      announceAddedToLibrary()
     })
   }
   const notes = result ? storeNotes(result) : []
@@ -542,7 +558,7 @@ export function Sources({
               </button>
             </div>
           ) : status ? (
-            <StoreState status={status} notes={notes} onJoin={join} />
+            <StoreState status={status} notes={notes} onJoin={join} onAdd={add} />
           ) : (
             <>
               <StoreState status={null} notes={notes} />

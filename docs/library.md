@@ -532,6 +532,9 @@ toolbar does beyond the review queue:
   matching "portishead"*). Before you start one, each says how many album folders it will take and
   what it writes - folders, as the line above counts them: an album you keep in two pressings is one
   album in the scan's count and two folders here.
+- **Held by nobody** - with logins on (since 2.0.0-player.51), under the runs: the albums nobody has in their
+  library (the first 20, then **Show all** - and **Show fewer**), and the flagged downloads with **Add for
+  them** and **Put away** - see [who has an album](#who-has-an-album-with-logins-on).
 
 The runs are offered once the library has been read from the disk - with the saved copy on screen
 the page says *Checking the library…* first, since the saved copy can be behind.
@@ -543,3 +546,35 @@ names the track count and size, and lists any files that aren't audio, in case o
 copy of a rip log. It only ever deletes a folder that holds audio directly, inside your library,
 and never the library folder itself. A deleted album leaves the **New** count and the review
 queue straight away.
+
+With logins on (since 2.0.0-player.51) the confirmation also says **whose libraries it is in** - "In
+ethan and sam's libraries: deleting it takes it out, and they'll see it was removed by the admin", or,
+when it is in yours too, "In your library and ethan's: deleting it takes it out, and ethan will see it
+was removed by the admin" - or that nobody has it. When deadwax can't read who has it (its database
+unavailable) it says that instead, never "nobody". Each of the others then finds it in **You → Your
+library** as **Removed by the admin**, to get again or put away
+([the phone player](player.md#your-library-with-logins-on)); it simply leaves yours, since you chose to
+delete it.
+
+## Who has an album, with logins on
+
+Since 2.0.0-player.51, with logins on, every album in the store is in the libraries of the people who
+asked for it - their starred albums in Navidrome ([the phone player](player.md#your-library-with-logins-on)).
+deadwax keeps that true as you look after the library:
+
+- **Applying a release** keeps the album in everyone's library: an apply that renames the folder writes
+  the tags first, waits for Navidrome's scan, and only then renames
+  ([troubleshooting](troubleshooting.md#applying-a-release-pauses-before-the-folder-is-renamed)), so
+  Navidrome's stars can follow the album - and afterwards deadwax stars it again for everyone who has it,
+  whatever Navidrome did.
+- **Merging a disc folder** into its album's folder puts the album in the library of everyone who had
+  either.
+- **Moving an artist's albums** under their current name changes only where they are: whoever had them
+  still has them.
+- **Deleting an album** takes it out of everyone's library, telling each of the others ([above](#deleting-an-album)).
+- **Library care → Held by nobody** (the app, an admin's) lists every album in the store that is in
+  nobody's library - copied in by hand or by another program, or unstarred by everyone who had it - and
+  the downloads **flagged** for you: ones whose every file was already in the folder they'd have been
+  filed into, but that folder holds another pressing or an untagged rip, so deadwax gave the album to
+  nobody on a guess. **Add for them** gives it to the people who asked after all; **Put away** leaves it.
+  Either way their row in Requests says what you did.

@@ -534,6 +534,10 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
         "problems": problems,
         "matched_tracks": len(mapping),
         "total_tracks": len(tracks),
+        #? (2.0.0-player.51) whether the folder already held this very release before anything was
+        #? written - what decides if a download that filed nothing new is given to those who asked
+        #? (src/library_ledger.py grant_for). Reading it changes nothing filed.
+        "same_release": same_release,
     }
 
 

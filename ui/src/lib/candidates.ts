@@ -650,6 +650,8 @@ export interface StoreStatus {
   lines: string[]
   /** a download somebody else asked for, which Join joins (lib/perPerson.ts storeStatusFor, 2.0.0-player.49) */
   joinJobId?: number
+  /** a pressing the store holds that isn't in your library: Add to my library is offered (2.0.0-player.51) */
+  add?: boolean
 }
 
 /**
@@ -657,6 +659,9 @@ export interface StoreStatus {
  * flight is what the server checks first too - or null for an ordinary result. `cancelIn` is where
  * a download is cancelled: the main page's Downloads panel, or the app's Requests tab.
  */
+/** The store line's title for a pressing held whole (and, logins on, in your library). */
+export const HELD_TITLE = 'Already in your library'
+
 export function storeStatus(
   result: Pick<FindCandidatesResponse, 'held' | 'downloading'> | null | undefined,
   cancelIn: 'Downloads' | 'Requests' = 'Downloads',
@@ -677,7 +682,7 @@ export function storeStatus(
   if (held?.complete) {
     return {
       kind: 'held',
-      title: 'Already in your library',
+      title: HELD_TITLE,
       lines: [
         //? every folder, for a set stored one folder per disc
         ...(held.paths?.length ? held.paths : [held.path]),
@@ -727,8 +732,10 @@ export function storeNotes(
   }
   const held = result?.held
   if (held && !held.complete) {
+    //? (2.0.0-player.51, logins on) a part the store holds that isn't in your library is the store's
+    const who = held.yours === false ? 'The store has' : 'You have'
     notes.push(
-      `You have ${held.track_count} of ${held.expected_tracks} tracks of this pressing, in `
+      `${who} ${held.track_count} of ${held.expected_tracks} tracks of this pressing, in `
       + `${listed(held.paths?.length ? held.paths : [held.path])}. ${whatADownloadDoes(held)}`,
     )
   }

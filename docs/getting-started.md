@@ -177,6 +177,12 @@ container, open deadwax, and sign in.
   own.
 - **Downloads are each person's own**: you see yours, join one somebody else has on its way, and
   your cancel leaves it to them - see [Downloading](downloading.md#with-logins-on-downloads-per-person).
+- **Each person has a library**: their starred albums in Navidrome, so Amperfy shows the same. What they
+  get is starred for them, an album the store already holds is a tap from theirs, and starring or
+  unstarring in Amperfy is read back. The first admin to sign in has everything already in the store put
+  into their library, once (after deadwax's first scan of the library, if it hasn't scanned it yet);
+  everyone else starts with only the albums they'd already starred - see [your
+  library](player.md#your-library-with-logins-on).
 - **The app** (`/player/`, the home-screen app included) shows a sign-in screen; **You → About** has
   **Sign out**. **The main page** says you're signed out and links to the app's sign-in, which brings
   you back to it.

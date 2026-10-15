@@ -130,15 +130,26 @@ export interface DownloadJob {
   shared?: boolean
   /** An admin's rows only: the OTHER people waiting for it, in the order they asked. */
   requested_by?: string[]
+  /**
+   * What its filing gave those who asked (2.0.0-player.51, personal libraries) - with logins on only:
+   * 'added' (in their libraries), 'incomplete' (added, some files failed to file), 'flagged' (every file
+   * was already in a folder holding another pressing or an untagged rip: nobody was given it, an admin
+   * looks - Add for them then makes it 'added'), 'looked' (a flagged one the admin put away: still not
+   * given), null for nothing (still going, failed, nothing filed).
+   */
+  library?: LibraryGrant | null
 }
+
+export type LibraryGrant = 'added' | 'incomplete' | 'flagged' | 'looked'
 
 /**
  * How a download ended (src/poller.py job_outcome). null for one still going, and for one that
  * finished without filing for another reason - a dry run, organizing off (ORGANIZE_MODE 'off', or
  * LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set), nothing that could be filed, no track filed -
- * which its `error` states (and organizing off leaves it none).
+ * which its `error` states (and organizing off leaves it none). With logins on (2.0.0-player.51) a
+ * download nothing of could be filed is `not_filed`, which "try the next peer" can start again.
  */
-export type JobOutcome = 'filed' | 'already_there' | 'partly_filed' | 'interrupted' | 'failed'
+export type JobOutcome = 'filed' | 'already_there' | 'partly_filed' | 'interrupted' | 'failed' | 'not_filed'
 
 export interface JobsResponse {
   jobs: DownloadJob[]
@@ -339,6 +350,9 @@ export interface HeldPressing {
   fills_gaps: boolean
   /** Where a download would be filed, relative to the library - null when it couldn't be told. */
   filed_to: string | null
+  /** (2.0.0-player.51, logins on only) whether it is in YOUR library - false: the store holds it, and
+   *  Add to my library is offered. Absent with logins off: the one library is everyone's. */
+  yours?: boolean
 }
 
 export interface DownloadInFlight extends Partial<JobQuality> {
@@ -1149,6 +1163,70 @@ export interface DeletionSummary {
   /** Named individually — these are the files that might not exist anywhere else. Capped. */
   other_files: string[]
   other_file_count: number
+  /** (2.0.0-player.51, logins on only) who ELSE holds it in their library, in the order they got it -
+   *  absent when deadwax couldn't read it (`holders_unknown`) */
+  holders?: string[]
+  /** (logins on) whether the admin asking holds it - their own entry is put away as they delete it */
+  yours?: boolean
+  /** (logins on) deadwax couldn't read who holds it: the dialog says so, never "nobody" */
+  holders_unknown?: boolean
+}
+
+/** One album in a person's library, as GET /deadwax/me/library lists it (2.0.0-player.51). */
+export interface LibraryEntry {
+  /** the store index's id for it (store_album.id) */
+  album_id: number
+  artist: string
+  album: string
+  release_mbid: string | null
+  release_group_mbid: string | null
+  /** Navidrome's album it was starred on - null until it has been */
+  navidrome_id: string | null
+  added_at: string | null
+  /** grabbed | added | seeded | starred (in Amperfy or another Subsonic app) */
+  how: string | null
+}
+
+/**
+ * GET /deadwax/me/library (2.0.0-player.51, personal libraries): your library - your starred albums in
+ * Navidrome - and how far deadwax has got starring it. `on` false with logins off (and nothing else);
+ * `library` false for the break-glass admin, who has no Navidrome account; `kept` false when deadwax
+ * can't read its database.
+ */
+export interface MyLibrary {
+  on: boolean
+  library?: boolean
+  kept?: boolean
+  count?: number
+  starred?: number
+  waiting?: number
+  incomplete?: number
+  /** whether deadwax can star for you: 'dead' - Navidrome no longer takes the login you signed in with */
+  login?: 'ok' | 'dead' | 'none'
+  login_problem?: string | null
+  waiting_albums?: (LibraryEntry & { problem: string | null; words: string | null })[]
+  /** the "new in your library" marker: added since, not yet opened */
+  new?: LibraryEntry[]
+  /** deleted by the admin - "removed by the admin, request it again" - until you put them away */
+  removed?: (LibraryEntry & { removed_at: string | null })[]
+}
+
+/** POST /deadwax/me/library/add */
+export interface AddedToLibrary {
+  added: boolean
+  /** it was in your library already */
+  already: boolean
+  /** false: the store holds only part of it, added marked incomplete */
+  complete: boolean
+}
+
+/** GET /deadwax/library/held (2.0.0-player.51, admin): what nobody holds, and the flagged downloads. */
+export interface HeldByNobody {
+  count: number
+  albums: { id: number; path: string; artist: string; album: string; edition: string; year: string;
+    release_mbid: string | null; formats: string[]; track_count: number }[]
+  flags: { id: number; album_id: number | null; artist: string | null; album: string | null; path: string | null;
+    release_mbid: string | null; users: string[]; created_at: string }[]
 }
 
 export interface DeleteResult extends DeletionSummary {

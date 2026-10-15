@@ -441,8 +441,9 @@ def test_held_complete(tmp_path, store):
 
     held = run(held_copy(store, root, "rel-1", release_of(2)))
 
-    assert held == {"path": DUMMY, "paths": [DUMMY], "artist": "Portishead", "album": "Dummy", "edition": "",
-                    "track_count": 2, "expected_tracks": 2, "formats": ["flac"], "complete": True,
+    #? (2.0.0-player.51) with the store's row ids, which a library entry keys on (never sent to the page)
+    assert held == {"path": DUMMY, "paths": [DUMMY], "album_ids": [1], "artist": "Portishead", "album": "Dummy",
+                    "edition": "", "track_count": 2, "expected_tracks": 2, "formats": ["flac"], "complete": True,
                     "fills_gaps": False, "filed_to": None}
 
 

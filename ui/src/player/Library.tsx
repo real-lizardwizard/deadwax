@@ -3,9 +3,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { ARTIST_ORDERS, ArtistsView, SongsView, countText, type ArtistOrder } from '../app/LibraryViews'
 import { chooseLibrary, onLibraryLeaving, setLibrarySongs, useLibraryPick } from '../app/libraryPick'
 import { useFrame } from '../app/useFrame'
+import { useMyLibrary } from '../app/useMyLibrary'
 import { usePaged } from '../app/usePaged'
 import { LIBRARY_TITLES, shownPick, type LibraryPick } from '../lib/appFrame'
 import { latestOnly } from '../lib/latest'
+import { isNew, newMarks } from '../lib/myLibrary'
 import { readPlayerOrder, writePlayerOrder, type LibraryView } from '../state/persisted'
 import { PAGE_SIZE, albumPage, dropPrefetch, librarySongs, prefetchAlbum, type Album, type AlbumOrder, type Artist } from './api'
 import { Cover } from './Cover'
@@ -36,6 +38,8 @@ function savedOrder(): AlbumOrder {
  */
 function AlbumsView({ order, onOpen, onCount }: { order: AlbumOrder; onOpen: (album: Album) => void; onCount: (count: number | null) => void }) {
   const albums = usePaged<Album>((offset, signal) => albumPage(order, offset, signal), PAGE_SIZE, order)
+  //? (2.0.0-player.51) what is new in your library is marked New until you open it - with logins on only
+  const marks = newMarks(useMyLibrary())
 
   useEffect(() => {
     onCount(albums.done ? albums.items.length : null)
@@ -58,6 +62,11 @@ function AlbumsView({ order, onOpen, onCount }: { order: AlbumOrder; onOpen: (al
             <Cover id={album.coverArt} size={400} class="pl-album-cover" />
             <span class="pl-album-title">{album.name}</span>
             <span class="pl-album-artist">{album.artist}</span>
+            {isNew(marks, album) && (
+              <span class="pl-album-new">
+                New<span class="app-visually-hidden"> in your library</span>
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -103,6 +112,10 @@ function AlbumsView({ order, onOpen, onCount }: { order: AlbumOrder; onOpen: (al
  * Albums view keeps the order chosen for it. Which view shows is app/libraryPick.ts's, a store both
  * choose from; a phone shows the albums for "Recently added". A view's scroll is kept as another is
  * chosen, by the chips or the sidebar, and put back as it is chosen again.
+ *
+ * NEW (2.0.0-player.51, personal libraries): with logins on, an album new in your library - added since
+ * you last opened it - carries a New mark on its tile (app/useMyLibrary.ts), gone once you open it. The
+ * tab still lists everything Navidrome has; step 6 makes it your starred albums, with Browse for the store.
  *
  * Tiles and rows navigate; nothing here plays (see "The one app" in CLAUDE.md).
  */

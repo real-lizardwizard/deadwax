@@ -88,6 +88,14 @@
  * handed to the box - and no Join for a download of your own. A Get - a card's, and a pick for you -
  * sends its folder's quality, and each runner-up's, as candidateQuality puts it.
  *
+ * And personal libraries (2.0.0-player.51): a pressing the store holds whole that isn't yours (`yours`
+ * false, logins on) is "In the store, not in your library" with a line saying adding downloads nothing,
+ * and offers Add to my library - yours, or logins off, is "Already in your library" word for word; a part
+ * the store holds that isn't yours is "The store has". AddToLibrary drawn: only where offered and the page
+ * gives a way; the tap asks at once and waits (aria-disabled), a second tap asks nothing; refused in an
+ * alert with Add back; added, said, its focus handed to the box. The main page's box: Add for the release
+ * the Find was for, waiting, added - and none with no release to send.
+ *
  * Run it with:  node ui/test/sources.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
@@ -150,6 +158,10 @@ exports.askGetSettings = () => { globalThis.__sources.settingsLog.push('ask'); r
 fs.writeFileSync(path.join(OUT, 'app/useSheet.js'), `
 exports.useSheet = (options) => { globalThis.__sources.sheet = options }
 `)
+//? (2.0.0-player.51) Add to my library: every add kept, answered when the test says
+fs.writeFileSync(path.join(OUT, 'api/me.js'), `
+exports.addToMyLibrary = (release) => globalThis.__sources.add(release)
+`)
 fs.writeFileSync(path.join(OUT, 'player/icons.js'), `exports.ChevronDownIcon = function ChevronDownIcon() { return null }\nexports.CloseIcon = function CloseIcon() { return null }\n`)
 
 function deferred() {
@@ -161,8 +173,10 @@ function deferred() {
 const asks = []
 const requested = []
 const joined = []
+const adds = []
 globalThis.__sources = {
   join(jobId) { joined.push(jobId); return Promise.resolve(true) },
+  add(release) { const d = deferred(); adds.push({ release, ...d }); return d.promise },
   settings: { get_mode: 'sources', quality_floor: 'lossless' },
   settingsAsked: [],
   //? the store asked (askGetSettings) and the Format read for a search (formatPreferenceNow), in order
@@ -749,6 +763,100 @@ async function main() {
     tree = draw({ status: { ...status, joinJobId: undefined } })
     check('a download of your own: no Join', find((node) => node.type === 'button').length, 0)
     globalThis.__sources.join = realJoin
+  }
+
+  console.log('\nAdd to my library (2.0.0-player.51): the store line\'s case, the app\'s button, the main page\'s box')
+  {
+    const { storeStatusFor } = require(path.join(OUT, 'lib/perPerson.js'))
+    const { storeNotes } = require(path.join(OUT, 'lib/candidates.js'))
+    const held = { path: 'Portishead/Third (2008)', paths: ['Portishead/Third (2008)'], artist: 'Portishead', album: 'Third', edition: '',
+      track_count: 11, expected_tracks: 11, formats: ['flac'], complete: true, fills_gaps: false, filed_to: null }
+    const notYours = storeStatusFor({ held: { ...held, yours: false }, downloading: null }, 'Requests')
+    check('held whole, not yours: "In the store, not in your library", what it is, that adding downloads nothing - and Add',
+      [notYours.title, notYours.lines, notYours.add],
+      ['In the store, not in your library', ['Portishead/Third (2008)', '11 of 11 tracks · FLAC',
+        'Add it to your library to have it starred for you in Navidrome - nothing is downloaded.'], true])
+    const yours = storeStatusFor({ held: { ...held, yours: true }, downloading: null }, 'Requests')
+    const off = storeStatusFor({ held, downloading: null }, 'Requests')
+    check('...yours, or logins off (no `yours`): "Already in your library" as it always was, no Add',
+      [yours.title, yours.add, off.title, off.add, JSON.stringify(off) === JSON.stringify(yours)], ['Already in your library', undefined, 'Already in your library', undefined, true])
+    const part = { ...held, complete: false, track_count: 9, filed_to: 'Portishead/Third (2008)', fills_gaps: true }
+    check('a part the store holds that isn\'t yours is the store\'s; yours (or logins off) is yours',
+      [storeNotes({ held: { ...part, yours: false }, downloading_part: null, other_pressings: [] })[0].slice(0, 40),
+        storeNotes({ held: part, downloading_part: null, other_pressings: [] })[0].slice(0, 40)],
+      ['The store has 9 of 11 tracks of this pre', 'You have 9 of 11 tracks of this pressing'])
+
+    const { AddToLibrary } = require(path.join(OUT, 'app/StoreState.js'))
+    const asked = []
+    let answerAdd = null
+    const onAdd = () => { asked.push('add'); return new Promise((resolve, reject) => { answerAdd = { resolve, reject } }) }
+    tree = StoreState({ status: notYours, notes: [], onAdd })
+    check('the app\'s box draws Add where it is offered and the page gives a way', find((node) => node.type === AddToLibrary).length, 1)
+    tree = StoreState({ status: notYours, notes: [] })
+    check('...none where the page gives none', find((node) => node.type === AddToLibrary).length, 0)
+    tree = StoreState({ status: yours, notes: [], onAdd })
+    check('...nor for a pressing of yours', find((node) => node.type === AddToLibrary).length, 0)
+
+    //? (review) the Sources panel doesn't ask the store again after its Add: its box says it's yours itself
+    const { addedStatus } = require(path.join(OUT, 'lib/perPerson.js'))
+    const added = addedStatus(notYours)
+    check('added from the box: "Already in your library", the add note gone - Add kept, so its own "Added" words stay',
+      [added.title, added.lines, added.add, addedStatus(yours) === yours], ['Already in your library', ['Portishead/Third (2008)', '11 of 11 tracks · FLAC'], true, true])
+    tree = StoreState({ status: added, notes: [], onAdd })
+    const kept = find((node) => node.type === AddToLibrary)
+    check('...the same AddToLibrary (its key the folder line, as before), so it keeps saying it was added', [kept.length, kept[0]?.key], [1, notYours.lines[0]])
+    const sourcesCode = require('fs').readFileSync(path.join(UI, 'src/app/Sources.tsx'), 'utf8')
+    const pageCode = require('fs').readFileSync(path.join(UI, 'src/app/ReleaseGroupPage.tsx'), 'utf8')
+    check('...the Sources panel draws that once its add is in, and tells the album page beside it, which asks the store again (review)',
+      [/const status = found && result !== null && addedFrom === result \? addedStatus\(found\) : found/.test(sourcesCode),
+        /return addToMyLibrary\(search\.release\)\.then\(\(\) => \{\s*setAddedFrom\(from\)\s*announceAddedToLibrary\(\)/.test(sourcesCode),
+        /useEffect\(\(\) => onAddedToLibrary\(\(\) => setFiled\(\(n\) => n \+ 1\)\), \[\]\)/.test(pageCode),
+        /addToMyLibrary\(download\.release\)\.then\(announceAddedToLibrary\)/.test(pageCode)],
+      [true, true, true, true])
+    const drawAdd = hooks.root(AddToLibrary)
+    tree = drawAdd({ onAdd })
+    const button = () => find((node) => node.type === 'button')[0]
+    check('Add to my library', [text(button()), button().props['aria-disabled']], ['Add to my library', false])
+    button().props.onClick()
+    tree = drawAdd({ onAdd })
+    check('the tap asks at once, the button waiting - still in the tab order; a second tap asks nothing more',
+      [(button().props.onClick(), asked), text(button()), button().props['aria-disabled']], [['add'], 'Adding…', true])
+    answerAdd.reject(new Error("That pressing isn't in the store now - Get it instead."))
+    await settle()
+    tree = drawAdd({ onAdd })
+    check('refused: deadwax\'s words in an alert, Add back', [find((node) => node.props?.role === 'alert').map(text), text(button())],
+      [["That pressing isn't in the store now - Get it instead."], 'Add to my library'])
+    const focused = []
+    const fakeButton = { closest: (selector) => (selector === '.app-store-box' ? { focus: () => focused.push('box') } : null) }
+    globalThis.document = { body: {}, activeElement: fakeButton }
+    button().props.onClick()
+    button().props.ref.current = fakeButton
+    answerAdd.resolve({ added: true })
+    await settle()
+    tree = drawAdd({ onAdd })
+    check('added: said, the button gone, its focus handed to the box', [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text), focused],
+      [0, ["Added - it's in your library, and deadwax stars it for you in Navidrome."], ['box']])
+    delete globalThis.document
+
+    const draw = hooks.root(StoreStatusBox)
+    const release = { artist: 'Portishead', album: 'Third', release_mbid: 'rel-third' }
+    tree = draw({ status: notYours, release })
+    const mainButton = () => find((node) => node.type === 'button')[0]
+    check('the main page\'s box: Add, for the release the Find was for', text(mainButton()), 'Add to my library')
+    mainButton().props.onClick()
+    tree = draw({ status: notYours, release })
+    check('...asked at once, waiting aria-disabled', [adds.map((a) => a.release.release_mbid), text(mainButton()), mainButton().props['aria-disabled']], [['rel-third'], 'Adding…', true])
+    adds[0].resolve({ added: true })
+    await settle()
+    tree = draw({ status: notYours, release })
+    check('...added, said', [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text)],
+      [0, ["Added - it's in your library, and deadwax stars it for you in Navidrome."]])
+    //? (review) the main page doesn't ask the store again either: the box says it's yours itself, as the panel does
+    check('...and the box above it says it is yours now: "Already in your library", the add note gone',
+      [find((node) => node.type === 'h4').map(text), find((node) => node.type === 'p' && node.props?.role === undefined).map(text)],
+      [['Already in your library'], ['Portishead/Third (2008)', '11 of 11 tracks · FLAC']])
+    tree = hooks.root(StoreStatusBox)({ status: notYours })
+    check('...and no Add with no release to send', find((node) => node.type === 'button').length, 0)
   }
 
   console.log('\na card, drawn: Speed leading, the facts, the missing line')

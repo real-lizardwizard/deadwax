@@ -475,6 +475,28 @@ refused ("already downloading from bob") rather than joined.
   sign in takes them over, with the pins and Getting albums settings - or, when an admin's session
   outlived the restart that switched logins on (an upgrade from 2.0.0-player.48, or logins switched
   off and on again), the first admin to use deadwax after it starts.
+- **What a download gives you** (since 2.0.0-player.51): it goes into [your library](player.md#your-library-with-logins-on) -
+  your starred albums in Navidrome - when it ends, for everyone still waiting for it (not anyone who
+  left it, nor the break-glass `admin`, which has no library), and its row in Requests says so:
+  - **filed** - added: **In your library** (an admin's row of somebody else's: **Filed - in their library**);
+  - **every file was already there**, in the folder of that same release - a second copy isn't filed
+    beside the first, and it's added: **Already in the store, added to your library**;
+  - **every file was already there** in a folder of **another pressing or an untagged rip** - given to
+    nobody on a guess, and an admin is asked to look (**Library care → Held by nobody**, in the app):
+    **Already in the store as another copy, so not added - an admin has been asked to look**. Once the
+    admin has looked, the row says so: **Already in the store, added to your library** after their **Add
+    for them**, **Already in the store as another copy, so not added - an admin has looked at it** after
+    their **Put away**;
+  - **some files failed to file** - added, marked incomplete: **Partly filed: … · in your library,
+    marked incomplete**;
+  - **a dry run**, or organizing off (with logins off only - on, organizing must be on), **failed**, or
+    **nothing could be filed** - nothing; the row says why, as it always has. A download that arrived but
+    of which nothing could be filed (nothing found where `SLSKD_DOWNLOAD_PATH` says, filing that failed,
+    no track filed) is under **Needs attention** with **Next peer** (the main page: **↻ next peer**) - not
+    **Ask again**, since the same files would fail the same way. With logins off it stays under Done.
+- **A pressing the store already holds** that isn't in your library says **In the store, not in your
+  library** with **Add to my library** instead of **Already in your library** - see
+  [the phone player](player.md#your-library-with-logins-on).
 
 ## The event log
 

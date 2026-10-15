@@ -402,6 +402,11 @@ haven't heard for a while. In order:
   than 374 points, so each card has room to say what it needs): an artist's picture round, an
   album's cover square, its name over "Artist" or the album's artist. Tap a card to open the album or
   the artist's page. With nothing pinned yet it says how to pin something.
+- **New in your library** - with logins on (since 2.0.0-player.51): the albums added to [your
+  library](#your-library-with-logins-on) since you last opened them - filed for you (or added for you
+  by an admin after a look), or starred in Amperfy - once Navidrome has them. An album you add yourself
+  with **Add to my library** isn't marked new: you were looking at it. Opening one, from here or
+  anywhere in the app, takes it off. With nothing new, or logins off, there's no such section.
 - **Recently added**, Navidrome's 20 newest albums.
 - **Not played in a while**: the albums you last played more than 30 days ago, the longest ago
   first, up to 20 - made from Navidrome's list of the albums played most recently (its first 500),
@@ -1599,6 +1604,66 @@ takes the screen back first (the visualizer closes), since nothing else can show
 app left open while logins are switched on reloads itself into the sign-in screen
 ([Turning logins on](getting-started.md#turning-logins-on)). What each message means:
 [Troubleshooting → Signing in](troubleshooting.md#signing-in).
+
+## Your library, with logins on
+
+Since 2.0.0-player.51. With logins on, **your library is your starred albums in Navidrome** - your
+favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and deadwax keeps it for you:
+
+- **What you get is starred for you.** A download you asked for (or joined) is added to your library
+  once it's filed, and deadwax stars it **as you** in Navidrome as soon as Navidrome has scanned it -
+  found by its MusicBrainz release id, starred, and then checked, since Navidrome answers "OK" to a
+  star even for an album it doesn't know. Not there yet, or the star didn't hold, and deadwax asks again
+  by itself: after 30 seconds, then a minute, two, and so on up to every half hour, for as long as it
+  takes. You needn't be signed in: deadwax keeps the login you last signed in with (encrypted, as your
+  session's is) so an album filed at 3am is starred all the same. Signing out leaves it; signing in
+  again replaces it.
+- **Add to my library.** An album the store already holds that isn't in your library says **In the
+  store, not in your library** under **Get the album** (and in the Sources sheet, and the main page's
+  candidates panel) with **Add to my library**: it goes into your library and is starred for you, and
+  nothing is downloaded. It's offered for a pressing the store holds whole; of a part the store holds
+  the line says **The store has 9 of 11 tracks of this pressing**, and a download fills it in, as before.
+  **Already in your library** now means yours.
+- **Two-way with Amperfy.** Every five minutes deadwax reads your starred albums back: an album you
+  star in Amperfy (and the store holds) is added to your library, one you unstar is taken out. A star
+  Navidrome loses rather than you taking it away - the album missing from Navidrome for a moment while
+  an admin applies a release to it, or coming back under a new Navidrome id after its tags changed - is
+  put back instead. Only albums count: starring a song or an artist stays an ordinary favourite. Pins on
+  Home stay deadwax's own. A star and an unstar made in two places within a few minutes end up as
+  whichever deadwax reads last. The albums you'd already starred before deadwax first read your stars
+  back are added to your library too, but not marked new - they were yours already. That first read
+  waits for deadwax to have scanned the library once (a new install hasn't until someone searches,
+  opens an album's page or runs **Library care → Rescan**): until then every read counts as the first,
+  so a star you make before that isn't marked new either.
+- **You → Your library** says how many albums your library holds and how many are still waiting to be
+  starred, and why - a few albums named for each reason, then how many more: "Navidrome hasn't got it
+  yet", "It has no MusicBrainz release id" (an admin can apply a release to it), "Its folder isn't there
+  just now", "Navidrome isn't answering". **If you
+  change your Navidrome password**, the login deadwax kept for you stops working: it says so in red -
+  deadwax can't star albums for you until you sign in again - and what you get meanwhile waits, then is
+  starred once you've signed in with the new password. An album an admin deleted is listed there as
+  **Removed by the admin - request it again to have it back**, with **Request it again** (its album
+  page, where **Get** is) and **Put away**; getting it again puts it away by itself.
+- **New** marks: Home's **New in your library**, and a **New** badge on an album's tile in the Library,
+  until you open it - from a tile, a link, or its address.
+- **What it isn't yet**: the Library tab still lists everything Navidrome has, as it always has - it
+  becomes your starred albums, with the whole store a tap away under Browse, in step 6 of the
+  multi-user plan - and "in your library" elsewhere in the app (Search's rows, an album page's line)
+  still means the store.
+- **The first admin** to sign in after this version (or to come back to deadwax with a session from
+  before it) has every album already in the store put into their library and starred for them, once:
+  it was all theirs before anyone else had a library. If deadwax hasn't scanned the library yet at that
+  moment - a new install, or one upgraded from a version whose saved scan it can't read - that waits for
+  its first scan (searching, opening an album's page or **Library care → Rescan** starts one), so the
+  albums it finds then are theirs too. The one exception is an album somebody else's download brought
+  in: that is theirs. An album somebody else had starred in Amperfy, or added, goes into both libraries.
+  Anyone else's library starts with only the albums they'd already starred. An album that arrives
+  without anyone asking for it - copied in by hand, or by another program - is nobody's: it stays in the
+  store for anyone to add, and an admin sees it under **Library care → Held by nobody**.
+- **The break-glass `admin`** has no Navidrome account, so no library: nothing it downloads goes into
+  one, its store line reads as it always did, and **Add to my library** isn't offered to it.
+- **With logins off** nothing of this shows: there is one library, and everything in the store is in
+  it.
 
 ## Using it away from home
 

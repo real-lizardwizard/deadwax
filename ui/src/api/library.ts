@@ -1,7 +1,7 @@
 import { fetchOk, get, post } from './http'
 import type {
   ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
-  DeletionSummary,
+  DeletionSummary, HeldByNobody,
   LibraryAlbum, LibraryResponse, LyricsSummary, NewImportsResponse, OwnedResponse, QueueSummaryResponse, RetagPlan,
   RetagRelease, RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackLyrics,
   TrackTagEdit,
@@ -289,6 +289,25 @@ export function deletionSummary(albumPath: string): Promise<DeletionSummary> {
  */
 export function deleteAlbum(albumPath: string): Promise<DeleteResult> {
   return post<DeleteResult>('/library/delete', { album_path: albumPath })
+}
+
+/**
+ * Held by nobody (2.0.0-player.51, an admin's): every album in the store nobody has in their library, and
+ * the downloads flagged for a look - every file already in a folder of another pressing or an untagged
+ * rip (src/routes/held.py).
+ */
+export function heldByNobody(signal?: AbortSignal): Promise<HeldByNobody> {
+  return get<HeldByNobody>('/library/held', signal)
+}
+
+/** A flagged download's album given to those who asked, after all. */
+export function addFlagged(flagId: number): Promise<{ added: boolean; users: string[] }> {
+  return post<{ added: boolean; users: string[] }>(`/library/held/flags/${flagId}/add`)
+}
+
+/** A flag put away. */
+export function dismissFlag(flagId: number): Promise<{ dismissed: boolean }> {
+  return post<{ dismissed: boolean }>(`/library/held/flags/${flagId}/dismiss`)
 }
 
 

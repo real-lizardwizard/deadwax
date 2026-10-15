@@ -2,6 +2,7 @@ import type { DownloadJob } from '../api/types'
 import type { PendingDownload } from './downloadOverlay'
 import { formatSpeed } from './format'
 import { isActive } from './jobs'
+import { grantWords } from './myLibrary'
 import { CANCEL_WORDS, askedByText, cancelWords, type CancelWords } from './perPerson'
 
 /**
@@ -155,7 +156,10 @@ export function ageText(iso: string | null | undefined, now: number): string {
  * How a finished download ended, in words, from the server's `outcome` - never read out of the
  * error text, which is shown only as the row's own words where no outcome names it.
  */
-export function outcomeWords(job: Pick<DownloadJob, 'outcome' | 'error'>): { text: string; tone: Tone } {
+export function outcomeWords(job: Pick<DownloadJob, 'outcome' | 'error' | 'library' | 'mine'>): { text: string; tone: Tone } {
+  //? (2.0.0-player.51, logins on) what its filing gave those who asked, where the server says
+  const granted = grantWords(job)
+  if (granted) return granted
   switch (job.outcome) {
     case 'filed':
       return { text: 'In your library', tone: 'plain' }
@@ -195,11 +199,14 @@ const titleOf = (album: string | null | undefined, edition?: string | null) =>
 const files = (done: number, total: number) => `${done} of ${total} ${plural(total, 'file', 'files')}`
 
 /** Which heading a job goes under. */
-export function sectionOf(job: Pick<DownloadJob, 'status' | 'progress'>): Section {
+export function sectionOf(job: Pick<DownloadJob, 'status' | 'progress' | 'outcome'>): Section {
   if (job.status === 'downloading' || job.status === 'organizing') return 'downloading'
   //? bytes moving before the poller has moved it on from queued (it looks every 5 s)
   if (job.status === 'queued') return (job.progress ?? 0) > 0 ? 'downloading' : 'waiting'
   if (RETRYABLE.has(job.status)) return 'attention'
+  //? (2.0.0-player.51, logins on) downloaded, and nothing of it could be filed: it needs a look, and the
+  //? next peer is offered - the plan's table
+  if (job.outcome === 'not_filed') return 'attention'
   return 'done'
 }
 
@@ -268,7 +275,8 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
     row.nextPeer = left > 0
       ? { left, primary: false, label: retrying && !same ? 'Trying next peer…' : `Next peer · ${left} left` }
       : null
-    row.askAgain = { label: same ? 'Asking again…' : 'Ask again' }
+    //? the same peer again is for a download that stopped - not one filing couldn't use (not_filed)
+    row.askAgain = job.outcome === 'not_filed' ? null : { label: same ? 'Asking again…' : 'Ask again' }
     row.busy = retrying
     //? short, for an Arriving card's end, where a long word would squeeze the album's name
     row.brief = retrying ? 'retrying…' : ''

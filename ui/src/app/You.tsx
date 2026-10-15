@@ -20,6 +20,7 @@ import { askGetSettings, chooseGetSettings, useGetSettings } from './useGetSetti
 import { WindDownChoice } from './WindDownChoice'
 import { adminUntilAsked } from './session'
 import { SignOutRow } from './SignOutRow'
+import { YourLibrary } from './YourLibrary'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
 
@@ -90,6 +91,11 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   (2.0.0-player.42) "Library care" under the queue's row: Rescan and the bulk runs, the same way. A
  *   desktop's only until 2.0.0-player.47; a phone's too since.
  *
+ * - Your library (2.0.0-player.51, YourLibrary.tsx): with logins on, at the top - how many albums your
+ *   library (your starred albums in Navidrome) holds, what still waits to be starred and why ("sign in
+ *   again" when Navidrome no longer takes your login), and what the admin deleted, to request again or
+ *   put away. Nothing with logins off.
+ *
  * It works with Navidrome unset or down: nothing here waits on it. A page, so it reads the player
  * from context; `shown` is App's word that the tab has been opened at least once, `current` that it
  * is the tab showing now.
@@ -104,6 +110,7 @@ export function You({
   needsLook = null,
   onNeedsLook,
   onManaging,
+  onRequestAgain,
 }: {
   shown: boolean
   /** the tab showing now: Getting albums are asked again each time it becomes so */
@@ -119,6 +126,8 @@ export function You({
   onNeedsLook?: () => void
   /** Library care, the server's settings, or the log: its page (2.0.0-player.33, .42) */
   onManaging?: (kind: ManagingKind) => void
+  /** (2.0.0-player.51) an album the admin deleted, requested again: its album page, where Get is */
+  onRequestAgain?: (group: { id: string; title: string }) => void
 }) {
   const player = usePlayerState()
   const actions = usePlayerActions()
@@ -189,6 +198,9 @@ export function You({
           {identity && <p class="app-identity-sub">{identity}</p>}
         </div>
       </header>
+
+      {/* (2.0.0-player.51) with logins on: your library - your starred albums - and how far its starring has got */}
+      <YourLibrary current={current} onRequestAgain={onRequestAgain} />
 
       <section class="app-section" aria-labelledby="app-getting-title">
         <h2 id="app-getting-title" class="app-section-title">

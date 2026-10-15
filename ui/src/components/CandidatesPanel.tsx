@@ -497,7 +497,7 @@ function CandidatesBody(
   if (status) {
     return (
       <>
-        <StoreStatusBox status={status} />
+        <StoreStatusBox status={status} release={search.release} />
         {notes}
       </>
     )

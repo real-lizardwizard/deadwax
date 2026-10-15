@@ -41,6 +41,26 @@ export function announceAlbumsFiled(): void {
 }
 
 /**
+ * "An album went into your library from the store" (2.0.0-player.51, Add to my library) - said by
+ * whichever store line added it (the album page's, or the Sources panel's beside it), heard by the album
+ * page, which asks the store again so its line says "Already in your library", and by your library's
+ * store (app/useMyLibrary.ts). Apart from announceAlbumsFiled: nothing was filed, so the library view,
+ * the badge and the owned marks have nothing to learn from it.
+ */
+const added = new Set<Listener>()
+
+export function onAddedToLibrary(listener: Listener): () => void {
+  added.add(listener)
+  return () => {
+    added.delete(listener)
+  }
+}
+
+export function announceAddedToLibrary(): void {
+  for (const listener of [...added]) listener()
+}
+
+/**
  * The jobs that became `organized` since the previous poll.
  *
  * `organized` and nothing else: it is the one status meaning files reached the library.

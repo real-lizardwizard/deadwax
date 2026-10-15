@@ -15,6 +15,7 @@ import { navidromeChecks } from '../lib/navidromeCheck'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
+import { newShelf } from '../lib/myLibrary'
 import type { Look } from '../lib/turntable'
 import { AlbumPage } from '../player/AlbumPage'
 import { navidromeStatus, playedAlbum, sentFormat, type Album, type Artist, type NavidromeStatus } from '../player/api'
@@ -53,6 +54,7 @@ import { useInfoDetails } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
 import { setPinned, usePins } from './usePins'
 import { askQueueSummary, useQueueSummary } from './useQueueSummary'
+import { askMyLibrary, hasLibrary, seenAlbum, useMyLibrary } from './useMyLibrary'
 import { takeOpener } from './useSheet'
 import { You } from './You'
 
@@ -72,6 +74,9 @@ const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
 
 /** The Managing pages, siblings in the sidebar: one opened over another replaces it. */
 const MANAGING_KINDS: readonly PageKind[] = ['queue', 'care', 'settings', 'log']
+
+/** Nothing new in your library (logins off): one array for every render, so Home's element holds still. */
+const NOTHING_NEW: readonly Album[] = []
 
 /** Nothing arriving: one array for every render, so Home's element holds still while it stays so. */
 const NOTHING_ARRIVING: readonly RequestRow[] = []
@@ -468,6 +473,8 @@ export function App() {
   }, [asksQueueSummary, admin, pageShown])
 
   const openAlbum = useCallback((album: Album) => {
+    //? (2.0.0-player.51) an album new in your library is new no longer once opened
+    seenAlbum(album)
     previews.current.delete(album.id)
     previews.current.set(album.id, album)
     if (previews.current.size > PREVIEWS_KEPT) {
@@ -1018,6 +1025,25 @@ export function App() {
     : null
   //? Home is what shows: its pins are asked again as it comes into view (2.0.0-player.18)
   const homeShown = watching === 'home'
+  //? (2.0.0-player.51) what is new in your library - logins on - asked as Home or the Library tab (whose
+  //? tiles carry the New marks) comes into view: a page opened on the Library, or a desktop left on it,
+  //? never waits for Home to have asked (review)
+  const myLibrary = useMyLibrary()
+  const libraryShown = pageShown && nav.tab === 'library'
+  useEffect(() => {
+    if (homeShown || libraryShown) askMyLibrary()
+  }, [homeShown, libraryShown])
+  //? ...and the album page on top is seen - opened from a tile (openAlbum told it already), reached by its
+  //? address or by going back to it - looked at again as an answer lands, so one opened before deadwax
+  //? first said what is new is cleared too
+  const topPage = nav.stacks[nav.tab][nav.stacks[nav.tab].length - 1] ?? null
+  const topAlbum = topPage?.kind === 'album' ? topPage.id : null
+  useEffect(() => {
+    if (topAlbum === null || !pageShown) return
+    const preview = previews.current.get(topAlbum)
+    seenAlbum({ id: topAlbum, ...(preview?.musicBrainzId ? { musicBrainzId: preview.musicBrainzId } : {}) })
+  }, [topAlbum, pageShown, myLibrary])
+  const newAlbums = useMemo(() => (!hasLibrary() ? NOTHING_NEW : myLibrary ? newShelf(myLibrary) : null), [myLibrary])
   const home = useMemo(
     () => (
       <Home
@@ -1029,9 +1055,10 @@ export function App() {
         onSeeAll={seeRequests}
         arrivingTrouble={arrivingTrouble}
         shown={homeShown}
+        newAlbums={newAlbums}
       />
     ),
-    [status, arriving, arrivingTrouble, homeShown],
+    [status, arriving, arrivingTrouble, homeShown, newAlbums],
   )
   const requests = useMemo(
     () => (
@@ -1074,6 +1101,7 @@ export function App() {
         needsLook={needsLook}
         onNeedsLook={openQueue}
         onManaging={openManaging}
+        onRequestAgain={openHeldGroup}
       />
     ),
     [youSeen, youCurrent, opensAs, windDown, needsLook],

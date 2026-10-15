@@ -35,9 +35,11 @@ you ignored.
 import asyncio
 import json
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from src import library_ledger
 from src.config import Config
 from src.logger import logger
 from src.peer_speed import merge_observation
@@ -297,7 +299,107 @@ CREATE TABLE IF NOT EXISTS job_requests (
     PRIMARY KEY (job_id, user)
 );
 CREATE INDEX IF NOT EXISTS idx_job_requests_user ON job_requests(user, job_id);
+
+CREATE TABLE IF NOT EXISTS library_membership (
+    -- Each person's library (2.0.0-player.51, step 5 of the multi-user plan): the ledger of the albums
+    -- each user holds, kept so a download that files at 3am is still starred for them in Navidrome -
+    -- their library IS their starred albums, two-way with Amperfy - and a star Navidrome loses can be
+    -- put back. src/library_ledger.py has the rules, src/stars.py the starring and the sync.
+    --
+    -- Keyed on store_album's `id`, never a path or a release id: both change when an album is re-filed
+    -- or a release applied, and the id doesn't. Merging disc folders unions their holders (index_merge);
+    -- deleting an album turns every entry into a tombstone (index_gone 'deleted') - "removed by the
+    -- admin, request it again". Keyed on src/users.py's user: `local`'s, with logins off, are kept
+    -- silently (never starred - local is nobody's Navidrome account) and the first admin's take-over
+    -- moves them on (adopt_local).
+    --
+    -- `how` it came: grabbed (a download filed for them), added (Add to my library, from the store),
+    -- seeded (everything in the store went into the first admin's library, once), starred (starred in
+    -- Amperfy or any Subsonic app, read back by the sync). `state`: waiting (not starred in Navidrome
+    -- yet - `problem` says why, `next_try` when deadwax asks again), starred (confirmed by getAlbum's
+    -- `starred`, on the Navidrome album `navidrome_id`), removed (`removed_why`: unstarred - by them,
+    -- read back by the sync; deleted - the admin deleted the album; dismissed - a deleted one they put
+    -- away). `incomplete` - some files failed to file. `seen_at` NULL is the "new in your library"
+    -- marker, cleared when they open it.
+    user          TEXT NOT NULL,
+    album_id      INTEGER NOT NULL,
+    added_at      TEXT NOT NULL,
+    how           TEXT NOT NULL,
+    state         TEXT NOT NULL,
+    incomplete    INTEGER NOT NULL DEFAULT 0,
+    navidrome_id  TEXT,
+    starred_at    TEXT,
+    removed_at    TEXT,
+    removed_why   TEXT,
+    seen_at       TEXT,
+    attempts      INTEGER NOT NULL DEFAULT 0,
+    next_try      REAL,
+    problem       TEXT,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (user, album_id)
+);
+CREATE INDEX IF NOT EXISTS idx_membership_album ON library_membership(album_id);
+CREATE INDEX IF NOT EXISTS idx_membership_due ON library_membership(state, next_try);
+
+CREATE TABLE IF NOT EXISTS user_credentials (
+    -- (2.0.0-player.51) Each user's Navidrome login as they last signed in with it - the same sealed
+    -- token and salt a session keeps (src/auth.py seal_credential, encrypted with DEADWAX_SECRET_KEY) -
+    -- kept per USER, not per session, so an album filed overnight is starred as them while nobody is
+    -- signed in, and their starred albums are read back every few minutes. Signing out leaves it;
+    -- signing in again replaces it. `dead_at` is set when Navidrome refuses it (error 40: the password
+    -- changed) or it won't open (another key): their albums then wait in the ledger until they sign in
+    -- again, and their library view says so.
+    -- `synced_at`: when their starred albums were first read back (src/stars.py) - the albums that read
+    -- found were theirs before deadwax kept a ledger of them, so none of it is "new in your library".
+    user        TEXT PRIMARY KEY,
+    credential  TEXT NOT NULL,
+    updated_at  REAL NOT NULL,
+    dead_at     REAL,
+    dead_why    TEXT,
+    synced_at   REAL
+);
+
+CREATE TABLE IF NOT EXISTS library_flags (
+    -- (2.0.0-player.51) Downloads whose every file was already in the album folder they would have
+    -- filed into - but that folder holds another pressing or an untagged rip, so nobody was given it:
+    -- the admin's to look at (Library care's "Held by nobody"). Kept apart from the job, which its
+    -- requesters may clear before the admin has looked. `users` is who asked (JSON list).
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    album_id      INTEGER,
+    job_id        INTEGER,
+    users         TEXT NOT NULL DEFAULT '[]',
+    artist        TEXT,
+    album         TEXT,
+    path          TEXT,
+    release_mbid  TEXT,
+    created_at    TEXT NOT NULL,
+    closed_at     TEXT,
+    closed_how    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS library_seed (
+    -- (2.0.0-player.51) That the store has been seeded into the first admin's library (`user`) - once,
+    -- ever. `seeded_at` and `albums` are NULL while it is HELD OVER: the admin signed in before the store
+    -- index had been filled from a scan of the library (a fresh install, or an upgrade whose saved scan
+    -- was in an older format), so the first full scan seeds it (index_reconcile) - an album the index
+    -- didn't know yet is still "in the store", not one that arrived without a request.
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    user       TEXT NOT NULL,
+    seeded_at  TEXT,
+    albums     INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS store_index_scanned (
+    -- (2.0.0-player.51) The library roots the store index has been filled from a full scan of, at
+    -- least once (index_reconcile with albums, or the saved scan at start-up) - what tells seeding the
+    -- index knows the store, rather than only the odd album a download or an apply indexed.
+    root        TEXT PRIMARY KEY,
+    scanned_at  TEXT NOT NULL
+);
 """
+
+#? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
+LIVE_STATES = ("waiting", "starred")
 
 #? A request still waiting for its download: asked for, not withdrawn, not cleared from its list.
 #? `r` is the job_requests row. One definition - who sees a row, who a cancel leaves behind, and when a
@@ -316,6 +418,12 @@ JOB_COLUMNS = {
     #? {formats, bitrates, bit_depths, sample_rates, variable_bitrate} - so a second person offered to
     #? join it is told what they'd get. '{}' for a job from before, or a caller that sent none.
     "quality_json": "TEXT NOT NULL DEFAULT '{}'",
+    #? (2.0.0-player.51) the store_album row a filing ended in, and what it meant for the libraries of
+    #? those who asked (src/library_ledger.py grant_for): 'added', 'incomplete', 'flagged' - or NULL
+    #? (nothing given: still going, failed, a dry run, nothing filed). A 'flagged' one becomes 'added'
+    #? when an admin adds it for them, 'looked' when they put the flag away (routes/held.py).
+    "album_id": "INTEGER",
+    "library_grant": "TEXT",
 }
 
 #? the parts of a candidate's quality a job keeps (quality_json), and nothing else it might be sent
@@ -467,6 +575,9 @@ class JobStore:
                 #? (2.0.0-player.49) whether this database already knew who asked for each download
                 had_requests = connection.execute(
                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'job_requests'").fetchone() is not None
+                #? (2.0.0-player.51) whether it already knew which roots the store index was filled from
+                had_scanned = connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'store_index_scanned'").fetchone() is not None
                 connection.executescript(SCHEMA)
                 #? CREATE TABLE IF NOT EXISTS never alters a table that is already there, so a
                 #? column added since a database was made has to be added to it by hand
@@ -481,6 +592,13 @@ class JobStore:
                     connection.execute(
                         "INSERT OR IGNORE INTO job_requests (job_id, user, requested_at) "
                         "SELECT id, ?, created_at FROM jobs", (LOCAL_USER,))
+                if not had_scanned:
+                    #? Once, as the table is made: a store index from before (2.0.0-player.7 to .50) was filled
+                    #? from scans - every root it holds counts as scanned, so an upgrade seeds the first admin
+                    #? at their sign-in rather than waiting for a scan
+                    connection.execute(
+                        "INSERT OR IGNORE INTO store_index_scanned (root, scanned_at) "
+                        "SELECT DISTINCT root, ? FROM store_album", (_now(),))
 
             self.available = True
             logger.info(f"job store ready at {self.path}")
@@ -561,7 +679,8 @@ class JobStore:
             logger.error("failed to record the download job", extra={"frontend": True, "src": "slskd"})
             return None
 
-    async def list_jobs(self, limit: int = 50, user: str | None = None, everyone: bool = False) -> list[dict]:
+    async def list_jobs(self, limit: int = 50, user: str | None = None, everyone: bool = False,
+                        not_filed: tuple[str, ...] = ()) -> list[dict]:
         """
         The newest jobs as the downloads panel polls them - twice a second while it's open.
 
@@ -582,6 +701,13 @@ class JobStore:
         admin), every download but those they cleared from their own list; each row then also has
         `requesters`, everyone whose request on it is active, in the order they asked. Without a
         user, every download, as before.
+
+        `not_filed` (2.0.0-player.51, passed with logins on only - poller.NOT_FILED_PATTERNS): LIKE
+        patterns of a `complete` row's error that "try the next peer" can restart too - one nothing
+        of could be filed - so its runners-up are read as well. Only those: a dry run, an "already
+        in the store", a partly filed one keep '[]', as every finished row did (review: reading them
+        all doubled the poll's cost). The patterns may match a little more than poller.retryable,
+        never less; that decides.
         """
         if not self.available:
             return []
@@ -594,6 +720,10 @@ class JobStore:
         else:
             where = f"WHERE EXISTS (SELECT 1 FROM job_requests r WHERE r.job_id = jobs.id AND r.user = ? AND {ACTIVE_REQUEST})"
             params = (user,)
+        not_filed = tuple(not_filed)
+        not_filed_sql = (
+            " OR (status = 'complete' AND (" + " OR ".join("error LIKE ?" for _ in not_filed) + "))" if not_filed else ""
+        )
         requesters = (
             f""", (SELECT json_group_array(user) FROM (SELECT r.user FROM job_requests r
                      WHERE r.job_id = jobs.id AND {ACTIVE_REQUEST} ORDER BY r.requested_at, r.rowid)) AS requesters_json"""
@@ -605,7 +735,7 @@ class JobStore:
                 rows = connection.execute(
                     """
                     SELECT id, release_mbid, artist, album, year, username, directory, files_json,
-                           status, error, created_at, updated_at, tried_json,
+                           status, error, created_at, updated_at, tried_json, library_grant,
                            CASE WHEN json_valid(release_json) THEN
                                json_extract(release_json, '$.release_group_mbid')
                            END AS release_group_mbid,
@@ -613,13 +743,14 @@ class JobStore:
                                COALESCE(NULLIF(TRIM(json_extract(release_json, '$.edition_label')), ''),
                                         NULLIF(TRIM(json_extract(release_json, '$.disambiguation')), ''))
                            END AS edition,
-                           CASE WHEN status IN ({retryable}) THEN
+                           CASE WHEN status IN ({retryable}){not_filed} THEN
                                (SELECT json_group_array(json_object('username', json_extract(value, '$.username')))
                                   FROM json_each(alternatives_json))
                            ELSE '[]' END AS alternatives_json{requesters}
                       FROM jobs {where} ORDER BY id DESC LIMIT ?
-                    """.format(retryable=", ".join("?" * len(RETRYABLE_STATUSES)), requesters=requesters, where=where),
-                    (*RETRYABLE_STATUSES, *params, limit),
+                    """.format(retryable=", ".join("?" * len(RETRYABLE_STATUSES)), requesters=requesters, where=where,
+                               not_filed=not_filed_sql),
+                    (*RETRYABLE_STATUSES, *not_filed, *params, limit),
                 ).fetchall()
                 return [self._row_to_job(r) for r in rows]
 
@@ -1241,7 +1372,7 @@ class JobStore:
         SYNCHRONOUS (src/auth.py's first-admin check runs in FastAPI's thread pool); raises on an error."""
         with self._connect() as connection:
             return any(connection.execute(f"SELECT 1 FROM {table} WHERE user = ? LIMIT 1", (LOCAL_USER,)).fetchone()
-                       for table in ("job_requests", "pins", "user_prefs"))
+                       for table in ("job_requests", "pins", "user_prefs", "library_membership"))
 
     def adopt_local_now(self, user: str) -> tuple[int, int, int]:
         """adopt_local's write, SYNCHRONOUS - for src/auth.py's first admin seen after a start, which runs
@@ -1278,6 +1409,17 @@ class JobStore:
                     "SELECT job_id, ?, requested_at, left_at, hidden_at FROM job_requests WHERE user = ?",
                     (user, LOCAL_USER)).rowcount
                 connection.execute("DELETE FROM job_requests WHERE user = ?", (LOCAL_USER,))
+
+                #? (2.0.0-player.51) local's library - the albums filed while logins were off, kept
+                #? silently - becomes theirs too, an entry they already have keeping theirs; not counted
+                #? (the three above are what is said), and never "new": it is no news to them
+                connection.execute(
+                    "INSERT OR IGNORE INTO library_membership (user, album_id, added_at, how, state, incomplete, "
+                    "navidrome_id, starred_at, removed_at, removed_why, seen_at, attempts, next_try, problem, updated_at) "
+                    "SELECT ?, album_id, added_at, how, state, incomplete, navidrome_id, starred_at, removed_at, "
+                    "removed_why, COALESCE(seen_at, ?), 0, NULL, NULL, ? FROM library_membership WHERE user = ?",
+                    (user, _now(), _now(), LOCAL_USER))
+                connection.execute("DELETE FROM library_membership WHERE user = ?", (LOCAL_USER,))
             return taken, preferences, requests
 
         return write()
@@ -1979,6 +2121,10 @@ class JobStore:
         One read and only the writes that change something: this runs after every real scan of
         the library tab, and a thousand unchanged albums should cost a comparison, not a
         thousand UPDATEs.
+
+        **Personal libraries** (2.0.0-player.51): a scan that found albums records that the index
+        knows this root (store_index_scanned), and does a seed held over until it did - the first
+        admin's (seed_library_now) - in the same transaction.
         """
         if not self.available or not root:
             return 0, 0
@@ -2074,16 +2220,64 @@ class JobStore:
                 for path in unpaired:
                     self._index_write(connection, root, path, scanned[path], now, pairs.get(path))
                     written += 1
-                return written, len(gone)
+
+                #? (2.0.0-player.51) the index knows this library now - and a seed held over until it did
+                #? (library_seed, seed_library_now) is done for the admin it waited for, in this same
+                #? transaction: what this scan found was in the store before anyone had a library
+                seeded = None
+                if scanned:
+                    connection.execute("INSERT OR IGNORE INTO store_index_scanned (root, scanned_at) VALUES (?, ?)",
+                                       (root, now))
+                    waiting = connection.execute(
+                        "SELECT user FROM library_seed WHERE id = 1 AND seeded_at IS NULL").fetchone()
+                    if waiting is not None:
+                        count = self._seed_rows(connection, waiting["user"], root, now, time.time())
+                        connection.execute("UPDATE library_seed SET seeded_at = ?, albums = ? WHERE id = 1", (now, count))
+                        seeded = (waiting["user"], count)
+                return written, len(gone), seeded
 
         try:
-            written, gone = await asyncio.to_thread(write)
+            written, gone, seeded = await asyncio.to_thread(write)
             if written or gone:
                 logger.debug(f"store index: {written} album(s) recorded, {gone} marked missing")
+            if seeded is not None:
+                logger.info(f"put {seeded[1]} album(s) already in the store into {seeded[0]}'s library, now the "
+                            f"library has been scanned - deadwax stars each for them in Navidrome",
+                            extra={"frontend": True})
+                library_ledger.kick()
             return written, gone
         except Exception as e:
             logger.error(f"could not bring the store index up to date ({e})")
             return 0, 0
+
+    @staticmethod
+    def _ledger_union(connection: sqlite3.Connection, source_id: int, target_id: int, now: str) -> None:
+        """
+        (2.0.0-player.51) Everyone who held `source_id` holds `target_id` now - a disc folder merged into
+        its release's. An entry only on the source moves; where a user has both, the one they still
+        hold wins (waiting or starred over removed; starred over waiting), and the other goes. The
+        new marker is kept if either was new; incomplete only if the one kept is.
+        """
+        rank = {"starred": 2, "waiting": 1}
+        sources = connection.execute("SELECT * FROM library_membership WHERE album_id = ?", (source_id,)).fetchall()
+        for entry in sources:
+            there = connection.execute("SELECT * FROM library_membership WHERE user = ? AND album_id = ?",
+                                       (entry["user"], target_id)).fetchone()
+            if there is None:
+                connection.execute("UPDATE library_membership SET album_id = ?, updated_at = ? WHERE user = ? AND album_id = ?",
+                                   (target_id, now, entry["user"], source_id))
+                continue
+            if rank.get(entry["state"], 0) > rank.get(there["state"], 0):
+                connection.execute("DELETE FROM library_membership WHERE user = ? AND album_id = ?", (entry["user"], target_id))
+                connection.execute("UPDATE library_membership SET album_id = ?, updated_at = ? WHERE user = ? AND album_id = ?",
+                                   (target_id, now, entry["user"], source_id))
+                kept, other = entry, there
+            else:
+                connection.execute("DELETE FROM library_membership WHERE user = ? AND album_id = ?", (entry["user"], source_id))
+                kept, other = there, entry
+            if kept["seen_at"] is not None and other["seen_at"] is None and other["state"] in LIVE_STATES:
+                connection.execute("UPDATE library_membership SET seen_at = NULL WHERE user = ? AND album_id = ?",
+                                   (entry["user"], target_id))
 
     @staticmethod
     def _moving_row(connection: sqlite3.Connection, root: str, path: str):
@@ -2128,10 +2322,16 @@ class JobStore:
                         "AND state = 'present'", (root, new_path)).fetchone()
                     if there is not None and (release_mbid is None or there["release_mbid"] == release_mbid):
                         return there["id"]
+                newcomers = [row["id"] for row in connection.execute(
+                    "SELECT id FROM store_album WHERE root = ? AND path = ? AND state = 'present' AND id != ?",
+                    (root, new_path, moving["id"]))]
                 connection.execute(
                     "UPDATE store_album SET state = 'merged', merged_into = ?, gone_at = ?, updated_at = ? "
                     "WHERE root = ? AND path = ? AND state = 'present' AND id != ?",
                     (moving["id"], now, now, root, new_path, moving["id"]))
+                #? (2.0.0-player.51) whoever held the newcomer holds the album it merged into
+                for newcomer in newcomers:
+                    self._ledger_union(connection, newcomer, moving["id"], now)
                 connection.execute(
                     "UPDATE store_album SET path = ?, state = 'present', gone_at = NULL, updated_at = ? "
                     "WHERE id = ?", (new_path, now, moving["id"]))
@@ -2169,6 +2369,8 @@ class JobStore:
                 connection.execute(
                     "UPDATE store_album SET state = 'merged', merged_into = ?, gone_at = ?, updated_at = ? "
                     "WHERE id = ?", (target["id"], now, now, source["id"]))
+                #? (2.0.0-player.51) merging disc folders unions their holders, in the same transaction
+                self._ledger_union(connection, source["id"], target["id"], now)
                 return target["id"]
 
         try:
@@ -2177,14 +2379,28 @@ class JobStore:
             logger.error(f"could not merge {source_path} in the store index ({e})")
             return None
 
-    async def index_gone(self, root: str, path: str, state: str) -> bool:
-        """The live row at `path` becomes a tombstone: `missing`, `deleted` or `merged`."""
+    async def index_gone(self, root: str, path: str, state: str, by: str | None = None) -> bool:
+        """
+        The live row at `path` becomes a tombstone: `missing`, `deleted` or `merged`. A `deleted` one
+        (deadwax deleted the album - mark_deleted) also turns every holder's library entry into a
+        tombstone in the same transaction (2.0.0-player.51): "removed by the admin, request it again" -
+        but `by`'s, the admin who deleted it, which is removed and put away at once ('dismissed'):
+        nobody is asked to request again what they chose to delete (review). A `missing` one leaves
+        them: far more often an unmounted share than an album gone.
+        """
         if not self.available or not root or state not in STORE_ALBUM_STATES or state == "present":
             return False
 
         def write():
             now = _now()
             with self._connect() as connection:
+                if state == "deleted":
+                    connection.execute(
+                        "UPDATE library_membership SET state = 'removed', removed_at = ?, "
+                        "removed_why = CASE WHEN user IS ? THEN 'dismissed' ELSE 'deleted' END, "
+                        "next_try = NULL, problem = NULL, updated_at = ? WHERE state IN ('waiting', 'starred') "
+                        "AND album_id IN (SELECT id FROM store_album WHERE root = ? AND path = ? AND state = 'present')",
+                        (now, by, now, root, path))
                 cursor = connection.execute(
                     "UPDATE store_album SET state = ?, gone_at = ?, updated_at = ? "
                     "WHERE root = ? AND path = ? AND state = 'present'",
@@ -2243,6 +2459,463 @@ class JobStore:
         except Exception as e:
             logger.error(f"could not count the store index ({e})")
             return 0
+
+    async def index_scanned(self, root: str) -> bool:
+        """(2.0.0-player.51) Whether the index has been filled from a full scan of this root at least once
+        (store_index_scanned) - so what it holds is the store, not only what downloads and applies indexed.
+        False when it can't be read."""
+        if not self.available or not root:
+            return False
+
+        def read():
+            with self._connect() as connection:
+                return connection.execute("SELECT 1 FROM store_index_scanned WHERE root = ?", (root,)).fetchone() is not None
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"could not read whether the store index knows the library ({e})")
+            return False
+
+    # ===== personal libraries (2.0.0-player.51, step 5 of the multi-user plan) ===
+    #
+    # library_membership, user_credentials, library_flags, library_seed and store_index_scanned in the
+    # schema say what each holds; src/library_ledger.py has the rules, src/stars.py the starring and the
+    # sync. The async ones degrade as the rest of the store does (nothing written, nothing held); the
+    # SYNCHRONOUS ones - for src/auth.py's sign-in and take-over, which run in FastAPI's thread pool - raise.
+
+    _ENTRY = (
+        "SELECT m.*, a.path AS path, a.state AS album_state, a.release_mbid AS release_mbid, "
+        "a.release_group_mbid AS release_group_mbid, a.artist AS artist, a.album AS album, a.edition AS edition, "
+        "a.year AS year, a.merged_into AS merged_into FROM library_membership m "
+        "LEFT JOIN store_album a ON a.id = m.album_id"
+    )
+
+    async def _ledger(self, work, what: str, failed=None):
+        if not self.available:
+            return failed
+        try:
+            return await asyncio.to_thread(work)
+        except Exception as e:
+            logger.error(f"could not {what} ({e})")
+            return failed
+
+    async def grant_albums(self, users: list[str], album_ids: list[int], how: str, incomplete: bool = False,
+                           seen: bool = False) -> int:
+        """
+        These albums go into these users' libraries, `how` they came: a new entry waits to be starred;
+        one they already hold keeps its state (its `incomplete` follows this grant); one they had
+        removed - or that was a tombstone - is held again, waiting, new. `seen` leaves no new marker
+        (Add to my library, made while looking at it). A tombstone of the same RELEASE ("removed by the
+        admin, request it again") is put away as it is fulfilled. How many entries were written.
+        """
+        pairs = [(user, album_id) for user in dict.fromkeys(users) if user for album_id in dict.fromkeys(album_ids)
+                 if album_id is not None]
+        if not pairs:
+            return 0
+
+        def write():
+            now, at = _now(), time.time()
+            with self._connect() as connection:
+                for user, album_id in pairs:
+                    connection.execute(
+                        """
+                        INSERT INTO library_membership (user, album_id, added_at, how, state, incomplete, seen_at,
+                                                        attempts, next_try, updated_at)
+                        VALUES (?, ?, ?, ?, 'waiting', ?, ?, 0, ?, ?)
+                        ON CONFLICT(user, album_id) DO UPDATE SET
+                            how        = CASE WHEN state = 'removed' THEN excluded.how ELSE how END,
+                            added_at   = CASE WHEN state = 'removed' THEN excluded.added_at ELSE added_at END,
+                            seen_at    = CASE WHEN state = 'removed' THEN excluded.seen_at ELSE seen_at END,
+                            attempts   = CASE WHEN state = 'removed' THEN 0 ELSE attempts END,
+                            next_try   = CASE WHEN state = 'removed' THEN excluded.next_try ELSE next_try END,
+                            problem    = CASE WHEN state = 'removed' THEN NULL ELSE problem END,
+                            state      = CASE WHEN state = 'removed' THEN 'waiting' ELSE state END,
+                            incomplete = excluded.incomplete,
+                            removed_at = NULL, removed_why = NULL, updated_at = excluded.updated_at
+                        """,
+                        (user, album_id, now, how, int(bool(incomplete)), now if seen else None, at, now))
+                    connection.execute(
+                        "UPDATE library_membership SET removed_why = 'dismissed', updated_at = ? "
+                        "WHERE user = ? AND state = 'removed' AND removed_why = 'deleted' AND album_id != ? "
+                        "AND album_id IN (SELECT id FROM store_album WHERE release_mbid IS NOT NULL AND release_mbid = "
+                        "(SELECT release_mbid FROM store_album WHERE id = ?))",
+                        (now, user, album_id, album_id))
+            return len(pairs)
+
+        return await self._ledger(write, f"add {len(pairs)} album(s) to {', '.join(dict.fromkeys(users))}'s library", 0)
+
+    async def ledger_entries(self, user: str) -> list[dict] | None:
+        """Every entry `user` has, with what the store holds of its album - None when it can't be read."""
+        def read():
+            with self._connect() as connection:
+                return [dict(row) for row in connection.execute(
+                    f"{self._ENTRY} WHERE m.user = ? ORDER BY m.added_at DESC, m.album_id DESC", (user,))]
+
+        return await self._ledger(read, f"read {user}'s library")
+
+    async def ledger_due(self, user: str, now: float, limit: int) -> list[dict]:
+        """`user`'s entries waiting to be starred whose turn has come (next_try passed, or none), oldest first."""
+        def read():
+            with self._connect() as connection:
+                return [dict(row) for row in connection.execute(
+                    f"{self._ENTRY} WHERE m.user = ? AND m.state = 'waiting' AND (m.next_try IS NULL OR m.next_try <= ?) "
+                    f"ORDER BY m.next_try IS NOT NULL, m.next_try, m.added_at LIMIT ?", (user, now, limit))]
+
+        return await self._ledger(read, f"read what is waiting in {user}'s library", [])
+
+    async def ledger_starred(self, user: str, album_id: int, navidrome_id: str) -> bool:
+        """The star holds - confirmed on Navidrome's album `navidrome_id` - for an entry still held."""
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                return connection.execute(
+                    "UPDATE library_membership SET state = 'starred', navidrome_id = ?, starred_at = COALESCE("
+                    "CASE WHEN state = 'starred' AND navidrome_id IS ? THEN starred_at END, ?), attempts = 0, "
+                    "next_try = NULL, problem = NULL, updated_at = ? WHERE user = ? AND album_id = ? "
+                    "AND state IN ('waiting', 'starred')",
+                    (navidrome_id, navidrome_id, now, now, user, album_id)).rowcount > 0
+
+        return bool(await self._ledger(write, f"record {user}'s star on album {album_id}", False))
+
+    async def ledger_wait(self, user: str, album_id: int, problem: str, next_try: float | None,
+                          counted: bool = True, from_state: tuple[str, ...] = ("waiting",)) -> bool:
+        """
+        Not starred (yet): the entry waits, saying why (`problem`), until `next_try`. `counted` adds one
+        to its attempts (the backoff grows); `from_state` is what it may be moved from - a starred entry
+        whose star Navidrome lost goes back to waiting this way, re-starred at its turn.
+        """
+        marks = ", ".join("?" for _ in from_state)
+
+        def write():
+            with self._connect() as connection:
+                return connection.execute(
+                    f"UPDATE library_membership SET state = 'waiting', problem = ?, next_try = ?, "
+                    f"attempts = attempts + ?, updated_at = ? WHERE user = ? AND album_id = ? AND state IN ({marks})",
+                    (problem, next_try, 1 if counted else 0, _now(), user, album_id, *from_state)).rowcount > 0
+
+        return bool(await self._ledger(write, f"note why album {album_id} isn't starred for {user}", False))
+
+    async def ledger_note_waiting(self, user: str, problem: str) -> int:
+        """Why everything `user` has waiting still waits - Navidrome not answering - when or how often it is
+        tried left as it was."""
+        def write():
+            with self._connect() as connection:
+                return connection.execute(
+                    "UPDATE library_membership SET problem = ?, updated_at = ? WHERE user = ? AND state = 'waiting'",
+                    (problem, _now(), user)).rowcount
+
+        return await self._ledger(write, f"note why {user}'s albums wait", 0)
+
+    async def ledger_sync_add(self, user: str, album_ids: list[int], navidrome_id: str, seen: bool = False) -> int:
+        """
+        Starred in Amperfy (or any Subsonic app): these albums are in `user`'s library, starred - a new
+        entry `how` starred (new), a waiting one confirmed, a removed one held again (new). A tombstone of
+        the same release ("removed by the admin") is put away, as grant_albums puts one away. `seen`: no
+        new marker - the user's first read-back, whose stars are favourites from before (stars.sync_user).
+        """
+        ids = [album_id for album_id in dict.fromkeys(album_ids) if album_id is not None]
+        if not ids:
+            return 0
+
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                for album_id in ids:
+                    connection.execute(
+                        """
+                        INSERT INTO library_membership (user, album_id, added_at, how, state, navidrome_id, starred_at,
+                                                        seen_at, attempts, updated_at)
+                        VALUES (?, ?, ?, 'starred', 'starred', ?, ?, ?, 0, ?)
+                        ON CONFLICT(user, album_id) DO UPDATE SET
+                            how        = CASE WHEN state = 'removed' THEN 'starred' ELSE how END,
+                            added_at   = CASE WHEN state = 'removed' THEN excluded.added_at ELSE added_at END,
+                            seen_at    = CASE WHEN state = 'removed' THEN excluded.seen_at ELSE seen_at END,
+                            starred_at = CASE WHEN state = 'starred' THEN starred_at ELSE excluded.starred_at END,
+                            state = 'starred', navidrome_id = excluded.navidrome_id, attempts = 0, next_try = NULL,
+                            problem = NULL, removed_at = NULL, removed_why = NULL, updated_at = excluded.updated_at
+                        """,
+                        (user, album_id, now, navidrome_id, now, now if seen else None, now))
+                    #? a tombstone of the same release is fulfilled, as at a grant
+                    connection.execute(
+                        "UPDATE library_membership SET removed_why = 'dismissed', updated_at = ? "
+                        "WHERE user = ? AND state = 'removed' AND removed_why = 'deleted' AND album_id != ? "
+                        "AND album_id IN (SELECT id FROM store_album WHERE release_mbid IS NOT NULL AND release_mbid = "
+                        "(SELECT release_mbid FROM store_album WHERE id = ?))",
+                        (now, user, album_id, album_id))
+            return len(ids)
+
+        return await self._ledger(write, f"add what {user} starred to their library", 0)
+
+    async def ledger_synced(self, user: str, at: float) -> bool:
+        """`user`'s starred albums have been read back once (user_credentials.synced_at, kept from the first)."""
+        def write():
+            with self._connect() as connection:
+                return connection.execute("UPDATE user_credentials SET synced_at = COALESCE(synced_at, ?) WHERE user = ?",
+                                          (at, user)).rowcount > 0
+
+        return bool(await self._ledger(write, f"note that {user}'s stars have been read back", False))
+
+    async def ledger_remove(self, user: str, album_id: int, why: str, navidrome_id: str | None) -> bool:
+        """Unstarred: `user`'s starred entry is removed - only while it is still the star read
+        (`navidrome_id`), so a re-star or an apply that moved it on meanwhile isn't undone."""
+        def write():
+            now = _now()
+            with self._connect() as connection:
+                return connection.execute(
+                    "UPDATE library_membership SET state = 'removed', removed_at = ?, removed_why = ?, next_try = NULL, "
+                    "problem = NULL, updated_at = ? WHERE user = ? AND album_id = ? AND state = 'starred' "
+                    "AND navidrome_id IS ?",
+                    (now, why, now, user, album_id, navidrome_id)).rowcount > 0
+
+        return bool(await self._ledger(write, f"take album {album_id} out of {user}'s library", False))
+
+    async def ledger_restar(self, album_id: int | None) -> int:
+        """
+        The backstop after a release is applied: everyone who holds this album has it starred again -
+        a starred entry goes back to waiting, asked now; a waiting one is asked now too. How many.
+        """
+        if album_id is None:
+            return 0
+
+        def write():
+            with self._connect() as connection:
+                return connection.execute(
+                    "UPDATE library_membership SET state = 'waiting', next_try = ?, attempts = 0, problem = NULL, "
+                    "updated_at = ? WHERE album_id = ? AND state IN ('waiting', 'starred')",
+                    (time.time(), _now(), album_id)).rowcount
+
+        return await self._ledger(write, f"have album {album_id} starred again for its holders", 0)
+
+    async def ledger_seen(self, user: str, release_mbid: str | None = None, album_ids: list[int] | None = None) -> int:
+        """`user` opened it: the new marker goes from their entries of this release (or these albums)."""
+        ids = [album_id for album_id in (album_ids or []) if album_id is not None]
+        release = (release_mbid or "").strip().lower()
+        if not ids and not release:
+            return 0
+
+        def write():
+            where, params = [], []
+            if ids:
+                where.append(f"album_id IN ({', '.join('?' for _ in ids)})")
+                params += ids
+            if release:
+                where.append("album_id IN (SELECT id FROM store_album WHERE LOWER(release_mbid) = ?)")
+                params.append(release)
+            with self._connect() as connection:
+                return connection.execute(
+                    f"UPDATE library_membership SET seen_at = ?, updated_at = ? WHERE user = ? AND seen_at IS NULL "
+                    f"AND ({' OR '.join(where)})", (_now(), _now(), user, *params)).rowcount
+
+        return await self._ledger(write, f"note what {user} has opened", 0)
+
+    async def ledger_dismiss(self, user: str, album_id: int) -> bool:
+        """`user` puts away one of their tombstones - an album the admin deleted."""
+        def write():
+            with self._connect() as connection:
+                return connection.execute(
+                    "UPDATE library_membership SET removed_why = 'dismissed', updated_at = ? WHERE user = ? "
+                    "AND album_id = ? AND state = 'removed' AND removed_why = 'deleted'",
+                    (_now(), user, album_id)).rowcount > 0
+
+        return bool(await self._ledger(write, f"put away a removed album of {user}'s", False))
+
+    async def ledger_holders(self, root: str, path: str) -> list[str] | None:
+        """Who holds the album at `path` (waiting or starred), in the order they got it - None when unread."""
+        def read():
+            with self._connect() as connection:
+                return [row["user"] for row in connection.execute(
+                    "SELECT m.user FROM library_membership m JOIN store_album a ON a.id = m.album_id "
+                    "WHERE a.root = ? AND a.path = ? AND a.state = 'present' AND m.state IN ('waiting', 'starred') "
+                    "ORDER BY m.added_at, m.rowid", (root, path))]
+
+        return await self._ledger(read, f"read who holds {path}")
+
+    async def ledger_holds(self, user: str, album_ids: list[int]) -> bool | None:
+        """Whether `user` holds any of these albums (waiting or starred) - None when unread."""
+        ids = [album_id for album_id in album_ids if album_id is not None]
+        if not ids:
+            return False
+
+        def read():
+            with self._connect() as connection:
+                return connection.execute(
+                    f"SELECT 1 FROM library_membership WHERE user = ? AND state IN ('waiting', 'starred') "
+                    f"AND album_id IN ({', '.join('?' for _ in ids)}) LIMIT 1", (user, *ids)).fetchone() is not None
+
+        return await self._ledger(read, f"read whether {user} holds an album")
+
+    async def ledger_unheld(self, root: str) -> list[dict] | None:
+        """Every album in the store nobody holds (no entry waiting or starred) - "held by nobody"."""
+        def read():
+            with self._connect() as connection:
+                return [_index_row(row) for row in connection.execute(
+                    "SELECT * FROM store_album a WHERE a.root = ? AND a.state = 'present' AND NOT EXISTS ("
+                    "SELECT 1 FROM library_membership m WHERE m.album_id = a.id AND m.state IN ('waiting', 'starred')) "
+                    "ORDER BY LOWER(a.artist), LOWER(a.album), a.path", (root,))]
+
+        return await self._ledger(read, "read which albums nobody holds")
+
+    async def set_job_grant(self, job_id: int, album_id: int | None, grant: str | None, was: str | None = None) -> None:
+        """What a filing meant for the libraries of those who asked (jobs.album_id, jobs.library_grant) -
+        with `was`, only while the job still says that (an admin's look at a flag moves only a 'flagged')."""
+        def write():
+            with self._connect() as connection:
+                if was is None:
+                    connection.execute("UPDATE jobs SET album_id = ?, library_grant = ? WHERE id = ?", (album_id, grant, job_id))
+                else:
+                    connection.execute("UPDATE jobs SET album_id = ?, library_grant = ? WHERE id = ? AND library_grant = ?",
+                                       (album_id, grant, job_id, was))
+
+        await self._ledger(write, f"record what job {job_id} gave its requesters")
+
+    # ----- each user's credential (SYNCHRONOUS: src/auth.py runs them in the thread pool; they raise)
+
+    def keep_credential(self, user: str, sealed: str, now: float) -> None:
+        """The login `user` just signed in with, kept for them - alive again if it had died - and what of
+        theirs waits to be starred asked about at once (a sign-in is the moment to try again)."""
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO user_credentials (user, credential, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(user) DO UPDATE SET credential = excluded.credential, updated_at = excluded.updated_at, "
+                "dead_at = NULL, dead_why = NULL", (user, sealed, now))
+            connection.execute("UPDATE library_membership SET next_try = ? WHERE user = ? AND state = 'waiting'",
+                               (now, user))
+
+    def credential_row(self, user: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM user_credentials WHERE user = ?", (user,)).fetchone()
+        return dict(row) if row is not None else None
+
+    def credential_dead(self, user: str, why: str, sealed: str, now: float) -> bool:
+        """`user`'s credential no longer works - only if it is still `sealed`: a newer sign-in has
+        replaced it otherwise, and that one stands."""
+        with self._connect() as connection:
+            return connection.execute(
+                "UPDATE user_credentials SET dead_at = ?, dead_why = ? WHERE user = ? AND credential = ? AND dead_at IS NULL",
+                (now, why, user, sealed)).rowcount > 0
+
+    def live_credentials(self) -> list[dict]:
+        """
+        Every user's live credential - the ones deadwax may star and read stars with. A user signed in
+        before this table existed (a session kept from 2.0.0-player.50, never signed in again) gets their
+        newest session's credential, kept here once - so their albums are starred without a sign-in.
+        """
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO user_credentials (user, credential, updated_at) "
+                "SELECT s.user, s.credential, s.created_at FROM sessions s WHERE s.created_at = "
+                "(SELECT MAX(created_at) FROM sessions t WHERE t.user = s.user)")
+            return [dict(row) for row in connection.execute(
+                "SELECT * FROM user_credentials WHERE dead_at IS NULL ORDER BY user")]
+
+    # ----- the store seeded into the first admin's library, once ever (SYNCHRONOUS; raises)
+
+    #? seed_library_now's answer when it is held over until the library's first scan
+    SEED_HELD_OVER = -1
+
+    def library_seeded(self) -> bool:
+        """Whether the seed has been DONE - a held-over one hasn't."""
+        with self._connect() as connection:
+            return connection.execute(
+                "SELECT 1 FROM library_seed WHERE id = 1 AND seeded_at IS NOT NULL").fetchone() is not None
+
+    @staticmethod
+    def _seed_rows(connection: sqlite3.Connection, user: str, root: str, now: str, at: float) -> int:
+        """The seed's write: every present album into `user`'s library, waiting, seen - but what a download
+        of somebody else's (not theirs, not `local`'s) brought: an entry of theirs `grabbed`, still held.
+
+        Only a grant leaves an album out. An album somebody else holds because they starred it in Amperfy
+        (the read-back's `starred` - favourites from before, read back by a worker pass that can run before
+        the admin's first request) or added it from the store was in the store already, and libraries
+        aren't exclusive: both hold it (review - the seed's outcome hung on whether a pass had run first)."""
+        return connection.execute(
+            "INSERT OR IGNORE INTO library_membership (user, album_id, added_at, how, state, seen_at, attempts, "
+            "next_try, updated_at) SELECT ?, a.id, ?, 'seeded', 'waiting', ?, 0, ?, ? FROM store_album a "
+            "WHERE a.root = ? AND a.state = 'present' AND NOT EXISTS (SELECT 1 FROM library_membership m "
+            "WHERE m.album_id = a.id AND m.user NOT IN (?, ?) AND m.how = ? AND m.state IN ('waiting', 'starred'))",
+            (user, now, now, at, now, root, user, LOCAL_USER, library_ledger.GRABBED)).rowcount
+
+    def seed_library_now(self, user: str, root: str) -> int | None:
+        """
+        Once, ever: every album in the store goes into `user`'s library - the first admin's, on their
+        first sign-in after this step or their take-over - waiting to be starred, marked seen (it is no
+        news). Not an album a download of somebody ELSE's brought (_seed_rows): it came with their request,
+        and seeding is for what was in the store before anyone had a library. None when it has been done
+        already; else how many. ONCE because of the look below, under BEGIN IMMEDIATE (seeded_at set: done)
+        - the one row only records whose seed it is, when it was done and how many it held, or that it is
+        held over; its write would take a second seed without a word.
+
+        HELD OVER (SEED_HELD_OVER) while the store index hasn't been filled from a scan of `root`
+        (store_index_scanned): what the index holds then is only what downloads and applies indexed, not
+        the store, and seeding it would leave every album the first scan finds belonging to nobody, for
+        good (review). The first admin to ask is remembered, and index_reconcile seeds for them at the end
+        of the first scan.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT user, seeded_at FROM library_seed WHERE id = 1").fetchone()
+            if row is not None and row["seeded_at"] is not None:
+                return None
+            now, at = _now(), time.time()
+            if connection.execute("SELECT 1 FROM store_index_scanned WHERE root = ?", (root,)).fetchone() is None:
+                connection.execute("INSERT OR IGNORE INTO library_seed (id, user) VALUES (1, ?)", (user,))
+                return self.SEED_HELD_OVER
+            #? held over for an admin before: it is theirs, whoever's sign-in finds the index filled
+            owner = row["user"] if row is not None else user
+            count = self._seed_rows(connection, owner, root, now, at)
+            connection.execute(
+                "INSERT INTO library_seed (id, user, seeded_at, albums) VALUES (1, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET seeded_at = excluded.seeded_at, albums = excluded.albums",
+                (owner, now, count))
+            return count
+
+    # ----- the admin's flags
+
+    async def flag_add(self, album_id: int | None, job_id: int | None, users: list[str], artist: str, album: str,
+                       path: str | None, release_mbid: str | None) -> int | None:
+        def write():
+            with self._connect() as connection:
+                return connection.execute(
+                    "INSERT INTO library_flags (album_id, job_id, users, artist, album, path, release_mbid, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (album_id, job_id, json.dumps(list(users)), artist, album, path, release_mbid, _now())).lastrowid
+
+        return await self._ledger(write, f"flag {artist} - {album} for the admin")
+
+    async def flags_open(self) -> list[dict] | None:
+        def read():
+            with self._connect() as connection:
+                rows = [dict(row) for row in connection.execute(
+                    "SELECT * FROM library_flags WHERE closed_at IS NULL ORDER BY created_at DESC, id DESC")]
+            for row in rows:
+                try:
+                    row["users"] = json.loads(row.get("users") or "[]")
+                except (TypeError, ValueError):
+                    row["users"] = []
+            return rows
+
+        return await self._ledger(read, "read the flags for the admin")
+
+    async def flag_close(self, flag_id: int, how: str) -> dict | None:
+        """Close an open flag (`how`: dismissed or added) - the flag as it was, or None if none was open."""
+        def write():
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute("SELECT * FROM library_flags WHERE id = ? AND closed_at IS NULL",
+                                         (flag_id,)).fetchone()
+                if row is None:
+                    return None
+                connection.execute("UPDATE library_flags SET closed_at = ?, closed_how = ? WHERE id = ?",
+                                   (_now(), how, flag_id))
+                flag = dict(row)
+            try:
+                flag["users"] = json.loads(flag.get("users") or "[]")
+            except (TypeError, ValueError):
+                flag["users"] = []
+            return flag
+
+        return await self._ledger(write, f"close flag {flag_id}")
 
 
 #? slskd reports a stopped transfer as "Completed, <substate>". "Succeeded" is the only good

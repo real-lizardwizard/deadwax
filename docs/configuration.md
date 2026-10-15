@@ -209,9 +209,17 @@ of deadwax before reaching it from anywhere else**, since over plain http a pass
 be read on the way.
 
 **The database holds the tokens.** `DB_PATH` (`/config/deadwax.db`) keeps each signed-in session's
-Navidrome token, encrypted with `DEADWAX_SECRET_KEY`, and only a hash of each session's cookie. Keep
-the file as private as the key: a copy of both is as good as the passwords on Navidrome's API until
-they change.
+Navidrome token, encrypted with `DEADWAX_SECRET_KEY`, and only a hash of each session's cookie. Since
+2.0.0-player.51 it also keeps each user's latest sign-in token the same way, beside the sessions - not
+removed by signing out - so the albums that go into their library are starred in Navidrome as them while
+they aren't signed in (see [your library](player.md#your-library-with-logins-on)); a new sign-in
+replaces it, and a changed Navidrome password makes it stop working. Keep the file as private as the
+key: a copy of both is as good as the passwords on Navidrome's API until they change.
+
+**Your library** (since 2.0.0-player.51): with logins on, each person's library is their starred albums
+in Navidrome - every download they asked for is added and starred as them, an album the store holds can
+be added without a download, and starring or unstarring in Amperfy is read back every five minutes. No
+setting: it follows `AUTH_MODE`. See [the phone player](player.md#your-library-with-logins-on).
 
 ## Preferences (per browser)
 

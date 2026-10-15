@@ -1191,10 +1191,27 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
   const app = code(read('app/App.tsx'))
   check('Home asks afresh as it comes into view, and App says when that is - never as the app starts',
     [/const \{ pins, problem \} = usePins\(shown \? 'fresh' : false\)/.test(home), /const homeShown = watching === 'home'/.test(app), /<Home\b[^>]*?shown=\{homeShown\}/.test(app.replace(/\n\s*/g, ' ')),
-      /\[status, arriving, arrivingTrouble, homeShown\]/.test(app)],
+      //? (2.0.0-player.51) and what is new in your library, which it draws too
+      /\[status, arriving, arrivingTrouble, homeShown, newAlbums\]/.test(app)],
     [true, true, true, true])
   check('...the shelves drawn once the pins have answered, or failed, or the wait - counted only while Home shows - is over',
-    [/const ready = pins !== null \|\| problem !== null \|\| waited/.test(home), /<div class="app-home-shelves" hidden=\{!ready\}>/.test(home), /if \(!shown \|\| waited\) return/.test(home)], [true, true, true])
+    //? (2.0.0-player.51) and, as the pins are, what is new in your library - so its shelf never moves those under it
+    [/const ready = \(pins !== null \|\| problem !== null \|\| waited\) && \(newAlbums !== null \|\| waited\)/.test(home), /<div class="app-home-shelves" hidden=\{!ready\}>/.test(home), /if \(!shown \|\| waited\) return/.test(home)], [true, true, true])
+  check('...New in your library (2.0.0-player.51) under Pinned and over Recently added, drawn only with something new; App asks for it as Home - or the Library tab, whose tiles carry the marks - comes into view, and an album opened is new no longer',
+    [home.indexOf('<Pinned ') < home.indexOf('<NewInYourLibrary ') && home.indexOf('<NewInYourLibrary ') < home.indexOf('{recent}'),
+      /\{!!newAlbums\?\.length && <NewInYourLibrary albums=\{newAlbums\} onOpen=\{onOpen\} \/>\}/.test(home),
+      /const libraryShown = pageShown && nav\.tab === 'library'/.test(app),
+      /useEffect\(\(\) => \{\s*if \(homeShown \|\| libraryShown\) askMyLibrary\(\)\s*\}, \[homeShown, libraryShown\]\)/.test(app),
+      /const openAlbum = useCallback\(\(album: Album\) => \{\s*seenAlbum\(album\)/.test(app)],
+    [true, true, true, true, true])
+  check('...and the album page on top seen - reached by its address too - again as an answer lands (review)',
+    [/const topAlbum = topPage\?\.kind === 'album' \? topPage\.id : null/.test(app),
+      /if \(topAlbum === null \|\| !pageShown\) return[\s\S]{0,200}seenAlbum\(\{ id: topAlbum,[\s\S]{0,160}\}, \[topAlbum, pageShown, myLibrary\]\)/.test(app)],
+    [true, true])
+  check('...with logins off (no library) Home is handed nothing new at once - never left waiting out its spinner for an answer never asked',
+    /const newAlbums = useMemo\(\(\) => \(!hasLibrary\(\) \? NOTHING_NEW : myLibrary \? newShelf\(myLibrary\) : null\), \[myLibrary\]\)/.test(app), true)
+  check('...and Library care draws Held by nobody only with logins on',
+    /\{sessionMe\(\)\?\.auth === 'on' && <HeldByNobody live=\{live\} \/>\}/.test(code(read('app/LibraryCare.tsx'))), true)
   check('...Pinned first, then Recently added, then Not played in a while, all inside the gate',
     /<NeedsNavidrome\b[^>]*>\s*<Shelves\b/.test(home) && home.indexOf('<Pinned ') < home.indexOf('{recent}') && home.indexOf('{recent}') < home.indexOf('{notPlayed}'), true)
   const notPlayed = home.slice(home.indexOf('function NotPlayedInAWhile('), home.indexOf('function Shelves('))

@@ -9,6 +9,8 @@ import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { ChevronLeftIcon } from '../player/icons'
 import { caughtUp, libraryCareNow, setCareNarrow, startBulk, stopBulk, useLibraryCare } from './useLibraryCare'
+import { HeldByNobody } from './HeldByNobody'
+import { sessionMe } from './session'
 
 /** Focus fell to the page (or was never taken) - the only time this page moves it. */
 const focusLost = (): boolean => {
@@ -43,6 +45,9 @@ const focusLost = (): boolean => {
  * real scan underneath), read only once the page first shows - and again, quietly, as it shows again
  * later with nothing under way. A control that goes as a run ends hands focus to what
  * the run says, never to the page.
+ *
+ * HELD BY NOBODY (2.0.0-player.51, personal libraries - with logins on): every album in the store nobody
+ * has in their library, and the downloads flagged for a look - HeldByNobody.tsx, under the runs.
  *
  * ON A PHONE TOO (2.0.0-player.47): the same page and the same runs, laid out for a phone by app.css.
  * Someone deadwax says isn't its admin gets a short note instead, asking nothing.
@@ -289,6 +294,8 @@ export function LibraryCare({
             </section>
           </>
         )}
+        {/* (2.0.0-player.51) with logins on: what nobody has in their library, and the flagged downloads */}
+        {sessionMe()?.auth === 'on' && <HeldByNobody live={live} />}
       </div>
     </section>
   )

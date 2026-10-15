@@ -8,6 +8,7 @@
 import type { GetSettings, GetSettingsAnswer } from '../lib/getSettings'
 import type { PinKind, PinsAnswer, PinToggleBody } from '../lib/pins'
 import { get, post, put } from './http'
+import type { AddedToLibrary, FindCandidatesRequest, MyLibrary } from './types'
 
 export interface Me {
   user: string
@@ -55,4 +56,28 @@ export function putPins(body: { pins: { kind: PinKind; ref: string }[]; known?: 
 /** Pin or unpin one album or artist, by what it is (lib/pins.ts toggleBody). Answers with every pin. */
 export function togglePin(body: PinToggleBody): Promise<PinsAnswer> {
   return post<PinsAnswer>('/me/pins/toggle', body)
+}
+
+/**
+ * Your library (2.0.0-player.51, personal libraries) - your starred albums in Navidrome, as deadwax keeps
+ * them (src/routes/my_library.py): how many, what still waits to be starred and why, what is new in it,
+ * and what the admin deleted. `{ on: false }` with logins off.
+ */
+export function myLibrary(signal?: AbortSignal): Promise<MyLibrary> {
+  return get<MyLibrary>('/me/library', signal)
+}
+
+/** Add to my library: a pressing the store holds - the release a Get would download - into yours. */
+export function addToMyLibrary(release: FindCandidatesRequest): Promise<AddedToLibrary> {
+  return post<AddedToLibrary>('/me/library/add', release)
+}
+
+/** You opened it: the "new in your library" marker goes from it - by release id, or by the store's ids. */
+export function markLibrarySeen(by: { release_mbid?: string; album_ids?: number[] }): Promise<{ cleared: number }> {
+  return post<{ cleared: number }>('/me/library/seen', by)
+}
+
+/** Put away an album the admin deleted ("removed by the admin"). */
+export function dismissRemoved(albumId: number): Promise<{ dismissed: boolean }> {
+  return post<{ dismissed: boolean }>('/me/library/dismiss', { album_id: albumId })
 }

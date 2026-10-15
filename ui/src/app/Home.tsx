@@ -16,6 +16,9 @@ export const RECENT_COUNT = 20
 /** A Home handed no way to open an artist (a sim's): one function for every render, so the memo holds. */
 const NO_ARTIST = () => {}
 
+/** Nothing new (logins off, or a sim's Home): one array for every render, so the memo holds. */
+const NONE_NEW: readonly Album[] = []
+
 /** How long Home's shelves wait for the pins to answer before they are drawn without them - Pinned
  *  is at the top, and arriving after the shelves under it would move them under a finger. */
 export const PINNED_WAIT_MS = 1500
@@ -137,6 +140,23 @@ function NotPlayedInAWhile({ onOpen }: { onOpen: (album: Album) => void }) {
 }
 
 /**
+ * "New in your library" (2.0.0-player.51, personal libraries): with logins on, the albums added to your
+ * library since you last opened them - filed for you (or by an admin's Add for them), starred in Amperfy -
+ * that Navidrome has (a starred one); opening one takes it off (App's openAlbum). Add to my library is
+ * never new (it is made while looking at the album). None, no shelf.
+ */
+function NewInYourLibrary({ albums, onOpen }: { albums: readonly Album[]; onOpen: (album: Album) => void }) {
+  return (
+    <section class="app-section app-shelf-section" aria-labelledby="app-new-title">
+      <h2 id="app-new-title" class="app-section-title app-shelf-title">
+        New in your library
+      </h2>
+      <Tiles albums={albums} onOpen={onOpen} />
+    </section>
+  )
+}
+
+/**
  * What Home draws from Navidrome, inside its gate: Pinned at the top, then Recently added, then Not
  * played in a while. The pins are asked afresh each time Home comes into view (`shown`); the shelves
  * are drawn once the pins have answered, or failed to, or PINNED_WAIT_MS has passed WHILE Home showed
@@ -148,10 +168,12 @@ function Shelves({
   shown,
   onOpen,
   onOpenArtist,
+  newAlbums,
 }: {
   shown: boolean
   onOpen: (album: Album) => void
   onOpenArtist: (artist: PinnedArtist) => void
+  newAlbums: readonly Album[] | null
 }) {
   const { pins, problem } = usePins(shown ? 'fresh' : false)
   //? the wait counts only while Home shows - afresh each time it comes into view, until it has once
@@ -165,13 +187,15 @@ function Shelves({
   }, [shown])
   const recent = useMemo(() => <RecentlyAdded onOpen={onOpen} />, [onOpen])
   const notPlayed = useMemo(() => <NotPlayedInAWhile onOpen={onOpen} />, [onOpen])
-  const ready = pins !== null || problem !== null || waited
+  //? (2.0.0-player.51) waited for as the pins are, so its shelf landing never moves the ones under it
+  const ready = (pins !== null || problem !== null || waited) && (newAlbums !== null || waited)
 
   return (
     <>
       {!ready && <div class="pl-spinner" aria-label="Loading" />}
       <div class="app-home-shelves" hidden={!ready}>
         <Pinned pins={pins} problem={problem} onOpenAlbum={onOpen} onOpenArtist={onOpenArtist} onMove={movePin} onRemove={removePin} />
+        {!!newAlbums?.length && <NewInYourLibrary albums={newAlbums} onOpen={onOpen} />}
         {recent}
         {notPlayed}
       </div>
@@ -181,8 +205,8 @@ function Shelves({
 
 /**
  * Home, the first tab, as Home.dc.html draws it: what's arriving - only while something is
- * (2.0.0-player.12) - then, since 2.0.0-player.18, what you pinned, what was added recently, and what
- * you haven't played in a while. James: Home is the PLAYER's, not the librarian's; none of it is
+ * (2.0.0-player.12) - then, since 2.0.0-player.18, what you pinned, (2.0.0-player.51, logins on) what is
+ * new in your library, what was added recently, and what you haven't played in a while. James: Home is the PLAYER's, not the librarian's; none of it is
  * faked, and each part with nothing to say draws nothing (Pinned says how to pin something).
  *
  * Arriving is deadwax's, not Navidrome's, so it draws whatever Navidrome says; the rest open albums in
@@ -198,6 +222,7 @@ export function Home({
   onSeeAll,
   arrivingTrouble = false,
   shown = false,
+  newAlbums = NONE_NEW,
 }: {
   status: NavidromeStatus | null
   onRetry: () => void
@@ -212,14 +237,17 @@ export function Home({
   arrivingTrouble?: boolean
   /** Home is what shows (App's watching): the pins are asked again as it comes into view */
   shown?: boolean
+  /** (2.0.0-player.51) what is new in your library, as Navidrome albums - null while deadwax hasn't said
+   *  (logins on); none with logins off */
+  newAlbums?: readonly Album[] | null
 }) {
   const shelves = useMemo(
     () => (
       <NeedsNavidrome status={status} onRetry={onRetry}>
-        <Shelves shown={shown} onOpen={onOpen} onOpenArtist={onOpenArtist} />
+        <Shelves shown={shown} onOpen={onOpen} onOpenArtist={onOpenArtist} newAlbums={newAlbums} />
       </NeedsNavidrome>
     ),
-    [status, onRetry, onOpen, onOpenArtist, shown],
+    [status, onRetry, onOpen, onOpenArtist, shown, newAlbums],
   )
 
   return (

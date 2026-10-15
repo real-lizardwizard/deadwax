@@ -436,6 +436,16 @@ song after another - and stops at the end with a reason that blames the song. No
 songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` signs everyone out
 the same way ("DEADWAX_SECRET_KEY has changed since you signed in").
 
+### Your library says deadwax can't star albums for you
+
+With logins on, deadwax stars what goes into your library **as you**, with the login you last signed in
+with (since 2.0.0-player.51). After you change your Navidrome password that login stops working, and
+**You → Your library** says so in red: "deadwax can't star albums for you: Navidrome no longer accepts
+the login you signed in with". Nothing is lost - what you get meanwhile is kept, waiting. Sign out
+(**You → About → Sign out**) and sign in with your new password: deadwax keeps the new login and stars
+everything waiting within a few seconds. Changing `DEADWAX_SECRET_KEY` does the same ("DEADWAX_SECRET_KEY
+has changed since you signed in"). Signing out by itself doesn't stop deadwax starring for you.
+
 ### "Too many tries for … - wait N seconds and try again"
 
 Three wrong passwords for one user name within a minute, and deadwax stops asking Navidrome about that
@@ -605,6 +615,40 @@ another Navidrome user don't count.
   release - it may still be scanning after a download or a re-file. Come back to Home in a moment:
   it asks again each time it's shown. If it stays, check that Navidrome can see the folder and that
   the album's files carry its MusicBrainz release id (Navidrome's `musicBrainzId` on the album).
+
+## An album in my library isn't starred in Amperfy, or "waiting to be starred"
+
+With logins on (since 2.0.0-player.51) your library is your starred albums in Navidrome, and **You →
+Your library** says how many are still waiting to be starred, and why:
+
+- **"Navidrome hasn't got it yet"** - it was filed, and Navidrome hasn't scanned it. Navidrome's watcher
+  usually picks a new folder up within a minute; deadwax asks again after 30 seconds, a minute, two, and
+  so on up to every half hour, until the star holds. If it never comes: Navidrome isn't reading the
+  folder deadwax files into (`LIBRARY_PATH` and Navidrome's music folder must be the same folder), or
+  the folder's files don't carry the release id Navidrome is asked for. **Needs a look** raises a folder
+  Navidrome doesn't list as **Not in Navidrome**.
+- **"It has no MusicBrainz release id"** - deadwax finds an album in Navidrome by its release id, so an
+  untagged album can't be starred. An admin can apply a release to it (its Edit panel's **Release**);
+  it is starred once it has one.
+- **"Its folder isn't there just now"** - the album's folder is missing (an unmounted share, say).
+  deadwax asks again once it's back.
+- **"Navidrome isn't answering"** - deadwax asks again by itself.
+- **"Navidrome took the star but didn't keep it"** - Navidrome said yes, and the album didn't come back
+  starred. deadwax tries again; if it keeps happening, look in Navidrome's log.
+- **In red, "deadwax can't star albums for you"** - see [Signing in](#your-library-says-deadwax-cant-star-albums-for-you).
+
+**The first admin's library is empty after signing in** (a new install, or an upgrade from a version
+whose saved scan deadwax can't read): the albums already in the store go into it after deadwax's first
+scan of the library, which the event log says ("deadwax hasn't scanned the library yet…"). Search for
+something, open an album's page, or press **Library care → Rescan**: once the scan is done, the event log
+says how many albums went into the library, and deadwax stars them.
+
+An album you **unstar** in Amperfy is taken out of your library at deadwax's next look (every five
+minutes) - deadwax never stars it back. An album you star there is added the same way, if the store
+holds it: deadwax finds it by its release id, so a starred album Navidrome reads no release id from
+isn't added. After an admin applies a release to an album, Navidrome may show it unstarred for a moment:
+deadwax notices it is the same album under a new id, or missing mid-scan, and stars it again rather
+than taking it out of your library.
 
 ## A pin won't stay, or the app says "Couldn't pin …" or "Not saved"
 
