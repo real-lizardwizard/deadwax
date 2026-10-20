@@ -1503,3 +1503,412 @@ The main page is untouched.
   player on a real screen; how often real MusicBrainz answers the songs after the albums (so folded) - the
   recording search answers more (47-436 KB against 1-12 KB), and a fielded miss asks twice; a real Navidrome 0.64.2's id bridge for a song's held album; MusicBrainz answers for queries
   not recorded here, and its recording search on a bad day (a 436 KB answer for a big song).
+
+### Search like Apple Music (2.0.0-player.55)
+
+James, 2026-10-15: "can we add something to the search so that it also searches songs and artists like apple
+music?" Asked how it should look, he chose **one list in Apple's sections**: "Top results first (the best artist,
+album or song, yours or not, yours marked), then Artists, Albums, Songs - each with yours first, then MusicBrainz's.
+Chips narrow it to one kind. Keeps 'library first' inside every section." He turned down Apple's scope switch
+(Everything | Your library) and keeping the two halves. The spec is `deadwax-scratch/uplan/slice-search-apple.md`
+(three designs, two judges, four maps under `work/design54/`); built on song search (.53) and the disk cache (.54),
+both landed first. The pieces: `lib/searchList.ts` (pure - the pool, the rank, Top results, the dedupe, the moments,
+the words; app-rules checks it imports no fetch, playback or DOM), `app/SearchRows.tsx` (the rows, Top results' rows
+and desktop tiles, the slots and heads - plain functions Search calls, reaching no player action),
+`app/searchAnswers.ts` (the kept answers), `app/Search.tsx` rewritten around them; on the server
+`GET /search_musicbrainz/artists`, `quick` on `/fully_search`, search patience, the busy 503, the 422 for a refused
+search, abandoned searches stopped, and the rate limiter's lock.
+
+- **The list** (`app/Search.tsx`): the large title, the box (unchanged; on a desktop the sidebar's field), then the
+  **chips** - the Library's view chips verbatim (`div.app-library-views.app-search-kinds[role=group][aria-label=Show]`,
+  `button.app-chip.app-library-view[aria-pressed]`: All, Artists, Albums, Songs), outside the form so a desktop draws
+  them - the list's **one live region** (there from the first render), then **Top results** (3 `.app-result` rows on
+  a phone; 6 tinted lockups three across on a desktop, `--app-top-lockup` one height with room for three lines), then
+  **Artists**, **Albums**, **Songs** (`section[aria-labelledby=app-search-<kind>]`, each head an h2 and **See all**),
+  then the foot. Rows keyed `artist:`/`album:`/`song:` by Navidrome id, `mb-artist:`/`group:` by MusicBrainz id,
+  `mb-song:` by song53's song key; Top results `top:` plus the same (`data-row` on each button - the sims, the
+  real-page monitor and focus handing go by it). Line 2 says the facts (the kind word first only in Top results:
+  "Song · Portishead · Dummy"; a MusicBrainz group's kind in a section only when it isn't a plain album, "EP ·
+  Portishead · 2008"), then the place in a span of its own that never shrinks (`.app-result-place`), so "in your
+  library" is never cut at 320. MusicBrainz artists get the round empty cover (no picture route).
+- **The order inside every section**, decided at the draw and never re-sorted: yours (search3's rows, then what
+  MusicBrainz's answer brought in that you hold), the store's (logins on: the same two), then MusicBrainz's in its
+  order. The All view's preview (`PREVIEW`): [library, MusicBrainz] artists 2+2, albums 3+3, songs 3+3 on a phone,
+  3+3/4+4/4+4 on a desktop - each source capped on its own, so MusicBrainz's show beside many of yours (finding what
+  you don't have is deadwax's purpose). All's search3 counts stay SEARCH_COUNTS (5/8/12).
+- **Top results** (`topResults`): candidates are the library's rows, MusicBrainz's after the dedupe, and - under
+  album-by-artist - the artist the box named. Compared by **tier** (deadwax's exactness test, `matchTier`: 0 exact -
+  foldName of the box, a song's title by titleKey; a MusicBrainz artist also by `matched_as` (answers_to keeps a
+  leading "the", foldName drops it, so both tests); under album-by-artist titled as read AND credited to the artist;
+  under the ARTIST reading titles never exact - "portishead" means them, the self-titled album is a coincidence; 1 by
+  the box's artist; 2 starts with, from three characters; 3 the rest), then **source** (0 yours, 1 the store's, 2
+  MusicBrainz's), then **kind**, then **position**. The best, then its **family** from its own fields, nothing asked
+  (a library song's album - search3's row when present - and artist; a library album's artist; a MusicBrainz song's
+  named album - the albums answer's group when it holds it, else a `song-album` row from the song's own album, not a
+  ReleaseGroup, which opens through openSongAlbum and Gets through songGet - and its sole credited artist,
+  `Song.artists` (new in lib/songs.ts, from the credit), resolved to the library's artist over the full getArtists list
+  when the library knows them; a MusicBrainz album's soleCredit), then round by round over the kinds.
+  - **The source-2 rule**: a row brought in through MusicBrainz's answer (a library artist matched to a MusicBrainz
+    one search3 didn't list, a held album or song search3 didn't list) ranks as MusicBrainz's, at its MusicBrainz
+    position - still drawn and marked as yours. It keeps the early decision sound.
+  - **Deciding early** (`decidedTop`): topResults over what is in hand plus one **phantom** per MusicBrainz kind still
+    out - the best tier its kind can reach under the reading (`bestTier`: free text 0/0/0; artist reading 0/1/none;
+    album-by-artist none/0/0), source 2, position -Infinity, so at least as good as anything that kind could bring.
+    The picks before the first phantom are drawn as the library settles and frozen; a phantom picked keeps one place
+    at Top results' foot (`li.app-search-top-place`, a row high or a tile, the sweep, aria-hidden); a phantom FIRST
+    draws no Top results section at all until moment 2. searchList.sim's property check runs 500 combinations of the
+    recorded answers (10 texts, 5 libraries, 5 answers, n 3 and 6): a decided prefix is always the real answers' Top
+    results' prefix.
+  - The worked examples, each a searchList.sim check: "portishead" held - Portishead, Dummy, Roads at the library's
+    moment; "roads" - Roads, Dummy, Portishead (its family); "glory box" - Glory Box, Dummy, Portishead, Apple's
+    order; "dummy" - Dummy and Portishead, then the place, MusicBrainz's exact song "Dummy" filling it at moment 2;
+    "third" (only Third Eye Blind held) - nothing early; "radiohead" - MusicBrainz's Radiohead first. **"por" departs
+    from the spec's table**: it is three characters, so MusicBrainz is to be asked at the pause and its phantoms (an
+    exact "Por" is possible) take the first pick - nothing is decided early and Top results come at moment 2. "Rows
+    that start with 'por', yours first" is what the library alone draws (MusicBrainz not to be asked, or Behind);
+    the rule is the spec's, followed over its example.
+- **One thing, shown once** (`pool`): **albums** - James's held-groups decision kept byte for byte (`shown:
+  notInLibrary(groups, ownedNow()?.index ?? null)`, worked out once as the answer lands; the app-rules pin is HEAD's)
+  and **extended, for James to confirm**: `heldUnlisted` brings a group notInLibrary left out whose album is NOT among
+  this answer's library rows (no library album's release is one held of the group) into its holder's block - marked by
+  groupPlace, no Get, opening the album you have through the id bridge. In one list the letter of the old rule could
+  hide a held album from both halves (search3 lists 8 and matches words its own way). An untagged library album that
+  IS such a group can show twice (no release id to tell) - accepted. **Artists** (`newArtists`): libraryArtistFor
+  over `knownArtists` - the full getArtists list (`libraryArtists()`, asked once as Search first shows with Navidrome
+  OK, kept in state once it lands, used from the next draw, asked again when Navidrome comes back after a failed ask)
+  together with search3's own artists (an artist search3 just found is in the library whatever an older list said -
+  a small departure: the spec had "libraryArtists() ?? search3's"); the NAME steps believed only when exactly one
+  MusicBrainz artist in the answer answers to that name (by name or matched_as) - two Nirvanas stay two rows, Ye is
+  your Kanye West. A matched row is dropped; the library's artist is brought in when search3 didn't list them.
+  **Songs** (`newSongs`): dropped when a library song of the answer has its titleKey and folded credit; one held with
+  an album (songAlbumHeld) brought in, marked as step 7 marks it. No match by recording id (deadwax writes none). That
+  a song of yours hides MusicBrainz's row for it (and so its other albums from Search; the artist page lists them) is
+  the spec's Choice 18.
+- **The marks** (lib/whose.ts `libraryPlace`): no half titles any more, so a library row says where it is in both
+  modes - **with logins off "in your library" (reversing navidromePlace's silence for Search's rows** - Search was
+  navidromePlace's only caller, so nothing in the app calls it now; it stays, its rule pinned by whose.sim, late review);
+  with a library of your own "in your library", "in the store", or nothing while unknown.
+  A library album among `yourAlbums()`' ids is yours whatever search3's starred said (asked before an Add); else
+  navidromeYours. A library song by its ALBUM's whose. A library artist: your count K from your albums when K > 0
+  ("1 album in your library"), else the store's count ("3 albums in the store", true either way). With logins on,
+  yours before the store's by the whose known at the draw; **a whose not yet known ranks as yours and is never
+  re-sorted**. `yourAlbums()` is asked as Search first shows with a library of your own and again when
+  `useYourAlbumsGeneration` moves (an Add or a Remove): rows re-marked in place.
+- **Drawing without moving** (the rule, for the notes and the docs: *every tappable thing drawn for a search keeps its
+  place until you do something; a later answer lands only below everything tappable, or inside a place one fixed
+  height already drawn for it*). The All view per text (`advance` in Search.tsx, the rules lib/searchList.ts's - in
+  one place for .56 to extend):
+  - **Moment 1**, as the library settles (answered, failed, not asked - Navidrome known not OK counts as empty - or
+    LIBRARY_LATE_MS past): the library's problem if it failed, Top results' decided prefix and its place, and one
+    asking line where the sections will go. Navidrome's status not known yet (`status === null`) is NOT "not OK":
+    moment 1 waits for it (no "Connecting" spinner - the asking line stands for it), the library asked the moment it
+    says OK.
+  - **Moment 2** (`sectionsReady`): every kind asked answered or failed, or RESULTS_WAIT_MS (1500) after MusicBrainz
+    was asked. In one render Top results are completed (`topResults(everything in hand, n, fixed = prefix)`) and the
+    sections drawn in the asking line's place. A kind still out (`lateKinds`) gets a **slot** (`.app-search-slot`,
+    song53's `.app-song-slot` renamed and made every kind's, `--app-search-slot` one height whatever it holds); it
+    lands by `drawInOrFold`: straight in when its section is the last drawn (every drawn section has See all in its
+    head, so only then is nothing tappable below), else folded - "Show 3 albums from MusicBrainz", its rows held
+    ones first (`lateRows`) - or why there are none (the allHeld words, song53's no-release words, "No artists on
+    MusicBrainz for “…”."); landing empty and last, a section with no library rows **goes**, head and all. Song53's
+    `late`, `albumsShown`, Show songs, `.app-song-slot`, `.app-song-show` and `--app-song-slot` went: the late slot
+    does their job for every kind, and song53's known gap ("No songs" said where no section would have been) with
+    them.
+  - **Behind** (`nextBehind`, a ref for the page's life): a search still current when its cap passed with a kind out,
+    or whose kind failed as MusicBrainz away, turns it on; the next searches draw whole at the library's moment, every
+    MusicBrainz kind in a slot - unless the library found nothing. A search whose every asked kind answers before its
+    cap turns it off; one superseded counts for nothing, nor one refused. Any **Try again** follows its own text's
+    moments whether or not Behind is on (Behind not applied to its run). Timed by the cap timer, never a wall clock.
+  - **The library late**: LIBRARY_LATE_MS (1500) from the settle and not settled - drawn as if it found nothing, one
+    slot at the top ("Searching your library…", then "N in your library - Show them", or its failure with Try again,
+    or "Nothing in your library for “…”." when it found nothing - a wording the spec didn't give - or, Navidrome
+    known not OK as it came, "Your library can't be searched just now." - after review). Show them draws afresh,
+    whole. The late time is the text's own: `lateFor` is let go as any new text starts (after review).
+  - Frozen at the draw: Top results' picks, each section's rows and their order, the frame (`useFrame().frame`, kept in
+    `drawn` - tiles or rows chosen by it, never re-picked by a resize), and **the studio line** - decided with the
+    sections by the request asked (`allAlbumsQuery(plan).studio` while albums are out), never added under Albums as a
+    late answer lands: the real page caught that line pushing Songs down 26 px when Portishead's studio albums landed
+    after the cap; search.sim pins it now. Afterwards only marks change in place.
+  - **A new text starts over**; the old list stays while you type, until the new text's library settles and its
+    moment 1 replaces it whole (the finger is on the keyboard). Emptying the box takes it away at once. Drawn afresh
+    only by your own act: a chip or See all, Enter on words MusicBrainz hadn't been asked for (or on a list drawn
+    with a failure in it - late recheck), any Try again, Show them, and Navidrome coming back (a list drawn while it
+    was away, or with the library's failure in it - late recheck).
+  - **Kind views** need none of this: the library's rows at its search3 answer, MusicBrainz's appended at the foot as
+    they land - never before the view's library rows (they wait for its search3, or LIBRARY_LATE_MS, then draw under a
+    slot kept at the top) - then More. Until the view's library lands, one asking line stands where its rows go
+    (after review); Navidrome's status not known yet is `waiting`, never "not OK"; a view skipped or waiting is asked
+    again as Navidrome comes back, and a chip back to a view whose library answered draws its rows (after review).
+- **The chips**: `view` is Search's state - kept while you type other words, back to All when the box is emptied, not
+  in the address (so Back doesn't undo it; the All chip does). A kind view: the chip's own search3
+  (`CHIP_LIBRARY_COUNTS`: 50/0/0, 0/50/0, 0/0/100, inside navidrome.py's bounds) through `searchLibrary(query,
+  signal, { counts, offsets })` - the two-argument call unchanged for the lab's picker and All's askLibrary (both
+  app-rules pins kept) - with **More from your library** ("More from the store" with logins on) by that kind's offset
+  when the page came back full; then MusicBrainz's with **More from MusicBrainz** (artists, by offset - new) or **More
+  songs** (song53's, without its show-the-rest step: a kind view shows every song in hand). The Albums view is the old
+  MusicBrainz half: unfiltered, 12 a page, the allHeld words, held groups its library rows don't list among
+  MusicBrainz's rows at their place. The Artists view under album-by-artist asks MusicBrainz nothing and lists the
+  named artist; the Songs view under the artist reading says how to find their songs. All's search3 is asked for
+  every text whatever the view (the box's reading takes its artists). See all presses its chip and scrolls the chips
+  into view (`block: 'nearest'`); with focus on it, focus goes to the pressed chip.
+- **Taps**: a library artist by Navidrome id; a MusicBrainz artist by `mb:` - new prop `onOpenMusicBrainzArtist` =
+  App's `openCreditedArtist`, outside the gate; an album you have (pointerdown prefetch as ever); a MusicBrainz album
+  (held: the id bridge); a library song plays (`playSong` stays in Search.tsx, the allowlist's one Search entry,
+  playTracks in the click with nothing awaited; SearchRows calls `onPlay` synchronously and imports no player action -
+  pinned); a MusicBrainz song in Songs is step 7's disclosure, in Top results it opens its named album, the song
+  marked (no aria-expanded). **Get on a song** (`songGet` in app/pressingLists.ts): the named album's pressings (kept,
+  else asked through getRequests, "Get…", aria-busy/aria-disabled), `songPressing` else the usual pressing, the group
+  from the pressings (`getGroup` - a recording search's group has no year or credit), buildDownloadRelease; pressings
+  unavailable - the album page opens, the song marked. aria-label "Get The Slow Rush, with Patience".
+- **Requests** (`askMusicBrainz`): nothing while typing; on Enter or MUSICBRAINZ_SETTLE_MS after typing stops with 3+
+  characters; albums, then artists, then songs, each through its own latestOnly (`musicRequests`, **`artistRequests`**,
+  `songRequests`), keyed by text AND query (song53's `songsFor` generalised: `keyFor`), at most four a settle (the
+  fallbacks of a fielded read) and three at once (tested on the real page). **What is asked by the reading and the
+  view**: free text - albums the words, artists the box, songs the words; an artist you have - All's albums
+  `withTypeFilter('artist:"A"', typeFilter({primary:['Album','EP'], studioOnly:true}))` (the studio clause, sorted by
+  `studioOrder`, named on screen: "MusicBrainz's studio albums and EPs - See all for everything they made." - "the
+  active filter is always shown" kept), the Albums chip `artist:"A"`, artists the box, no songs; Various Artists
+  never filtered; a title by an artist you have - fielded albums and songs (with their fallbacks), no artists. One
+  limit per kind whatever the view (10/12/25), so views share URLs and cache entries. Every answer waits for
+  /library/owned up to OWNED_WAIT_MS - except a kept one, drawn at once (holding from ownedNow(), refreshOwned() still
+  asked beside it).
+  - **Kept answers** (`app/searchAnswers.ts`, SEARCH_ANSWERS_KEPT 24, by the exact request path, successes only, for
+    the page's life). Kept over .54's disk layer for what that can't do: an answer kept is in hand synchronously as
+    the library settles (`takeKept`), so a text searched before draws WHOLE at the library's moment (measured 278 ms
+    after the last key, Top results and sections in one frame, nothing asked) - with only the disk layer it would be
+    asked at the pause (700 ms) and answered a round trip after, so drawn in two moments. Library answers are never
+    kept across texts.
+- **The server**: `GET /search_musicbrainz/artists?name=&limit=&offset=` (a user's route - test_logins' table):
+  `name` 1-200 and not blank, `limit` 1-100 (default ARTIST_SEARCH_LIMIT 10, the app's own, held to searchList.ts by a
+  test), `offset` 0-1000; `search_artists(name, limit, offset, quick)` keeps artist_query - `(artist:"X" OR
+  alias:"X")`, quoted - and sends an offset only past 0, so every existing call keeps its request and cache entry;
+  `{matches, count}` in the admin route's shape, `_match` moved to `src/artists.py` as `artist_match` (the admin
+  route's answers unchanged, its tests untouched). **`quick`** on /fully_search (only the app sends it; not sent to
+  MusicBrainz, so the request and cache key are the same - tested); /songs and /artists always quick. A quick search:
+  **SEARCH_PATIENCE** (3 attempts, 2 s after a 503 or 429, 1 s after a network error, none after the last) through
+  `request_with_retries(..., patience=)` into `_ask`, after .54's caches as ever; `busy=True` when the 503 said
+  search-shed (`x-ratelimit-who: search-shed`, or its "currently busy" words) - the route answers a JSONResponse 503
+  `{"detail": "MusicBrainz is busy just now - try again in a moment.", "busy": true}` (api/http.ts reads `busy` from the
+  body into `MusicBrainzUnavailable.busy`; Search chooses its words by it, never by matching words); a 400 raises
+  `MusicBrainzRejected` - a 422 "MusicBrainz couldn't read that search - try other words" (song53's /songs 400 was a
+  503; a test says so now), shown with no Try again, turning no Behind on, never counted as "isn't answering".
+  Everything else keeps RETRIES 10 and its pauses (the main page, album pages, the download flow - tested).
+  **Abandoned searches stop**: the three routes run their MusicBrainz work in `unless_abandoned`, answering ClientGone
+  with a 204 - a search still waiting its turn in the rate limiter (or between attempts) is cancelled before it spends
+  one (tested on each route: no request sent, no turn spent, `asking` back to 0). The cost, accepted: a request already
+  sent and cancelled never reaches the caches. **The rate limiter's lock**: `RateLimit.wait()` under an asyncio.Lock
+  held across its sleep, so waiters take turns (no window of five seconds holds more than four, a waiter cancelled
+  asleep gives its turn back); made lazily for the RUNNING loop (the limiter is a class attribute shared by every
+  loop - each asyncio.run, each TestClient - and a lock that waited in one raises RuntimeError contended from another).
+  .54's `quiet()` (the refresher's check) and refreshes (one attempt, `refreshing`) are untouched by either; the lock
+  sits inside wait(), so a refresh takes its turn as a question does. The limiter's clock and sleep can be handed to
+  it (`clock`, `sleep`; None for time.monotonic and asyncio.sleep, looked up as it waits) for
+  tests/test_musicbrainz_ratelimit.py's virtual time.
+- **Reconciled with what landed** (the spec was written while .53 was a draft and before .54): song53's final review
+  had the albums never wait for the songs and fold late songs - both replaced, as the spec meant, by moment 2 and the
+  late slot (app-rules' "never waits for the songs" pin rewritten, sectionsReady pinned instead); its wording "a
+  pressing in your library" (never "another pressing") is kept everywhere; .54's request_with_retries keeps its disk
+  layer and browse reads, the patience reaching `_ask` alone; .54 had added no queue to wait(), so the lock went into
+  wait() itself.
+- **Measured for this design** (2026-10-15, the design's own, at most a request a second): the artist search "portishead"
+  free text 0.46 s, count 3 (Portishead 100, Dave McDonald 45, G.B. 41 - free words reach disambiguations, so the phrase
+  and alias query is used); "the national" 0.56 s, count 196,826; `(artist:"bjork" OR alias:"bjork")` a 503 search-shed in
+  0.45 s (`work/design54/musicbrainz/artist-bjork.headers` - the busy fixture's model); release groups `artist:"Portishead"`
+  limit 12 1.58 s, 11 KB, count 90, all 100, no Dummy and no Third (`tests/fixtures/search/rg-artist-portishead.json`); the
+  studio clause 0.59 s, 14 KB, count 6 - Magic Doors, All Mine, Third, Dummy, Portishead, R.A.R.E.
+  (`tests/fixtures/search/rg-artist-portishead-studio.json`); recordings `artist:"Portishead"` count 958, the first 25
+  remixes, live and compilation takes (why an artist alone asks no songs). Recorded for this build (2026-10-15, the app's
+  user agent shape, 1.5 s apart, `work/apple55-builder/mb/record.py`): `(artist:"X" OR alias:"X")` for kanye west (0.49 s,
+  count 4: Ye "formerly Kanye West" matched as Kanye West, ¥$, two tributes), nirvana (2.49 s, count 42 - the grunge band,
+  Nirvana 2002 with "Nirvana" as an alias, the UK 60s band, five more Nirvanas), portishead (0.54 s, count 1), radiohead
+  (0.45 s, count 8 - On a Friday has "Radiohead" as an alias); trimmed into `tests/fixtures/artists/` with the route's own
+  `artist_match` answer beside each (`*.route.json`, a test holds them equal).
+- **Time budget on a phone** (E the spec's estimates; M measured on the real page below - from the last key, the
+  stand-in answering artists in 0.5 s, groups 0.7 s, recordings 1.5 s, 50 ms of round trip added):
+
+  | after the last key | shown | asked | M at 390x844 | M at 390x480 |
+  |---|---|---|---|---|
+  | 0-200 ms | the previous text's list | nothing | | |
+  | 200 ms | | search3 | | |
+  | ~300 ms (E) | Top results' decided prefix ("portishead": Portishead, Dummy, Roads) | the Top song's album | 279 ms | 273 ms |
+  | ~450 ms (E) | its ▶ | | 329 ms | 322 ms |
+  | 700 ms | | 2-3 MusicBrainz searches | | |
+  | moment 2, 2.2 s at most | the sections ("portishead": albums and artists in at 1.45 s) | | 1447 ms | 1441 ms |
+  | moment 2 at the cap ("roads": recordings 1.5 s, past it) | the sections, Songs' "Roads (play)" among them | | 2230 ms | 2223 ms |
+  | "roads"' songs landing (last: drawn in) | | | 3813 ms | 4823 ms |
+  | slow groups (3 s), "roads portishead" | Top results 285 ms, ▶ 335 ms, sections at the cap 2235 ms, settled 3751 ms | | | |
+  | MusicBrainz away (503 search-shed), "portishead third" | the sections at the cap 2234 ms, the busy words 9250 ms (three tries) | | | |
+  | Behind ("roads" after that) | Top results and sections 278 ms, MusicBrainz's in slots by 2244 ms | | | |
+  | a text searched before ("portishead") | everything at 278 ms | search3 only | | |
+
+- **Tests**: Python 3036 collected (3034 passed, 2 skipped; 42 more than .54's 2994, six of them after review and one
+  after the late recheck): `test_musicbrainz_routes.py` (20 tests, 31 with the refused bounds' and the network errors' cases: `/artists` - one
+  alias-aware request, the shape, its fixtures the route's own answers, paged and cached, empty, a 503 never cached,
+  shapeless, quoting, ten refused bounds asking nothing, the bounds, the app's page size; quick - three tries with a busy
+  body from the header and from the words, a non-shedding 503 not busy, a network error a second's pause and never
+  busy, a 429 two seconds and not busy (after review), a 400 a 422 asked once on all three routes,
+  `/fully_search` without quick as ever (ten tries, a 400 a 503, one request and cache entry for both), search_artists
+  without quick its ten tries (late recheck); abandoned on all
+  three routes, a 204 with nothing sent and no turn spent; /songs' 400 a 422), `test_musicbrainz_ratelimit.py` new (3), test_logins'
+  row (no new case), `test_app_css.py` (6 new, song53's slot test folded into the first: the slot's one height in every state, the place span
+  and its kept space, See all's reach, the chips the Library's, the phone's Top results rows, a kind view's foot at the edges once),
+  `test_app_desktop_css.py` (3 new and 1 moved: the tiles' grid, one height and whole outline, the columns beside a side panel,
+  the chips shown, the list's last box off the player bar - the rule and its test moved from `.app-search-more`). Sims:
+  `searchList.sim.cjs` new (130 checks, 10 after review), `search.sim.cjs` rewritten (315 - 293 checks and 22 invariant
+  checks after timed answers; 77 more after review, 27 after the late recheck), `searchQuery` (73), `whose` (100), `songs` (84), `app-rules` (411). app-rules kept byte for byte: James's
+  held-groups pin, playSong's shape, the allowlist, `useOwned(shown)`, heldRequests, standDown, the lab picker's
+  `searchLibrary(query, signal)` and askLibrary's `searchLibrary(term, request.signal)`; rewritten: the prefetch pin, the
+  rows' click and More's placement (into SearchRows and the kind views), askMusicBrainz's sequence, the owned race (each
+  kind's), the section order and labels, song53's songs-above-albums and fold pins (deleted - the late slot), and three
+  whose regexes now read app/SearchRows.tsx where the code moved - "no is-primary" (its file list gains SearchRows, where
+  the Get chip lives, and the chip's class is tested there), song53's evidence check (what you hold told by the library
+  half's songs, now read off SearchRows and lib/searchList.ts) and "a row looking for its album fades" (Search's half reads
+  `looking` in SearchRows) - the review found the notes had called the first kept byte for byte;
+  new: heldUnlisted in the holder's block with no Get, artistRequests, the chips outside the form, the gate above the list,
+  `onOpenMusicBrainzArtist={openCreditedArtist}`, SearchRows reaching no player action, searchList pure, Top results from
+  `drawn.top`, the frame kept. `work/apple55-builder/mut/mutate.py` breaks 48 rules one at a time - the rank, the source-2
+  rule, a phantom's tier, the decided prefix, the family, each dedupe, a cap, draw-in vs fold, Behind (superseded,
+  refused, ignored), the studio clause, its line and its order, the artist reading's title rule, libraryPlace, the cap
+  timer, a late empty kind going, the region, kept answers, chip asks, the status-unknown wait, Back to All's no-phantom
+  redraw, a kind view's library-first wait, the 422's missing Try again, busy read from the body, the frame kept, focus on
+  Show N, songGet's pressing, the MusicBrainz artist's tap, the phantom-first place, SearchRows' player action, Top results
+  at render, patience, busy, the 400, abandon, the lock and its loop, artist_match, the artists' offset, five CSS rules -
+  **48 of 48 caught** on a check's FAIL line, the tree byte-identical after each (`mutate.log`). After review,
+  `work/apple55-fixer/mut/mutate.py` breaks each fix and each rule the review found unpinned, one at a time in a copy of
+  the tree: **42 of 42 caught** (41 on a check's FAIL line or a failing test; a key put back into a selector throws, as a
+  browser would, on search.sim's stand-in DOM, and app-rules' pin fails too). The engine guard is empty.
+- **Real page** (my own deadwax on 8118 from this worktree, logins off, the disk cache off so each start asks again; my
+  own stand-in Navidrome on 4545 over a hard-linked copy of the stub library less Third (Portishead's Dummy held, The Slow
+  Rush's usual CD, Ye, Pink Floyd); my own fake slskd on 5045; MusicBrainz through my record-and-replay stand-in on 4546,
+  seeded with song53's recordings and my artist recordings, `delays.json` and `away`; headless Chromium as `deadwax.test`
+  over plain http with 50 ms of round trip; every drawn tappable's place sampled each frame from the last key to the list
+  settling, a move over 0.5 px outside a slot recorded; `work/apple55-builder/page/drive.cjs`, 28 checks): at 390x844 and
+  390x480 "portishead" and "roads" Top results at the library's moment and nothing moved; a text searched before drawn
+  whole, nothing asked; slow groups ("roads portishead": Portishead first under Artists), away (busy words), Behind - nothing
+  moved in any; typing "portis" then "portishead" a key every 150 ms asked nothing before the pause, then two requests (an
+  artist you have: albums and artists), never more than three at once; the Albums chip asking only its unfiltered albums;
+  the main page's /fully_search answered as ever; "radiohead" - MusicBrainz's Radiohead first, its tap opening
+  `#/search/artist/mb%3A…` (the hash percent-encodes the colon, as App always has); See all from the keyboard putting
+  focus on the pressed chip; a Top song playing from its first tap; Get on "Patience" (a song row) opening the sheet on The
+  Slow Rush's Japanese CD; at 320x568 nothing wider than the window and Dummy's "in your library" whole; at 1440x900 six
+  tiles three across, one height (80 px), the chips under the title; the accessibility tree's Top results, Artists, Albums
+  and Songs headings and the live region; no console errors. The first run found the studio line moving Songs (fixed,
+  above) and nothing else. Live MusicBrainz questions: 18, each once, at least 1.1 s apart - 11 of Search's (the studio
+  clause, "roads" three, "portishead third" two, `artist:"Portishead"`, the main page's "roads", "radiohead" two) and 7
+  by artist pages opened from Search (their facts and discography browse, as that page always asks; one answered 503 by
+  MusicBrainz and asked again). Not run on the real page: logins on (the stand-in has one user), a word typed before
+  Navidrome's status lands, a kind view whose MusicBrainz answers before its search3, and "dummy", "glory box" and "kanye
+  west" (to keep the live questions few) - each is search.sim's.
+- **Decisions this touches**, said plainly: the held-groups rule extended (for James to confirm); step 7's songs above the
+  albums now Apple's order (Songs last); navidromePlace's logins-off silence lifted for Search's rows; step 7's heading
+  and slot folded into the Songs section; the studio clause on an artist read's All preview, named on screen; step 7's
+  "the albums never wait for the songs" replaced by moment 2 (albums that answered at 0.5 s show at the cap when songs are
+  still out, ~1 s later than song53, so nothing drawn moves when the songs land). `docs/configuration.md` unchanged - no
+  new setting.
+- **Not built**, on purpose: Recently searched; completions, spell correction, lyrics, playlists, stations; the scope
+  switch and the chip in the address; the albums of an artist only MusicBrainz knows (the artist row opens the full
+  discography in one tap); songs for an artist's name alone; a popularity ranking; matching songs by recording id; "maybe"
+  marks on Search rows; reading an unknown artist inside a longer box; get-a-better-copy (James, 2026-10-15: not now);
+  search what's saved (.56). Focus handed on is pinned for Show N, All's Show them and a kind view's, every Try again
+  (a slot's, the all-failed foot's, a kind view's library's and MusicBrainz's), and the Albums and Songs views' last
+  More; the Artists view's last More and More from your library's last page are built the same way and not pinned.
+- **After review** (eleven findings fixed, each with a check that fails without it; `work/apple55-fixer/mut/mutate.py`
+  breaks each fix one at a time):
+  - **The box is read once MusicBrainz is asked** (a major): `askedPlan` keeps the SearchPlan askMusicBrainz asked by,
+    and `planFor` reads it for those words - so search3 or /library/owned naming an artist after the ask (search3
+    slower than ~0.5 s, Enter pressed straight after typing, owned's first answer after a restart, a track artist owned
+    doesn't list) can no longer re-read the box under the answers asked: their keys stranded them, a slot said "Asking
+    MusicBrainz…" for good, nothing was asked again and Behind was turned on as late. Enter reads the box afresh (as
+    the spec's "Enter after the library named a new artist asks afresh" says) and, the reading changed with a list
+    drawn, draws it afresh; a chip, Try again and the pause keep the reading. HEAD matched answers by text alone, so
+    this was new in .55.
+  - **A letter typed and taken back arms the cap** (a major): the box back at exactly the words asked ('keep') began a
+    run nothing marked asked, so its sections waited for the slowest kind (up to ~90 s on a hanging connection); the
+    'keep' branch and the library's own Try again now arm the run's cap (`armCap`, split out of askMusicBrainz).
+  - **"U2" + Search with MusicBrainz away** (a major): askAlbums' failure no longer clears `asked` (a failed kind is
+    asked again by Enter or Try again anyway - askedFor), which under three characters had turned an outage into "No
+    results for “U2”", dropped the other kinds' answers, and could say "press Search" after Search was pressed.
+  - **Focus**: a row is found by comparing its key (`rowNamed`) - a song's key holds a newline, and the selector built
+    from it made querySelector throw in a layout effect (Preact then drops the commit's other effects). The hand-on now
+    waits while its control is still drawn and focused (a Try again or Show them redraws a render after its tap: the
+    hand had been spent on the old draw and focus fell to the body), goes only to what the new draw holds (the row, the
+    note, its section's h2, Top results' h2, any h2 - at moment 1 a Try again's own section isn't drawn yet, so Top
+    results' heading; with none drawn it waits for the draw that brings one, unless focus moves), and a kind view's Try
+    again (its library's and MusicBrainz's) and Show them hand focus on too (`handOn`). search.sim's focus checks run on
+    a stand-in DOM over what is drawn (`dom`: an element is a drawn node, focus falls to the body as a draw takes the
+    focused one away, querySelector throws on a raw newline as a browser does) - the old stand-in answered any selector
+    and moved focus off a control as it was tapped.
+  - **Kind views and Navidrome's status**: a view's library is `waiting` while the status isn't known (MusicBrainz's
+    rows wait, the late timer armed), `skipped` once known not OK, and asked again - never refused - when it was
+    skipped, waiting or failed (Navidrome back through the gate's Try again, Enter, a chip); one asking line until its
+    library lands; the region says the view's library count as its rows draw, then MusicBrainz's or its failure, each
+    once (`kindSaid`). A chip back to a view whose library answered draws its rows rather than its late place.
+  - **Shown once**: `pool()` leaves out of the brought block any group in MusicBrainz's frozen `shown` - a group held
+    only since its answer landed (filed meanwhile, or /library/owned answering after OWNED_WAIT_MS) stays in
+    MusicBrainz's block, marked in place, no Get; it had been drawn twice under one key.
+  - **Marks**: a song-album relative (a MusicBrainz song's named album built from the song) has a whose (`rowYours`),
+    so a desktop tile's third line says "In your library" for one held with the song, never "On MusicBrainz"; an album
+    row made of a library song's own fields (no star, no release id) is read as search3 or `ready` has it, and is
+    unknown without - never "in the store" on a guess (`albumYours`).
+  - **CSS**: the place's words keep their leading space (`white-space: pre` - a flex item starts a line of its own,
+    where a collapsible space is dropped: rows read "1994· in your library"; measured in Chromium, 95.4 px with the
+    space against 92.0 without); beside a side panel Top results take as many columns as fit at `--app-top-lockup-min`
+    (240px), never more than three (two at 1280 and 1440 with Sources open: a Get tile's title 81 px at 1280 where it
+    was 1, 161 at 1440); every tile keeps its top border (the `li + li` reset, more particular than the tile's rule, is
+    gone); a kind view's foot is at the edges once (`.app-search-list > .app-search-foot`: 20 and 264 px, as its rows,
+    where it was 40 and 296). Without a panel a Get tile's title keeps 61 px - the spec's three across in 760 px; left
+    as designed.
+  - **Docs**: troubleshooting's "An artist shows twice" no longer offers Which artist is this? as the fix (Search never
+    reads it - it changes that page for the visit, an admin's); the lasting fix is the metadata editor, a Navidrome
+    rescan and a reload. "About eight seconds" is said only for MusicBrainz turning searches away: each attempt still
+    waits out the client's timeouts (connect 10 s, read 30 s), so a hanging connection takes up to ~1.5 minutes (the
+    review measured 92.2 s). finding-music.md says the box is read as it was asked, the kind view's asking line, the
+    library's can't-be-searched words, the hand-on, and two tiles across beside a panel.
+  - **Tests put back**: the cut-back checks the search.sim rewrite had dropped (cut back below three: every kind called
+    off, a More page too; the same words again asked again - the trap an earlier review found), the desktop sidebar's
+    field through the real app/searchBox.ts, More failing and its second tap in all three views; and checks for rules
+    nothing pinned (the chip back to All as the box empties, Behind not for a library that found nothing, Navidrome back
+    redrawing, the artist list asked again, the library's problem block and its Try again). test_musicbrainz_routes.py:
+    a quick search's network error (ConnectError, ConnectTimeout, ReadTimeout) - three attempts, a second between,
+    never busy - and a 429 (two seconds, not busy). app-rules: dropMusicBrainz clearing `asked`, `rowNamed` and no key
+    in a selector. Search.tsx's one apostrophe in JSX text became a string expression: app-rules' comment stripper reads
+    a bare `'` as a quote, and a new comment's apostrophes had flipped it.
+  - **Not rerun on the real page after review**: the fixes are search.sim's (the focus ones on its stand-in DOM, which
+    follows Preact's order - the draw's DOM, then its layout effects); the CSS was measured on a static page of the
+    real stylesheets in headless Chromium at 390, 1280 and 1440. A type-and-delete, like Back to All, now ends Behind
+    when every kind is already in hand (the run is armed, and nothing is out) - the way Back to All always did.
+- **After the late recheck** (nine findings: six fixed in the code, one in words, two rules or sets of rules nothing pinned -
+  each now with a check that fails without it; `work/apple55-final/mut/mutate.py` breaks each fix and each newly pinned
+  rule one at a time: **15 of 15 caught**, 14 on a search.sim FAIL line and one on a failing pytest, the tree
+  byte-identical after each):
+  - **Enter after a failure in All** (a major): a drawn list is frozen, so Enter's ask again of a failed kind (askedFor
+    counts a failure as not asked) or of the failed library landed nowhere - the slot kept its failure (busy words
+    turning to "isn't answering" as it asked again), the all-failed foot stayed, the library's rows never came, and the
+    requests were spent. Enter on an All list drawn with a failure in it - a kind's slot, the foot, the library's problem
+    - now begins a run as Try again does (`startRun(query, true, false)`: Behind not applied), arming the library's own
+    late clock when it was the library that failed; the failed are asked again and drawn by the moments.
+  - **Navidrome back after the library failed**: the status effect drew afresh only a list drawn with the library
+    skipped; one drawn with its failure is now asked, its late clock armed and drawn afresh the same way.
+  - **A kind view under its library's failure** never says "No albums for “…”." (`nothing` needs a library that didn't
+    fail, as All's `!drawn.libraryProblem`): its library wasn't searched. MusicBrainz's own words stay.
+  - **The Artists view under album-by-artist** (it asks MusicBrainz nothing), the named artist in none of the library's
+    lists: "No artists for “…”." drawn and said, where its heading had stood alone; the named artist looked for in the
+    full list and search3's artists together (`knownArtists`, as All's pool), not the full list alone.
+  - **Back to All** says "Showing everything." together with its whole draw's words (`showingAll`): the draw's words
+    had replaced it in the same commit, before a screen reader could read it.
+  - **A 422 said as refused**: every kind refused, the region says the refusal's words, never "MusicBrainz isn't
+    answering." (`mbWords`).
+  - **navidromePlace**: Search was its only caller, so nothing in the app calls it now; its docstring and the marks
+    bullet above say so (whose.sim still pins its rule) - words only.
+  - **Pinned at last** (rules the docs claim that survived mutation): the Albums view's held album its search3 didn't
+    list (among MusicBrainz's rows at its place, marked, no Get, opened through the id bridge); a logins-on kind view's
+    **More from the store**; a late albums kind landing all held saying the allHeld words; kept answers asking
+    /library/owned again beside them; two characters' asking line "Searching your library…"; and `search_artists`
+    without `quick` keeping RETRIES' ten tries (the admin's Which artist is this? and the artist page's id resolution -
+    test_musicbrainz_routes.py).
+- **NOT verified here**: a real Navidrome 0.64.2's search3 order (BM25; the stand-in sorts by name) - so which album and
+  song the decided prefix picks - whether its search3 artists carry `musicBrainzId`, and getArtists' cost on a big
+  library; WireGuard's round trip and how much an iPhone keyboard leaves; the phrase artist search's accent folding
+  ("bjork" - every try was shed); how often real MusicBrainz sheds three searches fired together, and whether three tries
+  are enough; VoiceOver on the iPhone (the region, the sections, the chips, a slot filling under a thumb); logins on in a
+  real page.

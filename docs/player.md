@@ -8,9 +8,9 @@ needs to reach deadwax.
 
 It's growing into one app for everything deadwax does: five tabs along the bottom (**Home**,
 **Library**, **Search**, **Requests** and **You**), with the player inside them. **Requests** shows
-your downloads as they arrive (since 2.0.0-player.12), and **Search** looks in your library and
-then on MusicBrainz, and shows an album you don't have with each of its pressings' tracklists
-(since 2.0.0-player.13) - and **Get** fetches it: the sources found on Soulseek, to choose from
+your downloads as they arrive (since 2.0.0-player.12), and **Search** finds artists, albums and songs -
+yours first in each, then MusicBrainz's, in one list as Apple Music shows it (since 2.0.0-player.55) - and
+shows an album you don't have with each of its pressings' tracklists (since 2.0.0-player.13) - and **Get** fetches it: the sources found on Soulseek, to choose from
 (since 2.0.0-player.15). **Home** has the albums and artists you [pin](#home-and-pins) to it, and
 what you haven't played in a while (since 2.0.0-player.18). On a computer's screen - a window 1024
 pixels wide or more - the same app has [a desktop's layout](#on-a-desktop) (since 2.0.0-player.19): a
@@ -190,38 +190,44 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   everyone. A pressing somebody else is already downloading offers **Join this download** where its
   sources would be, and under **Get the album**. [Downloading](downloading.md#with-logins-on-downloads-per-person)
   has the rules.
-- **Search**: one box, your library first, then MusicBrainz. **In your library** lists the
-  artist you typed (as the **Top result**), the other artists found, albums and songs; an artist
-  opens [their page](#artist-pages), an album opens it, and a song plays
-  from there through its album once that album has been fetched (a ▶ at its right says so - the
-  first five albums of the songs found are fetched as the answer arrives), and otherwise opens its
-  album. **Songs on MusicBrainz** (since 2.0.0-player.53) comes next: a few of the songs MusicBrainz has
-  for the box, every take of one song one row ("Roads · Portishead · 4:56 · Dummy · in your library"),
-  with **More songs** for the rest; tap one to open the albums it's on - albums and EPs, then singles,
-  then the compilations, live albums, soundtracks and broadcasts behind one line that opens - and an album
-  to open it on a pressing that has the song, the song marked and scrolled to (one you have the song on
-  opens the album you have; one you have a pressing of that nothing yet says has the song says "a pressing
-  in your library", and a tap looks through the album's pressings before it opens the album you have or
-  the one you don't). No song matching, there's no section - unless that answer arrives after the albums
-  are on the screen, when the line that was asking says *No songs on MusicBrainz for "…"* instead; songs
-  arriving after the albums wait behind **Show songs**, so the albums don't move under your finger.
-  **Not in your library yet** is MusicBrainz's albums, less the ones you have, asked when
-  you press Search on the keyboard or a moment after you stop typing (one your library turns out
-  to hold after the list is drawn says "in your library", and opens the album you have) - 12 at a
-  time, with **More from MusicBrainz** under them for the next 12 (since 2.0.0-player.50). Tap one
-  for **the album you don't have**: laid out like an album you have - its artist a link to their
-  page when it's credited to one artist - with a **Pressing** button where Play would be,
-  starting on the usual pressing - its status, date, labels, catalogue number and barcode under it,
-  every pressing's in the list, and a filter there for an album of more than 30 - and that
-  pressing's tracklist, with its bonus tracks, other versions and renamed or missing tracks marked;
+- **Search**: one box, then one list as Apple Music shows it (since 2.0.0-player.55): **Top results** - the
+  best artist, album or song, yours or not, each saying what it is ("Song · Portishead · Dummy"), three on a
+  phone and six tiles on a desktop - then **Artists**, **Albums** and **Songs**, each with yours first, then
+  MusicBrainz's, a few of each with **See all** in its heading. The chips **All**, **Artists**, **Albums**
+  and **Songs** over the list narrow it to one kind, in full, with **More from your library** and **More from
+  MusicBrainz** (**More songs**) for the next pages. Your rows say "in your library" (with logins on, "in
+  your library" or "in the store"). An artist opens [their page](#artist-pages) - one only MusicBrainz knows
+  by its MusicBrainz id, even with Navidrome down - an album opens it, and a song of yours plays from there
+  through its album once that album has been fetched (a ▶ at its right says so - the albums of the songs in
+  Top results and then of the first songs are fetched as the answer arrives), and otherwise opens its album.
+  MusicBrainz's songs (since 2.0.0-player.53) are every take of one song one row ("Portishead · 4:56 ·
+  Dummy · in your library"); in Songs a tap opens the albums it's on - albums and EPs, then singles, then the
+  compilations, live albums, soundtracks and broadcasts behind one line that opens - and an album to open it
+  on a pressing that has the song, the song marked and scrolled to (one you have the song on opens the album
+  you have; one you have a pressing of that nothing yet says has the song says "a pressing in your library",
+  and a tap looks through the album's pressings first); in Top results a tap goes straight to the album it
+  names. An artist's name alone asks MusicBrainz for their studio albums and EPs (said in a line under them;
+  the Albums chip asks for everything) and for no songs - type a title with the artist ("roads portishead").
+  MusicBrainz is asked when you press Search on the keyboard or a moment after you stop typing; its albums
+  leave out the ones you have (one your library turns out to hold after the list is drawn says "in your
+  library", and opens the album you have), and one you have that your library's own search didn't list is
+  shown among yours. **Nothing drawn moves under your finger**: what your library can already tell is drawn
+  at once, the sections when MusicBrainz has answered (a second and a half at most), and a kind still out
+  lands in a place kept for it - drawn straight in when nothing is below it, else behind **Show 3 albums
+  from MusicBrainz**. Tap an album MusicBrainz offers for **the album you don't have**: laid out like an
+  album you have - its artist a link to their page when it's credited to one artist - with a **Pressing**
+  button where Play would be, starting on the usual pressing - its status, date, labels, catalogue number
+  and barcode under it, every pressing's in the list, and a filter there for an album of more than 30 - and
+  that pressing's tracklist, with its bonus tracks, other versions and renamed or missing tracks marked;
   "maybe in your library", dashed, when only a folder with no MusicBrainz ids has its name ("maybe in the
-  store" with logins on, when that folder isn't in your library); and the
-  album and the pressing on musicbrainz.org at its foot. MusicBrainz isn't asked for anything until you
-  search, and the album page works with Navidrome down. [Finding music](finding-music.md#on-the-phone-the-apps-search-tab)
-  has how the box is read and what every note means.
+  store" with logins on, when that folder isn't in your library); and the album and the pressing on
+  musicbrainz.org at its foot. MusicBrainz isn't asked for anything until you search, and the album page
+  works with Navidrome down. [Finding music](finding-music.md#on-the-phone-the-apps-search-tab) has how the
+  box is read, how Top results are chosen and what every note means.
 - **Get**: **Get the album** on the album you don't have - under the Pressing button, with a line
   under it saying what you already have of that pressing, if anything - gets the pressing chosen;
-  **Get** at the end of a row under Not in your library yet gets the album's usual pressing. Either opens
+  **Get** at the end of an album MusicBrainz offers in Search gets its usual pressing, and at the end of a
+  MusicBrainz song (since 2.0.0-player.55) the album it names, on a pressing that has the song. Each opens
   **Choose a source**, a sheet of the folders found on Soulseek, one card each: the score, the
   folder and who it's from, then **Speed** first and large (what you got from that user before, in
   green, or their own average, or none reported), Tracks, Quality, Size and when it **Starts**, and
@@ -298,8 +304,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 
 ## Artist pages
 
-An artist's page (since 2.0.0-player.17) opens from Search (the **Top result** and the other
-artists), **Library → Artists**, the artist's name on an album you have and on the album you don't
+An artist's page (since 2.0.0-player.17) opens from Search (Top results and the Artists section - an artist
+only MusicBrainz knows by its MusicBrainz id, since 2.0.0-player.55), **Library → Artists**, the artist's name on an album you have and on the album you don't
 have, and Info's artist card.
 
 - **At the top**, their picture - their background (`fanart.*`) where it's in their folder, else the
@@ -557,8 +563,9 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   (and, there, to the top). So does the Library view showing. Another Library view shows that view -
   where you left it when you were already on the Library's first page, and at its top from anywhere
   else.
-- **The search field** is Search's box: type in it and Search's results show in the main area -
-  your library first, then MusicBrainz - and Enter asks at once. It keeps saying what you searched
+- **The search field** is Search's box: type in it and Search's results show in the main area - one list,
+  Top results as tiles three across (two across beside a side panel), then Artists, Albums and Songs, yours first in each, with the chips under
+  the large title (since 2.0.0-player.55) - and Enter asks at once. It keeps saying what you searched
   for while an album you found is open. (Search's own box isn't drawn on a desktop.)
 - **Recently added** in the sidebar is Navidrome's albums newest first, a view of its own beside
   **Albums**, so Albums keeps the order you chose for it (Recently added, Recently played, Artist or
@@ -1747,11 +1754,15 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   the line after it says how: star it in Amperfy. It isn't listed as "removed by the admin" in You
   either - you removed it. If deadwax can't write the Remove down (its database refusing a write), it
   says so - Navidrome has unstarred it, and Remove again finishes it.
-- **Search** looks in the store first - titled **In the store**, each album row saying **in your
-  library** or **in the store** - then MusicBrainz, **Not in the store yet**, for what deadwax doesn't
-  have. Its **Songs on MusicBrainz** (since 2.0.0-player.53) say **in your library** or **in the store** of
-  a song, and of each album it's on, the same way - and **a pressing in your library** (or **a pressing in
-  the store**) of an album held as a pressing nothing yet says has the song or hasn't.
+- **Search** (one list since 2.0.0-player.55): in each section yours first, then the store's, then
+  MusicBrainz's - each row of the store's saying **in your library** or **in the store** (nothing while
+  that isn't known yet: such a row sits among yours and may say "in the store" there once known, rather
+  than move), an artist's count your own when you have albums of theirs ("1 album in your library"), else
+  the store's; an album you add on its page says **in your library** in its row when you come back. With
+  logins off every row of yours says **in your library** now too, since the half titles that said it went.
+  MusicBrainz's songs (since 2.0.0-player.53) say **in your library** or **in the store** of a song, and of
+  each album it's on, the same way - and **a pressing in your library** (or **a pressing in the store**) of
+  an album held as a pressing nothing yet says has the song or hasn't.
 - **Home**: Recently added and Not played in a while are asked as you (so "not played" is what *you*
   haven't played); **New in your library** is as before.
 - **A Navidrome that gives users libraries of their own** (its multi-library setting): deadwax only ever
@@ -1894,9 +1905,14 @@ question the whole player existed to answer. Still to find out:
   your VPN; with logins on (2.0.0-player.49), **Join this download** and the ✕'s "Leave it" under a
   real finger, and Requests on two phones signed in as two people showing each their own;
 - **Search** against your Navidrome: what its search finds for an artist, an album and a song
-  (it hasn't been tried against a real Navidrome yet), a song's tap starting its album, the
-  pressing list scrolling under a finger without the page moving, and the Cover Art Archive's
-  covers over your VPN;
+  (it hasn't been tried against a real Navidrome yet) - and so (2.0.0-player.55) the order it finds them in,
+  which decides which of yours lead Top results and the sections (the test stand-in sorts by name, a real
+  Navidrome by relevance), whether it sends each artist's MusicBrainz id (MusicBrainz's artists are matched
+  to yours by it), and how long its whole list of artists takes on a big library; a song's tap starting its
+  album, the pressing list scrolling under a finger without the page moving, the Cover Art Archive's covers
+  over your VPN, and MusicBrainz's artist search with accents ("bjork" for Björk - every try of it was
+  turned away as MusicBrainz shedding searches); the list's places filling under a thumb, and what
+  VoiceOver reads of its one live region, its section headings and its chips;
 - **Artists and the id bridge** (2.0.0-player.17) against your Navidrome: whether it sends each
   artist's MusicBrainz id (the artist page's albums from MusicBrainz depend on it, or on the ids
   deadwax wrote into your files), whether its search finds an album by its MusicBrainz release id

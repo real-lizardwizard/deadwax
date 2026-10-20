@@ -1,9 +1,43 @@
-from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
-from src.artists import artist_facts
+from src.api.musicbrainz_endpoint import MusicBrainzRejected, MusicBrainzUnavailable, raise_for_search
+from src.artists import artist_facts, artist_match
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, Response
 from src.logger import logger
+from src.routes.download import ClientGone, unless_abandoned
 
 router = APIRouter()
+
+#? The app's Search's own words (2.0.0-player.55): MusicBrainz shedding searches, said as busy - its body
+#? carries `busy: true` beside the words, which the page reads (api/http.ts) - and a quick search
+#? MusicBrainz refused as malformed, said as the words, never as an outage.
+BUSY_WORDS = "MusicBrainz is busy just now - try again in a moment."
+REJECTED_WORDS = "MusicBrainz couldn't read that search - try other words"
+UNREACHABLE_WORDS = ("MusicBrainz is unreachable right now, so this search couldn't run. "
+                     "This isn't a problem with your search terms - try again shortly.")
+
+
+def _away(error: MusicBrainzUnavailable):
+    """MusicBrainz away, as a quick search answers it: busy (with `busy: true`), or unreachable."""
+    if getattr(error, "busy", False):
+        return JSONResponse(status_code=503, content={"detail": BUSY_WORDS, "busy": True})
+    raise HTTPException(status_code=503, detail=f"{UNREACHABLE_WORDS} ({error})")
+
+
+async def _quick(request: Request, work):
+    """
+    A quick search's MusicBrainz work (2.0.0-player.55: /fully_search with `quick`, /songs, /artists), run
+    so an abandoned search stops: the page's latestOnly() abort closes the connection, and a request still
+    waiting its turn in the rate limiter, or between attempts, is cancelled before it spends one - answered
+    204, nobody being there to read it. A 400 is a 422 with words; MusicBrainz away a 503 (busy or not).
+    """
+    try:
+        return await unless_abandoned(request, work)
+    except ClientGone:
+        return Response(status_code=204)
+    except MusicBrainzRejected:
+        raise HTTPException(status_code=422, detail=REJECTED_WORDS)
+    except MusicBrainzUnavailable as e:
+        return _away(e)
 
 #? How far into a search's answers /fully_search pages (2.0.0-player.50): the app's "More from
 #? MusicBrainz" asks for the next dozen by offset. A bound, so a page can't send MusicBrainz - rate
@@ -27,7 +61,22 @@ async def fully_search(
     #? MusicBrainz"). 0 - the first page - is asked as it always was, with no offset sent, so every
     #? existing search keeps its request and its cache entry.
     offset: int = Query(0, ge=0, le=FULLY_SEARCH_OFFSET_MAX),
+    #? (2.0.0-player.55) the app's Search alone sends it: a search's patience (three attempts, not ten), a
+    #? 400 said as words to try others, MusicBrainz shedding said as busy, and an abandoned search stopped.
+    #? Not sent to MusicBrainz, so the request and its cache entry are the same; the main page and the
+    #? metadata editor send none and are answered exactly as before.
+    quick: bool = Query(False),
 ):
+    if quick:
+        try:
+            mb_client = request.app.state.musicbrainz_client
+            return await _quick(request, mb_client.fully_search(query, limit, include_releases=releases, offset=offset, quick=True))
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Exception in /fully_search endpoint: {e}")
+            raise HTTPException(status_code=500, detail=f"Error searching MusicBrainz: {e}")
+
     try:
         mb_client = request.app.state.musicbrainz_client
         search_result = await mb_client.fully_search(query, limit, include_releases=releases, offset=offset)
@@ -80,21 +129,71 @@ async def songs(
     if not query.strip():
         raise HTTPException(status_code=422, detail="A song search needs some words to search for.")
 
+    #? (2.0.0-player.55) always a quick search: a search's patience, a 400 a 422 with words (it was a 503),
+    #? busy said, an abandoned search stopped - see _quick
     try:
         mb_client = request.app.state.musicbrainz_client
-        return await mb_client.search_recordings(query, limit, offset=offset)
+        return await _quick(request, mb_client.search_recordings(query, limit, offset=offset, quick=True))
 
-    except MusicBrainzUnavailable as e:
-        #? 503 not 500, as /fully_search: nothing is wrong with the request, the upstream is down
-        raise HTTPException(
-            status_code=503,
-            detail=f"MusicBrainz is unreachable right now, so this search couldn't run. "
-                   f"This isn't a problem with your search terms - try again shortly. ({e})",
-        )
+    except HTTPException:
+        raise
 
     except Exception as e:
         logger.error(f"Exception in /songs endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error searching MusicBrainz for songs: {e}")
+
+
+#? An artist search's bounds (2.0.0-player.55, the app's Search). ARTIST_SEARCH_LIMIT is the app's own page
+#? (ui/src/lib/searchList.ts keeps the number); MusicBrainz serves at most 100 to a search page; the paging
+#? goes no further than the other two searches'; the name no longer than the app's box.
+ARTIST_SEARCH_LIMIT = 10
+ARTIST_SEARCH_LIMIT_MAX = 100
+ARTIST_SEARCH_OFFSET_MAX = FULLY_SEARCH_OFFSET_MAX
+ARTIST_SEARCH_NAME_MAX = 200
+
+
+@router.get("/artists")
+async def artists(
+    request: Request,
+    name: str = Query(..., min_length=1, max_length=ARTIST_SEARCH_NAME_MAX),
+    limit: int = Query(ARTIST_SEARCH_LIMIT, ge=1, le=ARTIST_SEARCH_LIMIT_MAX),
+    offset: int = Query(0, ge=0, le=ARTIST_SEARCH_OFFSET_MAX),
+):
+    """
+    Artists on MusicBrainz going by a name (2.0.0-player.55, "search like Apple Music"): the app's Search
+    lists them under Artists, beside the library's own. Before this no user could search MusicBrainz for an
+    artist - the only artist search was the admin route POST /library/artist/search, the main page's picker.
+
+    `name` is words, never a query: it is asked as artist_query(name) - `(artist:"X" OR alias:"X")`, quoted
+    and escaped - so an alias finds the artist ("Kanye West" finds Ye) and nothing typed can change the
+    query or make MusicBrainz refuse it. Each match in the admin route's shape (artist_match): mbid, name,
+    disambiguation, country, type, score and `matched_as`. Always a quick search (_quick); cached in the
+    ResponseCache per name, limit and offset, successes only - an offset sent only past the first page. A
+    failed or shapeless answer is a 503 with words, never an empty list.
+    """
+    if not name.strip():
+        raise HTTPException(status_code=422, detail="An artist search needs a name to search for.")
+
+    async def search():
+        found = await request.app.state.musicbrainz_client.search_artists(name, limit=limit, offset=offset, quick=True)
+        #? request_with_retries answers a failure with an error dict rather than raising
+        if not isinstance(found, dict) or found.get("status") == "failed" or not isinstance(found.get("artists"), list):
+            raise_for_search(found if isinstance(found, dict) else {}, True)
+        count = found.get("count")
+        return {
+            "matches": [artist_match(artist, name) for artist in found["artists"] if isinstance(artist, dict) and artist.get("id")],
+            "count": count if isinstance(count, int) and not isinstance(count, bool) else None,
+        }
+
+    try:
+        return await _quick(request, search())
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Exception in /artists endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Error searching MusicBrainz for artists: {e}")
 
 
 #? The primary types MusicBrainz browse accepts. Validated here rather than passed straight

@@ -133,13 +133,22 @@ export interface LibraryResults {
 /** How much of each the Search tab asks for: a screenful of each, songs enough to choose from. */
 export const SEARCH_COUNTS = { artistCount: 5, albumCount: 8, songCount: 12 } as const
 
+/** How many of each a search3 asks for (SEARCH_COUNTS' shape), and where each kind's page starts. */
+export interface LibraryPage {
+  counts?: { artistCount: number; albumCount: number; songCount: number }
+  offsets?: { artistOffset?: number; albumOffset?: number; songOffset?: number }
+}
+
 /**
  * The library's artists, albums and songs matching `query` (2.0.0-player.13) - Navidrome's search3,
  * through deadwax's route, which declares and bounds every parameter (src/routes/navidrome.py).
+ * `page` (2.0.0-player.55, Search's kind chips and More from your library): other counts and each kind's offset,
+ * an offset sent only past the first page - the two-argument call asks exactly what it always did.
  */
-export function searchLibrary(query: string, signal?: AbortSignal): Promise<LibraryResults> {
+export function searchLibrary(query: string, signal?: AbortSignal, page: LibraryPage = {}): Promise<LibraryResults> {
   const params = new URLSearchParams({ q: query })
-  for (const [name, count] of Object.entries(SEARCH_COUNTS)) params.set(name, String(count))
+  for (const [name, count] of Object.entries(page.counts ?? SEARCH_COUNTS)) params.set(name, String(count))
+  for (const [name, offset] of Object.entries(page.offsets ?? {})) if (offset && offset > 0) params.set(name, String(offset))
   return get<LibraryResults>(`/navidrome/search?${params}`, signal)
 }
 

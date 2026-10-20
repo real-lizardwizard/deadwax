@@ -129,7 +129,7 @@ Every setting is described in [Configuration](configuration.md).
 **What the app shows without Navidrome.** Home's shelves, the Library tab, the albums and artists
 you have and Search's look in your library each say **Connect Navidrome** (or **Can't reach
 Navidrome**, with the reason and **Try again**) and how to set it up, in place of your albums. The
-rest works without it: Search's MusicBrainz half, an album you don't have and its **Get**,
+rest works without it: Search's MusicBrainz rows, an album you don't have and its **Get**,
 **Requests**, Home's arriving downloads and **You**. An album folder Navidrome doesn't list - not
 scanned yet, unreadable, or outside Navidrome's music folder - is never out of reach: on a desktop,
 **Needs a look** raises it as **Not in Navidrome** (see [the library](library.md#not-in-navidrome)).

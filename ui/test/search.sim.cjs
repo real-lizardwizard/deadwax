@@ -1,70 +1,57 @@
 /**
- * The app's Search tab (app/Search.tsx), 2.0.0-player.13 - the component itself, compiled with the
- * repo's TypeScript and rendered by the small stand-in for Preact the other component sims use, with
- * Navidrome, MusicBrainz and /library/owned faked and the clock a fake one. Beside it, the store of
- * what the library holds (app/useOwned.ts, the real one) and the real prefetch in player/api.ts.
+ * The app's Search tab (app/Search.tsx) - one list in Apple Music's sections since 2.0.0-player.55 ("search like
+ * Apple Music") - the component itself, compiled with the repo's TypeScript and rendered by the small stand-in for
+ * Preact the other component sims use, with Navidrome, MusicBrainz and /library/owned faked and the clock a fake
+ * one. Beside it, the store of what the library holds (app/useOwned.ts, the real one), the real prefetch in
+ * player/api.ts and the real MusicBrainz client.
  *
- * What it pins, each a review's finding:
+ * The rows are app/SearchRows.tsx's - plain FUNCTIONS Search calls (topRow, sectionRow, slot, head), never mounted
+ * as components, so the stand-in (whose `jsx` returns {type, props} and never renders a function component) sees
+ * every one of them: no teaching the stand-in to expand components was needed.
  *
- *  - What the library holds: one ask out at a time, one more after it when asked meanwhile; a
- *    refreshOwned() answered only once an ask made after it has landed; a filed album asking again
- *    once anything has asked - even after a first ask that failed - and never before.
- *  - The library half: Navidrome asked after the pause, the box no longer than the route takes, the
- *    songs' albums asked for KEPT, a song's tap playing its album from it (remembered first) only
- *    with the album in hand and opening the album otherwise, album rows prefetching as a tile does,
- *    and Navidrome failing drawn as the MusicBrainz half's problem is - the same 44px Try again.
- *  - The Navidrome gate: it wraps the library half alone, with App's status; MusicBrainz is searched
- *    with Navidrome down.
- *  - The MusicBrainz half: held albums left out (by the library's answer, waited for a moment), and
- *    an answer that lands later never taking a row away - it marks it "in your library" in place; a
- *    read as artist and album that finds nothing asked again as free text; and a box cut back below
- *    three characters dropping the longer text's answer (or calling off its search) and saying how to
- *    ask - and asking again when the text comes back.
- *  - The real prefetch: a press that turned into a scroll calls off a tile's own ask, never one Search
- *    keeps, whichever asked first; the album page still takes a kept ask once.
- *  - Get chips (2.0.0-player.15): on a MusicBrainz row the library doesn't hold, not on one it does;
- *    a tap takes its opener, asks for the album's pressings (busy meanwhile) through a latestOnly of
- *    its own - a newer tap calls the older off, and a late answer opens nothing - and opens the
- *    Sources sheet for the USUAL pressing, built by the one payload builder; MusicBrainz failing is
- *    the album as a whole, said so; a complete answer is kept for the session, so a second tap asks
- *    nothing, and a failure is not. And (review) a lookup still out is called off - the chip back to
- *    Get, its late answer opening nothing - the moment the tab's root stops being what shows (App's
- *    `active`) or the box changes.
- *  - The desktop's search field (2.0.0-player.19, app/searchBox.ts): this box's text is shared for the
- *    sidebar's field to show, typing there is typing here, and its Enter asks both halves at once.
- *  - Songs on MusicBrainz (2.0.0-player.53): asked with the albums, by the same pause and the box read the
- *    same way (an artist alone asks nothing; a fielded read finding nothing asked again as the words typed
- *    taken as ONE title, `recording:"…"` - never free text, and free text never asked twice), one page of 25,
- *    the album half's own request first; drawn in a section of their own above the albums - which never wait
- *    for them (review): the albums are drawn the moment they and the library have answered, and songs landing
- *    after that come folded into the slot that was asking, one height whatever it holds ("Show songs", "No
- *    songs on MusicBrainz for …", the no-release words, More songs for a bare page, or one line with Try
- *    again), so nothing drawn below moves; a search finding no song draws no section unless the albums were
- *    already drawn; every take of a song one row (Dummy held said), a disclosure opening onto Dummy and the
- *    fold, which opens, a second tap closing each and a new answer closing them; a song on no album or EP
- *    listed at once under the fold's words; an album you don't have opening its page with the song's
- *    recordings, one you have the album you have (the id bridge, the row busy, Navidrome not having it or the
- *    bridge failing the album you don't have, a look called off as the box changes); and (second review) a
- *    pressing held that nothing says has the song - Dummy's 1994 CD, its Roads another recording - said as "a
- *    pressing in your library", its tap asking the album's pressings first (busy), the album you have when its
- *    tracklist has the song, the album you don't have when it hasn't or MusicBrainz fails, the answer kept so
- *    the song then reads held and the next tap asks nothing, and called off as the box changes; the library
- *    half playing the song from a pressing held vouching for it, its Navidrome album opened at once; a few
- *    rows, More showing the rest without asking and then the next page by offset, merged in, busy and
- *    refusing a second tap, MusicBrainz away said and asked again, said to VoiceOver, its last page handing
- *    focus on; the albums' Try again and Enter asking the songs nothing more unless they failed too; their own
- *    Try again asking them alone; a new search calling the old one off, and the box cut back emptying them;
- *    the real client's request.
- *  - More from MusicBrainz (2.0.0-player.50): under the rows, a secondary button asking for the same
- *    search's next twelve by offset (the words typed when a fielded read fell back to them), busy and
- *    refusing a second tap meanwhile; the page appended below with every row above as it was, the held
- *    albums left out and a group got twice drawn once, said to VoiceOver; a page all held said so;
- *    MusicBrainz away said, the rows kept and the same page asked again; no button once every answer is
- *    in, and none past the route's bound (said instead); a page still out called off by a new search or
- *    the box cut back, and its answer drawing nothing. After review: two held albums said with their
- *    number; a page of repeats or an empty one said as nothing new, never as albums you have; another
- *    failure's own reason; each page's count heeded, grown or shrunk; and the last page landing with
- *    focus on More handing it to the first row it brought, or to the note in its place.
+ * What it pins, each a part of the slice or a review's finding:
+ *
+ *  - What the library holds (app/useOwned.ts): one ask out at a time, one more after it when asked meanwhile; a
+ *    refreshOwned() answered only once an ask made after it has landed; a filed album asking again once anything
+ *    has asked - even after a first ask that failed - and never before.
+ *  - THE LIST: the chips (the Library's, outside the form), the live region there from the first render, the
+ *    asking line before the library lands; Top results at the library's moment ("portishead", "roads", "glory box"
+ *    whole; "dummy" two rows and the place, then MusicBrainz's song in it; "third" nothing early); the sections
+ *    found by app-search-artists/-albums/-songs, drawn at moment 2 in the asking line's place; the studio line.
+ *  - THE INVARIANT, driven by timed answers (library 300 ms; artists 1.2 s, albums 1.5 s, songs 3 s; albums past
+ *    the cap; each kind failing; all failing): after every answer, every tappable drawn before keeps its key and
+ *    order, and every new tappable is inside a slot or after all of them.
+ *  - The moments: the cap, a late kind folding into "Show N" with something below and drawing in when last,
+ *    landing empty, Behind on and off (a superseded search never turning it on; Try again following its own
+ *    moments), kept answers drawing whole, the library late and "Show them", Navidrome's status not known yet.
+ *  - The chips: each kind view asks only its kind; Back to All draws whole, no phantom, late slots; MusicBrainz's
+ *    rows waiting for the view's library rows; the Artists view under album-by-artist; under three characters;
+ *    More from your library, More from MusicBrainz, More songs; See all with and without focus.
+ *  - Taps: a MusicBrainz artist opens `mb:`; a library song in Top results plays in the tap; a MusicBrainz song in
+ *    Top results opens its album with the song marked (no aria-expanded); Get on an album (the usual pressing) and
+ *    on a song (a pressing with the song; the page when MusicBrainz can't list them).
+ *  - Failures: per slot, the all-failed foot, busy words read from the body, a 422 refused (its words, no Try
+ *    again, Behind left off), Try again asking only the failed kinds; no results; the gate above the list.
+ *  - Logins on: yours before the store's, a whose not known yet as yours and never re-sorted, an Add re-marking a
+ *    row in place; the frame kept at the draw; focus handed on as Show N, Show them, Try again and the last More go -
+ *    on a stand-in DOM over what is drawn (`dom`: only what is drawn is found, focus falls to the body as a draw takes
+ *    the focused element away, a selector holding a raw newline throws as a browser's does).
+ *  - After review, each on a fresh Search (`remount`, the last one unmounted): the box cut back below three and the
+ *    same words typed again; the box read once MusicBrainz is asked (an artist search3 names afterwards strands
+ *    nothing; Enter reads it afresh); a letter typed and taken back arming the cap; "U2" and Search with MusicBrainz
+ *    away; a kind view while Navidrome is away or its status unknown; a kind view's asking line and region; a text
+ *    the library was once late for; an album held since its answer landed shown once; the library late then
+ *    Navidrome away; a kind view's late place after a chip round trip; the desktop sidebar's field (the real
+ *    app/searchBox.ts); More failing and its second tap; the rules nothing pinned (the chip back to All, Behind with
+ *    nothing found, Navidrome back, the artist list asked again, the library's problem).
+ *  - After the late recheck: Enter after a failure in All (a slot, the foot, the library) asking again AND drawing
+ *    afresh; Navidrome back after the library failed; a kind view's library failing (no "No albums for" under it); the
+ *    Artists view under album-by-artist with nothing named; the Albums view's held album its search3 didn't list;
+ *    Back to All said; a 422 said as refused; More from the store; a late kind all held; kept answers refreshing
+ *    holding; two characters' asking line.
+ *  - Song search's own (2.0.0-player.53): the disclosure and its fold, an album you have opening the album you have
+ *    (the id bridge, the pressings asked first for a pressing nothing vouches for), called off as the box changes.
+ *  - The real client and the real prefetch.
  *
  * Run it with:  node ui/test/search.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -73,6 +60,7 @@ const { execFileSync } = require('child_process')
 const fs = require('fs'), os = require('os'), path = require('path')
 
 const UI = path.resolve(__dirname, '..')
+const FIXTURES = path.resolve(__dirname, '../../tests/fixtures')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-search-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
@@ -83,10 +71,11 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 
 //? the real prefetch, kept aside before player/api.js is faked for the component
 fs.copyFileSync(path.join(OUT, 'player/api.js'), path.join(OUT, 'player/api.real.js'))
-//? ...and the real MusicBrainz client (2.0.0-player.50: the offset it sends)
+//? ...and the real MusicBrainz client (its paths, the offset and quick it sends)
 fs.copyFileSync(path.join(OUT, 'api/musicbrainz.js'), path.join(OUT, 'api/musicbrainz.real.js'))
 
-//? JSX as plain objects, and hooks with a cursor, as Preact's are - the stand-in group.sim.cjs uses
+//? JSX as plain objects, and hooks with a cursor, as Preact's are - a set state marks the root dirty, so a draw
+//? renders and commits again until nothing an effect did is left undrawn
 fs.mkdirSync(path.join(OUT, 'node_modules/preact'), { recursive: true })
 fs.writeFileSync(path.join(OUT, 'node_modules/preact/index.js'), `exports.Fragment = 'fragment'\nexports.createContext = () => ({})\n`)
 fs.writeFileSync(path.join(OUT, 'node_modules/preact/jsx-runtime.js'), `
@@ -97,7 +86,7 @@ fs.writeFileSync(path.join(OUT, 'node_modules/preact/hooks.js'), `
 let current = null
 function slot(init) { const i = current.cursor++; if (!(i in current.slots)) current.slots[i] = init(); return current.slots[i] }
 const changed = (a, b) => !a || !b || a.length !== b.length || a.some((v, i) => !Object.is(v, b[i]))
-exports.useState = (v) => { const s = slot(() => ({ v: typeof v === 'function' ? v() : v })); return [s.v, (x) => { s.v = typeof x === 'function' ? x(s.v) : x }] }
+exports.useState = (v) => { const root = current; const s = slot(() => ({ v: typeof v === 'function' ? v() : v })); return [s.v, (x) => { const next = typeof x === 'function' ? x(s.v) : x; if (!Object.is(next, s.v)) root.dirty = true; s.v = next }] }
 exports.useMemo = (f, deps) => { const s = slot(() => ({})); if (changed(s.deps, deps)) { s.v = f(); s.deps = deps } return s.v }
 exports.useRef = (v) => slot(() => ({ current: v }))
 exports.useEffect = exports.useLayoutEffect = (f, deps) => {
@@ -105,12 +94,15 @@ exports.useEffect = exports.useLayoutEffect = (f, deps) => {
   if (changed(s.deps, deps)) { s.deps = deps; current.effects.push(s); s.f = f }
 }
 exports.root = (component) => {
-  const root = { slots: [], cursor: 0, effects: [] }
+  const root = { slots: [], cursor: 0, effects: [], dirty: false }
   const render = (props) => {
-    const outer = current; current = root; root.cursor = 0
+    const outer = current; current = root; root.cursor = 0; root.dirty = false
     try { return component(props) } finally { current = outer }
   }
   render.commit = () => { for (const s of root.effects.splice(0)) { if (typeof s.cleanup === 'function') s.cleanup(); s.cleanup = s.f() } }
+  render.dirty = () => root.dirty
+  //? leaving: every effect's cleanup run, as Preact's unmount runs them
+  render.unmount = () => { for (const s of root.slots) if (s && typeof s.cleanup === 'function') { s.cleanup(); s.cleanup = null } }
   return render
 }
 `)
@@ -118,9 +110,14 @@ exports.root = (component) => {
 /* ===== Navidrome, MusicBrainz and the library, faked: each answer is what the test says next ===== */
 
 fs.writeFileSync(path.join(OUT, 'api/musicbrainz.js'), `
-exports.fullySearch = (query, limit, releases, signal, offset) => globalThis.__search.fullySearch(query, limit, releases, signal, offset)
+const real = require('./musicbrainz.real.js')
+exports.fullySearchPath = real.fullySearchPath
+exports.searchSongsPath = real.searchSongsPath
+exports.searchArtistsPath = real.searchArtistsPath
+exports.fullySearch = (query, limit, releases, signal, offset, quick) => globalThis.__search.fullySearch(query, limit, releases, signal, offset, quick)
 exports.getReleaseGroup = (id, signal) => globalThis.__search.getReleaseGroup(id, signal)
 exports.searchSongs = (query, limit, signal, offset) => globalThis.__search.searchSongs(query, limit, signal, offset)
+exports.searchArtists = (name, limit, signal, offset) => globalThis.__search.searchArtists(name, limit, signal, offset)
 `)
 //? You > Getting albums, asked as the tab shows; and the opener a chip's tap focuses
 fs.writeFileSync(path.join(OUT, 'app/useGetSettings.js'), `
@@ -133,11 +130,22 @@ fs.writeFileSync(path.join(OUT, 'api/library.js'), `
 exports.owned = () => globalThis.__search.owned()
 `)
 fs.writeFileSync(path.join(OUT, 'player/api.js'), `
-exports.searchLibrary = (text, signal) => globalThis.__search.searchLibrary(text, signal)
+exports.searchLibrary = (text, signal, page) => globalThis.__search.searchLibrary(text, signal, page)
+exports.libraryArtists = () => globalThis.__search.libraryArtists()
 exports.prefetchAlbum = (id, keep) => globalThis.__search.prefetchAlbum(id, keep)
 exports.dropPrefetch = (id) => globalThis.__search.calls.push(['dropPrefetch', id])
 exports.rememberPlayed = (album) => globalThis.__search.calls.push(['rememberPlayed', album.id])
 exports.toQueueTrack = (song, album) => ({ id: song.id, album: album.id })
+`)
+//? the frame (app/useFrame.ts reads matchMedia): the test says which; your albums (app/useYourAlbums.ts asks
+//? albumPage, which the faked player/api lacks): the test answers them, and moves their generation
+fs.writeFileSync(path.join(OUT, 'app/useFrame.js'), `
+exports.useFrame = () => ({ frame: globalThis.__search.frame, panel: globalThis.__search.frame === 'desktop' ? 'column' : 'sheet' })
+`)
+fs.writeFileSync(path.join(OUT, 'app/useYourAlbums.js'), `
+exports.yourAlbums = () => globalThis.__search.yourAlbums()
+exports.useYourAlbumsGeneration = () => globalThis.__search.generation
+exports.forgetYourAlbums = () => { globalThis.__search.generation += 1 }
 `)
 fs.writeFileSync(path.join(OUT, 'player/Cover.js'), `exports.Cover = function Cover() { return null }\n`)
 fs.writeFileSync(path.join(OUT, 'player/icons.js'), `exports.PlayIcon = function PlayIcon() { return null }\nexports.SearchIcon = function SearchIcon() { return null }\nexports.ChevronDownIcon = function ChevronDownIcon() { return null }\n`)
@@ -162,9 +170,11 @@ async function advance(ms) {
     now = due[1].at
     due[1].fn()
     await settle()
+    if (drawing) draw()
   }
   now = end
   await settle()
+  if (drawing) draw()
 }
 
 function deferred() {
@@ -178,50 +188,65 @@ function deferred() {
 
 /** Answer every ask of /library/owned out now, and the one each starts after it, until none is out. */
 async function answerOwned(answer) {
+  await settle()
   for (let pending = asks.owned.filter((d) => !d.done); pending.length; pending = asks.owned.filter((d) => !d.done)) {
     for (const d of pending) d.resolve(answer)
     await settle()
   }
+  if (drawing) draw()
 }
 
-const asks = { owned: [], library: [], musicbrainz: [], prefetch: [], pressings: [], songs: [], order: [] }
+const aborting = (d, signal) => {
+  if (signal) signal.addEventListener('abort', () => { if (!globalThis.__search.abortRejects) return; const error = new Error('aborted'); error.name = 'AbortError'; d.reject(error) })
+}
+const asks = { owned: [], library: [], musicbrainz: [], artists: [], prefetch: [], pressings: [], songs: [], order: [], lists: [], yours: [] }
 globalThis.__search = {
   calls: [],
   settingsAsked: [],
+  frame: 'phone',
+  generation: 0,
   //? false: an answer already on its way when it was called off still lands
   abortRejects: true,
   getReleaseGroup(id, signal) {
     const d = deferred()
     asks.pressings.push({ id, signal, ...d })
-    if (signal && globalThis.__search.abortRejects) signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; d.reject(error) })
+    aborting(d, signal)
     return d.promise
   },
   actions: { playTracks: (queue, at) => globalThis.__search.calls.push(['playTracks', queue.map((track) => track.id), at]) },
   owned() { const d = deferred(); asks.owned.push(d); return d.promise },
-  searchLibrary(text, signal) { const d = deferred(); asks.library.push({ text, signal, ...d }); return d.promise },
-  fullySearch(query, limit, releases, signal, offset) {
+  searchLibrary(text, signal, page) { const d = deferred(); asks.library.push({ text, signal, page, ...d }); aborting(d, signal); return d.promise },
+  libraryArtists() { const d = deferred(); asks.lists.push(d); return d.promise },
+  yourAlbums() { const d = deferred(); asks.yours.push(d); return d.promise },
+  fullySearch(query, limit, releases, signal, offset, quick) {
     const d = deferred()
-    asks.musicbrainz.push({ query, limit, releases, signal, offset, ...d })
+    asks.musicbrainz.push({ query, limit, releases, signal, offset, quick, ...d })
     asks.order.push('albums')
-    if (signal) signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; d.reject(error) })
+    aborting(d, signal)
+    return d.promise
+  },
+  searchArtists(name, limit, signal, offset) {
+    const d = deferred()
+    asks.artists.push({ name, limit, signal, offset, ...d })
+    asks.order.push('artists')
+    aborting(d, signal)
     return d.promise
   },
   prefetchAlbum(id, keep) { const d = deferred(); asks.prefetch.push({ id, keep, ...d }); return d.promise },
-  //? the song search (2.0.0-player.53): answered at once with nothing, unless a check takes it in hand
-  songsAuto: true,
   searchSongs(query, limit, signal, offset) {
     const d = deferred()
     asks.songs.push({ query, limit, signal, offset, ...d })
     asks.order.push('songs')
-    if (signal) signal.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; d.reject(error) })
-    if (globalThis.__search.songsAuto) d.resolve({ recordings: [], count: 0 })
+    aborting(d, signal)
     return d.promise
   },
 }
 
 let failures = 0
+let checks = 0
 function check(label, actual, expected) {
   const ok = JSON.stringify(actual) === JSON.stringify(expected)
+  checks++
   if (!ok) failures++
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}: ${JSON.stringify(actual)}` +
               (ok ? '' : `  (expected ${JSON.stringify(expected)})`))
@@ -233,6 +258,9 @@ const { Search, OWNED_WAIT_MS } = require(path.join(OUT, 'app/Search.js'))
 const { NeedsNavidrome } = require(path.join(OUT, 'app/NeedsNavidrome.js'))
 const { SEARCH_MAX_CHARS } = require(path.join(OUT, 'lib/searchQuery.js'))
 const { announceAlbumsFiled } = require(path.join(OUT, 'lib/libraryEvents.js'))
+const { forgetAnswers } = require(path.join(OUT, 'app/searchAnswers.js'))
+const Session = require(path.join(OUT, 'app/session.js'))
+const { MusicBrainzUnavailable, ApiError } = require(path.join(OUT, 'api/http.js'))
 
 let tree = null
 function find(test, within = tree) {
@@ -255,10 +283,213 @@ function text(node) {
 }
 const byClass = (name) => (node) => typeof node.props?.class === 'string' && node.props.class.split(' ').includes(name)
 
-const DUMMY = { id: '48140466-cff6-3222-bd55-63c27e43190d', title: 'Dummy', 'primary-type': 'Album', 'first-release-date': '1994-08-22' }
-const THIRD = { id: '0d4b7b3b-6b4b-4c7a-9d43-9b4f0c3f4b8e', title: 'Third', 'primary-type': 'Album', 'first-release-date': '2008-04-28' }
-const ROSELAND = { id: '5d1b0c5c-0ffa-3f1e-bc3e-0b7e1b4c9f20', title: 'Roseland NYC Live', 'primary-type': 'Album', 'secondary-types': ['Live'], 'first-release-date': '1998-11-02' }
-const holding = (...groups) => ({ albums: groups.map((group) => ({ path: `Portishead/${group.title}`, artist: 'Portishead', album: group.title, release_group_mbid: group.id })) })
+/* ===== what is drawn, read the way a person sees it ===== */
+
+const sectionOf = (id) => find((node) => node.type === 'section' && node.props['aria-labelledby'] === id)[0]
+const top = () => sectionOf('app-search-top')
+const kinds = () => find((node) => node.type === 'section' && /^app-search-(artists|albums|songs)$/.test(node.props['aria-labelledby'] ?? '')).map((node) => node.props['aria-labelledby'].slice(11))
+const rowKeys = (within) => find((node) => node.type === 'button' && node.props['data-row'], within).map((node) => node.props['data-row'])
+const topKeys = () => (top() ? rowKeys(top()) : [])
+const lineOf = (row) => text(find(byClass('app-result-line'), row)[0])
+const rowsOf = (kind) => {
+  const section = sectionOf(`app-search-${kind}`)
+  return section ? find((node) => node.type === 'button' && node.props['data-row'], section).map((node) => [text(find(byClass('app-result-title'), node)[0]), lineOf(node)]) : []
+}
+const keysOf = (kind) => (sectionOf(`app-search-${kind}`) ? rowKeys(sectionOf(`app-search-${kind}`)) : [])
+const asking = () => find((node) => byClass('app-search-asking')(node))
+const slotOf = (kind) => { const section = sectionOf(`app-search-${kind}`); return section ? find(byClass('app-search-slot'), section)[0] : undefined }
+const slotText = (kind) => text(slotOf(kind))
+const region = () => find((node) => node.props?.role === 'status' && node.props['aria-live'] === 'polite')
+const said = () => text(region()[0])
+const chipsOf = () => find(byClass('app-search-kinds'))[0]
+const chip = (label) => find((node) => node.type === 'button' && text(node) === label, chipsOf())[0]
+const seeAll = (kind) => find(byClass('app-search-see-all'), sectionOf(`app-search-${kind}`))[0]
+const buttonText = (label, within = tree) => find((node) => node.type === 'button' && text(node) === label, within)[0]
+const rowButton = (key) => find((node) => node.type === 'button' && node.props['data-row'] === key)[0]
+const getOf = (key) => {
+  const li = find((node) => (node.type === 'li' || node.type === 'div') && byClass('app-result-row')(node) && find((n) => n.type === 'button' && n.props['data-row'] === key, node).length)[0]
+  return li ? find(byClass('app-result-get'), li)[0] : undefined
+}
+
+/**
+ * A stand-in for the page's DOM over what is drawn (review: the focus checks answered any selector with an element and
+ * moved focus off a control as it was tapped, so a hand-on spent on the old draw, or a selector no browser would take,
+ * passed). An element is a drawn node known by what it is - its id, its row's key, else its tag, class and words in its
+ * section - the same object draw after draw; focus() makes it document.activeElement, isConnected says whether the
+ * latest draw holds it, and a draw that takes the focused element away leaves focus on the body, as a browser's does.
+ * querySelector takes `.class`, `#id`, `[attr]` and `[attr="value"]`, and throws, as a browser does, on a selector
+ * holding a raw newline.
+ */
+const dom = (() => {
+  const elements = new Map()
+  let drawnNow = []
+  const body = { name: 'body', isConnected: true }
+  const focused = []
+  //? a state's class (is-on, is-busy) and a More's words (it says "Asking MusicBrainz…" while it asks) change nothing:
+  //? Preact keeps the element and changes its class or words
+  const stable = (cls) => (typeof cls === 'string' ? cls : '').split(' ').filter((name) => name && name !== 'is-on' && name !== 'is-busy').join('.')
+  const identity = (node, section, parent) => node.props.id ? `#${node.props.id}`
+    : node.props['data-row'] !== undefined ? `row:${node.props['data-row']}`
+      : node.props['aria-label'] ? `${node.type}[${node.props['aria-label']}]|${section}`
+        : byClass('app-search-more')(node) ? `${node.type}.${stable(node.props.class)}|${section}`
+          : `${node.type}.${stable(node.props.class)}|${parent}|${section}|${text(node)}`
+  const element = (key) => {
+    if (!elements.has(key)) {
+      const el = {
+        key,
+        node: null,
+        focus() { document.activeElement = el; focused.push(key) },
+        getAttribute(name) { const value = el.node?.props[name]; return value === undefined || value === null || value === false ? null : String(value) },
+        get isConnected() { return drawnNow.some((each) => each.el === el) },
+        scrollIntoView() {},
+      }
+      elements.set(key, el)
+    }
+    return elements.get(key)
+  }
+  const matches = (node, selector) => {
+    const attr = /^\[([\w-]+)(?:="([^"]*)")?\]$/.exec(selector)
+    if (attr) { const value = node.props[attr[1]]; return value !== undefined && value !== null && value !== false && (attr[2] === undefined || String(value) === attr[2]) }
+    if (selector.startsWith('#')) return node.props.id === selector.slice(1)
+    if (selector.startsWith('.')) return selector.slice(1).split('.').every((name) => byClass(name)(node))
+    throw new Error(`the stand-in DOM doesn't read "${selector}"`)
+  }
+  const check = (selector) => { if (/\n/.test(selector)) throw new SyntaxError(`'${selector}' is not a valid selector`) }
+  const api = {
+    focused,
+    body,
+    /** what is drawn now: called as each draw is made, before its effects run */
+    sync(tree) {
+      const out = []
+      const visit = (node, section, parent) => {
+        if (!node || typeof node !== 'object') return
+        if (Array.isArray(node)) { node.forEach((each) => visit(each, section, parent)); return }
+        const drawnHere = typeof node.type === 'string' && node.type !== 'fragment'
+        if (drawnHere) {
+          const el = element(identity(node, section, parent))
+          el.node = node
+          out.push({ el, node })
+        }
+        visit(node.props?.children, node.type === 'section' ? (node.props['aria-labelledby'] ?? section) : section, drawnHere ? stable(node.props.class) : parent)
+      }
+      visit(tree, '', '')
+      drawnNow = out
+      if (globalThis.document?.activeElement && globalThis.document.activeElement !== body && !globalThis.document.activeElement.isConnected) globalThis.document.activeElement = body
+    },
+    /** the element a drawn node is */
+    el(node) { return drawnNow.find((each) => each.node === node)?.el },
+    querySelector(selector) { check(selector); return drawnNow.find((each) => matches(each.node, selector))?.el ?? null },
+    querySelectorAll(selector) { check(selector); return drawnNow.filter((each) => matches(each.node, selector)).map((each) => each.el) },
+    scrollIntoView() {},
+    /** a page with focus on `node` (null: the body), Search's root and the chips reading this DOM */
+    use(node = null) {
+      api.sync(tree)
+      globalThis.document = { activeElement: node ? api.el(node) : body, body }
+      focused.length = 0
+      const rootRef = find(byClass('app-search'))[0]?.props.ref
+      if (rootRef) rootRef.current = api
+      const chipsRef = find(byClass('app-search-kinds'))[0]?.props.ref
+      if (chipsRef) chipsRef.current = api
+    },
+    /** a tap from the keyboard: focus on it, then its click, its own element the event's */
+    press(node) { const el = api.el(node); globalThis.document.activeElement = el; node.props.onClick({ currentTarget: el }); draw() },
+    leave() { delete globalThis.document; const rootRef = find(byClass('app-search'))[0]?.props.ref; if (rootRef) rootRef.current = null },
+  }
+  return api
+})()
+
+/**
+ * Every tappable thing drawn, in reading order: its identity, and whether it sits in a slot (one place one fixed
+ * height: what fills it may change, nothing outside it moves).
+ */
+function tappables() {
+  const out = []
+  const visit = (node, inSlot) => {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach((each) => visit(each, inSlot)); return }
+    const slotted = inSlot || byClass('app-search-slot')(node) || byClass('app-search-top-place')(node)
+    if (node.type === 'button') {
+      const id = node.props['data-row'] ? `row:${node.props['data-row']}`
+        : byClass('app-result-get')(node) ? `get:${node.props['aria-label']}`
+          : byClass('app-search-see-all')(node) ? `see:${node.props['aria-label']}`
+            : `button:${text(node)}`
+      out.push({ id, slotted })
+    }
+    visit(node.props?.children, slotted)
+  }
+  visit(tree, false)
+  return out
+}
+let before = null
+/** The invariant: what was drawn tappable before keeps its identity and order, and anything new is in a slot or
+ *  after it all. `label` names the moment. */
+function invariant(label) {
+  const after = tappables()
+  if (before) {
+    const was = before.filter((each) => !each.slotted).map((each) => each.id)
+    const nowIds = after.filter((each) => !each.slotted).map((each) => each.id)
+    const kept = nowIds.slice(0, was.length)
+    const okay = JSON.stringify(kept) === JSON.stringify(was)
+    if (!okay) check(`(invariant) ${label}: what was drawn stays in place, anything new below it or in a slot`, kept, was)
+    else checks++
+  }
+  before = after
+}
+const freshInvariant = () => { before = null }
+
+const DUMMY = { id: '48140466-cff6-3222-bd55-63c27e43190d', title: 'Dummy', 'primary-type': 'Album', 'first-release-date': '1994-08-22',
+  'artist-credit': [{ name: 'Portishead', artist: { id: '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', name: 'Portishead' } }] }
+const THIRD = { id: '163339ab-813b-3d29-bba8-e1d5acf63cab', title: 'Third', 'primary-type': 'Album', 'first-release-date': '2008-04-28',
+  'artist-credit': [{ name: 'Portishead', artist: { id: '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', name: 'Portishead' } }] }
+const ROSELAND = { id: 'ce61f4a8-db95-3608-93de-53f9ecb1b8d2', title: 'Roseland NYC Live', 'primary-type': 'Album', 'secondary-types': ['Live'], 'first-release-date': '1998-11-02',
+  'artist-credit': [{ name: 'Portishead', artist: { id: '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', name: 'Portishead' } }] }
+const holding = (...groups) => ({ albums: groups.map((group) => ({ path: `Portishead/${group.title}`, artist: 'Portishead', album: group.title, release_group_mbid: group.id, release_mbid: `rel-${group.title.toLowerCase()}` })) })
+//? held by group alone (no release id): what every screen holds an untagged-by-release folder by - it says it has the song
+const byGroup = (...groups) => ({ albums: groups.map((group) => ({ path: `Portishead/${group.title}`, artist: 'Portishead', album: group.title, release_group_mbid: group.id })) })
+const load = (name) => JSON.parse(fs.readFileSync(path.join(FIXTURES, `${name}.json`), 'utf8'))
+const studio = load('search/rg-artist-portishead-studio')
+const unfiltered = load('search/rg-artist-portishead')
+const portisheadArtists = load('artists/portishead.route')
+const kanyeArtists = load('artists/kanye-west.route')
+const radioheadArtists = load('artists/radiohead.route')
+const roadsRecorded = load('songs/roads-portishead')
+
+const P = { id: 'ar1', name: 'Portishead', albumCount: 3, musicBrainzId: '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11' }
+const ndDummy = { id: 'nd-dummy', name: 'Dummy', artist: 'Portishead', artistId: 'ar1', year: 1994, musicBrainzId: 'rel-dummy' }
+const libSong = (id, title, albumId = 'nd-dummy', album = 'Dummy') => ({ id, title, artist: 'Portishead', artistId: 'ar1', albumId, album })
+const status = { configured: true, ok: true, server: 'Navidrome 0.64.2', problem: null }
+
+let drawing = false
+let render = null
+const props = {}
+function draw(more = {}) {
+  Object.assign(props, more)
+  for (let pass = 0; pass < 8; pass++) {
+    tree = render(props)
+    //? the page as this draw leaves it, before its effects run - focus off anything it took away
+    if (globalThis.document) dom.sync(tree)
+    render.commit()
+    if (!render.dirty()) break
+  }
+  return tree
+}
+/** A fresh Search - Behind, its answers, its runs all gone with the last one (unmounted: everything called off) - over
+ *  the same fakes, the full artist list answered as it asks. */
+async function remount(more = {}, artistList = [P, { id: 'ar-teb', name: 'Third Eye Blind' }]) {
+  await answerOwned(holding(DUMMY))
+  render.unmount()
+  timers.clear()
+  forgetAnswers()
+  render = hooks.root(Search)
+  Object.assign(props, { status, active: true, shown: true }, more)
+  draw()
+  //? (null: the list's ask left for the test to answer)
+  if (props.status?.ok && artistList) asks.lists.at(-1)?.resolve(artistList)
+  await settle()
+  draw()
+}
+const type = (value) => { find((node) => node.type === 'input')[0].props.onInput({ currentTarget: { value } }); draw() }
+const enter = () => { find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} }); draw() }
 
 async function main() {
   console.log('what the library holds (app/useOwned.ts)')
@@ -296,602 +527,914 @@ async function main() {
     await settle()
   }
 
-  console.log('\nthe library half')
-  const status = { configured: true, ok: true, server: 'Navidrome 0.64.2', problem: null }
   const opened = []
   const groupsOpened = []
-  const render = hooks.root(Search)
   const gets = []
   const songAlbums = []
-  const props = { shown: true, active: true, status, onRetry() {}, onOpenAlbum: (album) => opened.push(album), onOpenGroup: (group) => groupsOpened.push(group),
-    onOpenSongAlbum: (album, song) => songAlbums.push([album, song]), onGet: (request, opener) => gets.push([request, opener]) }
-  const draw = (more = {}) => { Object.assign(props, more); tree = render(props); render.commit(); return tree }
-  const type = (value) => { find((node) => node.type === 'input')[0].props.onInput({ currentTarget: { value } }); draw(); draw() }
-  const section = () => find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-search-musicbrainz')[0]
-  const rows = () => find(byClass('app-result'), section()).map((row) => [text(find(byClass('app-result-title'), row)[0]), text(find(byClass('app-result-line'), row)[0])])
+  const mbArtists = []
+  const artistsOpened = []
+  render = hooks.root(Search)
+  Object.assign(props, { shown: true, active: true, status, onRetry() {}, onOpenAlbum: (album) => opened.push(album), onOpenGroup: (group) => groupsOpened.push(group),
+    onOpenSongAlbum: (album, song) => songAlbums.push([album, song]), onOpenArtist: (artist) => artistsOpened.push(artist),
+    onOpenMusicBrainzArtist: (artist) => mbArtists.push(artist), onGet: (request, opener) => gets.push([request, opener]) })
+  drawing = true
+
+  console.log('\nthe box, the region, the hint')
   draw()
   check('the box holds no more than the route takes', find((node) => node.type === 'input')[0].props.maxLength, SEARCH_MAX_CHARS)
   check('...which is the route\'s bound', SEARCH_MAX_CHARS, 200)
+  check('the list\'s one live region is there from the first render, saying nothing yet (iOS reads only regions already in the page)', [region().length, said()], [1, ''])
+  check('before typing: no chips, the hint saying what is searched', [chipsOf(), text(find(byClass('app-search-hint'))[0])],
+    [undefined, "Artists, albums and songs: yours first, then MusicBrainz's."])
+  check('the library\'s whole list of artists asked once as Search first shows, Navidrome OK', asks.lists.length, 1)
+  asks.lists[0].resolve([P, { id: 'ar-teb', name: 'Third Eye Blind' }])
+  await settle()
+  draw()
 
+  console.log('\n"portishead", held: Top results at the library\'s moment, the sections at moment 2')
   type('portishead')
+  check('the chips once the box holds words: the Library\'s, verbatim - a group "Show", four chips, All pressed - outside the form',
+    [chipsOf()?.props.class, chipsOf()?.props.role, chipsOf()?.props['aria-label'], find((node) => node.type === 'button', chipsOf()).map((node) => [text(node), node.props['aria-pressed'], node.props.class]),
+      find(byClass('app-search-kinds'), find((node) => node.type === 'form')[0]).length],
+    ['app-library-views app-search-kinds', 'group', 'Show', [['All', true, 'app-chip app-library-view is-on'], ['Artists', false, 'app-chip app-library-view'],
+      ['Albums', false, 'app-chip app-library-view'], ['Songs', false, 'app-chip app-library-view']], 0])
+  check('before the library lands: one asking line - "Searching your library and MusicBrainz…" - and no spinner', [text(asking()[0]), find(byClass('pl-spinner')).length],
+    ['Searching your library and MusicBrainz…', 0])
+  invariant('typed')
   await advance(199)
   check('Navidrome is asked once typing has paused', asks.library.length, 0)
   await advance(1)
-  check('...200 ms after', asks.library.map((ask) => ask.text), ['portishead'])
+  check('...200 ms after - All\'s counts, as ever (no page asked)', asks.library.map((ask) => [ask.text, ask.page]), [['portishead', undefined]])
   asks.library[0].resolve({
-    artists: [{ id: 'ar1', name: 'Portishead', albumCount: 3 }],
-    albums: [{ id: 'nd-dummy', name: 'Dummy', artist: 'Portishead', year: 1994 }],
-    songs: [{ id: 's1', title: 'Sour Times', albumId: 'nd-dummy', album: 'Dummy' }, { id: 's2', title: 'Roads', albumId: 'nd-dummy', album: 'Dummy' },
-      { id: 's3', title: 'The Rip', albumId: 'nd-third', album: 'Third' }],
+    artists: [P],
+    albums: [ndDummy],
+    songs: [libSong('s-roads', 'Roads'), libSong('s-glory', 'Glory Box'), libSong('s-rip', 'The Rip', 'nd-third', 'Third')],
   })
   await settle()
-  check('the songs\' albums are asked for as the answer lands - KEPT, so a scroll can\'t call them off',
+  draw()
+  check('the library\'s moment: Top results - Portishead, Dummy, Roads (the mock) - all three decided, no place', [topKeys(), find(byClass('app-search-top-place')).length],
+    [['top:artist:ar1', 'top:album:nd-dummy', 'top:song:s-roads'], 0])
+  check('...each saying what it is first, its place in its own span', find((node) => node.type === 'button' && node.props['data-row'], top()).map(lineOf),
+    ['Artist · 3 albums in your library', 'Album · Portishead · 1994 · in your library', 'Song · Portishead · Dummy · in your library'])
+  check('...then one asking line where the sections will go, no region of its own', [kinds(), text(asking()[0]), asking()[0]?.props.role], [[], 'Asking MusicBrainz…', undefined])
+  check('the region says what the library found', said(), 'In your library: 1 artist, 1 album, 3 songs.')
+  check('the albums of Top results\' songs asked first, then the first songs\' - KEPT, so a scroll can\'t call them off',
     asks.prefetch.map((ask) => [ask.id, ask.keep]), [['nd-dummy', true], ['nd-third', true]])
-  asks.prefetch[0].resolve({ id: 'nd-dummy', name: 'Dummy', song: [{ id: 's1', title: 'Sour Times' }, { id: 's2', title: 'Roads' }] })
+  invariant('the library\'s moment')
+  asks.prefetch[0].resolve({ id: 'nd-dummy', name: 'Dummy', song: [{ id: 's-glory', title: 'Glory Box' }, { id: 's-roads', title: 'Roads' }] })
   await settle()
   draw()
-  const song = (id) => find((node) => node.type === 'li' && node.key === `song:${id}`)[0]
-  const playMark = (id) => find((node) => node.type?.name === 'PlayIcon', song(id)).length
-  check('a song whose album is in hand shows the play mark; one whose album isn\'t, none', [playMark('s1'), playMark('s3')], [1, 0])
-  find((node) => node.type === 'button', song('s2'))[0].props.onClick()
-  check('its tap remembers the album, then plays it from that song, in the tap', globalThis.__search.calls, [['rememberPlayed', 'nd-dummy'], ['playTracks', ['s1', 's2'], 1]])
-  find((node) => node.type === 'button', song('s3'))[0].props.onClick()
-  check('a song whose album isn\'t in hand opens the album instead', [opened.map((album) => album.id), globalThis.__search.calls.length], [['nd-third'], 2])
-  const albumRow = find((node) => node.type === 'li' && node.key === 'album:nd-dummy')[0]
-  const albumButton = find((node) => node.type === 'button', albumRow)[0]
-  albumButton.props.onPointerDown()
-  albumButton.props.onPointerCancel()
-  check('an album row asks for its songs as the finger lands, as a tile does - not kept - and lets go on a scroll',
-    [asks.prefetch.at(-1).id, asks.prefetch.at(-1).keep, globalThis.__search.calls.at(-1)], ['nd-dummy', undefined, ['dropPrefetch', 'nd-dummy']])
+  const playMark = (key) => find((node) => node.type?.name === 'PlayIcon', rowButton(key)).length
+  check('Roads in Top results shows ▶ once its album is in hand', playMark('top:song:s-roads'), 1)
+  rowButton('top:song:s-roads').props.onClick()
+  check('...and its tap remembers the album, then plays it from that song, in the tap', globalThis.__search.calls, [['rememberPlayed', 'nd-dummy'], ['playTracks', ['s-glory', 's-roads'], 1]])
+  await advance(499)
+  check('MusicBrainz is asked 700 ms after typing stops, not before', asks.musicbrainz.length + asks.artists.length + asks.songs.length, 0)
+  await advance(1)
+  check('...albums first - the studio clause for an artist you have, a quick search of twelve - then artists (the box, ten); no songs for an artist\'s name alone',
+    [asks.order, asks.musicbrainz.map((ask) => [ask.query, ask.limit, ask.releases, ask.offset, ask.quick]), asks.artists.map((ask) => [ask.name, ask.limit, ask.offset])],
+    [['albums', 'artists'], [['(artist:"Portishead") AND (primarytype:"Album" OR primarytype:"EP") AND -secondarytype:"Live" AND -secondarytype:"Compilation" AND -secondarytype:"Interview" AND -secondarytype:"Demo" AND -secondarytype:"Remix" AND -secondarytype:"DJ-mix"', 12, false, 0, true]],
+      [['portishead', 10, undefined]]])
+  check('...the library asked beside them', asks.owned.length, 6)
+  asks.artists[0].resolve(portisheadArtists)
+  await settle()
+  draw()
+  invariant('the artists landed')
+  check('artists in, albums still out: the sections wait (moment 2 is every kind, or the cap)', kinds(), [])
+  asks.musicbrainz[0].resolve(studio)
+  await answerOwned(holding(DUMMY))
+  draw()
+  invariant('moment 2')
+  check('moment 2: the three sections in the asking line\'s place - Apple\'s order', [kinds(), asking().length], [['artists', 'albums', 'songs'], 0])
+  check('Artists: yours - MusicBrainz\'s Portishead is yours (by id), so no second row', keysOf('artists'), ['artist:ar1'])
+  check('Albums: yours, then MusicBrainz\'s studio albums in the studio order, Dummy (held) left out, three on a phone',
+    rowsOf('albums'), [['Dummy', 'Portishead · 1994 · in your library'], ['Portishead', 'Portishead · 1997'], ['Third', 'Portishead · 2008'], ['R.A.R.E (Reliving a Real Experience)', 'Mixtape · Nickelus F & Portishead · 2009']])
+  check('...under them, the active filter: one quiet line', text(find(byClass('app-search-filter-note'), sectionOf('app-search-albums'))[0]),
+    "MusicBrainz's studio albums and EPs - See all for everything they made.")
+  check('Songs: yours, three on a phone', keysOf('songs'), ['song:s-roads', 'song:s-glory', 'song:s-rip'])
+  check('each section headed, its See all always drawn - a text button labelled for its kind', ['artists', 'albums', 'songs'].map((kind) => seeAll(kind)?.props['aria-label']),
+    ['See all artists', 'See all albums', 'See all songs'])
+  check('the region says what MusicBrainz brought, once every kind asked has settled', said(), 'From MusicBrainz: 3 albums.')
+  check('a MusicBrainz album has Get; one you have doesn\'t', [text(getOf(`group:${THIRD.id}`)), getOf('album:nd-dummy')], ['Get', undefined])
 
-  console.log('\nthe Navidrome gate wraps the library half alone')
+
+  console.log('\nSee all, and the chips: that kind in full')
   {
-    const gate = find((node) => node.type === NeedsNavidrome)[0]
-    check('with App\'s status', gate?.props.status === status, true)
-    check('...and the MusicBrainz half outside it', [!!section(), find((node) => node.props?.['aria-labelledby'] === 'app-search-musicbrainz', gate).length], [true, 0])
+    const scrolled = []
+    const focused = []
+    const rootRef = () => find(byClass('app-search'))[0].props.ref
+    const stand = () => {
+      chipsOf().props.ref.current = { scrollIntoView: (how) => scrolled.push(how), querySelector: (selector) => (selector === '[aria-pressed="true"]' ? { focus: () => focused.push('pressed chip') } : null) }
+      rootRef().current = { querySelector: () => null }
+    }
+    stand()
+    const libraryAsks = asks.library.length, albumAsks = asks.musicbrainz.length, artistAsks = asks.artists.length, songAsks = asks.songs.length
+    const button = seeAll('albums')
+    globalThis.document = { activeElement: button, body: { name: 'body' } }
+    button.props.onClick({ currentTarget: button })
+    draw()
+    stand()
+    draw()
+    check('See all pressed from the keyboard: the Albums chip pressed, the chips scrolled into view (nearest), focus to the chip it pressed',
+      [find((node) => node.type === 'button' && node.props['aria-pressed'], chipsOf()).map(text), scrolled, focused], [['Albums'], [{ block: 'nearest' }], ['pressed chip']])
+    delete globalThis.document
+    check('...the region says so', said(), 'Showing albums.')
+    check('the Albums view asks its own search3 - albums alone, fifty - and MusicBrainz unfiltered (one more request); nothing of another kind',
+      [asks.library.slice(libraryAsks).map((ask) => [ask.text, ask.page]), asks.musicbrainz.slice(albumAsks).map((ask) => [ask.query, ask.quick]), asks.artists.length - artistAsks, asks.songs.length - songAsks],
+      [[['portishead', { counts: { artistCount: 0, albumCount: 50, songCount: 0 } }]], [['artist:"Portishead"', true]], 0, 0])
+    check('one section, headed Albums, no See all, no Top results', [kinds(), seeAll('albums'), top()], [['albums'], undefined, undefined])
+    asks.musicbrainz.at(-1).resolve(unfiltered)
+    await answerOwned(holding(DUMMY))
+    draw()
+    check('MusicBrainz\'s rows never draw before the view\'s library rows: they wait for its search3', keysOf('albums'), [])
+    const fifty = Array.from({ length: 50 }, (_, at) => ({ id: `nd-a${at}`, name: `Album ${at}`, artist: 'Portishead', year: 2000 }))
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy, ...fifty.slice(0, 49)], songs: [] })
+    await settle()
+    draw()
+    check('then the view\'s library rows, More from your library under them (a full page), then MusicBrainz\'s - all twelve, unfiltered',
+      [keysOf('albums').slice(0, 2), keysOf('albums').length, text(find(byClass('app-search-more-library'))[0]), rowsOf('albums').slice(50).map(([title]) => title)],
+      [['album:nd-dummy', 'album:nd-a0'], 62, 'More from your library', unfiltered['release-groups'].map((group) => group.title)])
+    check('...More from MusicBrainz under them (the count says 90)', text(find((node) => byClass('app-search-more')(node) && !byClass('app-search-more-library')(node))[0]), 'More from MusicBrainz')
+    find(byClass('app-search-more-library'))[0].props.onClick()
+    draw()
+    check('More from your library asks the next page of albums by offset, the other counts 0', asks.library.at(-1).page,
+      { counts: { artistCount: 0, albumCount: 50, songCount: 0 }, offsets: { albumOffset: 50 } })
+    asks.library.at(-1).resolve({ artists: [], albums: fifty.slice(49), songs: [] })
+    await settle()
+    draw()
+    check('...its page appended, the button gone with a short page, said', [keysOf('albums')[50], find(byClass('app-search-more-library')).length, said()], ['album:nd-a49', 0, '1 more album from your library'])
+
+    //? back to All: drawn whole at once from everything in hand - the studio answer kept from before, so nothing asked
+    const kept = asks.musicbrainz.length
+    chip('All').props.onClick()
+    draw()
+    check('Back to All: drawn whole at once - Top results and every section - the studio answer kept from before, nothing asked of MusicBrainz',
+      [topKeys(), kinds(), asks.musicbrainz.length - kept, asking().length, said()], [['top:artist:ar1', 'top:album:nd-dummy', 'top:song:s-roads'], ['artists', 'albums', 'songs'], 0, 0,
+        'Showing everything. In your library: 1 artist, 1 album, 3 songs. From MusicBrainz: 3 albums.'])
+    freshInvariant()
+    invariant('back to All')
   }
 
-  console.log('\nthe MusicBrainz half: what the library holds is left out, and never taken away once drawn')
-  await advance(500)
-  check('MusicBrainz is asked 700 ms after typing stops, as the artist\'s albums', asks.musicbrainz.map((ask) => ask.query), ['artist:"Portishead"'])
-  check('...the library asked beside it', asks.owned.length, 6)
-  asks.musicbrainz[0].resolve({ 'release-groups': [DUMMY, THIRD, ROSELAND] })
-  await settle()
-  draw()
-  check('MusicBrainz answered, the library not yet: still asking, nothing drawn to be taken away', [text(find(byClass('app-asking'), section())[0]), rows().length],
-    ['Asking MusicBrainz…', 0])
-  asks.owned[5].resolve(holding(DUMMY))
-  await settle()
-  draw()
-  check('the library answered: drawn, the album it holds left out', rows().map(([title]) => title), ['Third', 'Roseland NYC Live'])
-  find((node) => node.type === 'button', section())[0].props.onClick()
-  check('a row opens the album you don\'t have', groupsOpened.map((group) => group.title), ['Third'])
 
-  //? Enter on the same words: the library slow to answer this time, past the wait
-  find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
-  draw()
-  asks.musicbrainz[1].resolve({ 'release-groups': [DUMMY, THIRD, ROSELAND] })
-  await settle()
-  await advance(OWNED_WAIT_MS - 1)
-  draw()
-  check('waiting on the library, a moment at most', rows().length, 0)
-  await advance(1)
-  draw()
-  check('...then drawn with the last answer', rows().map(([title]) => title), ['Third', 'Roseland NYC Live'])
-  asks.owned[6].resolve(holding(DUMMY, THIRD))
-  await settle()
-  draw()
-  check('an answer landing after never takes a row away: it says so in place', rows(),
-    [['Third', 'Album · 2008 · in your library'], ['Roseland NYC Live', 'Live album · 1998']])
+  //? a song MusicBrainz found, as its recording search answers it
+  const recording = (id, title, artist, artistId, group) => ({ id, title, 'artist-credit': [{ name: artist, artist: { id: artistId, name: artist } }],
+    releases: [{ id: `rel-${id}`, status: 'Official', date: group['first-release-date'] ?? '', 'release-group': { id: group.id, title: group.title, 'primary-type': group['primary-type'] ?? 'Album', 'secondary-types': group['secondary-types'] ?? [] },
+      media: [{ position: 1, track: [{ id: `t-${id}`, number: '1', title, length: 240000 }] }] }] })
+  const SOMEBODY = '00000000-0000-4000-8000-00000000b0d1'
+  const SOMEONE_ALBUM = { id: '00000000-0000-4000-8000-0000000000a1', title: 'Somebody\'s Album', 'primary-type': 'Album', 'first-release-date': '2001' }
+  const ARTISTS_NONE = { matches: [], count: 0 }
+  /** Type `words` and let the library and MusicBrainz be asked: the library at 200 ms (answered with `library`), MusicBrainz
+   *  at 700 - the asks returned, not yet answered. */
+  async function search(words, library) {
+    type(words)
+    freshInvariant()
+    invariant('typed')
+    const from = { library: asks.library.length, albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length, order: asks.order.length }
+    await advance(200)
+    if (library) {
+      asks.library.slice(from.library).find((ask) => !ask.page).resolve(library)
+      await settle()
+      draw()
+      //? the new text's moment 1 replaces the list whole (the finger is on the keyboard): what is kept from here
+      freshInvariant()
+      invariant('the library\'s moment')
+    }
+    return from
+  }
+  const newAsks = (from) => ({ albums: asks.musicbrainz.slice(from.albums), artists: asks.artists.slice(from.artists), songs: asks.songs.slice(from.songs), order: asks.order.slice(from.order) })
 
-  console.log('\nGet chips (2.0.0-player.15): the usual pressing, in the Sources sheet')
+  console.log('\n"dummy": two decided, the place, then MusicBrainz\'s exact song in it')
   {
+    const from = await search('dummy', { artists: [], albums: [ndDummy], songs: [libSong('s-sour', 'Sour Times')] })
+    check('Dummy and Portishead decided, then one place - a row high, the sweep, no words, hidden from a screen reader', [topKeys(), find(byClass('app-search-top-place')).map((node) => [node.props['aria-hidden'], text(node)])],
+      [['top:album:nd-dummy', 'top:artist:ar1'], [['true', '']]])
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [DUMMY], count: 1 })
+    asked.songs[0].resolve({ recordings: [recording('r-dummy', 'Dummy', 'Somebody', SOMEBODY, SOMEONE_ALBUM)], count: 1 })
+    await answerOwned(holding(DUMMY))
+    invariant('moment 2')
+    check('moment 2, in the render that draws the sections: the place filled by MusicBrainz\'s exact song "Dummy" - ahead of Sour Times',
+      [topKeys(), find(byClass('app-search-top-place')).length, kinds()], [['top:album:nd-dummy', 'top:artist:ar1', 'top:mb-song:00000000-0000-4000-8000-00000000b0d1\ndummy'], 0, ['albums', 'songs']])
+    check('...a MusicBrainz song in Top results opens its album, the song marked - not a disclosure (no aria-expanded)',
+      [rowButton('top:mb-song:00000000-0000-4000-8000-00000000b0d1\ndummy').props['aria-expanded'], (() => { rowButton('top:mb-song:00000000-0000-4000-8000-00000000b0d1\ndummy').props.onClick(); return songAlbums.at(-1) })()],
+      [undefined, [{ id: SOMEONE_ALBUM.id, title: 'Somebody\'s Album' }, ['r-dummy']]])
+    check('...its line says what it is first; its Get names the album and the song', [lineOf(rowButton('top:mb-song:00000000-0000-4000-8000-00000000b0d1\ndummy')), getOf('top:mb-song:00000000-0000-4000-8000-00000000b0d1\ndummy')?.props['aria-label']],
+      ['Song · Somebody · Somebody\'s Album', 'Get Somebody\'s Album, with Dummy'])
+    check('in Songs, the same song is step 7\'s disclosure, Get beside it', [rowButton('mb-song:00000000-0000-4000-8000-00000000b0d1\ndummy')?.props['aria-expanded'], text(getOf('mb-song:00000000-0000-4000-8000-00000000b0d1\ndummy'))],
+      [false, 'Get'])
+  }
+
+  console.log('\n"third", only Third Eye Blind held: nothing early, MusicBrainz\'s exact rows lead at moment 2')
+  {
+    const from = await search('third', { artists: [{ id: 'ar-teb', name: 'Third Eye Blind', albumCount: 2 }], albums: [], songs: [] })
+    check('the library\'s moment: no Top results section at all (no heading, no place) - only the asking line', [top(), asking().length], [undefined, 1])
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    invariant('moment 2')
+    check('moment 2: Top results drawn whole above the sections - Third (exact), then its artist, then Third Eye Blind',
+      [topKeys(), kinds()], [[`top:group:${THIRD.id}`, 'top:artist:ar1', 'top:artist:ar-teb'], ['artists', 'albums']])
+  }
+
+  console.log('\n"roads", Dummy held: Top results whole at the library\'s moment; the invariant through timed answers')
+  {
+    const from = await search('roads', { artists: [], albums: [], songs: [libSong('s-roads', 'Roads')] })
+    check('Roads, then its album and artist (its family) - all three at the library\'s moment, no place', [topKeys(), find(byClass('app-search-top-place')).length],
+      [['top:song:s-roads', 'top:album:nd-dummy', 'top:artist:ar1'], 0])
+    invariant('the library\'s moment')
+    await advance(500)
+    const asked = newAsks(from)
+    check('MusicBrainz at 700 ms: three requests, at most three at once - albums, then artists, then songs',
+      [asked.order, asked.albums.map((ask) => ask.query), asked.artists.map((ask) => ask.name), asked.songs.map((ask) => ask.query)],
+      [['albums', 'artists', 'songs'], ['roads'], ['roads'], ['roads']])
+    //? artists at 1.2 s, albums at 1.5 s after the last key - songs at 3 s, past the cap (700 + 1500 = 2.2 s)
+    await advance(500)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    await answerOwned(holding(DUMMY))
+    invariant('artists at 1.2 s')
+    check('...nothing drawn for a kind until moment 2', kinds(), [])
+    await advance(300)
+    asked.albums[0].resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-0000000000r1', title: 'Roads', 'primary-type': 'Single', 'first-release-date': '1995', 'artist-credit': DUMMY['artist-credit'] }], count: 1 })
+    await answerOwned(holding(DUMMY))
+    invariant('albums at 1.5 s')
+    check('...albums in, songs out: still waiting, under the cap', [kinds(), asking().length], [[], 1])
+    await advance(699)
+    check('...a moment before the cap: still the asking line', kinds(), [])
+    await advance(1)
+    invariant('the cap')
+    check('the cap (1.5 s after MusicBrainz was asked): the sections drawn, Songs\' slot asking for MusicBrainz\'s songs - aria-busy',
+      [kinds(), slotText('songs'), sectionOf('app-search-songs').props['aria-busy'], keysOf('songs')], [['albums', 'songs'], 'Asking MusicBrainz…', true, ['song:s-roads']])
+    check('...a section with nothing to show left out (no artist anywhere)', sectionOf('app-search-artists'), undefined)
+    await advance(800)
+    asked.songs[0].resolve({ recordings: [recording('r-roads2', 'Roads', 'Someone', SOMEBODY, SOMEONE_ALBUM)], count: 1 })
+    await answerOwned(holding(DUMMY))
+    invariant('songs at 3 s')
+    check('songs landing last, nothing tappable below them: drawn straight in, the slot gone', [keysOf('songs'), slotOf('songs'), sectionOf('app-search-songs').props['aria-busy']],
+      [['song:s-roads', 'mb-song:00000000-0000-4000-8000-00000000b0d1\nroads'], undefined, false])
+  }
+
+  console.log('\nBehind, turned on by the songs missing the cap')
+  {
+    const from = await search('roads portishead', { artists: [], albums: [], songs: [libSong('s-roads', 'Roads')] })
+    check('the next search draws at the library\'s moment: Top results from the library alone, a slot for each kind - Portishead leads Artists (the named artist)',
+      [topKeys(), kinds(), keysOf('artists'), slotText('albums'), slotText('songs')],
+      [['top:song:s-roads', 'top:album:nd-dummy', 'top:artist:ar1'], ['artists', 'albums', 'songs'], ['artist:ar1'], 'Asking MusicBrainz…', 'Asking MusicBrainz…'])
+    await advance(500)
+    const asked = newAsks(from)
+    check('...album-by-artist: no artists asked - the artist is yours; albums and songs fielded', [asked.artists.length, asked.albums.map((ask) => ask.query), asked.songs.map((ask) => ask.query)],
+      [0, ['releasegroup:"roads" AND (artist:"Portishead" OR artistname:"Portishead")'], ['recording:"roads" AND (artist:"Portishead" OR artistname:"Portishead")']])
+    asked.albums[0].resolve({ 'release-groups': [DUMMY], count: 1 })
+    asked.songs[0].resolve(roadsRecorded)
+    await answerOwned(holding(DUMMY))
+    invariant('Behind\'s kinds landing in time')
+    check('...landing: Albums (not last) folds the album you hold that search3 didn\'t list - brought in (the held-groups rule extended); Songs, last, loses its slot - the MusicBrainz Roads is yours',
+      [slotText('albums'), keysOf('songs'), slotOf('songs')], ['Show 1 album from MusicBrainz', ['song:s-roads'], undefined])
+    const show = buttonText('Show 1 album from MusicBrainz')
+    show.props.onClick({ currentTarget: show })
+    draw()
+    check('...shown: Dummy, marked "in your library", no Get - its tap opens the album you have', [rowsOf('albums'), getOf(`group:${DUMMY.id}`)], [[['Dummy', 'Portishead · 1994 · in your library']], undefined])
+  }
+
+  console.log('\na late kind with something below it folds; Behind')
+  {
+    const from = await search('glory box', { artists: [], albums: [ndDummy], songs: [libSong('s-glory', 'Glory Box')] })
+    check('"glory box": Glory Box, Dummy, Portishead - Apple\'s own order, all at the library\'s moment', topKeys(), ['top:song:s-glory', 'top:album:nd-dummy', 'top:artist:ar1'])
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.songs[0].resolve({ recordings: [recording('r-gb', 'Glory Box (live)', 'Someone', SOMEBODY, SOMEONE_ALBUM)], count: 1 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    invariant('the cap, albums out')
+    check('albums past the cap: Albums drawn with its slot, Songs below it', [kinds(), slotText('albums')], [['albums', 'songs'], 'Asking MusicBrainz…'])
+    asked.albums[0].resolve({ 'release-groups': [ROSELAND, THIRD], count: 2 })
+    await answerOwned(holding(DUMMY))
+    invariant('albums landing late')
+    check('...landing with something tappable below: folded into its slot - "Show 2 albums from MusicBrainz" - nothing below moves',
+      [slotText('albums'), keysOf('albums'), said()], ['Show 2 albums from MusicBrainz', ['album:nd-dummy'], '2 albums from MusicBrainz - Show them to see them. From MusicBrainz: 2 albums, 1 song.'])
+    const show = buttonText('Show 2 albums from MusicBrainz')
+    show.props.onClick({ currentTarget: show })
+    draw()
+    check('...a tap opens them in place (your own act)', [keysOf('albums'), slotOf('albums')], [['album:nd-dummy', `group:${ROSELAND.id}`, `group:${THIRD.id}`], undefined])
+
+    //? Behind is on: the next search draws at the library's moment, MusicBrainz's kinds in slots
+    const next = await search('sour times', { artists: [], albums: [], songs: [libSong('s-sour', 'Sour Times')] })
+    check('Behind: the next search draws at the library\'s moment - Top results from the library alone, every section with a slot for MusicBrainz\'s kinds',
+      [topKeys(), kinds(), slotText('artists'), slotText('songs')], [['top:song:s-sour', 'top:album:nd-dummy', 'top:artist:ar1'], ['artists', 'albums', 'songs'], 'Asking MusicBrainz…', 'Asking MusicBrainz…'])
+    invariant('Behind\'s draw')
+    await advance(500)
+    const behindAsked = newAsks(next)
+    behindAsked.artists[0].resolve(ARTISTS_NONE)
+    behindAsked.albums[0].resolve({ 'release-groups': [], count: 0 })
+    behindAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    invariant('Behind\'s kinds landing')
+    check('...kinds landing empty: Artists (no library rows, something below) keeps its slot saying why; Albums the same; Songs, last, loses its slot',
+      [kinds(), slotText('artists'), slotText('albums'), slotOf('songs')],
+      [['artists', 'albums', 'songs'], 'No artists on MusicBrainz for “sour times”.', 'No albums on MusicBrainz for “sour times”.', undefined])
+    //? that search answered in time: Behind ends - the next draws by its moments again
+    await search('sour', { artists: [], albums: [], songs: [libSong('s-sour', 'Sour Times')] })
+    check('...that search answered in time: Behind ends - the next shows Top results and the asking line', [kinds(), asking().length], [[], 1])
+    await advance(500)
+    for (const ask of [asks.artists.at(-1), asks.musicbrainz.at(-1), asks.songs.at(-1)]) ask.resolve(ask === asks.artists.at(-1) ? ARTISTS_NONE : ask === asks.songs.at(-1) ? { recordings: [], count: 0 } : { 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+  }
+
+
+  const away = () => new MusicBrainzUnavailable('MusicBrainz is unreachable right now')
+  const busy = () => new MusicBrainzUnavailable('MusicBrainz is busy just now - try again in a moment.', true)
+  const refused = () => new ApiError(422, "MusicBrainz couldn't read that search - try other words", 'refused')
+
+  console.log('\nMusicBrainz failing: per kind, all of them, busy, refused')
+  {
+    const from = await search('machine gun', { artists: [], albums: [ndDummy], songs: [] })
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].reject(away())
+    asked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    asked.songs[0].resolve({ recordings: [recording('r-mg', 'Machine Gun', 'Portishead', '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', THIRD)], count: 1 })
+    await answerOwned(holding(DUMMY))
+    invariant('one kind failed')
+    const failed = slotOf('artists')
+    check('one kind failed, the others answered: its own section, its slot one line with a text-button Try again (no foot block)',
+      [kinds(), failed?.props.class, text(find(byClass('app-search-empty'), failed)[0]), text(find((node) => node.type === 'button', failed)[0]), find(byClass('app-search-foot')).length],
+      [['artists', 'albums', 'songs'], 'app-search-slot is-row', "MusicBrainz isn't answering.", 'Try again', 0])
+    const before = { albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length }
+    find((node) => node.type === 'button', failed)[0].props.onClick({ currentTarget: {} })
+    draw()
+    check('Try again asks only the failed kind again - and draws the list afresh for these words, following the moments',
+      [asks.musicbrainz.length - before.albums, asks.artists.length - before.artists, asks.songs.length - before.songs, kinds(), asking().length],
+      [0, 1, 0, [], 1])
+    asks.artists.at(-1).resolve(ARTISTS_NONE)
+    await answerOwned(holding(DUMMY))
+    check('...its answer in: moment 2 again', kinds(), ['albums', 'songs'])
+
+    //? every kind failing: one block at the foot - nothing can draw in above it later
+    const all = await search('teardrop', { artists: [], albums: [ndDummy], songs: [] })
+    await advance(500)
+    const allAsked = newAsks(all)
+    for (const ask of [allAsked.artists[0], allAsked.albums[0], allAsked.songs[0]]) ask.reject(away())
+    await answerOwned(holding(DUMMY))
+    invariant('every kind failed')
+    const foot = find((node) => byClass('app-search-problem')(node) && byClass('app-search-foot')(node))[0]
+    check('every kind asked failed by moment 2: one block at the foot - isn\'t answering, what\'s in your library is above, a full-width Try again',
+      [kinds(), text(find((node) => node.type === 'p', foot)[0]), find((node) => node.type === 'button', foot)[0]?.props.class, said()],
+      [['albums'], "MusicBrainz isn't answering just now - it often goes away for a few minutes. What's in your library is above.", 'app-button', "MusicBrainz isn't answering."])
+
+    //? that turned Behind on; busy said as busy
+    const busyFrom = await search('wandering star', { artists: [], albums: [], songs: [libSong('s-ws', 'Wandering Star')] })
+    check('...which turned Behind on: the next search drawn at the library\'s moment, slots for MusicBrainz', kinds(), ['artists', 'albums', 'songs'])
+    await advance(500)
+    const busyAsked = newAsks(busyFrom)
+    busyAsked.artists[0].reject(busy())
+    busyAsked.albums[0].reject(busy())
+    busyAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    invariant('busy')
+    check('MusicBrainz shedding: its slots say busy, read from the 503\'s body (`busy`), never from its words', [slotText('artists'), slotText('albums')],
+      ['MusicBrainz is busy just now - try again in a moment.Try again', 'MusicBrainz is busy just now - try again in a moment.Try again'])
+    //? Try again while Behind is on follows its own moments: Top results decided, the asking line - not slots
+    find((node) => node.type === 'button' && text(node) === 'Try again', slotOf('artists')).at(0).props.onClick({ currentTarget: {} })
+    draw()
+    check('Try again with Behind on follows its own moments: Top results and the asking line, no slots', [topKeys().length > 0, kinds(), asking().length], [true, [], 1])
+    asks.artists.at(-1).resolve(ARTISTS_NONE)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+
+    //? refused: the words, no Try again, Behind left as it was, never "isn't answering"
+    const refusedFrom = await search('ac/dc (', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const refusedAsked = newAsks(refusedFrom)
+    for (const ask of [refusedAsked.artists[0], refusedAsked.albums[0], refusedAsked.songs[0]]) ask.reject(refused())
+    await answerOwned(holding(DUMMY))
+    check('a 422 with words: each kind\'s slot says them - no Try again - and no "isn\'t answering" foot',
+      [kinds(), slotText('artists'), find((node) => node.type === 'button' && text(node) === 'Try again').length, find(byClass('app-search-foot')).length],
+      [['artists', 'albums', 'songs'], "MusicBrainz couldn't read that search - try other words", 0, 0])
+    check('...and the region says the refusal\'s words - never "MusicBrainz isn\'t answering." (late review)', said(), "MusicBrainz couldn't read that search - try other words")
+  }
+
+  console.log('\na text searched before: drawn whole at the library\'s moment, MusicBrainz asked nothing (kept answers)')
+  {
+    //? (Behind ended first: a search answered in time)
+    const clear = await search('wild white horses', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const cleared = newAsks(clear)
+    cleared.artists[0].resolve(ARTISTS_NONE)
+    cleared.albums[0].resolve({ 'release-groups': [], count: 0 })
+    cleared.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    const first = await search('nude', { artists: [], albums: [], songs: [libSong('s-nude', 'Nude', 'nd-irb', 'In Rainbows')] })
+    await advance(500)
+    const firstAsked = newAsks(first)
+    firstAsked.artists[0].resolve(radioheadArtists)
+    firstAsked.albums[0].resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-0000000000nd', title: 'Nude', 'primary-type': 'Single', 'first-release-date': '2008' }], count: 1 })
+    firstAsked.songs[0].resolve({ recordings: [recording('r-nude', 'Nude', 'Radiohead', radioheadArtists.matches[0].mbid, { id: '00000000-0000-4000-8000-0000000000ir', title: 'In Rainbows', 'primary-type': 'Album', 'first-release-date': '2007' })], count: 1 })
+    await answerOwned(holding(DUMMY))
+    const firstDrawn = [topKeys(), kinds().map((kind) => [kind, keysOf(kind)])]
+    //? backspace one letter's worth of searching away and back: another text, then "nude" again
+    const other = await search('nudes', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const otherAsked = newAsks(other)
+    otherAsked.artists[0].resolve(ARTISTS_NONE)
+    otherAsked.albums[0].resolve({ 'release-groups': [], count: 0 })
+    otherAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    const ownedAsks = asks.owned.length
+    const again = await search('nude', { artists: [], albums: [], songs: [libSong('s-nude', 'Nude', 'nd-irb', 'In Rainbows')] })
+    check('...the kept answers taken at the library\'s moment ask /library/owned again beside them, so their rows re-mark in place (late review)', asks.owned.length - ownedAsks, 1)
+    check('"nude" again: Top results AND the sections, all at the library\'s moment - the list as it was drawn the first time, no place, no asking line',
+      [[topKeys(), kinds().map((kind) => [kind, keysOf(kind)])], asking().length, find(byClass('app-search-top-place')).length], [firstDrawn, 0, 0])
+    await advance(500)
+    check('...and at the pause MusicBrainz is asked nothing', [newAsks(again).albums.length, newAsks(again).artists.length, newAsks(again).songs.length], [0, 0, 0])
+  }
+
+  console.log('\nthe library late, and Navidrome\'s status')
+  {
+    const from = await search('tom waits', null)
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [ROSELAND], count: 1 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('MusicBrainz in, the library not: the previous words\' list still drawn - the new words\' rows never draw before the library has settled',
+      [topKeys().includes('top:song:s-nude'), keysOf('albums').includes(`group:${ROSELAND.id}`)], [true, false])
+    await advance(1000)
+    freshInvariant()
+    invariant('the library late')
+    const placeKept = find((node) => byClass('app-search-slot')(node) && !find((n) => n.type === 'section', node).length)[0]
+    check('LIBRARY_LATE_MS passed: drawn as if the library found nothing, one place kept at its top - "Searching your library…"',
+      [text(placeKept), kinds()], ['Searching your library…', ['albums']])
+    asks.library.at(-1).resolve({ artists: [{ id: 'ar-tw', name: 'Tom Waits', albumCount: 4 }], albums: [], songs: [] })
+    await settle()
+    draw()
+    invariant('the library landing late')
+    check('...its answer landing in that place: "1 in your library - Show them"', text(find(byClass('app-search-slot'))[0]), '1 in your library - Show them')
+    const show = buttonText('1 in your library - Show them')
+    show.props.onClick({ currentTarget: show })
+    draw()
+    check('...Show them: the list drawn afresh, whole - the library in it', [topKeys()[0], kinds()], ['top:artist:ar-tw', ['artists', 'albums']])
+
+    //? Navidrome's status not known yet (the app's first check): no library ask, no spinner of its own, moment 1 waits for it
+    draw({ status: null })
+    const libraryAsks = asks.library.length
+    const unknown = await search('massive attack', null)
+    check('the status not known yet: the library not asked, no "Connecting" spinner, no gate - the list drawn before kept, moment 1 waiting for it',
+      [asks.library.length - libraryAsks, find(byClass('pl-spinner')).length, find((node) => node.type === NeedsNavidrome).length, topKeys()[0]], [0, 0, 0, 'top:artist:ar-tw'])
+    draw({ status })
+    check('...the library asked the moment it says OK', asks.library.map((ask) => ask.text).slice(libraryAsks), ['massive attack'])
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await advance(500)
+    for (const ask of Object.values(newAsks(unknown)).slice(0, 3)) ask[0]?.resolve(ask === newAsks(unknown).artists ? ARTISTS_NONE : { 'release-groups': [], recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+
+    //? Navidrome away: its notice once, above the list - MusicBrainz's rows draw below it
+    const down = { configured: true, ok: false, server: null, problem: 'connection refused' }
+    draw({ status: down })
+    const asksBefore = asks.library.length
+    const awayFrom = await search('mezzanine', null)
+    const gate = find((node) => node.type === NeedsNavidrome)[0]
+    check('Navidrome away: its notice drawn once, above the list, with App\'s status and no children - the library not asked',
+      [gate?.props.status === down, gate?.props.children, asks.library.length - asksBefore], [true, null, 0])
+    await advance(500)
+    const awayAsked = newAsks(awayFrom)
+    awayAsked.artists[0].resolve(ARTISTS_NONE)
+    awayAsked.albums[0].resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-00000000me22', title: 'Mezzanine', 'primary-type': 'Album', 'first-release-date': '1998' }], count: 1 })
+    awayAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('...MusicBrainz still searched, its rows drawn: Top results and Albums MusicBrainz\'s alone', [topKeys(), kinds()],
+      [['top:group:00000000-0000-4000-8000-00000000me22'], ['albums']])
+    draw({ status })
+  }
+
+  console.log('\nunder three characters')
+  {
+    await search('po', { artists: [P], albums: [ndDummy], songs: [] })
+    check('the library alone - MusicBrainz isn\'t asked - and the foot line where its rows would go; never "No results"',
+      [topKeys(), text(find(byClass('app-search-foot'))[0]), find((node) => text(node) === 'No results for “po”').length], [['top:artist:ar1', 'top:album:nd-dummy'], 'Type a little more, or press Search, to ask MusicBrainz too.', 0])
+    await advance(700)
+    check('...nothing asked of MusicBrainz at the pause', asks.order.at(-1) !== undefined, true)
+    const mbBefore = asks.musicbrainz.length
+    enter()
+    check('Enter on words MusicBrainz hasn\'t been asked for: asked now, the list drawn afresh (its own moments)',
+      [asks.musicbrainz.length - mbBefore, asks.musicbrainz.at(-1).query, kinds(), asking().length], [1, 'po', [], 1])
+    asks.artists.at(-1).resolve(ARTISTS_NONE)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [], count: 0 })
+    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await search('pq', { artists: [], albums: [], songs: [] })
+    check('a one- or two-letter box finding nothing in the library: the foot line alone, no "No results"', [text(find(byClass('app-search-foot'))[0]), find((node) => /No results/.test(text(node))).length],
+      ['Type a little more, or press Search, to ask MusicBrainz too.', 0])
+    chip('Songs').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    check('...a kind view the same: the foot line where MusicBrainz\'s rows would go', text(find(byClass('app-search-foot'))[0]), 'Type a little more, or press Search, to ask MusicBrainz too.')
+    chip('All').props.onClick()
+    draw()
+  }
+
+
+  console.log('\nthe kind views: Artists, Songs - and what each asks')
+  {
+    //? "portishead third": album-by-artist - the Artists view asks MusicBrainz nothing, and lists the artist the box named
+    const from = await search('portishead third', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const asked = newAsks(from)
+    check('"portishead third" in All: albums and songs fielded, no artists', [asked.artists.length, asked.albums.length, asked.songs.length], [0, 1, 1])
+    asked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await settle()
+    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('...Artists in All led by the artist the box named (Navidrome needs every word, so its search found none)', keysOf('artists'), ['artist:ar1'])
+    const artistAsks = asks.artists.length
+    chip('Artists').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    check('the Artists view under album-by-artist: the named artist as its library row, nothing asked of MusicBrainz, and no more said',
+      [keysOf('artists'), asks.artists.length - artistAsks, find(byClass('app-asking'), sectionOf('app-search-artists')).length], [['artist:ar1'], 0, 0])
+    chip('All').props.onClick()
+    draw()
+
+    //? "kanye west": the Artists view - MusicBrainz's artists, the library's Kanye West instead of Ye, More from MusicBrainz
+    const kanyeLib = { id: 'ar-k', name: 'Kanye West', albumCount: 2, musicBrainzId: kanyeArtists.matches[0].mbid }
+    asks.lists.length = 0
+    const kanye = await search('kanye west', { artists: [kanyeLib], albums: [], songs: [] })
+    chip('Artists').props.onClick()
+    draw()
+    check('a chip pressed after the pause\'s ask: its own search3 (artists, fifty), and nothing more of MusicBrainz yet', [asks.library.at(-1).page?.counts, newAsks(kanye).artists.length], [{ artistCount: 50, albumCount: 0, songCount: 0 }, 0])
+    asks.library.at(-1).resolve({ artists: [kanyeLib], albums: [], songs: [] })
+    await settle()
+    draw()
+    await advance(500)
+    const kanyeAsked = newAsks(kanye)
+    check('...the pause asks only the view\'s kind: artists', [kanyeAsked.artists.length, kanyeAsked.albums.length, kanyeAsked.songs.length], [1, 0, 0])
+    kanyeAsked.artists[0].resolve({ ...kanyeArtists, count: 14 })
+    await answerOwned(holding(DUMMY))
+    check('the Artists view: your Kanye West (Ye is yours - by id), then MusicBrainz\'s, appended at the foot', rowsOf('artists').map(([title]) => title),
+      ['Kanye West', '¥$', 'Kanye West Tribute Band', 'Kanye West & Hatsune Miku'])
+    const more = find((node) => byClass('app-search-more')(node))[0]
+    check('...More from MusicBrainz (MusicBrainz counts more)', text(more), 'More from MusicBrainz')
+    more.props.onClick()
+    draw()
+    check('...which asks the next page of the same name by offset', [asks.artists.at(-1).name, asks.artists.at(-1).offset], ['kanye west', 4])
+    asks.artists.at(-1).resolve({ matches: [{ mbid: '00000000-0000-4000-8000-0000000000k9', name: 'Kanye', disambiguation: '', country: '', type: '', matched_as: '' }], count: 14 })
+    await settle()
+    draw()
+    check('...its page appended below, said', [rowsOf('artists').map(([title]) => title).at(-1), said()], ['Kanye', '1 more artist from MusicBrainz'])
+    const rowMb = rowButton('mb-artist:00000000-0000-4000-8000-0000000000k9')
+    rowMb.props.onClick()
+    check('a MusicBrainz artist\'s tap: their page by MusicBrainz id (`mb:` - outside the Navidrome gate)', mbArtists.at(-1), { mbid: '00000000-0000-4000-8000-0000000000k9', name: 'Kanye' })
+    rowButton('artist:ar-k').props.onClick()
+    check('...a library artist\'s: their page by Navidrome id', artistsOpened.at(-1).id, 'ar-k')
+    chip('All').props.onClick()
+    draw()
+    check('Back to All: everything at once, no phantom - the kind All needs and nobody asked for these words (albums: an artist you have, so no songs) in a slot',
+      [topKeys()[0], kinds(), slotText('albums')], ['top:artist:ar-k', ['artists', 'albums'], 'Asking MusicBrainz…'])
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+
+    //? "roads portishead": the Songs view - its own search3, MusicBrainz's songs (the one you have dropped), More songs
+    const roads = await search('roads portishead', { artists: [], albums: [], songs: [libSong('s-roads', 'Roads')] })
+    chip('Songs').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [libSong('s-roads', 'Roads'), libSong('s-roads2', 'Roads (live)', 'nd-rose', 'Roseland NYC Live')] })
+    await settle()
+    draw()
+    check('the Songs view\'s own search3: songs alone, a hundred; its first songs\' albums asked ahead, kept', [asks.library.at(-1).page.counts, asks.prefetch.slice(-2).map((ask) => [ask.id, ask.keep])],
+      [{ artistCount: 0, albumCount: 0, songCount: 100 }, [['nd-dummy', true], ['nd-rose', true]]])
+    await advance(500)
+    const roadsAsked = newAsks(roads)
+    check('...the pause asks songs only', [roadsAsked.songs.length, roadsAsked.albums.length, roadsAsked.artists.length], [1, 0, 0])
+    roadsAsked.songs[0].resolve({ ...roadsRecorded, recordings: [...roadsRecorded.recordings, recording('r-other', 'Roads (Max Cooper remix)', 'Portishead', '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', SOMEONE_ALBUM)], count: 60 })
+    await answerOwned(holding(DUMMY))
+    check('the Songs view: yours, then MusicBrainz\'s - its Roads dropped (yours is it), the remix kept - then More songs',
+      [keysOf('songs'), text(find(byClass('app-search-more'))[0])], [['song:s-roads', 'song:s-roads2', 'mb-song:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11\nroads (max cooper remix)'], 'More songs'])
+    find(byClass('app-search-more'))[0].props.onClick()
+    draw()
+    check('...More songs asks the next page by offset', asks.songs.at(-1).offset, 13)
+    const OTHER_ALBUM = { id: '00000000-0000-4000-8000-0000000000a2', title: 'Dub Album', 'primary-type': 'Album', 'first-release-date': '2003' }
+    asks.songs.at(-1).resolve({ recordings: [recording('r-new', 'Roads (Dub)', 'Portishead', '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', OTHER_ALBUM)], count: 60 })
+    await settle()
+    draw()
+    check('...merged in below, said', [keysOf('songs').at(-1), said()], ['mb-song:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11\nroads (dub)', '1 more song from MusicBrainz'])
+    //? Get on a song row: the album it names, on a pressing with the song
+    const remixKey = 'mb-song:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11\nroads (max cooper remix)'
+    const get = getOf(remixKey)
+    check('a MusicBrainz song\'s Get names its album and the song', get?.props['aria-label'], "Get Somebody's Album, with Roads (Max Cooper remix)")
+    get.props.onClick({ currentTarget: { chip: 'song' } })
+    draw()
+    check('...a tap asks for the album\'s pressings, the chip busy and aria-disabled - never disabled', [asks.pressings.at(-1).id, text(getOf(remixKey)), getOf(remixKey).props['aria-busy'], getOf(remixKey).props['aria-disabled'], getOf(remixKey).props.disabled],
+      [SOMEONE_ALBUM.id, 'Get…', true, true, undefined])
+    const track = (title, recordingId) => ({ title, position: 1, length: 240000, recording: { id: recordingId, title, length: 240000 } })
+    asks.pressings.at(-1).resolve({ id: SOMEONE_ALBUM.id, problem: null, releases: [
+      { id: 'rel-usual', title: 'Somebody\'s Album', status: 'Official', date: '2001-01-01', country: 'GB', media: [{ format: 'CD', position: 1, tracks: [track('Other Song', 'x-1')] }], 'release-group': { id: SOMEONE_ALBUM.id, title: 'Somebody\'s Album', 'first-release-date': '2001-01-01' }, 'artist-credit': [{ name: 'Somebody', artist: { id: SOMEBODY, name: 'Somebody' } }] },
+      { id: 'rel-other', title: 'Somebody\'s Album', status: 'Official', date: '2001-01-01', country: 'GB', media: [{ format: 'CD', position: 1, tracks: [track('Other Song', 'x-1')] }], 'release-group': { id: SOMEONE_ALBUM.id, title: 'Somebody\'s Album', 'first-release-date': '2001-01-01' }, 'artist-credit': [{ name: 'Somebody', artist: { id: SOMEBODY, name: 'Somebody' } }] },
+      { id: 'rel-with', title: 'Somebody\'s Album', status: 'Official', date: '2002-01-01', country: 'JP', media: [{ format: 'CD', position: 1, tracks: [track('Roads (Max Cooper remix)', 'r-other')] }], 'release-group': { id: SOMEONE_ALBUM.id, title: 'Somebody\'s Album', 'first-release-date': '2001-01-01' }, 'artist-credit': [{ name: 'Somebody', artist: { id: SOMEBODY, name: 'Somebody' } }] },
+    ] })
+    await settle()
+    draw()
+    check('...Sources opened on the pressing WITH the song, the group (and its year) from the pressings, the opener taken in the tap',
+      [gets.at(-1)[0].release.release_mbid, gets.at(-1)[0].release.year, gets.at(-1)[0].subtitle, gets.at(-1)[1], text(getOf(remixKey))],
+      ['rel-with', '2002', "Somebody's Album · CD · 2002 · JP", { chip: 'song' }, 'Get'])
+    check('...the album\'s own year the group\'s, from the pressings (a recording search\'s group has none): what the folder is named by', gets.at(-1)[0].release.original_year, '2001')
+    const pressingAsks = asks.pressings.length, getsBefore = gets.length
+    getOf(remixKey).props.onClick({ currentTarget: {} })
+    await settle()
+    check('...the pressings kept for the session: another tap asks nothing, and opens at once', [asks.pressings.length - pressingAsks, gets.length - getsBefore, gets.at(-1)[0].release.release_mbid],
+      [0, 1, 'rel-with'])
+    //? MusicBrainz unable to list the pressings: the album page opens instead, the song marked, its Get taking over
+    const opens = songAlbums.length, getsNow = gets.length
+    const dubKey = 'mb-song:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11\nroads (dub)'
+    getOf(dubKey).props.onClick({ currentTarget: {} })
+    asks.pressings.at(-1).reject(away())
+    await settle()
+    draw()
+    check('...MusicBrainz unable to list them: the album page opens instead, the song marked - never a download filed without a year',
+      [asks.pressings.at(-1).id, songAlbums.length - opens, songAlbums.at(-1), gets.length - getsNow, text(getOf(dubKey))],
+      [OTHER_ALBUM.id, 1, [{ id: OTHER_ALBUM.id, title: 'Dub Album' }, ['r-new']], 0, 'Get'])
+
+    //? the Songs view for an artist's name alone: MusicBrainz is asked no songs
+    const alone = await search('portishead', { artists: [P], albums: [], songs: [] })
+    asks.library.slice(alone.library).find((ask) => ask.page).resolve({ artists: [], albums: [], songs: [libSong('s-roads', 'Roads')] })
+    await settle()
+    draw()
+    check('the Songs view for an artist\'s name alone: their songs in your library, then how to find theirs on MusicBrainz',
+      [keysOf('songs'), text(find(byClass('app-search-foot'))[0])], [['song:s-roads'], "Type a song's title with the artist (“roads portishead”) to find their songs on MusicBrainz."])
+    chip('All').props.onClick()
+    draw()
+  }
+
+
+  console.log('\nfocus handed on as a control its own tap takes away goes (on the stand-in DOM: only what is drawn is found)')
+  {
+    const from = await search('only you', { artists: [], albums: [ndDummy], songs: [libSong('s-ou', 'Only You')] })
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    asked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    await answerOwned(holding(DUMMY))
+    dom.use()
+    dom.press(buttonText('Show 1 album from MusicBrainz'))
+    check('Show N tapped from the keyboard: focus to the first row it brought', [dom.focused, document.activeElement?.key], [[`row:group:${THIRD.id}`], `row:group:${THIRD.id}`])
+    //? a finger's tap on WebKit gives the control no focus: focus left alone, so the page isn't scrolled
+    const second = await search('only you!', { artists: [], albums: [ndDummy], songs: [libSong('s-ou', 'Only You')] })
+    await advance(500)
+    const secondAsked = newAsks(second)
+    secondAsked.artists[0].resolve(ARTISTS_NONE)
+    secondAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    secondAsked.albums[0].resolve({ 'release-groups': [ROSELAND], count: 1 })
+    await answerOwned(holding(DUMMY))
+    dom.use()
+    const tapped = buttonText('Show 1 album from MusicBrainz')
+    tapped.props.onClick({ currentTarget: dom.el(tapped) })
+    draw()
+    check('...tapped by a finger (WebKit focuses nothing): focus left alone', [dom.focused, document.activeElement === dom.body], [[], true])
+    //? Try again from the keyboard: its redraw comes a render after the tap - the hand waits for the button to go (review:
+    //? it was spent on the old draw, and focus fell to the body as the button went); at moment 1 its section isn't drawn
+    //? yet, so Top results' heading, the list's first - never the body
+    const failing = await search('only yours', { artists: [{ id: 'ar-oy', name: 'Only Yours', albumCount: 1 }], albums: [ndDummy], songs: [] })
+    await advance(500)
+    const failingAsked = newAsks(failing)
+    //? (an artist you have: no songs asked)
+    failingAsked.artists[0].reject(away())
+    failingAsked.albums[0].resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    dom.use()
+    dom.press(find((node) => node.type === 'button' && text(node) === 'Try again', slotOf('artists'))[0])
+    check('Try again from the keyboard: the button gone, focus to the heading the new draw holds - Top results\' at moment 1 - never the body',
+      [dom.focused, document.activeElement?.key, asking().length], [['#app-search-top'], '#app-search-top', 1])
+    asks.artists.at(-1).resolve(ARTISTS_NONE)
+    await answerOwned(holding(DUMMY))
+    //? with no heading drawn at all yet (nothing in the library: no Top results at moment 1), the hand waits for the draw
+    //? that brings one - its own section's, at moment 2
+    const bare = await search('only you??', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const bareAsked = newAsks(bare)
+    bareAsked.artists[0].reject(away())
+    bareAsked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    bareAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    dom.use()
+    dom.press(find((node) => node.type === 'button' && text(node) === 'Try again', slotOf('artists'))[0])
+    check('...no heading drawn yet at moment 1: nothing focused, the hand kept (focus on the body for now)', [dom.focused, top(), document.activeElement === dom.body], [[], undefined, true])
+    asks.artists.at(-1).resolve(portisheadArtists)
+    await answerOwned(holding(DUMMY))
+    check('...then, at moment 2, its own section\'s heading', dom.focused, ['#app-search-artists'])
+    //? every kind failing: the foot's Try again the same way
+    const allFail = await search('only you!!', { artists: [], albums: [ndDummy], songs: [] })
+    await advance(500)
+    for (const ask of Object.values(newAsks(allFail)).slice(0, 3)) ask[0]?.reject(away())
+    await answerOwned(holding(DUMMY))
+    dom.use()
+    dom.press(find((node) => node.type === 'button' && text(node) === 'Try again', find((node) => byClass('app-search-problem')(node) && byClass('app-search-foot')(node))[0])[0])
+    check('the all-failed foot\'s Try again from the keyboard: no heading at moment 1 (a phantom first), so the hand waits', dom.focused, [])
+    for (const ask of [asks.artists.at(-1), asks.musicbrainz.at(-1), asks.songs.at(-1)]) ask.resolve(ask === asks.artists.at(-1) ? ARTISTS_NONE : ask === asks.songs.at(-1) ? { recordings: [], count: 0 } : { 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('...then Top results\' heading as moment 2 draws it - never the body', dom.focused, ['#app-search-top'])
+    //? the library's Show them: the first row it brought
+    const lateLib = await search('only us', null)
+    await advance(500)
+    for (const ask of Object.values(newAsks(lateLib)).slice(0, 3)) ask[0]?.resolve(ask === newAsks(lateLib).artists ? ARTISTS_NONE : { 'release-groups': [], recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(1000)
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    dom.use()
+    dom.press(buttonText('1 in your library - Show them'))
+    check('the library\'s Show them from the keyboard: focus to the first row it brought', dom.focused, ['row:top:album:nd-dummy'])
+    dom.leave()
+  }
+
+  console.log('\nthe desktop frame: Top results as six tiles, kept as drawn')
+  {
+    globalThis.__search.frame = 'desktop'
+    draw()
+    const from = await search('massive live', { artists: [P], albums: [ndDummy, { id: 'nd-rose', name: 'Roseland NYC Live', artist: 'Portishead', artistId: 'ar1', year: 1998 }], songs: [libSong('s-roads', 'Roads'), libSong('s-sour', 'Sour Times'), libSong('s-glory', 'Glory Box')] })
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [ROSELAND, THIRD], count: 2 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    const tiles = find(byClass('app-top-tile'))
+    check('on a desktop, up to six tinted lockups three across - each with the place on its own third line', [find(byClass('app-top-tiles')).length, tiles.length,
+      find(byClass('app-top-place'), top()).map(text)], [1, 6, ['In your library', 'In your library', 'In your library', 'In your library', 'In your library', 'On MusicBrainz']])
+    check('...and the sections\' previews the desktop\'s: albums 4 + 4', keysOf('albums').length, 4)
+    globalThis.__search.frame = 'phone'
+    draw()
+    check('the window crossing to a phone after the draw: the list kept as drawn - six, tiles - until the next text redraws it', [find(byClass('app-top-tile')).length, topKeys().length], [6, 6])
+  }
+
+  console.log('\nlogins on, a library of your own: yours first, then the store\'s')
+  {
+    Session.setSessionMe({ user: 'ethan', admin: false, auth: 'on', version: '2.0.0-player.55' })
+    draw()
+    check('your albums asked as Search shows with a library of your own', asks.yours.length, 1)
+    asks.yours[0].resolve([ndDummy])
+    await settle()
+    draw()
+    const ndThird = { id: 'nd-third', name: 'Third', artist: 'Portishead', artistId: 'ar1', year: 2008, musicBrainzId: 'rel-third' }
+    const storeOwned = { albums: [{ path: 'Portishead/Dummy', artist: 'Portishead', album: 'Dummy', release_group_mbid: DUMMY.id, release_mbid: 'rel-dummy', yours: true },
+      { path: 'Portishead/Third', artist: 'Portishead', album: 'Third', release_group_mbid: THIRD.id, release_mbid: 'rel-third', yours: false }] }
+    const from = await search('bristol albums', { artists: [P], albums: [ndThird, ndDummy], songs: [libSong('s-mg', 'Machine Gun', 'nd-third', 'Third')] })
+    const atTheLibrary = said()
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [], count: 0 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(storeOwned)
+    check('the store\'s rows, yours first - Dummy (yours) before Third (in the store), each saying so', rowsOf('albums'),
+      [['Dummy', 'Portishead · 1994 · in your library'], ['Third', 'Portishead · 2008 · in the store']])
+    check('...a song by its album: on Third, "in the store"', rowsOf('songs'), [['Machine Gun', 'Portishead · Third · in the store']])
+    check('...an artist\'s count your own', rowsOf('artists'), [['Portishead', '1 album in your library']])
+    check('...the region says the store at the library\'s moment', atTheLibrary, 'In the store: 1 artist, 2 albums, 1 song.')
+    //? an Add on Third's page: your albums asked again, and the rows re-marked in place - never moved
+    globalThis.__search.generation += 1
+    draw()
+    check('an Add (your albums\' generation moving): your albums asked again', asks.yours.length, 2)
+    asks.yours[1].resolve([ndDummy, ndThird])
+    await settle()
+    draw()
+    check('...Third now "in your library", in its place: nothing re-sorted', rowsOf('albums'),
+      [['Dummy', 'Portishead · 1994 · in your library'], ['Third', 'Portishead · 2008 · in your library']])
+    check('...the hint before typing, with a library of your own', (() => { type(''); return text(find(byClass('app-search-hint'))[0]) })(),
+      "Artists, albums and songs: yours first, then the store's, then MusicBrainz's.")
+    Session.setSessionMe(null)
+    draw()
+  }
+
+
+  console.log('\nGet on a MusicBrainz album (2.0.0-player.15): the usual pressing, in the Sources sheet')
+  {
+    const from = await search('roseland nyc', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [ROSELAND, THIRD], count: 2 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY, THIRD))
     check('You > Getting albums asked as the tab shows', globalThis.__search.settingsAsked.at(-1), true)
-    const rowOf = (title) => find((node) => node.type === 'li' && byClass('app-result-row')(node), section()).find((li) => text(find(byClass('app-result-title'), li)[0]) === title)
-    const chipOf = (title) => find(byClass('app-result-get'), rowOf(title))[0]
-    check('a row the library holds has no chip; one it doesn\'t has', [!!chipOf('Third'), !!chipOf('Roseland NYC Live')], [false, true])
-    check('...beside the row\'s own button, which still opens the album', [find((node) => node.type === 'button' && byClass('app-result')(node), rowOf('Roseland NYC Live')).length, text(chipOf('Roseland NYC Live'))], [1, 'Get'])
+    const chipOf = (group) => getOf(`group:${group.id}`)
+    check('a row the library holds has no Get; one it doesn\'t has, beside the row\'s own button', [chipOf(THIRD), text(chipOf(ROSELAND)), chipOf(ROSELAND)?.props['aria-label']], [undefined, 'Get', 'Get Roseland NYC Live'])
     const track = (title, position) => ({ title, position, length: 300000 + position, recording: { title, length: 300000 + position, video: false } })
     const PRESSINGS = [
       { id: 'r-vinyl', title: 'Roseland NYC Live', status: 'Official', date: '1998-11-09', country: 'GB', media: [{ format: '12" Vinyl', position: 1, tracks: [track('Humming', 1), track('Cowboys', 2)] }] },
       { id: 'r-cd', title: 'Roseland NYC Live', status: 'Official', date: '1998-11-02', country: 'GB', 'label-info': [{ 'catalog-number': '559 424-2', label: { name: 'Go! Beat' } }], media: [{ format: 'CD', position: 1, tracks: [track('Humming', 1), track('Cowboys', 2)] }] },
     ]
-    const tap = () => chipOf('Roseland NYC Live').props.onClick({ currentTarget: { chip: true } })
+    const tap = () => chipOf(ROSELAND).props.onClick({ currentTarget: { chip: true } })
+    const getsBefore = gets.length
     tap()
     draw()
-    check('a tap asks for the album\'s pressings, the chip busy meanwhile', [asks.pressings.length, asks.pressings[0]?.id, text(chipOf('Roseland NYC Live')), chipOf('Roseland NYC Live').props['aria-busy']],
-      [1, ROSELAND.id, 'Get…', true])
+    check('a tap asks for the album\'s pressings, the chip busy meanwhile', [asks.pressings.at(-1)?.id, text(chipOf(ROSELAND)), chipOf(ROSELAND).props['aria-busy']], [ROSELAND.id, 'Get…', true])
+    const first = asks.pressings.at(-1)
     tap()
-    check('a second tap calls the first ask off', [asks.pressings.length, asks.pressings[0].signal.aborted], [2, true])
+    check('a second tap calls the first ask off', first.signal.aborted, true)
     await settle()
-    asks.pressings[1].reject(new Error('MusicBrainz is unreachable right now'))
+    asks.pressings.at(-1).reject(away())
     await settle()
     draw()
-    check('MusicBrainz failing: the album as a whole, said so - nothing opened for the call that was called off',
-      [gets.length, gets[0]?.[0].release.release_mbid, gets[0]?.[0].release.tracks.length, gets[0]?.[0].subtitle, gets[0]?.[1]?.chip, text(chipOf('Roseland NYC Live'))],
-      [1, null, 0, 'Roseland NYC Live · the album as a whole', true, 'Get'])
-    //? two more taps, the first's answer already on its way when the second called it off
-    globalThis.__search.abortRejects = false
+    check('MusicBrainz failing: the album as a whole, said so', [gets.length - getsBefore, gets.at(-1)[0].release.release_mbid, gets.at(-1)[0].subtitle, gets.at(-1)[1]?.chip, text(chipOf(ROSELAND))],
+      [1, null, 'Roseland NYC Live · the album as a whole', true, 'Get'])
     tap()
-    tap()
-    check('a failure isn\'t kept: the next taps ask again, the first of them called off', [asks.pressings.length, asks.pressings[2].signal.aborted], [4, true])
-    asks.pressings[3].resolve({ id: ROSELAND.id, releases: PRESSINGS.slice(0, 1), problem: 'MusicBrainz failed part way' })
+    asks.pressings.at(-1).resolve({ id: ROSELAND.id, releases: PRESSINGS, problem: null })
     await settle()
-    check('a list MusicBrainz broke off is the album as a whole - never a short list passing for its pressings',
-      [gets.length, gets[1]?.[0].release.release_mbid, gets[1]?.[0].subtitle], [2, null, 'Roseland NYC Live · the album as a whole'])
-    tap()
-    check('...and isn\'t kept: the next tap asks again', asks.pressings.length, 5)
-    asks.pressings[2].resolve({ id: ROSELAND.id, releases: PRESSINGS, problem: null })
-    await settle()
-    check('the call called off, its answer landing anyway, opens nothing', gets.length, 2)
-    asks.pressings[4].resolve({ id: ROSELAND.id, releases: PRESSINGS, problem: null })
-    await settle()
-    globalThis.__search.abortRejects = true
-    check('the usual pressing - a CD over the vinyl - built from the row\'s group', [gets.length, gets[2]?.[0].release.release_mbid, gets[2]?.[0].release.release_group_mbid, gets[2]?.[0].subtitle],
-      [3, 'r-cd', ROSELAND.id, 'Roseland NYC Live · CD · 1998 · GB · Go! Beat'])
+    check('the usual pressing - a CD over the vinyl - built from the row\'s group', [gets.at(-1)[0].release.release_mbid, gets.at(-1)[0].release.release_group_mbid, gets.at(-1)[0].subtitle],
+      ['r-cd', ROSELAND.id, 'Roseland NYC Live · CD · 1998 · GB · Go! Beat'])
+    const asksNow = asks.pressings.length
     tap()
     await settle()
-    check('kept for the session: another tap asks nothing, and opens at once', [asks.pressings.length, gets.length, gets[3]?.[0].release.release_mbid], [5, 4, 'r-cd'])
-
-    //? A lookup takes seconds (every pressing with its tracklist, at MusicBrainz's pace); meanwhile
-    //? the person opens Now Playing, another tab or a row's page, or types. Its answer landing then
-    //? must open nothing - not the sheet over Now Playing, not over another tab (review)
+    check('kept for the session: another tap asks nothing, and opens at once', [asks.pressings.length - asksNow, gets.at(-1)[0].release.release_mbid], [0, 'r-cd'])
+    //? a lookup still out when the tab's root stops showing, or the box changes: called off, opening nothing
     const GLORY = { id: '00000000-0000-4000-8000-0000000000aa', title: 'Glory Times', 'primary-type': 'Album', 'first-release-date': '1995' }
-    find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
-    draw()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [THIRD, ROSELAND, GLORY] })
-    await settle()
-    await answerOwned(holding(DUMMY, THIRD))
-    await settle()
-    draw()
-    check('(a row whose pressings nothing has asked for yet)', !!chipOf('Glory Times'), true)
+    const other = await search('glory times', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const otherAsked = newAsks(other)
+    otherAsked.artists[0].resolve(ARTISTS_NONE)
+    otherAsked.albums[0].resolve({ 'release-groups': [GLORY], count: 1 })
+    otherAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
     globalThis.__search.abortRejects = false
-    const opened = gets.length
-    const tapGlory = () => chipOf('Glory Times').props.onClick({ currentTarget: { chip: true } })
-    tapGlory()
+    const opened0 = gets.length
+    getOf(`group:${GLORY.id}`).props.onClick({ currentTarget: {} })
     draw()
     const out = asks.pressings.at(-1)
-    check('a tap asks for its pressings, the chip busy', [out.id, text(chipOf('Glory Times'))], [GLORY.id, 'Get…'])
     draw({ active: false })
-    draw()
-    check('the tab\'s root no longer what shows (Now Playing, another tab, a page over it): the lookup called off, the chip Get again',
-      [out.signal.aborted, text(chipOf('Glory Times')), chipOf('Glory Times').props['aria-busy']], [true, 'Get', false])
-    //? (an answer MusicBrainz broke off, so it isn't kept and the next tap asks again)
+    check('the tab\'s root no longer what shows: the lookup called off, the chip Get again', [out.signal.aborted, text(getOf(`group:${GLORY.id}`))], [true, 'Get'])
     out.resolve({ id: GLORY.id, releases: PRESSINGS.slice(0, 1), problem: 'MusicBrainz failed part way' })
     await settle()
-    check('...and its answer, landing anyway, opens no sheet over what you went to', gets.length, opened)
+    check('...its answer, landing anyway, opens no sheet over what you went to', gets.length, opened0)
     draw({ active: true })
-    tapGlory()
+    getOf(`group:${GLORY.id}`).props.onClick({ currentTarget: {} })
     draw()
     const typed = asks.pressings.at(-1)
-    check('(asked afresh)', typed !== out, true)
-    type('portishead live')
-    check('the box changed: the lookup called off too, the chip Get again', [typed.signal.aborted, text(chipOf('Glory Times'))], [true, 'Get'])
+    type('glory times!')
+    check('the box changed: the lookup called off too', typed.signal.aborted, true)
     typed.resolve({ id: GLORY.id, releases: PRESSINGS, problem: null })
     await settle()
-    check('...its answer opening nothing', gets.length, opened)
-    type('portishead')
+    check('...its answer opening nothing', gets.length, opened0)
     globalThis.__search.abortRejects = true
+    await advance(200)
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await advance(500)
   }
 
-  console.log('\na box cut back below three characters')
-  type('po')
-  check('drops what the longer text found, and says how to ask', [rows().length, text(find(byClass('app-search-empty'), section())[0])],
-    [0, 'Type a little more, or press Search, to ask MusicBrainz.'])
-  type('portishead')
-  await advance(700)
-  const out = asks.musicbrainz.at(-1)
-  type('po')
-  check('...and calls off a search still out for it', out.signal?.aborted, true)
-  await settle()
-  draw()
-  check('...which never draws', rows().length, 0)
-  const before = asks.musicbrainz.length
-  type('por')
-  await advance(700)
-  check('the text coming back asks again', [asks.musicbrainz.length - before, asks.musicbrainz.at(-1).query], [1, 'por'])
-  asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-  await answerOwned(holding(DUMMY))
-  draw()
-  //? the trap in the fix: cut back from what WAS asked, then back to it - it must ask again, not
-  //? keep an idle half that says nothing because it thinks that text is already answered
-  type('po')
-  type('por')
-  await advance(700)
-  check('cut back from what was asked and typed again: asked again', [asks.musicbrainz.length - before, asks.musicbrainz.at(-1).query], [2, 'por'])
-  asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-  await answerOwned(holding(DUMMY))
-  draw()
-  check('...and drawn', rows().map(([title]) => title), ['Roseland NYC Live'])
-
-  console.log('\nan artist and an album that finds nothing is asked again as the words typed')
-  type('portishead third')
-  await advance(700)
-  const fielded = asks.musicbrainz.at(-1)
-  check('first as Third by Portishead', fielded.query, 'releasegroup:"third" AND (artist:"Portishead" OR artistname:"Portishead")')
-  fielded.resolve({ 'release-groups': [] })
-  await settle()
-  check('...then, finding nothing, as the words', asks.musicbrainz.at(-1).query, 'portishead third')
-  asks.musicbrainz.at(-1).resolve({ 'release-groups': [THIRD] })
-  await answerOwned(holding(DUMMY))
-  draw()
-  check('...and that answer drawn', rows().map(([title]) => title), ['Third'])
-
-  console.log('\nNavidrome failing: the same problem, the same Try again, as MusicBrainz\'s')
-  type('zzz')
-  await advance(200)
-  asks.library.at(-1).reject(new Error('Navidrome answered 500'))
-  await settle()
-  draw()
+  console.log('\nsong search\'s own (2.0.0-player.53): the disclosure, and an album you have opening the album you have')
   {
-    const gate = find((node) => node.type === NeedsNavidrome)[0]
-    const problem = find(byClass('app-search-problem'), gate)[0]
-    const retry = find((node) => node.type === 'button', problem)[0]
-    check('the reason, and a full-width 44px Try again', [text(find((node) => node.type === 'p', problem)[0]), retry?.props.class, text(retry)],
-      ['Navidrome answered 500', 'app-button', 'Try again'])
-    check('...no bare text button left', find(byClass('pl-text-button')).length, 0)
-    const asked = asks.library.length
-    retry.props.onClick()
-    check('...which asks again', asks.library.length - asked, 1)
-  }
-
-  console.log('\nwith Navidrome down, MusicBrainz is still searched')
-  draw({ status: { configured: true, ok: false, server: null, problem: 'connection refused' } })
-  const libraryAsks = asks.library.length
-  type('massive attack')
-  await advance(700)
-  check('Navidrome not asked, MusicBrainz asked', [asks.library.length - libraryAsks, asks.musicbrainz.at(-1).query], [0, 'massive attack'])
-
-  console.log('\nthe desktop sidebar\'s field is this box (2.0.0-player.19, app/searchBox.ts)')
-  {
-    const Box = require(path.join(OUT, 'app/searchBox.js'))
-    draw({ status })
-    check('what the box says is shared, for the sidebar\'s field to show', Box.searchText(), 'massive attack')
-    Box.typeSearch('portishead third')
-    draw()
-    draw()
-    check('typing in the sidebar\'s field is typing here', [find((node) => node.type === 'input')[0].props.value, Box.searchText()], ['portishead third', 'portishead third'])
-    const libraryBefore = asks.library.length
-    const musicBefore = asks.musicbrainz.length
-    Box.submitSearch()
-    await settle()
-    check('...and its Enter asks both halves at once, as this form\'s submit - no pause waited for',
-      [asks.library.length - libraryBefore, asks.library.at(-1)?.text, asks.musicbrainz.length - musicBefore], [1, 'portishead third', 1])
-  }
-
-  console.log('\nMore from MusicBrainz (2.0.0-player.50): the next page of the same search, appended below')
-  {
-    const { MusicBrainzUnavailable } = require(path.join(OUT, 'api/http.js'))
-    const more = () => find(byClass('app-search-more'), section())[0]
-    const notes = () => find(byClass('app-search-more-note'), section()).map(text)
-    const said = () => text(find((node) => node.props?.role === 'status' && byClass('app-visually-hidden')(node), section())[0])
-    const albums = (from, to) => Array.from({ length: to - from }, (_, n) => ({
-      id: `00000000-0000-4000-8000-${String(from + n).padStart(12, '0')}`, title: `Album ${from + n}`, 'primary-type': 'Album' }))
-    type('bristol sound')
-    await advance(700)
-    const first = asks.musicbrainz.at(-1)
-    check('(the first page asked as ever: no offset)', [first.query, first.offset], ['bristol sound', undefined])
-    first.resolve({ 'release-groups': albums(0, 12), count: 30 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    const listed = find((node) => node.type === 'ul' && byClass('app-results')(node), section())[0]
-    check('twelve drawn, and under them More from MusicBrainz - a secondary button, never a row',
-      [rows().length, text(more()), more()?.type, more()?.props.class.split(' ').includes('app-button'), more()?.props.class.includes('app-result')], [12, 'More from MusicBrainz', 'button', true, false])
-    check('...after the list in the section, with the live region there before any page lands', [!!listed, said()], [true, ''])
-    more().props.onClick()
-    draw()
-    const second = asks.musicbrainz.at(-1)
-    check('a tap asks for the same search\'s next twelve, by offset', [asks.musicbrainz.length, second.query, second.limit, second.releases, second.offset],
-      [asks.musicbrainz.indexOf(first) + 2, 'bristol sound', 12, false, 12])
-    check('...the button busy meanwhile, refusing a tap rather than dropping focus', [text(more()), more().props['aria-busy'], more().props['aria-disabled'], more().props.disabled],
-      ['Asking MusicBrainz…', true, true, undefined])
-    more().props.onClick()
-    check('...a second tap asks nothing', asks.musicbrainz.at(-1) === second, true)
-    const above = rows()
-    //? one group the first page had already (relevance ties shift), and Dummy, which the library holds
-    second.resolve({ 'release-groups': [...albums(11, 12), DUMMY, ...albums(12, 22)], count: 30 })
-    await settle()
-    draw()
-    check('the page appended below: the held album left out, the repeat drawn once - every row above as it was',
-      [rows().length, JSON.stringify(rows().slice(0, 12)) === JSON.stringify(above), rows().slice(12).map(([title]) => title)],
-      [22, true, albums(12, 22).map((group) => group.title)])
-    check('...said to VoiceOver, and the button back', [said(), text(more())], ['10 more albums from MusicBrainz', 'More from MusicBrainz'])
-    more().props.onClick()
-    draw()
-    const third = asks.musicbrainz.at(-1)
-    check('the next page starts past every answer got, the held one and the repeat included', third.offset, 24)
-    third.reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
-    draw()
-    check('MusicBrainz away: said, the rows kept, and the button tries again',
-      [notes(), rows().length, text(more())], [["MusicBrainz isn't answering just now - it often goes away for a few minutes."], 22, 'Try again'])
-    more().props.onClick()
-    draw()
-    const retried = asks.musicbrainz.at(-1)
-    check('...the same page asked again', [retried !== third, retried.offset], [true, 24])
-    retried.resolve({ 'release-groups': albums(22, 28), count: 28 })
-    await settle()
-    draw()
-    check('every answer in: the last rows, and no button any more', [rows().length, more(), notes()], [28, undefined, []])
-
-    //? a page whose albums the library holds every one of
-    type('portishead live')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND], count: 2 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    more().props.onClick()
-    draw()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [DUMMY], count: 2 })
-    await settle()
-    draw()
-    check('a page all held: nothing added, and said so - in the page and to VoiceOver', [rows().map(([title]) => title), notes(), said(), more()],
-      [['Roseland NYC Live'], ['The next album MusicBrainz found is in your library already.'], 'The next album is in your library already', undefined])
-
-    //? the first page all held: "Everything ... already", and More still offered under it
-    type('portishead dummy remaster')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [DUMMY], count: 5 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('everything on the first page held: said, and More still offered', [text(find(byClass('app-search-empty'), section())[0]), text(more())],
-      ['Everything MusicBrainz found is in your library already.', 'More from MusicBrainz'])
-
-    //? a page out as a new search starts: called off, and its answer draws nothing
-    more().props.onClick()
-    const out = asks.musicbrainz.at(-1)
-    //? (review: only later pages' offsets were pinned) the first page's held album counts too - every
-    //? answer got, not the rows drawn, or each page after would start one early, its overlap hidden
-    check('...its next page asked from past the held one: the first page\'s every answer counted', out.offset, 1)
-    find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
-    check('a new search calls a page still out off', out.signal.aborted, true)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [THIRD], count: 1 })
-    await answerOwned(holding(DUMMY))
-    out.resolve({ 'release-groups': albums(40, 45), count: 5 })
-    await settle()
-    draw()
-    check('...only the new search drawn, with nothing more to ask for', [rows().map(([title]) => title), more()], [['Third'], undefined])
-
-    //? the box cut back below three characters: a page out is called off with the rest
-    type('massive')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(50, 62), count: 40 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    more().props.onClick()
-    const dropped = asks.musicbrainz.at(-1)
-    type('ma')
-    check('the box cut back: the page out called off too', dropped.signal.aborted, true)
-
-    //? a fielded read that found nothing was asked again as the words typed: More pages THAT search
-    type('portishead roseland')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await settle()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(70, 82), count: 20 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    more().props.onClick()
-    check('a search that fell back to the words typed: its next page is of the words typed', [asks.musicbrainz.at(-1).query, asks.musicbrainz.at(-1).offset], ['portishead roseland', 12])
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(82, 90), count: 20 })
-    await settle()
-    draw()
-
-    //? past the route's bound: narrowing is the way on
-    type('various')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(0, 12), count: 50000 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    const before = asks.musicbrainz.length
-    let pages = 0
-    while (more() && pages < 100) {
-      more().props.onClick()
-      const page = asks.musicbrainz.at(-1)
-      page.resolve({ 'release-groups': albums(1000 + pages * 12, 1012 + pages * 12), count: 50000 })
-      await settle()
-      draw()
-      pages++
-    }
-    check('a search with tens of thousands of answers pages up to the route\'s bound, never past it - then says to narrow it',
-      [asks.musicbrainz.slice(before).every((ask) => ask.offset <= 1000), asks.musicbrainz.at(-1).offset, more(), notes()],
-      [true, 996, undefined, ["That's as far into one search as deadwax goes - add a word to narrow it."]])
-
-    //? (review) every new album of a page held, two of them: the number said, in the page and to VoiceOver
-    type('portishead held twice')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND], count: 3 })
-    await answerOwned(holding(DUMMY, THIRD))
-    draw()
-    more().props.onClick()
-    draw()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [DUMMY, THIRD], count: 3 })
-    await settle()
-    draw()
-    check('a page of two albums, both held: said with their number - in the page and to VoiceOver', [rows().map(([title]) => title), notes(), said()],
-      [['Roseland NYC Live'], ['The next 2 albums MusicBrainz found are all in your library already.'], 'The next 2 albums are all in your library already'])
-
-    //? (review) a page of nothing but rows already drawn, then an empty one: never "in your library"
-    type('portishead repeats')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(100, 112), count: 20 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    more().props.onClick()
-    draw()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(111, 112), count: 20 })
-    await settle()
-    draw()
-    check('a page of a repeat alone: nothing added, said as nothing new - never as albums you have - and More still offered',
-      [rows().length, notes(), said(), text(more())], [12, ['MusicBrainz sent nothing new.'], 'MusicBrainz sent nothing new', 'More from MusicBrainz'])
-    more().props.onClick()
-    draw()
-    asks.musicbrainz.at(-1).resolve({})
-    await settle()
-    draw()
-    check('...then an empty page (MusicBrainz\'s count ran ahead): nothing new said, never "the next 0", and the button gone',
-      [rows().length, notes(), said(), more()], [12, ['MusicBrainz sent nothing new.'], 'MusicBrainz sent nothing new', undefined])
-
-    //? (review) a failure that isn't MusicBrainz away: its own reason, and Try again
-    type('portishead broken')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(200, 212), count: 40 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    more().props.onClick()
-    draw()
-    asks.musicbrainz.at(-1).reject(new Error('MusicBrainz answered 502'))
-    await settle()
-    draw()
-    check('a page failing for another reason: that reason said, the rows kept, and Try again', [notes(), rows().length, text(more())], [['MusicBrainz answered 502'], 12, 'Try again'])
-
-    //? (review) each page's own count: a count grown keeps the button, one shrunk ends it
-    type('portishead grows')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(300, 312), count: 24 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    more().props.onClick()
-    draw()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(312, 324), count: 60 })
-    await settle()
-    draw()
-    check('the next page\'s count grown past the first\'s: the button stays for what more now match', [rows().length, text(more())], [24, 'More from MusicBrainz'])
-    type('portishead shrinks')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(400, 412), count: 40 })
-    await answerOwned(holding(DUMMY))
-    draw()
-    more().props.onClick()
-    draw()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(412, 424), count: 24 })
-    await settle()
-    draw()
-    check('...shrunk to the answers already got: the button goes, no empty page asked for', [rows().length, more()], [24, undefined])
-
-    //? (review) the last page lands with focus on the button: focus to the first row it brought, or to
-    //? the note in the button's place - only when the button had it, and never over focus gone elsewhere
-    const focused = []
-    const body = { name: 'body' }
-    const button = { name: 'More' }
-    const note = { focus: () => focused.push('note') }
-    const page = (n) => Array.from({ length: n }, (_, at) => ({ focus: () => focused.push(`row ${at}`) }))
-    const standIn = (count) => {
-      section().props.ref.current = {
-        querySelector: (selector) => (selector === '.app-search-more' ? button : selector === '.app-search-more-note' ? note : null),
-        querySelectorAll: (selector) => (selector === '.app-result' ? page(count) : []),
-      }
-    }
-    const lastPage = async (title, first, next, focus, count) => {
-      type(title)
-      await advance(700)
-      asks.musicbrainz.at(-1).resolve(first)
-      await answerOwned(holding(DUMMY))
-      draw()
-      more().props.onClick()
-      draw()
-      globalThis.document = { activeElement: focus, body }
-      standIn(count)
-      asks.musicbrainz.at(-1).resolve(next)
-      await settle()
-      //? the button going takes the page's focus with it, as a browser does
-      if (globalThis.document.activeElement === button) globalThis.document.activeElement = body
-      draw()
-    }
-    await lastPage('portishead focus', { 'release-groups': albums(500, 512), count: 18 }, { 'release-groups': albums(512, 518), count: 18 }, button, 18)
-    check('the last page landing with focus on More: the button gone, focus on the first row the page brought', [more(), focused], [undefined, ['row 12']])
-    focused.length = 0
-    await lastPage('portishead focus held', { 'release-groups': [ROSELAND], count: 2 }, { 'release-groups': [DUMMY], count: 2 }, button, 1)
-    check('...a last page that brought no row: focus on the note said in the button\'s place', [more(), focused], [undefined, ['note']])
-    focused.length = 0
-    await lastPage('portishead focus tapped', { 'release-groups': albums(520, 532), count: 18 }, { 'release-groups': albums(532, 538), count: 18 }, body, 18)
-    check('...More tapped by a finger on WebKit (which focuses nothing): focus left alone, so the page isn\'t scrolled', [more(), focused], [undefined, []])
-    await lastPage('portishead focus elsewhere', { 'release-groups': albums(560, 572), count: 18 }, { 'release-groups': albums(572, 578), count: 18 }, { name: 'a Get' }, 18)
-    check('...focus moved on from More before the page landed: left where it went', [more(), focused], [undefined, []])
-    await lastPage('portishead focus stays', { 'release-groups': albums(540, 552), count: 40 }, { 'release-groups': albums(552, 564), count: 40 }, button, 24)
-    check('...a page with more after it: the button stays, and keeps its focus', [text(more()), focused], ['More from MusicBrainz', []])
-    delete globalThis.document
-    section().props.ref.current = null
-  }
-
-  console.log('\nSongs on MusicBrainz (2.0.0-player.53): asked beside the albums, drawn above them')
-  {
-    const { MusicBrainzUnavailable } = require(path.join(OUT, 'api/http.js'))
-    const SONGS = path.resolve(__dirname, '../../tests/fixtures/songs')
-    const recorded = (name) => JSON.parse(fs.readFileSync(path.join(SONGS, `${name}.json`), 'utf8'))
-    const roads = recorded('roads-portishead'), heyJudeFree = recorded('hey-jude-free'), misery = recorded('miss-misery-elliott-smith')
-    const songsSection = () => find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-search-songs')[0]
-    const songRows = () => find(byClass('app-song-row'), songsSection()).map((row) => [text(find(byClass('app-result-title'), row)[0]), text(find(byClass('app-result-line'), row)[0])])
+    const UK_CD = '87888070-1b25-4830-aebc-dee490058b74'
+    //? (the answers kept from the earlier "roads portishead" let go, so these are asked)
+    forgetAnswers()
+    const from = await search('roads portishead', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const asked = newAsks(from)
+    asked.albums[0].resolve({ 'release-groups': [ROSELAND], count: 1 })
+    asked.songs[0].resolve(roadsRecorded)
+    void Owned.refreshOwned()
+    await answerOwned(byGroup(DUMMY))
+    const songsSection = () => sectionOf('app-search-songs')
+    const songRows = () => find(byClass('app-song-row'), songsSection()).map((row) => [text(find(byClass('app-result-title'), row)[0]), lineOf(row)])
     const songButton = (n = 0) => find(byClass('app-song-row'), songsSection())[n]
-    const albumsOf = (n = 0) => find(byClass('app-song-album'), find(byClass('app-song'), songsSection())[n]).map((row) => [text(find(byClass('app-result-title'), row)[0]), text(find(byClass('app-result-line'), row)[0])])
-    const moreSongs = () => find(byClass('app-search-more'), songsSection())[0]
-    const said = () => text(find((node) => node.props?.role === 'status' && byClass('app-visually-hidden')(node), songsSection())[0])
-    const slot = () => find(byClass('app-song-slot'), songsSection())[0]
-    const showSongs = () => find(byClass('app-song-show'), songsSection())[0]
+    const albumsOf = (n = 0) => find(byClass('app-song-album'), find(byClass('app-song'), songsSection())[n]).map((row) => [text(find(byClass('app-result-title'), row)[0]), lineOf(row)])
     const listOf = (node) => find((each) => each.props?.id === node.props['aria-controls'])[0]
-    //? Dummy's 1994 UK CD, one of the pressings the search found Roads on; and the 20th anniversary reissue, which this
-    //? 12-recording fixture doesn't list (at the app's 25 a page it is on the first page - its 1994 XE CD is the one past it)
-    const UK_CD = '87888070-1b25-4830-aebc-dee490058b74', REISSUE = 'f5804905-6e8d-45dc-bae9-b36c64ccc99b'
-    draw({ status })
-    globalThis.__search.songsAuto = false
-
-    const songsBefore = asks.songs.length
-    const musicBefore = asks.musicbrainz.length
-    type('roads portishead')
-    await advance(699)
-    check('nothing asked while typing - the album half\'s pause', asks.songs.length - songsBefore, 0)
-    await advance(1)
-    const ask = asks.songs.at(-1)
-    check('asked with the albums, the box read the same way: Roads by Portishead, one page of 25, no offset',
-      [asks.songs.length - songsBefore, ask.query, ask.limit, ask.offset, asks.musicbrainz.length - musicBefore, asks.musicbrainz.at(-1).query],
-      [1, 'recording:"roads" AND (artist:"Portishead" OR artistname:"Portishead")', 25, undefined, 1, 'releasegroup:"roads" AND (artist:"Portishead" OR artistname:"Portishead")'])
-    check('...the album half\'s request first, as it always was - the songs\' after it', asks.order.slice(-2), ['albums', 'songs'])
-    draw()
-    check('"Asking MusicBrainz…" under "Songs on MusicBrainz", in the slot, before the albums\' section', [text(find((node) => node.type === 'h2', songsSection())[0]),
-      text(find(byClass('app-asking'), slot())[0]), songsSection().props['aria-busy'],
-      find((node) => node.type === 'section' && /app-search-(songs|musicbrainz)/.test(node.props['aria-labelledby'] ?? '')).map((node) => node.props['aria-labelledby'])],
-      ['Songs on MusicBrainz', 'Asking MusicBrainz…', true, ['app-search-songs', 'app-search-musicbrainz']])
-    ask.resolve(roads)
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('the songs land before the albums: every take of Roads one song, Dummy held (by its group) - drawn at once, the albums still asking',
-      [songRows(), slot(), rows().length], [[['Roads', 'Portishead · 4:56 · Dummy · in your library']], undefined, 0])
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-    await settle()
-    draw()
-    check('...then the albums drawn under them', [songRows().length, rows().map(([title]) => title)], [1, ['Roseland NYC Live']])
-    check('...a disclosure, closed', [songButton().props['aria-expanded'], find(byClass('app-song-albums'), songsSection())[0].props.hidden], [false, true])
-    songButton().props.onClick()
-    draw()
-    check('tapped: open, Dummy listed, the rest behind one fold', [songButton().props['aria-expanded'], albumsOf(), text(find(byClass('app-song-fold'), songsSection())[0])],
-      [true, [['Dummy', 'Album · 1994 · in your library']], 'On 12 compilations, live albums and broadcasts'])
     const fold = () => find(byClass('app-song-fold'), songsSection())[0]
-    check('...the fold closed, its list hidden', [fold().props['aria-expanded'], listOf(fold()).props.hidden], [false, true])
-    fold().props.onClick()
-    draw()
-    check('...opened: every one listed after Dummy, the official ones first, a live take\'s length said', [fold().props['aria-expanded'], albumsOf().length, albumsOf()[2],
-      albumsOf().find(([title]) => title === 'Only We')], [true, 13, ['Roseland NYC Live', 'Live album · 2023 · 5:30'], ['Only We', 'Live album · Bootleg · 1997 · 5:36']])
-    //? (review) a second tap closes each again - "Tap the song again to close it"
-    fold().props.onClick()
-    draw()
-    check('...the fold tapped again: closed, its list hidden', [fold().props['aria-expanded'], listOf(fold()).props.hidden], [false, true])
-    songButton().props.onClick()
-    draw()
-    check('...the song tapped again: closed, its albums hidden', [songButton().props['aria-expanded'], listOf(songButton()).props.hidden], [false, true])
-    songButton().props.onClick()
-    draw()
-    fold().props.onClick()
-    draw()
-    check('...and opened again: the song and its fold as they were', [songButton().props['aria-expanded'], fold().props['aria-expanded']], [true, true])
-
-    //? an album you don't have: the album page, with the song's recordings on it; one you have: the album you have
     const row = (title) => find(byClass('app-song-album'), songsSection()).find((node) => text(find(byClass('app-result-title'), node)[0]) === title)
+    check('every take of Roads one song, Dummy held (by its group) - its line\'s place in its own span', songRows(), [['Roads', 'Portishead · 4:56 · Dummy · in your library']])
+    check('...a disclosure, closed - with no Get (held with the song)', [songButton().props['aria-expanded'], listOf(songButton()).props.hidden, getOf(songButton().props['data-row'])], [false, true, undefined])
+    songButton().props.onClick()
+    draw()
+    check('tapped: open, Dummy listed, the rest behind one fold', [songButton().props['aria-expanded'], albumsOf(), text(fold())],
+      [true, [['Dummy', 'Album · 1994 · in your library']], 'On 12 compilations, live albums and broadcasts'])
+    fold().props.onClick()
+    draw()
+    check('...the fold opened: every one listed after Dummy', [fold().props['aria-expanded'], albumsOf().length], [true, 13])
+    fold().props.onClick()
+    draw()
+    songButton().props.onClick()
+    draw()
+    check('...each tapped again: closed', [songButton().props['aria-expanded'], listOf(songButton()).props.hidden], [false, true])
+    songButton().props.onClick()
+    draw()
+    fold().props.onClick()
+    draw()
     row('Roseland NYC Live').props.onClick()
     check('an album you don\'t have opens on its page, with the song\'s recordings on it', songAlbums.at(-1),
       [{ id: 'ce61f4a8-db95-3608-93de-53f9ecb1b8d2', title: 'Roseland NYC Live' }, ['63f3cb71-10d1-40a3-91f6-b682cf47c85b']])
-    row('Dummy').props.onClick()
-    check('...and one held by its group alone, with no release to ask the id bridge about: its page too, as a held row opens', songAlbums.at(-1)[0].title, 'Dummy')
     const fetches = []
     const fetchBefore = globalThis.fetch
     globalThis.fetch = (url, init) => new Promise((resolve, reject) => {
@@ -899,579 +1442,1051 @@ async function main() {
         fail: () => resolve({ ok: false, status: 500, json: async () => ({ detail: 'deadwax had a problem' }) }) })
       init?.signal?.addEventListener('abort', () => { const error = new Error('aborted'); error.name = 'AbortError'; reject(error) })
     })
-    //? the library holding a release of Dummy the song is on: the album you have
     void Owned.refreshOwned()
     await answerOwned({ albums: [{ path: 'Portishead/Dummy', artist: 'Portishead', album: 'Dummy', release_group_mbid: DUMMY.id, release_mbid: UK_CD }] })
     draw()
     row('Dummy').props.onClick()
     draw()
-    check('one you have: the id bridge asked about the release you hold, the row busy meanwhile', [fetches.length, fetches[0]?.url.includes(`release_mbid=${UK_CD}`), row('Dummy').props['aria-busy']],
-      [1, true, true])
+    check('one you have: the id bridge asked about the release you hold, the row busy meanwhile', [fetches.length, fetches[0]?.url.includes(`release_mbid=${UK_CD}`), row('Dummy').props['aria-busy']], [1, true, true])
     fetches[0].answer({ navidrome_id: 'nd-dummy' })
     await settle()
     draw()
     check('...then the album you have, credited', [opened.at(-1), row('Dummy').props['aria-busy']], [{ id: 'nd-dummy', name: 'Dummy', artist: 'Portishead' }, false])
-    //? (review) Navidrome not having found it yet, or the bridge failing: the album you don't have, never nothing
     const opensNow = songAlbums.length
     row('Dummy').props.onClick()
     fetches.at(-1).answer({ navidrome_id: null })
     await settle()
     draw()
-    check('...Navidrome hasn\'t found it: the album you don\'t have, with the song\'s recordings, the row no longer busy',
-      [songAlbums.length - opensNow, songAlbums.at(-1)[0].title, songAlbums.at(-1)[1], row('Dummy').props['aria-busy']], [1, 'Dummy', ['ef37de8d-8fab-42ed-82da-fbfe25715989'], false])
+    check('...Navidrome hasn\'t found it: the album you don\'t have, with the song\'s recordings', [songAlbums.length - opensNow, songAlbums.at(-1)[0].title, songAlbums.at(-1)[1]],
+      [1, 'Dummy', ['ef37de8d-8fab-42ed-82da-fbfe25715989']])
     row('Dummy').props.onClick()
     fetches.at(-1).fail()
     await settle()
     draw()
-    check('...the bridge failing: the same', [songAlbums.length - opensNow, songAlbums.at(-1)[0].title, row('Dummy').props['aria-busy']], [2, 'Dummy', false])
-    row('Dummy').props.onClick()
-    type('roads portishead!')
-    await settle()
-    check('...a look still out called off as the box changes - it opens nothing', [opened.at(-1).id, songAlbums.length - opensNow, fetches.length], ['nd-dummy', 2, 4])
-
-    //? (second review) a pressing of Dummy the search didn't find Roads on - its 1994 CD, the most common pressing, whose
-    //? Roads is another recording (8a49dba0), only on the real search's second page: "a pressing in your library" - never
-    //? the song, nor its absence - and its tap finds out from the album's pressings before it opens either page. (The
-    //? library half's answer on hand, for "portishead", names no artist: it vouches for nothing.)
+    check('...the bridge failing: the same', [songAlbums.length - opensNow, row('Dummy').props['aria-busy']], [2, false])
+    //? a pressing of Dummy the search didn't find Roads on - its 1994 CD: "a pressing in your library", and its tap looks first
     const CD_1994 = '76df3287-6cda-33eb-8e9a-044b5e15ffdd'
-    const roadsOn = (id, recording, title = 'Roads') => ({ id, title: 'Dummy', status: 'Official', date: '1994-08-22',
-      media: [{ format: 'CD', position: 1, tracks: [{ number: '8', position: 8, title, length: 302000, recording: { id: recording, title } }] }] })
+    const roadsOn = (id, recordingId, title = 'Roads') => ({ id, title: 'Dummy', status: 'Official', date: '1994-08-22',
+      media: [{ format: 'CD', position: 1, tracks: [{ number: '8', position: 8, title, length: 302000, recording: { id: recordingId, title } }] }] })
     void Owned.refreshOwned()
     await answerOwned({ albums: [{ path: 'Portishead/Dummy (1994)', artist: 'Portishead', album: 'Dummy', release_group_mbid: DUMMY.id, release_mbid: CD_1994 }] })
     draw()
-    const opensBefore = songAlbums.length, openedBefore = opened.length, pressingAsks = asks.pressings.length, bridgeAsks = fetches.length
-    check('a pressing held that nothing says has the song: the row claims nothing, Dummy\'s line says "a pressing in your library"', [songRows()[0][1], albumsOf()[0][1]],
-      ['Portishead · 4:56 · Dummy', 'Album · 1994 · a pressing in your library'])
+    check('a pressing held that nothing says has the song: the row claims nothing (and offers Get), Dummy\'s line says "a pressing in your library"',
+      [songRows()[0][1], albumsOf()[0][1], text(getOf(songButton().props['data-row']))], ['Portishead · 4:56 · Dummy', 'Album · 1994 · a pressing in your library', 'Get'])
+    const pressingAsks = asks.pressings.length, bridgeAsks = fetches.length
     row('Dummy').props.onClick()
     draw()
-    check('...its tap asks for the album\'s pressings first, the row busy - nothing opened yet, the id bridge asked nothing',
-      [asks.pressings.length - pressingAsks, asks.pressings.at(-1).id, row('Dummy').props['aria-busy'], songAlbums.length - opensBefore, opened.length - openedBefore, fetches.length - bridgeAsks],
-      [1, DUMMY.id, true, 0, 0, 0])
+    check('...its tap asks for the album\'s pressings first, the row busy - the id bridge asked nothing yet', [asks.pressings.length - pressingAsks, asks.pressings.at(-1).id, row('Dummy').props['aria-busy'], fetches.length - bridgeAsks],
+      [1, DUMMY.id, true, 0])
     asks.pressings.at(-1).resolve({ id: DUMMY.id, problem: null, releases: [roadsOn(UK_CD, 'ef37de8d-8fab-42ed-82da-fbfe25715989'), roadsOn(CD_1994, '8a49dba0-253a-4535-b87f-78bb035336ce')] })
     await settle()
     draw()
-    check('...the 1994 CD\'s tracklist has Roads (another recording, known by its title): the id bridge asked about THAT CD, the row still busy',
-      [fetches.length - bridgeAsks, fetches.at(-1).url.includes(`release_mbid=${CD_1994}`), row('Dummy').props['aria-busy'], songAlbums.length - opensBefore], [1, true, true, 0])
+    check('...the 1994 CD\'s tracklist has Roads: the id bridge asked about THAT CD', [fetches.length - bridgeAsks, fetches.at(-1).url.includes(`release_mbid=${CD_1994}`)], [1, true])
     fetches.at(-1).answer({ navidrome_id: 'nd-dummy-94' })
     await settle()
     draw()
-    check('...then the album you have - never the album you don\'t', [opened.at(-1), songAlbums.length - opensBefore, row('Dummy').props['aria-busy']],
-      [{ id: 'nd-dummy-94', name: 'Dummy', artist: 'Portishead' }, 0, false])
-    check('...its pressings kept, so the song now reads held: the row and Dummy\'s line', [songRows()[0][1], albumsOf()[0][1]],
-      ['Portishead · 4:56 · Dummy · in your library', 'Album · 1994 · in your library'])
-    row('Dummy').props.onClick()
-    check('...a second tap asks no pressings - the bridge at once', [asks.pressings.length - pressingAsks, fetches.length - bridgeAsks, fetches.at(-1).url.includes(`release_mbid=${CD_1994}`)], [1, 2, true])
-    fetches.at(-1).answer({ navidrome_id: 'nd-dummy-94' })
-    await settle()
-
-    //? ...the library half (Navidrome's search3, for the same words) playing Roads from a Dummy held: the song held, that
-    //? album of Navidrome's opened at once - Dummy's 20th anniversary reissue held, which the kept pressings don't list
-    const libraryAsk = asks.library.at(-1)
-    check('(the library half\'s ask for these words, still out)', libraryAsk.text, 'roads portishead')
-    libraryAsk.resolve({ artists: [], albums: [], songs: [{ id: 'nd-s-roads', title: 'Roads', artist: 'Portishead', album: 'Dummy', albumId: 'nd-dummy-20', coverArt: 'al-20' }] })
-    await settle()
-    void Owned.refreshOwned()
-    await answerOwned({ albums: [{ path: 'Portishead/Dummy [20th Anniversary]', artist: 'Portishead', album: 'Dummy', release_group_mbid: DUMMY.id, release_mbid: REISSUE }] })
-    draw()
-    check('the library half playing Roads from a Dummy held: the row and Dummy\'s line say "in your library"', [songRows()[0][1], albumsOf()[0][1]],
-      ['Portishead · 4:56 · Dummy · in your library', 'Album · 1994 · in your library'])
-    const quick = [asks.pressings.length, fetches.length]
-    row('Dummy').props.onClick()
-    check('...and its tap opens that album at once - no pressings asked, no bridge', [opened.at(-1), asks.pressings.length - quick[0], fetches.length - quick[1]],
-      [{ id: 'nd-dummy-20', name: 'Dummy', artist: 'Portishead' }, 0, 0])
-
-    //? ...and a pressing WITHOUT the song: a Roseland NYC Live held that isn't one the song was found on
-    const ROSELAND_SONG = 'ce61f4a8-db95-3608-93de-53f9ecb1b8d2', ROSELAND_HELD = 'eeeeeeee-0000-4000-8000-000000000001'
-    const roseland = (id, recording, title = 'Roads') => ({ ...roadsOn(id, recording, title), title: 'Roseland NYC Live' })
-    const roselandPressings = { id: ROSELAND_SONG, problem: null, releases: [roseland('450d91d8-13e5-4d4d-acd5-166ce9b7edd0', '63f3cb71-10d1-40a3-91f6-b682cf47c85b'),
-      roseland(ROSELAND_HELD, '99999999-0000-4000-8000-000000000009', 'Humming')] }
-    void Owned.refreshOwned()
-    await answerOwned({ albums: [{ path: 'Portishead/Roseland NYC Live (DVD)', artist: 'Portishead', album: 'Roseland NYC Live', release_group_mbid: ROSELAND_SONG, release_mbid: ROSELAND_HELD }] })
-    draw()
-    check('a Roseland NYC Live held that nothing says has Roads: its line says "a pressing in your library"', albumsOf().find(([title]) => title === 'Roseland NYC Live')[1],
-      'Live album · 2023 · 5:30 · a pressing in your library')
-    const roselandOpens = songAlbums.length, roselandBridge = fetches.length
-    row('Roseland NYC Live').props.onClick()
-    asks.pressings.at(-1).reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
-    draw()
-    check('...MusicBrainz failing to list its pressings: the album you don\'t have, with the song\'s recordings - the row no longer busy',
-      [asks.pressings.at(-1).id, songAlbums.length - roselandOpens, songAlbums.at(-1), row('Roseland NYC Live').props['aria-busy']],
-      [ROSELAND_SONG, 1, [{ id: ROSELAND_SONG, title: 'Roseland NYC Live' }, ['63f3cb71-10d1-40a3-91f6-b682cf47c85b']], false])
-    const roselandAsks = asks.pressings.length
-    row('Roseland NYC Live').props.onClick()
-    check('...a failure isn\'t kept: the next tap asks again', asks.pressings.length - roselandAsks, 1)
-    asks.pressings.at(-1).resolve(roselandPressings)
-    await settle()
-    draw()
-    check('...the pressing held hasn\'t Roads: the album you don\'t have, on a pressing with it - the id bridge asked nothing',
-      [songAlbums.length - roselandOpens, songAlbums.at(-1)[0].title, fetches.length - roselandBridge, row('Roseland NYC Live').props['aria-busy']], [2, 'Roseland NYC Live', 0, false])
-    check('...still only "a pressing", now its pressings are kept', albumsOf().find(([title]) => title === 'Roseland NYC Live')[1], 'Live album · 2023 · 5:30 · a pressing in your library')
-    row('Roseland NYC Live').props.onClick()
-    check('...and kept: the next tap asks nothing, and opens at once', [asks.pressings.length - roselandAsks, songAlbums.length - roselandOpens], [1, 3])
-    //? a look at the pressings still out, the box changing: called off, opening nothing
+    check('...then the album you have; its pressings kept, so the song now reads held', [opened.at(-1).id, songRows()[0][1], albumsOf()[0][1]],
+      ['nd-dummy-94', 'Portishead · 4:56 · Dummy · in your library', 'Album · 1994 · in your library'])
+    //? a look still out, the box changing: called off, opening nothing
     const ONLY_WE = '5c6c3376-856f-4cc7-8c9f-87613eb07d41'
     void Owned.refreshOwned()
     await answerOwned({ albums: [{ path: 'Portishead/Only We', artist: 'Portishead', album: 'Only We', release_group_mbid: ONLY_WE, release_mbid: 'eeeeeeee-0000-4000-8000-000000000002' }] })
     draw()
-    const onlyWeOpens = [songAlbums.length, opened.length]
+    const before = [songAlbums.length, opened.length]
     row('Only We').props.onClick()
     const look = asks.pressings.at(-1)
     check('(asked for Only We\'s pressings)', look.id, ONLY_WE)
     type('roads portishead!!')
     await settle()
-    check('...called off as the box changes - the row no longer busy, nothing opened', [look.signal.aborted, row('Only We').props['aria-busy'], songAlbums.length - onlyWeOpens[0], opened.length - onlyWeOpens[1]],
-      [true, false, 0, 0])
-    //? ...and its answer already on its way when the box changed: it lands, and still opens nothing - nor asks the bridge
-    globalThis.__search.abortRejects = false
-    row('Only We').props.onClick()
-    const late = asks.pressings.at(-1), lateBridge = fetches.length
-    type('roads portishead!!!')
-    late.resolve({ id: ONLY_WE, problem: null, releases: [roadsOn('eeeeeeee-0000-4000-8000-000000000002', 'ef5f969b-5a0e-4397-a220-ab4adf84cbb6')] })
-    await settle()
-    globalThis.__search.abortRejects = true
-    check('...an answer landing after the box changed opens nothing, and asks the bridge nothing', [late !== look, songAlbums.length - onlyWeOpens[0], opened.length - onlyWeOpens[1], fetches.length - lateBridge],
-      [true, 0, 0, 0])
-    //? ...a list MusicBrainz broke off part way: never kept (the next tap asks again) - but what it does show still counts
-    const brokeAsks = asks.pressings.length, brokeBridge = fetches.length
-    row('Only We').props.onClick()
-    asks.pressings.at(-1).resolve({ id: ONLY_WE, problem: 'MusicBrainz failed part way', releases: [roadsOn('eeeeeeee-0000-4000-8000-000000000002', 'ef5f969b-5a0e-4397-a220-ab4adf84cbb6')] })
-    await settle()
-    check('...a list broken off part way, showing the pressing held with the song: the bridge asked about it all the same',
-      [asks.pressings.length - brokeAsks, fetches.length - brokeBridge, fetches.at(-1).url.includes('release_mbid=eeeeeeee-0000-4000-8000-000000000002')], [1, 1, true])
-    fetches.at(-1).answer({ navidrome_id: 'nd-only-we' })
-    await settle()
-    check('...the album you have opened', opened.at(-1)?.id, 'nd-only-we')
-    row('Only We').props.onClick()
-    check('...and that list not kept: the next tap asks again', asks.pressings.length - brokeAsks, 2)
-    asks.pressings.at(-1).reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
+    check('...called off as the box changes - nothing opened', [look.signal.aborted, songAlbums.length - before[0], opened.length - before[1]], [true, 0, 0])
     globalThis.fetch = fetchBefore
     void Owned.refreshOwned()
     await answerOwned(holding(DUMMY))
-
-    //? the album half's Try again, and Enter on the same words, ask the songs nothing more
-    type('portishead roads')
-    await advance(700)
-    asks.songs.at(-1).resolve(roads)
-    asks.musicbrainz.at(-1).reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    //? (review) a new answer closes every song, the one open before among them
-    check('a new answer: its songs closed, whatever was open before (Roads and its fold were)', [songButton().props['aria-expanded'], listOf(songButton()).props.hidden], [false, true])
-    songButton().props.onClick()
-    draw()
-    check('...its fold too, the song opened again', [songButton().props['aria-expanded'], fold().props['aria-expanded'], listOf(fold()).props.hidden], [true, false, true])
-    const songAsks = asks.songs.length
-    find((node) => node.type === 'button' && text(node) === 'Try again', section())[0].props.onClick()
-    find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
-    check('the albums\' Try again, and Enter on the same words, ask the songs nothing more', asks.songs.length - songAsks, 0)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-    await answerOwned(holding(DUMMY))
-    draw()
-    //? (review) ...unless the songs failed too: then the albums' Try again asks them again
-    type('glory box portishead')
-    await advance(700)
-    asks.songs.at(-1).reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    asks.musicbrainz.at(-1).reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
-    draw()
-    const bothFailed = asks.songs.length
-    find((node) => node.type === 'button' && text(node) === 'Try again', section())[0].props.onClick()
-    check('both halves failing: the albums\' Try again asks the songs again too', [asks.songs.length - bothFailed, asks.songs.at(-1).query],
-      [1, 'recording:"glory box" AND (artist:"Portishead" OR artistname:"Portishead")'])
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await answerOwned(holding(DUMMY))
-    draw()
-
-    console.log('\n...a few at first, More shows the rest, then asks for the next page')
-    type('hey jude')
-    await advance(700)
-    check('words with no artist you have: asked as typed', asks.songs.at(-1).query, 'hey jude')
-    asks.songs.at(-1).resolve(heyJudeFree)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('eleven songs (each artist\'s cover its own), three shown, then More songs', [songRows().length, text(moreSongs())], [3, 'More songs'])
-    const page2 = asks.songs.length
-    moreSongs().props.onClick()
-    draw()
-    check('More shows the songs in hand first - nothing asked - and says how many', [songRows().length, asks.songs.length - page2, said()], [11, 0, '8 more songs'])
-    check('...the button still there: MusicBrainz counts more', text(moreSongs()), 'More songs')
-    moreSongs().props.onClick()
-    draw()
-    const next = asks.songs.at(-1)
-    check('then the next page of the same search, from every recording got (12), busy meanwhile - a second tap refused',
-      [next.query, next.offset, text(moreSongs()), moreSongs().props['aria-busy'], moreSongs().props['aria-disabled'], moreSongs().props.disabled], ['hey jude', 12, 'Asking MusicBrainz…', true, true, undefined])
-    moreSongs().props.onClick()
-    check('...', asks.songs.length - page2, 1)
-    next.reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
-    draw()
-    check('MusicBrainz away: said, the songs kept, Try again asks the same page', [text(find(byClass('app-search-more-note'), songsSection())[0]), songRows().length, text(moreSongs())],
-      ["MusicBrainz isn't answering just now - it often goes away for a few minutes.", 11, 'Try again'])
-    moreSongs().props.onClick()
-    check('...', asks.songs.at(-1).offset, 12)
-    const covers = [...heyJudeFree.recordings.slice(0, 2).map((r) => ({ ...r, id: `again-${r.id}` })), { ...heyJudeFree.recordings[3], id: 'new-1', 'artist-credit': [{ name: 'Somebody New', artist: { id: 'nobody' } }] }]
-    asks.songs.at(-1).resolve({ recordings: covers, count: 15 })
-    await settle()
-    draw()
-    check('a page merged in: takes of songs drawn add albums in place, a new song comes after - every row above as it was',
-      [songRows().length, songRows()[0], songRows().at(-1)[1].startsWith('Somebody New'), said()],
-      [12, ['Hey Jude (Hey Jude)', 'The Beatles Revival Band · 6:29 · Ein Flug in die DDR'], true, '1 more song from MusicBrainz'])
-    check('...every answer in (15 of 15): no button', moreSongs(), undefined)
-
-    console.log('\n...a song on no album or EP: its albums listed at once, under the fold\'s words')
-    type('miss misery')
-    await advance(700)
-    asks.songs.at(-1).resolve(misery)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    songButton().props.onClick()
-    draw()
-    check('no fold to open: the words as a caption, all eleven listed', [find(byClass('app-song-fold'), songsSection()).length, text(find(byClass('app-song-caption'), songsSection())[0]), albumsOf().length],
-      [0, 'On 11 compilations, live albums and soundtracks', 11])
-
-    console.log('\n...only the newest answer, and the album half\'s rules')
-    type('roads portishead')
-    await advance(700)
-    const old = asks.songs.at(-1)
-    type('glory box portishead')
-    await advance(700)
-    check('a new search calls the old one off', old.signal.aborted, true)
-    old.resolve(roads)
-    await settle()
-    draw()
-    check('...whose answer never draws', text(find(byClass('app-asking'), songsSection())[0]), 'Asking MusicBrainz…')
-    const glory = asks.songs.at(-1)
-    type('gl')
-    check('the box cut back below three characters: the songs called off, and gone', [glory.signal.aborted, songsSection()], [true, undefined])
-    type('portishead')
-    await advance(700)
-    draw()
-    check('an artist\'s name alone: no songs asked, no songs section', [asks.songs.at(-1) === glory, songsSection()], [true, undefined])
-    //? (review) the same words again after the box was cut back: asked again, never "already answered" with nothing drawn
-    type('roads portishead')
-    await advance(700)
-    asks.songs.at(-1).resolve(roads)
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    const retyped = asks.songs.length
-    type('ro')
-    type('roads portishead')
-    await advance(700)
-    check('cut back and typed again: the songs asked again', asks.songs.length - retyped, 1)
-    asks.songs.at(-1).resolve(roads)
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('...and drawn again', songRows().map(([title]) => title), ['Roads'])
-
-    //? (review) a title beside an artist that finds no song: asked again as the words typed AS ONE TITLE - not the
-    //? words loose, which matched strangers' songs titled after the artist above an album's words
-    type('the slow rush portishead')
-    await advance(700)
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    check('a title beside an artist that finds nothing: asked again as the words typed, as one title', asks.songs.at(-1).query, 'recording:"the slow rush portishead"')
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('...finding nothing either, before the albums are drawn: no section - the albums answer for the words', songsSection(), undefined)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await settle()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await settle()
-    draw()
-    check('...nor after', [songsSection(), text(find(byClass('app-search-empty'), section())[0])], [undefined, 'Nothing on MusicBrainz for “the slow rush portishead”.'])
-    const freeBefore = asks.songs.length
-    type('zzyzx qwerty')
-    await advance(700)
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('words with no artist you have, finding nothing: asked once - the same words aren\'t asked twice - and no section', [asks.songs.length - freeBefore, songsSection()], [1, undefined])
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await answerOwned(holding(DUMMY))
-
-    //? (review) recordings found, none of them on a release: said so - not "No songs" - and More when MusicBrainz counts more
-    const bare = (n) => Array.from({ length: n }, (_, at) => ({ id: `bare-${at}`, title: `Roads (take ${at})`, 'artist-credit': [{ name: 'Portishead', artist: { id: 'P' } }], releases: [] }))
-    const bareBefore = asks.songs.length
-    type('roads remix portishead')
-    await advance(700)
-    asks.songs.at(-1).resolve({ recordings: bare(25), count: 40 })
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('a page of recordings on no release: said, no fallback asked, and More for the next page',
-      [asks.songs.length - bareBefore, text(find(byClass('app-search-empty'), songsSection())[0]), songRows().length, text(moreSongs())],
-      [1, 'MusicBrainz has songs for “roads remix portishead”, but on no release yet - nothing to get.', 0, 'More songs'])
-    moreSongs().props.onClick()
-    check('...which asks the next page', asks.songs.at(-1).offset, 25)
-    asks.songs.at(-1).resolve({ recordings: roads.recordings.slice(3, 4), count: 40 })
-    await settle()
-    draw()
-    check('...whose song is drawn', songRows().map(([title]) => title), ['Roads'])
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await answerOwned(holding(DUMMY))
-
-    type('only you portishead')
-    await advance(700)
-    asks.songs.at(-1).reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
-    draw()
-    const albumAsks = asks.musicbrainz.length
-    check('the songs failing: said, with their own Try again', [text(find(byClass('app-search-empty'), songsSection())[0]), text(find((node) => node.type === 'button', find(byClass('app-search-problem'), songsSection())[0])[0])],
-      ["MusicBrainz isn't answering just now - it often goes away for a few minutes.", 'Try again'])
-    find((node) => node.type === 'button', find(byClass('app-search-problem'), songsSection())[0])[0].props.onClick()
-    check('...which asks the songs again, not the albums', [asks.songs.at(-1).query, asks.musicbrainz.length - albumAsks], ['recording:"only you" AND (artist:"Portishead" OR artistname:"Portishead")', 0])
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-    await answerOwned(holding(DUMMY))
-
-    console.log('\n...the songs slower than the albums: the albums drawn as they always were, the songs folded in the slot')
-    type('sour times portishead')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('the albums drawn the moment they and the library have answered - never waiting for the songs (review)', [rows().length, text(find(byClass('app-asking'), slot())[0])], [1, 'Asking MusicBrainz…'])
-    asks.songs.at(-1).resolve(roads)
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('...the songs landing after them: folded into the slot - "Show songs", no rows - so nothing drawn below moves', [songRows().length, text(showSongs()), !!slot(), said()],
-      [0, 'Show songs', true, '1 song on MusicBrainz - Show songs to see them'])
-    showSongs().props.onClick()
-    draw()
-    check('...shown at a tap: the songs, the slot gone', [songRows().map(([title]) => title), slot()], [['Roads'], undefined])
-    type('hey jude late')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-    await answerOwned(holding(DUMMY))
-    draw()
-    asks.songs.at(-1).resolve(heyJudeFree)
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    showSongs().props.onClick()
-    draw()
-    check('...a few of them, as a search drawn at once shows, More for the rest', [songRows().length, text(moreSongs())], [3, 'More songs'])
-    type('teardrop portishead')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-    await answerOwned(holding(DUMMY))
-    draw()
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('...finding nothing, after the albums: said in the slot, which stays', [!!slot(), text(find(byClass('app-search-empty'), slot())[0])],
-      [true, 'No songs on MusicBrainz for “teardrop portishead”.'])
-    type('wandering star portishead')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-    await answerOwned(holding(DUMMY))
-    draw()
-    asks.songs.at(-1).reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
-    await settle()
-    draw()
-    const lateRow = () => find(byClass('is-row'), songsSection())[0]
-    check('...failing after the albums: said in the slot, with a Try again of its own', [text(find(byClass('app-search-empty'), lateRow())[0]), text(find((node) => node.type === 'button', lateRow())[0])],
-      ["MusicBrainz isn't answering.", 'Try again'])
-    const lateAsks = asks.songs.length
-    find((node) => node.type === 'button', lateRow())[0].props.onClick()
-    asks.songs.at(-1).resolve(roads)
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('...which asks them again - asked for, they open at once', [asks.songs.length - lateAsks, songRows().map(([title]) => title), slot()], [1, ['Roads'], undefined])
-    type('roads take portishead')
-    await advance(700)
-    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-    await answerOwned(holding(DUMMY))
-    draw()
-    asks.songs.at(-1).resolve({ recordings: bare(25), count: 40 })
-    await settle()
-    await answerOwned(holding(DUMMY))
-    draw()
-    check('...a late page on no release with more to come: More songs in the slot', [text(showSongs()), songRows().length], ['More songs', 0])
-    showSongs().props.onClick()
-    asks.songs.at(-1).resolve({ recordings: roads.recordings.slice(3, 4), count: 40 })
-    await settle()
-    draw()
-    check('...which asks the next page and opens', [asks.songs.at(-1).offset, songRows().map(([title]) => title), slot()], [25, ['Roads'], undefined])
-
-    console.log('\n...focus handed on as More songs, or Show songs, goes')
-    {
-      const focused = []
-      const body = { name: 'body' }
-      const button = { name: 'More songs' }
-      const show = { name: 'Show songs' }
-      const note = { focus: () => focused.push('note') }
-      //? the section as the browser would have it, its song rows as many as are drawn
-      const standIn = () => {
-        songsSection().props.ref.current = {
-          querySelector: (selector) => (selector === '.app-search-more' ? button : selector === '.app-song-show' ? show : selector === '.app-search-more-note' ? note
-            : selector === '.app-song-row' ? { focus: () => focused.push('song 0') } : null),
-          querySelectorAll: (selector) => (selector === '.app-song-row' ? Array.from({ length: songRows().length }, (_, at) => ({ focus: () => focused.push(`song ${at}`) })) : []),
-        }
-      }
-      type('hey jude!')
-      await advance(700)
-      asks.songs.at(-1).resolve({ ...heyJudeFree, count: 12 })
-      asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-      await settle()
-      await answerOwned(holding(DUMMY))
-      draw()
-      standIn()
-      globalThis.document = { activeElement: button, body }
-      moreSongs().props.onClick()
-      if (globalThis.document.activeElement === button) globalThis.document.activeElement = body
-      draw()
-      check('the songs in hand shown, the last of them: focus to the first song it showed', [moreSongs(), focused], [undefined, ['song 3']])
-      focused.length = 0
-      type('hey jude?')
-      await advance(700)
-      asks.songs.at(-1).resolve({ recordings: heyJudeFree.recordings.slice(0, 2), count: 4 })
-      asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-      await settle()
-      await answerOwned(holding(DUMMY))
-      draw()
-      standIn()
-      globalThis.document = { activeElement: button, body }
-      moreSongs().props.onClick()
-      draw()
-      //? the same two songs again, each on an album of its own: only albums - no new song
-      const elsewhere = (r) => ({ ...r, id: `${r.id}-again`, releases: r.releases.map((release) => ({ ...release, id: `${release.id}-2`, 'release-group': { ...release['release-group'], id: `${release['release-group'].id}-2` } })) })
-      asks.songs.at(-1).resolve({ recordings: heyJudeFree.recordings.slice(0, 2).map(elsewhere), count: 4 })
-      await settle()
-      if (globalThis.document.activeElement === button) globalThis.document.activeElement = body
-      draw()
-      check('a last page that brought only albums: focus to the note said in the button\'s place', [moreSongs(), focused, text(find(byClass('app-search-more-note'), songsSection())[0])],
-        [undefined, ['note'], 'No new songs - 2 more albums for the songs above.'])
-      focused.length = 0
-      //? (review) a song whose take on the first page was on no release, back on the last page: after the song drawn - and focus to IT
-      const free = recorded('roads-portishead-free').recordings
-      type('breathe roads!')
-      await advance(700)
-      asks.songs.at(-1).resolve({ recordings: [free[4], free[0]], count: 3 })
-      asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-      await settle()
-      await answerOwned(holding(DUMMY))
-      draw()
-      standIn()
-      globalThis.document = { activeElement: button, body }
-      moreSongs().props.onClick()
-      draw()
-      asks.songs.at(-1).resolve({ recordings: [free[3]], count: 3 })
-      await settle()
-      if (globalThis.document.activeElement === button) globalThis.document.activeElement = body
-      draw()
-      check('...a song first seen bare, back on the last page: after the one drawn, and focus to it', [songRows().map(([, line]) => line.split(' · ')[0]), focused], [['The Last Embrace', 'DJ Tripp'], ['song 1']])
-      focused.length = 0
-      type('glory box portishead!')
-      await advance(700)
-      asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-      await answerOwned(holding(DUMMY))
-      draw()
-      asks.songs.at(-1).resolve({ recordings: [], count: 0 })
-      await settle()
-      asks.songs.at(-1).resolve(roads)
-      await settle()
-      await answerOwned(holding(DUMMY))
-      draw()
-      standIn()
-      globalThis.document = { activeElement: show, body }
-      showSongs().props.onClick()
-      if (globalThis.document.activeElement === show) globalThis.document.activeElement = body
-      draw()
-      check('"Show songs" tapped from the keyboard: focus to the first song as the button goes', focused, ['song 0'])
-      focused.length = 0
-      type('glory box portishead?')
-      await advance(700)
-      asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND] })
-      await answerOwned(holding(DUMMY))
-      draw()
-      asks.songs.at(-1).resolve(roads)
-      await settle()
-      await answerOwned(holding(DUMMY))
-      draw()
-      standIn()
-      globalThis.document = { activeElement: body, body }
-      showSongs().props.onClick()
-      draw()
-      check('...tapped by a finger (WebKit focuses nothing): focus left alone', focused, [])
-      delete globalThis.document
-      songsSection().props.ref.current = null
-    }
-
-    console.log('\n...as far into one search as deadwax goes')
-    {
-      type('roads portishead far')
-      await advance(700)
-      const take = (n) => ({ ...roads.recordings[3], id: `far-${n}` })
-      asks.songs.at(-1).resolve({ recordings: Array.from({ length: 25 }, (_, at) => take(at)), count: 5000 })
-      asks.musicbrainz.at(-1).resolve({ 'release-groups': [] })
-      await settle()
-      await answerOwned(holding(DUMMY))
-      draw()
-      let pages = 1
-      while (moreSongs() && pages < 50) {
-        moreSongs().props.onClick()
-        asks.songs.at(-1).resolve({ recordings: Array.from({ length: 25 }, (_, at) => take(pages * 25 + at)), count: 5000 })
-        await settle()
-        draw()
-        pages++
-      }
-      check('More songs up to the route\'s bound (1,000 answers in), then said instead', [asks.songs.at(-1).offset, moreSongs(), text(find(byClass('app-search-more-note'), songsSection()).at(-1))],
-        [1000, undefined, "That's as far into one search as deadwax goes - add a word to narrow it."])
-    }
-    globalThis.__search.songsAuto = true
+    await advance(200)
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await advance(500)
   }
 
-  console.log('\nthe real MusicBrainz client (api/musicbrainz.ts): an offset sent only past the first page')
+  console.log('\nthe rest of the moments: no results, an empty late kind going, a superseded search, a refusal, "va"')
+  {
+    const answerAll = (from, albums = { 'release-groups': [], count: 0 }, songs = { recordings: [], count: 0 }, artists = ARTISTS_NONE) => {
+      const asked = newAsks(from)
+      asked.artists[0]?.resolve(artists)
+      asked.albums[0]?.resolve(albums)
+      asked.songs[0]?.resolve(songs)
+    }
+    const none = await search('zzyzx qwerty', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    answerAll(none)
+    await answerOwned(holding(DUMMY))
+    check('no results - the library found nothing and every kind asked answered empty: "No results for “…”", and what to do',
+      find(byClass('app-search-foot')).map((node) => text(node)), ['No results for “zzyzx qwerty”Check the spelling or try a new search.'])
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    check('...in a kind view: "No albums for “…”."', text(find(byClass('app-search-foot')).at(-1)), 'No albums for “zzyzx qwerty”.')
+    chip('All').props.onClick()
+    draw()
+
+    //? a superseded search counts for nothing: Behind stays off
+    const superseded = await search('aphex', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    check('(a search asked of MusicBrainz)', newAsks(superseded).albums.length, 1)
+    const next = await search('aphex twin', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    check('a search superseded before its cap - you typed on - calls its asks off and turns no Behind on', newAsks(superseded).albums[0].signal.aborted, true)
+    answerAll(next)
+    await answerOwned(holding(DUMMY))
+    await search('aphex twin selected', { artists: [], albums: [], songs: [libSong('s-x', 'Xtal', 'nd-saw', 'Selected Ambient Works')] })
+    check('...the next draws by its moments (Top results and the asking line), not Behind\'s slots', [kinds(), asking().length], [[], 1])
+    await advance(500)
+    answerAll(newAsks({ library: 0, albums: asks.musicbrainz.length - 1, artists: asks.artists.length - 1, songs: asks.songs.length - 1, order: 0 }))
+    await answerOwned(holding(DUMMY))
+
+    //? a refusal: the words, no Try again - and Behind left as it was (off)
+    const refusedFrom = await search('ac/dc ((', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const refusedAsked = newAsks(refusedFrom)
+    refusedAsked.artists[0].resolve(ARTISTS_NONE)
+    refusedAsked.albums[0].reject(refused())
+    refusedAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await search('acdc', { artists: [], albums: [], songs: [libSong('s-tnt', 'TNT', 'nd-hv', 'High Voltage')] })
+    check('a refused search (a 422) turns no Behind on: the next draws by its moments', [kinds(), asking().length], [[], 1])
+    await advance(500)
+    answerAll(newAsks({ library: 0, albums: asks.musicbrainz.length - 1, artists: asks.artists.length - 1, songs: asks.songs.length - 1, order: 0 }))
+    await answerOwned(holding(DUMMY))
+
+    //? "va": Various Artists - today's query, unfiltered, no studio line
+    const va = await search('va', { artists: [], albums: [], songs: [] })
+    enter()
+    const vaAsked = newAsks(va)
+    check('"va" reads as Various Artists: asked unfiltered - never the studio clause (its records are compilations by nature)', vaAsked.albums.map((ask) => ask.query), ['artist:"Various Artists"'])
+    vaAsked.albums[0].resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-0000000000c1', title: 'Pure Moods', 'primary-type': 'Album', 'secondary-types': ['Compilation'], 'first-release-date': '1994' }], count: 1 })
+    vaAsked.artists[0]?.resolve(ARTISTS_NONE)
+    await answerOwned(holding(DUMMY))
+    check('...and no studio line under its albums', find(byClass('app-search-filter-note')).length, 0)
+
+    //? Behind on, a late kind with no library rows landing empty and last: its section goes, head and all
+    const lateFrom = await search('zz top', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const lateAsked = newAsks(lateFrom)
+    lateAsked.artists[0].resolve(ARTISTS_NONE)
+    lateAsked.albums[0].resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-0000000000e1', title: 'Eliminator', 'primary-type': 'Album', 'first-release-date': '1983' }], count: 1 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    check('(the songs past the cap: a Songs section with only its slot)', [kinds(), slotText('songs'), keysOf('songs')], [['albums', 'songs'], 'Asking MusicBrainz…', []])
+    lateAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    invariant('an empty late kind, last')
+    check('a late kind landing empty, nothing tappable below, no library rows: its section goes, head and all', kinds(), ['albums'])
+  }
+
+  console.log('\nthe studio line decided with the sections - never added under Albums as its late answer lands (the real page found it)')
+  {
+    forgetAnswers()
+    const from = await search('portishead', { artists: [P], albums: [ndDummy], songs: [libSong('s-roads', 'Roads')] })
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(portisheadArtists)
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    invariant('the cap, albums out')
+    const note = () => find(byClass('app-search-filter-note')).map(text)
+    check('albums late at the cap: Albums drawn with its slot and - its request carrying the studio clause - the studio line already under it, Songs below',
+      [kinds(), slotText('albums'), note()], [['artists', 'albums', 'songs'], 'Asking MusicBrainz…', ["MusicBrainz's studio albums and EPs - See all for everything they made."]])
+    asked.albums[0].resolve(studio)
+    await answerOwned(holding(DUMMY))
+    invariant('the studio answer landing late')
+    check('...the answer landing folds into the slot; the line was there all along - nothing below moved', [slotText('albums'), note().length], ['Show 3 albums from MusicBrainz', 1])
+  }
+
+  console.log('\nMore from MusicBrainz in the Albums view; See all without focus; Show them and the last More handing focus on')
+  {
+    const from = await search('bristol sound', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const asked = newAsks(from)
+    const albums = (start, end) => Array.from({ length: end - start }, (_, n) => ({ id: `00000000-0000-4000-8000-${String(start + n).padStart(12, '0')}`, title: `Album ${start + n}`, 'primary-type': 'Album' }))
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': albums(0, 12), count: 18 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    const focused = []
+    const rootRef = () => find(byClass('app-search'))[0].props.ref
+    chipsOf().props.ref.current = { scrollIntoView() {}, querySelector: () => ({ focus: () => focused.push('chip') }) }
+    globalThis.document = { activeElement: { name: 'elsewhere' }, body: { name: 'body' } }
+    seeAll('albums').props.onClick({ currentTarget: seeAll('albums') })
+    draw()
+    check('See all tapped by a finger (it never had focus): focus left alone', focused, [])
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    check('the Albums view: the twelve, More from MusicBrainz under them', [keysOf('albums').length, text(find(byClass('app-search-more'))[0])], [12, 'More from MusicBrainz'])
+    const more = find(byClass('app-search-more'))[0]
+    dom.use()
+    dom.press(more)
+    check('More asks the same search\'s next page by offset, quick', [asks.musicbrainz.at(-1).query, asks.musicbrainz.at(-1).offset, asks.musicbrainz.at(-1).quick], ['bristol sound', 12, true])
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': albums(12, 18), count: 18 })
+    await settle()
+    draw()
+    check('...its last page appended below, the button gone - focus (it had it) to the first album it brought', [keysOf('albums').length, find(byClass('app-search-more')).length, dom.focused, said()],
+      [18, 0, [`row:group:${albums(12, 13)[0].id}`], '6 more albums from MusicBrainz'])
+    dom.leave()
+    void rootRef
+    chip('All').props.onClick()
+    draw()
+  }
+
+  //? what a list draws in its library's place at the top: a slot outside every section
+  const libraryPlaceText = () => {
+    const inSections = find((node) => node.type === 'section' && node.props['aria-labelledby']).flatMap((section) => find(byClass('app-search-slot'), section))
+    return find(byClass('app-search-slot')).filter((node) => !inSections.includes(node)).map(text)
+  }
+  const PID = '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11'
+  const down = { configured: true, ok: false, server: null, problem: 'connection refused' }
+  const TYPE_MORE_WORDS = 'Type a little more, or press Search, to ask MusicBrainz too.'
+
+  console.log('\na box cut back below three characters, and the same words typed again (the review trap, kept)')
+  {
+    await remount()
+    const from = await search('portis', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    const asked = newAsks(from)
+    check('(MusicBrainz asked for "portis": every kind)', [asked.albums.length, asked.artists.length, asked.songs.length], [1, 1, 1])
+    type('po')
+    check('cut back below three characters: every kind still out called off at once', [asked.albums[0].signal.aborted, asked.artists[0].signal.aborted, asked.songs[0].signal.aborted], [true, true, true])
+    await advance(200)
+    asks.library.at(-1).resolve({ artists: [P], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('...its own library settled: the short words\' list, no MusicBrainz row of the longer words - the foot saying how to ask',
+      [find(byClass('app-search-list'))[0]?.props['data-text'], keysOf('albums').filter((key) => key.startsWith('group:')), text(find(byClass('app-search-foot'))[0])], ['po', [], TYPE_MORE_WORDS])
+    const again = await search('portis', { artists: [], albums: [], songs: [] })
+    await advance(499)
+    check('the same words typed again: nothing asked before the pause', [newAsks(again).albums.length, newAsks(again).artists.length, newAsks(again).songs.length], [0, 0, 0])
+    await advance(1)
+    check('...then every kind asked again - words called off are never taken as answered (review: MusicBrainz\'s part sat empty)',
+      [newAsks(again).albums.length, newAsks(again).artists.length, newAsks(again).songs.length], [1, 1, 1])
+    newAsks(again).albums[0].resolve({ 'release-groups': Array.from({ length: 12 }, (_, n) => ({ id: `00000000-0000-4000-8000-0000000p${String(n).padStart(4, '0')}`, title: `Portis ${n}`, 'primary-type': 'Album' })), count: 30 })
+    newAsks(again).artists[0].resolve(ARTISTS_NONE)
+    newAsks(again).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    //? a More page still out as the box is cut back: called off with the rest
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    find(byClass('app-search-more-musicbrainz'))[0].props.onClick()
+    draw()
+    const page = asks.musicbrainz.at(-1)
+    check('(More asked in the Albums view)', page.offset, 12)
+    type('po')
+    check('...the box cut back: the More page still out called off too', page.signal.aborted, true)
+    chip('All').props.onClick()
+    draw()
+  }
+
+  console.log('\nthe box read once MusicBrainz is asked: an artist the library names afterwards strands nothing asked (review)')
+  {
+    const TEB = { id: 'ar-teb', name: 'Third Eye Blind', albumCount: 1 }
+    await remount()
+    const from = { albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length, library: asks.library.length, order: asks.order.length }
+    type('third eye blind')
+    await advance(700)
+    const asked = newAsks(from)
+    check('MusicBrainz asked before the library answered: the box read as free text - every kind',
+      [asked.albums.map((ask) => ask.query), asked.artists.map((ask) => ask.name), asked.songs.map((ask) => ask.query)], [['third eye blind'], ['third eye blind'], ['third eye blind']])
+    await advance(300)
+    asks.library.at(-1).resolve({ artists: [TEB], albums: [], songs: [] })
+    await settle()
+    draw()
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    asked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('...search3 then naming the artist: the answers asked still in hand - the sections drawn, none asking, MusicBrainz\'s Third among the albums',
+      [kinds(), ['artists', 'albums', 'songs'].map(slotText), keysOf('albums').includes(`group:${THIRD.id}`)], [['artists', 'albums'], ['', '', ''], true])
+    await advance(20000)
+    check('...and so it stays: nothing asked again, no slot left asking', [newAsks(from).albums.length, newAsks(from).artists.length, newAsks(from).songs.length, ['artists', 'albums', 'songs'].map(slotText)],
+      [1, 1, 1, ['', '', '']])
+    enter()
+    const reread = newAsks(from)
+    check('Enter reads the box afresh - now an artist you have: their studio albums asked, the artists already in hand, no songs; the list drawn afresh (your own act)',
+      [reread.albums.length, reread.albums.at(-1).query.startsWith('(artist:"Third Eye Blind") AND'), reread.artists.length, reread.songs.length, kinds(), asking().length], [2, true, 1, 1, [], 1])
+    reread.albums.at(-1).resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-0000000000b1', title: 'Third Eye Blind', 'primary-type': 'Album', 'first-release-date': '1997' }], count: 1 })
+    await answerOwned(holding(DUMMY))
+    check('...its answer drawn at moment 2', [kinds(), keysOf('albums')], [['artists', 'albums'], ['group:00000000-0000-4000-8000-0000000000b1']])
+
+    //? Search pressed straight after typing - before the library answers - as a phone's keyboard does
+    await remount()
+    const quick = { albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length, order: asks.order.length }
+    type('third eye blind')
+    enter()
+    await advance(150)
+    asks.library.at(-1).resolve({ artists: [TEB], albums: [], songs: [] })
+    await settle()
+    draw()
+    const quickAsked = newAsks(quick)
+    quickAsked.artists[0].resolve(ARTISTS_NONE)
+    quickAsked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    quickAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(3000)
+    check('Search pressed before the library answered, the artist named after: drawn, none asking, nothing asked again',
+      [kinds(), ['artists', 'albums', 'songs'].map(slotText), keysOf('albums').includes(`group:${THIRD.id}`), [newAsks(quick).albums.length, newAsks(quick).artists.length, newAsks(quick).songs.length]],
+      [['artists', 'albums'], ['', '', ''], true, [1, 1, 1]])
+  }
+
+  console.log('\na letter typed and taken back while a kind is out: the run\'s cap still counts (review)')
+  {
+    await remount()
+    const from = await search('portishead', { artists: [P], albums: [ndDummy], songs: [libSong('s-roads', 'Roads')] })
+    await advance(500)
+    const asked = newAsks(from)
+    asked.artists[0].resolve(portisheadArtists)
+    await answerOwned(holding(DUMMY))
+    await advance(300)
+    type('portisheadx')
+    await advance(50)
+    type('portishead')
+    check('(back to exactly what MusicBrainz was asked for: nothing asked again, moment 1 drawn afresh)', [newAsks(from).albums.length, newAsks(from).artists.length, kinds(), asking().length], [1, 1, [], 1])
+    await advance(1499)
+    check('...a moment before the cap, counted from the letter taken back: the asking line', kinds(), [])
+    await advance(1)
+    check('...the cap: the sections drawn, the albums still out in their slot - never waiting on the slowest kind',
+      [kinds(), slotText('albums'), keysOf('artists'), keysOf('songs')], [['artists', 'albums', 'songs'], 'Asking MusicBrainz…', ['artist:ar1'], ['song:s-roads']])
+    asked.albums[0].resolve(studio)
+    await answerOwned(holding(DUMMY))
+    check('...the albums landing in their slot', slotText('albums'), 'Show 3 albums from MusicBrainz')
+
+    //? the library's own Try again for words MusicBrainz was asked for: its run's cap counts from the Try again too
+    await remount()
+    type('glory times')
+    await advance(200)
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await settle()
+    draw()
+    await advance(500)
+    asks.artists.at(-1).resolve(ARTISTS_NONE)
+    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
+    const slowAlbums = asks.musicbrainz.at(-1)
+    await answerOwned(holding(DUMMY))
+    await advance(1600)
+    dom.leave()
+    find((node) => node.type === 'button' && text(node) === 'Try again', find((node) => byClass('app-search-problem')(node) && !byClass('app-search-foot')(node))[0])[0].props.onClick({ currentTarget: {} })
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('the library\'s Try again, the albums still out: moment 1 again (the asking line, no sections)', [kinds(), asking().length], [[], 1])
+    await advance(1500)
+    check('...the cap counted from the Try again: the sections drawn, the albums in their slot - never waiting on the slowest kind', [kinds(), slotText('albums')], [['albums'], 'Asking MusicBrainz…'])
+    slowAlbums.resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+  }
+
+  console.log('\n"U2" and Search, MusicBrainz away: said as away - never "No results" (review)')
+  {
+    await remount()
+    type('U2')
+    await advance(200)
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    const from = { albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length, order: asks.order.length }
+    enter()
+    const asked = newAsks(from)
+    check('(Search pressed on two letters: every kind asked)', [asked.albums.length, asked.artists.length, asked.songs.length], [1, 1, 1])
+    asked.albums[0].reject(away())
+    await settle()
+    draw()
+    asked.artists[0].reject(away())
+    asked.songs[0].reject(away())
+    await answerOwned(holding(DUMMY))
+    check('every kind failing at once: the foot says MusicBrainz isn\'t answering, with Try again - no "No results", no "Type a little more"',
+      [find(byClass('app-search-foot')).map(text), find((node) => node.type === 'p' && /No results|Type a little more/.test(text(node))).length],
+      [["MusicBrainz isn't answering just now - it often goes away for a few minutes.Try again"], 0])
+    //? the albums failing first, the others answering: the failure in its own slot, the artist drawn
+    const second = { albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length, order: asks.order.length }
+    type('U3')
+    await advance(200)
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    enter()
+    const secondAsked = newAsks(second)
+    secondAsked.albums[0].reject(away())
+    await settle()
+    draw()
+    secondAsked.artists[0].resolve({ matches: [{ mbid: '00000000-0000-4000-8000-0000000000u3', name: 'U3', disambiguation: 'a band', country: 'IE', type: 'Group', matched_as: 'U3' }], count: 1 })
+    secondAsked.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('...the albums failing alone: their slot says so with Try again, the artist MusicBrainz found drawn - never "No results"',
+      [kinds(), slotText('albums'), keysOf('artists'), find((node) => node.type === 'p' && /No results/.test(text(node))).length],
+      [['artists', 'albums'], "MusicBrainz isn't answering.Try again", ['mb-artist:00000000-0000-4000-8000-0000000000u3'], 0])
+    //? Search pressed before the library settled, the albums failing at once: never "press Search" after Search was pressed
+    const third = { albums: asks.musicbrainz.length, order: asks.order.length, artists: asks.artists.length, songs: asks.songs.length }
+    type('U4')
+    enter()
+    newAsks(third).albums[0].reject(away())
+    await settle()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('...Search pressed before the library settled, the albums failing first: no "Type a little more, or press Search"', find((node) => node.type === 'p' && text(node) === TYPE_MORE_WORDS).length, 0)
+    newAsks(third).artists[0].resolve(ARTISTS_NONE)
+    newAsks(third).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+  }
+
+  console.log('\nMore songs\' last page landing with focus: its first song, found by comparing keys - a song\'s key holds a newline no selector may (review)')
+  {
+    await remount()
+    await search('roads portishead', { artists: [], albums: [], songs: [] })
+    chip('Songs').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    await advance(500)
+    asks.songs.at(-1).resolve({ recordings: [recording('r1', 'Roads', 'Portishead', PID, ROSELAND)], count: 2 })
+    await answerOwned(holding(DUMMY))
+    dom.use()
+    dom.press(find(byClass('app-search-more-musicbrainz'))[0])
+    asks.songs.at(-1).resolve({ recordings: [recording('r2', 'Roads (Dub)', 'Portishead', PID, THIRD)], count: 2 })
+    await settle()
+    draw()
+    check('...focus to the song it brought (the stand-in DOM throws on a selector holding a newline, as a browser does)', dom.focused, [`row:mb-song:${PID}\nroads (dub)`])
+    dom.leave()
+    chip('All').props.onClick()
+    draw()
+  }
+
+  console.log('\na kind view while Navidrome is away, or its status not known: its own library asked the moment Navidrome is OK (review)')
+  {
+    await remount({ status: down })
+    const asksBefore = asks.library.length
+    type('teardrop')
+    await advance(200)
+    chip('Songs').props.onClick()
+    draw()
+    await advance(500)
+    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('Navidrome away: the Songs view MusicBrainz\'s alone - its library not asked, counted as empty', [asks.library.length - asksBefore, text(find(byClass('app-search-foot')).at(-1))],
+      [0, 'No songs for “teardrop”.'])
+    const before = asks.library.length
+    //? the gate's Try again: the status put away while it checks, then OK
+    draw({ status: null })
+    draw({ status })
+    check('Navidrome back: All\'s search3 and the Songs view\'s own both asked', asks.library.slice(before).map((ask) => [ask.text, ask.page?.counts ?? null]),
+      [['teardrop', null], ['teardrop', { artistCount: 0, albumCount: 0, songCount: 100 }]])
+    const teardrop = { artists: [], albums: [], songs: [libSong('s-tear', 'Teardrop', 'nd-mezz', 'Mezzanine')] }
+    asks.library.slice(before).find((ask) => ask.page)?.resolve(teardrop)
+    asks.library.slice(before).find((ask) => !ask.page)?.resolve(teardrop)
+    await settle()
+    draw()
+    check('...its library\'s row drawn - and no "No songs for" said any more', [keysOf('songs'), find((node) => node.type === 'p' && /No songs for/.test(text(node))).length], [['song:s-tear'], 0])
+    chip('All').props.onClick()
+    draw()
+
+    //? the status not known yet (the app's first check): the view waits for it, as All does - MusicBrainz's rows never first
+    await remount({ status: null })
+    type('protection')
+    await advance(200)
+    chip('Albums').props.onClick()
+    draw()
+    await advance(500)
+    const PROTECTION = { id: '00000000-0000-4000-8000-0000000000p7', title: 'Protection', 'primary-type': 'Album', 'first-release-date': '1994' }
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [PROTECTION], count: 1 })
+    await answerOwned(holding(DUMMY))
+    check('the status not known yet: the Albums view\'s library waits - none asked - MusicBrainz\'s row not drawn before it, one asking line, busy',
+      [asks.library.filter((ask) => ask.text === 'protection').length, keysOf('albums'), find(byClass('app-asking'), sectionOf('app-search-albums')).map(text), sectionOf('app-search-albums').props['aria-busy']],
+      [0, [], ['Searching your library and MusicBrainz…'], true])
+    draw({ status })
+    check('...the status OK: All\'s search3 and the view\'s own asked', asks.library.filter((ask) => ask.text === 'protection').map((ask) => ask.page?.counts ?? null),
+      [null, { artistCount: 0, albumCount: 50, songCount: 0 }])
+    asks.library.filter((ask) => ask.text === 'protection').forEach((ask) => ask.resolve({ artists: [], albums: [{ id: 'nd-prot', name: 'Protection', artist: 'Massive Attack', year: 1994 }], songs: [] }))
+    await settle()
+    draw()
+    check('...the view\'s library rows, then MusicBrainz\'s under them', keysOf('albums'), ['album:nd-prot', `group:${PROTECTION.id}`])
+    chip('All').props.onClick()
+    draw()
+
+    //? ...and known not OK after all: the view's library counts as empty, MusicBrainz's rows drawn
+    await remount({ status: null })
+    type('heat miser')
+    await advance(200)
+    chip('Albums').props.onClick()
+    draw()
+    await advance(500)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [PROTECTION], count: 1 })
+    await answerOwned(holding(DUMMY))
+    draw({ status: down })
+    check('...the status known not OK after all: counted as empty, MusicBrainz\'s row drawn, no asking line', [keysOf('albums'), find(byClass('app-asking'), sectionOf('app-search-albums')).length],
+      [[`group:${PROTECTION.id}`], 0])
+    chip('All').props.onClick()
+    draw({ status })
+  }
+
+  console.log('\na kind view: one asking line while its library is asked, and the region saying what it found (review)')
+  {
+    await remount()
+    await search('mezzanine', { artists: [], albums: [], songs: [] })
+    chip('Albums').props.onClick()
+    draw()
+    check('the Albums view before its library lands: one asking line where its rows go - not its heading alone',
+      [find(byClass('app-asking'), sectionOf('app-search-albums')).map(text), keysOf('albums'), said()], [['Searching your library and MusicBrainz…'], [], 'Showing albums.'])
+    asks.library.at(-1).resolve({ artists: [], albums: [{ id: 'nd-mezz', name: 'Mezzanine', artist: 'Massive Attack', year: 1998 }], songs: [] })
+    await settle()
+    draw()
+    check('...its rows drawn: the line gone, the region saying what the library found', [find(byClass('app-asking'), sectionOf('app-search-albums')).map(text), keysOf('albums'), said()],
+      [['Asking MusicBrainz…'], ['album:nd-mezz'], 'Showing albums. In your library: 1 album.'])
+    await advance(500)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-00000000me22', title: 'Mezzanine', 'primary-type': 'Album', 'first-release-date': '1998' }], count: 1 })
+    await answerOwned(holding(DUMMY))
+    check('...then MusicBrainz\'s, said as they draw', said(), 'From MusicBrainz: 1 album.')
+    chip('All').props.onClick()
+    draw()
+  }
+
+  console.log('\na text the library was once late for, typed again: drawn by its own clock (review)')
+  {
+    await remount()
+    type('portishead')
+    await advance(200)
+    await advance(1500)
+    asks.library.at(-1).resolve({ artists: [P], albums: [ndDummy], songs: [libSong('s-roads', 'Roads')] })
+    await settle()
+    draw()
+    const other = await search('radiohead', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    for (const ask of [newAsks(other).artists[0], newAsks(other).albums[0], newAsks(other).songs[0]]) ask?.resolve(ask === newAsks(other).artists[0] ? ARTISTS_NONE : { 'release-groups': [], recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    type('portishead')
+    check('typed again: the list drawn before stays until its own library settles - never at once as if late', [find(byClass('app-search-list'))[0]?.props['data-text'], libraryPlaceText()], ['radiohead', []])
+    await advance(200)
+    asks.library.at(-1).resolve({ artists: [P], albums: [ndDummy], songs: [libSong('s-roads', 'Roads')] })
+    await settle()
+    draw()
+    check('...its library answering in time: its rows drawn, never behind a Show them', [topKeys(), libraryPlaceText()], [['top:artist:ar1', 'top:album:nd-dummy', 'top:song:s-roads'], []])
+  }
+
+  console.log('\nan album found held after MusicBrainz\'s answer landed, the list drawn again: shown once (review)')
+  {
+    await remount()
+    await search('bristol trip', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [THIRD, DUMMY, ROSELAND], count: 3 })
+    asks.artists.at(-1).resolve(ARTISTS_NONE)
+    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('(Dummy, held and not listed by search3, brought in; MusicBrainz\'s Third and Roseland)', keysOf('albums'), [`group:${DUMMY.id}`, `group:${THIRD.id}`, `group:${ROSELAND.id}`])
+    //? Third filed meanwhile: what the library holds asked again
+    void Owned.refreshOwned()
+    await answerOwned(holding(DUMMY, THIRD))
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    chip('All').props.onClick()
+    draw()
+    check('Back to All: each album once - Third, held since, kept in MusicBrainz\'s block and marked there, its Get gone',
+      [keysOf('albums'), getOf(`group:${THIRD.id}`), getOf(`group:${ROSELAND.id}`) ? 'Get' : null], [[`group:${DUMMY.id}`, `group:${THIRD.id}`, `group:${ROSELAND.id}`], undefined, 'Get'])
+    void Owned.refreshOwned()
+    await answerOwned(holding(DUMMY))
+  }
+
+  console.log('\nthe library late, then Navidrome known away: its place never says it found nothing (review)')
+  {
+    await remount({ status: null })
+    type('roads')
+    await advance(200)
+    await advance(1500)
+    check('(the status not known: the list drawn as if the library found nothing, its place kept)', libraryPlaceText(), ['Searching your library…'])
+    draw({ status: down })
+    await settle()
+    draw()
+    check('...Navidrome known away: the place says the library can\'t be searched - not "Nothing in your library"', libraryPlaceText(), ["Your library can't be searched just now."])
+    draw({ status })
+    await settle()
+    draw()
+    check('...and Navidrome back fills it: the library asked', asks.library.at(-1).text, 'roads')
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [libSong('s-roads', 'Roads')] })
+    await settle()
+    draw()
+    check('...its answer landing in that place', libraryPlaceText(), ['1 in your library - Show them'])
+  }
+
+  console.log('\na kind view whose library was late, after a chip round trip: drawn afresh from what is in hand (review)')
+  {
+    await remount()
+    await search('bristol trip', { artists: [], albums: [], songs: [] })
+    chip('Albums').props.onClick()
+    draw()
+    await advance(1600)
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('(the view\'s library late: its place says Show them)', slotText('albums'), '1 in your library - Show them')
+    chip('All').props.onClick()
+    draw()
+    chip('Albums').props.onClick()
+    draw()
+    check('back to Albums: its library\'s row drawn, no place kept', [keysOf('albums')[0], slotText('albums')], ['album:nd-dummy', ''])
+    chip('All').props.onClick()
+    draw()
+  }
+
+  console.log('\nthe desktop sidebar\'s field is this box (2.0.0-player.19, app/searchBox.ts - the real one)')
+  {
+    const Box = require(path.join(OUT, 'app/searchBox.js'))
+    await remount()
+    Box.typeSearch('massive attack')
+    draw()
+    check('typing in the sidebar\'s field is typing here', [find((node) => node.type === 'input')[0].props.value, Box.searchText()], ['massive attack', 'massive attack'])
+    const before = { library: asks.library.length, albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length }
+    Box.submitSearch()
+    await settle()
+    draw()
+    check('...and its Enter is this box\'s: the library and MusicBrainz asked at once, no pause waited for',
+      [asks.library.length - before.library, asks.library.at(-1)?.text, asks.musicbrainz.length - before.albums, asks.artists.length - before.artists, asks.songs.length - before.songs], [1, 'massive attack', 1, 1, 1])
+  }
+
+  console.log('\nMore failing, and a second tap while it asks')
+  {
+    await remount()
+    const albums = (start, end) => Array.from({ length: end - start }, (_, n) => ({ id: `00000000-0000-4000-8000-0000000m${String(start + n).padStart(4, '0')}`, title: `Album ${start + n}`, 'primary-type': 'Album' }))
+    const from = await search('bristol sounds', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    newAsks(from).albums[0].resolve({ 'release-groups': albums(0, 12), count: 30 })
+    newAsks(from).artists[0].resolve({ matches: Array.from({ length: 10 }, (_, n) => ({ mbid: `00000000-0000-4000-8000-0000000a${String(n).padStart(4, '0')}`, name: `Bristol ${n}`, disambiguation: '', country: '', type: '', matched_as: '' })), count: 20 })
+    newAsks(from).songs[0].resolve({ recordings: Array.from({ length: 25 }, (_, n) => recording(`rb${n}`, `Bristol Song ${n}`, 'Someone', SOMEBODY, SOMEONE_ALBUM)), count: 60 })
+    await answerOwned(holding(DUMMY))
+    const moreButton = () => find(byClass('app-search-more-musicbrainz'))[0]
+    const note = () => find(byClass('app-search-more-note')).map(text)
+    for (const [kind, label, asked] of [['Albums', 'More from MusicBrainz', () => asks.musicbrainz], ['Artists', 'More from MusicBrainz', () => asks.artists], ['Songs', 'More songs', () => asks.songs]]) {
+      chip(kind).props.onClick()
+      draw()
+      asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+      await settle()
+      draw()
+      const rows = keysOf(kind.toLowerCase()).length
+      check(`(the ${kind} view: its rows, ${label} under them)`, text(moreButton()), label)
+      moreButton().props.onClick()
+      draw()
+      const page = asked().at(-1)
+      check(`${kind}: More asking - the button busy, aria-disabled, never disabled`, [text(moreButton()), moreButton().props['aria-busy'], moreButton().props['aria-disabled'], moreButton().props.disabled],
+        ['Asking MusicBrainz…', true, true, undefined])
+      moreButton().props.onClick()
+      draw()
+      check(`...a second tap while it asks asks nothing`, asked().at(-1) === page, true)
+      page.reject(away())
+      await settle()
+      draw()
+      check(`...MusicBrainz away: said, the rows kept, the button trying again`, [note(), keysOf(kind.toLowerCase()).length, text(moreButton())],
+        [["MusicBrainz isn't answering just now - it often goes away for a few minutes."], rows, 'Try again'])
+      moreButton().props.onClick()
+      draw()
+      check(`...Try again asks the same page`, [asked().at(-1) !== page, asked().at(-1).offset], [true, page.offset])
+      asked().at(-1).reject(away())
+      await settle()
+      draw()
+    }
+    chip('All').props.onClick()
+    draw()
+  }
+
+  console.log('\na kind view\'s Try again and Show them hand focus on, as All\'s do (review)')
+  {
+    await remount()
+    await search('nude day', { artists: [], albums: [], songs: [] })
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await settle()
+    draw()
+    dom.use()
+    dom.press(find((node) => node.type === 'button' && text(node) === 'Try again', sectionOf('app-search-albums'))[0])
+    check('the Albums view\'s library Try again from the keyboard: focus to the view\'s heading as the button goes - never the body', dom.focused, ['#app-search-albums'])
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    await advance(500)
+    asks.musicbrainz.at(-1).reject(away())
+    await answerOwned(holding(DUMMY))
+    dom.use()
+    dom.press(find((node) => node.type === 'button' && text(node) === 'Try again', sectionOf('app-search-albums'))[0])
+    check('...its MusicBrainz Try again the same', dom.focused, ['#app-search-albums'])
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    const late = await search('nude dawn', { artists: [], albums: [], songs: [] })
+    await advance(1600)
+    asks.library.slice(late.library).find((ask) => ask.page).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    dom.use()
+    dom.press(buttonText('1 in your library - Show them', sectionOf('app-search-albums')))
+    check('...the view\'s late library\'s Show them: focus to the first row it brought', dom.focused, ['row:album:nd-dummy'])
+    dom.leave()
+    chip('All').props.onClick()
+    draw()
+  }
+
+  console.log('\nthe rest of the slice\'s rules, each pinned (review)')
+  {
+    //? (a) the box emptied in a kind view: the chip back to All - words typed after open in All
+    await remount()
+    await search('mezzanine', { artists: [], albums: [], songs: [] })
+    chip('Songs').props.onClick()
+    draw()
+    type('')
+    type('teardrop')
+    check('the box emptied in a kind view, then words typed: All pressed again', find((node) => node.type === 'button' && node.props['aria-pressed'] === true, chipsOf()).map(text), ['All'])
+    await advance(200)
+    asks.library.filter((ask) => ask.text === 'teardrop' && !ask.page).at(-1)?.resolve({ artists: [], albums: [], songs: [] })
+    await advance(500)
+    for (const ask of [asks.artists.at(-1), asks.musicbrainz.at(-1), asks.songs.at(-1)]) ask.resolve(ask === asks.artists.at(-1) ? ARTISTS_NONE : { 'release-groups': [], recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+
+    //? (b) Behind on, a search the library finds nothing for: its own moments - nothing on screen to wait for
+    await remount()
+    const late = await search('cowboys', { artists: [], albums: [ndDummy], songs: [] })
+    await advance(500)
+    newAsks(late).artists[0].resolve(ARTISTS_NONE)
+    newAsks(late).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    newAsks(late).albums[0].resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    const nothingHere = await search('humming', { artists: [], albums: [ndDummy], songs: [] })
+    check('(Behind on: the next search the library found something for, drawn at the library\'s moment with slots)', [kinds().length > 0, asking().length], [true, 0])
+    await advance(500)
+    for (const ask of Object.values(newAsks(nothingHere)).slice(0, 3)) ask[0]?.resolve(ask === newAsks(nothingHere).artists ? ARTISTS_NONE : { 'release-groups': [], recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    //? (that one answered in time - Behind off; turned on again by a late one)
+    const lateAgain = await search('cowboys again', { artists: [], albums: [ndDummy], songs: [] })
+    await advance(500)
+    newAsks(lateAgain).artists[0].resolve(ARTISTS_NONE)
+    newAsks(lateAgain).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    newAsks(lateAgain).albums[0].resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await search('mysterons', { artists: [], albums: [], songs: [] })
+    check('Behind on, the library finding nothing: Behind doesn\'t apply - its own moments, the asking line, no slots', [kinds(), asking().length, find(byClass('app-search-slot')).length], [[], 1, 0])
+    await advance(500)
+    for (const ask of [asks.artists.at(-1), asks.musicbrainz.at(-1), asks.songs.at(-1)]) ask.resolve(ask === asks.artists.at(-1) ? ARTISTS_NONE : { 'release-groups': [], recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+
+    //? (c) a list drawn while Navidrome was away, Navidrome back: drawn afresh, the library in it
+    await remount({ status: down })
+    const awayFrom = await search('glory times', null)
+    await advance(500)
+    for (const ask of Object.values(newAsks(awayFrom)).slice(0, 3)) ask[0]?.resolve(ask === newAsks(awayFrom).artists ? ARTISTS_NONE : { 'release-groups': [], recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('(drawn while Navidrome was away: no library in it)', topKeys(), [])
+    draw({ status })
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('Navidrome back: the list drawn afresh for these words, the library\'s rows in it', [asks.library.at(-1).text, topKeys()[0], keysOf('albums')], ['glory times', 'top:album:nd-dummy', ['album:nd-dummy']])
+
+    //? (d) the full artist list failing: asked again when Navidrome comes back
+    const listAsks = asks.lists.length
+    await remount({ status }, null)
+    asks.lists.at(-1).reject(new Error('Navidrome is busy'))
+    await settle()
+    draw({ status: down })
+    draw({ status })
+    check('the full artist list failing: asked again as Navidrome comes back', asks.lists.length - listAsks, 2)
+
+    //? (e) the library failing: its problem at the top, with a Try again that asks it again
+    await remount()
+    type('wandering stars')
+    await advance(200)
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await settle()
+    draw()
+    const problem = find((node) => byClass('app-search-problem')(node) && !byClass('app-search-foot')(node))[0]
+    check('the library failing: its problem at the top of the list, with Try again', [text(find((node) => node.type === 'p', problem)[0]), text(find((node) => node.type === 'button', problem)[0])],
+      ['Navidrome had a problem', 'Try again'])
+    const libraryAsks = asks.library.length
+    find((node) => node.type === 'button', problem)[0]?.props.onClick({ currentTarget: {} })
+    draw()
+    check('...Try again asks the library again', [asks.library.length - libraryAsks, asks.library.at(-1).text], [1, 'wandering stars'])
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+  }
+
+  console.log('\nthe late recheck: Enter after a failure, Navidrome back after one, a kind view\'s words, Back to All said, the held album in the Albums view, the rules nothing pinned (late review)')
+  {
+    const MEZZ = { id: '00000000-0000-4000-8000-00000000me55', title: 'Mezzanine', 'primary-type': 'Album', 'first-release-date': '1998' }
+    const TEAR = { id: '00000000-0000-4000-8000-00000000te55', title: 'Teardrop', 'primary-type': 'Single', 'first-release-date': '1998' }
+    const problemAtTop = () => find((node) => byClass('app-search-problem')(node) && !byClass('app-search-foot')(node)).map((node) => text(find((n) => n.type === 'p', node)[0]))
+    const footBlock = () => find((node) => byClass('app-search-problem')(node) && byClass('app-search-foot')(node))
+    const tryAgains = () => find((node) => node.type === 'button' && text(node) === 'Try again').length
+    const asksNow = () => ({ library: asks.library.length, albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length, order: asks.order.length })
+    const answerAll = (from, albums = { 'release-groups': [], count: 0 }) => {
+      const asked = newAsks(from)
+      asked.albums[0]?.resolve(albums)
+      asked.artists[0]?.resolve(ARTISTS_NONE)
+      asked.songs[0]?.resolve({ recordings: [], count: 0 })
+    }
+
+    //? 1. Enter after a kind failed in All: the failed asked again AND the list drawn afresh - a drawn list is frozen, so
+    //? an answer to an ask again landed nowhere (the slot kept failing, its busy words turned to "isn't answering")
+    await remount()
+    const failedSlot = await search('mezzanine', { artists: [], albums: [], songs: [libSong('s-ang', 'Angel', 'nd-mezz', 'Mezzanine')] })
+    await advance(500)
+    newAsks(failedSlot).albums[0].reject(busy())
+    newAsks(failedSlot).artists[0].resolve(ARTISTS_NONE)
+    newAsks(failedSlot).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('(the albums failed busy, the others answered: Albums\' slot says so)', [kinds(), slotText('albums')], [['albums', 'songs'], 'MusicBrainz is busy just now - try again in a moment.Try again'])
+    const enterFrom = asksNow()
+    enter()
+    check('Enter after a failed slot: only the failed kind asked again - and the list drawn afresh by its moments (the asking line), as Try again draws it',
+      [newAsks(enterFrom).albums.length, newAsks(enterFrom).artists.length, newAsks(enterFrom).songs.length, kinds(), asking().length], [1, 0, 0, [], 1])
+    newAsks(enterFrom).albums[0].resolve({ 'release-groups': [MEZZ], count: 1 })
+    await answerOwned(holding(DUMMY))
+    check('...its answer drawn: Mezzanine among the albums, no failure left', [keysOf('albums'), slotOf('albums'), tryAgains()], [[`group:${MEZZ.id}`], undefined, 0])
+
+    //? ...after the all-failed foot
+    await remount()
+    const allFailed = await search('teardrop', { artists: [], albums: [ndDummy], songs: [] })
+    await advance(500)
+    for (const each of [newAsks(allFailed).albums[0], newAsks(allFailed).artists[0], newAsks(allFailed).songs[0]]) each.reject(away())
+    await answerOwned(holding(DUMMY))
+    check('(every kind failed: the foot\'s block)', footBlock().length, 1)
+    const footFrom = asksNow()
+    enter()
+    check('Enter after the all-failed foot: every kind asked again, the foot gone, the list drawn afresh by its moments',
+      [newAsks(footFrom).albums.length, newAsks(footFrom).artists.length, newAsks(footFrom).songs.length, footBlock().length, asking().length], [1, 1, 1, 0, 1])
+    answerAll(footFrom, { 'release-groups': [TEAR], count: 1 })
+    await answerOwned(holding(DUMMY))
+    check('...their answers drawn: Teardrop under your Dummy, no failure left', [keysOf('albums'), footBlock().length, tryAgains()], [['album:nd-dummy', `group:${TEAR.id}`], 0, 0])
+
+    //? ...after the library failed
+    await remount()
+    const libFailed = asksNow()
+    type('wandering stars')
+    await advance(200)
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await advance(500)
+    answerAll(libFailed)
+    await answerOwned(holding(DUMMY))
+    check('(the library failed: its problem at the top of the list)', problemAtTop(), ['Navidrome had a problem'])
+    const libEnter = asksNow()
+    enter()
+    check('Enter after the library failed: it is asked again (All\'s counts), MusicBrainz nothing more', [asks.library.slice(libEnter.library).map((ask) => [ask.text, ask.page]), newAsks(libEnter).albums.length],
+      [[['wandering stars', undefined]], 0])
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('...its answer drawn: the list drawn afresh with the library in it, the problem gone', [problemAtTop(), topKeys()[0], keysOf('albums')], [[], 'top:album:nd-dummy', ['album:nd-dummy']])
+    //? ...asked again and slow: its own late clock, as the library's Try again arms it - never the old failure standing
+    await remount()
+    const slowFrom = asksNow()
+    type('wandering stair')
+    await advance(200)
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await advance(500)
+    answerAll(slowFrom)
+    await answerOwned(holding(DUMMY))
+    //? (long after the first ask's own clock ran out)
+    await advance(3000)
+    enter()
+    await advance(1499)
+    check('(asked again, not answered yet: the list drawn as it was)', problemAtTop(), ['Navidrome had a problem'])
+    await advance(1)
+    check('...asked again and LIBRARY_LATE_MS passing: drawn as if it found nothing, its place kept - the old failure gone', [problemAtTop(), libraryPlaceText()], [[], ['Searching your library…']])
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('...its answer landing in that place', libraryPlaceText(), ['1 in your library - Show them'])
+
+    //? 2. Navidrome coming back after the library failed: asked again, and the list drawn afresh with it
+    await remount()
+    const backFrom = asksNow()
+    type('wandering star')
+    await advance(200)
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await advance(500)
+    answerAll(backFrom)
+    await answerOwned(holding(DUMMY))
+    check('(the library failed: its problem at the top of the list)', problemAtTop(), ['Navidrome had a problem'])
+    const backAsks = asks.library.length
+    draw({ status: down })
+    draw({ status })
+    check('Navidrome back after the library failed: All\'s search3 asked again', asks.library.slice(backAsks).map((ask) => [ask.text, ask.page]), [['wandering star', undefined]])
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    check('...the list drawn afresh for these words, the library\'s rows in it, its problem gone', [problemAtTop(), topKeys()[0], keysOf('albums')], [[], 'top:album:nd-dummy', ['album:nd-dummy']])
+
+    //? 3. a kind view whose own library failed: never "No albums for" under the failure - the library wasn't searched
+    await remount()
+    await search('zzqx', { artists: [], albums: [], songs: [] })
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await settle()
+    draw()
+    await advance(500)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    const albumsSection = sectionOf('app-search-albums')
+    check('a kind view whose library failed, MusicBrainz finding nothing: the failure with Try again and MusicBrainz\'s own words - no "No albums for" under them',
+      [text(find((node) => node.type === 'p', find(byClass('app-search-problem'), albumsSection)[0])[0]), find((node) => node.type === 'p', albumsSection).map(text).filter((each) => /^No albums/.test(each))],
+      ['Navidrome had a problem', ['No albums on MusicBrainz for “zzqx”.']])
+    chip('All').props.onClick()
+    draw()
+
+    //? 4. the Artists view under album-by-artist, the artist the box named not in the library's lists: it says so
+    await remount({}, null)
+    const named = await search('portishead third', { artists: [], albums: [], songs: [] })
+    await advance(500)
+    newAsks(named).albums[0]?.resolve({ 'release-groups': [THIRD], count: 1 })
+    newAsks(named).songs[0]?.resolve({ recordings: [], count: 0 })
+    await settle()
+    asks.songs.at(-1).resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    chip('Artists').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    check('the Artists view under album-by-artist, the named artist in none of the library\'s lists: "No artists for …" drawn and said - never a heading alone',
+      [keysOf('artists'), find((node) => node.type === 'p', sectionOf('app-search-artists')).map(text), said()],
+      [[], ['No artists for “portishead third”.'], 'Showing artists. No artists for “portishead third”.'])
+    chip('All').props.onClick()
+    draw()
+    //? ...the full list stale (they're not in it yet), All's search3 naming them, the view's own failing: they still lead
+    await remount({}, [{ id: 'ar-teb', name: 'Third Eye Blind' }])
+    await search('portishead third', { artists: [P], albums: [], songs: [] })
+    chip('Artists').props.onClick()
+    draw()
+    asks.library.at(-1).reject(new Error('Navidrome had a problem'))
+    await settle()
+    draw()
+    check('...an older full list without them: the artist All\'s search3 named leads, looked for among both (knownArtists, as All\'s pool does)', keysOf('artists'), ['artist:ar1'])
+    chip('All').props.onClick()
+    draw()
+
+    //? 5. the Albums view: an album you have that its own search3 didn't list is among MusicBrainz's rows at its place -
+    //? marked, no Get - and opens the album you have through the id bridge
+    await remount()
+    void Owned.refreshOwned()
+    await answerOwned(holding(DUMMY, THIRD))
+    draw()
+    await search('bristol sound', { artists: [], albums: [ndDummy], songs: [] })
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
+    await settle()
+    draw()
+    await advance(500)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND, THIRD, DUMMY], count: 3 })
+    await answerOwned(holding(DUMMY, THIRD))
+    check('the Albums view: Third (held, its search3 not listing it) among MusicBrainz\'s rows at its place, marked; Dummy (listed) once',
+      [keysOf('albums'), rowsOf('albums').map(([, line]) => line)],
+      [['album:nd-dummy', `group:${ROSELAND.id}`, `group:${THIRD.id}`], ['Portishead · 1994 · in your library', 'Live album · Portishead · 1998', 'Portishead · 2008 · in your library']])
+    check('...no Get on the album you have; Get on the one you don\'t', [getOf(`group:${THIRD.id}`), text(getOf(`group:${ROSELAND.id}`))], [undefined, 'Get'])
+    const bridged = []
+    const fetchBefore = globalThis.fetch
+    globalThis.fetch = (url) => { bridged.push(url); return Promise.resolve({ ok: true, status: 200, json: async () => ({ navidrome_id: 'nd-third' }) }) }
+    rowButton(`group:${THIRD.id}`).props.onClick()
+    await settle()
+    draw()
+    globalThis.fetch = fetchBefore
+    check('...its tap: the album you have, through the id bridge', [bridged.length, bridged[0]?.includes('release_mbid=rel-third'), opened.at(-1)], [1, true, { id: 'nd-third', name: 'Third', artist: 'Portishead' }])
+    chip('All').props.onClick()
+    draw()
+
+    //? 6. the rules nothing pinned: (a) More from the store, logins on
+    Session.setSessionMe({ user: 'ethan', admin: false, auth: 'on', version: '2.0.0-player.55' })
+    await remount()
+    asks.yours.at(-1)?.resolve([ndDummy])
+    await settle()
+    draw()
+    await search('store pages', { artists: [], albums: [], songs: [] })
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).resolve({ artists: [], albums: Array.from({ length: 50 }, (_, at) => ({ id: `nd-s${at}`, name: `Store Album ${at}`, artist: 'Somebody', year: 2001 })), songs: [] })
+    await settle()
+    draw()
+    check('logins on, a library of your own: a kind view\'s full page offers More from the store', text(find(byClass('app-search-more-library'))[0]), 'More from the store')
+    chip('All').props.onClick()
+    Session.setSessionMe(null)
+    draw()
+
+    //? (b) a late albums kind landing all held, something tappable below: its slot says so
+    await remount()
+    const heldLate = await search('glory box', { artists: [], albums: [ndDummy], songs: [libSong('s-glory', 'Glory Box')] })
+    await advance(500)
+    newAsks(heldLate).artists[0].resolve(ARTISTS_NONE)
+    newAsks(heldLate).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    check('(albums past the cap: its slot, Songs below it)', [kinds(), slotText('albums')], [['albums', 'songs'], 'Asking MusicBrainz…'])
+    newAsks(heldLate).albums[0].resolve({ 'release-groups': [DUMMY], count: 1 })
+    await answerOwned(holding(DUMMY))
+    check('a late albums kind landing with all it found held, something below: its slot says everything is in your library - not "No albums on MusicBrainz"',
+      slotText('albums'), 'Everything MusicBrainz found is in your library already.')
+
+    //? (d) under three characters, before the library answers: it alone is said to be searched
+    await remount()
+    type('po')
+    check('two characters before the library answers: "Searching your library…" - MusicBrainz isn\'t asked for them', text(asking()[0]), 'Searching your library…')
+    await advance(200)
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+  }
+
+  console.log('\nthe real MusicBrainz client (api/musicbrainz.ts): offsets past the first page only, `quick`, the artists, busy from the body')
   {
     const urls = []
     const fetchBefore = globalThis.fetch
     globalThis.fetch = (url) => { urls.push(url); return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) }
     const MB = require(path.join(OUT, 'api/musicbrainz.real.js'))
     await MB.fullySearch('artist:"Portishead"', 12, false)
-    await MB.fullySearch('artist:"Portishead"', 12, false, undefined, 0)
     await MB.fullySearch('artist:"Portishead"', 12, false, undefined, 24)
+    await MB.fullySearch('artist:"Portishead"', 12, false, undefined, 0, true)
     const query = (url) => Object.fromEntries(new URL(url, 'http://deadwax.test').searchParams)
-    check('the first page asked as it always was - no offset, so the same request and cache entry; a later page by its offset',
-      urls.map(query), [{ query: 'artist:"Portishead"', limit: '12', releases: 'false' }, { query: 'artist:"Portishead"', limit: '12', releases: 'false' },
-        { query: 'artist:"Portishead"', limit: '12', releases: 'false', offset: '24' }])
+    check('the first page asked as it always was; a later page by its offset; `quick` only from the app\'s Search',
+      urls.map(query), [{ query: 'artist:"Portishead"', limit: '12', releases: 'false' }, { query: 'artist:"Portishead"', limit: '12', releases: 'false', offset: '24' },
+        { query: 'artist:"Portishead"', limit: '12', releases: 'false', quick: 'true' }])
     urls.length = 0
-    await MB.searchSongs('recording:"roads"', 25)
+    await MB.searchArtists('kanye west', 10)
+    await MB.searchArtists('kanye west', 10, undefined, 10)
     await MB.searchSongs('recording:"roads"', 25, undefined, 25)
-    check('(2.0.0-player.53) the songs: /search_musicbrainz/songs, the limit asked, an offset only past the first page',
+    check('(2.0.0-player.55) the artists: /search_musicbrainz/artists by name, the limit asked, an offset only past the first page',
       urls.map((url) => [new URL(url, 'http://deadwax.test').pathname.replace(/^.*\/search_musicbrainz/, ''), query(url)]),
-      [['/songs', { query: 'recording:"roads"', limit: '25' }], ['/songs', { query: 'recording:"roads"', limit: '25', offset: '25' }]])
+      [['/artists', { name: 'kanye west', limit: '10' }], ['/artists', { name: 'kanye west', limit: '10', offset: '10' }], ['/songs', { query: 'recording:"roads"', limit: '25', offset: '25' }]])
+    //? busy: the 503's body says `busy: true` beside its words - read from the body, never the words
+    const answers = [{ status: 503, body: { detail: 'MusicBrainz is busy just now - try again in a moment.', busy: true } }, { status: 503, body: { detail: 'MusicBrainz is unreachable right now (busy)' } },
+      { status: 422, body: { detail: "MusicBrainz couldn't read that search - try other words" } }]
+    globalThis.fetch = () => { const next = answers.shift(); return Promise.resolve({ ok: false, status: next.status, json: async () => next.body }) }
+    const caught = []
+    for (let n = 0; n < 3; n++) await MB.searchArtists('x', 10).catch((error) => caught.push([error.constructor.name, error.status, error.busy]))
+    check('a 503 whose body says busy: MusicBrainzUnavailable, busy; any other 503 not busy (whatever its words); a 422 an ApiError with its words',
+      caught, [['MusicBrainzUnavailable', 503, true], ['MusicBrainzUnavailable', 503, false], ['ApiError', 422, false]])
     globalThis.fetch = fetchBefore
   }
 
-  console.log('\nthe real prefetch (player/api.ts): a scroll calls off a tile\'s ask, never one Search keeps')
+  console.log('\nthe real prefetch (player/api.ts): a scroll calls off a tile\'s ask, never one Search keeps; the library\'s page')
   {
     const fetches = []
     globalThis.fetch = (url, init) => new Promise((resolve, reject) => {
-      const entry = { url, aborted: false, answer: () => resolve({ ok: true, status: 200, json: async () => ({ id: url.split('/').pop(), song: [] }) }),
+      const entry = { url, aborted: false, answer: () => resolve({ ok: true, status: 200, json: async () => ({ id: url.split('/').pop(), song: [], artists: [], albums: [], songs: [] }) }),
         fail: () => resolve({ ok: false, status: 503, json: async () => ({ detail: 'Navidrome is busy' }) }) }
       init?.signal?.addEventListener('abort', () => { entry.aborted = true; const error = new Error('aborted'); error.name = 'AbortError'; reject(error) })
       fetches.push(entry)
@@ -1496,17 +2511,24 @@ async function main() {
     check('the album page takes a kept ask once, asking nothing more', [api.album('page') === kept, fetches.length], [true, 4])
     api.album('page')
     check('...and asks afresh after', fetches.length, 5)
-    //? 2.0.0-player.17: a FAILED kept ask is let go, so the next asks afresh - the artist page's Try
-    //? again, or the album page opening - rather than being handed the same failure for 30 s
     const flaky = api.prefetchAlbum('flaky', true)
     flaky.catch(() => {})
     check('a kept ask still out is the one handed back', [api.prefetchAlbum('flaky', true) === flaky, fetches.length], [true, 6])
     fetches[5].fail()
     await settle()
     check('...and once it has failed, it is let go: the next asks afresh', [api.prefetchAlbum('flaky', true) === flaky, fetches.length], [false, 7])
+    //? (2.0.0-player.55) the library's search with a page: the two-argument call asks what it always did
+    void api.searchLibrary('portishead')
+    void api.searchLibrary('portishead', undefined, { counts: { artistCount: 0, albumCount: 50, songCount: 0 }, offsets: { albumOffset: 50 } })
+    void api.searchLibrary('portishead', undefined, { counts: { artistCount: 50, albumCount: 0, songCount: 0 }, offsets: { artistOffset: 0 } })
+    const query = (url) => Object.fromEntries(new URL(url, 'http://deadwax.test').searchParams)
+    check('searchLibrary: two arguments ask SEARCH_COUNTS as ever; a page its counts, and an offset only past the first page',
+      fetches.slice(-3).map((entry) => query(entry.url)),
+      [{ q: 'portishead', artistCount: '5', albumCount: '8', songCount: '12' }, { q: 'portishead', artistCount: '0', albumCount: '50', songCount: '0', albumOffset: '50' },
+        { q: 'portishead', artistCount: '50', albumCount: '0', songCount: '0' }])
   }
 
-  console.log(failures ? `\n${failures} FAILED` : '\nall passed')
+  console.log(failures ? `\n${failures} FAILED of ${checks}` : `\nall ${checks} passed`)
   process.exit(failures ? 1 : 0)
 }
 

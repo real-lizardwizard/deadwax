@@ -67,6 +67,12 @@ console.log('every take of one song is one song: its albums unioned, the studio 
   //? two of the twelve are live BROADCASTS (Roskilde 1998, Canal+'s Concert Privé) - named as their rows name them
   check('...the fold says what it holds', S.foldLabel(folded), 'On 12 compilations, live albums and broadcasts')
   check('...the row: the credit, the length on the album it names, and that album', S.songLine(songs[0], null), 'Portishead · 4:56 · Dummy')
+  //? (2.0.0-player.55) the artists its credit names, by id - what Search's Top results pull in for a song (its sole artist)
+  check('...the artists its credit names, by MusicBrainz id: Portishead alone', songs[0].artists, [{ id: '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', name: 'Portishead' }])
+  const duo = S.groupSongs([{ id: 'd1', title: 'Under Pressure', 'artist-credit': [{ name: 'Queen', joinphrase: ' & ', artist: { id: 'Q' } }, { name: 'David Bowie', artist: { id: 'B' } }, { name: 'Queen', artist: { id: 'Q' } }],
+    releases: [{ id: 'r1', 'release-group': { id: 'g1', title: 'Hot Space', 'primary-type': 'Album' } }] }, { id: 'd2', title: 'Nameless', 'artist-credit': [{ name: 'Nobody' }],
+    releases: [{ id: 'r2', 'release-group': { id: 'g2', title: 'X', 'primary-type': 'Album' } }] }])
+  check('...a duet two artists, each once (lowercase ids); a credit naming no id none', duo.map((song) => song.artists), [[{ id: 'q', name: 'Queen' }, { id: 'b', name: 'David Bowie' }], []])
   check('...Dummy\'s releases with the song kept (an .m4a filed holds a release id alone), and its recording',
     [listed[0].releases.length, listed[0].recordings], [5, ['ef37de8d-8fab-42ed-82da-fbfe25715989']])
   check('...its line: the kind and the year', S.songAlbumLine(listed[0], songs[0], null), 'Album · 1994')

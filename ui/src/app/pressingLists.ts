@@ -1,6 +1,7 @@
 import type { ReleaseGroup, ReleaseGroupResponse } from '../api/types'
-import { pressingLabel, type PageRelease } from '../lib/pressings'
+import { getGroup, pressingLabel, type PageRelease } from '../lib/pressings'
 import { buildDownloadRelease, usualPressing } from '../lib/releasePayload'
+import { songPressing } from '../lib/songs'
 import type { GetRequest } from './Sources'
 
 /**
@@ -50,4 +51,24 @@ export function usualGet(group: ReleaseGroup, pressings: ReleaseGroupResponse | 
     release: built.release,
     subtitle: [group.title, usual ? pressingLabel(usual) : 'the album as a whole'].filter(Boolean).join(' · '),
   }
+}
+
+/**
+ * What Get on a MusicBrainz SONG gets (2.0.0-player.55, Search's song rows and Top results: the mock's "Machine Gun -
+ * Third (Get)"): the album it names, on a pressing that has the song - songPressing over its pressings (the album's
+ * usual pressing when that has it, else the most usual with one of its recordings, else with a track of its title) -
+ * and the group taken from the pressings (getGroup), since a recording search's group carries no year or credit to
+ * file a download under. Null when there are no pressings to choose from: the album page opens instead, the song
+ * marked, and its Get takes over - a download is never filed without a year.
+ */
+export function songGet(album: { id: string; title: string }, recordings: readonly string[], pressings: ReleaseGroupResponse | null): Omit<GetRequest, 'key'> | null {
+  const releases = (pressings?.releases ?? []) as PageRelease[]
+  if (!pressings || pressings.problem || !releases.length) return null
+  const chosenId = songPressing(releases, recordings) ?? usualPressing(releases)?.id ?? null
+  const chosen = releases.find((release) => release.id === chosenId) ?? null
+  if (!chosen) return null
+  const group = getGroup(album.id, null, releases, chosen)
+  const pressing = pressings.releases.find((release) => release.id === chosen.id) ?? null
+  const built = buildDownloadRelease(group, pressing)
+  return { release: built.release, subtitle: [group.title || album.title, pressingLabel(chosen)].filter(Boolean).join(' · ') }
 }

@@ -892,6 +892,11 @@ store reads/writes (ledger_held_paths, ledger_drop, ledger_by_navidrome); in the
 words and whose an album is), `lib/yourLibrary.ts` and `app/useYourAlbums.ts` (your albums), and the
 Library's Browse (`lib/appFrame.ts`, `player/Library.tsx`, `app/LibraryViews.tsx`, `app/Sidebar.tsx`).
 
+(2.0.0-player.55: Search became one list with no half titles, so its library rows now say "in your library"
+with logins off too - `lib/whose.ts` libraryPlace - and with logins on yours come first, then the store's; see
+"Search like Apple Music (2.0.0-player.55)" in notes/app-requests-search-get.md. The bullets on Search's words
+below are this step's history.)
+
 - **Every call is made as you.** `auth.user_for` (current_user's, so every route but the public ones) keeps
   a `PlayerLogin` - the session's id hash, its user, the sealed login THAT SESSION was signed in with (held
   in `_Held` beside the user, read with the session) and the store - on `request.state`; `client_for`

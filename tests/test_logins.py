@@ -85,6 +85,8 @@ ROUTES = {
     ("GET", "/deadwax/interface_logs/interface_logs"): "admin",
     ("GET", "/deadwax/search_musicbrainz/fully_search"): "user",
     ("GET", "/deadwax/search_musicbrainz/songs"): "user",
+    #? (2.0.0-player.55) the app's Search's artists: a search, like /songs - MusicBrainz's data is nobody's own
+    ("GET", "/deadwax/search_musicbrainz/artists"): "user",
     ("GET", "/deadwax/search_musicbrainz/discography"): "user",
     ("GET", "/deadwax/search_musicbrainz/releases"): "user",
     ("GET", "/deadwax/search_musicbrainz/release_group"): "user",

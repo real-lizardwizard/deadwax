@@ -1,0 +1,115 @@
+{
+ "created": "2026-10-15T22:32:03.064Z",
+ "count": 8,
+ "offset": 0,
+ "artists": [
+  {
+   "id": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+   "type": "Group",
+   "score": 100,
+   "name": "Radiohead",
+   "sort-name": "Radiohead",
+   "country": "GB",
+   "aliases": [
+    {
+     "name": "Radiohead",
+     "sort-name": "Radiohead",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "r/head",
+     "sort-name": "r/head",
+     "type": "Search hint",
+     "end-date": null
+    },
+    {
+     "name": "电台司令",
+     "sort-name": "电台司令",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "レディオヘッド",
+     "sort-name": "れでぃおへっど",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "Radiohead & Thom Yorke",
+     "sort-name": "Radiohead & Thom Yorke",
+     "type": "Search hint",
+     "end-date": null
+    },
+    {
+     "name": "Radio Head",
+     "sort-name": "Radio Head",
+     "type": "Search hint",
+     "end-date": null
+    }
+   ]
+  },
+  {
+   "id": "c74f4726-2671-4011-81b6-f70da905c05a",
+   "type": "Group",
+   "score": 57,
+   "name": "On a Friday",
+   "sort-name": "On a Friday",
+   "disambiguation": "pre‐Radiohead group, until 1991",
+   "aliases": [
+    {
+     "name": "Radiohead",
+     "sort-name": "Radiohead",
+     "type": "Search hint",
+     "end-date": null
+    },
+    {
+     "name": "Shindig",
+     "sort-name": "Shindig",
+     "type": null,
+     "end-date": null
+    }
+   ]
+  },
+  {
+   "id": "3ecaa799-94ae-45cd-9ad1-bcabae4073e1",
+   "score": 49,
+   "name": "radiohead 3",
+   "sort-name": "radiohead 3",
+   "disambiguation": "Capsmusic LTD. artist"
+  },
+  {
+   "id": "118b7a68-9249-4f5a-91f4-1fd046c07f8f",
+   "score": 48,
+   "name": "DJ Radiohead",
+   "sort-name": "Radiohead, DJ"
+  },
+  {
+   "id": "33bfaa56-037f-4f7d-9a0a-c2412c636e56",
+   "score": 48,
+   "name": "Radiohead 2",
+   "sort-name": "Radiohead 2"
+  },
+  {
+   "id": "b21ab3cc-88ed-4d2b-bd01-6edb83c37900",
+   "type": "Group",
+   "score": 45,
+   "name": "Fake Plastic Radiohead",
+   "sort-name": "Fake Plastic Radiohead"
+  },
+  {
+   "id": "e48fc8b3-e8ab-4dd4-9dc8-6b0f06ef07d6",
+   "score": 45,
+   "name": "Radiohead Cover Brasil",
+   "sort-name": "Radiohead Cover Brasil"
+  },
+  {
+   "id": "1545e981-65ca-4123-9223-ae8efd72cf54",
+   "type": "Group",
+   "score": 43,
+   "name": "An Evening of Radiohead",
+   "sort-name": "Evening of Radiohead, An",
+   "disambiguation": "Radiohead cover band"
+  }
+ ]
+}

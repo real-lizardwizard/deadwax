@@ -1,0 +1,134 @@
+{
+ "created": "2026-10-15T22:31:55.081Z",
+ "count": 4,
+ "offset": 0,
+ "artists": [
+  {
+   "id": "164f0d73-1234-4e2c-8743-d77bf2191051",
+   "type": "Person",
+   "score": 100,
+   "name": "Ye",
+   "sort-name": "Ye",
+   "country": "US",
+   "disambiguation": "formerly Kanye West",
+   "aliases": [
+    {
+     "name": "Ye",
+     "sort-name": "Ye",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "KanYeWest",
+     "sort-name": "KanYeWest",
+     "type": "Search hint",
+     "end-date": null
+    },
+    {
+     "name": "Donda",
+     "sort-name": "Donda",
+     "type": null,
+     "end-date": null
+    },
+    {
+     "name": "Kanye",
+     "sort-name": "Kanye",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "K. West",
+     "sort-name": "K. West",
+     "type": "Search hint",
+     "end-date": null
+    },
+    {
+     "name": "Kayne West",
+     "sort-name": "Kayne West",
+     "type": "Search hint",
+     "end-date": null
+    },
+    {
+     "name": "Kanye West",
+     "sort-name": "West, Kanye",
+     "type": "Artist name",
+     "end-date": "2024"
+    },
+    {
+     "name": "Ye",
+     "sort-name": "Ye",
+     "type": "Legal name",
+     "end-date": null
+    },
+    {
+     "name": "Yeezy",
+     "sort-name": "Yeezy",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "Kanye West",
+     "sort-name": "West, Kanye",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "Kanye Omari West",
+     "sort-name": "West, Kanye Omari",
+     "type": "Legal name",
+     "end-date": "2021-10-18"
+    },
+    {
+     "name": "カニエ・ウェスト",
+     "sort-name": "カニエ・ウェスト",
+     "type": "Artist name",
+     "end-date": null
+    }
+   ]
+  },
+  {
+   "id": "58daf317-be5f-439f-a04d-0d6727f1a3b2",
+   "type": "Group",
+   "score": 88,
+   "name": "¥$",
+   "sort-name": "¥$",
+   "country": "US",
+   "disambiguation": "Ye & Ty Dolla $ign",
+   "aliases": [
+    {
+     "name": "Yen Dollar",
+     "sort-name": "Dollar, Yen",
+     "type": null,
+     "end-date": null
+    },
+    {
+     "name": "YS",
+     "sort-name": "YS",
+     "type": "Search hint",
+     "end-date": null
+    },
+    {
+     "name": "¥$, Kanye West & Ty Dolla $ign",
+     "sort-name": "¥$",
+     "type": null,
+     "end-date": null
+    }
+   ]
+  },
+  {
+   "id": "0eb17834-1d29-47ef-a422-9dc68d73c5e4",
+   "type": "Group",
+   "score": 77,
+   "name": "Kanye West Tribute Band",
+   "sort-name": "West, Kanye, Tribute Band"
+  },
+  {
+   "id": "48c25fb5-480f-48ca-86f3-8aba60bc6ce9",
+   "type": "Group",
+   "score": 72,
+   "name": "Kanye West & Hatsune Miku",
+   "sort-name": "Kanye & Miku",
+   "country": "US"
+  }
+ ]
+}

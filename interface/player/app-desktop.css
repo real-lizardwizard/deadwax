@@ -3261,7 +3261,8 @@
    The chosen pressing's facts, the pressing list's facts and filter, the maybe and the links out are
    drawn by app.css on both frames; here only what the desktop changes: the facts one line under Get and
    the pressing, the row's whole width (the pressing's own width never grows with them, so it never
-   wraps under Get), in the desktop's small words - and room under More from MusicBrainz. */
+   wraps under Get), in the desktop's small words. (Room under More from MusicBrainz went to the Search list's
+   last box, 2.0.0-player.55, below.) */
 @media (min-width: 1024px) {
     :root {
         --app-desk-rg-facts-lines: 1;
@@ -3278,8 +3279,60 @@
 
     .app-desk .app-picker-facts { font-size: var(--app-desk-text-sm); }
 
-    /* More from MusicBrainz, the Search column's last box, kept off the player bar's edge (review) */
-    .app-desk .app-search-more { margin-bottom: var(--app-desk-gap); }
+}
+
+/* ===== search like Apple Music on a desktop (2.0.0-player.55) =====
+   Top results as Apple's web and Mac draw them - tinted lockups three across, each one fixed height with room for
+   three lines (the title, the kind line, the place) whether or not the third has words; the cover 56px, round for
+   an artist. The sections stay single-column rows at the content's measure (app.css). And the list's last box -
+   the foot, a slot, the last row or a More - kept off the player bar's edge (it was More from MusicBrainz's alone,
+   review: the shell keeps exactly the bar's height under the page). */
+@media (min-width: 1024px) {
+    :root {
+        --app-top-lockup-cover: 56px;
+        --app-top-lockup-pad: 12px;
+        --app-top-lockup: calc(var(--app-top-lockup-cover) + 2 * var(--app-top-lockup-pad));
+        --app-top-lockup-gap: 12px;       /* tile to tile, across and down */
+        --app-top-lockup-columns: 3;
+        --app-top-lockup-line: calc(var(--dw-text-footnote) * var(--dw-leading-tight));
+        /* a tile's least width beside a side panel: a title's worth of room beside its cover and its Get */
+        --app-top-lockup-min: 240px;
+    }
+
+    .app-desk .app-top-tiles {
+        display: grid;
+        grid-template-columns: repeat(var(--app-top-lockup-columns), minmax(0, 1fr));
+        gap: var(--app-top-lockup-gap);
+    }
+
+    /* (review) a side panel (Sources from a Get, Info) takes 470px of the page, and three tiles in what is left kept
+       no title at all beside a Get (1px at 1280): as many as fit at a tile's least width, never more than three -
+       the picks as drawn, in fewer columns */
+    .app-desk.has-side .app-top-tiles {
+        grid-template-columns: repeat(auto-fill, minmax(max(var(--app-top-lockup-min),
+            (100% - (var(--app-top-lockup-columns) - 1) * var(--app-top-lockup-gap)) / var(--app-top-lockup-columns)), 1fr));
+    }
+
+    .app-desk .app-top-tile {
+        display: flex;
+        align-items: center;
+        gap: var(--app-result-gap);
+        min-width: 0;
+        height: var(--app-top-lockup);
+        padding: 0 var(--app-top-lockup-pad);
+        border: var(--dw-hairline) solid var(--dw-secondary-border);
+        border-radius: var(--dw-radius-card);
+        background: var(--dw-secondary-bg);
+    }
+
+    .app-desk .app-top-lockup { flex: 1; min-width: 0; height: 100%; min-height: 0; }
+    .app-desk .app-top-lockup .app-result-cover { width: var(--app-top-lockup-cover); height: var(--app-top-lockup-cover); }
+    .app-desk .app-top-lockup .app-result-title { font-weight: var(--dw-weight-semibold); }
+    /* the third line holds its height with no words, so the tile's lines never shift */
+    .app-desk .app-top-place { min-height: var(--app-top-lockup-line); }
+    .app-desk .app-search-top-place.app-top-tile { height: var(--app-top-lockup); }
+
+    .app-desk .app-search-list { margin-bottom: var(--app-desk-gap); }
 }
 
 /* ===== inside a track, the cover viewer and Properties on a desktop (2.0.0-player.44) =====

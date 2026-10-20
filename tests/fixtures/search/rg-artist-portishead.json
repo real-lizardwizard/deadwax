@@ -1,0 +1,246 @@
+{
+ "created": "2026-10-15T18:56:42.844Z",
+ "count": 90,
+ "offset": 0,
+ "release-groups": [
+  {
+   "id": "cf0054cf-1273-38bf-be77-7569ad078b1d",
+   "score": 100,
+   "title": "L : Live",
+   "primary-type": "EP",
+   "secondary-types": [
+    "Live"
+   ],
+   "first-release-date": "1995-05-03",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "47b9a834-a90e-3574-94f8-d11568fa2468",
+   "score": 100,
+   "title": "2008-04-07: Heineken Music Hall, Amsterdam, The Netherlands",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Live"
+   ],
+   "first-release-date": "2008-04-07",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "4bb9ae7f-64fe-3024-847a-4a998c81b4d4",
+   "score": 100,
+   "title": "Interview & Mix",
+   "secondary-types": [
+    "Remix"
+   ],
+   "first-release-date": "1997",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "188a1c4a-20b8-3f40-aa64-09695d318e43",
+   "score": 100,
+   "title": "Lowland Beats",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Live"
+   ],
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "09f0d0fa-8d8d-3cb9-8422-1d7a6508423e",
+   "score": 100,
+   "title": "Live Weisen 1998",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Live"
+   ],
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "145bf2f3-90e9-33dc-ba03-b6a32debf14d",
+   "score": 100,
+   "title": "Desolation Row",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Live"
+   ],
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "dc3c8cb2-b60c-3ad3-b131-7029eac87822",
+   "score": 100,
+   "title": "Greatest Hits '99",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Compilation"
+   ],
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "3a58a638-718b-3a3a-99bf-219071f73da9",
+   "score": 100,
+   "title": "Live in Paris",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Live"
+   ],
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "a0441860-63d1-3414-847f-fe58bb90ea9f",
+   "score": 100,
+   "title": "Only You",
+   "primary-type": "Single",
+   "first-release-date": "1997",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "48db8dfc-21c4-3a2d-b62d-dd1874cfc28a",
+   "score": 100,
+   "title": "Sweet Times: Non-Album Tracks",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Compilation"
+   ],
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "193a4b3e-1dd0-31e0-9323-e3fc5b1b448b",
+   "score": 100,
+   "title": "All Mine",
+   "primary-type": "Single",
+   "first-release-date": "1997-09-08",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "347f8b14-ca20-3809-b39b-4036ff555d18",
+   "score": 100,
+   "title": "Toy Box",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Compilation"
+   ],
+   "first-release-date": "2002",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  }
+ ]
+}

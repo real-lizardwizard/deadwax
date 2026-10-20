@@ -131,9 +131,23 @@ export function navidromeYours(
 }
 
 /** A store album's place in a row's line: "in your library" or "in the store" - '' while that can't be told,
- *  and always '' with logins off, where every album Navidrome has is in your library and no row ever said so. */
+ *  and always '' with logins off, where every album Navidrome has is in your library and no row ever said so.
+ *  (2.0.0-player.52's rule for Search's library rows. Since 2.0.0-player.55 Search says libraryPlace instead, and
+ *  nothing in the app calls this one - only whose.sim, which still pins its rule.) */
 export function navidromePlace(personal: boolean, yours: boolean | null): string {
   if (!personal || yours === null) return ''
+  return yours ? IN_YOUR_LIBRARY : IN_THE_STORE
+}
+
+/**
+ * A library row's place in Search (2.0.0-player.55, "search like Apple Music"): the list has no half titles any
+ * more ("In your library" over the library's rows is gone), so a row says where it is in both modes - "in your
+ * library" with logins off (where navidromePlace, the rule it replaces for Search, was silent), and with a library
+ * of your own "in your library" or "in the store", '' while that can't be told.
+ */
+export function libraryPlace(personal: boolean, yours: boolean | null): string {
+  if (!personal) return IN_YOUR_LIBRARY
+  if (yours === null) return ''
   return yours ? IN_YOUR_LIBRARY : IN_THE_STORE
 }
 

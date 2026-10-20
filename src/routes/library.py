@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from src.config import Config
 from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
 from src.artist_refile import execute_artist_refile, plan_artist_refile
-from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, answers_to, artist_facts,
+from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, artist_facts, artist_match,
                          best_per_kind)
 from src.api.artist_images_endpoint import ArtistImagesClient
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
@@ -1685,25 +1685,6 @@ def _artist_summary(name: str, albums: list[dict]) -> dict:
     }
 
 
-def _match(artist: dict, wanted: str = "") -> dict:
-    """
-    One search result, as the picker lists it.
-
-    `matched_as` is the name this artist goes by that `wanted` matched, and it is on the row
-    because without it the list is baffling: search for Kanye West and the answer is an artist
-    called "Ye", with nothing on screen connecting the two.
-    """
-    return {
-        "mbid": artist.get("id"),
-        "name": artist.get("name"),
-        "disambiguation": artist.get("disambiguation") or "",
-        "country": artist.get("country") or "",
-        "type": artist.get("type") or "",
-        "score": artist.get("score"),
-        "matched_as": answers_to(artist, wanted),
-    }
-
-
 async def _resolve_artist_mbid(request: Request, name: str, albums: list[dict], given: str | None):
     """
     Which MusicBrainz artist this is, and how sure we are.
@@ -1734,7 +1715,7 @@ async def _resolve_artist_mbid(request: Request, name: str, albums: list[dict], 
     except (AttributeError, MusicBrainzUnavailable):
         return None, None, []
 
-    matches = [_match(a, name) for a in (found.get("artists") or [])[:5] if a.get("id")]
+    matches = [artist_match(a, name) for a in (found.get("artists") or [])[:5] if a.get("id")]
 
     #? Believed only when one artist answers to this name exactly and carries MusicBrainz's own
     #? top score. Two bands sharing a name is common, and the wrong one writing its picture into
@@ -2074,5 +2055,5 @@ async def artist_search(request: Request, body: ArtistSearchRequest):
 
     return {
         "query": query,
-        "matches": [_match(a, query) for a in (found.get("artists") or [])[:8] if a.get("id")],
+        "matches": [artist_match(a, query) for a in (found.get("artists") or [])[:8] if a.get("id")],
     }

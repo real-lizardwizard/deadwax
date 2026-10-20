@@ -588,6 +588,27 @@ def answers_to(artist: dict | None, name: str) -> str:
 
 
 
+def artist_match(artist: dict, wanted: str = "") -> dict:
+    """
+    One artist a name search found, as a list of them shows it - the main page's picker (Which artist
+    is this?) and, since 2.0.0-player.55, the app's Search (/search_musicbrainz/artists). Moved here from
+    src/routes/library.py so both routes shape it one way.
+
+    `matched_as` is the name this artist goes by that `wanted` matched, and it is on the row
+    because without it the list is baffling: search for Kanye West and the answer is an artist
+    called "Ye", with nothing on screen connecting the two.
+    """
+    return {
+        "mbid": artist.get("id"),
+        "name": artist.get("name"),
+        "disambiguation": artist.get("disambiguation") or "",
+        "country": artist.get("country") or "",
+        "type": artist.get("type") or "",
+        "score": artist.get("score"),
+        "matched_as": answers_to(artist, wanted),
+    }
+
+
 def former_names(artist: dict | None) -> list[str]:
     """
     The names an artist PERFORMED under and has stopped using, from MusicBrainz's aliases.

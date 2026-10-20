@@ -86,6 +86,9 @@ export interface Song {
   key: string
   title: string
   credit: string
+  /** (2.0.0-player.55) the artists its credit names, by MusicBrainz id - what Search's Top results pull in for
+   *  a song (its sole credited artist, lib/searchList.ts); empty when the credit names none */
+  artists: { id: string; name: string }[]
   /** its recordings, by id (lowercase), in the order found */
   recordings: string[]
   /** the albums it is on, sorted (sortAlbums) - never empty */
@@ -167,12 +170,12 @@ function trackLength(release: RecordingRelease): number | null {
  * there is no album to show it on, or to get.
  */
 export function groupSongs(recordings: readonly Recording[]): Song[] {
-  const songs = new Map<string, { title: string; credit: string; recordings: string[]; albums: Map<string, SongAlbum> }>()
+  const songs = new Map<string, { title: string; credit: string; artists: { id: string; name: string }[]; recordings: string[]; albums: Map<string, SongAlbum> }>()
   for (const recording of recordings) {
     const key = songKey(recording)
     let song = songs.get(key)
     if (!song) {
-      song = { title: recording.title ?? '', credit: creditName(recording['artist-credit']), recordings: [], albums: new Map() }
+      song = { title: recording.title ?? '', credit: creditName(recording['artist-credit']), artists: creditArtists(recording['artist-credit']), recordings: [], albums: new Map() }
       songs.set(key, song)
     }
     //? the row says the song by a plain title - "Roads", not "Roads (live)" - when any take has one
@@ -207,7 +210,18 @@ export function groupSongs(recordings: readonly Recording[]): Song[] {
   }
   return [...songs.entries()]
     .filter(([, song]) => song.albums.size)
-    .map(([key, song]) => ({ key, title: song.title, credit: song.credit, recordings: song.recordings, albums: sortAlbums([...song.albums.values()]) }))
+    .map(([key, song]) => ({ key, title: song.title, credit: song.credit, artists: song.artists, recordings: song.recordings, albums: sortAlbums([...song.albums.values()]) }))
+}
+
+/** The artists a credit names, each once, by id (lowercase) and the name the credit gives them - those with an id. */
+function creditArtists(credit: Recording['artist-credit']): { id: string; name: string }[] {
+  const artists: { id: string; name: string }[] = []
+  for (const entry of credit ?? []) {
+    const id = lower(entry.artist?.id)
+    const name = (entry.name || entry.artist?.name || '').trim()
+    if (id && !artists.some((artist) => artist.id === id)) artists.push({ id, name })
+  }
+  return artists
 }
 
 /**

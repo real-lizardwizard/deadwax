@@ -1,0 +1,23 @@
+{
+ "created": "2026-10-15T22:32:01.116Z",
+ "count": 1,
+ "offset": 0,
+ "artists": [
+  {
+   "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+   "type": "Group",
+   "score": 100,
+   "name": "Portishead",
+   "sort-name": "Portishead",
+   "country": "GB",
+   "aliases": [
+    {
+     "name": "Postishead",
+     "sort-name": "Postishead",
+     "type": null,
+     "end-date": null
+    }
+   ]
+  }
+ ]
+}

@@ -1,6 +1,7 @@
 import { ApiError, MusicBrainzUnavailable, get } from './http'
 import type {
-  ArtistFacts, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse, SongSearchResponse,
+  ArtistFacts, ArtistSearchResponse, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse,
+  SongSearchResponse,
 } from './types'
 
 /**
@@ -33,16 +34,27 @@ export async function fullySearch(
    * route refuses past MUSICBRAINZ_OFFSET_MAX (lib/searchResults.ts).
    */
   offset = 0,
+  /**
+   * The app's Search (2.0.0-player.55): a search's patience on the server (three attempts, not ten), a query
+   * MusicBrainz refuses a 422 with words, MusicBrainz shedding a busy 503, and an abandoned search stopped. The
+   * main page and the metadata editor send none. Not sent to MusicBrainz: the server's cache entry is the same.
+   */
+  quick = false,
 ): Promise<FullySearchResponse> {
-  const params = new URLSearchParams({ query, limit: String(limit) })
-  if (!includeReleases) params.set('releases', 'false')
-  if (offset > 0) params.set('offset', String(offset))
-
   try {
-    return await get<FullySearchResponse>(`/search_musicbrainz/fully_search?${params}`, signal)
+    return await get<FullySearchResponse>(fullySearchPath(query, limit, includeReleases, offset, quick), signal)
   } catch (error) {
     throw asUnavailable(error)
   }
+}
+
+/** The address fullySearch asks - Search's kept answers (app/searchAnswers.ts) are kept by it. */
+export function fullySearchPath(query: string, limit = 5, includeReleases = true, offset = 0, quick = false): string {
+  const params = new URLSearchParams({ query, limit: String(limit) })
+  if (!includeReleases) params.set('releases', 'false')
+  if (offset > 0) params.set('offset', String(offset))
+  if (quick) params.set('quick', 'true')
+  return `/search_musicbrainz/fully_search?${params}`
 }
 
 /**
@@ -53,14 +65,40 @@ export async function fullySearch(
  * nothing found; throws MusicBrainzUnavailable when MusicBrainz is away - never the one for the other.
  */
 export async function searchSongs(query: string, limit: number, signal?: AbortSignal, offset = 0): Promise<SongSearchResponse> {
-  const params = new URLSearchParams({ query, limit: String(limit) })
-  if (offset > 0) params.set('offset', String(offset))
-
   try {
-    return await get<SongSearchResponse>(`/search_musicbrainz/songs?${params}`, signal)
+    return await get<SongSearchResponse>(searchSongsPath(query, limit, offset), signal)
   } catch (error) {
     throw asUnavailable(error)
   }
+}
+
+/** The address searchSongs asks. */
+export function searchSongsPath(query: string, limit: number, offset = 0): string {
+  const params = new URLSearchParams({ query, limit: String(limit) })
+  if (offset > 0) params.set('offset', String(offset))
+  return `/search_musicbrainz/songs?${params}`
+}
+
+/**
+ * Artists on MusicBrainz going by a name (2.0.0-player.55, the app's Search): `name` is words, never a query - the
+ * server asks `(artist:"…" OR alias:"…")`, so an alias finds the artist ("Kanye West" finds Ye). `limit` a page
+ * (lib/searchList.ts ARTIST_SEARCH_LIMIT, the route's); `offset` sent only past the first page. Always a quick search.
+ * Resolves to an empty list for nothing found; throws MusicBrainzUnavailable when MusicBrainz is away (`busy` when
+ * it said it is shedding), an ApiError 422 with words when MusicBrainz refused the search.
+ */
+export async function searchArtists(name: string, limit: number, signal?: AbortSignal, offset = 0): Promise<ArtistSearchResponse> {
+  try {
+    return await get<ArtistSearchResponse>(searchArtistsPath(name, limit, offset), signal)
+  } catch (error) {
+    throw asUnavailable(error)
+  }
+}
+
+/** The address searchArtists asks. */
+export function searchArtistsPath(name: string, limit: number, offset = 0): string {
+  const params = new URLSearchParams({ name, limit: String(limit) })
+  if (offset > 0) params.set('offset', String(offset))
+  return `/search_musicbrainz/artists?${params}`
 }
 
 /**
@@ -150,7 +188,7 @@ export function ping(): Promise<PingResponse> {
 
 function asUnavailable(error: unknown): unknown {
   if (error instanceof ApiError && error.status === 503) {
-    return new MusicBrainzUnavailable(error.detail)
+    return new MusicBrainzUnavailable(error.detail, error.busy)
   }
   return error
 }

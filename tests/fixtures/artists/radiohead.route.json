@@ -1,0 +1,77 @@
+{
+ "matches": [
+  {
+   "mbid": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+   "name": "Radiohead",
+   "disambiguation": "",
+   "country": "GB",
+   "type": "Group",
+   "score": 100,
+   "matched_as": "Radiohead"
+  },
+  {
+   "mbid": "c74f4726-2671-4011-81b6-f70da905c05a",
+   "name": "On a Friday",
+   "disambiguation": "pre‐Radiohead group, until 1991",
+   "country": "",
+   "type": "Group",
+   "score": 57,
+   "matched_as": "Radiohead"
+  },
+  {
+   "mbid": "3ecaa799-94ae-45cd-9ad1-bcabae4073e1",
+   "name": "radiohead 3",
+   "disambiguation": "Capsmusic LTD. artist",
+   "country": "",
+   "type": "",
+   "score": 49,
+   "matched_as": ""
+  },
+  {
+   "mbid": "118b7a68-9249-4f5a-91f4-1fd046c07f8f",
+   "name": "DJ Radiohead",
+   "disambiguation": "",
+   "country": "",
+   "type": "",
+   "score": 48,
+   "matched_as": ""
+  },
+  {
+   "mbid": "33bfaa56-037f-4f7d-9a0a-c2412c636e56",
+   "name": "Radiohead 2",
+   "disambiguation": "",
+   "country": "",
+   "type": "",
+   "score": 48,
+   "matched_as": ""
+  },
+  {
+   "mbid": "b21ab3cc-88ed-4d2b-bd01-6edb83c37900",
+   "name": "Fake Plastic Radiohead",
+   "disambiguation": "",
+   "country": "",
+   "type": "Group",
+   "score": 45,
+   "matched_as": ""
+  },
+  {
+   "mbid": "e48fc8b3-e8ab-4dd4-9dc8-6b0f06ef07d6",
+   "name": "Radiohead Cover Brasil",
+   "disambiguation": "",
+   "country": "",
+   "type": "",
+   "score": 45,
+   "matched_as": ""
+  },
+  {
+   "mbid": "1545e981-65ca-4123-9223-ae8efd72cf54",
+   "name": "An Evening of Radiohead",
+   "disambiguation": "Radiohead cover band",
+   "country": "",
+   "type": "Group",
+   "score": 43,
+   "matched_as": ""
+  }
+ ],
+ "count": 8
+}

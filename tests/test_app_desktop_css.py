@@ -903,10 +903,53 @@ def test_the_chosen_pressings_facts_are_one_line_the_rows_whole_width_on_a_deskt
     assert media_tokens(DESKTOP, DESK)["--app-desk-rg-facts-lines"] == "1"
 
 
-def test_more_from_musicbrainz_keeps_off_the_player_bar():
+def test_the_search_lists_last_box_keeps_off_the_player_bar():
     """(review) The desktop's shell keeps exactly the bar's height under the page, so the Search column's
-    last box - the bordered More button - sat flush on the bar's edge: it keeps the main area's gap."""
-    assert declarations(DESKTOP, ".app-desk .app-search-more", DESK)["margin-bottom"] == "var(--app-desk-gap)"
+    last box sat flush on the bar's edge: it keeps the main area's gap. (2.0.0-player.55) That last box can be the
+    foot, a slot, the last row or a More now - so the gap is the list's, not More from MusicBrainz's alone."""
+    assert declarations(DESKTOP, ".app-desk .app-search-list", DESK)["margin-bottom"] == "var(--app-desk-gap)"
+    assert ".app-desk .app-search-more {" not in DESKTOP
+
+
+def test_top_results_on_a_desktop_are_tiles_three_across_each_one_height():
+    """(2.0.0-player.55) Apple's web and Mac lockups: a grid three across, each tile tinted and rounded (the secondary
+    look), a 56px cover, one fixed height with room for three lines whether or not the third has words."""
+    grid = declarations(DESKTOP, ".app-desk .app-top-tiles", DESK)
+    assert (grid["display"], grid["grid-template-columns"]) == ("grid", "repeat(var(--app-top-lockup-columns), minmax(0, 1fr))")
+    tokens = media_tokens(DESKTOP, DESK)
+    assert tokens["--app-top-lockup-columns"] == "3" and tokens["--app-top-lockup-cover"] == "56px"
+    assert tokens["--app-top-lockup"] == "calc(var(--app-top-lockup-cover) + 2 * var(--app-top-lockup-pad))"
+    tile = declarations(DESKTOP, ".app-desk .app-top-tile", DESK)
+    assert (tile["height"], tile["background"], tile["border-radius"]) == ("var(--app-top-lockup)", "var(--dw-secondary-bg)", "var(--dw-radius-card)")
+    assert tile["border"] == "var(--dw-hairline) solid var(--dw-secondary-border)"
+    assert declarations(DESKTOP, ".app-desk .app-top-place", DESK)["min-height"] == "var(--app-top-lockup-line)"
+    #? the tiles styled in the desktop query alone: app.css draws no tile
+    assert ".app-top-tile" not in APP and ".app-top-tiles" not in APP
+    #? (review) every tile keeps its whole outline: no rule over a tile's top border (a reset of the rows' separator,
+    #? more particular than the tile's rule, took it off every tile but the first) - the tile's own rule already beats
+    #? app.css's separator (.app-results > li + li)
+    for where, selector, values in rules(DESKTOP):
+        if "app-top-tile" in selector and selector != ".app-desk .app-top-tile":
+            assert not any(name.startswith("border") for name in values), selector
+
+
+def test_beside_a_side_panel_top_results_take_as_many_columns_as_fit():
+    """(review) A side panel - Sources from a Get, Info - takes 470px of the page, and three tiles in what was left
+    kept no title at all beside a Get (1px at 1280): beside a panel, as many columns as fit at a tile's least width,
+    never more than three - the shelf's and the grid's own rule."""
+    tokens = media_tokens(DESKTOP, DESK)
+    assert tokens["--app-top-lockup-min"] == "240px"
+    side = declarations(DESKTOP, ".app-desk.has-side .app-top-tiles", DESK)
+    assert side["grid-template-columns"] == ("repeat(auto-fill, minmax(max(var(--app-top-lockup-min), (100% - (var(--app-top-lockup-columns) - 1) "
+                                             "* var(--app-top-lockup-gap)) / var(--app-top-lockup-columns)), 1fr))")
+
+
+def test_searchs_chips_show_on_a_desktop():
+    """The desktop hides the Library's own view chips (the sidebar lists its views) - never Search's: its box is the
+    sidebar's field, and the chips sit under the large title, outside the form it hides."""
+    assert ".app-search-kinds" not in DESKTOP
+    assert declarations(DESKTOP, ".app-desk .pl-library > .app-library-views", DESK)["display"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-search-form", DESK)["display"] == "none"
 
 
 def test_every_class_a_not_exclusion_names_is_still_drawn():

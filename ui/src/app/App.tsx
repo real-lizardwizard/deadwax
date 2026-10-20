@@ -1103,7 +1103,7 @@ export function App() {
     [status, librarySeen],
   )
   const search = useMemo(
-    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenSongAlbum={openSongAlbum} onOpenArtist={openLibraryArtist} onGet={openSources} />,
+    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenSongAlbum={openSongAlbum} onOpenArtist={openLibraryArtist} onOpenMusicBrainzArtist={openCreditedArtist} onGet={openSources} />,
     [status, searchSeen, searchActive],
   )
   const you = useMemo(

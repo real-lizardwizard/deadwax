@@ -38,9 +38,12 @@ And for the Requests tab and Home's Arriving (2.0.0-player.12):
 - An Arriving card's state word gives way before the album's name.
 
 And for song search (2.0.0-player.53): a song's albums open under it, indented to its title, `hidden` hiding
-them; its chevron turns (still for reduced motion); its fold a finger-tall text button; the songs' slot one
-height whatever folds into it (review); and the song an album was opened from tinted, barred and in the accent
-in its tracklist, a Bonus track keeping its green.
+them; its chevron turns (still for reduced motion); its fold a finger-tall text button; and the song an album was
+opened from tinted, barred and in the accent in its tracklist, a Bonus track keeping its green.
+
+And for search like Apple Music (2.0.0-player.55): a slot - song search's, made every kind's - one height whatever
+lands in it; a row's place never cut, the facts taking the ellipsis; See all a finger's reach without a taller
+head; the chips the Library's, wrapping; Top results on a phone .app-result rows, their place a row high.
 
 And for the Search tab and the album you don't have (2.0.0-player.13):
 
@@ -1523,7 +1526,8 @@ def test_a_songs_chevron_turns_as_it_opens_and_stands_still_for_reduced_motion()
 
 
 def test_a_songs_fold_is_a_text_button_a_finger_tall_and_its_caption_quieter():
-    source = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Search.tsx").read_text()
+    #? (2.0.0-player.55) the rows moved to app/SearchRows.tsx, stateless, called by Search
+    source = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "SearchRows.tsx").read_text()
     assert 'class="app-text-button app-song-fold"' in source
     assert declarations(APP, ".app-text-button")["min-height"] == "var(--dw-row)" and px("--dw-row") >= px("--pl-hit")
     fold = declarations(APP, ".app-song-fold")
@@ -1531,22 +1535,89 @@ def test_a_songs_fold_is_a_text_button_a_finger_tall_and_its_caption_quieter():
     assert declarations(APP, ".app-song-caption")["color"] == "var(--dw-text-2)"
 
 
-def test_the_songs_slot_holds_one_height_whatever_folds_into_it():
-    """(review) The albums never wait for the songs, so songs landing after the albums are drawn come folded into
-    the slot that was asking - Show songs, why there are none, MusicBrainz away with Try again. The slot is one
-    fixed height, room for a button a finger tall, every line in it one line (ending in an ellipsis), so nothing
-    drawn below it moves; and it clips nothing, so a focused button keeps its ring."""
-    slot = declarations(APP, ".app-song-slot")
-    assert slot["height"] == "var(--app-song-slot)" and "min-height" not in slot and "overflow" not in slot
-    assert length("--app-song-slot") >= length("--dw-row") >= px("--pl-hit")
-    assert declarations(APP, ".app-song-slot .app-asking")["padding"] == "0"
-    line = declarations(APP, ".app-song-slot .app-search-empty")
+def test_a_slot_holds_one_height_whatever_lands_in_it():
+    """(2.0.0-player.55; song search's slot, made every kind's) A kind still out when the sections draw gets a slot, and
+    its answer lands in it - "Show 3 albums from MusicBrainz", why there are none, its failure with Try again, the
+    library's "Searching your library…" and "Show them". One fixed height whatever it holds, room for a button a
+    finger tall, every line one line ending in an ellipsis, so nothing drawn below moves; it clips nothing, so a
+    focused button keeps its ring."""
+    slot = declarations(APP, ".app-search-slot")
+    assert slot["height"] == "var(--app-search-slot)" and "min-height" not in slot and "overflow" not in slot
+    assert length("--app-search-slot") >= length("--dw-row") >= px("--pl-hit")
+    assert declarations(APP, ".app-search-slot .app-asking")["padding"] == "0"
+    line = declarations(APP, ".app-search-slot .app-search-empty")
     assert (line["white-space"], line["overflow"], line["text-overflow"], line["padding"]) == ("nowrap", "hidden", "ellipsis", "0")
-    assert declarations(APP, ".app-song-show")["width"] == "100%" and declarations(APP, ".app-button")["min-height"] == "var(--dw-row)"
+    assert declarations(APP, ".app-search-show")["width"] == "100%" and declarations(APP, ".app-button")["min-height"] == "var(--dw-row)"
+    row = declarations(APP, ".app-search-slot.is-row")
+    assert (row["flex-direction"], row["align-items"]) == ("row", "center")
+    rows = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "SearchRows.tsx").read_text()
+    #? every state drawn in a slot: the asking line, Show, a button, the words - and the failure, a row
+    assert rows.count('class="app-search-slot"') == 4 and rows.count('class="app-search-slot is-row"') == 1
+    #? song search's own slot and its fold went (the late slot does their job for every kind)
+    assert "app-song-slot" not in APP and "app-song-show" not in APP and "--app-song-slot" not in APP
+
+
+def test_a_rows_place_is_never_cut_the_facts_take_the_ellipsis():
+    """(2.0.0-player.55) A row's line ends with its place in a span of its own that never shrinks, so "in your library"
+    is never cut at 320 wide while the facts before it end in an ellipsis."""
+    assert declarations(APP, ".app-result-split")["display"] == "flex"
+    facts = declarations(APP, ".app-result-facts")
+    assert (facts["min-width"], facts["overflow"], facts["white-space"], facts["text-overflow"]) == ("0", "hidden", "nowrap", "ellipsis")
+    place = declarations(APP, ".app-result-place")
+    #? (review) pre, not nowrap: the place's words start with their " · ", and a flex item starts a line of its own,
+    #? where a space that may collapse is dropped - the row read "1994· in your library" (measured in Chromium)
+    assert (place["flex-shrink"], place["white-space"]) == ("0", "pre")
+    rows = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "SearchRows.tsx").read_text()
+    assert rows.count("<span class=\"app-result-place\">{`${line ? ' · ' : ''}${place}`}</span>") == 3
+
+
+def test_a_kind_views_foot_sits_at_the_edges_once():
+    """(review) The list's own foot keeps the page's edges as a section does; a kind view's foot sits in its section,
+    which already pads to them - so the edges are the list's children's alone, never a foot's inside a section (it
+    was inset twice: 40px on a phone, 64 on a desktop)."""
+    edges = declarations(APP, ".app-search-list > .app-search-foot")
+    assert (edges["margin-left"], edges["margin-right"]) == ("var(--pl-edge-left)", "var(--pl-edge-right)")
+    assert declarations(APP, ".app-search-foot") == {}
+    assert declarations(APP, ".app-search-section")["padding"] == "0 var(--pl-edge-right) 0 var(--pl-edge-left)"
+
+
+def test_see_all_reaches_a_finger_without_making_the_head_taller():
+    """See all sits in each section's head beside its heading: its words small, its own height theirs (no min-height,
+    no padding), and a reach past them - drawn, not laid out - a finger tall."""
+    head = declarations(APP, ".app-search-head")
+    assert (head["display"], head["justify-content"]) == ("flex", "space-between")
+    see = declarations(APP, ".app-search-see-all")
+    assert (see["position"], see["min-height"], see["padding"], see["line-height"]) == ("relative", "0", "0", "var(--dw-leading-tight)")
+    reach = declarations(APP, ".app-search-see-all::before")
+    assert (reach["position"], reach["top"], reach["bottom"]) == ("absolute", "calc(-1 * var(--app-search-see-all-reach))", "calc(-1 * var(--app-search-see-all-reach))")
+    assert ALL_TOKENS["--app-search-see-all-reach"] == "calc((var(--pl-hit) - var(--app-search-see-all-line)) / 2)"
+    assert ALL_TOKENS["--app-search-see-all-line"] == "calc(var(--dw-text-footnote) * var(--dw-leading-tight))"
+    #? a heading focus is handed to has no ring on its words
+    assert declarations(APP, ".app-search-title:focus")["outline"] == "none"
+
+
+def test_searchs_chips_are_the_librarys_and_wrap():
+    """The chips are the Library's view chips, verbatim - their classes, their 44px reach, their wrapping at 320 - and
+    Search has no rule of its own for them but where they sit."""
     source = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Search.tsx").read_text()
-    #? the asking line drawn in the slot, and every late state in one
-    assert re.search(r'<div class="app-song-slot">\s*<div class="app-asking" role="status">', source)
-    assert source.count('class="app-song-slot') == 3
+    assert 'class="app-library-views app-search-kinds" role="group" aria-label="Show"' in source
+    assert "class={`app-chip app-library-view${view === each ? ' is-on' : ''}`}" in source
+    assert declarations(APP, ".app-library-views")["flex-wrap"] == "wrap"
+    assert set(declarations(APP, ".app-search-kinds")) == {"margin-top"}
+
+
+def test_top_results_on_a_phone_are_result_rows_and_its_place_a_row_high():
+    """On a phone Top results are today's .app-result rows (64px, a 48px cover, round for an artist); the place kept for
+    what is still to come is one row high, the sweep and no words."""
+    rows = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "SearchRows.tsx").read_text()
+    assert "class={`app-result${tile ? ' app-top-lockup' : ''}${looking ? ' is-busy' : ''}`}" in rows
+    assert declarations(APP, ".app-result")["min-height"] == "var(--app-result)"
+    place = declarations(APP, ".app-search-top-place")
+    assert (place["display"], place["height"]) == ("flex", "var(--app-result)")
+    assert declarations(APP, ".app-search-top-place .app-sweep")["flex"] == "1"
+    #? the active filter's line: one quiet line, an ellipsis
+    note = declarations(APP, ".app-search-filter-note")
+    assert (note["white-space"], note["text-overflow"], note["color"]) == ("nowrap", "ellipsis", "var(--dw-text-2)")
 
 
 def test_the_song_an_album_was_opened_from_is_marked_in_its_tracklist():

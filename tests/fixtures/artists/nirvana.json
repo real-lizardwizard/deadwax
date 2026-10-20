@@ -1,0 +1,140 @@
+{
+ "created": "2026-10-15T22:31:59.075Z",
+ "count": 42,
+ "offset": 0,
+ "artists": [
+  {
+   "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+   "type": "Group",
+   "score": 100,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "US",
+   "disambiguation": "1980s–1990s US grunge band",
+   "aliases": [
+    {
+     "name": "ニルヴァーナ",
+     "sort-name": "ニルヴァーナ",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "Nirvana",
+     "sort-name": "Nirvana",
+     "type": "Artist name",
+     "end-date": null
+    },
+    {
+     "name": "Nirvana US",
+     "sort-name": "Nirvana US",
+     "type": null,
+     "end-date": null
+    }
+   ]
+  },
+  {
+   "id": "f2dfdff9-3862-4be0-bf85-9c833fa3059e",
+   "type": "Group",
+   "score": 62,
+   "name": "Nirvana 2002",
+   "sort-name": "Nirvana 2002",
+   "country": "SE",
+   "disambiguation": "Swedish death metal band",
+   "aliases": [
+    {
+     "name": "Nirvana",
+     "sort-name": "Nirvana",
+     "type": null,
+     "end-date": "1988"
+    },
+    {
+     "name": "N2K2",
+     "sort-name": "N2K2",
+     "type": null,
+     "end-date": null
+    },
+    {
+     "name": "Prophet 2002",
+     "sort-name": "Prophet 2002",
+     "type": null,
+     "end-date": "1988"
+    }
+   ]
+  },
+  {
+   "id": "9282c8b4-ca0b-4c6b-b7e3-4f7762dfc4d6",
+   "type": "Group",
+   "score": 59,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "GB",
+   "disambiguation": "60s band from the UK"
+  },
+  {
+   "id": "c3a64a25-251b-4d03-afba-1471440245b8",
+   "type": "Group",
+   "score": 58,
+   "name": "Approaching Nirvana",
+   "sort-name": "Approaching Nirvana",
+   "country": "US"
+  },
+  {
+   "id": "c49d69dc-e008-47cf-b5ff-160fafb1fe1f",
+   "type": "Group",
+   "score": 48,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "FR",
+   "disambiguation": "’70s French band from Martigues"
+  },
+  {
+   "id": "85af0709-95db-4fbc-801a-120e9f4766d0",
+   "type": "Group",
+   "score": 47,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "FI",
+   "disambiguation": "early 1980s Finnish punk band"
+  },
+  {
+   "id": "28a4618c-38e4-4027-ad2c-db66a14a2d85",
+   "type": "Group",
+   "score": 47,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "YU",
+   "disambiguation": "Croatian prog-rock band active in first half of 70s in former Yugoslavia."
+  },
+  {
+   "id": "3aa878c0-224b-41e5-abd1-63be359d2bca",
+   "score": 47,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "disambiguation": "founded in 1987 by a Michael Jackson double/imitator"
+  },
+  {
+   "id": "426f27d1-8ae5-4d4b-89ef-17d18472134a",
+   "type": "Person",
+   "score": 47,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "disambiguation": "James Ferraro"
+  },
+  {
+   "id": "f33b3d7b-776d-412e-9820-b32201f07999",
+   "type": "Group",
+   "score": 47,
+   "name": "Nirvanna the Band",
+   "sort-name": "Nirvanna the Band",
+   "disambiguation": "fictitious band",
+   "aliases": [
+    {
+     "name": "Nirvana the Band",
+     "sort-name": "Nirvana the Band",
+     "type": "Artist name",
+     "end-date": "2016-09-10"
+    }
+   ]
+  }
+ ]
+}

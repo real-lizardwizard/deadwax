@@ -1,0 +1,127 @@
+{
+ "created": "2026-10-15T18:56:55.425Z",
+ "count": 6,
+ "offset": 0,
+ "release-groups": [
+  {
+   "id": "e3342ab7-cd75-4d58-b176-86579fe0e090",
+   "score": 100,
+   "title": "Magic Doors",
+   "primary-type": "EP",
+   "first-release-date": "2008",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "5b4a33d5-7381-4b83-8ca9-b5bb0cff564a",
+   "score": 100,
+   "title": "All Mine",
+   "primary-type": "EP",
+   "first-release-date": "1997-09-08",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "163339ab-813b-3d29-bba8-e1d5acf63cab",
+   "score": 90,
+   "title": "Third",
+   "primary-type": "Album",
+   "first-release-date": "2008-04-08",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "48140466-cff6-3222-bd55-63c27e43190d",
+   "score": 90,
+   "title": "Dummy",
+   "primary-type": "Album",
+   "first-release-date": "1994-08-22",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "46b38f09-e90b-39eb-b04f-002da20f7f96",
+   "score": 90,
+   "title": "Portishead",
+   "primary-type": "Album",
+   "first-release-date": "1997-09-29",
+   "artist-credit": [
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  },
+  {
+   "id": "9bf6cf4a-3302-4cd2-86eb-37010722ce4c",
+   "score": 56,
+   "title": "R.A.R.E (Reliving a Real Experience)",
+   "primary-type": "Album",
+   "secondary-types": [
+    "Mixtape/Street"
+   ],
+   "first-release-date": "2009-06-19",
+   "artist-credit": [
+    {
+     "name": "Nickelus F",
+     "joinphrase": " & ",
+     "artist": {
+      "id": "ceb0daa8-b469-4fdb-bccf-ee54053eecff",
+      "name": "Nickelus F",
+      "sort-name": "F, Nickelus"
+     }
+    },
+    {
+     "name": "Portishead",
+     "joinphrase": "",
+     "artist": {
+      "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+      "name": "Portishead",
+      "sort-name": "Portishead"
+     }
+    }
+   ]
+  }
+ ]
+}

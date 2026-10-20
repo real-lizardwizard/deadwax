@@ -1416,3 +1416,10 @@ export interface ArtistSearchResult {
   query: string
   matches: ArtistMatch[]
 }
+
+/** GET /search_musicbrainz/artists (2.0.0-player.55): the artists going by a name, in the admin search's shape, and
+ *  how many match in all - null when MusicBrainz didn't say. */
+export interface ArtistSearchResponse {
+  matches: ArtistMatch[]
+  count: number | null
+}

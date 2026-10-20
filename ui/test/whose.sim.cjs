@@ -13,7 +13,8 @@
  *    (withStoreLine; group.sim renders it, logins on);
  *  - Search's words and rows, the pressing picker's marks and its filter, the artist page's rows and its play
  *    line, "The store also has another pressing", Info's count - each "in the store" for what isn't yours, and
- *    each as it was with logins off;
+ *    each as it was with logins off - except (2.0.0-player.55) Search's library rows, which say "in your library"
+ *    with logins off too (libraryPlace): the half titles that said it are gone;
  *  - lib/yourLibrary.ts: your albums in the four orders, and your artists;
  *  - lib/appFrame.ts: the Library's views and Browse's with a library of your own, and with logins off exactly
  *    the views and titles it always had;
@@ -227,27 +228,38 @@ console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the s
 }
 
 console.log('\nSearch: the store first, its rows marked; MusicBrainz for what the store doesn\'t have')
-check('the words with a library of your own',
-  (({ hint, libraryTitle, musicbrainzTitle, allHeld, label, searching }) => [hint, libraryTitle, musicbrainzTitle, allHeld, label, searching, S.searchWords(true).nothing('x')])(S.searchWords(true)),
-  ["The store first - what's in your library says so - then MusicBrainz for the albums deadwax doesn't have yet.", 'In the store', 'Not in the store yet',
-    'Everything MusicBrainz found is in the store already.', 'Search the store and MusicBrainz', 'Searching the store', 'Nothing in the store matches “x”.'])
-check('...and with logins off, every word as it was',
-  (({ hint, libraryTitle, musicbrainzTitle, allHeld, label, searching }) => [hint, libraryTitle, musicbrainzTitle, allHeld, label, searching, S.searchWords(false).nothing('x')])(S.searchWords(false)),
-  ["Your library first, then MusicBrainz for the albums you don't have yet.", 'In your library', 'Not in your library yet',
-    'Everything MusicBrainz found is in your library already.', 'Search your library and MusicBrainz', 'Searching your library', 'Nothing in your library matches “x”.'])
+//? (2.0.0-player.55) one list, no half titles: the hint, the field's label, the asking line, the all-held words
+check('the words with a library of your own: yours, then the store\'s, then MusicBrainz\'s',
+  (({ hint, allHeld, label, searching }) => [hint, allHeld, label, searching(true), searching(false)])(S.searchWords(true)),
+  ["Artists, albums and songs: yours first, then the store's, then MusicBrainz's.", 'Everything MusicBrainz found is in the store already.', 'Search the store and MusicBrainz',
+    'Searching the store and MusicBrainz…', 'Searching the store…'])
+check('...and with logins off, yours then MusicBrainz\'s - the field\'s label as it was',
+  (({ hint, allHeld, label, searching }) => [hint, allHeld, label, searching(true), searching(false)])(S.searchWords(false)),
+  ["Artists, albums and songs: yours first, then MusicBrainz's.", 'Everything MusicBrainz found is in your library already.', 'Search your library and MusicBrainz',
+    'Searching your library and MusicBrainz…', 'Searching your library…'])
+check('...the half titles gone', Object.keys(S.searchWords(true)).sort(), ['allHeld', 'hint', 'label', 'searching'])
+//? (2.0.0-player.55) a library row's place in Search: said in both modes now - the half titles that said it are gone
+check('a library row\'s place in Search (libraryPlace): "in your library" with logins off too - reversing navidromePlace\'s silence there; with a library of your own whose it is, nothing while unknown',
+  [W.libraryPlace(false, null), W.libraryPlace(false, false), W.libraryPlace(true, true), W.libraryPlace(true, false), W.libraryPlace(true, null)],
+  ['in your library', 'in your library', 'in your library', 'in the store', ''])
 const group = { id: 'rg-third', title: 'Third', 'primary-type': 'Album', 'first-release-date': '2008-04-28', 'artist-credit': [{ name: 'Portishead' }] }
 check('a MusicBrainz row the store turns out to hold says whose it is',
   [S.groupLine(group, true, S.groupPlace(index, 'rg-third', true)), S.groupLine({ ...group, id: 'rg-dummy' }, true, S.groupPlace(index, 'rg-dummy', true)),
     S.groupLine(group, true, S.groupPlace(index, 'rg-third', false)), S.groupLine(group, true)],
   ['Album · Portishead · 2008 · in the store', 'Album · Portishead · 2008 · in your library', 'Album · Portishead · 2008 · in your library', 'Album · Portishead · 2008 · in your library'])
-check('an artist\'s count is the store\'s with a library of your own', [S.artistLine(2, true), S.artistLine(1, false), S.artistLine(0, true)],
-  ['Artist · 2 albums in the store', 'Artist · 1 album in your library', 'Artist'])
+check('an artist\'s count is the store\'s with a library of your own', [S.artistLine(2, true), S.artistLine(1, false), S.artistLine(0, true), S.artistLine(2, true, true)],
+  ['2 albums in the store', '1 album in your library', '', 'Artist · 2 albums in the store'])
 check('"More from MusicBrainz" says the store has them', [S.morePageWords(0, 2, true).note, S.morePageWords(0, 1, false).note],
   ['The next 2 albums MusicBrainz found are all in the store already.', 'The next album MusicBrainz found is in your library already.'])
 {
-  const search = read('app/Search.tsx')
-  check('the library half\'s album rows carry their place, from navidromeYours over the one /library/owned answer',
-    /navidromePlace\(personal, navidromeYours\(album, owned\?\.index \?\? null\)\)/.test(search), true)
+  const list = read('lib/searchList.ts')
+  //? (2.0.0-player.55) replaces the half-titles pin: every library row says its place, by libraryPlace over whose it is - an
+  //? album row made of a song's own fields read as search3 or `ready` has it, unknown without (review: "in the store" on a guess)
+  check('Search\'s library rows carry their place - albums and songs by libraryPlace, over your albums\' ids and the one /library/owned answer',
+    [/line: join\(top \? 'Album' : '', row\.album\.artist, year\), place: libraryPlace\(marks\.personal, albumYours\(row\.album, marks\)\)/.test(list),
+      /place: libraryPlace\(marks\.personal, songYours\(row\.song, marks\)\)/.test(list),
+      /if \(marks\.yourAlbums\?\.has\(album\.id\)\) return true\s*if \(!album\.starred && !album\.musicBrainzId && marks\.albumOf\) \{\s*const known = marks\.albumOf\(album\.id\)\s*return known \? navidromeYours\(known, marks\.index\) : null\s*\}\s*return navidromeYours\(album, marks\.index\)/.test(list)],
+    [true, true, true])
 }
 
 console.log('\nthe pressing picker: yours marked "In your library", the store\'s "In the store"')
@@ -382,12 +394,13 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
       /sidebarMove\(item, libraryPick\(\), librarySongs\(\), hasLibrary\(\)\)/.test(app), /aria-label=\{searchWords\(personal\)\.label\}/.test(sidebar)],
     [true, true, true, true])
   const search = read('app/Search.tsx')
+  const list = read('lib/searchList.ts')
   check('Search: its words, its artists\' counts, More\'s note and its MusicBrainz rows\' places, each by `personal`',
-    [/const personal = hasLibrary\(\)\n {2}const words = searchWords\(personal\)\n/.test(search), /artistLine\(top\.albumCount, personal\)/.test(search),
-      /artistLine\(artist\.albumCount, personal\)/.test(search), /morePageWords\(more\.added, more\.held, personal\)/.test(search),
-      /groupLine\(group, held, groupPlace\(owned\?\.index \?\? null, group\.id, personal\)\)/.test(search)],
-    [true, true, true, true, true])
-  check('...and its two halves titled by those words', [/>\{words\.libraryTitle\}<\/h2>/.test(search), />\{words\.musicbrainzTitle\}<\/h2>/.test(search)], [true, true])
+    [/const personal = hasLibrary\(\)\n {2}const words = searchWords\(personal\)\n/.test(search), /artistLine\(row\.artist\.albumCount, marks\.personal\)/.test(list),
+      /morePageWords\(more\.added, more\.held, personal\)/.test(search),
+      /place: held \? groupPlace\(marks\.index, row\.group\.id, marks\.personal\) : ''/.test(list)],
+    [true, true, true, true])
+  check('...and no half titles any more (2.0.0-player.55): one list in sections', [/words\.libraryTitle|words\.musicbrainzTitle/.test(search), /<h2 id="app-search-top"/.test(search)], [false, true])
   const artist = read('app/ArtistPage.tsx')
   check('the artist page: its facts headed, its waits and empties said, its rows worded and ticked, Play\'s line - each by `personal`',
     [/<h2 id="app-artist-library-title" class="app-section-title">\{personal \? 'In the store' : 'In your library'\}<\/h2>/.test(artist),

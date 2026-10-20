@@ -10,38 +10,32 @@
  */
 
 import type { ReleaseGroup } from '../api/types'
-import { foldName, ownedForGroup, type OwnedIndex } from './owned'
+import { ownedForGroup, type OwnedIndex } from './owned'
 import { creditName } from './release'
 import { IN_THE_STORE, IN_YOUR_LIBRARY, anyYours, heldPhrase } from './whose'
 
 /**
- * The Search tab's words (2.0.0-player.52): with logins on and a library of your own (`personal`), the library
- * half is the STORE - Navidrome's search, asked as you, finds everything deadwax holds - each row saying
- * whether it is yours (lib/whose.ts), and the MusicBrainz half is what the store doesn't have. With logins off
- * the store is your library, and every word is what it always was.
+ * The Search tab's words (2.0.0-player.52; since 2.0.0-player.55 one list in Apple Music's sections, so no half
+ * titles): with logins on and a library of your own (`personal`), the library's rows are the STORE's -
+ * Navidrome's search, asked as you, finds everything deadwax holds - each row saying whether it is yours
+ * (lib/whose.ts), then MusicBrainz's. `searching` is the one asking line before the library has answered - with
+ * MusicBrainz in it when MusicBrainz is to be asked too. The field's `label` is the sidebar's too.
  */
 export function searchWords(personal: boolean): {
-  hint: string; label: string; libraryTitle: string; searching: string; musicbrainzTitle: string; allHeld: string
-  nothing: (text: string) => string
+  hint: string; label: string; searching: (musicBrainz: boolean) => string; allHeld: string
 } {
   return personal
     ? {
-      hint: "The store first - what's in your library says so - then MusicBrainz for the albums deadwax doesn't have yet.",
+      hint: "Artists, albums and songs: yours first, then the store's, then MusicBrainz's.",
       label: 'Search the store and MusicBrainz',
-      libraryTitle: 'In the store',
-      searching: 'Searching the store',
-      musicbrainzTitle: 'Not in the store yet',
+      searching: (musicBrainz) => (musicBrainz ? 'Searching the store and MusicBrainz…' : 'Searching the store…'),
       allHeld: 'Everything MusicBrainz found is in the store already.',
-      nothing: (text) => `Nothing in the store matches “${text}”.`,
     }
     : {
-      hint: "Your library first, then MusicBrainz for the albums you don't have yet.",
+      hint: "Artists, albums and songs: yours first, then MusicBrainz's.",
       label: 'Search your library and MusicBrainz',
-      libraryTitle: 'In your library',
-      searching: 'Searching your library',
-      musicbrainzTitle: 'Not in your library yet',
+      searching: (musicBrainz) => (musicBrainz ? 'Searching your library and MusicBrainz…' : 'Searching your library…'),
       allHeld: 'Everything MusicBrainz found is in your library already.',
-      nothing: (text) => `Nothing in your library matches “${text}”.`,
     }
 }
 
@@ -178,18 +172,18 @@ export function morePages(next: number, count: number | null | undefined, lastPa
   return next <= MUSICBRAINZ_OFFSET_MAX ? 'more' : 'far'
 }
 
-/** The library half's top result: an artist whose name IS what was typed. */
-export function topArtist<A extends { name?: string }>(artists: readonly A[], text: string): A | null {
-  const typed = foldName(text)
-  return (typed && artists.find((artist) => foldName(artist.name) === typed)) || null
-}
-
-/** The first few distinct albums of the songs found, in order: what is asked for, so a song's tap plays. */
-export function albumsToPrefetch(songs: readonly { albumId?: string | null }[], count = SONG_ALBUMS_PREFETCHED): string[] {
+/**
+ * The first few distinct albums of the songs found, in order: what is asked for, so a song's tap plays. `preferred`
+ * (2.0.0-player.55): the library's songs in Top results' decided picks, asked for first - so a song at the top of
+ * the list plays from its first tap - then the first songs' albums, SONG_ALBUMS_PREFETCHED distinct in all.
+ */
+export function albumsToPrefetch(
+  songs: readonly { albumId?: string | null }[], preferred: readonly { albumId?: string | null }[] = [], count = SONG_ALBUMS_PREFETCHED,
+): string[] {
   const ids: string[] = []
-  for (const song of songs) {
-    if (song.albumId && !ids.includes(song.albumId)) ids.push(song.albumId)
+  for (const song of [...preferred, ...songs]) {
     if (ids.length >= count) break
+    if (song.albumId && !ids.includes(song.albumId)) ids.push(song.albumId)
   }
   return ids
 }
@@ -199,9 +193,15 @@ export function songIndex(songs: readonly { id: string }[] | undefined, id: stri
   return (songs ?? []).findIndex((song) => song.id === id)
 }
 
-/** "Artist · 2 albums in your library" - "in the store" with a library of your own (2.0.0-player.52): Navidrome
- *  counts the store's albums of theirs, whoever asks. */
-export function artistLine(albumCount: number | null | undefined, personal = false): string {
+/**
+ * A library artist's count, in Search (2.0.0-player.55): "2 albums in your library" in a section, where the heading
+ * says it is an artist - "Artist · 2 albums in your library" in Top results (`top`), which say what each row is
+ * first; "Artist" alone there, and '' in a section, for an artist Navidrome counted nothing for. "in the store"
+ * with a library of your own (2.0.0-player.52): Navidrome counts the store's albums of theirs, whoever asks -
+ * Search says your own count when you have any (lib/searchList.ts).
+ */
+export function artistLine(albumCount: number | null | undefined, personal = false, top = false): string {
   const count = albumCount ?? 0
-  return count ? `Artist · ${count} ${count === 1 ? 'album' : 'albums'} ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}` : 'Artist'
+  const words = count ? `${count} ${count === 1 ? 'album' : 'albums'} ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}` : ''
+  return top ? ['Artist', words].filter(Boolean).join(' · ') : words
 }

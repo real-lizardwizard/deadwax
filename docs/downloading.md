@@ -206,9 +206,13 @@ start it:
   the deluxe beside the standard, say - from **Other pressings** on the album's own page (since
   2.0.0-player.41; see [finding music](finding-music.md#another-pressing-of-an-album-you-have)).
   Its **Pressing** list marks every pressing you already have **In your library**.
-- **Get**, the small button at the end of each row under **Not in your library yet**, in the
-  **Search** tab. It gets the album's usual pressing (the one its page opens on, and the main page's
-  card **Find** downloads), without opening the page. It reads **Get…** while it asks MusicBrainz for the album's pressings,
+- **Get**, the small button at the end of an album MusicBrainz offers in the **Search** tab - in Top
+  results, under **Albums**, or in the Albums view. It gets the album's usual pressing (the one its page
+  opens on, and the main page's card **Find** downloads), without opening the page. At the end of a song
+  MusicBrainz offers (since 2.0.0-player.55; "Get The Slow Rush, with Patience") it gets **the album that song
+  row names, on a pressing that has the song** - its Japanese CD, for Patience - and if MusicBrainz can't list
+  that album's pressings just then, the album's page opens instead, the song marked, and its **Get the album**
+  takes over: a download is never filed without the album's year. It reads **Get…** while it asks MusicBrainz for the album's pressings,
   which can take a few seconds; if you move on meanwhile - type in the box, open a row, Now Playing
   or another tab - it gives up and reads **Get** again, so the sheet never opens over where you went.
   If MusicBrainz can't list the album's pressings just then, it gets the album as a whole, as the

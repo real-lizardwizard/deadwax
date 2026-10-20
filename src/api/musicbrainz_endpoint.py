@@ -14,7 +14,62 @@ class MusicBrainzUnavailable(Exception):
 
     The distinction matters to whoever is staring at the screen: "no results" means try a
     different search, "unreachable" means wait and try the same one again.
+
+    `busy` (2.0.0-player.55): MusicBrainz answered, saying it is shedding searches just now (a 503
+    with `x-ratelimit-who: search-shed`, or its "currently busy" words) - the app's Search says
+    "MusicBrainz is busy just now" rather than that it isn't answering.
     """
+
+    def __init__(self, *args, busy: bool = False):
+        super().__init__(*args)
+        self.busy = busy
+
+
+class MusicBrainzRejected(Exception):
+    """
+    A QUICK search (2.0.0-player.55, the app's Search) MusicBrainz refused as malformed - a 400. Said as
+    "MusicBrainz couldn't read that search - try other words", never as an outage: the same words
+    would be refused again, so the page offers no Try again. Every other path keeps a 400 as it was.
+    """
+
+
+class Patience(NamedTuple):
+    """How long a request keeps trying (2.0.0-player.55): its attempts, and the pauses between them."""
+    attempts: int
+    #? after a 503 or a 429 - MusicBrainz shedding, or the rate limit
+    busy_pause: float
+    #? after a connection that failed or timed out
+    network_pause: float
+
+
+#? The app's Search (/fully_search with `quick`, /songs, /artists): somebody is looking at a list, and
+#? three kinds of search go at once - so a search gives up after three attempts and says so, rather than
+#? the ten everything else keeps (album pages, the download flow): about eight seconds while MusicBrainz is
+#? turning searches away (a 503 or 429 answers at once), but each attempt still waits out the client's own
+#? timeouts (_new_client: connect 10 s, read 30 s), so a connection that hangs takes up to ~1.5 minutes.
+SEARCH_PATIENCE = Patience(attempts=3, busy_pause=2.0, network_pause=1.0)
+
+
+def _shedding(response) -> bool:
+    """Whether a 503 is MusicBrainz shedding searches: its header says so, or its words do."""
+    headers = getattr(response, "headers", None) or {}
+    try:
+        who = headers.get("x-ratelimit-who") or ""
+    except Exception:
+        who = ""
+    text = str(getattr(response, "text", "") or "")
+    return who.strip().lower() == "search-shed" or "currently busy" in text.lower()
+
+
+def raise_for_search(answer: dict, quick: bool) -> None:
+    """
+    A search that failed, as the exception its route answers (2.0.0-player.55): a quick search's 400 is
+    MusicBrainzRejected; anything else MusicBrainzUnavailable, `busy` when MusicBrainz said it was shedding.
+    """
+    reason = answer.get("error", "unknown error") if isinstance(answer, dict) else "no answer"
+    if quick and isinstance(answer, dict) and answer.get("code") == 400:
+        raise MusicBrainzRejected(reason)
+    raise MusicBrainzUnavailable(reason, busy=bool(isinstance(answer, dict) and answer.get("busy")))
 
 
 class RateLimit:
@@ -23,26 +78,54 @@ class RateLimit:
 
     def __init__(self):
         self.request_times = deque(maxlen=self.max_requests)
+        #? (2.0.0-player.55) waiters take turns - see wait(). Made lazily, for the loop that runs it
+        self._turns: asyncio.Lock | None = None
+        self._turns_loop: asyncio.AbstractEventLoop | None = None
+        #? the clock and the sleep wait() runs on - None for time.monotonic and asyncio.sleep, looked up as it
+        #? waits; tests/test_musicbrainz_ratelimit.py hands it a clock of its own
+        self.clock = None
+        self.sleep = None
+
+    def _now(self) -> float:
+        return (self.clock or time.monotonic)()
+
+    def _turn(self) -> asyncio.Lock:
+        """
+        The lock waiters take turns by, made for the RUNNING event loop: this limiter is a class attribute
+        of MusicBrainzClient, shared by every loop in the process (a test's asyncio.run, each TestClient),
+        and an asyncio.Lock that has waited in one loop raises RuntimeError when contended from another.
+        """
+        loop = asyncio.get_running_loop()
+        if self._turns is None or self._turns_loop is not loop:
+            self._turns = asyncio.Lock()
+            self._turns_loop = loop
+        return self._turns
 
     async def wait(self) -> None:
-        curr_time = time.monotonic()
+        #? (2.0.0-player.55) Under a lock held across the sleep. Without it, waiters arriving together
+        #? each read the same oldest send, computed the same wake time and fired together - six sends in
+        #? one five-second window, measured - and the app's Search asks three kinds at once, so that
+        #? would be the normal case. With it they take turns, and no window holds more than four. A
+        #? waiter cancelled while it sleeps (a search abandoned) lets the lock go and takes no turn.
+        async with self._turn():
+            curr_time = self._now()
 
-        if len(self.request_times) >= self.max_requests:
-            oldest_time = self.request_times[0]
-            time_since_oldest = curr_time - oldest_time
+            if len(self.request_times) >= self.max_requests:
+                oldest_time = self.request_times[0]
+                time_since_oldest = curr_time - oldest_time
 
-            if time_since_oldest < self.time_window:
-                wait_time = self.time_window - time_since_oldest
-                #? Deliberately NOT a frontend warning. This is the throttle doing its job -
-                #? MusicBrainz asks for about a request a second and we hold ourselves to it -
-                #? so it fires constantly during any normal burst, and telling the user their
-                #? own politeness is a problem made a working search look broken. The interface
-                #? already says "asking MusicBrainz..." while this waits.
-                logger.debug(f"holding off {wait_time:.1f}s to stay inside the MusicBrainz rate limit")
-                await asyncio.sleep(wait_time)
-                curr_time = time.monotonic()
+                if time_since_oldest < self.time_window:
+                    wait_time = self.time_window - time_since_oldest
+                    #? Deliberately NOT a frontend warning. This is the throttle doing its job -
+                    #? MusicBrainz asks for about a request a second and we hold ourselves to it -
+                    #? so it fires constantly during any normal burst, and telling the user their
+                    #? own politeness is a problem made a working search look broken. The interface
+                    #? already says "asking MusicBrainz..." while this waits.
+                    logger.debug(f"holding off {wait_time:.1f}s to stay inside the MusicBrainz rate limit")
+                    await (self.sleep or asyncio.sleep)(wait_time)
+                    curr_time = self._now()
 
-        self.request_times.append(curr_time)
+            self.request_times.append(curr_time)
 
     def quiet(self, seconds: float) -> bool:
         """
@@ -52,7 +135,7 @@ class RateLimit:
         only request in it, and the questions asked next still find three turns of the four.
         Synchronous, so nothing can slip in between this saying yes and the refresh taking its turn.
         """
-        now = time.monotonic()
+        now = self._now()
         if self.request_times and now - self.request_times[-1] < seconds:
             return False
         return len(self.request_times) < self.max_requests or now - self.request_times[0] >= self.time_window
@@ -347,7 +430,8 @@ class MusicBrainzClient:
 
 
     async def request_with_retries(self, endpoint: str, params: dict, *, disk: bool = True,
-                                   refreshing: bool = False, browse: Browse | None = None) -> dict:
+                                   refreshing: bool = False, browse: Browse | None = None,
+                                   patience: Patience | None = None) -> dict:
         """
         Every MusicBrainz request deadwax makes goes through here (a test holds it to that), so every
         caller gets the caches for free: memory first (an hour), then - since 2.0.0-player.54 - the
@@ -358,6 +442,10 @@ class MusicBrainzClient:
         again for an old saved answer, behind it: no cache read, one attempt, its own connection, and
         nothing said in the event log - nobody is waiting for it. `browse` is one page of a paged
         browse, read with the pages around it as one answer - see Browse and _browse.
+
+        `patience` (2.0.0-player.55) is how long MusicBrainz is asked before giving up: SEARCH_PATIENCE for
+        the app's Search (three attempts, short pauses), None for everything else - RETRIES and the pauses
+        as they always were. It changes nothing before MusicBrainz: the caches answer as ever.
         """
         if refreshing or (browse is not None and browse.refreshing):
             if browse is not None and browse.answers:
@@ -398,7 +486,7 @@ class MusicBrainzClient:
                     browse.stamp = self.cache.now()
 
             return await self._ask(endpoint, params, disk=disk,
-                                   fetched_at=browse.stamp if browse is not None else None)
+                                   fetched_at=browse.stamp if browse is not None else None, patience=patience)
         finally:
             self.asking -= 1
 
@@ -496,16 +584,19 @@ class MusicBrainzClient:
                 return
 
     async def _ask(self, endpoint: str, params: dict, *, disk: bool = True, refreshing: bool = False,
-                   keep: bool = True, fetched_at: float | None = None) -> dict:
+                   keep: bool = True, fetched_at: float | None = None, patience: Patience | None = None) -> dict:
         """
         MusicBrainz asked, retrying what is worth retrying. Only request_with_retries calls this.
         `keep=False` stores nothing (a browse's refresh keeps its pages back until every one has come);
         `fetched_at` is the stamp the answer is stored with (a browse's pages share the first one's), now
-        when left out.
+        when left out. `patience` (2.0.0-player.55): its attempts and pauses instead of RETRIES and the
+        usual ones, and no pause after the last attempt - a 503 that said MusicBrainz is shedding marks
+        the failure `busy`.
         """
         logger.info("refreshing an old saved MusicBrainz answer" if refreshing else "requesting MusicBrainz")
         #? a refresh is asked once: dropped if MusicBrainz is away, and nobody is told - nobody is waiting
-        attempts = 1 if refreshing else self.RETRIES
+        attempts = 1 if refreshing else patience.attempts if patience is not None else self.RETRIES
+        quick = patience is not None and not refreshing
         loud = {} if refreshing else {"frontend": True, "src": "musicbrainz"}
         connect = self.get_refresh_client if refreshing else self.get_client
         attempt = 0
@@ -541,7 +632,8 @@ class MusicBrainzClient:
                 return payload
             
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
-                delay = 2.0 + (attempt * 0.5)
+                #? (2.0.0-player.55) a search somebody is looking at pauses its patience's short while
+                delay = patience.network_pause if quick else 2.0 + (attempt * 0.5)  # type: ignore[union-attr]
 
                 if attempt < attempts:
                     logger.warning(f"Network error on attempt {attempt}. Retrying in {delay:.2f} seconds...", extra={"frontend": True, "src":"musicbrainz"})
@@ -555,6 +647,13 @@ class MusicBrainzClient:
 
                 #? only the connection that failed: a refresh's never takes down a question's, nor the reverse
                 await (self._close_refresh_client() if refreshing else self._close_main_client())
+                if quick:
+                    #? ...and none after its last attempt; the failure said as a connection's, never as busy
+                    ping_error_obj.update({"error": "musicbrainz ping failed with connection error",
+                                           "status": "failed", "code": "CONNECTION_ERROR", "busy": False})
+                    if attempt < attempts:
+                        await asyncio.sleep(delay)
+                    continue
                 await asyncio.sleep(delay)
 
             except httpx.HTTPStatusError as exc:
@@ -570,6 +669,12 @@ class MusicBrainzClient:
                     ping_error_obj["error"] =  "musicbrainz ping failed with 503 overloaded error, responded to ping but server currenty busy"
                     ping_error_obj["status"] =  "failed"
                     ping_error_obj["code"] = 503 # type: ignore
+                    if quick:
+                        #? (2.0.0-player.55) shedding searches, said so: the page words it as busy
+                        ping_error_obj["busy"] = _shedding(exc.response)  # type: ignore
+                        if attempt < attempts:
+                            await asyncio.sleep(patience.busy_pause)  # type: ignore[union-attr]
+                        continue
                     await asyncio.sleep(3.0) #shrugs
                     continue
 
@@ -587,6 +692,11 @@ class MusicBrainzClient:
                     ping_error_obj["error"] =  "musicbrainz ping failed with 429 rate limit error, responded to ping but server is rate limiting"
                     ping_error_obj["status"] =  "failed"
                     ping_error_obj["code"] = 429 # type: ignore
+                    if quick:
+                        ping_error_obj["busy"] = False  # type: ignore
+                        if attempt < attempts:
+                            await asyncio.sleep(patience.busy_pause)  # type: ignore[union-attr]
+                        continue
                     await asyncio.sleep(6) #? this is just a fallback if the rate limit class is a little zesty 
                     continue
 
@@ -666,7 +776,7 @@ class MusicBrainzClient:
     #? line-up. Tags and genres are what the artist IS, in other people's words.
     ARTIST_INC = "url-rels+tags+genres+aliases+artist-rels"
 
-    async def search_artists(self, name: str, limit: int = 5) -> dict:
+    async def search_artists(self, name: str, limit: int = 5, offset: int = 0, quick: bool = False) -> dict:
         """
         Artists by name, for when the files don't say which one they are.
 
@@ -677,10 +787,17 @@ class MusicBrainzClient:
         The query searches ALIASES as well as current names, because the name on disk is the
         one the release was credited under and MusicBrainz keeps only the current one under
         `artist:`. See artist_query() for what that cost before it did.
+
+        `offset` (2.0.0-player.55, the app's Search) is sent only past the first page, so every
+        existing call keeps its request and its cache entry; `quick` is the app's Search's patience
+        (SEARCH_PATIENCE). Answers MusicBrainz's own payload, or request_with_retries' error dict.
         """
-        return await self.request_with_retries(
-            "artist/", {"query": artist_query(name), "fmt": "json", "limit": limit},
-        )
+        params = {"query": artist_query(name), "fmt": "json", "limit": limit}
+        if offset:
+            params["offset"] = offset
+        if quick:
+            return await self.request_with_retries("artist/", params, patience=SEARCH_PATIENCE)
+        return await self.request_with_retries("artist/", params)
 
     async def get_artist_aliases(self, artist_mbid: str) -> dict:
         """
@@ -940,7 +1057,8 @@ class MusicBrainzClient:
         ]
 
 
-    async def fully_search(self, query: str, limit: int = 5, include_releases: bool = True, offset: int = 0) -> dict:
+    async def fully_search(self, query: str, limit: int = 5, include_releases: bool = True, offset: int = 0,
+                           quick: bool = False) -> dict:
         """
         Release groups matching the query, and by default the releases of the best one.
 
@@ -955,6 +1073,10 @@ class MusicBrainzClient:
         MusicBrainz". It is sent only when it isn't 0, so the first page is asked exactly as before
         (the same request, the same cache entry). The answer carries MusicBrainz's `count` - how
         many groups match in all - so a page can tell whether there are more to ask for.
+
+        `quick` (2.0.0-player.55, the app's Search alone): SEARCH_PATIENCE instead of the ten attempts, a
+        400 raised as MusicBrainzRejected, and a failure's `busy` passed on. Not sent to MusicBrainz, so the
+        request and its cache entry are the same either way.
         """
         logger.info("searching musicbrainz...", extra={"frontend": True, "src":"musicbrainz"})
         params = {
@@ -964,7 +1086,9 @@ class MusicBrainzClient:
         }
         if offset:
             params["offset"] = offset
-        release_groups =  await self.request_with_retries("release-group/", params)
+        #? a quick search's patience - the call otherwise exactly as it always was
+        release_groups = (await self.request_with_retries("release-group/", params, patience=SEARCH_PATIENCE) if quick
+                          else await self.request_with_retries("release-group/", params))
 
         #? request_with_retries returns an error dict rather than raising when it gives up, so
         #? reaching straight for "release-groups" threw a KeyError that surfaced as
@@ -973,10 +1097,14 @@ class MusicBrainzClient:
         #? that people reasonably blamed their own search terms for it.
         if release_groups.get("status") == "failed" or "release-groups" not in release_groups:
             reason = release_groups.get("error", "unknown error")
+            if quick and release_groups.get("code") == 400:
+                raise_for_search(release_groups, quick)
             logger.error(
                 f"MusicBrainz is unreachable, this is not a problem with your search ({reason})",
                 extra={"frontend": True, "src": "musicbrainz"},
             )
+            if quick:
+                raise_for_search(release_groups, quick)
             raise MusicBrainzUnavailable(reason)
 
         if not release_groups["release-groups"]:
@@ -1004,7 +1132,7 @@ class MusicBrainzClient:
             **counted,
         }
     
-    async def search_recordings(self, query: str, limit: int = 25, offset: int = 0) -> dict:
+    async def search_recordings(self, query: str, limit: int = 25, offset: int = 0, quick: bool = False) -> dict:
         """
         Recordings - songs - matching the query (2.0.0-player.53): the app's "Songs on MusicBrainz".
 
@@ -1018,21 +1146,28 @@ class MusicBrainzClient:
         `offset` is sent only past the first page, as fully_search does. The answer is `recordings`
         (an empty list when nothing matched - never a failure) and MusicBrainz's `count` when it said
         one; a failed request raises MusicBrainzUnavailable, so an outage never reads as no songs.
+        `quick` (2.0.0-player.55 - /songs always sends it): SEARCH_PATIENCE, a 400 raised as
+        MusicBrainzRejected, a failure's `busy` passed on.
         """
         logger.info("searching musicbrainz for songs...")
         params = {"query": query, "fmt": "json", "limit": limit}
         if offset:
             params["offset"] = offset
-        found = await self.request_with_retries("recording/", params)
+        found = (await self.request_with_retries("recording/", params, patience=SEARCH_PATIENCE) if quick
+                 else await self.request_with_retries("recording/", params))
 
         #? request_with_retries answers a failure with an error dict rather than raising - the trap
         #? fully_search documents: read as an answer, an outage would be "no songs found"
         if found.get("status") == "failed" or not isinstance(found.get("recordings"), list):
             reason = found.get("error", "unknown error")
+            if quick and found.get("code") == 400:
+                raise_for_search(found, quick)
             logger.error(
                 f"MusicBrainz is unreachable, this is not a problem with your search ({reason})",
                 extra={"frontend": True, "src": "musicbrainz"},
             )
+            if quick:
+                raise_for_search(found, quick)
             raise MusicBrainzUnavailable(reason)
 
         count = found.get("count")

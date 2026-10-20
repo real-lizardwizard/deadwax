@@ -306,19 +306,27 @@ fetched behind it for the next time.
 The phone app's [Search tab](finding-music.md#on-the-phone-the-apps-search-tab) and its album pages
 ask MusicBrainz through deadwax, so the same slow minutes reach them.
 
-- **"MusicBrainz isn't answering just now - it often goes away for a few minutes."** under **Not in
-  your library yet** - or, on an album you don't have, **"MusicBrainz isn't answering just now, so
-  this album's pressings couldn't be loaded - it often goes away for a few minutes."**: deadwax
-  couldn't get an answer (it retries for a while first). That's not the same as **Nothing on
-  MusicBrainz for "…"**, which is an answer.
+- **"MusicBrainz isn't answering just now - it often goes away for a few minutes."** at the foot of
+  Search's list (every kind it asked failed), **"MusicBrainz isn't answering."** in one section's place
+  (that kind alone) - or, on an album you don't have, **"MusicBrainz isn't answering just now, so this
+  album's pressings couldn't be loaded - it often goes away for a few minutes."**: deadwax couldn't get an
+  answer (a search tries three times - about eight seconds when MusicBrainz is turning searches away, up to
+  about a minute and a half when its connection hangs, each try waiting half a minute; an album page for a
+  while longer). That's not
+  the same as **No albums on MusicBrainz for "…"** or **No results for "…"**, which are answers.
   Tap **Try again** in a minute; the album page never shows part of a pressing list as if it were
   all of it. You's **Connections** says whether deadwax can reach MusicBrainz at all, and [The
   MusicBrainz pill is red](#the-musicbrainz-pill-is-red) goes through why it might not.
-- **The same words under Songs on MusicBrainz** (since 2.0.0-player.53): the song search couldn't get an
-  answer. Its own **Try again** asks for the songs alone; the albums' asks for the albums (and the songs
-  too, only if they failed as well). When the albums were already on the screen it's shorter - *MusicBrainz
-  isn't answering.* with **Try again** beside it, in the line that was asking, so nothing under it moves.
-- **A song I know isn't under Songs on MusicBrainz, or only covers of it are**: words with no artist you
+- **"MusicBrainz is busy just now - try again in a moment."** (since 2.0.0-player.55): MusicBrainz answered,
+  saying it is turning searches away for a moment - it does, often, for a few minutes at a time, and asking
+  for artists, albums and songs at once makes it likelier. **Try again** (or **Search** pressed again) draws the
+  list afresh for the same words and asks only what failed. After a search MusicBrainz was too slow for, or away for, the next ones
+  draw your library's rows at once and MusicBrainz's arrive in the places kept for them, until it answers in
+  time again.
+- **"MusicBrainz couldn't read that search - try other words"**: MusicBrainz refused the words as a search
+  (unusual punctuation can do it; a slash, as in "AC/DC", is fine). There's no Try again - the same words would
+  be refused again; change them.
+- **A song I know isn't among MusicBrainz's songs, or only covers of it are**: words with no artist you
   have are matched against song **titles** only, so a famous title alone finds tribute bands and string
   quartets ("hey jude" alone has no Beatles in its first pages). Type the artist with the title - an artist in your
   library is read as the artist ("roads portishead"). Even then a famous song can have hundreds of takes
@@ -326,9 +334,20 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   albums of the next 25 to it - the studio album can take a page or two to arrive.
 - **An album opened from a song shows a pressing that isn't its usual one**: on purpose - the usual one
   hasn't got the song (a bonus track, say), so it opens on one that has. Choose another in **Pressing**.
-- **Songs on MusicBrainz shows only "Show songs"**: the songs arrived after the albums were already on
-  the screen, so they wait behind that button rather than pushing the albums down under your finger. Tap
-  it.
+- **"Show 3 albums from MusicBrainz"** (or artists, or songs) where a section's rows would be: that answer
+  arrived after the list was drawn, with something below it, so it waits in the place kept for it rather than
+  pushing what's under your finger down. Tap it. (Song search's "Show songs" became this, for every kind.)
+- **Only studio albums under Albums for an artist** - "MusicBrainz's studio albums and EPs - See all for
+  everything they made." under them: for an artist's name alone All asks MusicBrainz for their studio albums
+  and EPs, since otherwise its first answers are live albums, interviews and compilations. **See all** (the
+  Albums chip) asks for everything they made, unfiltered.
+- **An artist shows twice, mine and MusicBrainz's**: deadwax matches MusicBrainz's artist to yours by the
+  artist's MusicBrainz id in your files - or, when they have none, by name, but only when one MusicBrainz
+  artist goes by it. With no id in the files and a name several artists share (there are many Nirvanas), both
+  rows stay. The lasting fix: apply the album's release in the metadata editor, which writes the artist's id
+  into its files, let Navidrome rescan, then reload the app (Search keeps your library's artist list while it's
+  open). **Which artist is this?** on the artist's page (an admin's) only changes that page, for that visit -
+  Search doesn't read it.
 - **An album under a song says "a pressing in your library"**: you have a pressing of that album, and
   nothing deadwax has yet says whether the song is on it. MusicBrainz often keeps one song as several
   recordings across an album's pressings and names only some of them in its answer, so the pressing you
@@ -336,7 +355,7 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   not have it at all (The Slow Rush's usual CD, for the Japanese CD's bonus track "Patience"). Tap it:
   deadwax fetches the album's pressings first (the row looks busy) and opens **the album you have** when
   yours has the song, otherwise the album you don't have, on a pressing that has it, where **Get** gets
-  it. When your library's own search (the half above) finds the song by that artist on that album, it
+  it. When your library's own search finds the song by that artist on that album, it
   says **in your library** straight away. If it opened the album you don't have because MusicBrainz
   couldn't list the pressings, the page tries again itself.
 - **"Asking MusicBrainz…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
@@ -345,11 +364,11 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   open (the last 20 albums), so going back to the album is instant - and since 2.0.0-player.54
   deadwax saves them too, so the album opens at once next time, after a reload or a restart as well
   ([saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections)).
-- **The library half shows nothing, or "Can't reach Navidrome"**: that half is Navidrome's search,
-  and needs Navidrome as Home does ([below](#the-player-says-connect-navidrome-or-cant-reach-navidrome));
-  MusicBrainz is still searched under it.
-- **An album you have is listed under Not in your library yet**: only albums whose files carry
-  MusicBrainz's id for the ALBUM (the release group) are recognised there.
+- **None of your library in Search, or "Can't reach Navidrome" above the list**: your rows come from
+  Navidrome's search, and need Navidrome as Home does ([below](#the-player-says-connect-navidrome-or-cant-reach-navidrome));
+  its notice sits once above the list, and MusicBrainz's rows still fill every section under it.
+- **An album you have is offered with Get under Albums**: only albums whose files carry MusicBrainz's id for
+  the ALBUM (the release group) are recognised as yours there.
   - With no MusicBrainz ids at all: match it to its release in the main page's metadata editor,
     which writes them, then search again.
   - **An .m4a album deadwax filed** carries the pressing's id but not the album's - deadwax can't
@@ -915,7 +934,7 @@ albums, and in Search in place of what's in your library, with the reason under 
 deadwax needs Navidrome for the app's library (2.0.0-player.46), that it does: **Connect Navidrome**
 says "deadwax needs Navidrome for your library" and to set it up in deadwax's settings
 (Connections), and **Can't reach Navidrome** that your library shows once deadwax can reach it. The other tabs
-(and Search's MusicBrainz half, and an album you don't have) work without Navidrome, and You's
+(and Search's MusicBrainz rows, and an album you don't have) work without Navidrome, and You's
 **Connections** shows Navidrome as **Not set up** or **Can't reach it**, with the same reason under it.
 
 - **Connect Navidrome**: the three Navidrome settings aren't all set. Fill in `NAVIDROME_URL`,

@@ -1804,7 +1804,6 @@ html.app-viz-open { overflow: hidden; }
 
 .app-search-hint,
 .app-search-empty,
-.app-search-from,
 .app-asking-text {
     margin: 0;
     color: var(--dw-text-2);
@@ -1816,8 +1815,6 @@ html.app-viz-open { overflow: hidden; }
 .app-search-hint { padding: var(--pl-gap) var(--pl-edge-right) 0 var(--pl-edge-left); }
 .app-search-section { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
 .app-search-title { margin: var(--app-search-heading-gap) 0; }
-.app-search-title-tight { margin-bottom: 0; }
-.app-search-from { padding-bottom: var(--app-search-heading-gap); }
 .app-search-empty { padding: var(--pl-gap-sm) 0; }
 .app-search-problem .app-button { width: 100%; }
 
@@ -2864,30 +2861,7 @@ button.app-result:active { background: var(--dw-pressed); }
     --app-song-turn: 180deg;         /* the chevron of an open song */
     --app-song-gap: 4px;             /* the song to its albums, the albums to the fold */
     --app-song-bar: 3px;             /* the song's mark in a tracklist */
-    /* the songs' place while they're asked, and all that's folded into it once the albums are under it: a
-       button a finger tall with a little room above and below - taller than the asking line it holds first */
-    --app-song-slot: calc(var(--dw-row) + 2 * var(--pl-gap-sm));
 }
-
-/* The songs' slot (review): the asking line, and - the songs landing after the albums were drawn under it -
-   what folds into it: Show songs, why there are none, MusicBrainz away with Try again. One height whatever it
-   holds, so nothing drawn below moves; a line too long for it ends in an ellipsis rather than wrapping. No
-   overflow of its own, so a focused button's ring isn't clipped. */
-.app-song-slot {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    height: var(--app-song-slot);
-}
-
-.app-song-slot.is-row { flex-direction: row; align-items: center; gap: var(--app-song-gap); }
-.app-song-slot .app-asking,
-.app-song-slot .app-search-empty { padding: 0; }
-.app-song-slot .app-search-empty { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.app-song-slot.is-row .app-search-empty { flex: 1; }
-.app-song-slot .app-text-button { flex: none; padding: 0; }
-.app-song-show { width: 100%; }
-.app-song-show.is-busy { opacity: var(--app-job-busy); }
 
 .app-song-chevron {
     flex: none;
@@ -2945,6 +2919,104 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-rg-track.is-song.is-version,
 .app-rg-track.is-song.is-renamed { background: var(--dw-tint-amber); }
 .app-rg-track.is-song .app-rg-title { color: var(--dw-accent); font-weight: var(--dw-weight-semibold); }
+
+/* ===== search like Apple Music (2.0.0-player.55): one list - Top results, Artists, Albums, Songs - and chips =====
+   The chips are the Library's view chips, verbatim (their classes, their 44px reach, their wrapping at 320) - only
+   where they sit is Search's. Each section's head holds its heading and See all, whose reach is a finger tall
+   without making the head taller. A row's line ends with its place in a span that never shrinks, so "in your
+   library" is never cut at 320 while the facts before it take the ellipsis. A late kind's answer lands in a slot
+   one fixed height, whatever it holds - the sweep, "Show 3 albums from MusicBrainz", why there are none, or its
+   failure with Try again - so nothing drawn below it moves. Top results' place for what is still to come is a
+   row high on a phone (a tile on a desktop, app-desktop.css), the sweep and no words. */
+:root {
+    /* a slot: a button a finger tall with a little room above and below - taller than the asking line it holds
+       first (song search's slot, 2.0.0-player.53, renamed and made every kind's) */
+    --app-search-slot: calc(var(--dw-row) + 2 * var(--pl-gap-sm));
+    --app-search-head-gap: 12px;          /* a section's heading to See all */
+    --app-search-see-all-line: calc(var(--dw-text-footnote) * var(--dw-leading-tight));
+    --app-search-see-all-reach: calc((var(--pl-hit) - var(--app-search-see-all-line)) / 2);
+    --app-search-see-all-side: 8px;       /* ...and past its words, either side */
+}
+
+/* the chips under the box (on a desktop, under the large title: the box is the sidebar's) */
+.app-search-kinds { margin-top: var(--pl-gap-sm); }
+
+/* what sits in the list outside a section - the asking line, the library's place, a problem, the foot - keeps
+   the page's edges, as a section does */
+/* (review) the foot only where the list holds it: a kind view's foot sits in its section, already at the edges */
+.app-search-asking,
+.app-search-list > .app-search-slot,
+.app-search-list > .app-search-problem,
+.app-search-list > .app-search-foot { margin-right: var(--pl-edge-right); margin-left: var(--pl-edge-left); }
+
+.app-search-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--app-search-head-gap);
+}
+
+.app-search-head .app-search-title { min-width: 0; }
+/* a heading focus is handed to (a Show or a Try again gone with its tap): no ring on words */
+.app-search-title:focus { outline: none; }
+
+.app-search-see-all {
+    position: relative;
+    flex: none;
+    min-height: 0;
+    padding: 0;
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-tight);
+}
+
+.app-search-see-all::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--app-search-see-all-reach));
+    right: calc(-1 * var(--app-search-see-all-side));
+    bottom: calc(-1 * var(--app-search-see-all-reach));
+    left: calc(-1 * var(--app-search-see-all-side));
+}
+
+/* a row's line: the facts take the ellipsis, the place never shrinks. The place's words begin with their " · ": a
+   flex item starts a line of its own, where a space that may collapse is dropped - kept (pre), or the row read
+   "1994· in your library" (review) */
+.app-result-split { display: flex; }
+.app-result-facts { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.app-result-place { flex-shrink: 0; white-space: pre; }
+
+/* A slot: the asking line, then what lands in it. One height whatever it holds; a line too long for it ends in an
+   ellipsis rather than wrapping. No overflow of its own, so a focused button's ring isn't clipped. */
+.app-search-slot {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: var(--app-search-slot);
+}
+
+.app-search-slot.is-row { flex-direction: row; align-items: center; gap: var(--app-song-gap); }
+.app-search-slot .app-asking,
+.app-search-slot .app-search-empty { padding: 0; }
+.app-search-slot .app-search-empty { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.app-search-slot.is-row .app-search-empty { flex: 1; }
+.app-search-slot .app-text-button { flex: none; padding: 0; }
+.app-search-show { width: 100%; }
+
+/* Top results' place for what is still to come: a row high, the sweep, no words */
+.app-search-top-place { display: flex; align-items: center; height: var(--app-result); }
+.app-search-top-place .app-sweep { flex: 1; }
+
+/* the active filter, always shown: one quiet line under an artist read's Albums */
+.app-search-filter-note {
+    margin: 0;
+    padding: 0 0 var(--pl-gap-sm);
+    overflow: hidden;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
 
 /* ===== Artists, and the two libraries joined (2.0.0-player.17) ===== */
 

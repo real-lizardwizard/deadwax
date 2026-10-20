@@ -9,16 +9,19 @@
 
 const BASE = '/deadwax'
 
-/** A non-2xx response. `detail` is FastAPI's HTTPException detail when it sent one. */
+/** A non-2xx response. `detail` is FastAPI's HTTPException detail when it sent one. `busy` (2.0.0-player.55): the
+ *  body said `busy: true` beside it - the app's Search's MusicBrainz searches, MusicBrainz shedding them. */
 export class ApiError extends Error {
   readonly status: number
   readonly detail: string | null
+  readonly busy: boolean
 
-  constructor(status: number, detail: string | null, fallback: string) {
+  constructor(status: number, detail: string | null, fallback: string, busy = false) {
     super(detail || fallback)
     this.name = 'ApiError'
     this.status = status
     this.detail = detail
+    this.busy = busy
   }
 }
 
@@ -31,19 +34,24 @@ export class ApiError extends Error {
  * to surface as an upstream outage and not as a failed search.
  */
 export class MusicBrainzUnavailable extends ApiError {
-  constructor(detail: string | null) {
-    super(503, detail, 'MusicBrainz is unreachable right now')
+  /**
+   * `busy` (2.0.0-player.55): MusicBrainz said it is shedding searches just now - the 503's body carried
+   * `busy: true` (src/routes/search_musicbrainz.py) - and Search says "MusicBrainz is busy just now" by it, never by
+   * matching the detail's words. False for every other 503.
+   */
+  constructor(detail: string | null, busy = false) {
+    super(503, detail, 'MusicBrainz is unreachable right now', busy)
     this.name = 'MusicBrainzUnavailable'
   }
 }
 
-async function readDetail(response: Response): Promise<string | null> {
+async function readBody(response: Response): Promise<{ detail: string | null; busy: boolean }> {
   try {
-    const body = (await response.json()) as { detail?: unknown }
-    return typeof body.detail === 'string' ? body.detail : null
+    const body = (await response.json()) as { detail?: unknown; busy?: unknown }
+    return { detail: typeof body.detail === 'string' ? body.detail : null, busy: body.busy === true }
   } catch {
     // an error response that isn't JSON is still an error; don't mask it with a parse failure
-    return null
+    return { detail: null, busy: false }
   }
 }
 
@@ -80,12 +88,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, init)
 
   if (!response.ok) {
-    const detail = await readDetail(response)
+    const { detail, busy } = await readBody(response)
     noteSignedOut(path, response.status, detail, sentUnder)
     // deliberately not special-cased here: 503 only means "MusicBrainz is down" on the
     // MusicBrainz routes, and slskd answers 502 for its own refusals. Mapping status codes
     // to meanings is each module's job - see musicbrainz.ts.
-    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`)
+    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy)
   }
 
   return (await response.json()) as T
@@ -105,9 +113,9 @@ export async function fetchOk(path: string, init?: RequestInit): Promise<Respons
   const sentUnder = session
   const response = await fetch(`${BASE}${path}`, init)
   if (!response.ok) {
-    const detail = await readDetail(response)
+    const { detail, busy } = await readBody(response)
     noteSignedOut(path, response.status, detail, sentUnder)
-    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`)
+    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy)
   }
   return response
 }

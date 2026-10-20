@@ -12,7 +12,9 @@
  * More from MusicBrainz: a page appended below by the first page's held rule, a group got twice drawn
  * once, and whether another page is there - by MusicBrainz's count, a full page without one, never past
  * the route's bound; what a page brought said in words, a page of repeats or none never "in your library"
- * (review). And (2.0.0-player.53) the song search's reading of the same box: a title beside an artist you
+ * (review). And (2.0.0-player.55) an artist's line in its two forms, Top results' songs' albums asked first, and what
+ * All's Albums asks by the reading (the studio clause for an artist alone, never for Various Artists). And
+ * (2.0.0-player.53) the song search's reading of the same box: a title beside an artist you
  * have as that song by them (credited then or called now), falling back to the words typed as one title
  * (review), the words typed otherwise - never a type filter - and nothing at all for an artist's name alone.
  *
@@ -26,12 +28,13 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-search-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/searchQuery.ts', 'src/lib/searchResults.ts', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022',
+  'src/lib/searchQuery.ts', 'src/lib/searchResults.ts', 'src/lib/searchList.ts', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022',
   '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' })
 
 const Q = require(path.join(OUT, 'lib/searchQuery.js'))
 const R = require(path.join(OUT, 'lib/searchResults.js'))
+const L = require(path.join(OUT, 'lib/searchList.js'))
 const O = require(path.join(OUT, 'lib/owned.js'))
 
 let failures = 0
@@ -143,14 +146,12 @@ check('...an EP, a compilation, a soundtrack, nothing at all', [
 ], ['EP', 'Compilation', 'Soundtrack', 'Release'])
 check('line: kind, artist, year', R.groupLine(groups[0]), 'Album · Portishead · 2008')
 check('...what MusicBrainz doesn\'t say is left out', [R.groupLine({ id: 'x', 'primary-type': 'Single' }), R.groupYear({ 'first-release-date': '' })], ['Single', null])
-check('an artist\'s line', [R.artistLine(2), R.artistLine(1), R.artistLine(0), R.artistLine(undefined)],
-  ['Artist · 2 albums in your library', 'Artist · 1 album in your library', 'Artist', 'Artist'])
-check('the top result is an artist whose name IS what was typed', [
-  R.topArtist([{ name: 'Portishead' }, { name: 'Portishead Tribute' }], 'portishead')?.name,
-  R.topArtist([{ name: 'The Beatles' }], 'beatles')?.name,
-  R.topArtist([{ name: 'Portishead' }], 'portishead third'),
-  R.topArtist([{ name: 'Portishead' }], ''),
-], ['Portishead', 'The Beatles', null, null])
+//? (2.0.0-player.55) two forms: a section's (the heading says it is an artist) and Top results' (the kind word first)
+check('an artist\'s line in a section: the count alone - nothing when Navidrome counted none', [R.artistLine(2), R.artistLine(1), R.artistLine(0), R.artistLine(undefined)],
+  ['2 albums in your library', '1 album in your library', '', ''])
+check('...in Top results, "Artist" first - alone when there is no count', [R.artistLine(2, false, true), R.artistLine(1, true, true), R.artistLine(0, false, true)],
+  ['Artist · 2 albums in your library', 'Artist · 1 album in the store', 'Artist'])
+check('(the top result as an artist alone went: Top results rank every kind - lib/searchList.ts)', R.topArtist, undefined)
 
 console.log('\na song plays within its album, once that album is in hand')
 const songs = [
@@ -159,6 +160,8 @@ const songs = [
 ]
 check('the first five DISTINCT albums of the songs found are asked for', R.albumsToPrefetch(songs), ['a', 'b', 'c', 'd', 'e'])
 check('...fewer when there are fewer', R.albumsToPrefetch(songs.slice(0, 3)), ['a', 'b'])
+check('(2.0.0-player.55) the library songs in Top results\' decided picks first, then the first songs\' - five distinct in all',
+  [R.albumsToPrefetch(songs, [{ albumId: 'f' }, { albumId: 'a' }]), R.albumsToPrefetch(songs, [{ albumId: 'z' }, {}])], [['f', 'a', 'b', 'c', 'd'], ['z', 'a', 'b', 'c', 'd']])
 check('a song\'s place in its album\'s own answer', [R.songIndex([{ id: 'x' }, { id: 's2' }], 's2'), R.songIndex([{ id: 'x' }], 's9'), R.songIndex(undefined, 's1')], [1, -1, -1])
 
 console.log('\nMore from MusicBrainz (2.0.0-player.50): the next page appended, and whether there is one')
@@ -208,6 +211,19 @@ console.log('\nthe song search (2.0.0-player.53): the box read as the album half
   check('the fallback: the words typed as one title, spaces closed up, quotes escaped; nothing for nothing',
     [Q.songTitleQuery('  the slow rush   tame impala '), Q.songTitleQuery('prince charming'), Q.songTitleQuery('Say "Hi"'), Q.songTitleQuery('   ')],
     ['recording:"the slow rush tame impala"', 'recording:"prince charming"', 'recording:"Say \\"Hi\\""', null])
+}
+
+console.log('\nwhat All\'s Albums asks, by the reading (2.0.0-player.55, lib/searchList.ts allAlbumsQuery)')
+{
+  const artists = ['Portishead']
+  const studio = '(artist:"Portishead") AND (primarytype:"Album" OR primarytype:"EP") AND -secondarytype:"Live" AND -secondarytype:"Compilation" AND -secondarytype:"Interview" AND -secondarytype:"Demo" AND -secondarytype:"Remix" AND -secondarytype:"DJ-mix"'
+  check('an artist you have alone: their studio albums and EPs - the query bracketed before the clauses are ANDed on', L.allAlbumsQuery(Q.searchQuery('portishead', artists)), { query: studio, studio: true })
+  check('...Various Artists ("va", "various artists"): today\'s query, unfiltered - its records are compilations by nature',
+    [L.allAlbumsQuery(Q.searchQuery('va', artists)), L.allAlbumsQuery(Q.searchQuery('various artists', artists))],
+    [{ query: 'artist:"Various Artists"', studio: false }, { query: 'artist:"Various Artists"', studio: false }])
+  check('...a title by an artist you have: fielded, as read', L.allAlbumsQuery(Q.searchQuery('portishead third', artists)),
+    { query: 'releasegroup:"third" AND (artist:"Portishead" OR artistname:"Portishead")', studio: false })
+  check('...free text: the words', L.allAlbumsQuery(Q.searchQuery('dark side of the moon', artists)), { query: 'dark side of the moon', studio: false })
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

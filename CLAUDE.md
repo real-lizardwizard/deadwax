@@ -223,8 +223,13 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    app/ServerSettings.tsx (drawn from components/SettingsView.tsx's own exported
                    parts) and app/EventLog.tsx (lib/eventLog.ts) are the server's settings and the
                    event log (both frames) - see "Server settings and the log in the app".
-                   app/Search.tsx's Songs on MusicBrainz group a recording search's takes into songs with
-                   lib/songs.ts - see "Song search (2.0.0-player.53)".
+                   app/Search.tsx is one list as Apple Music shows it (2.0.0-player.55): Top results,
+                   then Artists, Albums, Songs - yours first in each - its rules the pure
+                   lib/searchList.ts (the rank, the dedupe, the moments that never move anything),
+                   its rows app/SearchRows.tsx (stateless functions, no player action), its kept
+                   MusicBrainz answers app/searchAnswers.ts - see "Search like Apple Music". Its
+                   Songs section groups a recording search's takes into songs with lib/songs.ts -
+                   see "Song search (2.0.0-player.53)".
                    app/LibraryCare.tsx is Rescan and the bulk runs (both frames; its runs
                    app/useLibraryCare.ts; which albums each takes lib/bulkTargets.ts, the main
                    page's too) - see "Looking after the library".
@@ -235,7 +240,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             2994 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3036 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -271,7 +276,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | one stream for FLAC, hi-res resampled to 48 kHz | `notes/player-stream-hires.md` |
 | the store index and the "already have it" checks | `notes/store-index.md` |
 | the one app: routes, the gesture rule, the restyle, Now Playing, Info | `notes/app.md` |
-| Requests, Search, the album you don't have, Sources and Get, song search | `notes/app-requests-search-get.md` |
+| Requests, Search, the album you don't have, Sources and Get, song search, search like Apple Music | `notes/app-requests-search-get.md` |
 | artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
 | logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove) | `notes/logins.md` |
@@ -481,7 +486,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 2994 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3036 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -519,7 +524,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 2994 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3036 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
