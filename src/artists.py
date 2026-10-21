@@ -588,6 +588,21 @@ def answers_to(artist: dict | None, name: str) -> str:
 
 
 
+def credit_name(credit) -> str:
+    """
+    An artist credit as the app says it (2.0.0-player.56, the saved-search index): each name as the credit gives it
+    (else the artist's), then its join phrase - " & ", " feat. " - trimmed. ui/src/lib/release.ts creditName() is
+    the app's own; tests/test_saved_search.py holds the two to one answer on the same credits.
+    """
+    parts = []
+    for entry in credit or []:
+        if not isinstance(entry, dict):
+            continue
+        artist = entry.get("artist") if isinstance(entry.get("artist"), dict) else {}
+        parts.append(f"{entry.get('name') or artist.get('name') or ''}{entry.get('joinphrase') or ''}")
+    return "".join(parts).strip()
+
+
 def artist_match(artist: dict, wanted: str = "") -> dict:
     """
     One artist a name search found, as a list of them shows it - the main page's picker (Which artist

@@ -1912,3 +1912,9 @@ search, abandoned searches stopped, and the rate limiter's lock.
   ("bjork" - every try was shed); how often real MusicBrainz sheds three searches fired together, and whether three tries
   are enough; VoiceOver on the iPhone (the region, the sections, the chips, a slot filling under a thumb); logins on in a
   real page.
+
+### Search what's saved (2.0.0-player.56)
+
+What MusicBrainz's saved answers hold, searched under any words and drawn first in each kind's MusicBrainz rows, marked
+saved - its write-up is beside .54's, in notes/backend-gotchas.md ("Search what's saved (2.0.0-player.56)"): the index,
+the route, and Search's side (the saved block, SOURCE.saved in Top results, SAVED_WAIT_MS, the late kinds, the words).

@@ -99,10 +99,17 @@ while MusicBrainz is away. The answers are shared by everyone using deadwax. Onl
 never a failure: a minute when MusicBrainz is down is never remembered as an answer. (Before, they were
 kept in memory for an hour; that hour is still there, in front of the file.)
 
+Since 2.0.0-player.56 the app's Search also looks through everything the answers hold - every artist,
+album and song in them, the songs of every album page opened included - **under any words**, and shows
+what it finds first ([what deadwax has saved](finding-music.md#what-deadwax-has-saved)). For that the file
+keeps an index of them beside the answers, made as each answer is saved and dropped with the last answer
+that mentions a thing; its room counts toward `MUSICBRAINZ_CACHE_MB` below. A file saved by an earlier
+version is read into it once, in the background, on the first start (the log says when it's done).
+
 | setting | default | what it does |
 | --- | --- | --- |
 | `MUSICBRAINZ_CACHE_PATH` | *(the database's folder)* | the **folder** MusicBrainz's answers are saved in, as `musicbrainz-cache.db`, **as seen from inside this container**. Always a folder, never the file itself: deadwax makes it when it isn't there yet, and touches nothing else in it. Left empty, it is the folder `DB_PATH` is in - `/config/musicbrainz-cache.db` for most - so it is on the volume you already have. It can be the same folder as `PLAYER_CACHE_PATH`, on a fast disk ([below](#paths)). The folder has to be writable by `PUID`/`PGID`; a file of that name, or a folder holding deadwax's own database as `musicbrainz-cache.db`, is refused. **It's only a cache**: nothing in it needs backing up, deleting it is always safe (stop deadwax first, or use **Clear** below), and all it costs is speed - the next answers are asked of MusicBrainz again. The file is made when the first answer is saved. A change applies from the next answer, with no restart (the old file is left where it is). |
-| `MUSICBRAINZ_CACHE_MB` | `200` | the most the saved answers take, in MB, from 0 to 1048576. An artist searched, their page and one album opened take about 45 KB, so 200 MB holds about 4,000 of those. Past it, the answers used longest ago are dropped first, until the file is back under 90% of this. **`0` turns saving off**: answers are kept in memory only, for an hour, as before 2.0.0-player.54 - a file already there is left as it is, and **Clear** still empties it. |
+| `MUSICBRAINZ_CACHE_MB` | `200` | the most the saved answers take, in MB, from 0 to 1048576 - the index Search looks through included (since 2.0.0-player.56). An artist explored the app's way - searched, their page with all of their albums, one album opened and one of its songs searched - is 6 to 10 answers: 44 to 108 KB of answers, and 68 to 248 KB with the index (about 160 KB on average, measured on five artists; the more albums in their discography the more - Metallica's 539 took the most), so 200 MB holds about 1,100 of those (about 2,700 before the index). Past it, the answers used longest ago are dropped first, until the file is back under 90% of this. **`0` turns saving off**: answers are kept in memory only, for an hour, as before 2.0.0-player.54 - and Search finds nothing saved; a file already there is left as it is, and **Clear** still empties it. |
 
 **How old an answer can be.** MusicBrainz changes - new releases, corrections - so a saved answer has
 an age: a **search** is refreshed after **7 days**, and everything else - an artist, a release, an
@@ -123,7 +130,7 @@ of MusicBrainz again.
 
 **Clear MusicBrainz's saved answers**, under the two settings (on the settings tab and in the app's
 Server settings, both under **Connections**), shows how many answers the file holds and how big it
-is, and empties it - on disk and in memory. Only speed is lost. It's refused while
+is, and empties it - on disk and in memory, and what Search finds in it. Only speed is lost. It's refused while
 `MUSICBRAINZ_CACHE_PATH` has an unsaved change (it clears the file that is saved) and when nothing is
 saved.
 

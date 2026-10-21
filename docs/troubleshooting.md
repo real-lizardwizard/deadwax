@@ -301,6 +301,32 @@ fetched behind it for the next time.
   as `musicbrainz-cache.db.unreadable-<date>` the next time deadwax uses it, and a new one started;
   the old one can be deleted.
 
+## Search shows an old name, or misses something new
+
+Since 2.0.0-player.56 the app's Search shows [what deadwax has saved](finding-music.md#what-deadwax-has-saved)
+of MusicBrainz's answers first, marked **saved**, under any words - before MusicBrainz is asked. What's saved
+is what MusicBrainz said when it was saved: an artist renamed since (still under the old name), an album
+added since (missing), a correction (not shown) - until MusicBrainz's own answer for the words arrives, a
+second or so later, and adds what it found below the saved rows. What's saved for these exact words is
+refreshed behind itself once it's old (a search after 7 days, the rest after 30).
+
+- **Wait for MusicBrainz's answer**: it lands below the saved rows, never moving them. A row of it that is
+  the same artist, album or song as a saved row isn't shown twice - the saved row stands for it, as it was
+  saved, until the words are searched again after the saved answers behind it are refreshed (above).
+- **Or clear them now**: **Clear MusicBrainz's saved answers** (Settings → Connections, or the app's You →
+  Server settings → Connections) empties what's saved and what Search finds in it; the next searches ask
+  MusicBrainz again.
+- **Nothing saved ever shows**: saving is off (`MUSICBRAINZ_CACHE_MB` is `0`), nothing has been saved yet,
+  or the line beside Clear says why nothing is being saved ([above](#a-musicbrainz-answer-looks-out-of-date)).
+  The log says it once if deadwax's SQLite can't search text (it needs FTS5, SQLite 3.43 or newer - the
+  image's, 3.46, has it): answers are still saved, only not searched. If the file can't be written (a
+  read-only folder), the answers in it are still read, Search finds nothing saved, and the log says *couldn't
+  make the saved-search index* once; deadwax tries again a minute later.
+- **After going back to an older deadwax and forward again**: an older version (before 2.0.0-player.56)
+  saves and drops answers without telling the index. The next start notices (the log says *changed while the
+  saved-search index wasn't kept*) and reads every answer into it again, in the background - until it is
+  done, Search finds less of what's saved. Nothing needs doing.
+
 ## The app's Search says MusicBrainz isn't answering, or keeps asking
 
 The phone app's [Search tab](finding-music.md#on-the-phone-the-apps-search-tab) and its album pages
@@ -317,6 +343,10 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   Tap **Try again** in a minute; the album page never shows part of a pressing list as if it were
   all of it. You's **Connections** says whether deadwax can reach MusicBrainz at all, and [The
   MusicBrainz pill is red](#the-musicbrainz-pill-is-red) goes through why it might not.
+- **"MusicBrainz isn't answering just now - these are what deadwax has saved from it."** (or **"Saved -
+  MusicBrainz is away."** / **"Saved - MusicBrainz is busy."** in a section's place, since
+  2.0.0-player.56): the same, under rows [deadwax had saved](finding-music.md#what-deadwax-has-saved) -
+  those stay, and **Try again** asks MusicBrainz again.
 - **"MusicBrainz is busy just now - try again in a moment."** (since 2.0.0-player.55): MusicBrainz answered,
   saying it is turning searches away for a moment - it does, often, for a few minutes at a time, and asking
   for artists, albums and songs at once makes it likelier. **Try again** (or **Search** pressed again) draws the

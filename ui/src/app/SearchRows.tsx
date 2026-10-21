@@ -29,6 +29,8 @@ import { ArchiveCover } from './ArchiveCover'
  *    disclosure onto the albums they are on.
  *  - A SLOT: one fixed height for a late kind's answer - the sweep while it asks, then "Show 3 albums from
  *    MusicBrainz", why there are none, or its failure with Try again.
+ *  - WHAT'S SAVED (2.0.0-player.56): a row from MusicBrainz's saved answers is MusicBrainz's row - drawn, tapped and
+ *    got the same - its place saying "saved" (a tile's third line "Saved from MusicBrainz") unless it is held.
  */
 
 /** What every row needs: the marks, the live state of a Get or a look, and what a tap calls. */
@@ -370,7 +372,8 @@ export type SlotState =
   | { state: 'asking'; words?: string }
   | { state: 'show'; kind: Kind; count: number; onShow: (event: MouseEvent) => void; words?: string }
   | { state: 'said'; words: string }
-  | { state: 'failed'; failure: { refused: boolean; busy: boolean; message: string; unavailable: boolean }; onRetry: (event: MouseEvent) => void }
+  //? `words`: said instead of the failure's own (2.0.0-player.56: under what's saved, that these are saved)
+  | { state: 'failed'; failure: { refused: boolean; busy: boolean; message: string; unavailable: boolean }; onRetry: (event: MouseEvent) => void; words?: string }
   | { state: 'button'; words: string; onPress: (event: MouseEvent) => void }
 
 export function slot(state: SlotState, key: string) {
@@ -405,7 +408,7 @@ export function slot(state: SlotState, key: string) {
     case 'failed':
       return (
         <div key={key} class="app-search-slot is-row">
-          <p class="app-search-empty">{failureWords(state.failure, true)}</p>
+          <p class="app-search-empty">{state.words ?? failureWords(state.failure, true)}</p>
           {!state.failure.refused && (
             <button type="button" class="app-text-button" onClick={state.onRetry}>
               Try again

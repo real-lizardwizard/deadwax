@@ -222,8 +222,13 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   "maybe in your library", dashed, when only a folder with no MusicBrainz ids has its name ("maybe in the
   store" with logins on, when that folder isn't in your library); and the album and the pressing on
   musicbrainz.org at its foot. MusicBrainz isn't asked for anything until you search, and the album page
-  works with Navidrome down. [Finding music](finding-music.md#on-the-phone-the-apps-search-tab) has how the
-  box is read, how Top results are chosen and what every note means.
+  works with Navidrome down. **What deadwax has saved** of MusicBrainz's answers (since 2.0.0-player.56) is
+  searched too, under any words, the moment your library is: its rows lead each kind's MusicBrainz rows,
+  marked **saved** - search "portishead", open Dummy, and "glory box" later finds Glory Box at once, after a
+  restart, with MusicBrainz away - and MusicBrainz's own answer adds what isn't there yet below them. When
+  MusicBrainz is away the saved rows stay, with a line saying these are what deadwax has saved.
+  [Finding music](finding-music.md#on-the-phone-the-apps-search-tab) has how the box is read, how Top
+  results are chosen, [what's saved](finding-music.md#what-deadwax-has-saved) and what every note means.
 - **Get**: **Get the album** on the album you don't have - under the Pressing button, with a line
   under it saying what you already have of that pressing, if anything - gets the pressing chosen;
   **Get** at the end of an album MusicBrainz offers in Search gets its usual pressing, and at the end of a

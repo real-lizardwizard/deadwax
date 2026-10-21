@@ -1,7 +1,7 @@
 import { ApiError, MusicBrainzUnavailable, get } from './http'
 import type {
   ArtistFacts, ArtistSearchResponse, DiscographyResponse, FullySearchResponse, PingResponse, Release, ReleaseGroupResponse, ReleasesResponse,
-  SongSearchResponse,
+  SavedSearchResponse, SongSearchResponse,
 } from './types'
 
 /**
@@ -99,6 +99,21 @@ export function searchArtistsPath(name: string, limit: number, offset = 0): stri
   const params = new URLSearchParams({ name, limit: String(limit) })
   if (offset > 0) params.set('offset', String(offset))
   return `/search_musicbrainz/artists?${params}`
+}
+
+/**
+ * Search what's saved (2.0.0-player.56): the artists, albums and songs MusicBrainz's answers saved on disk hold that
+ * match the words typed - every word, the last as a prefix, accents folded - in milliseconds, MusicBrainz asked
+ * nothing. Each kind in its own route's shape, so its rows are MusicBrainz's rows. Not a MusicBrainz search: it never
+ * says MusicBrainz is away - `available: false` is "nothing saved to search".
+ */
+export async function searchSaved(words: string, signal?: AbortSignal): Promise<SavedSearchResponse> {
+  return await get<SavedSearchResponse>(searchSavedPath(words), signal)
+}
+
+/** The address searchSaved asks. */
+export function searchSavedPath(words: string): string {
+  return `/search_musicbrainz/saved?${new URLSearchParams({ words })}`
 }
 
 /**

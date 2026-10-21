@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 
 import { ApiError, MusicBrainzUnavailable } from '../api/http'
 import {
-  fullySearch, fullySearchPath, getReleaseGroup, searchArtists, searchArtistsPath, searchSongs, searchSongsPath,
+  fullySearch, fullySearchPath, getReleaseGroup, searchArtists, searchArtistsPath, searchSaved, searchSongs, searchSongsPath,
 } from '../api/musicbrainz'
 import { navidromeAlbumFor } from '../api/store'
 import type { ArtistMatch, FullySearchResponse, Recording, ReleaseGroup, ReleaseGroupResponse, SongSearchResponse, ArtistSearchResponse } from '../api/types'
@@ -14,11 +14,12 @@ import {
   songSearchQuery, songTitleQuery, type SearchPlan,
 } from '../lib/searchQuery'
 import {
-  ARTIST_SEARCH_LIMIT, CHIP_LIBRARY_COUNTS, KINDS, LIBRARY_LATE_MS, PREVIEW, RESULTS_WAIT_MS, STUDIO_NOTE, SONGS_NEED_A_TITLE, TOP_RESULTS, TYPE_MORE,
-  allAlbumsQuery, artistRow, albumRow, candidatesOf, knownArtists, decidedTop, drawInOrFold, emptyWords, failureWords, foldWords, groupRow, heldUnlisted,
-  lateKinds, lateRows, libraryLateWords, librarySkippedWords, libraryWords, mbArtistRow, mbSongRow, musicBrainzWords, namedArtist, newArtists, newSongs, nextBehind,
-  nothingWords, phantom, pool, preferredSongs, sectionRows, sectionsReady, songRow as librarySongRow, studioOrder, topResults, viewWords,
-  type Candidate, type Frame, type Kind, type KindPool, type Marks, type Outcome, type Row, type View,
+  ARTIST_SEARCH_LIMIT, CHIP_LIBRARY_COUNTS, KINDS, LIBRARY_LATE_MS, PREVIEW, RESULTS_WAIT_MS, SAVED_WAIT_MS, STUDIO_NOTE, SONGS_NEED_A_TITLE, TOP_RESULTS,
+  TYPE_MORE, allAlbumsQuery, artistRow, albumRow, candidatesOf, drawnCounts, knownArtists, decidedTop, drawInOrFold, emptyWords, failureWords, foldWords,
+  groupRow, heldUnlisted, kindArea, lateKinds, lateRows, libraryLateWords, librarySkippedWords, libraryWords, mbArtistRow, mbSongRow, musicBrainzWords, namedArtist,
+  newArtists, newSongs, nextBehind, nothingMoreWords, nothingWords, phantom, pool, preferredSongs, savedAwayWords, savedFor, savedRow, savedWords,
+  sectionRows, sectionsReady, songRow as librarySongRow, studioOrder, topResults, viewWords,
+  type Candidate, type Frame, type Kind, type KindPool, type Marks, type Outcome, type KindArea, type Row, type SavedAnswer, type SavedFound, type View,
 } from '../lib/searchList'
 import { albumsToPrefetch, appendPage, groupHeld, morePageWords, morePages, notInLibrary, searchWords, songIndex } from '../lib/searchResults'
 import {
@@ -119,6 +120,14 @@ type Songs =
   }
   | ({ state: 'failed'; text: string; key: string } & Failure)
 
+/** What's saved for a text (2.0.0-player.56): asked as the words settle, beside the library; `none` when there was
+ *  nothing to search, it failed, or it missed SAVED_WAIT_MS - given up for the words: MusicBrainz's answer alone. */
+type Saved =
+  | { state: 'idle' }
+  | { state: 'asking'; text: string }
+  | ({ state: 'done'; text: string } & SavedFound)
+  | { state: 'none'; text: string }
+
 /** All's search3 for a text: `waiting` for Navidrome's status (not known yet - not "not OK"), `skipped` with it not OK
  *  (the library counts as empty). */
 type Library =
@@ -154,11 +163,13 @@ interface Run {
   outcome: Outcome | null
 }
 
-/** A drawn section: its rows, kept in their order, and its slot when its kind was late. */
+/** A drawn section: its rows, kept in their order, and its slot when its kind was late. `saved`: rows from what's
+ *  saved are among them (2.0.0-player.56) - its failure then says so. */
 interface DrawnSection {
   kind: Kind
   rows: Row[]
   slot: null | { state: 'asking' } | { state: 'show'; rows: Row[] } | { state: 'said'; words: string } | { state: 'failed' }
+  saved?: boolean
 }
 
 /** What the All view has drawn for a text - frozen: Top results' picks and each section's rows and their order, the
@@ -181,6 +192,9 @@ interface Drawn {
   /** every kind asked failed by moment 2, none late, none refused: one block at the foot */
   allFailed: Failure | null
 }
+
+/** Whether a drawn row is from what's saved. */
+const fromSaved = (row: Row) => 'saved' in row && row.saved === true
 
 const SEND_ORDER: readonly Kind[] = ['albums', 'artists', 'songs']
 const words1 = (text: string) => text.trim().split(/\s+/).filter(Boolean).join(' ')
@@ -302,6 +316,14 @@ export function Search({
   const [musicbrainz, setMusicbrainz] = useState<Musicbrainz>({ state: 'idle' })
   const [artists, setArtists] = useState<Artists>({ state: 'idle' })
   const [songs, setSongs] = useState<Songs>({ state: 'idle' })
+  //? (2.0.0-player.56) what's saved for the words
+  const [saved, setSaved] = useState<Saved>({ state: 'idle' })
+  const savedNow = useRef(saved)
+  savedNow.current = saved
+  const putSaved = (next: Saved) => {
+    savedNow.current = next
+    setSaved(next)
+  }
   //? each kind's answer as last SET - what an ask in the same tap as another reads (a render's copy can be a step behind)
   const musicNow = useRef(musicbrainz)
   musicNow.current = musicbrainz
@@ -341,6 +363,8 @@ export function Search({
   const artistRequests = useMemo(latestOnly, [])
   //? the songs' own (2.0.0-player.53): a new search calls the old one off, as each kind's does
   const songRequests = useMemo(latestOnly, [])
+  //? (2.0.0-player.56) what's saved: its own, as each kind's is
+  const savedRequests = useMemo(latestOnly, [])
   const listRequests = useMemo(latestOnly, [])
   const yoursRequests = useMemo(latestOnly, [])
   //? a Get chip's lookup of the album's pressings: only the newest tap opens the sheet
@@ -366,6 +390,7 @@ export function Search({
   const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const kindLateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   //? a control its own tap takes away, which had focus: where focus goes once the render has drawn what it brought
   //? `control`: the control itself, while its tap's redraw is still to come - the hand waits until it has gone
   const handFocus = useRef<{ key: string | null; kind: Kind | null; note?: boolean; control?: Element } | null>(null)
@@ -374,6 +399,9 @@ export function Search({
   const showingAll = useRef<number | null>(null)
   //? what the region has said of a kind view's words: its library's rows, then MusicBrainz's - each once (review)
   const kindSaid = useRef<{ key: string; library: boolean; musicBrainz: boolean }>({ key: '', library: false, musicBrainz: false })
+  //? (2.0.0-player.56, after review) what each kind view drew below its library's rows, for its words: kept in place
+  //? as later answers land (lib/searchList.ts kindArea)
+  const kindAreas = useRef(new Map<string, KindArea>())
   const results = library?.state === 'answered' ? library.results : null
   const artistsKnown = useRef<string[]>([])
   artistsKnown.current = [...(owned?.artists ?? []), ...(results?.artists ?? []).map((artist) => artist.name)]
@@ -419,6 +447,60 @@ export function Search({
 
   const answerOf = (kind: Kind): Musicbrainz | Artists | Songs => (kind === 'albums' ? musicbrainz : kind === 'artists' ? artists : songs)
   const answerNow = (kind: Kind): Musicbrainz | Artists | Songs => (kind === 'albums' ? musicNow : kind === 'artists' ? artistsNow : songsNow).current
+
+  /**
+   * What's saved for these words (2.0.0-player.56): asked as the words settle, beside the library - only for words
+   * MusicBrainz is to be asked for - and kept for them. It answers in milliseconds; the library's moment waits for it
+   * at most SAVED_WAIT_MS from now, and past that it is given up for the words (called off, `none`) - so a slow or
+   * broken index only means MusicBrainz's answer alone. Asked ONCE for the words, whatever it answered: given up or
+   * failed, it stays so until the words change (the review's catch: asked again by a chip's tap, Enter or Try again,
+   * a saved answer landing late went above MusicBrainz's rows already drawn in a kind view).
+   */
+  function askSaved(term: string) {
+    const was = savedNow.current
+    if (was.state !== 'idle' && was.text === term) return
+    const request = savedRequests.begin()
+    putSaved({ state: 'asking', text: term })
+    if (savedTimer.current !== null) clearTimeout(savedTimer.current)
+    savedTimer.current = setTimeout(() => {
+      savedTimer.current = null
+      const now = savedNow.current
+      if (now.state === 'asking' && now.text === term) {
+        savedRequests.supersede()
+        putSaved({ state: 'none', text: term })
+      }
+    }, SAVED_WAIT_MS)
+    searchSaved(term, request.signal).then(
+      (answer) => {
+        if (!request.current()) return
+        if (!answer.available) {
+          putSaved({ state: 'none', text: term })
+          return
+        }
+        //? what is held is left out as it is DRAWN (savedFor, from the library's index then): never worked out here, as
+        //? it lands, which drew an album you have twice when /library/owned hadn't answered yet (review)
+        putSaved({
+          state: 'done', text: term, matches: answer.artists?.matches ?? [], groups: answer.albums?.['release-groups'] ?? [],
+          credited: answer.credited?.['release-groups'] ?? [], songs: groupSongs(answer.songs?.recordings ?? []),
+        })
+      },
+      (reason: unknown) => {
+        if (!request.current() || isAbort(reason)) return
+        putSaved({ state: 'none', text: term })
+      },
+    )
+  }
+
+  /** The library's moment waits for what's saved while it is being asked for these words - never longer than
+   *  SAVED_WAIT_MS, which gives it up. */
+  const savedSettled = (term: string) => !(saved.state === 'asking' && saved.text === term)
+
+  /** What's saved for these words, as a view reading them this way draws it (lib/searchList.ts savedFor). */
+  function savedOf(term: string, plan: SearchPlan, inView: View): SavedAnswer | null {
+    if (saved.state !== 'done' || saved.text !== term || !drawnMusicBrainz(term)) return null
+    const studio = inView === 'all' && allAlbumsQuery(plan).studio
+    return savedFor(plan, saved, wantedKinds(term, plan, inView), studio, ownedNow()?.index ?? null)
+  }
 
   function askLibrary(term: string) {
     libraryAsked.current = term
@@ -473,10 +555,15 @@ export function Search({
   function decidedPrefix(term: string, results: LibraryResults): Row[] {
     const plan = planFor(term)
     if (!plan) return []
-    const rows = pool({ reading: plan, library: results, artistList, index: ownedNow()?.index ?? null, marks: marksNow(), artists: null, albums: null, songs: null })
+    const rows = pool({
+      reading: plan, library: results, artistList, index: ownedNow()?.index ?? null, marks: marksNow(), artists: null, albums: null, songs: null,
+      saved: savedOf(term, plan, 'all'),
+    })
     const will = asked.current === term || asksMusicBrainzBySettling(term)
     const phantoms = will ? wantedKinds(term, plan, 'all').map((kind) => phantom(kind, plan)).filter((each): each is Candidate => !!each) : []
-    return decidedTop(candidatesOf(rows, term, plan), phantoms, TOP_RESULTS[frame], { library: results, artistList, index: ownedNow()?.index ?? null, groups: [] }).prefix
+    return decidedTop(candidatesOf(rows, term, plan), phantoms, TOP_RESULTS[frame], {
+      library: results, artistList, index: ownedNow()?.index ?? null, groups: [...(savedOf(term, plan, 'all')?.groups ?? [])],
+    }).prefix
   }
 
   /** A kind chip's own search3 (CHIP_LIBRARY_COUNTS) for these words, beside All's; the Songs view's albums asked ahead. */
@@ -695,6 +782,8 @@ export function Search({
     if (!plan) return
     asked.current = term
     askedPlan.current = { text: term, plan }
+    //? what's saved beside it, if these words haven't had it (Enter on fewer than three characters)
+    askSaved(term)
     const ownedAnswered = refreshOwned()
     const wanted = wantedKinds(term, plan, inView)
     for (const kind of SEND_ORDER) {
@@ -936,6 +1025,7 @@ export function Search({
   useEffect(() => {
     //? the box changed: a Get chip's lookup for what it said before opens nothing now
     standDown()
+    for (const key of [...kindAreas.current.keys()]) if (!key.endsWith(`\n${query}`)) kindAreas.current.delete(key)
     const musicBrainz = musicBrainzOnTyping(query, asked.current)
     if (lateTimer.current !== null) clearTimeout(lateTimer.current)
     lateTimer.current = null
@@ -950,6 +1040,8 @@ export function Search({
       setKindLibrary(null)
       setReady(new Map())
       dropMusicBrainz()
+      savedRequests.supersede()
+      putSaved({ state: 'idle' })
       setDrawn(null)
       setView('all')
       setSaid('')
@@ -962,6 +1054,8 @@ export function Search({
     //? the run's cap counts from here, so its sections never wait on the slowest kind (review)
     if (musicBrainz === 'keep') armCap(query)
     const forLibrary = setTimeout(() => {
+      //? what's saved first, beside the library: the library's moment waits for it (savedSettled)
+      if (asksMusicBrainzBySettling(query) || asked.current === query) askSaved(query)
       if (libraryAsked.current !== query) askLibrary(query)
       if (viewNow.current !== 'all') askKindLibrary(query, viewNow.current)
       armLibraryLate(query)
@@ -1054,11 +1148,12 @@ export function Search({
     musicRequests.supersede()
     artistRequests.supersede()
     songRequests.supersede()
+    savedRequests.supersede()
     getRequests.supersede()
     heldRequests.supersede()
     listRequests.supersede()
     yoursRequests.supersede()
-    for (const timer of [capTimer, lateTimer, kindLateTimer]) if (timer.current !== null) clearTimeout(timer.current)
+    for (const timer of [capTimer, lateTimer, kindLateTimer, savedTimer]) if (timer.current !== null) clearTimeout(timer.current)
   }, [])
 
   /* ----- whose: the marks ----- */
@@ -1107,13 +1202,21 @@ export function Search({
     return pool({
       reading: plan, library: withLibrary ? results : null, artistList, index: owned?.index ?? null, marks, evidence,
       artists: found ? found.matches : null, albums: albums ? { groups: albums.groups, shown: albums.shown } : null, songs: recorded ? recorded.songs : null,
+      saved: savedOf(term, plan, 'all'),
     })
   }
 
-  const familyFor = (withLibrary: boolean) => ({
-    library: withLibrary ? results : null, artistList, index: owned?.index ?? null, evidence,
-    groups: musicbrainz.state === 'done' && musicbrainz.text === run.text ? musicbrainz.groups : [],
-  })
+  const familyFor = (withLibrary: boolean) => {
+    const plan = planFor(run.text)
+    const kept = (plan && savedOf(run.text, plan, 'all')?.groups) ?? []
+    return {
+      library: withLibrary ? results : null, artistList, index: owned?.index ?? null, evidence,
+      //? a song's named album is a saved group's, or MusicBrainz's answer's, when either holds it - marked as saved
+      //? when it is what's saved's
+      groups: [...kept, ...(musicbrainz.state === 'done' && musicbrainz.text === run.text ? musicbrainz.groups : [])],
+      saved: new Set(kept.map((group) => group.id)),
+    }
+  }
 
   /** The sections for a draw: each kind with library rows, MusicBrainz's rows in hand, a slot for a kind still out,
    *  or its failure while another kind answered. Every kind asked failed (none late, none refused): the foot's block. */
@@ -1128,7 +1231,7 @@ export function Search({
       const late = out.includes(kind)
       const failing = failed.includes(kind) && !allFailed
       if (!drawnRows.length && !late && !failing) continue
-      sections.push({ kind, rows: drawnRows, slot: late ? { state: 'asking' } : failing ? { state: 'failed' } : null })
+      sections.push({ kind, rows: drawnRows, slot: late ? { state: 'asking' } : failing ? { state: 'failed' } : null, ...(drawnRows.some(fromSaved) ? { saved: true } : {}) })
     }
     return { sections, allFailed }
   }
@@ -1150,7 +1253,8 @@ export function Search({
     const term = run.text
     const plan = planFor(term)
     if (!plan) return { drawn: was, said: null }
-    const settled = librarySettled(term)
+    //? (2.0.0-player.56) ...and what's saved, while it is asked for (at most SAVED_WAIT_MS)
+    const settled = librarySettled(term) && savedSettled(term)
     const musicBrainz = drawnMusicBrainz(term)
     const wanted = musicBrainz ? wantedKinds(term, plan, 'all') : []
     const out = lateKinds(wanted, (kind) => inHandFor(kind, term, plan, 'all'))
@@ -1175,7 +1279,7 @@ export function Search({
         const settledAll = !out.length && wanted.length > 0
         return {
           drawn: { ...base, top, topPlace: false, sections, allFailed, studio: studioOn(term, plan, out) },
-          said: [said, settledAll ? mbWords(term, plan, rows, wanted, frame) : ''].filter(Boolean).join(' '),
+          said: [said, savedSaid(sections), settledAll ? mbWords(term, plan, rows, wanted, frame, sections) : ''].filter(Boolean).join(' '),
         }
       }
       const phantoms = out.map((kind) => phantom(kind, plan)).filter((each): each is Candidate => !!each)
@@ -1193,9 +1297,10 @@ export function Search({
         : was.top
       const { sections, allFailed } = sectionsOf(term, plan, rows, out, was.frame)
       const settledAll = !out.length && wanted.length > 0
+      const told = [savedSaid(sections), settledAll ? mbWords(term, plan, rows, wanted, was.frame, sections) : ''].filter(Boolean).join(' ')
       return {
         drawn: { ...was, top, topPlace: false, sections, allFailed, studio: studioOn(term, plan, out) },
-        said: settledAll ? mbWords(term, plan, rows, wanted, was.frame) : null,
+        said: told || null,
       }
     }
 
@@ -1215,8 +1320,10 @@ export function Search({
       const withLibrary = !was.libraryLate && library?.text === term && library.state === 'answered'
       const rows = poolFor(term, plan, withLibrary)
       const cap = PREVIEW[was.frame][kind]
-      const libraryDrawn = section.rows.length
-      const landing = lateRows(rows[kind], [Math.max(0, cap[0] - libraryDrawn), cap[1]])
+      //? (2.0.0-player.56) what's saved may be drawn above the slot already: MusicBrainz's answer adds only what
+      //? isn't, each part's cap less what it has drawn
+      const [libraryDrawn, musicBrainzDrawn] = drawnCounts(rows[kind], section.rows)
+      const landing = lateRows(rows[kind], [Math.max(0, cap[0] - libraryDrawn), Math.max(0, cap[1] - musicBrainzDrawn)], new Set(section.rows.map((row) => row.key)))
       const where = drawInOrFold(kind, order)
       if (landing.length) {
         sections = sections.map((each) => (each.kind !== kind ? each : where === 'in' ? { ...each, rows: [...each.rows, ...landing], slot: null } : { ...each, slot: { state: 'show', rows: landing } }))
@@ -1224,13 +1331,15 @@ export function Search({
       } else if (where === 'in') {
         sections = section.rows.length ? sections.map((each) => (each.kind === kind ? { ...each, slot: null } : each)) : sections.filter((each) => each.kind !== kind)
       } else {
-        sections = sections.map((each) => (each.kind === kind ? { ...each, slot: { state: 'said', words: emptyKindWords(kind, term) } } : each))
+        //? nothing new, under rows MusicBrainz's answer already holds (what's saved): never "No albums on MusicBrainz"
+        const words = section.rows.some(fromSaved) ? nothingMoreWords(kind, term) : emptyKindWords(kind, term)
+        sections = sections.map((each) => (each.kind === kind ? { ...each, slot: { state: 'said', words } } : each))
       }
     }
     if (!changed) return { drawn: was, said: null }
     const settledAll = !out.length && wanted.length > 0
     const withLibrary = !was.libraryLate && library?.text === term && library.state === 'answered'
-    const words = [folded, settledAll ? mbWords(term, plan, poolFor(term, plan, withLibrary), wanted, was.frame) : null].filter(Boolean).join(' ')
+    const words = [folded, settledAll ? mbWords(term, plan, poolFor(term, plan, withLibrary), wanted, was.frame, sections) : null].filter(Boolean).join(' ')
     //? the studio line was decided with the sections (by the request asked): never added below them as albums land
     return { drawn: { ...was, sections }, said: words || null }
   }
@@ -1251,16 +1360,21 @@ export function Search({
 
   const noReleaseWords = (term: string) => `MusicBrainz has songs for “${term}”, but on no release yet - nothing to get.`
 
-  /** The region's words for MusicBrainz once every kind asked has settled: what it brought to the list, as drawn. */
-  function mbWords(term: string, plan: SearchPlan, rows: Record<Kind, KindPool>, wanted: readonly Kind[], frameAt: Frame): string {
+  /** The region's words for MusicBrainz once every kind asked has settled: what it brought to the list, as drawn -
+   *  more than what's saved above it, when that is drawn (`sections`). */
+  function mbWords(term: string, plan: SearchPlan, rows: Record<Kind, KindPool>, wanted: readonly Kind[], frameAt: Frame, sections: readonly DrawnSection[] = []): string {
     const answered = wanted.some((kind) => answerOf(kind).state === 'done' && inHandFor(kind, term, plan, 'all'))
     //? every kind refused (a 422 with words): the refusal's words, as the slots say them - refused is not away, and is
     //? never said as "isn't answering" (late review)
     const failures = wanted.filter((kind) => inHandFor(kind, term, plan, 'all')).map(answerOf).flatMap((now) => (now.state === 'failed' ? [now] : []))
     if (!answered && failures.length && failures.every((each) => each.refused)) return failureWords(failures[0]!)
-    const drawnOf = (kind: Kind) => Math.min(rows[kind].musicbrainz.length, PREVIEW[frameAt][kind][1])
-    return musicBrainzWords({ artists: drawnOf('artists'), albums: drawnOf('albums'), songs: drawnOf('songs') }, answered)
+    const savedLeft = Object.fromEntries(KINDS.map((kind) => [kind, Math.max(0, PREVIEW[frameAt][kind][1] - Math.min(rows[kind].saved.length, PREVIEW[frameAt][kind][1]))]))
+    const drawnOf = (kind: Kind) => Math.min(rows[kind].musicbrainz.length, savedLeft[kind]!)
+    return musicBrainzWords({ artists: drawnOf('artists'), albums: drawnOf('albums'), songs: drawnOf('songs') }, answered, sections.some((each) => each.saved))
   }
+
+  /** The region's words for what's saved, as the sections holding it are drawn: "Saved from MusicBrainz: 1 song." */
+  const savedSaid = (sections: readonly DrawnSection[]) => savedWords(Object.fromEntries(sections.map((each) => [each.kind, each.rows.filter(fromSaved).length])))
 
   useLayoutEffect(() => {
     const next = advance(drawn)
@@ -1298,9 +1412,12 @@ export function Search({
         parts.push(libraryWords({ [view]: model.libraryRows.length }, personal) || (model.noMusicBrainz && model.nothing ? nothingWords(view, query) : ''))
       }
       const mine = model.mine
-      if (!kindSaid.current.musicBrainz && model.mbAllowed && !model.noMusicBrainz && (mine?.state === 'done' || mine?.state === 'failed')) {
+      if (!kindSaid.current.musicBrainz && model.mbAllowed && !model.mbHeld && !model.noMusicBrainz && (mine?.state === 'done' || mine?.state === 'failed')) {
         kindSaid.current.musicBrainz = true
-        parts.push(mine.state === 'failed' ? failureWords(mine, true) : musicBrainzWords({ [view]: model.mbRows.length }, true))
+        //? (2.0.0-player.56) what's saved, said with MusicBrainz's words: drawn above them
+        const kept = model.savedCount
+        if (kept) parts.push(savedWords({ [view]: kept }))
+        parts.push(mine.state === 'failed' ? (kept ? savedAwayWords(mine, true) : failureWords(mine, true)) : musicBrainzWords({ [view]: model.mbRows.length - model.mbRows.filter(fromSaved).length }, true, kept > 0))
       }
       const told = parts.filter(Boolean)
       //? "Showing albums." just said, and the view drawn at once: said together
@@ -1668,7 +1785,8 @@ export function Search({
     if (now.state === 'said') return { state: 'said', words: now.words }
     const answer = answerOf(section.kind)
     const failure = answer.state === 'failed' ? answer : { message: "MusicBrainz isn't answering.", unavailable: true, busy: false, refused: false }
-    return { state: 'failed', failure, onRetry: (event) => tryAgain(event, section.kind) }
+    //? (2.0.0-player.56) under what's saved: MusicBrainz isn't answering, and these are what deadwax has saved
+    return { state: 'failed', failure, onRetry: (event) => tryAgain(event, section.kind), ...(section.saved ? { words: savedAwayWords(failure, true) } : {}) }
   }
 
   function allView() {
@@ -1739,8 +1857,14 @@ export function Search({
         {drawn.allFailed && (
           <div class="app-search-problem app-search-foot">
             <p class="app-search-empty">
-              {failureWords(drawn.allFailed)}
-              {drawn.top.length || sections.length ? ` ${personal ? "What's in the store is above." : "What's in your library is above."}` : ''}
+              {sections.some((each) => each.saved) || drawn.top.some(fromSaved)
+                //? (2.0.0-player.56) what's saved drawn above: one line saying MusicBrainz is away and these are saved
+                ? savedAwayWords(drawn.allFailed)
+                : failureWords(drawn.allFailed)}
+              {/* only when something of the library's IS drawn above - what's saved isn't (review: "What's in your library is
+                  above." under saved rows alone) */}
+              {drawn.top.some((row) => !fromSaved(row)) || sections.some((each) => each.rows.some((row) => !fromSaved(row)))
+                ? ` ${personal ? "What's in the store is above." : "What's in your library is above."}` : ''}
             </p>
             <button type="button" class="app-button" onClick={(event) => tryAgain(event)}>
               Try again
@@ -1817,21 +1941,61 @@ export function Search({
         for (const song of mine.songs) if (keptSongs.has(song.key)) mbRows.push(mbSongRow(song))
       }
     }
+    //? (2.0.0-player.56) what's saved leads MusicBrainz's rows - deduped against the library's as MusicBrainz's are, and
+    //? MusicBrainz's answer against it by key: drawn as soon as the view's library is, MusicBrainz's added below
+    const savedRows: Row[] = []
+    const kept = mbAllowed && plan ? savedOf(query, plan, kind) : null
+    if (kept && kind === 'albums') {
+      const held = new Set(heldUnlisted(kept.groups, index, libraryOf as Album[]).map((group) => group.id))
+      const shownIds = new Set(kept.shown.map((group) => group.id))
+      for (const group of kept.groups) if (shownIds.has(group.id) || held.has(group.id)) savedRows.push(savedRow(groupRow(group)))
+    } else if (kept && kind === 'artists') {
+      const listed = [...(libraryOf as Artist[]), ...answeredRows.flatMap((row) => (row.type === 'artist' ? [row.artist] : []))]
+      const split = newArtists(kept.matches, knownArtists(artistList, listed), index, listed)
+      const brought = new Map(split.brought.map((each) => [each.position, each.artist]))
+      const found = new Map(split.musicbrainz.map((each) => [each.position, each.match]))
+      kept.matches.forEach((_, at) => {
+        const artist = brought.get(at)
+        const match = found.get(at)
+        if (artist) savedRows.push(artistRow(artist))
+        else if (match) savedRows.push(savedRow(mbArtistRow(match)))
+      })
+    } else if (kept && kind === 'songs') {
+      const split = newSongs(kept.songs, libraryOf as Song[], index, evidence)
+      const keptSongs = new Set([...split.musicbrainz, ...split.brought].map((each) => each.song.key))
+      for (const song of kept.songs) if (keptSongs.has(song.key)) savedRows.push(savedRow(mbSongRow(song)))
+    }
+    //? MusicBrainz's rows held while what's saved is still being asked for these words (SAVED_WAIT_MS at most, then
+    //? given up): the two drawn together, saved first - as the All view's moment waits for it (review)
+    //? - never once any of them is drawn (taken away again, they would move everything below)
+    const areaKey = `${kind}\n${query}`
+    const drewBefore = kindAreas.current.get(areaKey) ?? null
+    //? - its failure as its rows (second review: a 503 back before what's saved was drawn, then pushed down by it)
+    const mbHeld = !savedSettled(query) && (mine?.state === 'done' || mine?.state === 'failed') && !drewBefore?.rest.length && !drewBefore?.problem
+    //? ...and what is drawn kept where it is as answers land after it (kindArea): a late saved answer goes below - below
+    //? MusicBrainz's failure too, once that is drawn (second review: else its Try again moved down under the finger)
+    const problem = mbAllowed && !mbHeld && mine?.state === 'failed'
+    const { lead, rest, area } = kindArea(drewBefore, savedRows, mbHeld ? [] : mbRows, new Set(answeredRows.map((row) => row.key)), problem)
+    if (mbAllowed) kindAreas.current.set(areaKey, area)
+    savedRows.splice(0, savedRows.length, ...lead)
+    mbRows.splice(0, mbRows.length, ...rest)
+    //? how many of each are drawn, for the region's words (a late saved row is among MusicBrainz's)
+    const savedCount = [...lead, ...rest].filter(fromSaved).length
     const noMusicBrainz = kind === 'artists' && plan?.kind === 'album-by-artist'
     //? before its library lands: one asking line where its rows will go (review: the view drew its heading alone)
     const searching = !late && !libSettled && !(!lib && awayKnown)
     //? nothing at all found: never under the library's failure - it wasn't searched (late review, as All's
     //? `!drawn.libraryProblem`); and for a view that asks MusicBrainz nothing, the library's answer alone decides it -
     //? else its heading stood alone (late review)
-    const nothing = libSettled && lib?.state !== 'failed' && !answeredRows.length
+    const nothing = libSettled && lib?.state !== 'failed' && !answeredRows.length && !savedRows.length && !mbHeld
       && (noMusicBrainz || (mine?.state === 'done' && !mbRows.length && !(kind === 'albums' && 'groups' in mine && mine.groups.length)))
-    return { plan, lib, lateKey, late, libSettled, showLib, answeredRows, libraryRows, keyNow, musicBrainz, mine, mbAllowed, mbRows, noMusicBrainz, searching, nothing }
+    return { plan, lib, lateKey, late, libSettled, showLib, answeredRows, libraryRows, keyNow, musicBrainz, mine, mbAllowed, mbHeld, savedRows, mbRows, savedCount, noMusicBrainz, searching, nothing }
   }
 
   /** A kind view: that kind in full - the library's rows (its chip's own search3), More from your library, then
    *  MusicBrainz's appended at the foot as they land (never before the view's library rows), then More. */
   function kindView(kind: Kind) {
-    const { plan, lib, lateKey, late, showLib, answeredRows, libraryRows, keyNow, musicBrainz, mine, mbAllowed, mbRows, noMusicBrainz, searching, nothing } = kindModel(kind)
+    const { plan, lib, lateKey, late, showLib, answeredRows, libraryRows, keyNow, musicBrainz, mine, mbAllowed, mbHeld, savedRows, mbRows, noMusicBrainz, searching, nothing } = kindModel(kind)
     const pages = mine?.state === 'done' ? morePages(mine.nextOffset, mine.count, mine.last, kind === 'albums' ? MUSICBRAINZ_LIMIT : kind === 'artists' ? ARTIST_SEARCH_LIMIT : SONG_SEARCH_LIMIT) : 'end'
     const more = mine?.state === 'done' ? mine.more : null
     const moreNote = more?.state === 'added' && kind === 'albums' && 'held' in more ? morePageWords(more.added, more.held, personal).note
@@ -1886,25 +2050,32 @@ export function Search({
             <p class="app-search-empty app-search-foot">{TYPE_MORE}</p>
           ) : kind === 'songs' && plan?.kind === 'artist' ? (
             <p class="app-search-empty app-search-foot">{SONGS_NEED_A_TITLE}</p>
-          ) : !mbAllowed ? null : mine?.state === 'searching' || (!mine && musicBrainz) ? (
+          ) : !mbAllowed ? null : (<>
+          {/* (2.0.0-player.56) what's saved, at once - MusicBrainz's answer below it */}
+          {savedRows.length > 0 && <ul class="app-results">{savedRows.map((row, at) => sectionRow(row, context, libraryRows.length + at))}</ul>}
+          {mine?.state === 'searching' || (!mine && musicBrainz) || mbHeld ? (<>
             <div class="app-asking">
               <span class="app-sweep" aria-hidden="true" />
               <span class="app-asking-text">Asking MusicBrainz…</span>
             </div>
-          ) : mine?.state === 'failed' ? (
+            {/* what's saved that landed below a failure stays drawn while it is asked again (its Try again) */}
+            {mbRows.length > 0 && <ul class="app-results">{mbRows.map((row, at) => sectionRow(row, context, libraryRows.length + savedRows.length + at))}</ul>}
+          </>) : mine?.state === 'failed' ? (<>
             <div class="app-search-problem">
-              <p class="app-search-empty">{failureWords(mine)}</p>
+              <p class="app-search-empty">{savedRows.length ? savedAwayWords(mine) : failureWords(mine)}</p>
               {!mine.refused && (
                 <button type="button" class="app-button" onClick={(event) => askMusicBrainzAgain(kind, event)}>
                   Try again
                 </button>
               )}
             </div>
-          ) : mine?.state === 'done' ? (
+            {/* what's saved landing after the failure was drawn: below it, never pushing it down (second review) */}
+            {mbRows.length > 0 && <ul class="app-results">{mbRows.map((row, at) => sectionRow(row, context, libraryRows.length + savedRows.length + at))}</ul>}
+          </>) : mine?.state === 'done' ? (
             <>
               {mbRows.length > 0 ? (
-                <ul class="app-results">{mbRows.map((row, at) => sectionRow(row, context, libraryRows.length + at))}</ul>
-              ) : nothing ? null : kind === 'albums' && 'groups' in mine && mine.groups.length ? (
+                <ul class="app-results">{mbRows.map((row, at) => sectionRow(row, context, libraryRows.length + savedRows.length + at))}</ul>
+              ) : nothing || savedRows.length ? null : kind === 'albums' && 'groups' in mine && mine.groups.length ? (
                 <p class="app-search-empty">{words.allHeld}</p>
               ) : kind === 'songs' && 'recordings' in mine && mine.recordings.length ? (
                 <p class="app-search-empty">{noReleaseWords(query)}</p>
@@ -1927,7 +2098,8 @@ export function Search({
                 <p class="app-search-empty app-search-more-note" tabIndex={-1}>{"That's as far into one search as deadwax goes - add a word to narrow it."}</p>
               ) : null}
             </>
-          ) : null)}
+          ) : null}
+          </>))}
           {nothing && (
             <p class="app-search-empty app-search-foot">{nothingWords(kind, query)}</p>
           )}

@@ -965,9 +965,10 @@ def test_the_file_keeps_to_its_size_dropping_the_least_recently_used(made):
 def test_an_answer_bigger_than_the_budget_is_not_kept(made):
     """...and nothing else is dropped to make room for it."""
     answers, client = made
-    saved = answers(max_bytes=64 << 10)
+    #? (2.0.0-player.56) half a megabyte: the saved-search index's empty tables are some 68 KB of the file (17 pages of 4 KB, measured)
+    saved = answers(max_bytes=512 << 10)
     c = client(saved)
-    connect(c, MusicBrainz({"release-group/": DUMMY, LOOKUP[0]: {"noise": os.urandom(80 << 10).hex()}}))
+    connect(c, MusicBrainz({"release-group/": DUMMY, LOOKUP[0]: {"noise": os.urandom(600 << 10).hex()}}))
     ask(c)
     ask(c, LOOKUP)
     assert [json.loads(key)[0] for key, _, _ in saved_rows(saved.path())] == ["release-group/"]
@@ -978,11 +979,12 @@ def test_an_answer_over_90_percent_of_the_budget_is_not_kept(made):
     as `> 90% of it`. One between the two: kept, the trim back under 90% would drop everything else - and
     then it too."""
     answers, client = made
-    budget = 64 << 10
+    #? (2.0.0-player.56) half a megabyte: the saved-search index's empty tables are some 68 KB of the file (17 pages of 4 KB, measured)
+    budget = 512 << 10
     saved = answers(max_bytes=budget)
     c = client(saved)
     key = ResponseCache.disk_key(*LOOKUP)
-    noise = os.urandom(30 << 10)
+    noise = os.urandom(240 << 10)
     for _ in range(40):
         payload = {"noise": noise.hex()}
         share = (len(pack(payload)) + len(key)) / budget
@@ -1214,8 +1216,12 @@ def test_a_file_of_another_shape_is_emptied_and_made_afresh(made, tmp_path):
 
     assert [key for key, _, _ in saved_rows(path)] == [ResponseCache.disk_key(*SEARCH)]
     with sqlite3.connect(path) as connection:
-        assert dict(connection.execute("SELECT name, value FROM meta")) == \
-            {"kind": musicbrainz_cache.KIND, "format": musicbrainz_cache.FORMAT}
+        assert answers_meta(connection) == {"kind": musicbrainz_cache.KIND, "format": musicbrainz_cache.FORMAT}
+
+
+def answers_meta(connection) -> dict:
+    """The meta rows that say what the file is - less the saved-search index's own (2.0.0-player.56: `index_*`)."""
+    return {name: value for name, value in connection.execute("SELECT name, value FROM meta") if not name.startswith("index_")}
 
 
 class FullAtTheMetaRows(sqlite3.Connection):
@@ -1258,8 +1264,7 @@ def test_a_file_whose_making_was_cut_short_is_made_afresh(made, tmp_path, monkey
     assert saved.problem is None
     assert [key for key, _, _ in saved_rows(saved.path())] == ["second"]
     with real_connect(saved.path()) as connection:
-        assert dict(connection.execute("SELECT name, value FROM meta")) == \
-            {"kind": musicbrainz_cache.KIND, "format": musicbrainz_cache.FORMAT}
+        assert answers_meta(connection) == {"kind": musicbrainz_cache.KIND, "format": musicbrainz_cache.FORMAT}
 
 
 def test_a_file_killed_while_it_was_being_made_is_made_afresh(tmp_path):
@@ -1421,6 +1426,10 @@ def test_the_lifespan_attaches_the_file_and_closes_it_after_the_refreshes_stop(m
         async def close(self):
             order.append(("close the file", Client.cache.disk is self))
 
+        def warm(self):
+            #? (2.0.0-player.56) opened as the app starts, attached first - so its backfill reads the attached file
+            order.append(("warm", Client.cache.disk is self))
+
     the_file = File()
 
     async def forever(*_args):
@@ -1449,7 +1458,7 @@ def test_the_lifespan_attaches_the_file_and_closes_it_after_the_refreshes_stop(m
         return attached
 
     assert asyncio.run(go()) is True, "attached while the app runs"
-    assert order == ["stop refreshing", "close connections", ("close the file", True)]
+    assert order == [("warm", True), "stop refreshing", "close connections", ("close the file", True)]
     assert Client.cache.disk is None, "detached after"
 
 

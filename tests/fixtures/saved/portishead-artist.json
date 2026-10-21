@@ -1,0 +1,27 @@
+{
+ "about": "Recorded from MusicBrainz 2026-10-20 (deadwax 2.0.0-player.56's builder, a request every 1.2 s), trimmed to what the saved-search index reads. {endpoint, params} as the disk cache keys the answer.",
+ "endpoint": "artist/8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+ "params": {
+  "inc": "url-rels+tags+genres+aliases+artist-rels",
+  "fmt": "json"
+ },
+ "payload": {
+  "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+  "name": "Portishead",
+  "sort-name": "Portishead",
+  "type": "Group",
+  "country": "GB",
+  "disambiguation": "",
+  "life-span": {
+   "begin": "1991",
+   "ended": false,
+   "end": null
+  },
+  "aliases": [
+   {
+    "name": "Postishead",
+    "sort-name": "Postishead"
+   }
+  ]
+ }
+}

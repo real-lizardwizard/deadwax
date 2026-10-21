@@ -73,12 +73,15 @@ async def lifespan(app: FastAPI):
     Config.report_logins()
 
     #? (2.0.0-player.54) MusicBrainz's answers kept on disk, under the hour in memory - after the
-    #? overrides, since MUSICBRAINZ_CACHE_PATH and MUSICBRAINZ_CACHE_MB can be ones. Nothing is opened
-    #? until the first answer is looked for. Only here, so nothing outside a running app touches the file.
+    #? overrides, since MUSICBRAINZ_CACHE_PATH and MUSICBRAINZ_CACHE_MB can be ones. Nothing is made
+    #? until the first answer is saved. Only here, so nothing outside a running app touches the file.
     MusicBrainzClient.cache.disk = saved_answers
     if saved_answers.enabled():
         logger.info(f"MusicBrainz's answers are kept on disk in {saved_answers.path()}, at most "
                     f"{saved_answers.max_bytes() >> 20} MB")
+        #? (2.0.0-player.56) opened now, on its own thread, if it is there: answers saved before there was a
+        #? saved-search index are read into one in the background, from the first start of this version
+        saved_answers.warm()
     else:
         logger.info("MUSICBRAINZ_CACHE_MB is 0, so MusicBrainz's answers are kept in memory only, for an hour")
 

@@ -26,8 +26,13 @@
  *  - THE MOMENTS (`sectionsReady`, `lateKinds`, `drawInOrFold`, `nextBehind`): every tappable thing drawn for a
  *    search keeps its place until you do something; a later answer lands only below everything tappable, or
  *    inside a place one fixed height already drawn for it. app/Search.tsx wires them; this file holds the
- *    rules, in one place - "search what's saved" (2.0.0-player.56) puts saved matches at the top of each
- *    kind's MusicBrainz rows from here.
+ *    rules, in one place.
+ *  - WHAT'S SAVED (2.0.0-player.56, "search what's saved"): what MusicBrainz's saved answers hold matching the words
+ *    (/search_musicbrainz/saved - in MusicBrainz's own shapes, so its rows are MusicBrainz's rows, marked `saved`)
+ *    leads each kind's MusicBrainz rows, deduped against the library as MusicBrainz's are and MusicBrainz's own
+ *    answer deduped against it by key (`pool`'s `saved` block); in Top results it ranks after yours and the
+ *    store's and before MusicBrainz's answer (SOURCE.saved), so a song you came across on a saved album page is a
+ *    Top result at the library's moment. Only for the kinds MusicBrainz is asked for, read as it is (`savedFor`).
  */
 
 import type { ArtistMatch, ReleaseGroup } from '../api/types'
@@ -37,7 +42,7 @@ import { libraryArtistFor, mbidOf, soleCredit } from './artistPage'
 import { heldReleases } from './idBridge'
 import { foldName, ownedForGroup, type OwnedIndex } from './owned'
 import { creditName } from './release'
-import { VARIOUS_ARTISTS, quoteTerm, typeFilter, withTypeFilter, type SearchPlan } from './searchQuery'
+import { NOISY_SECONDARY_TYPES, VARIOUS_ARTISTS, quoteTerm, typeFilter, withTypeFilter, type SearchPlan } from './searchQuery'
 import { artistLine, groupHeld, groupKind, groupPlace, groupYear, notInLibrary } from './searchResults'
 import {
   heldWords, namedAlbum, songAlbumHeld, songAlbumHolding, songAlbumWords, titleKey, type Song as FoundSong, type SongAlbum, type SongEvidence,
@@ -88,13 +93,14 @@ export const PREVIEW: Record<Frame, Record<Kind, readonly [number, number]>> = {
  *  and the invariant check go by): a library row's Navidrome id, a MusicBrainz row's MusicBrainz id. */
 export type Row =
   | { type: 'artist'; key: string; artist: Artist }
-  | { type: 'mb-artist'; key: string; match: ArtistMatch }
+  //? `saved` (2.0.0-player.56): from what's saved, not MusicBrainz's answer to these words - the same row, marked
+  | { type: 'mb-artist'; key: string; match: ArtistMatch; saved?: true }
   | { type: 'album'; key: string; album: Album }
-  | { type: 'group'; key: string; group: ReleaseGroup }
+  | { type: 'group'; key: string; group: ReleaseGroup; saved?: true }
   | { type: 'song'; key: string; song: LibrarySong }
-  | { type: 'mb-song'; key: string; song: FoundSong }
+  | { type: 'mb-song'; key: string; song: FoundSong; saved?: true }
   //? a MusicBrainz song's named album, pulled into Top results from the song's own fields (not a ReleaseGroup)
-  | { type: 'song-album'; key: string; song: FoundSong; album: SongAlbum }
+  | { type: 'song-album'; key: string; song: FoundSong; album: SongAlbum; saved?: true }
 
 export const artistRow = (artist: Artist): Row => ({ type: 'artist', key: `artist:${artist.id}`, artist })
 export const mbArtistRow = (match: ArtistMatch): Row => ({ type: 'mb-artist', key: `mb-artist:${match.mbid}`, match })
@@ -103,6 +109,9 @@ export const groupRow = (group: ReleaseGroup): Row => ({ type: 'group', key: `gr
 export const songRow = (song: LibrarySong): Row => ({ type: 'song', key: `song:${song.id}`, song })
 export const mbSongRow = (song: FoundSong): Row => ({ type: 'mb-song', key: `mb-song:${song.key}`, song })
 export const songAlbumRow = (song: FoundSong, album: SongAlbum): Row => ({ type: 'song-album', key: `group:${album.id}`, song, album })
+/** A MusicBrainz row from what's saved (2.0.0-player.56): the very row MusicBrainz's answer would draw - the same key,
+ *  so the two are never both drawn - marked as saved. */
+export const savedRow = (row: Row): Row => (row.type === 'mb-artist' || row.type === 'group' || row.type === 'mb-song' || row.type === 'song-album' ? { ...row, saved: true } : row)
 
 /** Which kind a row is. */
 export function kindOf(row: Pick<Row, 'type'>): Kind {
@@ -209,19 +218,151 @@ const holder = (yours: boolean | null): 'yours' | 'store' => (yours === false ? 
 
 /* ===== one thing, shown once ===== */
 
-/** A row in its place in the pool: whose block it is in, and its index in its own answer. */
+/** A row in its place in the pool: whose block it is in, and its index in its own answer - `saved` when that answer is
+ *  what's saved (2.0.0-player.56). */
 export interface Placed {
   row: Row
   holder: 'yours' | 'store'
   position: number
+  saved?: boolean
 }
 
-/** One kind's rows in hand: the library's (search3, in its order), those brought in through MusicBrainz's answer (held,
- *  but not listed by search3), and MusicBrainz's own. */
+/** One kind's rows in hand: the library's (search3, in its order), those brought in through MusicBrainz's answer or
+ *  what's saved (held, but not listed by search3), what's saved (2.0.0-player.56) and MusicBrainz's own. */
 export interface KindPool {
   library: Placed[]
   brought: Placed[]
+  saved: Placed[]
   musicbrainz: Placed[]
+}
+
+/* ===== what's saved (2.0.0-player.56) ===== */
+
+/** How long the library's moment waits for what's saved, from when it was asked - it answers in milliseconds; past
+ *  this it is given up for the words (a slow index degrades to MusicBrainz alone), so nothing waits on it. */
+export const SAVED_WAIT_MS = 400
+
+/** Top results' sources, best first: yours, the store's, what's saved, MusicBrainz's answer. What's saved ranks before
+ *  MusicBrainz's answer because it is in hand at the library's moment - MusicBrainz's phantoms (source 2) can never
+ *  outrank it, so a saved row can be decided early and never moves - and it is what you have come across before. */
+export const SOURCE = { yours: 0, store: 1, saved: 1.5, musicbrainz: 2 } as const
+
+/** What's saved for some words, as Search keeps it: artists as /artists answers them, release groups, the groups
+ *  credited to exactly the words (`credited`, in studio order - the artist reading's, chosen from all theirs saved),
+ *  songs (groupSongs of its recordings). */
+export interface SavedFound {
+  matches: readonly ArtistMatch[]
+  groups: readonly ReleaseGroup[]
+  credited?: readonly ReleaseGroup[]
+  songs: readonly FoundSong[]
+}
+
+/** ...and as a view draws it (savedFor): the block `shown` worked out from the library's index as it is drawn. */
+export interface SavedAnswer {
+  matches: readonly ArtistMatch[]
+  groups: readonly ReleaseGroup[]
+  shown: readonly ReleaseGroup[]
+  songs: readonly FoundSong[]
+}
+
+/** How many of an artist's saved albums the artist reading draws at most: MusicBrainz's page (MUSICBRAINZ_LIMIT). */
+export const SAVED_ARTIST_ALBUMS = 12
+
+/** A studio album or EP, as the studio clause reads one: an Album or EP with none of the noisy secondary types. */
+export function studioGroup(group: ReleaseGroup): boolean {
+  const primary = (group['primary-type'] ?? '').toLowerCase()
+  const noisy = new Set(NOISY_SECONDARY_TYPES.map((type) => type.toLowerCase()))
+  return (primary === 'album' || primary === 'ep') && !(group['secondary-types'] ?? []).some((type) => noisy.has(String(type).toLowerCase()))
+}
+
+/**
+ * What's saved that a view draws for words read this way: only the kinds MusicBrainz is asked for (`kinds` - the
+ * artist reading asks no songs, album-by-artist no artists: the saved ones of those aren't drawn either), and under
+ * the ARTIST reading only albums credited to that artist - from `credited`, all of theirs that are saved, not the
+ * albums the words found (which titles naming them fill first: the review's catch) - the studio ones when
+ * MusicBrainz is asked the studio clause (`studio`), as the line under them says, read in the studio order an
+ * artist's albums are (studioOrder), SAVED_ARTIST_ALBUMS of them.
+ *
+ * `shown` (what isn't held) is worked out from `index` as it is drawn - none until the library's index is in hand
+ * (the review's catch: worked out as the answer landed, before /library/owned had, an album you have was drawn twice -
+ * yours, and the saved one among MusicBrainz's). What's saved answers in milliseconds, so it never waits for the index
+ * (a first /library/owned can walk a sleeping array); its albums are drawn once the index is in, MusicBrainz's below.
+ */
+export function savedFor(reading: Reading, saved: SavedFound | null, kinds: readonly Kind[], studio: boolean, index: OwnedIndex | null): SavedAnswer | null {
+  if (!saved) return null
+  const artist = reading.kind === 'artist' ? foldName(reading.artist) : ''
+  const keep = (group: ReleaseGroup) => (!artist || foldName(creditName(group['artist-credit'])) === artist) && (!studio || studioGroup(group))
+  const albums = kinds.includes('albums')
+  const groups = !albums ? [] : artist ? studioOrder((saved.credited ?? saved.groups).filter(keep)).slice(0, SAVED_ARTIST_ALBUMS) : saved.groups.filter(keep)
+  return {
+    matches: kinds.includes('artists') ? saved.matches : [],
+    groups,
+    shown: index ? notInLibrary(groups, index) : [],
+    songs: kinds.includes('songs') ? saved.songs : [],
+  }
+}
+
+/**
+ * A kind view's rows below its library's (2.0.0-player.56, after review): what's saved, then MusicBrainz's answer -
+ * and once drawn, each row kept in its place, and as what it was drawn as. The All view's list is frozen as it is
+ * drawn; a kind view is drawn from what is in hand at every render, so without this a saved answer landing after
+ * MusicBrainz's rows (asked again on a chip's tap, say) went ABOVE them, taking MusicBrainz's copies of the same
+ * things away - rows moving under a finger, and changing their lines.
+ *
+ * `before`: what the view drew for these words last (null: nothing yet); `saved` and `musicbrainz`: its rows now, in
+ * their order (MusicBrainz's may hold what's saved holds - one key is drawn once); `above`: the keys drawn above them
+ * (the library's); `problem`: MusicBrainz's failure (its words and Try again) is drawn now, below the lead. What's
+ * saved leads (`lead`) while nothing of MusicBrainz's - its rows, or its failure - has been drawn below it; anything
+ * new after that goes at the foot (`rest`, drawn below the failure too) - so what lands late never moves what was
+ * drawn, a Try again under the finger included (second review).
+ */
+export interface KindArea {
+  lead: readonly string[]
+  rest: readonly string[]
+  /** what each key was drawn as: what's saved, or MusicBrainz's answer */
+  from: Readonly<Record<string, 'saved' | 'musicbrainz'>>
+  /** MusicBrainz's failure has been drawn below the lead for these words (it stays so: once drawn, below is taken) */
+  problem: boolean
+}
+
+export function kindArea(
+  before: KindArea | null, saved: readonly Row[], musicbrainz: readonly Row[], above: ReadonlySet<string>, problem = false,
+): { lead: Row[]; rest: Row[]; area: KindArea } {
+  const savedBy = new Map(saved.filter((row) => !above.has(row.key)).map((row) => [row.key, row]))
+  const answerBy = new Map(musicbrainz.filter((row) => !above.has(row.key)).map((row) => [row.key, row]))
+  const from: Record<string, 'saved' | 'musicbrainz'> = {}
+  const placed = new Set<string>()
+  const lead: Row[] = []
+  const rest: Row[] = []
+  const put = (into: Row[], row: Row | undefined, source: 'saved' | 'musicbrainz') => {
+    if (!row || placed.has(row.key)) return
+    into.push(row)
+    placed.add(row.key)
+    from[row.key] = source
+  }
+  //? what was drawn, where it was, as what it was (else as what still holds it)
+  const again = (into: Row[], key: string) => {
+    const was = before?.from[key] === 'musicbrainz' ? 'musicbrainz' : 'saved'
+    const same = was === 'musicbrainz' ? answerBy : savedBy
+    if (same.has(key)) put(into, same.get(key), was)
+    else if (was === 'musicbrainz') put(into, savedBy.get(key), 'saved')
+    else put(into, answerBy.get(key), 'musicbrainz')
+  }
+  for (const key of before?.lead ?? []) again(lead, key)
+  for (const key of before?.rest ?? []) again(rest, key)
+  //? what is new: what's saved leads only while nothing is drawn below it; then everything new at the foot
+  const below = !!before?.rest.length || !!before?.problem
+  for (const row of savedBy.values()) put(below ? rest : lead, row, 'saved')
+  for (const row of answerBy.values()) put(rest, row, 'musicbrainz')
+  return { lead, rest, area: { lead: lead.map((row) => row.key), rest: rest.map((row) => row.key), from, problem: problem || !!before?.problem } }
+}
+
+/** How many of a drawn section's rows are the library's (and brought in) and how many MusicBrainz's (what's saved
+ *  among them) - what its late kind's rows are capped by. */
+export function drawnCounts(kind: KindPool, rows: readonly Row[]): [number, number] {
+  const library = new Set([...kind.library, ...kind.brought].map((each) => each.row.key))
+  const fromLibrary = rows.filter((row) => library.has(row.key)).length
+  return [fromLibrary, rows.length - fromLibrary]
 }
 
 /** How many MusicBrainz artists in an answer answer to a name - by their name, or the name they were matched as. */
@@ -328,6 +469,8 @@ export interface PoolInput {
   /** MusicBrainz's groups, and the block shown (notInLibrary, as drawn) */
   albums: { groups: readonly ReleaseGroup[]; shown: readonly ReleaseGroup[] } | null
   songs: readonly FoundSong[] | null
+  /** (2.0.0-player.56) what's saved for these words, as this view draws it (savedFor) - null when none */
+  saved?: SavedAnswer | null
 }
 
 /** Everything in hand, each thing once, in its block (`newArtists`, `heldUnlisted`, `newSongs`). */
@@ -341,41 +484,78 @@ export function pool(input: PoolInput): Record<Kind, KindPool> {
     artistsLibrary.push({ row: artistRow(named), holder: holder(artistYours(named, marks)), position: -1 })
   }
   listedArtists.forEach((artist, position) => artistsLibrary.push({ row: artistRow(artist), holder: holder(artistYours(artist, marks)), position }))
-  const artists: KindPool = { library: artistsLibrary, brought: [], musicbrainz: [] }
-  if (input.artists) {
+  const saved = input.saved ?? null
+  const artists: KindPool = { library: artistsLibrary, brought: [], saved: [], musicbrainz: [] }
+  //? (2.0.0-player.56) what's saved first, then MusicBrainz's answer less what's saved (by MusicBrainz id) - read as ONE
+  //? list by newArtists, so a library artist is brought in once, and "answers to that name" counts both
+  const savedMatches = saved?.matches ?? []
+  if (savedMatches.length || input.artists) {
+    const savedIds = new Set(savedMatches.map((match) => match.mbid))
+    const live = (input.artists ?? []).filter((match) => !savedIds.has(match.mbid))
     const listed = named ? [...listedArtists, named] : listedArtists
-    const split = newArtists(input.artists, known, index, listed)
-    artists.musicbrainz = split.musicbrainz.map(({ match, position }) => ({ row: mbArtistRow(match), holder: 'yours', position }))
-    artists.brought = split.brought.map(({ artist, position }) => ({ row: artistRow(artist), holder: holder(artistYours(artist, marks)), position }))
+    const split = newArtists([...savedMatches, ...live], known, index, listed)
+    const fromSaved = (position: number) => position < savedMatches.length
+    const at = (position: number) => (fromSaved(position) ? position : (input.artists ?? []).indexOf(live[position - savedMatches.length]!))
+    for (const { match, position } of split.musicbrainz) {
+      const row = mbArtistRow(match)
+      if (fromSaved(position)) artists.saved.push({ row: savedRow(row), holder: 'yours', position, saved: true })
+      else artists.musicbrainz.push({ row, holder: 'yours', position: at(position) })
+    }
+    artists.brought = split.brought.map(({ artist, position }) => ({
+      row: artistRow(artist), holder: holder(artistYours(artist, marks)), position: at(position), ...(fromSaved(position) ? { saved: true } : {}),
+    }))
   }
 
   const libraryAlbums = library?.albums ?? []
   const albums: KindPool = {
     library: libraryAlbums.map((album, position) => ({ row: albumRow(album), holder: holder(albumYours(album, marks)), position })),
     brought: [],
+    saved: [],
     musicbrainz: [],
   }
+  const savedGroups = saved?.groups ?? []
+  const savedGroupIds = new Set(savedGroups.map((group) => group.id))
+  if (savedGroups.length) {
+    const at = new Map(savedGroups.map((group, position) => [group.id, position]))
+    albums.saved = (saved?.shown ?? []).map((group) => ({ row: savedRow(groupRow(group)), holder: 'yours', position: at.get(group.id) ?? 0, saved: true }))
+    const shown = new Set((saved?.shown ?? []).map((group) => group.id))
+    albums.brought = heldUnlisted(savedGroups, index, libraryAlbums)
+      .filter((group) => !shown.has(group.id))
+      .map((group) => ({ row: groupRow(group), holder: holder(groupYours(group, marks)), position: at.get(group.id) ?? 0, saved: true }))
+  }
   if (input.albums) {
+    const groups = input.albums.groups.filter((group) => !savedGroupIds.has(group.id))
     const at = new Map(input.albums.groups.map((group, position) => [group.id, position]))
-    albums.musicbrainz = input.albums.shown.map((group) => ({ row: groupRow(group), holder: 'yours', position: at.get(group.id) ?? 0 }))
+    albums.musicbrainz = input.albums.shown.filter((group) => !savedGroupIds.has(group.id))
+      .map((group) => ({ row: groupRow(group), holder: 'yours', position: at.get(group.id) ?? 0 }))
     //? MusicBrainz's block is the one worked out as its answer landed (`shown`); a group found held only since stays
     //? in it, marked in place - never brought in as well, which drew it twice (review)
     const shown = new Set(input.albums.shown.map((group) => group.id))
-    albums.brought = heldUnlisted(input.albums.groups, index, libraryAlbums)
+    albums.brought.push(...heldUnlisted(groups, index, libraryAlbums)
       .filter((group) => !shown.has(group.id))
-      .map((group) => ({ row: groupRow(group), holder: holder(groupYours(group, marks)), position: at.get(group.id) ?? 0 }))
+      .map((group) => ({ row: groupRow(group), holder: holder(groupYours(group, marks)), position: at.get(group.id) ?? 0 })))
   }
 
   const librarySongs = library?.songs ?? []
   const songs: KindPool = {
     library: librarySongs.map((song, position) => ({ row: songRow(song), holder: holder(songYours(song, marks)), position })),
     brought: [],
+    saved: [],
     musicbrainz: [],
   }
+  const savedSongs = saved?.songs ?? []
+  const savedKeys = new Set(savedSongs.map((song) => song.key))
+  if (savedSongs.length) {
+    const split = newSongs(savedSongs, librarySongs, index, evidence)
+    songs.saved = split.musicbrainz.map(({ song, position }) => ({ row: savedRow(mbSongRow(song)), holder: 'yours', position, saved: true }))
+    songs.brought = split.brought.map(({ song, position, yours }) => ({ row: mbSongRow(song), holder: marks.personal && !yours ? 'store' : 'yours', position, saved: true }))
+  }
   if (input.songs) {
-    const split = newSongs(input.songs, librarySongs, index, evidence)
-    songs.musicbrainz = split.musicbrainz.map(({ song, position }) => ({ row: mbSongRow(song), holder: 'yours', position }))
-    songs.brought = split.brought.map(({ song, position, yours }) => ({ row: mbSongRow(song), holder: marks.personal && !yours ? 'store' : 'yours', position }))
+    const live = input.songs.filter((song) => !savedKeys.has(song.key))
+    const position = new Map(input.songs.map((song, at) => [song.key, at]))
+    const split = newSongs(live, librarySongs, index, evidence)
+    songs.musicbrainz = split.musicbrainz.map(({ song }) => ({ row: mbSongRow(song), holder: 'yours', position: position.get(song.key) ?? 0 }))
+    songs.brought.push(...split.brought.map(({ song, yours }) => ({ row: mbSongRow(song), holder: (marks.personal && !yours ? 'store' : 'yours') as Placed['holder'], position: position.get(song.key) ?? 0 })))
   }
   return { artists, albums, songs }
 }
@@ -390,15 +570,18 @@ export function pool(input: PoolInput): Record<Kind, KindPool> {
 export function sectionRows(kind: KindPool, cap: readonly [number, number] | null = null): Row[] {
   const ofHolder = (who: 'yours' | 'store') => [...kind.library, ...kind.brought].filter((each) => each.holder === who)
   const library = [...ofHolder('yours'), ...ofHolder('store')].map((each) => each.row)
-  const musicbrainz = kind.musicbrainz.map((each) => each.row)
+  //? (2.0.0-player.56) what's saved leads MusicBrainz's rows, the preview's cap for MusicBrainz's taking both
+  const musicbrainz = [...kind.saved, ...kind.musicbrainz].map((each) => each.row)
   return cap ? [...library.slice(0, cap[0]), ...musicbrainz.slice(0, cap[1])] : [...library, ...musicbrainz]
 }
 
 /** The rows a late kind brings to its slot: held ones first, then MusicBrainz's - never in the yours block above it,
- *  which would move the rows under it. */
-export function lateRows(kind: KindPool, cap: readonly [number, number] | null = null): Row[] {
-  const brought = [...kind.brought.filter((each) => each.holder === 'yours'), ...kind.brought.filter((each) => each.holder === 'store')].map((each) => each.row)
-  const musicbrainz = kind.musicbrainz.map((each) => each.row)
+ *  which would move the rows under it. `drawn`: the keys already drawn in its section, left out (2.0.0-player.56:
+ *  what's saved is drawn before MusicBrainz answers, and MusicBrainz's answer adds only what isn't there). */
+export function lateRows(kind: KindPool, cap: readonly [number, number] | null = null, drawn: ReadonlySet<string> = new Set()): Row[] {
+  const fresh = (each: Placed) => !drawn.has(each.row.key)
+  const brought = [...kind.brought.filter((each) => each.holder === 'yours'), ...kind.brought.filter((each) => each.holder === 'store')].filter(fresh).map((each) => each.row)
+  const musicbrainz = [...kind.saved, ...kind.musicbrainz].filter(fresh).map((each) => each.row)
   return cap ? [...brought.slice(0, cap[0]), ...musicbrainz.slice(0, cap[1])] : [...brought, ...musicbrainz]
 }
 
@@ -489,18 +672,19 @@ export function rank(a: Candidate, b: Candidate): number {
   return a.tier - b.tier || a.source - b.source || KIND_RANK[a.kind] - KIND_RANK[b.kind] || a.position - b.position
 }
 
-/** Top results' candidates from the pool: the library's (yours 0, the store's 1, by the whose known now), and
- *  MusicBrainz's AND what MusicBrainz brought in (2, at their MusicBrainz positions) - so a decision taken before
- *  MusicBrainz answered stays sound. */
+/** Top results' candidates from the pool: the library's (yours 0, the store's 1, by the whose known now), what's
+ *  saved and what it brought in (1.5 - SOURCE.saved), and MusicBrainz's AND what MusicBrainz brought in (2, at their
+ *  MusicBrainz positions) - so a decision taken before MusicBrainz answered stays sound. */
 export function candidatesOf(rows: Record<Kind, KindPool>, box: string, reading: Reading): Candidate[] {
   const out: Candidate[] = []
   for (const kind of KINDS) {
     const add = (placed: Placed, source: number) => out.push({
       row: placed.row, key: placed.row.key, kind, tier: matchTier(placed.row, box, reading), source, position: placed.position, phantom: false,
     })
-    for (const placed of rows[kind].library) add(placed, placed.holder === 'store' ? 1 : 0)
-    for (const placed of rows[kind].brought) add(placed, 2)
-    for (const placed of rows[kind].musicbrainz) add(placed, 2)
+    for (const placed of rows[kind].library) add(placed, placed.holder === 'store' ? SOURCE.store : SOURCE.yours)
+    for (const placed of rows[kind].brought) add(placed, placed.saved ? SOURCE.saved : SOURCE.musicbrainz)
+    for (const placed of rows[kind].saved) add(placed, SOURCE.saved)
+    for (const placed of rows[kind].musicbrainz) add(placed, SOURCE.musicbrainz)
   }
   return out
 }
@@ -509,7 +693,7 @@ export function candidatesOf(rows: Record<Kind, KindPool>, box: string, reading:
  *  MusicBrainz's source, before every position - at least as good as anything that kind could bring. */
 export function phantom(kind: Kind, reading: Reading): Candidate | null {
   const tier = bestTier(reading, kind)
-  return tier === null ? null : { row: null, key: `phantom:${kind}`, kind, tier, source: 2, position: -Infinity, phantom: true }
+  return tier === null ? null : { row: null, key: `phantom:${kind}`, kind, tier, source: SOURCE.musicbrainz, position: -Infinity, phantom: true }
 }
 
 /** What Top results' family is built from - every relative from the best's own fields, nothing asked. */
@@ -520,6 +704,8 @@ export interface Family {
   evidence?: SongEvidence
   /** MusicBrainz's albums answer: a song's named album is that answer's own group when it holds the same id */
   groups: readonly ReleaseGroup[]
+  /** (2.0.0-player.56) which of those groups are from what's saved - a relative made of one is marked so */
+  saved?: ReadonlySet<string>
 }
 
 /** A MusicBrainz artist credited somewhere, as a row: the library's artist when the library knows them (over the full
@@ -565,14 +751,16 @@ export function familyOf(row: Row, family: Family): Row[] {
     case 'mb-song': {
       const named = namedAlbum(row.song, family.index, family.evidence).album
       const group = family.groups.find((each) => each.id === named.id)
-      const out: Row[] = [group ? groupRow(group) : songAlbumRow(row.song, named)]
+      //? (2.0.0-player.56) a relative made of what's saved - a saved song's own album, a saved group - is marked saved
+      const kept = (relative: Row) => (row.saved || (relative.type === 'group' && family.saved?.has(relative.group.id)) ? savedRow(relative) : relative)
+      const out: Row[] = [kept(group ? groupRow(group) : songAlbumRow(row.song, named))]
       const sole = row.song.artists.length === 1 ? row.song.artists[0]! : null
-      if (sole && mbidOf(sole.id)) out.push(creditedRow({ mbid: mbidOf(sole.id)!, name: sole.name || row.song.credit }, family))
+      if (sole && mbidOf(sole.id)) out.push((row.saved ? savedRow : (each: Row) => each)(creditedRow({ mbid: mbidOf(sole.id)!, name: sole.name || row.song.credit }, family)))
       return out
     }
     case 'group': {
       const sole = soleCredit(row.group['artist-credit'])
-      return sole ? [creditedRow(sole, family)] : []
+      return sole ? [(row.saved ? savedRow : (each: Row) => each)(creditedRow(sole, family))] : []
     }
     default:
       return []
@@ -732,9 +920,19 @@ export function placeLabel(row: Row, marks: Marks, evidence: SongEvidence = {}):
   const library = row.type === 'artist' || row.type === 'album' || row.type === 'song'
   const yours = rowYours(row, marks, evidence)
   if (library) return yours === null ? '' : yours ? 'In your library' : 'In the store'
-  if (yours === null) return 'On MusicBrainz'
+  if (yours === null) return isSaved(row) ? SAVED_PLACE : 'On MusicBrainz'
   return yours ? 'In your library' : 'In the store'
 }
+
+/** Whether a row is from what's saved (2.0.0-player.56). */
+export const isSaved = (row: Row) => 'saved' in row && row.saved === true
+
+/** What marks a row from what's saved: a section row's place words, and a Top results tile's third line. */
+export const SAVED_MARK = 'saved'
+export const SAVED_PLACE = 'Saved from MusicBrainz'
+
+/** What's saved's place on a row, unless the row already says where it is (held: "in your library"). */
+const savedPlace = (row: Row, place: string) => (place || !isSaved(row) ? place : SAVED_MARK)
 
 /** A MusicBrainz group's kind word in a section, said only when it isn't a plain album ("EP", "Live album"), as Apple
  *  adds " - EP". */
@@ -768,7 +966,7 @@ export function rowLine(row: Row, context: LineContext, top = false): { line: st
     }
     case 'mb-artist': {
       const said = matchLine(row.match)
-      return { line: top ? join('Artist', said) : said, place: '' }
+      return { line: top ? join('Artist', said) : said, place: savedPlace(row, '') }
     }
     case 'album': {
       const year = row.album.year && row.album.year > 0 ? String(row.album.year) : ''
@@ -779,7 +977,7 @@ export function rowLine(row: Row, context: LineContext, top = false): { line: st
       const word = top ? groupKind(row.group) : groupWord(row.group)
       return {
         line: join(word, creditName(row.group['artist-credit']), groupYear(row.group)),
-        place: held ? groupPlace(marks.index, row.group.id, marks.personal) : '',
+        place: savedPlace(row, held ? groupPlace(marks.index, row.group.id, marks.personal) : ''),
       }
     }
     case 'song':
@@ -789,14 +987,14 @@ export function rowLine(row: Row, context: LineContext, top = false): { line: st
       const length = album.length === null ? '' : clock(Math.round(album.length / 1000))
       return {
         line: top ? join('Song', row.song.credit, album.title) : join(row.song.credit, length, album.title),
-        place: heldWords(held, marks.personal),
+        place: savedPlace(row, heldWords(held, marks.personal)),
       }
     }
     case 'song-album': {
       const word = row.album.kind && row.album.kind !== 'Album' ? row.album.kind : 'Album'
       return {
         line: join(top ? word : '', row.album.credit, yearOfDate(row.album.date)),
-        place: songAlbumWords(songAlbumHolding(marks.index, row.album, row.song, evidence), marks.personal),
+        place: savedPlace(row, songAlbumWords(songAlbumHolding(marks.index, row.album, row.song, evidence), marks.personal)),
       }
     }
   }
@@ -820,11 +1018,37 @@ export function libraryWords(counts: Partial<Record<Kind, number>>, personal: bo
 }
 
 /** ...and for MusicBrainz, once every kind asked has settled: "From MusicBrainz: 2 artists, 3 albums, 3 songs." - or
- *  that it isn't answering, when no kind did. */
-export function musicBrainzWords(counts: Partial<Record<Kind, number>>, answered: boolean): string {
-  if (!answered) return "MusicBrainz isn't answering."
+ *  that it isn't answering, when no kind did. `saved` (2.0.0-player.56): what's saved is drawn above - what
+ *  MusicBrainz adds is more, and when it isn't answering, what is drawn is what's saved. */
+export function musicBrainzWords(counts: Partial<Record<Kind, number>>, answered: boolean, saved = false): string {
+  if (!answered) return saved ? SAVED_AWAY_SAID : "MusicBrainz isn't answering."
   const said = countWords(counts)
+  if (saved) return said ? `More from MusicBrainz: ${said}.` : 'Nothing more from MusicBrainz.'
   return said ? `From MusicBrainz: ${said}.` : 'Nothing from MusicBrainz.'
+}
+
+/** The region's words for what's saved, as the sections that hold it are drawn: "Saved from MusicBrainz: 1 song." */
+export function savedWords(counts: Partial<Record<Kind, number>>): string {
+  const said = countWords(counts)
+  return said ? `Saved from MusicBrainz: ${said}.` : ''
+}
+
+const SAVED_AWAY_SAID = "MusicBrainz isn't answering - these are what deadwax has saved."
+
+/** A MusicBrainz failure's words where what's saved is drawn above it (2.0.0-player.56): MusicBrainz isn't answering
+ *  (or is busy), and these are what deadwax has saved - one line; a refusal is the words', as ever. */
+export function savedAwayWords(failure: { refused: boolean; busy: boolean; message: string; unavailable: boolean }, short = false): string {
+  if (failure.refused) return failure.message
+  //? `short`: a kind's slot, one fixed-height row beside Try again - the point first, so it fits a 320-wide phone
+  //? (the review measured "MusicBrainz isn't answering - these are saved." cut to "…these are sa…" at 375 and 320)
+  if (failure.busy) return short ? 'Saved - MusicBrainz is busy.' : 'MusicBrainz is busy just now - these are what deadwax has saved from it.'
+  if (failure.unavailable) return short ? 'Saved - MusicBrainz is away.' : "MusicBrainz isn't answering just now - these are what deadwax has saved from it."
+  return failure.message
+}
+
+/** What a late kind's slot says when MusicBrainz's answer brought nothing that isn't drawn above it already. */
+export function nothingMoreWords(kind: Kind, text: string): string {
+  return `No more ${KIND_WORDS[kind][1]} on MusicBrainz for “${text}”.`
 }
 
 /** A late kind folded into its slot: the button's words, and what the region says of it. */

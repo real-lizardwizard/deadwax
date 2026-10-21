@@ -496,5 +496,164 @@ console.log('\nafter review: an album made of a song\'s fields, a held named alb
     ["Your library can't be searched just now.", "The store can't be searched just now."])
 }
 
+console.log('\nsearch what\'s saved (2.0.0-player.56): saved rows lead MusicBrainz\'s, ranked between the store\'s and MusicBrainz\'s')
+{
+  const { notInLibrary } = require(path.join(OUT, 'lib/searchResults.js'))
+  const LIVE = { id: '00000000-0000-4000-8000-00000000live', title: 'Roseland NYC Live', 'primary-type': 'Album', 'secondary-types': ['Live'], 'artist-credit': DUMMY['artist-credit'] }
+  const OTHERS = { id: '00000000-0000-4000-8000-0000000other', title: 'Welcome to Portishead', 'primary-type': 'Album', 'artist-credit': [{ name: 'Somebody', artist: { id: YE, name: 'Somebody' } }] }
+  const savedOf = (groups, matches = [], songs = []) => ({ matches, groups, shown: notInLibrary(groups, index), songs })
+  const everything = savedOf([LIVE, THIRD, OTHERS, DUMMY], portisheadMb, roadsSongs)
+  const reading = (text) => searchQuery(text, ['Portishead'])
+  check('savedFor, free text: everything saved, for every kind asked', ((s) => [s.matches.length, keys(s.groups.map(L.groupRow)), s.songs.length])(L.savedFor(reading('bristol'), everything, L.KINDS, false, index)),
+    [1, [`group:${LIVE.id}`, `group:${THIRD.id}`, `group:${OTHERS.id}`, `group:${DUMMY.id}`], roadsSongs.length])
+  check('...the artist reading: only albums credited to them - the studio ones under the studio clause - in the studio order an artist\'s albums are read in, and no songs (none asked)',
+    [((s) => [keys(s.groups.map(L.groupRow)), keys(s.shown.map(L.groupRow)), s.songs.length, s.matches.length])(L.savedFor(reading('portishead'), everything, ['artists', 'albums'], true, index)),
+      keys(L.savedFor(reading('portishead'), everything, ['albums'], false, index).groups.map(L.groupRow))],
+    [[[`group:${DUMMY.id}`, `group:${THIRD.id}`], [`group:${THIRD.id}`], 0, 1], [`group:${DUMMY.id}`, `group:${THIRD.id}`, `group:${LIVE.id}`]])
+  check('...album-by-artist: no artists (none asked)', L.savedFor(reading('roads portishead'), everything, ['albums', 'songs'], false, index).matches.length, 0)
+  //? (after review) the artist reading draws from `credited` - all of theirs saved, not the twelve the words found, which
+  //? titles naming them fill first - studio-ordered, MusicBrainz's page of them at most
+  const theirs = Array.from({ length: 16 }, (_, n) => ({ id: `00000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`, title: `Record ${n}`, 'primary-type': 'Album',
+    'first-release-date': String(2015 - n), 'artist-credit': DUMMY['artist-credit'] }))
+  const titled = { ...everything, groups: [OTHERS], credited: [LIVE, ...theirs] }
+  check('...the artist reading, from `credited`: theirs whatever the words found, earliest first, SAVED_ARTIST_ALBUMS (12) at most - the live one after the studio ones (not drawn at all under the studio clause)',
+    [keys(L.savedFor(reading('portishead'), titled, ['albums'], false, index).groups.map(L.groupRow)), L.savedFor(reading('portishead'), titled, ['albums'], true, index).groups.some((group) => group.id === LIVE.id), L.SAVED_ARTIST_ALBUMS],
+    [keys(theirs.slice(4).reverse().map(L.groupRow)), false, 12])
+  check('...a free reading draws the albums the words found, never `credited`', keys(L.savedFor(reading('bristol'), titled, ['albums'], false, index).groups.map(L.groupRow)), [`group:${OTHERS.id}`])
+  //? (after review) what isn't held is worked out as it is DRAWN, from the index then - none drawn before it is in hand
+  //? (an album you have, drawn twice: yours, and the saved one among MusicBrainz's)
+  check('savedFor: `shown` from the index as drawn - nothing shown while the library\'s index isn\'t in hand; the held left out once it is',
+    [keys(L.savedFor(reading('bristol'), everything, L.KINDS, false, null).shown.map(L.groupRow)), keys(L.savedFor(reading('bristol'), everything, L.KINDS, false, index).shown.map(L.groupRow))],
+    [[], keys(notInLibrary([LIVE, THIRD, OTHERS, DUMMY], index).map(L.groupRow))])
+  const unknown = L.pool({ reading: reading('bristol'), library: lib([], [dummy]), artistList: null, index: null, marks: off, artists: null, albums: null, songs: null,
+    saved: L.savedFor(reading('bristol'), everything, L.KINDS, false, null) })
+  check('...so the pool draws no saved album before the index: Dummy (yours) once', [keys(L.sectionRows(unknown.albums)).filter((key) => key.includes(DUMMY.id) || key === `album:${dummy.id}`)],
+    [[`album:${dummy.id}`]])
+
+  //? (after review) a kind view's rows below its library's: kept where they were drawn as later answers land
+  const r = (group, saved = false) => (saved ? L.savedRow(L.groupRow(group)) : L.groupRow(group))
+  const drewFirst = L.kindArea(null, [], [r(SELF), r(THIRD)], new Set())
+  const late = L.kindArea(drewFirst.area, [r(THIRD, true), r(LIVE, true)], [r(SELF), r(THIRD)], new Set())
+  check('kindArea: MusicBrainz\'s rows drawn, then what\'s saved lands - nothing drawn moves or changes: Third stays MusicBrainz\'s row, in its place; the new saved row at the foot',
+    [keys(drewFirst.rest), keys(late.lead), keys(late.rest), late.rest.map((row) => row.saved === true)],
+    [[`group:${SELF.id}`, `group:${THIRD.id}`], [], [`group:${SELF.id}`, `group:${THIRD.id}`, `group:${LIVE.id}`], [false, false, true]])
+  const savedFirst = L.kindArea(null, [r(THIRD, true)], [], new Set())
+  const thenAnswer = L.kindArea(savedFirst.area, [r(THIRD, true)], [r(THIRD), r(SELF)], new Set())
+  const thenMore = L.kindArea(thenAnswer.area, [r(THIRD, true), r(LIVE, true)], [r(THIRD), r(SELF)], new Set())
+  check('...what\'s saved first leads, MusicBrainz\'s answer below it less what\'s saved (by key); anything saved after that goes below too',
+    [keys(savedFirst.lead), keys(thenAnswer.lead), keys(thenAnswer.rest), thenAnswer.lead[0].saved === true, keys(thenMore.lead), keys(thenMore.rest)],
+    [[`group:${THIRD.id}`], [`group:${THIRD.id}`], [`group:${SELF.id}`], true, [`group:${THIRD.id}`], [`group:${SELF.id}`, `group:${LIVE.id}`]])
+  const { foldName } = require(path.join(OUT, 'lib/owned.js'))
+  check('foldName folds as src/saved_index.py name_key does (tests/test_saved_search.py, the same names): the route\'s `credited` and savedFor agree on whose an album is',
+    ['Björk', 'The Beatles', 'Simon & Garfunkel', 'Sigur Rós (band)', 'AC/DC', 'Guns N\u2019 Roses', '  '].map(foldName), ['bjork', 'beatles', 'simon and garfunkel', 'sigur ros', 'ac dc', 'guns n roses', ''])
+  check('...a key the library\'s rows draw above is never drawn below', keys(L.kindArea(null, [r(THIRD, true)], [r(SELF)], new Set([`group:${THIRD.id}`])).lead), [])
+  //? (second review) MusicBrainz's failure drawn takes below as its rows do - and keeps it while it is asked again
+  const failed = L.kindArea(null, [], [], new Set(), true)
+  const askedAgain = L.kindArea(failed.area, [], [], new Set(), false)
+  const savedLate = L.kindArea(askedAgain.area, [r(THIRD, true)], [], new Set(), false)
+  check('kindArea: a failure drawn, asked again (Try again), then what\'s saved lands - at the foot, below where the failure was, never above it',
+    [failed.area.problem, askedAgain.area.problem, keys(savedLate.lead), keys(savedLate.rest)], [true, true, [], [`group:${THIRD.id}`]])
+  check('...with no failure drawn, what\'s saved still leads', keys(L.kindArea(L.kindArea(null, [], [], new Set()).area, [r(THIRD, true)], [], new Set()).lead), [`group:${THIRD.id}`])
+  check('studioGroup: an Album or EP with no noisy secondary type', [L.studioGroup(THIRD), L.studioGroup(LIVE), L.studioGroup({ id: 'x', 'primary-type': 'Single' }), L.studioGroup({ id: 'x', 'primary-type': 'EP', 'secondary-types': ['Soundtrack'] })],
+    [true, false, false, true])
+
+  const saved = savedOf([THIRD, SELF], [], roadsSongs.slice(0, 1))
+  const rows = L.pool({ reading: reading('bristol'), library: lib(), artistList: null, index, marks: off, artists: null, albums: { groups: [SELF, LIVE], shown: [SELF, LIVE] }, songs: roadsSongs, saved })
+  check('the pool: what\'s saved its own block, marked; MusicBrainz\'s answer less it, by key - Portishead (self-titled) once',
+    [keys(rows.albums.saved.map((each) => each.row)), rows.albums.saved.every((each) => each.row.saved === true && each.saved), keys(rows.albums.musicbrainz.map((each) => each.row)), rows.albums.musicbrainz.some((each) => each.row.saved)],
+    [[`group:${THIRD.id}`, `group:${SELF.id}`], true, [`group:${LIVE.id}`], false])
+  check('...a section: what\'s saved first among MusicBrainz\'s rows, the preview\'s cap taking both', [keys(L.sectionRows(rows.albums)), keys(L.sectionRows(rows.albums, [3, 2]))],
+    [[`group:${THIRD.id}`, `group:${SELF.id}`, `group:${LIVE.id}`], [`group:${THIRD.id}`, `group:${SELF.id}`]])
+  check('...songs too: MusicBrainz\'s take of a saved song (the same key) left out', [keys(rows.songs.saved.map((each) => each.row)), rows.songs.musicbrainz.some((each) => each.row.key === rows.songs.saved[0].row.key)],
+    [[`mb-song:${roadsSongs[0].key}`], false])
+  check('a late kind\'s rows: what isn\'t drawn - drawnCounts says how many of each part are', [keys(L.lateRows(rows.albums, [3, 3], new Set([`group:${THIRD.id}`, `group:${SELF.id}`]))), L.drawnCounts(rows.albums, [L.groupRow(THIRD), L.groupRow(SELF)])],
+    [[`group:${LIVE.id}`], [0, 2]])
+  const sources = L.candidatesOf(rows, 'bristol', reading('bristol'))
+  check('candidates: what\'s saved at SOURCE.saved (1.5) - after yours (0) and the store\'s (1), before MusicBrainz\'s (2)',
+    [L.SOURCE, sources.find((each) => each.key === `group:${THIRD.id}`).source, sources.find((each) => each.key === `group:${LIVE.id}`).source], [{ yours: 0, store: 1, saved: 1.5, musicbrainz: 2 }, 1.5, 2])
+  //? the held album what's saved holds that search3 didn't list: brought in, ranked as what's saved
+  const heldSaved = L.pool({ reading: reading('bristol'), library: lib(), artistList: null, index, marks: off, artists: null, albums: null, songs: null, saved: savedOf([DUMMY, THIRD]) })
+  check('...a held album only what\'s saved holds: brought into the yours block (no Get), ranked as what\'s saved',
+    [keys(heldSaved.albums.brought.map((each) => each.row)), L.candidatesOf(heldSaved, 'bristol', reading('bristol')).find((each) => each.key === `group:${DUMMY.id}`).source],
+    [[`group:${DUMMY.id}`], 1.5])
+  //? artists: one list for the dedupe - two Nirvanas, one saved and one MusicBrainz's, stay two
+  const nirvanas = L.pool({ reading: reading('nirvana'), library: lib(), artistList: [], index, marks: off, artists: nirvana, albums: null, songs: null, saved: savedOf([], nirvana.slice(0, 1)) })
+  check('artists: the saved one first, MusicBrainz\'s less it (by id) after - each Nirvana once', [nirvanas.artists.saved.map((each) => each.row.key), nirvanas.artists.musicbrainz.length, nirvanas.artists.musicbrainz.some((each) => each.row.key === `mb-artist:${nirvana[0].mbid}`)],
+    [[`mb-artist:${nirvana[0].mbid}`], nirvana.length - 1, false])
+  const brought = L.pool({ reading: reading('portishead'), library: lib(), artistList: [P], index, marks: off, artists: portisheadMb, albums: null, songs: null, saved: savedOf([], portisheadMb) })
+  check('...the library\'s Portishead (by id) brought in once, from what\'s saved, ranked as saved', [keys(brought.artists.brought.map((each) => each.row)), brought.artists.brought[0].saved, brought.artists.musicbrainz.length],
+    [['artist:ar-p'], true, 0])
+
+  //? Top results: a saved song beats MusicBrainz's phantoms at its tier - decided at the library's moment
+  const glorySaved = groupSongs(load('songs/roads-portishead').recordings).slice(0, 1)
+  const early = L.pool({ reading: reading('roads'), library: lib(), artistList: [P], index: buildOwnedIndex([]), marks: { ...off, index: buildOwnedIndex([]) }, artists: null, albums: null, songs: null, saved: savedOf([], [], glorySaved) })
+  const phantoms = L.KINDS.map((kind) => L.phantom(kind, reading('roads')))
+  check('"roads", nothing of the library, a saved Roads: Top results decided at the library\'s moment - the song, its album, its artist - no place kept',
+    ((d) => [keys(d.prefix), d.place])(L.decidedTop(L.candidatesOf(early, 'roads', reading('roads')), phantoms, 3, { library: lib(), artistList: [P], index: buildOwnedIndex([]), groups: [] })),
+    [[`mb-song:${glorySaved[0].key}`, `group:${glorySaved[0].albums[0].id}`, 'artist:ar-p'], false])
+
+  //? a relative made of what's saved is marked saved too - a library artist never
+  const savedSong = L.savedRow(L.mbSongRow(glorySaved[0]))
+  const relatives = L.familyOf(savedSong, { library: lib(), artistList: [], index: buildOwnedIndex([]), groups: [] })
+  const yoursToo = L.familyOf(savedSong, { library: lib(), artistList: [P], index: buildOwnedIndex([]), groups: [] })
+  check('Top results\' family of a saved song: its album and its MusicBrainz artist marked saved; the library\'s artist as ever',
+    [relatives.map((row) => [row.type, row.saved === true]), yoursToo.map((row) => [row.type, row.saved === true]), L.rowLine(relatives[0], { marks: { ...off, index: buildOwnedIndex([]) } }, true).place],
+    [[['song-album', true], ['mb-artist', true]], [['song-album', true], ['artist', false]], 'saved'])
+  check('...a saved group in the family\'s groups marks its relative even under a MusicBrainz song', ((row) => [row.type, row.saved === true])(L.familyOf(L.mbSongRow(glorySaved[0]),
+    { library: lib(), artistList: [], index: buildOwnedIndex([]), groups: [DUMMY], saved: new Set([DUMMY.id]) })[0]), ['group', true])
+
+  //? the property, with what's saved in hand as the library settles: still sound
+  const texts = ['portishead', 'roads', 'glory box', 'dummy', 'third', 'radiohead', 'nirvana', 'kanye west', 'roads portishead', 'portishead third']
+  const thirdEye = { id: 'ar-teb', name: 'Third Eye Blind' }
+  const libraries = [lib(), lib([P], [dummy], [roads, glory, sour]), lib([], [dummy], [sour]), lib([thirdEye]), lib([P], [selfTitled])]
+  const saves = [savedOf([THIRD, LIVE], radiohead.slice(0, 2), roadsSongs.slice(0, 1)), savedOf([DUMMY, SELF], kanye.slice(0, 1), []), savedOf([], nirvana, roadsSongs)]
+  const answers = [
+    { artists: [], albums: { groups: [], shown: [] }, songs: [] },
+    { artists: portisheadMb, albums: { groups: studio, shown: studio }, songs: roadsSongs },
+    { artists: nirvana, albums: { groups: unfiltered, shown: unfiltered }, songs: roadsSongs.slice(1) },
+    { artists: radiohead, albums: { groups: [SELF], shown: [SELF] }, songs: [] },
+  ]
+  let held = 0, tried = 0
+  for (const text of texts) {
+    const read = reading(text)
+    const asked = L.KINDS.filter((kind) => L.bestTier(read, kind) !== null)
+    for (const library of libraries) {
+      for (const each of saves) {
+        const kept = L.savedFor(read, each, asked, false, index)
+        const early = L.pool({ reading: read, library, artistList: [P], index, marks: off, artists: null, albums: null, songs: null, saved: kept })
+        for (const n of [3, 6]) {
+          const { prefix } = L.decidedTop(L.candidatesOf(early, text, read), asked.map((kind) => L.phantom(kind, read)), n, family(library, [...kept.groups], [P]))
+          for (const answer of answers) {
+            tried++
+            //? MusicBrainz answers only the kinds it is asked for (the artist reading asks no songs) - as the app asks it
+            const real = L.pool({ reading: read, library, artistList: [P], index, marks: off, saved: kept,
+              artists: asked.includes('artists') ? answer.artists : null, albums: asked.includes('albums') ? answer.albums : null, songs: asked.includes('songs') ? answer.songs : null })
+            const whole = L.topResults(L.candidatesOf(real, text, read), n, family(library, [...kept.groups, ...answer.albums.groups], [P])).map((one) => one.key)
+            if (JSON.stringify(whole.slice(0, prefix.length)) === JSON.stringify(keys(prefix))) held++
+          }
+        }
+      }
+    }
+  }
+  check(`the property with what's saved in hand: a decided prefix is the real answers' Top results' prefix, every time (${tried} combinations)`, held, tried)
+
+  //? the words
+  const savedThird = L.savedRow(L.groupRow(THIRD))
+  const savedDummy = L.savedRow(L.groupRow(DUMMY))
+  check('a saved row\'s place says "saved" - unless it says where you hold it; a tile\'s third line "Saved from MusicBrainz"',
+    [L.rowLine(savedThird, { marks: off }).place, L.rowLine(savedDummy, { marks: off }).place, L.placeLabel(savedThird, off), L.placeLabel(L.groupRow(THIRD), off), L.rowLine(L.groupRow(THIRD), { marks: off }).place],
+    ['saved', 'in your library', 'Saved from MusicBrainz', 'On MusicBrainz', ''])
+  check('...its facts MusicBrainz\'s row\'s own', L.rowLine(savedThird, { marks: off }).line, L.rowLine(L.groupRow(THIRD), { marks: off }).line)
+  check('the region\'s words: what\'s saved; MusicBrainz\'s as more; away, what is drawn is what\'s saved',
+    [L.savedWords({ albums: 1, songs: 2 }), L.musicBrainzWords({ albums: 1 }, true, true), L.musicBrainzWords({}, true, true), L.musicBrainzWords({}, false, true), L.musicBrainzWords({}, true)],
+    ['Saved from MusicBrainz: 1 album, 2 songs.', 'More from MusicBrainz: 1 album.', 'Nothing more from MusicBrainz.', "MusicBrainz isn't answering - these are what deadwax has saved.", 'Nothing from MusicBrainz.'])
+  const away = { refused: false, busy: false, message: 'x', unavailable: true }
+  check('...a failure under what\'s saved: one line, MusicBrainz away and these saved; busy said as busy; a refusal its words',
+    [L.savedAwayWords(away), L.savedAwayWords(away, true), L.savedAwayWords({ ...away, busy: true }, true), L.savedAwayWords({ ...away, refused: true, message: 'MusicBrainz couldn\'t read that search - try other words' })],
+    ["MusicBrainz isn't answering just now - these are what deadwax has saved from it.", 'Saved - MusicBrainz is away.', 'Saved - MusicBrainz is busy.', 'MusicBrainz couldn\'t read that search - try other words'])
+  check('...a late kind adding nothing new under saved rows', L.nothingMoreWords('albums', 'third'), 'No more albums on MusicBrainz for “third”.')
+  check('SAVED_WAIT_MS: the library\'s moment waits for what\'s saved at most this long', L.SAVED_WAIT_MS, 400)
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

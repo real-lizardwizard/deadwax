@@ -49,6 +49,7 @@ import zlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+from src import saved_index
 from src.config import (MUSICBRAINZ_CACHE_FILE, Config, is_the_database, musicbrainz_cache_file,
                         musicbrainz_cache_megabytes)
 from src.logger import logger
@@ -67,6 +68,10 @@ READ_TIMEOUT_SECONDS = 1.0
 TRIM_TO = 0.9
 #? A file that couldn't be opened is tried again after this long (a volume being mounted, say)
 RETRY_OPEN_SECONDS = 60.0
+#? (2.0.0-player.56) the answers already saved, read into the saved-search index in steps this small - so a search
+#? asked meanwhile waits behind one step at most, never behind the whole file (the worker does one thing at a time)
+BACKFILL_ANSWERS = 25
+BACKFILL_BYTES = 256 * 1024
 
 #? One statement each, run inside ONE transaction with the meta rows (_make_tables) - never executescript,
 #? which commits each CREATE on its own
@@ -134,6 +139,20 @@ class SavedAnswers:
         self._failed: dict[str, float] = {}
         #? why nothing is being saved, in words for the settings row - None when nothing is wrong
         self.problem: str | None = None
+        #? (2.0.0-player.56) whether the open file's saved-search index can be used (SQLite without FTS5 can't make
+        #? one: answers are still saved, Search just finds nothing saved), and the answers this run's backfill read
+        self._index_ready = False
+        self._index_checked = False
+        self._index_said: str | None = None
+        self._backfilled = 0
+        #? when making the index last failed (a read-only or locked file - time.monotonic): answers are still read
+        #? from it meanwhile, and the index is tried again after RETRY_OPEN_SECONDS
+        self._index_failed_at: float | None = None
+        #? closing (the app's lifespan ending): nothing more is queued - a backfill step already queued does nothing -
+        #? so no step runs after the file is closed, reopening it on a thread that is going away (the review's catch:
+        #? the next step then ran on a NEW worker against the old thread's connection, and SQLite's "objects created
+        #? in a thread" error was taken for a broken file and the whole file set aside)
+        self._closing = False
 
     # ------------------------------------------------------------- what the settings say now
 
@@ -183,6 +202,32 @@ class SavedAnswers:
             now = self._clock()
             self._later(self._put, key, payload, now, now if fetched_at is None else fetched_at)
 
+    async def search(self, words: str) -> dict | None:
+        """
+        What the saved answers hold matching `words` (2.0.0-player.56, Search what's saved): the artists, albums and
+        songs, in MusicBrainz's own shapes (saved_index.search). Read on the worker, never the event loop - and
+        given up after READ_TIMEOUT_SECONDS, as a read is: None then, and when saving is off (0), there is no file
+        yet, its index can't be used, or it failed - with one log line, never an error: Search draws MusicBrainz's
+        answer alone, as before.
+        """
+        if not self.enabled():
+            return None
+        try:
+            return await asyncio.wait_for(self._run(self._search, words), READ_TIMEOUT_SECONDS)
+        except (asyncio.TimeoutError, TimeoutError):
+            logger.info(f"MusicBrainz's saved answers took more than {READ_TIMEOUT_SECONDS:g}s to search, so Search "
+                        f"shows MusicBrainz's answer alone")
+            return None
+        except Exception as e:
+            logger.warning(f"couldn't search MusicBrainz's saved answers ({e}), so Search shows MusicBrainz's answer alone")
+            return None
+
+    def warm(self) -> None:
+        """The app has started (its lifespan): the file opened on the worker if it is there - which reads the answers
+        a file without an index already holds into one, in the background (2.0.0-player.56). Never makes a file."""
+        if self.enabled():
+            self._later(lambda: self._connection_for(False))
+
     async def stats(self) -> dict:
         """What the settings show beside Clear: the file, its size, how many answers it holds."""
         return await self._run(self._stats)
@@ -202,9 +247,14 @@ class SavedAnswers:
     async def close(self) -> None:
         if self._pool is None:
             return
-        await self._run(self._close)
-        pool, self._pool = self._pool, None
-        pool.shutdown(wait=True)
+        self._closing = True
+        try:
+            await self._run(self._close)
+            pool, self._pool = self._pool, None
+            pool.shutdown(wait=True)
+        finally:
+            #? closed: a later use (a test, a lifespan started again) opens it afresh, as before
+            self._closing = False
 
     # ------------------------------------------------------------- the worker
 
@@ -218,6 +268,8 @@ class SavedAnswers:
         return await asyncio.get_running_loop().run_in_executor(self._ensure_pool(), work, *args)
 
     def _later(self, work, *args) -> None:
+        if self._closing:
+            return
         def guarded():
             try:
                 work(*args)
@@ -233,11 +285,14 @@ class SavedAnswers:
             except sqlite3.Error:
                 pass
         self._connection = self._open_path = None
+        self._index_ready = self._index_checked = False
+        self._index_failed_at = None
 
     def _reset(self) -> None:
         self._close()
         self._failed.clear()
         self.problem = None
+        self._index_said = None
 
     def _connection_for(self, create: bool, repair: bool = True) -> sqlite3.Connection | None:
         """
@@ -247,7 +302,7 @@ class SavedAnswers:
         """
         path = self.path()
         if self._connection is not None and self._open_path == path:
-            return self._connection
+            return self._indexed(self._connection, path, repair)
         self._close()
 
         if is_the_database(path, Config.DB_PATH):
@@ -289,6 +344,45 @@ class SavedAnswers:
         self._failed.pop(path, None)
         self.problem = None
         logger.info(f"MusicBrainz's answers are saved in {path}")
+        return self._indexed(connection, path, repair)
+
+    def _indexed(self, connection: sqlite3.Connection, path: str, repair: bool) -> sqlite3.Connection | None:
+        """
+        The open file, its saved-search index made sure of (2.0.0-player.56) - once per open, by real use: the
+        settings' look (`repair=False`) only reads whether one is there, and writes nothing. A failure making it is
+        the file's, as any other: the connection closed, None.
+        """
+        if self._index_checked:
+            if self._index_failed_at is None or time.monotonic() - self._index_failed_at < RETRY_OPEN_SECONDS or not repair:
+                return connection
+            #? making it failed a minute ago: tried again on the file opened afresh (one opened read-only stays so)
+            self._close()
+            return self._connection_for(False, repair)
+        if not repair:
+            if not self._index_checked:
+                meta = dict(connection.execute("SELECT name, value FROM meta").fetchall())
+                self._index_ready = meta.get("index_format") == saved_index.INDEX_FORMAT
+            return connection
+        try:
+            self._index_ready = self._ensure_index(connection, path)
+            self._index_failed_at = None
+        except sqlite3.OperationalError as e:
+            #? locked, a full disk, read-only: the answers are still read (and saved, when they can be) as they were,
+            #? without the index - Search finds nothing saved - and it is tried again after the retry minute (the
+            #? review's catch: closing the file for it lost every saved answer of a read-only file 2.0.0-player.55
+            #? still read)
+            said = f"couldn't make the saved-search index ({e}), so Search won't find what is saved for now"
+            if self._index_said != said:
+                logger.warning(f"MusicBrainz's saved answers: {said}")
+            self._index_said = said
+            self._index_ready = False
+            self._index_checked = True
+            self._index_failed_at = time.monotonic()
+            return connection
+        self._index_checked = True
+        if self._index_ready and self._backfill_left(connection):
+            #? answers saved before there was an index: read into it, a step at a time, behind whatever is queued
+            self._later(self._backfill_step)
         return connection
 
     def _open(self, path: str, repair: bool = True) -> sqlite3.Connection:
@@ -352,6 +446,9 @@ class SavedAnswers:
         try:
             if drop:
                 connection.execute("DROP TABLE IF EXISTS answers")
+                #? its index goes with it, made afresh by _ensure_index - over no answers
+                if SavedAnswers._has_table(connection, "meta"):
+                    connection.execute("DELETE FROM meta WHERE name LIKE 'index_%'")
             for statement in SCHEMA:
                 connection.execute(statement)
             connection.executemany("INSERT OR REPLACE INTO meta (name, value) VALUES (?, ?)",
@@ -360,6 +457,139 @@ class SavedAnswers:
         except BaseException:
             SavedAnswers._rolled_back(connection)
             raise
+
+    @staticmethod
+    def _has_table(connection: sqlite3.Connection, name: str) -> bool:
+        return connection.execute("SELECT 1 FROM sqlite_master WHERE name = ?", (name,)).fetchone() is not None
+
+    def _ensure_index(self, connection: sqlite3.Connection, path: str) -> bool:
+        """
+        The saved-search index (2.0.0-player.56) beside the answers, of this version's shape - made when it isn't,
+        in ONE transaction with the meta rows saying how far the answers already saved have been read into it
+        (`index_at` of `index_to`, the answers' rowids): a file 2.0.0-player.54 or .55 made has its answers read in
+        once, in the background (_backfill_step). False when it can't be (SQLite built without FTS5): answers are
+        saved as ever, and Search finds nothing saved - said once.
+        """
+        meta = dict(connection.execute("SELECT name, value FROM meta").fetchall())
+        if meta.get("index_format") == saved_index.INDEX_FORMAT and all(
+                self._has_table(connection, table) for table in saved_index.INDEX_TABLES):
+            triggers = connection.execute(
+                f"SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN "
+                f"({', '.join('?' for _ in saved_index.TRIGGER_NAMES)})", saved_index.TRIGGER_NAMES).fetchone()[0]
+            if triggers == len(saved_index.TRIGGER_NAMES) and saved_index.STALE not in meta:
+                return True
+            #? the answers have changed without it - an older deadwax (2.0.0-player.55) used the file since this one
+            #? indexed it, adding, trimming or clearing answers it never told the index of: made afresh and read in again
+            logger.info("MusicBrainz's saved answers changed while the saved-search index wasn't kept (an older "
+                        "deadwax used the file?) - it is read into the index again, in the background")
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            saved_index.make_index(connection, drop=True)
+            last = connection.execute("SELECT COALESCE(MAX(rowid), 0) FROM answers").fetchone()[0]
+            connection.executemany("INSERT OR REPLACE INTO meta (name, value) VALUES (?, ?)", (
+                ("index_format", saved_index.INDEX_FORMAT), ("index_at", "0"), ("index_to", str(last))))
+            connection.execute("DELETE FROM meta WHERE name = ?", (saved_index.STALE,))
+            connection.execute("COMMIT")
+        except sqlite3.OperationalError as e:
+            self._rolled_back(connection)
+            #? FTS5 missing, or too old for a contentless table deleted from (3.43): no index - anything else (locked,
+            #? a full disk) is the file's, and tried again
+            if not any(word in str(e).lower() for word in ("fts5", "no such module", "unrecognized", "contentless")):
+                raise
+            said = f"this SQLite can't search text (FTS5, 3.43 or newer), so Search won't find what is saved ({e})"
+            if self._index_said != said:
+                logger.warning(f"MusicBrainz's saved answers: {said}")
+            self._index_said = said
+            return False
+        except BaseException:
+            self._rolled_back(connection)
+            raise
+        return True
+
+    @classmethod
+    def _has_index(cls, connection: sqlite3.Connection) -> bool:
+        """Whether the file holds a saved-search index of this version's shape."""
+        row = connection.execute("SELECT value FROM meta WHERE name = 'index_format'").fetchone()
+        return row is not None and row[0] == saved_index.INDEX_FORMAT and cls._has_table(connection, "saved_mentions")
+
+    @staticmethod
+    def _stale(connection: sqlite3.Connection) -> bool:
+        """Whether the answers changed without the index being told (saved_index.STALE)."""
+        return connection.execute("SELECT 1 FROM meta WHERE name = ?", (saved_index.STALE,)).fetchone() is not None
+
+    @classmethod
+    def _in_step(cls, connection: sqlite3.Connection, stale_before: bool) -> None:
+        """A change to the answers the index was kept in step with, inside its transaction: the mark the triggers
+        made taken off again - unless it was there before the change (an older deadwax's), which only a fresh
+        index takes off."""
+        if not stale_before:
+            connection.execute("DELETE FROM meta WHERE name = ?", (saved_index.STALE,))
+
+    @staticmethod
+    def _backfill_left(connection: sqlite3.Connection) -> bool:
+        meta = dict(connection.execute("SELECT name, value FROM meta WHERE name IN ('index_at', 'index_to')").fetchall())
+        return int(meta.get("index_at", 0) or 0) < int(meta.get("index_to", 0) or 0)
+
+    def _backfill_step(self) -> None:
+        """
+        One step of reading the answers saved before there was an index into it (2.0.0-player.56): a few answers
+        (BACKFILL_ANSWERS, BACKFILL_BYTES), in one transaction with how far it has got - then the next step queued
+        BEHIND whatever was asked meanwhile, so a search waits for one step at most. Ends with one log line.
+        """
+        def step(connection) -> bool:
+            if not self._index_ready:
+                return False
+            meta = dict(connection.execute("SELECT name, value FROM meta WHERE name IN ('index_at', 'index_to')").fetchall())
+            at, to = int(meta.get("index_at", 0) or 0), int(meta.get("index_to", 0) or 0)
+            if at >= to:
+                return False
+            rows, size = [], 0
+            for row in connection.execute(
+                    "SELECT rowid, key, body, fetched_at FROM answers WHERE rowid > ? AND rowid <= ? ORDER BY rowid LIMIT ?",
+                    (at, to, BACKFILL_ANSWERS)):
+                rows.append(row)
+                size += len(row[2])
+                if size >= BACKFILL_BYTES:
+                    break
+            reached = rows[-1][0] if rows else to
+            connection.execute("BEGIN")
+            try:
+                for rowid, key, body, fetched_at in rows:
+                    try:
+                        payload = unpack(body)
+                    except (zlib.error, ValueError):
+                        continue
+                    found = self._read(key, payload)
+                    saved_index.unindex(connection, [rowid])
+                    saved_index.index_answer(connection, rowid, found, fetched_at)
+                connection.execute("INSERT OR REPLACE INTO meta (name, value) VALUES ('index_at', ?)", (str(reached),))
+                connection.execute("COMMIT")
+            except BaseException:
+                self._rolled_back(connection)
+                raise
+            self._backfilled += len(rows)
+            if reached >= to:
+                logger.info(f"MusicBrainz's saved answers: {self._backfilled} read into the saved-search index - Search "
+                            f"finds what they hold under any words now")
+                self._backfilled = 0
+                return False
+            return True
+
+        if self._closing:
+            #? the app is stopping: the rest is read in from where it got to, next start
+            return
+        if self._with_file(False, step, False):
+            self._later(self._backfill_step)
+
+    @staticmethod
+    def _read(key: str, payload) -> "saved_index.Found":
+        """What an answer saved under `key` mentions - nothing, never an error, for a key or answer of a shape the
+        index doesn't read (saved_index.read_answer)."""
+        try:
+            endpoint, params = json.loads(key)
+            return saved_index.read_answer(endpoint, params, payload)
+        except Exception:
+            return saved_index.Found()
 
     @staticmethod
     def _not_a_database(path: str) -> bool:
@@ -405,6 +635,12 @@ class SavedAnswers:
             if not self._rolled_back(connection):
                 self._close()
             return default
+        except sqlite3.ProgrammingError as e:
+            #? the connection misused (another thread's, or closed) - deadwax's, never the file's: closed, the next use
+            #? opening it afresh, and NOTHING set aside (it is a DatabaseError too, which would have been)
+            logger.warning(f"MusicBrainz's saved answers: {e}")
+            self._close()
+            return default
         except sqlite3.DatabaseError as e:
             #? broken while in use: set aside, and the next use starts afresh (only looking: left for it)
             path = self._open_path or self.path()
@@ -437,8 +673,20 @@ class SavedAnswers:
             try:
                 return unpack(row[0]), row[1]
             except (zlib.error, ValueError):
-                #? one answer that can't be read is dropped, not the file
-                connection.execute("DELETE FROM answers WHERE key = ?", (key,))
+                #? one answer that can't be read is dropped, not the file - with what only it mentioned in the
+                #? saved-search index (the review's catch: its things were found ever after)
+                connection.execute("BEGIN")
+                try:
+                    stale = self._stale(connection)
+                    rowid = connection.execute("SELECT rowid FROM answers WHERE key = ?", (key,)).fetchone()
+                    connection.execute("DELETE FROM answers WHERE key = ?", (key,))
+                    if self._index_ready and rowid is not None:
+                        saved_index.unindex(connection, [rowid[0]])
+                        self._in_step(connection, stale)
+                    connection.execute("COMMIT")
+                except BaseException:
+                    self._rolled_back(connection)
+                    raise
                 return None
 
         return self._with_file(False, read)
@@ -457,11 +705,30 @@ class SavedAnswers:
             #? bigger than the whole budget leaves room for: not kept, rather than emptying the file for it
             return
 
+        #? what the answer mentions, read before the file is touched (2.0.0-player.56)
+        found = self._read(key, payload)
+
         def write(connection):
-            connection.execute(
-                "INSERT OR REPLACE INTO answers (key, body, size, fetched_at, used_at) VALUES (?, ?, ?, ?, ?)",
-                (key, body, size, fetched_at, now),
-            )
+            #? the answer and its place in the saved-search index together: a refresh replacing an answer takes the
+            #? old one's mentions with it, and what only it mentioned
+            connection.execute("BEGIN")
+            try:
+                stale = self._stale(connection)
+                if self._index_ready:
+                    old = connection.execute("SELECT rowid FROM answers WHERE key = ?", (key,)).fetchone()
+                    if old is not None:
+                        saved_index.unindex(connection, [old[0]])
+                cursor = connection.execute(
+                    "INSERT OR REPLACE INTO answers (key, body, size, fetched_at, used_at) VALUES (?, ?, ?, ?, ?)",
+                    (key, body, size, fetched_at, now),
+                )
+                if self._index_ready:
+                    saved_index.index_answer(connection, cursor.lastrowid, found, fetched_at)
+                    self._in_step(connection, stale)
+                connection.execute("COMMIT")
+            except BaseException:
+                self._rolled_back(connection)
+                raise
             self._trim(connection, budget)
 
         self._with_file(True, write)
@@ -482,11 +749,27 @@ class SavedAnswers:
             if used <= budget:
                 break
             excess = used - int(budget * TRIM_TO)
-            doomed, freed = [], 0
-            cursor = connection.execute("SELECT key, size FROM answers ORDER BY used_at, rowid")
-            for key, size in cursor:
+            doomed, rowids, freed = [], [], 0
+            #? (2.0.0-player.56) an answer's place in the saved-search index is freed with it too: each answer's
+            #? share counted by its mentions, at what a mention costs in this file on average (the pages beyond the
+            #? answers themselves, over every mention) - so the trim drops what it needs to, not every answer it
+            #? would take to free the excess from the answers' own bytes alone. Mentions another answer shares free
+            #? less; the loop measures again and goes on
+            #? (the trim on opening runs before the index is made sure of: an index of this shape is kept in step then too)
+            indexed = self._has_index(connection)
+            share = 0.0
+            if indexed:
+                stored = connection.execute("SELECT COALESCE(SUM(size), 0) FROM answers").fetchone()[0]
+                mentions = connection.execute("SELECT COUNT(*) FROM saved_mentions").fetchone()[0]
+                share = max(0, used - stored) / mentions if mentions else 0.0
+            cursor = connection.execute(
+                "SELECT key, size, rowid, (SELECT COUNT(*) FROM saved_mentions m WHERE m.answer = answers.rowid) "
+                "FROM answers ORDER BY used_at, rowid" if indexed else
+                "SELECT key, size, rowid, 0 FROM answers ORDER BY used_at, rowid")
+            for key, size, rowid, mentioned in cursor:
                 doomed.append((key,))
-                freed += size
+                rowids.append(rowid)
+                freed += size + mentioned * share
                 if freed >= excess:
                     break
             cursor.close()
@@ -494,7 +777,12 @@ class SavedAnswers:
                 break
             connection.execute("BEGIN")
             try:
+                stale = self._stale(connection)
                 connection.executemany("DELETE FROM answers WHERE key = ?", doomed)
+                #? (2.0.0-player.56) what only they mentioned goes from the saved-search index with them
+                if indexed:
+                    saved_index.unindex(connection, rowids)
+                    self._in_step(connection, stale)
                 connection.execute("COMMIT")
             except sqlite3.Error:
                 #? a DELETE or COMMIT refused (another process's lock past the timeout, a full disk): out
@@ -504,6 +792,10 @@ class SavedAnswers:
                 raise
             dropped = True
         if dropped:
+            #? the full-text tables' deleted entries merged away, so their pages are freed too - a little work each
+            #? time, never a rewrite of the whole index
+            if self._has_index(connection):
+                connection.execute("INSERT INTO saved_words (saved_words, rank) VALUES ('merge', 64)")
             #? the freed pages back to the disk
             connection.execute("PRAGMA incremental_vacuum").fetchall()
 
@@ -529,9 +821,30 @@ class SavedAnswers:
             "problem": self.problem,
         }
 
+    def _search(self, words: str) -> dict | None:
+        def find(connection):
+            if not self._index_ready:
+                return None
+            return saved_index.search(connection, words)
+
+        return self._with_file(False, find)
+
     def _clear(self) -> dict:
         def empty(connection):
-            connection.execute("DELETE FROM answers")
+            connection.execute("BEGIN")
+            try:
+                connection.execute("DELETE FROM answers")
+                #? (2.0.0-player.56) the saved-search index with them - and nothing left to read into it
+                if self._index_ready:
+                    saved_index.clear_index(connection)
+                    connection.execute("INSERT OR REPLACE INTO meta (name, value) VALUES ('index_at', '0')")
+                    connection.execute("INSERT OR REPLACE INTO meta (name, value) VALUES ('index_to', '0')")
+                    #? nothing left either side: in step, whoever changed the answers before
+                    connection.execute("DELETE FROM meta WHERE name = ?", (saved_index.STALE,))
+                connection.execute("COMMIT")
+            except BaseException:
+                self._rolled_back(connection)
+                raise
             #? the file shrunk, not just emptied - Clear is also how it is made small again
             connection.execute("VACUUM")
 

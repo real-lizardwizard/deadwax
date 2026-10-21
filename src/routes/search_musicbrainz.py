@@ -196,6 +196,46 @@ async def artists(
         raise HTTPException(status_code=500, detail=f"Error searching MusicBrainz for artists: {e}")
 
 
+#? How long the words a saved search takes may be: the app's box (ARTIST_SEARCH_NAME_MAX, its 200 characters)
+SAVED_SEARCH_WORDS_MAX = ARTIST_SEARCH_NAME_MAX
+
+
+@router.get("/saved")
+async def saved(
+    request: Request,
+    words: str = Query(..., min_length=1, max_length=SAVED_SEARCH_WORDS_MAX),
+):
+    """
+    Search what's saved (2.0.0-player.56): the artists, albums and songs MusicBrainz's saved answers hold that
+    match the words typed - anything you have come across before, under any words, in milliseconds, MusicBrainz
+    asked nothing (src/saved_index.py says what is in the index and how it matches: every word, the last as a
+    prefix, accents folded, names and titles over credits).
+
+    The app's Search asks it beside MusicBrainz's own searches and draws what it finds first, MusicBrainz's answer
+    adding what it found below. Each kind in the shape of the route the app already draws it from - `artists` as
+    /artists, `albums` as /fully_search, `songs` as /songs - bounded to the app's page of each (SAVED_ARTISTS 10,
+    SAVED_ALBUMS 12, SAVED_SONGS 25 recordings) - and `credited`, as `albums`: the albums credited to exactly these
+    words, in studio order (SAVED_CREDITED 50), which is what the app draws when it reads the words as an artist. Shared by everyone signed in: MusicBrainz's data is nobody's own,
+    and nothing in the index says who looked it up.
+
+    `available` is false when nothing could be searched - saving off (MUSICBRAINZ_CACHE_MB 0), no file yet, an
+    index this SQLite can't keep, or one slow or broken (given up within a second, read off the event loop) -
+    never an error: Search then shows MusicBrainz's answer alone, as before.
+    """
+    empty = {"artists": {"matches": [], "count": 0}, "albums": {"release-groups": [], "count": 0},
+             "songs": {"recordings": [], "count": 0}, "credited": {"release-groups": [], "count": 0}}
+    if not words.strip():
+        return {**empty, "available": False}
+    disk = getattr(getattr(request.app.state, "musicbrainz_client", None), "cache", None)
+    disk = getattr(disk, "disk", None)
+    if disk is None:
+        return {**empty, "available": False}
+    found = await disk.search(words.strip())
+    if found is None:
+        return {**empty, "available": False}
+    return {**found, "available": True}
+
+
 #? The primary types MusicBrainz browse accepts. Validated here rather than passed straight
 #? through: an unrecognised value makes the whole browse return nothing, which would look
 #? exactly like an artist with no records.

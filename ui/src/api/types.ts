@@ -1423,3 +1423,18 @@ export interface ArtistSearchResponse {
   matches: ArtistMatch[]
   count: number | null
 }
+
+/**
+ * GET /search_musicbrainz/saved (2.0.0-player.56, search what's saved): what MusicBrainz's saved answers hold
+ * matching some words - each kind in the shape of the route the app already draws it from (/artists, /fully_search,
+ * /songs). `available` false: nothing could be searched (saving off, no file yet, an index slow or broken) - every
+ * list empty, and never an error: Search shows MusicBrainz's answer alone.
+ */
+export interface SavedSearchResponse {
+  artists: ArtistSearchResponse
+  albums: FullySearchResponse
+  songs: SongSearchResponse
+  /** the albums credited to exactly the words, in studio order (after review): what the artist reading draws */
+  credited?: FullySearchResponse
+  available: boolean
+}

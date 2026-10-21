@@ -448,3 +448,234 @@ browse refresh's pages taking no turn, its pages stamped one by one, live pages 
 stamp, a disk hit put back without its stamp, a cancel leaving `asking` up, `> budget` for `> 90%`,
 the lifespan not stopping the refreshes, not closing the file, detaching before closing - every one
 failed its test.
+
+### Search what's saved (2.0.0-player.56)
+
+James (2026-10-15), of the answers .54 keeps on disk: "and the cache includes songs and albums as well, correct? so i
+can search it all?" It held every answer, but keyed on the exact request, so new WORDS asked MusicBrainz again:
+search "portishead", open Dummy, type "glory box" - asked, though Glory Box is in Dummy's saved tracklist. He chose
+**a searchable index of everything saved** (not a MusicBrainz mirror, offered and not wanted now): Search finds
+anything you have come across before, under any words, at once, even with MusicBrainz down, and MusicBrainz's full
+answer fills in after. The spec is `deadwax-scratch/uplan/slice-saved-search.md`; built on .54 (the disk layer)
+and .55 (Search's one list, notes/app-requests-search-get.md).
+
+- **The index** (`src/saved_index.py`, pure but for the connection it's handed): tables in the saved answers' own
+  file, beside `answers`. `read_answer(endpoint, params, payload)` reads what an answer mentions from the key the
+  disk layer stores it under (`json.loads` of `ResponseCache.disk_key` - no signature changed): `release-group/`
+  (an album search, a discography page) its groups and their credits; `recording/` (a song search) its recordings,
+  each release they are on and its group, and the track; `release/` with `release-group` (an album's pressings,
+  with their tracklists) the group (each pressing's own, asked with release-groups, else the one asked for), the
+  pressings and every track's recording - **the songs on the album**, so a song seen only on a saved album page is
+  found by its title; `artist/` (a search) and `artist/<id>` (a page, or the aliases lookup) the artists. Nothing
+  else: one release looked up alone (`get_release`) has no group to put its songs on, and ping is never saved. A
+  payload of a shape it doesn't know reads as nothing.
+  - **Artists**: name, sort name, aliases, disambiguation, type, country, years - from searches and pages, and the
+    name, sort name and disambiguation every credit carries. **Albums**: title, types, first release date, the
+    credit as the app renders it (`artists.credit_name`, the Python twin of `release.ts` creditName) and the
+    credit itself, compact (`[name, joinphrase, id, artist name if not the credited one]` - an id is most of what a
+    credit costs). A song search's release-group carries no credit: the release's is kept **weakly** - it fills an
+    album nothing better has credited, never replaces one (a compilation's "Various Artists" never re-credits
+    Dummy). **Songs**: title, length, credit, and `pressings` - `{release n: [track number, length, title when not
+    the song's]}`, merged across answers whichever is read in first (a `union` field of `_upsert`: written as
+    merged, never kept back by an older `seen`). **Releases**: their album, status, date, country, their title and credit
+    only when not the album's. Pressings aren't rows Search lists.
+  - **One row per thing** (`id BLOB UNIQUE` - a UUID's 16 bytes, `stored_id`/`given_id`; `n INTEGER PRIMARY KEY
+    AUTOINCREMENT`); `_upsert`: the newest answer's fields win, one it doesn't carry (None) keeps the older's - a
+    credit's partial artist never wipes the aliases their page gave.
+  - **Mentions** (`saved_mentions(answer rowid, kind, thing n)`): a thing stays while a stored answer mentions it
+    and goes with the last one (`unindex`) - the trim, Clear, a refresh replacing an answer (its old rowid's
+    mentions dropped first, in the same transaction as the new answer and its own). A song's pressings naming a
+    release since gone simply join to nothing.
+  - **The words** (`saved_words`): ONE FTS5 table for the three kinds, `unicode61 remove_diacritics 2`,
+    CONTENTLESS with `contentless_delete=1` (SQLite 3.43+; the words live in the things' own rows), its rowid `n * 4
+    + kind`, no prefix index. Measured on the recorded answers: three self-content tables with `prefix='1 2 3'` took
+    256 KB where this takes 84; numbering things by a hash of their id (tried, to drop the id index) took two and a
+    half times the room in the full-text lists (their rowid deltas stopped being small), so AUTOINCREMENT n and the
+    16-byte id index it is. A trim merges a little (`'merge', 64`) so deleted words free their pages.
+  - SQLite without FTS5 (or before 3.43): the index can't be made - answers are saved as ever, Search finds nothing
+    saved, said once in the log (`_index_said`).
+- **Searching** (`search`): every word must match, the last as a prefix, each quoted (`match_expression` - nothing
+  typed is FTS5 syntax; a word all punctuation dropped); per kind, bm25 (`ARTIST_WEIGHTS` 10/4 - an artist's name
+  over the other names they go by; `TITLE_WEIGHTS` 10/2 - a title over its credit) over 100 candidates, then
+  `_lifted`: named exactly as typed first (an alias counts: "kanye west" lifts Ye), then starting with it, bm25's
+  order inside each. Björk was seventh by bm25 alone for "bjork" - her dozen spellings lengthen her other-names
+  column. Songs of one title: the one on the most pressings first (a song search's covers are saved too; "glory box"
+  means Portishead's). Bounded to the app's pages (10 artists, 12 albums, 25 recordings - `test_the_pages_are_the_apps_own`),
+  each answered in its own route's shape: `artist_match` (so `matched_as` is /artists' own), a search's release
+  group, a recording with `releases[]` as groupSongs reads them.
+- **Kept in step**: the index's pages count toward `MUSICBRAINZ_CACHE_MB` (`_used_bytes` is the file's). The trim
+  counted each answer's own bytes alone, which the index made a fraction of what dropping it frees - so it dropped
+  nearly every answer to free the excess (a test found 6 answers of 82 left in a 1 MB file); now each answer's share of the index is
+  counted by its mentions, at the file's own average per mention (`(used - answers' bytes) / mentions`), and the
+  loop measures again. Clear empties the index in the same transaction as the answers. `0`: no search (`enabled()`).
+- **The backfill**: `_ensure_index` (once per open, by real use - the settings' look only reads whether it's there)
+  makes the index in one transaction with `index_format`, `index_at` 0 and `index_to` the answers' last rowid; then
+  `_backfill_step` reads 25 answers or 256 KB at a time, each step in one transaction with how far it got, the next
+  queued BEHIND anything asked meanwhile (the worker is one thread, FIFO) - so a search waits for one step at most -
+  and says one line when done: "MusicBrainz's saved answers: N read into the saved-search index - Search finds what
+  they hold under any words now". `warm()` (the lifespan, after attaching) opens the file if it's there, so it starts
+  on the first start without waiting for a search; it never makes one.
+- **The route**: `GET /search_musicbrainz/saved?words=` (1-200 characters; a user's - test_logins' table),
+  `disk.search(words)` on the worker within READ_TIMEOUT_SECONDS (1 s), else `available: false` with every list
+  empty and one log line - never an error. Shared: the index says nothing of who asked.
+- **In Search** (`app/Search.tsx`, the rules in `lib/searchList.ts`):
+  - Asked as the words settle - in the library's timer, for words MusicBrainz is to be asked for (3+ characters, or
+    asked) - on Enter, and by askMusicBrainz; its own `latestOnly` (`savedRequests`), keyed by text, asked ONCE for
+    the words whatever it answered (given up or failed, it stays so until the words change - after review); the box
+    emptied calls it off.
+  - **The library's moment waits for it** (`savedSettled`) at most `SAVED_WAIT_MS` (400) from its ask; past that
+    it is given up for the words (`none`, called off) - a slow index means MusicBrainz alone - so a saved answer
+    never lands after moment 1 and Top results' early decision stays sound. A cost said plainly: Enter on words not
+    asked before now redraws a render or two later (after the saved answer, milliseconds) - search.sim's check
+    waits for it.
+  - **The pool** (`pool`'s `saved` block): what's saved, as the view reads the box (`savedFor` - only the kinds
+    MusicBrainz is asked for; under the ARTIST reading only albums credited to the artist - from the route's
+    `credited`, after review - the studio ones under the studio clause, studio-ordered, 12 at most; `shown` from the
+    library's index as drawn, none before it is in), deduped against the library as MusicBrainz's are (newArtists over saved + MusicBrainz's
+    together, so a library artist is brought in once and "answers to that name" counts both; heldUnlisted; newSongs);
+    MusicBrainz's answer less what's saved, by key (MusicBrainz id; a song's key). `sectionRows`: saved first among
+    MusicBrainz's rows, the preview's MusicBrainz cap over both. A held thing brought in by what's saved is in the
+    yours block as ever.
+  - **Top results**: `SOURCE` - yours 0, the store's 1, **saved 1.5**, MusicBrainz's 2 (and what each brought in, at
+    its own). The phantoms stay MusicBrainz's (source 2), so a saved candidate at a phantom's tier beats it: "glory
+    box" with nothing in the library decides Glory Box, Dummy, Portishead at the library's moment. The property
+    check (searchList.sim) runs 1,200 combinations with saved answers in hand: a decided prefix is always the real
+    answers' prefix - modelled, unlike .55's, with MusicBrainz answering only the kinds it is asked for (the artist
+    reading's songs). A relative made of what's saved is marked saved (`familyOf`, Family.saved).
+  - **Moment 2 and late kinds**: unchanged moments; a late kind's landing (`lateRows(pool, cap, drawn)`) leaves out
+    what its section already drew, each part's cap less what it drew (`drawnCounts`), so MusicBrainz's answer adds
+    only what isn't there, below - drawn in when last, folded when not - and when it adds nothing, *No more albums on
+    MusicBrainz for "…"* (`nothingMoreWords`), never the empty words.
+  - **The marks**: a saved row is MusicBrainz's row (`savedRow`: the same key, `saved: true`), its place "saved"
+    unless it says you have it; a tile's third line "Saved from MusicBrainz". The region: "Saved from MusicBrainz:
+    1 song." as the sections holding it are drawn, then "More from MusicBrainz: …" / "Nothing more from
+    MusicBrainz." **Away**: a failed slot under saved rows says *Saved - MusicBrainz is away.* (busy: *Saved -
+    MusicBrainz is busy.* - after review, to fit 320), the all-failed foot *MusicBrainz isn't answering just now - these are
+    what deadwax has saved from it.* (`savedAwayWords`); a refusal keeps its words.
+  - **Kind views**: what's saved after the view's library rows, as soon as they are, then MusicBrainz's states
+    below (asking line, failure - in the saved words when saved rows are drawn - or its rows less what's saved);
+    after review, MusicBrainz's rows held (the asking line) while what's saved is asked for the words, and what is
+    drawn kept in place (`kindArea`).
+  - With nothing saved for the words: today's draw exactly (search.sim's 315 earlier checks, unchanged but for the
+    Enter one waiting a settle).
+- **Measured** (2026-10-20, on answers recorded for this build - `work/saved56-builder/mb/answers/`, a request
+  every 1.2 s, 38 answers - each artist explored the app's way: their artist search, the studio clause, their page,
+  every page of their album discography, one album's pressings with tracks, one song search; added to ONE file in
+  turn, the file's used pages before and after): Portishead 44 KB of answers / 68 KB with the index, Radiohead 64 /
+  212, Tame Impala 44 / 72, Björk 108 / 200, Metallica 72 / 248 - **about 160 KB an artist on average, against 66
+  KB for the answers alone**, so 200 MB holds about 1,100 artists explored (about 2,700 before); the index grows with
+  a discography (Metallica's 539 albums, Radiohead's 405), less with songs. The empty index's tables: about 68 KB
+  once (17 pages of 4 KB: 98,304 bytes used with them, 28,672 without, measured after review). Searches on that file 0.7-4.7 ms; on a synthetic 100,000 albums and 12,000 songs (36 MB, a 24-word
+  vocabulary - every term common, the worst case for bm25) 11-25 ms, 68 ms for a one-letter prefix (asked only on
+  Enter); indexing about 180 answers a second on the worker.
+- **Tests** (as built; after review below): Python 3087 collected (3085 passed, 2 skipped; 51 more than .55's 3036): `tests/test_saved_search.py`
+  (51 - each answer kind read, one row and newest-wins, the weak credit, a song only on an album page, every word /
+  prefix / accents / quoting / no words, the exact lift and an alias's, title over credit, the most-released song,
+  the bounds, a refresh, the trim (its words and its share), the index's room, Clear, 0, no file, the backfill (once,
+  in steps, one line), a search between steps, no FTS5 said once, a slow search given up, the worker thread, the
+  route's shapes against /artists, /fully_search and /songs, its `available`, its bounds, the pages the app's) with
+  `tests/fixtures/saved/` (trimmed recordings); test_musicbrainz_disk_cache.py's tiny budgets raised to 512 KB (the
+  empty index is ~68 KB, more than all of 64 KB), its meta checks reading past `index_*`, the lifespan's order with
+  `warm` first; test_logins' row. Sims: `searchList.sim` (savedFor, studioGroup, the pool's blocks and dedupe, the
+  cap over both, lateRows' drawn, the sources, the brought, the Nirvanas, the early decision, the family marks, the
+  1,200-combination property, the words), `search.sim` (40 new: the library's moment, the mark and the tap, moment 2
+  and the region, a late kind drawn in below and folded with nothing new, away (all and one), nothing saved = today,
+  the artist reading, a saved artist's tap and dedupe, the Albums view, only the newest, given up, the box emptied,
+  the real client's path), `app-rules` and `whose` (five pins moved to the new code: the frozen `shown` less what's
+  saved, lateRows' call, the unmount's supersede list, heldUnlisted from both, the group place).
+  `work/saved56-builder/mut/mutate.py` breaks 60 rules one at a time in the worktree, its test run, the file put
+  back byte for byte (sha256 checked): 60 of 60 caught (the first pass caught 52 of 59; the missed seven - an alias's
+  exact lift, title over credit, the words unindexed, the weak credit, the backfill's steps, the guard on a superseded
+  saved answer, the box emptied - each got a test that fails without it).
+- **Real page** (my own deadwax on 8116 from this worktree, logins off, the disk cache ON in a scratch folder; my
+  stand-in Navidrome on 4547 over a hard-linked stub library with Third and not Dummy; fake slskd 5047; MusicBrainz
+  through my record-and-replay stand-in on 4548; headless Chromium as `deadwax.test`, plain http, 50 ms of round
+  trip; `work/saved56-builder/page/drive.cjs`, 16 checks, all passing): "portishead", Dummy opened (its tracklist);
+  deadwax restarted; "glory box" - Glory Box from Dummy Top results' first at 287 ms after the last key ("Song ·
+  Portishead · Dummy · saved"), then Dummy (saved) and Portishead (yours), before MusicBrainz's answer (sections at
+  2,237 ms), nothing moved, Songs led by the saved row; MusicBrainz away ("glory box!", words never asked): Top results
+  at 283 ms, the saved rows kept, each kind's place "MusicBrainz is busy - these are saved.", nothing moved; 320x568
+  nothing wider than the window, the mark whole; 1440x900 a saved tile's "Saved from MusicBrainz"; no console errors.
+  Live MusicBrainz: 40 requests for the recordings (38 answers, two 503s asked again after 3 s) and 6 through the
+  stand-in (each once).
+- **Verified after review**: the image's SQLite - `docker run python:3.14-slim` (the dockerfile's base, pulled
+  2026-10-20): SQLite 3.46.1, and `fts5(a, content='', contentless_delete=1, tokenize='unicode61 remove_diacritics
+  2')` made. **NOT verified**: a real file of months of answers being backfilled
+  (steps measured only on 31 answers); VoiceOver on the saved mark; logins on in a real page.
+- **Decisions this touches**, said plainly: Top results rank saved before MusicBrainz's answer (a new source between
+  the store's and MusicBrainz's); the library's moment waits for what's saved, at most 400 ms; a song search is no
+  longer the only way a MusicBrainz song shows under the free-text reading - a saved one shows without it; what
+  MusicBrainz's answer brings that is the same thing as a saved row isn't drawn (the saved row stands for it, as it
+  was saved - a renamed artist keeps its old name in that row until the saved answers refresh); and the default
+  200 MB holds about 1,100 artists explored where it held about 2,700.
+- **After review** (16 findings; each reproduced first - a test, a sim check or the code traced - and each fix has a
+  test or sim check that fails without it, `work/saved56-fixer/mut/mutate.py`):
+  - **A kind view moved what it drew** (two findings): its rows are drawn from what is in hand at every render, so a
+    saved answer landing after MusicBrainz's rows - asked again by a chip's tap, Enter or Try again after it had been
+    given up, or asked at the pause after a letter typed and taken back with Navidrome away - went ABOVE them,
+    taking MusicBrainz's copies away. Now what's saved is asked once for the words whatever it answered;
+    MusicBrainz's rows are held (the asking line) while it is being asked for the words - never once any is drawn;
+    and `kindArea` (lib/searchList.ts, pure) keeps each drawn row in its place and as what it was drawn as - a late
+    saved row goes at the foot, MusicBrainz's row of a thing saved stays MusicBrainz's, its line as it was.
+  - **The artist reading's albums**: the route took its 12 albums by bm25 before the app kept the artist's own, and
+    titles naming them fill the 12 first ("metallica" kept one album of a saved discography). The route now answers
+    `credited` too - the albums whose credit is exactly the words (`name_key`, foldName's Python twin, held to it
+    by the same names in test_saved_search and searchList.sim), found by their credit's words over up to 2,000
+    candidates, studio-ordered, 50 at most - and `savedFor` draws the artist reading's from it, studio-ordered, 12
+    at most. The section is still saved first, MusicBrainz's below: each block reads earliest first, not the whole
+    (Dummy yours, Third saved, Portishead MusicBrainz's) - said in finding-music.md.
+  - **An album you have drawn twice**: `shown` was worked out as the saved answer landed, before /library/owned had
+    answered. Now `savedFor` works it out from the index as it is drawn, and draws no saved album before the index
+    is in hand - waiting for it instead (as MusicBrainz's answers do, 1.5 s) would give what's saved up at 0.4 s on
+    a first /library/owned walking a sleeping array, the restart case it exists for.
+  - **The away words**: the slot's *MusicBrainz isn't answering - these are saved.* needed 280 px where a 375-wide
+    phone gives 266 and a 320 one 211 (measured: real theme/player/app CSS, Noto Sans 13 px, headless Chromium);
+    now *Saved - MusicBrainz is away.* (173 px) and *Saved - MusicBrainz is busy.* (170). The all-failed foot adds
+    "What's in your library is above." only when a drawn row isn't what's saved (it is true when a saved song's
+    artist is the library's: search.sim pins both).
+  - **Stopping during the backfill set the whole file aside**: a step queued behind the close reopened the file on
+    the old thread and queued the next on a NEW worker, whose use of the old connection raised ProgrammingError - a
+    DatabaseError, so "broken": renamed `.unreadable-…`. Now `close()` sets `_closing` (nothing queued, a queued step
+    does nothing; the next start goes on from `index_at`), and a ProgrammingError closes the connection, never sets
+    a file aside.
+  - **A rollback to .55 and forward again** left a stale index (things gone still found, new answers never indexed;
+    a count and the highest rowid can't tell - .55's Clear then one answer saved leaves both as they were). Now the
+    index's schema includes three triggers on `answers` (insert, delete, update of key or body) that mark the index
+    stale in meta for ANY writer; this version clears the mark in the same transaction as each change it keeps the
+    index in step with (`_in_step`) - unless it was there before (the trim on opening runs before the index is made
+    sure of) - and `_ensure_index` makes the index afresh and reads everything in again when the mark or a trigger
+    is missing, with one log line.
+  - **A read-only file couldn't be read**: making the index failed (BEGIN IMMEDIATE), and the file was closed for
+    it. Now the connection is kept for reads, Search finds nothing saved (said once), and the index is tried again
+    after RETRY_OPEN_SECONDS on the file opened afresh (a connection opened read-only stays so).
+  - **The index's own bookkeeping**: a song's pressings are a `union` field of `_upsert` (an older answer read in
+    after a newer one - the backfill's normal case - lost the pressings it added); songs are ordered by the pressings
+    that still join, worked out before the cap (a song's pressings keep the numbers of pressings gone with their
+    answer); an unreadable answer `_get` drops is unindexed in the same transaction.
+  - **Tests the docstrings claimed**: the artists and songs bounds, disambiguations answered, the settings' look
+    writing nothing, a track's own title, pressings oldest first and capped at 100, a pressing's title kept only
+    when not the album's, credit_name trimmed, each backfill's count its own, the trim's FTS merge.
+  - **Figures**: the empty index is ~68 KB (17 pages; the notes said 40, the tests' comments 110); the image's
+    SQLite checked (3.46.1, FTS5 with contentless_delete); the route added to docs/FRONTEND-MIGRATION.md's table.
+  - Tests after review: Python 3114 collected (3112 passed, 2 skipped; 27 more, test_saved_search.py 78);
+    searchList.sim +8 checks (kindArea, savedFor's index and `credited`, foldName's twin), search.sim 364 (+9: the
+    kind view's late saved answer, the hold, asked once - after an answer and after `available: false` - the foot
+    both ways). Mutations: 37 rules the fixes added or the review named broken one at a time, 37 caught (two missed
+    on the first pass - the credited name filter, asked once after nothing to search - each test strengthened).
+- **Second review** (4 findings, each reproduced first; `work/saved56-fixer2/mut/`):
+  - **A kind view moved its Try again**: the hold and `kindArea` covered MusicBrainz's rows, not its failure. With
+    Navidrome and MusicBrainz away, a letter typed and taken back drew the kept failure at once, then what's saved,
+    asked at the pause, landed ABOVE it - Try again a row lower under the finger; and a 503 back before what's saved
+    answered was drawn, then pushed down. Now the failure is held behind the asking line as the rows are (`mbHeld`
+    counts `failed` as `done`), and once drawn `kindArea` takes below for it (`problem`, kept while it is asked
+    again): a late saved row is drawn BELOW the failure (and below the asking line of its Try again), the failure's
+    words as they were. search.sim pins both ways, searchList.sim the pure rule.
+  - **The trim's `_in_step` untested**: the test's 60 "trimming" answers compressed to nothing and never trimmed.
+    Now their titles don't compress, the file is checked trimmed with no stale mark, and reopened before Clear.
+  - **The rollback test passed with the stale index kept**: .55's one answer after its Clear took rowid 1 again,
+    and reading it in took the old rowid-1 mentions (Dummy's) away by coincidence. Dummy's answer is now rowid 2;
+    and each trigger missing alone is shown to rebuild the index (three cases).
+  - **`credited`'s 50**: tested - 60 saved albums of one artist, the 50 earliest kept, saved in reverse order.
+  - Tests: Python 3118 collected (3116 passed, 2 skipped; test_saved_search.py 82); search.sim 371 (+7),
+    searchList.sim +2. Mutations: 9 rules broken one at a time, all caught (the failure's `problem` kept while asked
+    again is caught by searchList.sim alone).

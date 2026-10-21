@@ -1,0 +1,87 @@
+{
+ "about": "Recorded from MusicBrainz 2026-10-20 (deadwax 2.0.0-player.56's builder, a request every 1.2 s), trimmed to what the saved-search index reads. {endpoint, params} as the disk cache keys the answer.",
+ "endpoint": "artist/",
+ "params": {
+  "query": "(artist:\"Björk\" OR alias:\"Björk\")",
+  "fmt": "json",
+  "limit": 10
+ },
+ "payload": {
+  "count": 69,
+  "offset": 0,
+  "artists": [
+   {
+    "id": "87c5dedd-371d-4a53-9f7f-80522fb7f3cb",
+    "name": "Björk",
+    "sort-name": "Björk",
+    "type": "Person",
+    "country": "IS",
+    "disambiguation": null,
+    "life-span": {
+     "begin": "1965-11-21",
+     "ended": null
+    },
+    "score": 100,
+    "aliases": [
+     {
+      "name": "Βjörk"
+     },
+     {
+      "name": "Biork"
+     },
+     {
+      "name": "Bjцrk"
+     },
+     {
+      "name": "Björk Gudmundsdottir"
+     },
+     {
+      "name": "Bjørk"
+     },
+     {
+      "name": "Bj rk"
+     }
+    ]
+   },
+   {
+    "id": "9c17713b-14f7-47ee-b0ba-87802d186aab",
+    "name": "Brant Bjork",
+    "sort-name": "Bjork, Brant",
+    "type": "Person",
+    "country": "US",
+    "disambiguation": null,
+    "life-span": {
+     "begin": "1973-03-19",
+     "ended": null
+    },
+    "score": 75,
+    "aliases": [
+     {
+      "name": "Brant Bjork & the Operators"
+     },
+     {
+      "name": "Brant Bjork & the Bros"
+     }
+    ]
+   },
+   {
+    "id": "19a151ce-f7fa-4bf5-9abe-18964992cfcb",
+    "name": "Hera Björk",
+    "sort-name": "Hera Björk",
+    "type": "Person",
+    "country": "IS",
+    "disambiguation": null,
+    "life-span": {
+     "begin": "1972-03-29",
+     "ended": null
+    },
+    "score": 69,
+    "aliases": [
+     {
+      "name": "Hera Björk Þórhallsdóttir"
+     }
+    ]
+   }
+  ]
+ }
+}

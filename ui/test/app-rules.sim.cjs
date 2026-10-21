@@ -1013,7 +1013,8 @@ console.log('\nSearch: a song plays from the tap, with its album in hand; the ne
     [true, true, true, true])
   check('...and what MusicBrainz found is left out once, as it lands - never filtered again as the library\'s answer changes - and drawn from that',
     [/shown: notInLibrary\(groups, ownedNow\(\)\?\.index \?\? null\)/.test(askAlbums), /albums: albums \? \{ groups: albums\.groups, shown: albums\.shown \} : null/.test(search),
-      /albums\.musicbrainz = input\.albums\.shown\.map\(/.test(code(read('lib/searchList.ts')))],
+      //? (2.0.0-player.56) less what's saved, by id - MusicBrainz's answer adds only what isn't drawn above it
+      /albums\.musicbrainz = input\.albums\.shown\.filter\(\(group\) => !savedGroupIds\.has\(group\.id\)\)\s*\.map\(/.test(code(read('lib/searchList.ts')))],
     [true, true, true])
   const picker = code(read('app/PressingPicker.tsx'))
   check('the pressing list is brought into view as it opens, and focus going nowhere doesn\'t close it',
@@ -1097,7 +1098,7 @@ console.log('\nsong search (2.0.0-player.53): Songs on MusicBrainz, and the albu
     [true, true])
   //? (2.0.0-player.55) song53's fold for songs landing after the albums went: every kind late at moment 2 has a slot, and lands in it
   check('...a kind landing late lands in its slot - drawn in when its section is the last, folded when something is below - song53\'s songs-only fold gone',
-    [/const where = drawInOrFold\(kind, order\)/.test(search), /const landing = lateRows\(rows\[kind\], \[Math\.max\(0, cap\[0\] - libraryDrawn\), cap\[1\]\]\)/.test(search),
+    [/const where = drawInOrFold\(kind, order\)/.test(search), /const landing = lateRows\(rows\[kind\], \[Math\.max\(0, cap\[0\] - libraryDrawn\), Math\.max\(0, cap\[1\] - musicBrainzDrawn\)\], new Set\(section\.rows\.map\(\(row\) => row\.key\)\)\)/.test(search),
       /albumsShown|showSongs|app-song-slot|app-song-show/.test(search)],
     [true, true, false])
   check('...More songs through the same latestOnly, by offset, merged in, drawing only for the search it was asked for',
@@ -1108,7 +1109,7 @@ console.log('\nsong search (2.0.0-player.53): Songs on MusicBrainz, and the albu
   check('...every kind called off and emptied as the box empties or is cut back, and as the tab goes',
     [/setReady\(new Map\(\)\)\s*dropMusicBrainz\(\)/.test(search), /if \(musicBrainz === 'drop'\) dropMusicBrainz\(\)/.test(search),
       /function dropMusicBrainz\(\) \{\s*musicRequests\.supersede\(\)\s*artistRequests\.supersede\(\)\s*songRequests\.supersede\(\)\s*asked\.current = null\s*askedPlan\.current = null/.test(search),
-      /musicRequests\.supersede\(\)\s*artistRequests\.supersede\(\)\s*songRequests\.supersede\(\)\s*getRequests\.supersede\(\)/.test(search)],
+      /musicRequests\.supersede\(\)\s*artistRequests\.supersede\(\)\s*songRequests\.supersede\(\)\s*savedRequests\.supersede\(\)\s*getRequests\.supersede\(\)/.test(search)],
     [true, true, true, true])
   //? (2.0.0-player.55) Apple's order: Top results, then Artists, Albums, Songs - songs last now (step 7 drew them above the albums)
   check('...drawn in Apple\'s order - Top results, then Artists, Albums, Songs, each section labelled by its own heading',
@@ -1167,7 +1168,8 @@ console.log('\nsearch like Apple Music (2.0.0-player.55): one list, its rows sta
   //? James's held-groups decision extended (for him to confirm): an album you hold that search3 didn't list is brought in, at
   //? the end of its holder's block - marked, no Get, opening the album you have
   check('a held album search3 didn\'t list: brought in to the yours (or the store\'s) block, never MusicBrainz\'s - with no Get',
-    [/albums\.brought = heldUnlisted\(input\.albums\.groups, index, libraryAlbums\)/.test(list),
+    //? (2.0.0-player.56) what's saved's held albums brought in the same way, MusicBrainz's answer's after them
+    [/albums\.brought = heldUnlisted\(savedGroups, index, libraryAlbums\)/.test(list) && /albums\.brought\.push\(\.\.\.heldUnlisted\(groups, index, libraryAlbums\)/.test(list),
       /const ofHolder = \(who: 'yours' \| 'store'\) => \[\.\.\.kind\.library, \.\.\.kind\.brought\]\.filter\(\(each\) => each\.holder === who\)/.test(list),
       /if \(row\.type === 'group'\) \{\s*if \(groupHeld\(context\.index, row\.group\.id\)\) return null/.test(rows),
       /const openAnyGroup = \(group: ReleaseGroup\) => \(groupHeld\(owned\?\.index \?\? null, group\.id\) \? openGroup\(group\) : onOpenGroup\(group\)\)/.test(search)],

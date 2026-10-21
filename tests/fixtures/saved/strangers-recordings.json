@@ -1,0 +1,194 @@
+{
+ "about": "Recorded from MusicBrainz 2026-10-20 (deadwax 2.0.0-player.56's builder, a request every 1.2 s), trimmed to what the saved-search index reads. {endpoint, params} as the disk cache keys the answer.",
+ "endpoint": "recording/",
+ "params": {
+  "query": "recording:\"Strangers\" AND (artist:\"Portishead\" OR artistname:\"Portishead\")",
+  "fmt": "json",
+  "limit": 25
+ },
+ "payload": {
+  "count": 31,
+  "offset": 0,
+  "recordings": [
+   {
+    "id": "adf608b5-0d94-4b10-953f-82a5b29c8473",
+    "title": "Strangers",
+    "length": 351894,
+    "disambiguation": "",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead"
+      }
+     }
+    ],
+    "releases": [
+     {
+      "id": "e9ee365f-1144-4f53-9149-030c4bea982e",
+      "title": "Desolation Row",
+      "status": "Bootleg",
+      "date": null,
+      "country": null,
+      "artist-credit": [
+       {
+        "name": "Portishead",
+        "joinphrase": "",
+        "artist": {
+         "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+         "name": "Portishead",
+         "sort-name": "Portishead"
+        }
+       }
+      ],
+      "release-group": {
+       "id": "145bf2f3-90e9-33dc-ba03-b6a32debf14d",
+       "title": "Desolation Row",
+       "primary-type": "Album",
+       "secondary-types": [
+        "Live"
+       ]
+      },
+      "media": [
+       {
+        "position": 1,
+        "format": "CD",
+        "track-count": 12,
+        "track": [
+         {
+          "id": "b8080a63-b643-3492-9216-a4b79094f587",
+          "number": "12",
+          "title": "Strangers",
+          "length": 351894
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "b4b2a239-b4ae-4d42-a184-97046b5a46b0",
+    "title": "Strangers",
+    "length": null,
+    "disambiguation": "",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead"
+      }
+     }
+    ],
+    "releases": [
+     {
+      "id": "08f60241-3e0c-4275-939f-7505dfe50fd7",
+      "title": "An Evening With",
+      "status": "Bootleg",
+      "date": null,
+      "country": null,
+      "artist-credit": [
+       {
+        "name": "Portishead",
+        "joinphrase": "",
+        "artist": {
+         "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+         "name": "Portishead",
+         "sort-name": "Portishead"
+        }
+       }
+      ],
+      "release-group": {
+       "id": "fea6c4b4-3bb9-37da-b043-f091a03de52c",
+       "title": "An Evening With",
+       "primary-type": "Album",
+       "secondary-types": [
+        "Live"
+       ]
+      },
+      "media": [
+       {
+        "position": 1,
+        "format": null,
+        "track-count": 12,
+        "track": [
+         {
+          "id": "10137cd3-7a44-3f8d-b2d1-761afde0059b",
+          "number": "12",
+          "title": "Strangers"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "6ff954ee-ad47-45bd-98a8-fc92fd6f3f53",
+    "title": "Strangers",
+    "length": 362626,
+    "disambiguation": "live, 1997: New York",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead"
+      }
+     }
+    ],
+    "releases": [
+     {
+      "id": "d5868987-9d34-4a40-96e5-4dc9f77110d8",
+      "title": "Live at New York (1997)",
+      "status": "Bootleg",
+      "date": null,
+      "country": null,
+      "artist-credit": [
+       {
+        "name": "Portishead",
+        "joinphrase": "",
+        "artist": {
+         "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+         "name": "Portishead",
+         "sort-name": "Portishead"
+        }
+       }
+      ],
+      "release-group": {
+       "id": "2b632efe-e6cf-3a6c-bc0b-05383b513557",
+       "title": "Live at New York (1997)",
+       "primary-type": "Album",
+       "secondary-types": [
+        "Live"
+       ]
+      },
+      "media": [
+       {
+        "position": 1,
+        "format": null,
+        "track-count": 14,
+        "track": [
+         {
+          "id": "14645a97-a0f3-3394-9d34-e626e2856de9",
+          "number": "13",
+          "title": "Strangers",
+          "length": 362626
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

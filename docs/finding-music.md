@@ -155,10 +155,57 @@ Only the newest search is ever shown: an answer that arrives after you've typed 
 
 A search MusicBrainz was asked before is answered at once from deadwax's
 [saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections) (since
-2.0.0-player.54), after a restart too. And the app itself keeps the last 24 MusicBrainz answers it was
+2.0.0-player.54), after a restart too - and since 2.0.0-player.56 everything in them is searched under any
+words, [below](#what-deadwax-has-saved). And the app itself keeps the last 24 MusicBrainz answers it was
 given while the page is open, so words you searched a moment ago - "portishead third" cut back to
 "portishead", Back, a chip there and back - are drawn whole the moment your library answers, with nothing
 asked at all.
+
+### What deadwax has saved
+
+Everything MusicBrainz has answered deadwax - every search, artist page and discography, and every album page
+with all its pressings' tracklists - is kept on disk, and since 2.0.0-player.56 Search looks through all of it
+**under any words**, not only the words asked before: search "portishead" and open Dummy, and later "glory
+box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has been asked - after a restart too.
+
+- It's asked as the words settle, beside your library (for words MusicBrainz is asked for: 3 characters or
+  more, or **Search**), and answers in a few milliseconds. **Every word must match** - in a name or a title, or
+  in who it's by - the last one as you type it ("glory bo" finds Glory Box), accents aside ("bjork" finds
+  Björk). A name typed exactly comes first ("bjork": Björk before Hera Björk; "kanye west": Ye, who went by
+  it), words in the title before words only in the credit, and of songs with one title, the one on the most
+  pressings (Portishead's Glory Box before a cover). At most 10 artists, 12 albums and 25 recordings.
+- What it finds **leads each kind's MusicBrainz rows**, marked **saved** at the end of its line - a desktop
+  tile's third line says *Saved from MusicBrainz* - unless the line says you have it. It is the row
+  MusicBrainz's answer would draw, and does what that row does: an album opens its page, an artist theirs, a
+  song the albums it's on (in Top results the album it names, the song marked), and Get gets the same - and
+  those pages are saved answers too, so they open at once. MusicBrainz's own answer, when it lands, adds what
+  it found that isn't there yet **below** them: nothing drawn moves, and the same artist, album or song is
+  never shown twice. When it brings nothing new, a kind's place says *No more albums on MusicBrainz for
+  "…".* In a chip's view the same holds whatever answers first: something saved that turns up after
+  MusicBrainz's rows are drawn goes below them, and what's saved is looked up once for the words - a chip's
+  tap, **Search** or **Try again** asks MusicBrainz again, not it.
+- An album you have is left out of what's saved as it is out of MusicBrainz's rows. Until deadwax knows what
+  your library holds - the first look after deadwax restarts can take a while on a sleeping disk - saved
+  albums wait (saved artists and songs don't); MusicBrainz's albums come as ever.
+- In **Top results** what's saved ranks after yours (and, with logins on, the store's) and before
+  MusicBrainz's answer, so a saved match can be drawn the moment your library answers, and never moves after
+  - for "glory box": Glory Box, Dummy, Portishead, at once.
+- It shows only the kinds MusicBrainz is asked for, read as the box is read: an artist you have typed alone
+  ("portishead") shows their own saved albums - picked from every album of theirs that's saved, whatever
+  else the words find: the studio ones, as the line under them says, earliest first, at most 12 - and no
+  songs; a title and an artist you have ("roads portishead") no saved artists. (Saved first, then
+  MusicBrainz's: the two blocks each read earliest first, not the section as a whole.)
+- **When MusicBrainz is away** what's saved stays, with one line saying so: *MusicBrainz isn't answering just
+  now - these are what deadwax has saved from it.* (*MusicBrainz is busy just now - …* when it is shedding
+  searches; in a kind's place, short enough for a small phone, *Saved - MusicBrainz is away.* or *Saved -
+  MusicBrainz is busy.*), with **Try again**.
+- It's shared by everyone signed in: MusicBrainz's data is nobody's own, and nothing in it says who looked
+  something up. With nothing saved for the words the list is exactly as it was. Your library's moment waits
+  for it a little while at most (0.4 seconds); slower than that - a busy disk - it's left out for those words
+  and MusicBrainz's answer stands alone. `MUSICBRAINZ_CACHE_MB` set to `0` (nothing saved) turns it off.
+- What's saved is what MusicBrainz said when it was saved (a search is asked again after a week, the rest
+  after a month), so an artist renamed since, or an album added since, shows as it was until MusicBrainz's
+  own answer arrives - see [troubleshooting](troubleshooting.md#search-shows-an-old-name-or-misses-something-new).
 
 ### One list
 
@@ -166,7 +213,8 @@ asked at all.
   match** - an artist named what you typed, an album or song titled it (case, accents, brackets and a
   leading "The" aside) - before one that is **by the artist you typed** before one that only **starts
   with** it. When two are as exact, **yours comes before MusicBrainz's** (with logins on, yours before the
-  store's before MusicBrainz's). Then what the best match belongs to, as Apple pulls it in: for "glory box"
+  store's before MusicBrainz's), and [what deadwax has saved](#what-deadwax-has-saved) before MusicBrainz's
+  answer. Then what the best match belongs to, as Apple pulls it in: for "glory box"
   the song, then **Dummy**, then **Portishead**. Then one of each kind in turn. An artist you have, typed
   alone ("portishead"), is them first, then their albums and songs - their self-titled album is by them, not
   an exact match. Each row says what it is first: "Artist · 3 albums in your library", "Album · Portishead ·
@@ -305,9 +353,10 @@ all - so the list is drawn in steps that never move each other: **every row and 
 keeps its place until you do something; a later answer lands only below everything you can tap, or inside a
 place already drawn for it, one fixed height.**
 
-- As your library answers, Top results are drawn as far as your library can already tell (all three for
-  "portishead" or "roads"); a row still waiting on MusicBrainz keeps a place with a moving bar, and
-  *Asking MusicBrainz…* stands where the sections will go.
+- As your library answers, Top results are drawn as far as your library - and what deadwax has saved - can
+  already tell (all three for "portishead" or "roads", or "glory box" once Dummy's page is saved); a row
+  still waiting on MusicBrainz keeps a place with a moving bar, and *Asking MusicBrainz…* stands where the
+  sections will go.
 - When every kind MusicBrainz was asked for has answered - or a second and a half after it was asked,
   whichever is first - Top results are completed and the sections drawn, in one go.
 - A kind still out then gets a **place** at the end of its section, one fixed height, saying *Asking
@@ -326,7 +375,9 @@ When MusicBrainz is shedding searches (it often does, for a few minutes) a kind'
 busy just now - try again in a moment.*; when it isn't answering at all, *MusicBrainz isn't answering.* -
 each with its own **Try again**, which draws the list afresh for the same words and asks only what failed.
 When every kind failed, one block at the foot says so - *MusicBrainz isn't answering just now - it often goes
-away for a few minutes. What's in your library is above.* - with **Try again**. Pressing **Search** again (or
+away for a few minutes. What's in your library is above.* - with **Try again** (the last sentence only when
+something of your library is drawn above). Under rows
+[deadwax has saved](#what-deadwax-has-saved) the words say these are saved instead. Pressing **Search** again (or
 Enter in the desktop's field) does what Try again does. If MusicBrainz can't read
 what you typed as a search, it says *MusicBrainz couldn't read that search - try other words*, with no Try
 again (the same words would be refused again). A search gives up after three tries: about eight seconds

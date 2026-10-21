@@ -118,6 +118,8 @@ exports.fullySearch = (query, limit, releases, signal, offset, quick) => globalT
 exports.getReleaseGroup = (id, signal) => globalThis.__search.getReleaseGroup(id, signal)
 exports.searchSongs = (query, limit, signal, offset) => globalThis.__search.searchSongs(query, limit, signal, offset)
 exports.searchArtists = (name, limit, signal, offset) => globalThis.__search.searchArtists(name, limit, signal, offset)
+exports.searchSavedPath = real.searchSavedPath
+exports.searchSaved = (words, signal) => globalThis.__search.searchSaved(words, signal)
 `)
 //? You > Getting albums, asked as the tab shows; and the opener a chip's tap focuses
 fs.writeFileSync(path.join(OUT, 'app/useGetSettings.js'), `
@@ -199,7 +201,10 @@ async function answerOwned(answer) {
 const aborting = (d, signal) => {
   if (signal) signal.addEventListener('abort', () => { if (!globalThis.__search.abortRejects) return; const error = new Error('aborted'); error.name = 'AbortError'; d.reject(error) })
 }
-const asks = { owned: [], library: [], musicbrainz: [], artists: [], prefetch: [], pressings: [], songs: [], order: [], lists: [], yours: [] }
+const asks = { owned: [], library: [], musicbrainz: [], artists: [], prefetch: [], pressings: [], songs: [], order: [], lists: [], yours: [], saved: [] }
+//? what's saved (2.0.0-player.56): answered at once with nothing - every check before it is today's behaviour - unless a
+//? check says what it holds (`savedHolds`, by the words) or answers it by hand (`savedByHand`)
+const NOTHING_SAVED = { available: true, artists: { matches: [], count: 0 }, albums: { 'release-groups': [], count: 0 }, songs: { recordings: [], count: 0 } }
 globalThis.__search = {
   calls: [],
   settingsAsked: [],
@@ -233,6 +238,15 @@ globalThis.__search = {
     return d.promise
   },
   prefetchAlbum(id, keep) { const d = deferred(); asks.prefetch.push({ id, keep, ...d }); return d.promise },
+  savedHolds: null,
+  savedByHand: false,
+  searchSaved(words, signal) {
+    const d = deferred()
+    asks.saved.push({ words, signal, ...d })
+    aborting(d, signal)
+    if (!globalThis.__search.savedByHand) d.resolve(globalThis.__search.savedHolds?.(words) ?? NOTHING_SAVED)
+    return d.promise
+  },
   searchSongs(query, limit, signal, offset) {
     const d = deferred()
     asks.songs.push({ query, limit, signal, offset, ...d })
@@ -1021,6 +1035,9 @@ async function main() {
     check('...nothing asked of MusicBrainz at the pause', asks.order.at(-1) !== undefined, true)
     const mbBefore = asks.musicbrainz.length
     enter()
+    //? (2.0.0-player.56) what's saved is asked with it, and the fresh draw waits for its answer - milliseconds
+    await settle()
+    draw()
     check('Enter on words MusicBrainz hasn\'t been asked for: asked now, the list drawn afresh (its own moments)',
       [asks.musicbrainz.length - mbBefore, asks.musicbrainz.at(-1).query, kinds(), asking().length], [1, 'po', [], 1])
     asks.artists.at(-1).resolve(ARTISTS_NONE)
@@ -2449,6 +2466,393 @@ async function main() {
     asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
     await settle()
     draw()
+  }
+
+  console.log('\nsearch what\'s saved (2.0.0-player.56): saved rows first, MusicBrainz\'s added below, nothing moved')
+  {
+    //? what's saved, as /search_musicbrainz/saved answers it: each kind in its own route's shape
+    //? (`credited`: the albums credited to exactly the words, in studio order - what the artist reading draws)
+    const savedAnswer = ({ artists = [], groups = [], recordings = [], credited = [] } = {}) => ({ available: true, artists: { matches: artists, count: artists.length },
+      albums: { 'release-groups': groups, count: groups.length }, songs: { recordings, count: recordings.length }, credited: { 'release-groups': credited, count: credited.length } })
+    const PORTISHEAD_MATCH = { mbid: PID, name: 'Portishead', disambiguation: '', country: 'GB', type: 'Group', score: null, matched_as: 'Portishead' }
+    const theRip = recording('r-rip', 'The Rip', 'Portishead', PID, THIRD)
+    const RIP = `mb-song:${PID}\nthe rip`
+    const OTHER_RIP = `mb-song:${SOMEBODY}\nthe rip`
+    const nothing = { artists: [], albums: [], songs: [] }
+
+    await remount()
+    globalThis.__search.savedHolds = (words) => (words === 'the rip' ? savedAnswer({ recordings: [theRip] }) : null)
+    const from = await search('the rip', nothing)
+    check('asked as the words settle, beside the library - the box\'s words, once', asks.saved.filter((ask) => ask.words === 'the rip').length, 1)
+    check('the library\'s moment, MusicBrainz not yet asked: a song seen only on a saved album page is Top results\' first - its album and its artist after it (Apple\'s family)',
+      [topKeys(), find(byClass('app-search-top-place')).length, asking().length], [[`top:${RIP}`, `top:group:${THIRD.id}`, 'top:artist:ar1'], 0, 1])
+    check('...marked as saved - its place words, the facts as MusicBrainz\'s row says them', lineOf(rowButton(`top:${RIP}`)), 'Song · Portishead · Third · saved')
+    rowButton(`top:${RIP}`).props.onClick()
+    check('...and its tap is a MusicBrainz song\'s: its album, the song marked', songAlbums.at(-1), [{ id: THIRD.id, title: 'Third' }, ['r-rip']])
+    await advance(500)
+    const asked = newAsks(from)
+    check('MusicBrainz asked as ever at the pause - every kind', [asked.albums.length, asked.artists.length, asked.songs.length], [1, 1, 1])
+    asked.artists[0].resolve(ARTISTS_NONE)
+    asked.albums[0].resolve({ 'release-groups': [], count: 0 })
+    asked.songs[0].resolve({ recordings: [recording('r-rip2', 'The Rip', 'Portishead', PID, THIRD), recording('r-rip3', 'The Rip', 'Somebody', SOMEBODY, SOMEONE_ALBUM)], count: 2 })
+    await answerOwned(holding(DUMMY))
+    invariant('moment 2, what\'s saved in hand')
+    check('moment 2: Songs - what\'s saved first, then MusicBrainz\'s, its own take of the same song left out (by its key)',
+      [kinds(), keysOf('songs'), topKeys()], [['songs'], [RIP, OTHER_RIP], [`top:${RIP}`, `top:group:${THIRD.id}`, 'top:artist:ar1']])
+    check('...the region: what\'s saved, then what MusicBrainz added', said(), 'Saved from MusicBrainz: 1 song. More from MusicBrainz: 1 song.')
+    check('...the saved row a MusicBrainz row, marked; MusicBrainz\'s not', [lineOf(rowButton(RIP)), lineOf(rowButton(OTHER_RIP))], ['Portishead · 4:00 · Third · saved', 'Somebody · 4:00 · Somebody\'s Album'])
+
+    //? MusicBrainz's songs past the cap: the saved row drawn at the cap, MusicBrainz's landing below it - drawn in (last)
+    const late = await search('the rip', null)
+    asks.library.at(-1).resolve(nothing)
+    await settle()
+    draw()
+    check('(the same words again: the kept answers draw at once)', keysOf('songs'), [RIP, OTHER_RIP])
+    globalThis.__search.savedHolds = (words) => (words === 'rip portishead' ? savedAnswer({ recordings: [theRip], groups: [THIRD] }) : null)
+    const capped = await search('rip portishead', nothing)
+    await advance(500)
+    const cappedAsks = newAsks(capped)
+    //? (a title by an artist you have: no artists asked)
+    check('(a title by an artist you have: albums and songs asked, no artists)', [cappedAsks.albums.length, cappedAsks.artists.length, cappedAsks.songs.length], [1, 0, 1])
+    cappedAsks.albums[0].resolve({ 'release-groups': [THIRD, ROSELAND], count: 2 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    invariant('the cap, songs out')
+    check('at the cap, songs still out: Albums - Third (saved) first, then MusicBrainz\'s Roseland, Third once; Songs - the saved row, its slot under it',
+      [kinds(), keysOf('albums'), keysOf('songs'), slotText('songs')], [['artists', 'albums', 'songs'], [`group:${THIRD.id}`, `group:${ROSELAND.id}`], [RIP], 'Asking MusicBrainz…'])
+    check('...the region says what\'s saved as the sections draw', said(), 'Saved from MusicBrainz: 1 album, 1 song.')
+    cappedAsks.songs[0].resolve({ recordings: [recording('r-rip2', 'The Rip', 'Portishead', PID, THIRD), recording('r-rip3', 'The Rip', 'Somebody', SOMEBODY, SOMEONE_ALBUM)], count: 2 })
+    await answerOwned(holding(DUMMY))
+    invariant('songs landing after the cap')
+    check('MusicBrainz\'s songs land last: drawn in BELOW the saved row, nothing above moved, the same song never twice',
+      [keysOf('songs'), slotOf('songs')], [[RIP, OTHER_RIP], undefined])
+    void late
+
+    //? a late kind with something below: folded - and an answer adding nothing new says so, never "No albums on MusicBrainz"
+    globalThis.__search.savedHolds = (words) => (words === 'third portishead' ? savedAnswer({ groups: [THIRD], recordings: [theRip] }) : null)
+    const folded = await search('third portishead', nothing)
+    await advance(500)
+    const foldAsks = newAsks(folded)
+    foldAsks.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    await advance(1500)
+    check('(at the cap: Albums with the saved row and a slot, Songs below it)', [kinds(), keysOf('albums'), slotText('albums')], [['artists', 'albums', 'songs'], [`group:${THIRD.id}`], 'Asking MusicBrainz…'])
+    foldAsks.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    await answerOwned(holding(DUMMY))
+    invariant('albums landing with nothing new')
+    check('MusicBrainz\'s albums bring nothing that isn\'t drawn: its slot says so - never that MusicBrainz has none', [keysOf('albums'), slotText('albums')],
+      [[`group:${THIRD.id}`], 'No more albums on MusicBrainz for “third portishead”.'])
+
+    //? MusicBrainz away: what's saved stays, with one line saying so
+    globalThis.__search.savedHolds = (words) => (words === 'the rip live' ? savedAnswer({ recordings: [recording('r-ripl', 'The Rip Live', 'Portishead', PID, ROSELAND)] }) : null)
+    const gone = await search('the rip live', nothing)
+    await advance(500)
+    const goneAsks = newAsks(gone)
+    for (const ask of [...goneAsks.albums, ...goneAsks.artists, ...goneAsks.songs]) ask.reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
+    await answerOwned(holding(DUMMY))
+    invariant('MusicBrainz away')
+    check('MusicBrainz away, every kind: what\'s saved stays drawn, and one line says MusicBrainz isn\'t answering and these are what deadwax has saved',
+      [keysOf('songs'), text(find(byClass('app-search-foot'))[0]),
+        find((node) => node.type === 'button' && text(node) === 'Try again', find(byClass('app-search-foot'))[0]).length],
+      //? the whole line (after review) - "What's in your library is above." only because it is: the song's artist, Portishead,
+      //? is the library's (Top results' third)
+      [[`mb-song:${PID}\nthe rip live`], "MusicBrainz isn't answering just now - these are what deadwax has saved from it. What's in your library is above.Try again", 1])
+    check('...the region says it the same way', said().includes("MusicBrainz isn't answering - these are what deadwax has saved."), true)
+    //? (after review) nothing of the library's drawn - the artist isn't in it: the foot never says the library's is above
+    await remount({}, [])
+    const bare = await search('the rip live', nothing)
+    await advance(500)
+    const bareAsks = newAsks(bare)
+    for (const ask of [...bareAsks.albums, ...bareAsks.artists, ...bareAsks.songs]) ask.reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
+    await answerOwned(holding(DUMMY))
+    check('MusicBrainz away, only what\'s saved drawn (its artist not the library\'s): the foot one line - never "What\'s in your library is above."',
+      [topKeys().every((key) => key.startsWith('top:mb-') || key.startsWith('top:group:')), text(find(byClass('app-search-foot'))[0])],
+      [true, "MusicBrainz isn't answering just now - these are what deadwax has saved from it.Try again"])
+
+    //? one kind failing under a saved row while another answers: its slot says these are saved (a fresh Search: no Behind)
+    await remount()
+    globalThis.__search.savedHolds = (words) => (words === 'roseland portishead' ? savedAnswer({ groups: [ROSELAND], recordings: [recording('r-ros', 'Roseland Intro', 'Portishead', PID, ROSELAND)] }) : null)
+    const half = await search('roseland portishead', nothing)
+    await advance(500)
+    const halfAsks = newAsks(half)
+    //? (album-by-artist: albums and songs asked)
+    halfAsks.albums[0].reject(new MusicBrainzUnavailable('MusicBrainz is unreachable right now'))
+    //? (its own take of the saved song: MusicBrainz's answer holding nothing new for Songs)
+    halfAsks.songs[0].resolve({ recordings: [recording('r-ros2', 'Roseland Intro', 'Portishead', PID, ROSELAND)], count: 1 })
+    await answerOwned(holding(DUMMY))
+    check('one kind failing under its saved rows: its slot says MusicBrainz isn\'t answering and these are saved, with Try again',
+      [keysOf('albums'), slotText('albums')], [[`group:${ROSELAND.id}`], 'Saved - MusicBrainz is away.Try again'])
+
+    //? nothing saved for the words: today's behaviour exactly - the asks, the moments, the rows
+    await remount()
+    globalThis.__search.savedHolds = null
+    const plain = await search('third', { artists: [{ id: 'ar-teb', name: 'Third Eye Blind', albumCount: 2 }], albums: [], songs: [] })
+    check('nothing saved: the library\'s moment as before ("third": nothing early, only the asking line)', [top(), asking().length], [undefined, 1])
+    await advance(500)
+    const plainAsks = newAsks(plain)
+    plainAsks.artists[0].resolve(ARTISTS_NONE)
+    plainAsks.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
+    plainAsks.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('...and moment 2 as before - no row marked saved, the region as before', [topKeys(), kinds(), lineOf(rowButton(`group:${THIRD.id}`)), said()],
+      [[`top:group:${THIRD.id}`, 'top:artist:ar1', 'top:artist:ar-teb'], ['artists', 'albums'], 'Portishead · 2008', 'From MusicBrainz: 1 album.'])
+
+    //? the artist reading: only their albums, the studio ones (the line under them says so), saved artists by id once
+    globalThis.__search.savedHolds = (words) => (words === 'portishead' ? savedAnswer({
+      artists: [PORTISHEAD_MATCH],
+      groups: [ROSELAND, THIRD, { id: '00000000-0000-4000-8000-0000000000w1', title: 'Welcome to Portishead', 'primary-type': 'Album', 'first-release-date': '2003', 'artist-credit': [{ name: 'Somebody', artist: { id: SOMEBODY, name: 'Somebody' } }] }],
+      credited: [THIRD, ROSELAND],
+      recordings: [theRip],
+    }) : null)
+    const reading = await search('portishead', { artists: [P], albums: [ndDummy], songs: [] })
+    await advance(500)
+    const readingAsks = newAsks(reading)
+    readingAsks.artists[0].resolve(portisheadArtists)
+    readingAsks.albums[0].resolve(studio)
+    await answerOwned(holding(DUMMY))
+    check('an artist you have: Albums - yours, then what\'s saved of THEIRS that is a studio album (Third - not the live one, not somebody else\'s "Welcome to Portishead"), then MusicBrainz\'s',
+      keysOf('albums').slice(0, 3), ['album:nd-dummy', `group:${THIRD.id}`, `group:${studio['release-groups'].find((group) => group.title === 'Portishead').id}`])
+    check('...Third once, the studio line under them; no Songs (an artist\'s name alone asks none, so none saved drawn either)',
+      [keysOf('albums').filter((key) => key === `group:${THIRD.id}`).length, kinds()], [1, ['artists', 'albums']])
+    check('...their saved artist is the library\'s Portishead (by id): one row', keysOf('artists'), ['artist:ar1'])
+
+    //? a saved artist only MusicBrainz knows: its tap opens their page by mb:, MusicBrainz's copy of them never twice
+    const RADIOHEAD = radioheadArtists.matches[0]
+    globalThis.__search.savedHolds = (words) => (words === 'radiohead' ? savedAnswer({ artists: [{ ...RADIOHEAD }] }) : null)
+    const rh = await search('radiohead', nothing)
+    check('a saved artist nobody\'s library has: Top results\' first at the library\'s moment, marked saved', [topKeys()[0], lineOf(rowButton(`top:mb-artist:${RADIOHEAD.mbid}`)).endsWith('· saved')],
+      [`top:mb-artist:${RADIOHEAD.mbid}`, true])
+    rowButton(`top:mb-artist:${RADIOHEAD.mbid}`).props.onClick()
+    check('...its tap their page by mb: - a MusicBrainz artist\'s', mbArtists.at(-1), { mbid: RADIOHEAD.mbid, name: RADIOHEAD.name })
+    await advance(500)
+    const rhAsks = newAsks(rh)
+    rhAsks.artists[0].resolve(radioheadArtists)
+    rhAsks.albums[0].resolve({ 'release-groups': [], count: 0 })
+    rhAsks.songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    check('...MusicBrainz\'s answer holding them too: Artists - the saved row first, MusicBrainz\'s others after it, Radiohead once',
+      [keysOf('artists')[0], keysOf('artists').filter((key) => key === `mb-artist:${RADIOHEAD.mbid}`).length, keysOf('artists').length], [`mb-artist:${RADIOHEAD.mbid}`, 1, 2])
+
+    //? the Albums view: what's saved after the view's library rows, MusicBrainz's below it
+    await remount()
+    globalThis.__search.savedHolds = (words) => (words === 'third portishead' ? savedAnswer({ groups: [THIRD] }) : null)
+    const view = await search('third portishead', nothing)
+    await advance(500)
+    //? (album-by-artist, so All asked fielded albums and songs; the Albums view asks its own)
+    chip('Albums').props.onClick()
+    draw()
+    const viewAsks = newAsks(view)
+    asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
+    await settle()
+    draw()
+    check('the Albums view, MusicBrainz still out: what\'s saved drawn at once, the asking line under it',
+      [keysOf('albums'), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], [[`group:${THIRD.id}`], ['Asking MusicBrainz…']])
+    viewAsks.albums.at(-1).resolve({ 'release-groups': [THIRD, ROSELAND], count: 2 })
+    await answerOwned(holding(DUMMY))
+    check('...MusicBrainz\'s added below it, Third once', keysOf('albums'), [`group:${THIRD.id}`, `group:${ROSELAND.id}`])
+    chip('All').props.onClick()
+    draw()
+
+    //? only the newest answer draws; a slow one is given up and draws nothing - its answer landing even so (as one already
+    //? on its way when called off can), never drawn
+    globalThis.__search.savedByHand = true
+    globalThis.__search.savedHolds = null
+    globalThis.__search.abortRejects = false
+    type('the ri')
+    await advance(200)
+    const first = asks.saved.at(-1)
+    type('the rip')
+    await advance(200)
+    const second = asks.saved.at(-1)
+    check('a new text calls the old saved ask off (latestOnly)', [first.words, first.signal.aborted, second.words], ['the ri', true, 'the rip'])
+    first.resolve(savedAnswer({ recordings: [theRip] }))
+    asks.library.at(-1).resolve(nothing)
+    await settle()
+    draw()
+    check('...the library\'s moment waits for what\'s saved (asked, not answered): the old list stays', find(byClass('app-search-list'))[0]?.props['data-text'], 'third portishead')
+    await advance(399)
+    check('...for SAVED_WAIT_MS at most', find(byClass('app-search-list'))[0]?.props['data-text'], 'third portishead')
+    await advance(1)
+    check('...then it is given up: the list drawn without it (MusicBrainz alone) - the superseded answer drew nothing', [find(byClass('app-search-list'))[0]?.props['data-text'], topKeys(), second.signal.aborted],
+      ['the rip', [], true])
+    second.resolve(savedAnswer({ recordings: [theRip] }))
+    await settle()
+    draw()
+    check('...and its answer, landing after, draws nothing for these words', topKeys(), [])
+    globalThis.__search.abortRejects = true
+    //? the box emptied: what's saved called off with everything else
+    type('the ripper')
+    await advance(200)
+    const emptied = asks.saved.at(-1)
+    type('')
+    check('the box emptied: the saved ask still out called off', [emptied.words, emptied.signal.aborted], ['the ripper', true])
+    globalThis.__search.savedByHand = false
+
+    //? (after review) a kind view never moves what it drew: what's saved asked again after MusicBrainz's rows are drawn
+    //? (Navidrome away, a letter typed and taken back - the kept answer draws at once) lands BELOW them, never above;
+    //? MusicBrainz's row of a thing saved stays MusicBrainz's row, in its place, its line as it was
+    await remount({ status: down })
+    globalThis.__search.savedHolds = (words) => (words === 'zork live' ? savedAnswer({ groups: [THIRD] }) : null)
+    type('zork live')
+    await advance(200)
+    chip('Albums').props.onClick()
+    draw()
+    await advance(500)
+    asks.musicbrainz.at(-1).resolve({ 'release-groups': [ROSELAND, THIRD], count: 2 })
+    await answerOwned(holding(DUMMY))
+    check('(the Albums view, Navidrome away: what\'s saved first, MusicBrainz\'s below it, Third once)', keysOf('albums'), [`group:${THIRD.id}`, `group:${ROSELAND.id}`])
+    globalThis.__search.savedByHand = true
+    type('zork livex')
+    await advance(300)
+    type('zork live')
+    const drawnBack = keysOf('albums')
+    const linesBack = drawnBack.map((key) => lineOf(rowButton(key)))
+    check('...a letter typed and taken back: MusicBrainz\'s kept answer drawn at once, what\'s saved not asked for the words yet',
+      [drawnBack, asks.saved.at(-1).words], [[`group:${ROSELAND.id}`, `group:${THIRD.id}`], 'zork livex'])
+    await advance(200)
+    check('(what\'s saved asked again for the words, at the pause)', asks.saved.at(-1).words, 'zork live')
+    asks.saved.at(-1).resolve(savedAnswer({ groups: [THIRD, SOMEONE_ALBUM] }))
+    await settle()
+    draw()
+    check('...its answer landing after: nothing drawn moves or changes - Third MusicBrainz\'s row in its place, its line as it was; the new saved album BELOW',
+      [keysOf('albums'), drawnBack.map((key) => lineOf(rowButton(key))), lineOf(rowButton(`group:${SOMEONE_ALBUM.id}`)).endsWith('· saved')],
+      [[`group:${ROSELAND.id}`, `group:${THIRD.id}`, `group:${SOMEONE_ALBUM.id}`], linesBack, true])
+    //? asked once for the words: a chip's tap, Enter and Try again never ask it again (the review's first catch)
+    const savedAsks = asks.saved.length
+    chip('Songs').props.onClick()
+    draw()
+    chip('Albums').props.onClick()
+    draw()
+    enter()
+    await settle()
+    draw()
+    check('...what\'s saved asked once for the words: chip taps and Enter ask it nothing more', asks.saved.length, savedAsks)
+    globalThis.__search.savedByHand = false
+    chip('All').props.onClick()
+    draw()
+    //? ...and when it had nothing to search (no file yet, say: `available: false`), or was given up or failed, the same -
+    //? never asked again for the words (the review's first catch: asked again on a chip's tap, its late answer moved rows)
+    globalThis.__search.savedHolds = (words) => (words === 'zork gone' ? { ...savedAnswer(), available: false } : null)
+    type('zork gone')
+    await advance(200)
+    const goneOnce = asks.saved.filter((ask) => ask.words === 'zork gone').length
+    chip('Albums').props.onClick()
+    draw()
+    chip('Songs').props.onClick()
+    draw()
+    enter()
+    await settle()
+    draw()
+    chip('All').props.onClick()
+    draw()
+    check('...nothing to search for the words: asked once, never again by a chip\'s tap or Enter', [goneOnce, asks.saved.filter((ask) => ask.words === 'zork gone').length], [1, 1])
+
+    //? (after review) a kind view's own search3 answering before what's saved: MusicBrainz's rows held (the asking line)
+    //? until it has answered - SAVED_WAIT_MS at most - then drawn together, what's saved first
+    await remount()
+    globalThis.__search.savedHolds = (words) => (words === 'zork live' ? savedAnswer({ groups: [THIRD] }) : null)
+    const z = await search('zork live', nothing)
+    await advance(500)
+    newAsks(z).albums[0].resolve({ 'release-groups': [ROSELAND, THIRD], count: 2 })
+    newAsks(z).artists[0].resolve(ARTISTS_NONE)
+    newAsks(z).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).resolve(nothing)
+    await settle()
+    draw()
+    globalThis.__search.savedByHand = true
+    type('zork livex')
+    await advance(200)
+    type('zork live')
+    await advance(200)
+    for (const ask of asks.library.filter((each) => each.text === 'zork live').slice(-2)) ask.resolve(nothing)
+    await settle()
+    draw()
+    check('the view\'s library in, what\'s saved still asked: MusicBrainz\'s kept rows held - the asking line where they go',
+      [keysOf('albums'), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], [[], ['Asking MusicBrainz…']])
+    asks.saved.at(-1).resolve(savedAnswer({ groups: [THIRD] }))
+    await settle()
+    draw()
+    check('...what\'s saved in: drawn together, what\'s saved first, Third once', keysOf('albums'), [`group:${THIRD.id}`, `group:${ROSELAND.id}`])
+    globalThis.__search.savedByHand = false
+    chip('All').props.onClick()
+    draw()
+
+    //? (second review) MusicBrainz's FAILURE is held and kept as its rows are: drawn, a late saved answer goes BELOW it
+    //? (its Try again never moved down under the finger); still being asked for, the failure waits behind the asking line
+    const order = () => find((node) => byClass('app-search-problem')(node) || byClass('app-result')(node), sectionOf('app-search-albums'))
+      .map((node) => (byClass('app-search-problem')(node) ? 'PROBLEM' : 'row'))
+    await remount({ status: down })
+    globalThis.__search.savedHolds = (words) => (words === 'zork fail' ? savedAnswer({ groups: [THIRD] }) : null)
+    type('zork fail')
+    await advance(200)
+    chip('Albums').props.onClick()
+    draw()
+    await advance(500)
+    asks.musicbrainz.at(-1).reject(away())
+    await answerOwned(holding(DUMMY))
+    await settle()
+    draw()
+    check('(the Albums view, Navidrome and MusicBrainz away: what\'s saved, then the failure)', [order(), keysOf('albums')], [['row', 'PROBLEM'], [`group:${THIRD.id}`]])
+    globalThis.__search.savedByHand = true
+    type('zork failx')
+    await advance(300)
+    type('zork fail')
+    draw()
+    check('...a letter typed and taken back: the kept failure drawn at once, what\'s saved not asked for the words yet',
+      [order(), asks.saved.at(-1).words], [['PROBLEM'], 'zork failx'])
+    await advance(200)
+    check('(what\'s saved asked again for the words, at the pause - the failure still drawn)', [asks.saved.at(-1).words, order()], ['zork fail', ['PROBLEM']])
+    asks.saved.at(-1).resolve(savedAnswer({ groups: [THIRD] }))
+    await settle()
+    draw()
+    check('...its answer landing after: the failure and its Try again stay where they were, the saved album BELOW them',
+      [order(), keysOf('albums')], [['PROBLEM', 'row'], [`group:${THIRD.id}`]])
+    check('...the failure\'s words as they were drawn (nothing saved above it)', find(byClass('app-search-problem'), sectionOf('app-search-albums')).map(text).join(' ').includes('Saved -'), false)
+    globalThis.__search.savedByHand = false
+    chip('All').props.onClick()
+    draw()
+    //? ...and a failure in hand before what's saved has answered (the view's own search3 answering first): held behind
+    //? the asking line as MusicBrainz's rows are, then drawn together, what's saved first
+    await remount()
+    globalThis.__search.savedHolds = (words) => (words === 'zork held' ? savedAnswer({ groups: [THIRD] }) : null)
+    const zh = await search('zork held', nothing)
+    await advance(500)
+    newAsks(zh).albums[0].reject(away())
+    newAsks(zh).artists[0].resolve(ARTISTS_NONE)
+    newAsks(zh).songs[0].resolve({ recordings: [], count: 0 })
+    await answerOwned(holding(DUMMY))
+    chip('Albums').props.onClick()
+    draw()
+    asks.library.at(-1).resolve(nothing)
+    await settle()
+    draw()
+    globalThis.__search.savedByHand = true
+    type('zork heldx')
+    await advance(200)
+    type('zork held')
+    await advance(200)
+    for (const ask of asks.library.filter((each) => each.text === 'zork held').slice(-2)) ask.resolve(nothing)
+    await settle()
+    //? a failed answer isn't kept: the words back ask MusicBrainz again - and it fails again, before what's saved answers
+    newAsks(zh).albums[1].reject(away())
+    await settle()
+    draw()
+    check('MusicBrainz failing, the view\'s library in, what\'s saved still asked: no failure drawn yet - the asking line where it goes',
+      [asks.saved.at(-1).words, order(), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], ['zork held', [], ['Asking MusicBrainz…']])
+    asks.saved.at(-1).resolve(savedAnswer({ groups: [THIRD] }))
+    await settle()
+    draw()
+    check('...what\'s saved in: drawn with the failure, what\'s saved first', [order(), keysOf('albums')], [['row', 'PROBLEM'], [`group:${THIRD.id}`]])
+    globalThis.__search.savedByHand = false
+    chip('All').props.onClick()
+    draw()
+
+    //? the real client's address
+    check('the real client: /search_musicbrainz/saved?words=…', require(path.join(OUT, 'api/musicbrainz.real.js')).searchSavedPath('björk & co'), '/search_musicbrainz/saved?words=bj%C3%B6rk+%26+co')
+    await remount()
   }
 
   console.log('\nthe real MusicBrainz client (api/musicbrainz.ts): offsets past the first page only, `quick`, the artists, busy from the body')

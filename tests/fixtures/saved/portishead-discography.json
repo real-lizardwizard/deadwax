@@ -1,0 +1,184 @@
+{
+ "about": "Recorded from MusicBrainz 2026-10-20 (deadwax 2.0.0-player.56's builder, a request every 1.2 s), trimmed to what the saved-search index reads. {endpoint, params} as the disk cache keys the answer.",
+ "endpoint": "release-group/",
+ "params": {
+  "artist": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+  "inc": "artist-credits",
+  "fmt": "json",
+  "limit": 100,
+  "type": "album",
+  "offset": 0
+ },
+ "payload": {
+  "release-group-count": 49,
+  "release-group-offset": 0,
+  "release-groups": [
+   {
+    "id": "09f0d0fa-8d8d-3cb9-8422-1d7a6508423e",
+    "title": "Live Weisen 1998",
+    "primary-type": "Album",
+    "secondary-types": [
+     "Live"
+    ],
+    "first-release-date": "",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   },
+   {
+    "id": "145bf2f3-90e9-33dc-ba03-b6a32debf14d",
+    "title": "Desolation Row",
+    "primary-type": "Album",
+    "secondary-types": [
+     "Live"
+    ],
+    "first-release-date": "",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   },
+   {
+    "id": "14c123e7-33bc-313d-8f5f-c36d57d83c00",
+    "title": "Mysteries",
+    "primary-type": "Album",
+    "secondary-types": [
+     "Compilation"
+    ],
+    "first-release-date": "2002",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   },
+   {
+    "id": "163339ab-813b-3d29-bba8-e1d5acf63cab",
+    "title": "Third",
+    "primary-type": "Album",
+    "secondary-types": [],
+    "first-release-date": "2008-04-08",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   },
+   {
+    "id": "188a1c4a-20b8-3f40-aa64-09695d318e43",
+    "title": "Lowland Beats",
+    "primary-type": "Album",
+    "secondary-types": [
+     "Live"
+    ],
+    "first-release-date": "",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   },
+   {
+    "id": "196a7a58-ea83-38ee-b6b2-8db5f97c3ac6",
+    "title": "Trip-Hop Reconstruction",
+    "primary-type": "Album",
+    "secondary-types": [
+     "Compilation"
+    ],
+    "first-release-date": "1995",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   },
+   {
+    "id": "23684b6a-8231-4936-96de-de975b445445",
+    "title": "Portishead Remix Collection",
+    "primary-type": "Album",
+    "secondary-types": [
+     "Compilation"
+    ],
+    "first-release-date": "2002",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   },
+   {
+    "id": "254e9d58-8b7a-3d4f-ab3e-2e0c9a04c38e",
+    "title": "Live Chicago",
+    "primary-type": "Album",
+    "secondary-types": [
+     "Live"
+    ],
+    "first-release-date": "",
+    "artist-credit": [
+     {
+      "name": "Portishead",
+      "joinphrase": "",
+      "artist": {
+       "id": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+       "name": "Portishead",
+       "sort-name": "Portishead",
+       "disambiguation": ""
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -398,7 +398,7 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
   check('Search: its words, its artists\' counts, More\'s note and its MusicBrainz rows\' places, each by `personal`',
     [/const personal = hasLibrary\(\)\n {2}const words = searchWords\(personal\)\n/.test(search), /artistLine\(row\.artist\.albumCount, marks\.personal\)/.test(list),
       /morePageWords\(more\.added, more\.held, personal\)/.test(search),
-      /place: held \? groupPlace\(marks\.index, row\.group\.id, marks\.personal\) : ''/.test(list)],
+      /place: savedPlace\(row, held \? groupPlace\(marks\.index, row\.group\.id, marks\.personal\) : ''\)/.test(list)],
     [true, true, true, true])
   check('...and no half titles any more (2.0.0-player.55): one list in sections', [/words\.libraryTitle|words\.musicbrainzTitle/.test(search), /<h2 id="app-search-top"/.test(search)], [false, true])
   const artist = read('app/ArtistPage.tsx')
